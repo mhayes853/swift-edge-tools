@@ -1,27 +1,51 @@
-// swift-tools-version: 6.3
+// swift-tools-version: 6.2
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
 
 let package = Package(
-    name: "swift-needle",
-    products: [
-        // Products define the executables and libraries a package produces, making them visible to other packages.
-        .library(
-            name: "swift-needle",
-            targets: ["swift-needle"]
-        ),
-    ],
-    targets: [
-        // Targets are the basic building blocks of a package, defining a module or a test suite.
-        // Targets can depend on other targets in this package and products from dependencies.
-        .target(
-            name: "swift-needle"
-        ),
-        .testTarget(
-            name: "swift-needleTests",
-            dependencies: ["swift-needle"]
-        ),
-    ],
-    swiftLanguageModes: [.v6]
+  name: "swift-needle",
+  platforms: [
+    .macOS(.v14),
+    .iOS(.v17),
+    .tvOS(.v17),
+    .watchOS(.v10),
+    .visionOS(.v1)
+  ],
+  products: [
+    .library(name: "Needle", targets: ["Needle"])
+  ],
+  traits: [
+    .trait(name: "SwiftNeedleXGrammar", description: "XGrammar-powered structured generation."),
+    .default(enabledTraits: ["SwiftNeedleXGrammar"])
+  ],
+  dependencies: [
+    .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.18.7"),
+    .package(url: "https://github.com/pointfreeco/swift-custom-dump", from: "1.3.3"),
+    .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.31.3"),
+    .package(url: "https://github.com/mattt/swift-xgrammar", from: "0.1.0")
+  ],
+  targets: [
+    .target(
+      name: "Needle",
+      dependencies: [
+        .product(name: "MLX", package: "mlx-swift"),
+        .product(name: "MLXNN", package: "mlx-swift"),
+        .product(
+          name: "XGrammar",
+          package: "swift-xgrammar",
+          condition: .when(traits: ["SwiftNeedleXGrammar"])
+        )
+      ]
+    ),
+    .testTarget(
+      name: "NeedleTests",
+      dependencies: [
+        "Needle",
+        .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
+        .product(name: "CustomDump", package: "swift-custom-dump")
+      ]
+    )
+  ],
+  swiftLanguageModes: [.v6]
 )
