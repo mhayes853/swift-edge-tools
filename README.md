@@ -7,13 +7,17 @@ A runtime for [Cactus Needle](https://github.com/cactus-compute/needle) in pure 
 ```swift
 import Needle
 
-let modelURL = try await Needle.download(from: .cactusNeedleHuggingFace) { progress in
+let modelURL = try await NeedleMLX.download(from: .cactusNeedleMLXHuggingFace) { progress in
   print("Progress", progress)
 }
 
-let model = try Needle(from: modelURL)
+// Any of (start with MLX)
+let model = try NeedleMLX(from: modelURL)
+let model = try NeedleONNX(from: modelURL)
+let model = try NeedleCactus(from: modelURL)
+let model = try NeedleCoreML(from: modelURL)
 
-let toolDefinition = Needle.ToolDefinition(
+let toolDefinition = NeedleToolDefinition(
   name: "get_weather",
   arguments: toolSchema
 )
@@ -32,7 +36,8 @@ struct GetWeather: NeedleSession.Tool {
   }
 }
 
-let session = try NeedleSession(from: modelURL, tools: [GetWeather()])
+// Can also construct with NeedleCactus, NeedleONNX, etc.
+let session = try NeedleSession<NeedleMLX>(from: modelURL, tools: [GetWeather()])
 
 try await session.prefill(prompt: "What is the weather in ")
 

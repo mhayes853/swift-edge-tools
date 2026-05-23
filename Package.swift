@@ -17,9 +17,11 @@ let package = Package(
   ],
   traits: [
     .trait(name: "SwiftNeedleXGrammar", description: "XGrammar-powered structured generation."),
+    .trait(name: "SwiftNeedleMLX"),
     .default(enabledTraits: ["SwiftNeedleXGrammar"])
   ],
   dependencies: [
+    .package(url: "https://github.com/ml-explore/mlx-swift-lm", from: "3.31.3"),
     .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.18.7"),
     .package(url: "https://github.com/pointfreeco/swift-custom-dump", from: "1.3.3"),
     .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.31.3"),
@@ -29,8 +31,18 @@ let package = Package(
     .target(
       name: "Needle",
       dependencies: [
-        .product(name: "MLX", package: "mlx-swift"),
-        .product(name: "MLXNN", package: "mlx-swift"),
+        .product(name: "MLX", package: "mlx-swift", condition: .when(traits: ["SwiftNeedleMLX"])),
+        .product(name: "MLXNN", package: "mlx-swift", condition: .when(traits: ["SwiftNeedleMLX"])),
+        .product(
+          name: "MLXLLM",
+          package: "mlx-swift-lm",
+          condition: .when(traits: ["SwiftNeedleMLX"])
+        ),
+        .product(
+          name: "MLXLMCommon",
+          package: "mlx-swift-lm",
+          condition: .when(traits: ["SwiftNeedleMLX"])
+        ),
         .product(
           name: "XGrammar",
           package: "swift-xgrammar",
