@@ -30,6 +30,11 @@ extension BaseTestSuite {
               )
             )
           }
+
+          init(needleValue: NeedleCore.NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.name = try String(needleValue: _needleValue(object, forKey: "name"))
+          }
         }
 
         extension Person: NeedleCore.NeedleGenerable {
@@ -65,6 +70,11 @@ extension BaseTestSuite {
                 )
               )
             }
+
+            init(needleValue: NeedleCore.NeedleValue) throws {
+              let object = try _needleRequireObjectValue(needleValue)
+              self.name = try String(needleValue: _needleValue(object, forKey: "name"))
+            }
           }
         }
 
@@ -99,6 +109,11 @@ extension BaseTestSuite {
               )
             )
           }
+
+          init(needleValue: NeedleCore.NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.name = try String(needleValue: _needleValue(object, forKey: "name"))
+          }
         }
 
         extension Person: NeedleCore.NeedleGenerable {
@@ -131,6 +146,11 @@ extension BaseTestSuite {
                 required: ["name"]
               )
             )
+          }
+
+          init(needleValue: NeedleCore.NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.name = try String(needleValue: _needleValue(object, forKey: "name"))
           }
         }
 
@@ -165,6 +185,11 @@ extension BaseTestSuite {
               )
             )
           }
+
+          init(needleValue: NeedleCore.NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.firstName = try String(needleValue: _needleValue(object, forKey: "first_name"))
+          }
         }
 
         extension Person: NeedleCore.NeedleGenerable {
@@ -198,6 +223,11 @@ extension BaseTestSuite {
               )
             )
           }
+
+          init(needleValue: NeedleCore.NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.name = try String(needleValue: _needleValue(object, forKey: "display_name"))
+          }
         }
 
         extension Payload: NeedleCore.NeedleGenerable {
@@ -207,22 +237,27 @@ extension BaseTestSuite {
     }
 
     @Test
-    func `Auto Applies StreamParseableIgnored For NeedleIgnored`() {
+    func `Decodes Ignored Optional As Nil`() {
       assertMacro {
         """
         @NeedleGenerable
         struct Payload {
           @NeedleIgnored
-          var internalID: String
+          var internalID: String?
         }
         """
       } expansion: {
         """
         struct Payload {
-          var internalID: String
+          var internalID: String?
 
           static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
             .object(valueSchema: .object())
+          }
+
+          init(needleValue: NeedleCore.NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.internalID = nil
           }
         }
 
@@ -259,6 +294,11 @@ extension BaseTestSuite {
               )
             )
           }
+
+          init(needleValue: NeedleCore.NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.name = try String(needleValue: _needleValue(object, forKey: "display_name"))
+          }
         }
 
         extension Payload: NeedleCore.NeedleGenerable {
@@ -275,17 +315,22 @@ extension BaseTestSuite {
         struct Payload {
           @NeedleIgnored
           @StreamParseableIgnored
-          var internalID: String
+          var internalID: String?
         }
         """
       } expansion: {
         """
         struct Payload {
           @StreamParseableIgnored
-          var internalID: String
+          var internalID: String?
 
           static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
             .object(valueSchema: .object())
+          }
+
+          init(needleValue: NeedleCore.NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.internalID = nil
           }
         }
 
@@ -320,6 +365,11 @@ extension BaseTestSuite {
               )
             )
           }
+
+          init(needleValue: NeedleCore.NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.name = try String(needleValue: _needleValue(object, forKey: "name"))
+          }
         }
 
         extension Person: NeedleCore.NeedleGenerable {
@@ -352,6 +402,11 @@ extension BaseTestSuite {
                 required: ["name"]
               )
             )
+          }
+
+          init(needleValue: NeedleCore.NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.name = try String(needleValue: _needleValue(object, forKey: "name"))
           }
         }
 
@@ -389,6 +444,12 @@ extension BaseTestSuite {
               )
             )
           }
+
+          init(needleValue: NeedleCore.NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.confidence = try Optional<Double>(needleValue: _needleValue(object, forKey: "confidence"))
+            self.isVisible = try Optional<Bool>(needleValue: _needleValue(object, forKey: "isVisible"))
+          }
         }
 
         extension Payload: NeedleCore.NeedleGenerable {
@@ -425,6 +486,12 @@ extension BaseTestSuite {
                 required: ["tags", "metadata"]
               )
             )
+          }
+
+          init(needleValue: NeedleCore.NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.tags = try [String](needleValue: _needleValue(object, forKey: "tags"))
+            self.metadata = try [String: Int](needleValue: _needleValue(object, forKey: "metadata"))
           }
         }
 
@@ -673,6 +740,12 @@ extension BaseTestSuite {
               )
             )
           }
+
+          init(needleValue: NeedleCore.NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.title = try Optional<String>(needleValue: _needleValue(object, forKey: "title"))
+            self.count = try Optional<Int>(needleValue: _needleValue(object, forKey: "count"))
+          }
         }
 
         extension Payload: NeedleCore.NeedleGenerable {
@@ -752,6 +825,11 @@ extension BaseTestSuite {
               )
             )
           }
+
+          init(needleValue: NeedleCore.NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.values = try [[String]](needleValue: _needleValue(object, forKey: "values"))
+          }
         }
 
         extension Payload: NeedleCore.NeedleGenerable {
@@ -807,6 +885,11 @@ extension BaseTestSuite {
                 required: ["payload"]
               )
             )
+          }
+
+          init(needleValue: NeedleCore.NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.payload = try [String: [String: [String: Int]]](needleValue: _needleValue(object, forKey: "payload"))
           }
         }
 
@@ -880,6 +963,163 @@ extension BaseTestSuite {
           ┬────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
           ╰─ 🛑 @NeedleGuide(.string) can only be applied to properties of type String. Found 'values: Int'.
           var values: [[[Int]]]
+        }
+        """
+      }
+    }
+
+    @Test
+    func `Uses Default Value For Ignored Defaulted Property`() {
+      assertMacro {
+        """
+        @NeedleGenerable
+        struct Payload {
+          @NeedleIgnored
+          var internalID: String = "default"
+        }
+        """
+      } expansion: {
+        """
+        struct Payload {
+          var internalID: String = "default"
+
+          static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+            .object(valueSchema: .object())
+          }
+
+          init(needleValue: NeedleCore.NeedleValue) throws {
+            _ = try _needleRequireObjectValue(needleValue)
+          }
+        }
+
+        extension Payload: NeedleCore.NeedleGenerable {
+        }
+        """
+      }
+    }
+
+    @Test
+    func `Rejects Ignored Non Optional Property Without Default`() {
+      assertMacro {
+        """
+        @NeedleGenerable
+        struct Payload {
+          @NeedleIgnored
+          var internalID: String
+        }
+        """
+      } diagnostics: {
+        """
+        @NeedleGenerable
+        struct Payload {
+          @NeedleIgnored
+          ┬─────────────
+          ╰─ 🛑 @NeedleIgnored can only be applied to optional properties or properties with default values.
+          var internalID: String
+        }
+        """
+      }
+    }
+
+    @Test
+    func `Does Not Generate Needle Value Initializer When Already Declared`() {
+      assertMacro {
+        """
+        @NeedleGenerable
+        struct Payload {
+          var name: String
+
+          init(needleValue: NeedleValue) throws {
+            self.name = "custom"
+          }
+        }
+        """
+      } expansion: {
+        """
+        struct Payload {
+          var name: String
+
+          init(needleValue: NeedleValue) throws {
+            self.name = "custom"
+          }
+
+          static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+            .object(
+              valueSchema: .object(
+                properties: [
+                  "name": String.needleGenerationSchema
+                ],
+                required: ["name"]
+              )
+            )
+          }
+        }
+
+        extension Payload: NeedleCore.NeedleGenerable {
+        }
+        """
+      }
+    }
+
+    @Test
+    func `Initializes Nested NeedleGenerable Property`() {
+      assertMacro {
+        """
+        @NeedleGenerable
+        struct Payload {
+          var user: User
+        }
+
+        @NeedleGenerable
+        struct User {
+          var name: String
+        }
+        """
+      } expansion: {
+        """
+        struct Payload {
+          var user: User
+
+          static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+            .object(
+              valueSchema: .object(
+                properties: [
+                  "user": User.needleGenerationSchema
+                ],
+                required: ["user"]
+              )
+            )
+          }
+
+          init(needleValue: NeedleCore.NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.user = try User(needleValue: _needleValue(object, forKey: "user"))
+          }
+        }
+        struct User {
+          var name: String
+
+          static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+            .object(
+              valueSchema: .object(
+                properties: [
+                  "name": String.needleGenerationSchema
+                ],
+                required: ["name"]
+              )
+            )
+          }
+
+          init(needleValue: NeedleCore.NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.name = try String(needleValue: _needleValue(object, forKey: "name"))
+          }
+        }
+
+        extension Payload: NeedleCore.NeedleGenerable {
+        }
+
+        extension User: NeedleCore.NeedleGenerable {
         }
         """
       }

@@ -16,6 +16,7 @@ public enum NeedleGenerableMacro: ExtensionMacro, MemberMacro, MemberAttributeMa
     let schemaMetadata = Self.schemaMetadata(from: node)
     let accessModifier = Self.accessModifier(for: structDecl)
     let hasNeedleGenerationSchema = Self.hasExistingNeedleGenerationSchema(in: structDecl)
+    let hasNeedleValueInitializer = Self.hasExistingNeedleValueInitializer(in: structDecl)
     let modifierPrefix = Self.modifierPrefix(for: accessModifier)
 
     var members = [DeclSyntax]()
@@ -26,6 +27,15 @@ public enum NeedleGenerableMacro: ExtensionMacro, MemberMacro, MemberAttributeMa
           from: properties,
           modifierPrefix: modifierPrefix,
           schemaMetadata: schemaMetadata
+        )
+      )
+    }
+
+    if !hasNeedleValueInitializer {
+      members.append(
+        Self.needleValueInitializer(
+          from: properties,
+          modifierPrefix: modifierPrefix
         )
       )
     }
@@ -96,6 +106,15 @@ public enum NeedleGenerableMacro: ExtensionMacro, MemberMacro, MemberAttributeMa
         }
         return identifierPattern.identifier.text == "needleGenerationSchema"
       }
+    }
+  }
+
+  private static func hasExistingNeedleValueInitializer(in declaration: StructDeclSyntax) -> Bool {
+    declaration.memberBlock.members.contains { member in
+      guard let initializer = member.decl.as(InitializerDeclSyntax.self) else { return false }
+      let parameters = initializer.signature.parameterClause.parameters
+      guard parameters.count == 1, let parameter = parameters.first else { return false }
+      return parameter.firstName.text == "needleValue"
     }
   }
 
@@ -198,6 +217,41 @@ public enum NeedleGenerableMacro: ExtensionMacro, MemberMacro, MemberAttributeMa
       """
   }
 
+  private static func needleValueInitializer(
+    from properties: [StoredProperty],
+    modifierPrefix: String
+  ) -> DeclSyntax {
+    let assignments =
+      properties
+      .compactMap { property -> String? in
+        if property.isIgnored {
+          if property.hasDefaultValue {
+            return nil
+          }
+          return "self.\(property.name) = nil"
+        }
+
+        return
+          "self.\(property.name) = try \(property.initializerTypeName)(needleValue: _needleValue(object, forKey: \(Self.quotedStringLiteral(property.schemaKey))))"
+      }
+      .joined(separator: "\n")
+
+    if assignments.isEmpty {
+      return """
+        \(raw: modifierPrefix)init(needleValue: NeedleCore.NeedleValue) throws {
+          _ = try _needleRequireObjectValue(needleValue)
+        }
+        """
+    }
+
+    return """
+      \(raw: modifierPrefix)init(needleValue: NeedleCore.NeedleValue) throws {
+        let object = try _needleRequireObjectValue(needleValue)
+        \(raw: assignments)
+      }
+      """
+  }
+
   private static func accessModifier(for declaration: StructDeclSyntax) -> String? {
     declaration.modifiers
       .first { modifier in
@@ -285,7 +339,10 @@ extension NeedleGenerableMacro {
     let name: String
     let schemaKey: String
     let typeName: String
+    let initializerTypeName: String
     let isIgnored: Bool
+    let isOptional: Bool
+    let hasDefaultValue: Bool
     let schemaExpression: String?
   }
 
@@ -407,6 +464,14 @@ extension NeedleGenerableMacro {
       )
     }
     let schemaKey = propertySelection?.key ?? propertyName
+    let typeName = type.trimmedDescription
+    let parsedType = Self.parseTypeName(typeName)
+    let hasDefaultValue = variableDecl.bindings.contains { binding in
+      guard let identifierPattern = binding.pattern.as(IdentifierPatternSyntax.self) else {
+        return false
+      }
+      return identifierPattern.identifier.text == propertyName && binding.initializer != nil
+    }
 
     if isIgnored && needleGenerationSchemaPropertyAttribute != nil {
       if let conflictingAttribute = needleGenerationSchemaPropertyAttribute {
@@ -418,7 +483,14 @@ extension NeedleGenerableMacro {
       }
     }
 
-    let typeName = type.trimmedDescription
+    if isIgnored && needleGenerationSchemaPropertyAttribute == nil && !parsedType.isOptional
+      && !hasDefaultValue
+    {
+      if let ignoredAttribute {
+        Self.diagnoseInvalidNeedleIgnoredAttribute(in: ignoredAttribute, context: context)
+      }
+    }
+
     let overriddenSchemaExpression = Self.schemaExpression(
       for: propertySelection,
       propertyName: propertyName,
@@ -435,7 +507,10 @@ extension NeedleGenerableMacro {
       name: propertyName,
       schemaKey: schemaKey,
       typeName: typeName,
+      initializerTypeName: Self.initializerTypeName(for: typeName),
       isIgnored: isIgnored,
+      isOptional: parsedType.isOptional,
+      hasDefaultValue: hasDefaultValue,
       schemaExpression: schemaExpression
     )
   }
@@ -864,6 +939,14 @@ extension NeedleGenerableMacro {
       return String(typeName.dropLast())
     }
     return Self.optionalInnerType(in: typeName) ?? typeName
+  }
+
+  private static func initializerTypeName(for typeName: String) -> String {
+    let trimmed = typeName.replacingOccurrences(of: " ", with: "")
+    if trimmed.hasSuffix("?") {
+      return "Optional<\(String(trimmed.dropLast()))>"
+    }
+    return trimmed
   }
 
   private static func optionalInnerType(in typeName: String) -> String? {
@@ -1346,6 +1429,20 @@ extension NeedleGenerableMacro {
         node: attribute,
         message: MacroExpansionErrorMessage(
           "@NeedleIgnored cannot be combined with @NeedleGuide on the same property."
+        )
+      )
+    )
+  }
+
+  private static func diagnoseInvalidNeedleIgnoredAttribute(
+    in attribute: AttributeSyntax,
+    context: some MacroExpansionContext
+  ) {
+    context.diagnose(
+      Diagnostic(
+        node: attribute,
+        message: MacroExpansionErrorMessage(
+          "@NeedleIgnored can only be applied to optional properties or properties with default values."
         )
       )
     )

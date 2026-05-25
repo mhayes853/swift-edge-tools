@@ -4,7 +4,7 @@ import NeedleCore
 
 /// Generates ``NeedleGenerable`` support for a struct.
 @attached(extension, conformances: NeedleGenerable)
-@attached(member, names: named(needleGenerationSchema))
+@attached(member, names: named(needleGenerationSchema), named(init))
 @attached(memberAttribute)
 public macro NeedleGenerable(
   title: String? = nil,
@@ -80,6 +80,8 @@ public struct _NeedleGuideSchema {
   public static func custom(_ schema: NeedleGenerationSchema) -> Self { Self() }
 }
 
+@inlinable
+@inline(__always)
 public func _needleMergeGenerationSchema(
   _ schema: NeedleGenerationSchema,
   title: String? = nil,
@@ -95,9 +97,17 @@ public func _needleMergeGenerationSchema(
   return .object(object)
 }
 
+@inlinable
+@inline(__always)
 public func _needleRequireObjectValue(_ value: NeedleValue) throws -> [String: NeedleValue] {
   switch value {
   case .object(let object): object
   default: throw NeedleValueTypeError(expected: .object, received: value.type)
   }
+}
+
+@inlinable
+@inline(__always)
+public func _needleValue(_ object: [String: NeedleValue], forKey key: String) -> NeedleValue {
+  object[key] ?? .null
 }
