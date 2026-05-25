@@ -5,10 +5,14 @@
 // MARK: - NeedleGenerable
 
 /// A type that can generate a Needle generation schema description of itself.
-public protocol NeedleGenerable {
+public protocol NeedleGenerable: ConvertibleFromNeedleValue {
   /// The Needle generation schema describing this type.
   static var needleGenerationSchema: NeedleGenerationSchema { get }
+}
 
+// MARK: - ConvertibleFromNeedleValue
+
+public protocol ConvertibleFromNeedleValue {
   /// Creates this type from a ``NeedleValue``.
   init(needleValue: NeedleValue) throws
 }
@@ -201,7 +205,9 @@ extension Array: NeedleGenerable where Element: NeedleGenerable {
   public static var needleGenerationSchema: NeedleGenerationSchema {
     .array(items: .schemaForAll(Element.needleGenerationSchema))
   }
+}
 
+extension Array: ConvertibleFromNeedleValue where Element: ConvertibleFromNeedleValue {
   public init(needleValue: NeedleValue) throws {
     guard case .array(let array) = needleValue else {
       throw NeedleValueTypeError(expected: .array, received: needleValue.type)
@@ -215,7 +221,10 @@ where Key == String, Value: NeedleGenerable {
   public static var needleGenerationSchema: NeedleGenerationSchema {
     .object(additionalProperties: Value.needleGenerationSchema)
   }
+}
 
+extension Dictionary: ConvertibleFromNeedleValue
+where Key == String, Value: ConvertibleFromNeedleValue {
   public init(needleValue: NeedleValue) throws {
     guard case .object(let object) = needleValue else {
       throw NeedleValueTypeError(expected: .object, received: needleValue.type)
@@ -228,7 +237,9 @@ extension Optional: NeedleGenerable where Wrapped: NeedleGenerable {
   public static var needleGenerationSchema: NeedleGenerationSchema {
     .object(anyOf: [Wrapped.needleGenerationSchema, .null()])
   }
+}
 
+extension Optional: ConvertibleFromNeedleValue where Wrapped: ConvertibleFromNeedleValue {
   public init(needleValue: NeedleValue) throws {
     switch needleValue {
     case .null:

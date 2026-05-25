@@ -26,7 +26,7 @@ let toolDefinition = NeedleToolDefinition(
 let response = try model.invoke(messages: [], tools: [toolDefinition])
 print(response.messages, response.toolCalls)
 
-struct GetWeather: NeedleSession.Tool {
+struct GetWeather: NeedleTool {
   @NeeldeGenerable
   struct Input {
     let city: String
@@ -38,19 +38,22 @@ struct GetWeather: NeedleSession.Tool {
 }
 
 // Can also construct with NeedleCactus, NeedleONNX, etc.
-let session = try NeedleSession<NeedleMLX>(from: modelURL, tools: [GetWeather()])
+let session = try NeedleSession<NeedleMLX>(from: modelURL)
 
-try await session.prefill(prompt: "What is the weather in ")
+try await session.prefill(prompt: "What is the weather in ", tools: [GetWeather()])
 
-let response = try await session.invoke(prompt: "What is the weather in San Francisco?")
+let response = try await session.invoke(
+  prompt: "What is the weather in San Francisco?", 
+  tools: [GetWeather()]
+)
 print(response) // [String]
 
-let stream = try await session.stream(prompt: "What is the weather in San Francisco?")
+let stream = try await session.stream(prompt: "What is the weather in San Francisco?", tools: [GetWeather()])
 for try await token in stream {
   print(token.stringValue, token.id)
 }
 
-struct GetPopulation: NeedleSession.Tool {
+struct GetPopulation: NeedleTool {
   @NeedleGenerable
   struct Input {
     let city: String
@@ -62,8 +65,11 @@ struct GetPopulation: NeedleSession.Tool {
 }
 
 // Dynamic
-let session = try NeedleSession(from: modelURL, tools: [GetWeather(), GetPopulation()])
-let response = try await session.invoke(prompt: "What is the weather in San Francisco?")
+let session = try NeedleSession<NeedleMLX>(from: modelURL)
+let response = try await session.invoke(
+  prompt: "What is the weather in San Francisco?", 
+  tools: [GetWeather(), GetPopulation()]
+)
 print(response) // NeedleSession.DynamicToolInvocations
 
 let weatherResult = response[0].result(of: GetWeather.self) // Result<NeedleToolInvocation<GetWeather>, any Error>?
@@ -80,18 +86,20 @@ enum SessionTools {
 // Macro Generates
 // @NeedleStaticToolCollectionCase(GetWeather(/* Custom args */)) on case if one wants custom configuration
 extension SessionTools {
-  static let tools: [any NeedleSession.Tool] = [
-    GetWeather(),
-    GetPopulation()
-  ]
+  static let tools: [any NeedleTool] = [GetWeather(), GetPopulation()]
 
-  enum Output {
+  enum Output: NeedleStaticToolsCollectionOutput {
     case getWeather(GetWeather.Output)
     case getPopulation(GetPopulation.Output)
+
+    // Generates getter func body...
   }
 }
 
-let session = try NeedleSession(from: modelURL, staticCollection: SessionTools.self)
-let response = try await session.invoke(prompt: "What is the weather in San Francisco?")
+let session = try NeedleSession<NeedleMLX>(from: modelURL)
+let response = try await session.invoke(
+  prompt: "What is the weather in San Francisco?", 
+  tools: SessionTools.self
+)
 print(response) // NeedleSession.StaticToolInvocations<SessionTools.Output>
 ```
