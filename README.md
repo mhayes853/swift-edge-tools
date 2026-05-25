@@ -27,7 +27,7 @@ let response = try model.invoke(messages: [], tools: [toolDefinition])
 print(response.messages, response.toolCalls)
 
 struct GetWeather: NeedleSession.Tool {
-  @JSONSchema
+  @NeeldeGenerable
   struct Input {
     let city: String
   }
@@ -51,7 +51,7 @@ for try await token in stream {
 }
 
 struct GetPopulation: NeedleSession.Tool {
-  @JSONSchema
+  @NeedleGenerable
   struct Input {
     let city: String
   }
@@ -66,11 +66,8 @@ let session = try NeedleSession(from: modelURL, tools: [GetWeather(), GetPopulat
 let response = try await session.invoke(prompt: "What is the weather in San Francisco?")
 print(response) // NeedleSession.DynamicToolInvocations
 
-let weatherResponse = response[0].output(of: GetWeather.self) // String?
-let weatherInput = response[0].input(of: GetWeather.self) // GetWeather.Input?
-
-let populationResponse = response[0].output(of: GetPopulation.self) // Int?
-let populationInput = response[0].input(of: GetPopulation.self) // GetPopulation.Input?
+let weatherResult = response[0].result(of: GetWeather.self) // Result<NeedleToolInvocation<GetWeather>, any Error>?
+let populationResult = response[0].output(of: GetPopulation.self) // Result<NeedleToolInvocation<GetPopulation>, any Error>?
 
 // Static
 
