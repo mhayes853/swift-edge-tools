@@ -16,6 +16,7 @@ let model = try NeedleMLX(from: modelURL)
 let model = try NeedleONNX(from: modelURL)
 let model = try NeedleCactus(from: modelURL)
 let model = try NeedleCoreML(from: modelURL)
+let model = try NeedleCoreAI(from: modelURL) // WWDC Rumors
 
 let toolDefinition = NeedleToolDefinition(
   name: "get_weather",
