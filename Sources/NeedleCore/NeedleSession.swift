@@ -5,28 +5,28 @@ public final class NeedleSession<Engine: NeedleEngine>: Sendable {
     false
   }
 
-  public init(engine: sending Engine) {
+  public init(engine: sending Engine, grammarEngine: sending Engine.GrammarEngine) {
 
   }
 
-  public func prefill(prompt: String, tools: sending [any NeedleTool]) async throws {
+  public func prefill(tools: sending [any NeedleTool], prompt: String) async throws {
 
   }
 
-  public func prefill(prompt: String, tools: (some NeedleStaticToolsCollection).Type) async throws {
+  public func prefill(tools: (some NeedleStaticToolsCollection).Type, prompt: String) async throws {
 
   }
 
   public func invoke(
-    prompt: String,
-    tools: sending [any NeedleTool]
+    tools: sending [any NeedleTool],
+    with prompt: String
   ) async throws -> NeedleDynamicToolCalls {
     fatalError()
   }
 
   public func invoke<Collection: NeedleStaticToolsCollection>(
-    prompt: String,
-    tools: Collection.Type
+    tools: Collection.Type,
+    with prompt: String,
   ) async throws -> NeedleStaticToolCalls<Collection> {
     fatalError()
   }
@@ -63,15 +63,15 @@ extension NeedleSessionStream: AsyncSequence {
 
 extension NeedleSession {
   public func stream(
-    prompt: String,
-    tools: sending [any NeedleTool]
+    tools: sending [any NeedleTool],
+    with prompt: String
   ) -> NeedleSessionStream<NeedleDynamicToolCalls> {
     fatalError()
   }
 
   public func stream<Collection: NeedleStaticToolsCollection>(
-    prompt: String,
-    tools: Collection.Type
+    tools: Collection.Type,
+    with prompt: String
   ) -> NeedleSessionStream<NeedleStaticToolCalls<Collection>> {
     fatalError()
   }
