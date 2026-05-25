@@ -2,6 +2,10 @@
 
 public typealias NeedleToolCallOf<Tool: NeedleTool> = NeedleToolCall<Tool.Input, Tool.Output>
 
+// MARK: - NeedleRawToolCall
+
+public typealias NeedleRawToolCall = NeedleToolCall<NeedleValue, NeedleValue>
+
 // MARK: - NeedleToolCall
 
 public struct NeedleToolCall<Input: ConvertibleFromNeedleValue, Output> {

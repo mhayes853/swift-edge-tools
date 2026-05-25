@@ -13,8 +13,16 @@ public protocol NeedleGenerable: ConvertibleFromNeedleValue {
 // MARK: - ConvertibleFromNeedleValue
 
 public protocol ConvertibleFromNeedleValue {
+  associatedtype NeedleConversionFailure: Error
+
   /// Creates this type from a ``NeedleValue``.
-  init(needleValue: NeedleValue) throws
+  init(needleValue: NeedleValue) throws(NeedleConversionFailure)
+}
+
+extension NeedleValue: ConvertibleFromNeedleValue {
+  public init(needleValue: NeedleValue) {
+    self = needleValue
+  }
 }
 
 // MARK: - Scalar Types
