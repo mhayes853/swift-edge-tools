@@ -10,12 +10,12 @@ public protocol NeedleEngine {
     tools: [NeedleToolDefinition],
     matcher: GrammarEngine.Matcher,
     onToken: (NeedleToken) -> Void
-  ) throws -> NeedleEngineCompletion
+  ) throws -> NeedleEngineGeneration
 }
 
-// MARK: - NeedleEngineCompletion
+// MARK: - NeedleEngineGeneration
 
-public struct NeedleEngineCompletion: Hashable, Sendable {
+public struct NeedleEngineGeneration: Hashable, Sendable {
   public let prefillMetrics: NeedlePrefillMetrics
   public let decodeMetrics: NeedleDecodeMetrics
   public let toolCalls: [NeedleRawToolCall]

@@ -1,7 +1,7 @@
 // MARK: - NeedleGrammarBitmask
 
 public struct NeedleGrammarBitmask: Hashable, Sendable {
-  private var elements: [Int]
+  private var elements: [Int32]
 
   public init() {
     self.elements = []

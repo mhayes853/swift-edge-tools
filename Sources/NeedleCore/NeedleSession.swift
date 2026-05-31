@@ -8,7 +8,11 @@ public final class NeedleSession<Engine: NeedleEngine>: Sendable {
   public init(engine: sending Engine, grammarEngine: sending Engine.GrammarEngine) {
 
   }
+}
 
+// MARK: - Prefill
+
+extension NeedleSession {
   @discardableResult
   public func prefill(
     tools: sending [any NeedleTool],
@@ -24,18 +28,34 @@ public final class NeedleSession<Engine: NeedleEngine>: Sendable {
   ) async throws -> NeedlePrefillMetrics {
     fatalError()
   }
+}
 
-  public func invoke(
+// MARK: - Generate
+
+public struct NeedleSessionDynamicGeneration: Sendable {
+  public let prefillMetrics: NeedlePrefillMetrics
+  public let decodeMetrics: NeedleDecodeMetrics
+  public let toolCalls: NeedleDynamicToolCalls
+}
+
+public struct NeedleSessionStaticGeneration<Collection: NeedleStaticToolsCollection> {
+  public let prefillMetrics: NeedlePrefillMetrics
+  public let decodeMetrics: NeedleDecodeMetrics
+  public let toolCalls: NeedleStaticToolCalls<Collection>
+}
+
+extension NeedleSession {
+  public func generate(
     tools: sending [any NeedleTool],
     with prompt: String
-  ) async throws -> NeedleDynamicToolCalls {
+  ) async throws -> NeedleSessionDynamicGeneration {
     fatalError()
   }
 
-  public func invoke<Collection: NeedleStaticToolsCollection>(
+  public func generate<Collection: NeedleStaticToolsCollection>(
     tools: Collection.Type,
     with prompt: String,
-  ) async throws -> NeedleStaticToolCalls<Collection> {
+  ) async throws -> NeedleSessionStaticGeneration<Collection> {
     fatalError()
   }
 }
