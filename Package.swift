@@ -53,7 +53,8 @@ let package = Package(
           package: "swift-xgrammar",
           condition: .when(traits: ["SwiftNeedleXGrammar"])
         )
-      ]
+      ],
+      swiftSettings: [.enableExperimentalFeature("LifetimeDependence")]
     ),
     .macro(
       name: "NeedleMacros",
