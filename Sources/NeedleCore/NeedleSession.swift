@@ -9,12 +9,20 @@ public final class NeedleSession<Engine: NeedleEngine>: Sendable {
 
   }
 
-  public func prefill(tools: sending [any NeedleTool], prompt: String) async throws {
-
+  @discardableResult
+  public func prefill(
+    tools: sending [any NeedleTool],
+    prompt: String
+  ) async throws -> NeedlePrefillMetrics {
+    fatalError()
   }
 
-  public func prefill(tools: (some NeedleStaticToolsCollection).Type, prompt: String) async throws {
-
+  @discardableResult
+  public func prefill(
+    tools: (some NeedleStaticToolsCollection).Type,
+    prompt: String
+  ) async throws -> NeedlePrefillMetrics {
+    fatalError()
   }
 
   public func invoke(
