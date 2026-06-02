@@ -18,15 +18,15 @@ public protocol NeedleEngine {
 public struct NeedleEngineGeneration: Hashable, Sendable {
   public let prefillMetrics: NeedlePrefillMetrics
   public let decodeMetrics: NeedleDecodeMetrics
-  public let toolCalls: [NeedleRawToolCall]
+  public let tokens: [NeedleToken]
 
   public init(
     prefillMetrics: NeedlePrefillMetrics,
     decodeMetrics: NeedleDecodeMetrics,
-    toolCalls: [NeedleRawToolCall]
+    tokens: [NeedleToken]
   ) {
     self.prefillMetrics = prefillMetrics
     self.decodeMetrics = decodeMetrics
-    self.toolCalls = toolCalls
+    self.tokens = tokens
   }
 }

@@ -20,7 +20,7 @@ let package = Package(
   traits: [
     .trait(name: "SwiftNeedleXGrammar", description: "XGrammar-powered structured generation."),
     .trait(name: "SwiftNeedleMLX"),
-    .default(enabledTraits: ["SwiftNeedleXGrammar"])
+    .default(enabledTraits: ["SwiftNeedleXGrammar", "SwiftNeedleMLX"])
   ],
   dependencies: [
     .package(url: "https://github.com/ml-explore/mlx-swift-lm", from: "3.31.3"),
