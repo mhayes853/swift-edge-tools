@@ -29,7 +29,7 @@ extension NeedleGrammarBitmask: MutableCollection {
   @inlinable
   @inline(__always)
   public subscript(position: Index) -> Bool {
-    get { Int((self.storage[position / 32] & (1 << (position % 32)))) != 0 }
+    get { (self.storage[position / 32] & (1 << (position % 32))) != 0 }
     set {
       let index = position / 32
       let mask = 1 &<< Int32(position % 32)
