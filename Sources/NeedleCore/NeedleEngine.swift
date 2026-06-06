@@ -3,6 +3,8 @@
 public protocol NeedleEngine {
   associatedtype GrammarEngine: NeedleGrammarEngine
 
+  var grammarEngine: GrammarEngine { get }
+
   func prefill(prompt: String, tools: [NeedleToolDefinition]) throws -> NeedlePrefillMetrics
 
   func generate(

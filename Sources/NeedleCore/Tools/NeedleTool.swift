@@ -39,4 +39,8 @@ public struct NeedleToolDefinition: Hashable, Sendable, Codable {
     self.description = description
     self.arguments = arguments
   }
+
+  public func normalized() -> Self {
+    self
+  }
 }

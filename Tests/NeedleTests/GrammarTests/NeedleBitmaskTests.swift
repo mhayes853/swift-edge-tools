@@ -14,6 +14,12 @@ struct `NeedleBitmask tests` {
   }
 
   @Test
+  func `Count`() {
+    let mask = NeedleGrammarBitmask()
+    expectNoDifference(mask.count, 8192)
+  }
+
+  @Test
   func `Set Bool Basics`() {
     var mask = NeedleGrammarBitmask()
 

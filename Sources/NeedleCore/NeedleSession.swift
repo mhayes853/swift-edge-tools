@@ -5,7 +5,7 @@ public final class NeedleSession<Engine: NeedleEngine>: Sendable {
     false
   }
 
-  public init(engine: sending Engine, grammarEngine: sending Engine.GrammarEngine) {
+  public init(engine: sending Engine) {
 
   }
 }
