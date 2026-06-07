@@ -6,7 +6,7 @@
   import IssueReporting
 
   @Suite(.serialized)
-  struct `NeedleMLX tests` {
+  struct `NeedleMLXEnegine tests` {
     private let engine: NeedleMLXEngine<AlwaysGrammarEngine>
 
     init() throws {

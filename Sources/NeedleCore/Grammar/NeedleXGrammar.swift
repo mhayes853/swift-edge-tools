@@ -19,14 +19,14 @@
 
   extension NeedleXGrammarEngine {
     public struct Matcher: NeedleGrammarMatcher {
-      let matcher: Grammar.Matcher
+      fileprivate let matcher: Grammar.Matcher
 
       public func bitmask() -> NeedleGrammarBitmask {
         NeedleGrammarBitmask()
       }
 
-      public func accept(token: NeedleToken) {
-        self.matcher.accept(Int32(token.id))
+      public mutating func accept(tokenId: Int) {
+        self.matcher.accept(Int32(tokenId))
       }
     }
   }
