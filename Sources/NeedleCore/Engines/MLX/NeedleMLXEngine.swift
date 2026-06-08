@@ -6,7 +6,7 @@
 
   // MARK: - NeedleMLX
 
-  public struct NeedleMLXEngine<GrammarEngine: NeedleGrammarEngine>
+  public final class NeedleMLXEngine<GrammarEngine: NeedleGrammarEngine>
   where GrammarEngine.Matcher: NeedleGrammarMatcher {
     public init(from url: URL) throws {
     }
