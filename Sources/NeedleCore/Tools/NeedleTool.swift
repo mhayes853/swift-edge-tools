@@ -41,6 +41,8 @@ public struct NeedleToolDefinition: Hashable, Sendable, Codable {
   }
 
   public func normalized() -> Self {
-    self
+    var definition = self
+    definition.name = self.name.snakeCased()
+    return definition
   }
 }
