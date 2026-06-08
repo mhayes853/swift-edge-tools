@@ -19,8 +19,16 @@ let package = Package(
   ],
   traits: [
     .trait(name: "SwiftNeedleXGrammar", description: "XGrammar-powered structured generation."),
-    .trait(name: "SwiftNeedleMLX"),
-    .default(enabledTraits: ["SwiftNeedleXGrammar", "SwiftNeedleMLX"])
+    .trait(
+      name: "SwiftNeedleSentencepiece",
+      description: "Sentencepiece tokenizer implementation."
+    ),
+    .trait(
+      name: "SwiftNeedleMLX",
+      description: "MLX Support.",
+      enabledTraits: ["SwiftNeedleSentencepiece"]
+    ),
+    .default(enabledTraits: ["SwiftNeedleXGrammar", "SwiftNeedleMLX", "SwiftNeedleSentencepiece"])
   ],
   dependencies: [
     .package(url: "https://github.com/ml-explore/mlx-swift-lm", from: "3.31.3"),
@@ -52,10 +60,12 @@ let package = Package(
           name: "XGrammar",
           package: "swift-xgrammar",
           condition: .when(traits: ["SwiftNeedleXGrammar"])
-        )
+        ),
+        .target(name: "Sentencepiece", condition: .when(traits: ["SwiftNeedleSentencepiece"]))
       ],
       swiftSettings: [.enableExperimentalFeature("LifetimeDependence")]
     ),
+    .binaryTarget(name: "Sentencepiece", path: "bin/sentencepiece.xcframework.zip"),
     .macro(
       name: "NeedleMacros",
       dependencies: [

@@ -67,7 +67,7 @@
     private func caches(
       from caches: [any KVCache]
     ) -> [(selfCache: any KVCache, crossCache: any KVCache)] {
-      Array(zip(caches, caches.dropFirst()))
+      stride(from: 0, to: caches.count, by: 2).map { (caches[$0], caches[$0 + 1]) }
     }
   }
 
@@ -76,7 +76,7 @@
   extension NeedleMLXModel {
     public static func input(
       from prompt: NeedlePrompt,
-      using tokenizer: NeedleTokenizer
+      using tokenizer: NeedleSentencepieceTokenizer
     ) throws -> LMInput {
       let tokens = try MLXArray(tokenizer.encodeToTokenIds(text: prompt.formatted()))
       return LMInput(text: LMInput.Text(tokens: tokens))
