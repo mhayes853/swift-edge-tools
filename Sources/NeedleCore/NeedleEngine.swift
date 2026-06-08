@@ -5,14 +5,15 @@ public protocol NeedleEngine {
 
   var grammarEngine: GrammarEngine { get }
 
-  func prefill(prompt: String, tools: [NeedleToolDefinition]) throws -> NeedlePrefillMetrics
+  func prefill(prompt: NeedlePrompt) throws -> NeedlePrefillMetrics
 
   func generate(
-    prompt: String,
-    tools: [NeedleToolDefinition],
+    prompt: NeedlePrompt,
     matcher: GrammarEngine.Matcher,
     onToken: (NeedleToken) -> Void
   ) throws -> NeedleEngineGeneration
+
+  func reset()
 }
 
 // MARK: - NeedleEngineGeneration

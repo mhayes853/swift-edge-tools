@@ -11,21 +11,19 @@
     public init(from url: URL) throws {
     }
 
-    public func prefill(
-      prompt: String,
-      tools: [NeedleToolDefinition]
-    ) throws -> NeedlePrefillMetrics {
+    public func prefill(prompt: NeedlePrompt) throws -> NeedlePrefillMetrics {
       fatalError()
     }
 
     public func generate(
-      prompt: String,
-      tools: [NeedleToolDefinition],
+      prompt: NeedlePrompt,
       matcher: GrammarEngine.Matcher,
       onToken: (NeedleToken) -> Void
     ) throws -> NeedleEngineGeneration {
       fatalError()
     }
+
+    public func reset() {}
   }
 
   // MARK: - XGrammar

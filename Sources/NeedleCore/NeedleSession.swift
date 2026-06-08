@@ -5,7 +5,7 @@ public final class NeedleSession<Engine: NeedleEngine>: Sendable {
     false
   }
 
-  public init(engine: sending Engine) {
+  public init(engine: sending Engine, instructions: String) {
 
   }
 }
@@ -27,6 +27,13 @@ extension NeedleSession {
     prompt: String
   ) async throws -> NeedlePrefillMetrics {
     fatalError()
+  }
+}
+
+// MARK: - Reset
+
+extension NeedleSession {
+  public func reset() {
   }
 }
 
