@@ -4,7 +4,7 @@
   import Testing
   import MLX
 
-  @Suite
+  @Suite(.enabledIfXcode())
   struct `NeedleGrammarLogitsProcessor tests` {
     @Test
     func `Filters Masked Tokens`() {

@@ -5,7 +5,7 @@
   import SnapshotTesting
   import IssueReporting
 
-  @Suite(.serialized)
+  @Suite(.serialized, .enabledIfXcode())
   struct `NeedleMLXEnegine tests` {
     private let engine: NeedleMLXEngine<AlwaysGrammarEngine>
 
