@@ -76,9 +76,9 @@
   extension NeedleMLXModel {
     public static func input(
       from prompt: NeedlePrompt,
-      using tokenizer: NeedleSentencepieceTokenizer
+      using tokenizer: borrowing NeedleSentencepieceTokenizer
     ) throws -> LMInput {
-      let tokens = try MLXArray(tokenizer.encodeToTokenIds(text: prompt.formatted()))
+      let tokens = try MLXArray(tokenizer.encode(text: prompt.formatted()))
       return LMInput(text: LMInput.Text(tokens: tokens))
     }
   }

@@ -87,7 +87,8 @@ let package = Package(
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
         .product(name: "CustomDump", package: "swift-custom-dump")
       ],
-      exclude: ["NeedleGenerationSchemaTests/__Snapshots__"]
+      exclude: ["NeedleGenerationSchemaTests/__Snapshots__"],
+      resources: [.copy("Resources")]
     )
   ],
   swiftLanguageModes: [.v6]
