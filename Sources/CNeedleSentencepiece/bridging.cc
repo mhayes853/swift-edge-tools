@@ -11,11 +11,9 @@
 
 #include <sys/stat.h>
 
-namespace {
-    struct NeedleSPHandle {
-        std::unique_ptr<sentencepiece::SentencePieceProcessor> processor;
-    };
-}
+struct NeedleSPHandle {
+    std::unique_ptr<sentencepiece::SentencePieceProcessor> processor;
+};
 
 extern "C" {
 
