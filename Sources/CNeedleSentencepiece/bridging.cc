@@ -120,6 +120,11 @@ int needle_sp_tokenizer_pad_token_id(needle_sp_tokenizer_t tokenizer) {
     return handle->processor->pad_id();
 }
 
+size_t needle_sp_tokenizer_vocab_size(needle_sp_tokenizer_t tokenizer) {
+    const auto* handle = static_cast<NeedleSPHandle*>(tokenizer);
+    return !handle ? 0 : handle->processor->GetPieceSize();
+}
+
 int needle_sp_tokenizer_tokens_to_ids(
     needle_sp_tokenizer_t tokenizer,
     const char** tokens,
@@ -153,7 +158,6 @@ int needle_sp_tokenizer_ids_to_tokens(
         }
         const auto& token = handle->processor->IdToPiece(id);
         std::strncpy(tokens[i], token.c_str(), token.size());
-        tokens[i][token.size()] = '\0';
     }
     return 0;
 }

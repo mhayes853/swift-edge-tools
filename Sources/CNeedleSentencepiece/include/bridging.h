@@ -26,6 +26,8 @@ int needle_sp_tokenizer_bos_token_id(needle_sp_tokenizer_t tokenizer);
 int needle_sp_tokenizer_eos_token_id(needle_sp_tokenizer_t tokenizer);
 int needle_sp_tokenizer_pad_token_id(needle_sp_tokenizer_t tokenizer);
 
+size_t needle_sp_tokenizer_vocab_size(needle_sp_tokenizer_t tokenizer);
+
 int needle_sp_tokenizer_tokens_to_ids(
     needle_sp_tokenizer_t tokenizer,
     const char** tokens,

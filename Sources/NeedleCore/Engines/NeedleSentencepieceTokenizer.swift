@@ -5,12 +5,29 @@
   // MARK: - NeedleSentencepieceTokenizer
 
   public struct NeedleSentencepieceTokenizer: ~Copyable {
+    private static let tokenBufferSize = 256
+
     public let tokenizer: needle_sp_tokenizer_t
 
-    public var unkTokenId: NeedleToken.ID { Int(needle_sp_tokenizer_unk_token_id(self.tokenizer)) }
-    public var bosTokenId: NeedleToken.ID { Int(needle_sp_tokenizer_bos_token_id(self.tokenizer)) }
-    public var eosTokenId: NeedleToken.ID { Int(needle_sp_tokenizer_eos_token_id(self.tokenizer)) }
-    public var padTokenId: NeedleToken.ID { Int(needle_sp_tokenizer_pad_token_id(self.tokenizer)) }
+    public var unkTokenId: NeedleToken.ID {
+      Int(needle_sp_tokenizer_unk_token_id(self.tokenizer))
+    }
+
+    public var bosTokenId: NeedleToken.ID {
+      Int(needle_sp_tokenizer_bos_token_id(self.tokenizer))
+    }
+
+    public var eosTokenId: NeedleToken.ID {
+      Int(needle_sp_tokenizer_eos_token_id(self.tokenizer))
+    }
+
+    public var padTokenId: NeedleToken.ID {
+      Int(needle_sp_tokenizer_pad_token_id(self.tokenizer))
+    }
+
+    public var vocabSize: Int {
+      needle_sp_tokenizer_vocab_size(self.tokenizer)
+    }
 
     public init(modelURL: URL) throws {
       let nativePath = modelURL.withUnsafeFileSystemRepresentation { $0 }
@@ -44,7 +61,7 @@
       let buffer = UnsafeMutableBufferPointer<UnsafeMutablePointer<CChar>?>
         .allocate(capacity: tokenIds.count)
       for i in 0..<buffer.count {
-        buffer[i] = .allocate(capacity: 64)
+        buffer[i] = .allocate(capacity: Self.tokenBufferSize)
       }
       defer {
         for i in 0..<buffer.count {
