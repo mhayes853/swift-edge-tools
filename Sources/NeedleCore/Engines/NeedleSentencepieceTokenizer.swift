@@ -5,32 +5,32 @@
   // MARK: - NeedleSentencepieceTokenizer
 
   public struct NeedleSentencepieceTokenizer: ~Copyable {
-    public let tokenizer: needle_sp_t
+    public let tokenizer: needle_sp_tokenizer_t
 
-    public var unkTokenId: NeedleToken.ID { Int(needle_sp_unk_token_id(self.tokenizer)) }
-    public var bosTokenId: NeedleToken.ID { Int(needle_sp_bos_token_id(self.tokenizer)) }
-    public var eosTokenId: NeedleToken.ID { Int(needle_sp_eos_token_id(self.tokenizer)) }
-    public var padTokenId: NeedleToken.ID { Int(needle_sp_pad_token_id(self.tokenizer)) }
+    public var unkTokenId: NeedleToken.ID { Int(needle_sp_tokenizer_unk_token_id(self.tokenizer)) }
+    public var bosTokenId: NeedleToken.ID { Int(needle_sp_tokenizer_bos_token_id(self.tokenizer)) }
+    public var eosTokenId: NeedleToken.ID { Int(needle_sp_tokenizer_eos_token_id(self.tokenizer)) }
+    public var padTokenId: NeedleToken.ID { Int(needle_sp_tokenizer_pad_token_id(self.tokenizer)) }
 
     public init(modelURL: URL) throws {
       let nativePath = modelURL.withUnsafeFileSystemRepresentation { $0 }
-      guard let tokenizer = needle_sp_init_from_file(nativePath) else {
+      guard let tokenizer = needle_sp_tokenizer_init_from_file(nativePath) else {
         throw NeedleSentencepieceTokenizerError()
       }
       self.tokenizer = tokenizer
     }
 
-    public init(tokenizer: consuming needle_sp_t) {
+    public init(tokenizer: consuming needle_sp_tokenizer_t) {
       self.tokenizer = tokenizer
     }
 
-    deinit { needle_sp_destroy(self.tokenizer) }
+    deinit { needle_sp_tokenizer_destroy(self.tokenizer) }
 
     public func tokenIds(from tokens: [String]) -> [NeedleToken.ID] {
       let buffer = UnsafeMutablePointer<Int32>.allocate(capacity: tokens.count)
       defer { buffer.deallocate() }
       _ = withCStringPointerBuffer(tokens) { tokensPtr in
-        needle_sp_tokens_to_ids(
+        needle_sp_tokenizer_tokens_to_ids(
           self.tokenizer,
           UnsafeMutablePointer(mutating: tokensPtr.baseAddress),
           buffer,
@@ -55,7 +55,7 @@
 
       _ = tokenIds.map { Int32($0) }
         .withUnsafeBufferPointer { tokenIdsPtr in
-          needle_sp_ids_to_tokens(
+          needle_sp_tokenizer_ids_to_tokens(
             self.tokenizer,
             tokenIdsPtr.baseAddress,
             buffer.baseAddress,
@@ -67,7 +67,7 @@
 
     public func encode(text: String) -> [NeedleToken.ID] {
       var size = 0
-      let tokenIds = needle_sp_encode(self.tokenizer, text, &size)
+      let tokenIds = needle_sp_tokenizer_encode(self.tokenizer, text, &size)
       defer { tokenIds?.deallocate() }
       return Array(UnsafeBufferPointer(start: tokenIds, count: Int(size)))
         .map { NeedleToken.ID($0) }
@@ -76,7 +76,7 @@
     public func decode(tokenIds: some Sequence<NeedleToken.ID>) -> String {
       let tokenIds = Array(tokenIds.map { Int32($0) })
       let str = tokenIds.withUnsafeBufferPointer { tokenIdsPtr in
-        needle_sp_decode(self.tokenizer, tokenIdsPtr.baseAddress, tokenIdsPtr.count, nil)
+        needle_sp_tokenizer_decode(self.tokenizer, tokenIdsPtr.baseAddress, tokenIdsPtr.count, nil)
       }
       defer { str?.deallocate() }
       return str.map { String(cString: $0) } ?? ""
@@ -89,7 +89,7 @@
     public let message: String
 
     fileprivate init() {
-      self.message = String(cString: needle_last_error_message())
+      self.message = String(cString: needle_sp_last_error_message())
     }
   }
 #endif

@@ -7,39 +7,39 @@
 extern "C" {
 #endif
 
-typedef void* needle_sp_t;
+typedef void* needle_sp_tokenizer_t;
 
-needle_sp_t needle_sp_init_from_file(const char* model_file);
+needle_sp_tokenizer_t needle_sp_tokenizer_init_from_file(const char* model_file);
 
-const char* needle_last_error_message();
+const char* needle_sp_last_error_message();
 
-int* needle_sp_encode(needle_sp_t tokenizer, const char* text, size_t* size);
-const char* needle_sp_decode(
-    needle_sp_t tokenizer,
+int* needle_sp_tokenizer_encode(needle_sp_tokenizer_t tokenizer, const char* text, size_t* size);
+const char* needle_sp_tokenizer_decode(
+    needle_sp_tokenizer_t tokenizer,
     const int* token_ids,
     size_t token_ids_size,
     size_t* size
 );
 
-int needle_sp_unk_token_id(needle_sp_t tokenizer);
-int needle_sp_bos_token_id(needle_sp_t tokenizer);
-int needle_sp_eos_token_id(needle_sp_t tokenizer);
-int needle_sp_pad_token_id(needle_sp_t tokenizer);
+int needle_sp_tokenizer_unk_token_id(needle_sp_tokenizer_t tokenizer);
+int needle_sp_tokenizer_bos_token_id(needle_sp_tokenizer_t tokenizer);
+int needle_sp_tokenizer_eos_token_id(needle_sp_tokenizer_t tokenizer);
+int needle_sp_tokenizer_pad_token_id(needle_sp_tokenizer_t tokenizer);
 
-int needle_sp_tokens_to_ids(
-    needle_sp_t tokenizer,
+int needle_sp_tokenizer_tokens_to_ids(
+    needle_sp_tokenizer_t tokenizer,
     const char** tokens,
     int* token_ids,
     size_t size
 );
-int needle_sp_ids_to_tokens(
-    needle_sp_t tokenizer,
+int needle_sp_tokenizer_ids_to_tokens(
+    needle_sp_tokenizer_t tokenizer,
     const int* token_ids,
     char** tokens,
     size_t size
 );
 
-void needle_sp_destroy(needle_sp_t tokenizer);
+void needle_sp_tokenizer_destroy(needle_sp_tokenizer_t tokenizer);
 
 #ifdef __cplusplus
 }
