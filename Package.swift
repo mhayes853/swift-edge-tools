@@ -20,15 +20,27 @@ let package = Package(
   traits: [
     .trait(name: "SwiftNeedleXGrammar", description: "XGrammar-powered structured generation."),
     .trait(
+      name: "SwiftNeedleTokenizers",
+      description: "Hugging Face tokenizers support via swift-transformers."
+    ),
+    .trait(
       name: "SwiftNeedleSentencepiece",
-      description: "Sentencepiece tokenizer implementation."
+      description: "Sentencepiece tokenizer implementation.",
+      enabledTraits: ["SwiftNeedleTokenizers"]
     ),
     .trait(
       name: "SwiftNeedleMLX",
       description: "MLX Support.",
       enabledTraits: ["SwiftNeedleSentencepiece"]
     ),
-    .default(enabledTraits: ["SwiftNeedleXGrammar", "SwiftNeedleMLX", "SwiftNeedleSentencepiece"])
+    .default(
+      enabledTraits: [
+        "SwiftNeedleXGrammar",
+        "SwiftNeedleMLX",
+        "SwiftNeedleSentencepiece",
+        "SwiftNeedleTokenizers"
+      ]
+    )
   ],
   dependencies: [
     .package(url: "https://github.com/ml-explore/mlx-swift-lm", from: "3.31.3"),
@@ -37,7 +49,8 @@ let package = Package(
     .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.31.3"),
     .package(url: "https://github.com/mattt/swift-xgrammar", from: "0.1.0"),
     .package(url: "https://github.com/pointfreeco/swift-macro-testing", from: "0.6.5"),
-    .package(url: "https://github.com/swiftlang/swift-syntax", "600.0.0"..<"603.0.0")
+    .package(url: "https://github.com/swiftlang/swift-syntax", "600.0.0"..<"603.0.0"),
+    .package(url: "https://github.com/huggingface/swift-transformers", from: "1.3.0")
   ],
   targets: [
     .target(name: "Needle", dependencies: ["NeedleCore", "NeedleMacros"]),
@@ -60,6 +73,16 @@ let package = Package(
           name: "XGrammar",
           package: "swift-xgrammar",
           condition: .when(traits: ["SwiftNeedleXGrammar"])
+        ),
+        .product(
+          name: "Tokenizers",
+          package: "swift-transformers",
+          condition: .when(traits: ["SwiftNeedleTokenizers"])
+        ),
+        .product(
+          name: "Hub",
+          package: "swift-transformers",
+          condition: .when(traits: ["SwiftNeedleTokenizers"])
         ),
         .target(
           name: "CNeedleSentencepiece",

@@ -4,6 +4,7 @@
   import MLXLLM
   import MLXLMCommon
   import Foundation
+  import Tokenizers
 
   // MARK: - NeedleMLXModel
 
@@ -76,10 +77,11 @@
   extension NeedleMLXModel {
     public static func input(
       from prompt: NeedlePrompt,
-      using tokenizer: borrowing NeedleSentencepieceTokenizer
+      using tokenizer: borrowing some TokenizingModel
     ) throws -> LMInput {
-      let tokens = try MLXArray(tokenizer.encode(text: prompt.formatted()))
-      return LMInput(text: LMInput.Text(tokens: tokens))
+      let tokenStrings = try tokenizer.tokenize(text: prompt.formatted())
+      let tokens = tokenStrings.compactMap(tokenizer.convertTokenToId)
+      return LMInput(text: LMInput.Text(tokens: MLXArray(tokens)))
     }
   }
 
