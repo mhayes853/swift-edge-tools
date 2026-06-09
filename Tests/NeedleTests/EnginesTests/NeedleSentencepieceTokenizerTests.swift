@@ -20,9 +20,10 @@
 
     @Test
     func `Throws Error For Invalid URL`() {
-      #expect(throws: NeedleSentencepieceTokenizerError.failedToLoad) {
+      let error = #expect(throws: NeedleSentencepieceTokenizerError.self) {
         _ = try NeedleSentencepieceTokenizer(modelURL: .temporaryDirectory)
       }
+      expectNoDifference(error?.message.lowercased().contains("file not found"), true)
     }
 
     @Test
@@ -39,6 +40,34 @@
       let tokenizer = try NeedleSentencepieceTokenizer(modelURL: self.modelURL)
       let tokens = tokenizer.encode(text: "This is a test")
       assertSnapshot(of: tokens, as: .dump)
+    }
+
+    @Test
+    func `Token Id Conversions`() throws {
+      let tokenizer = try NeedleSentencepieceTokenizer(modelURL: self.modelURL)
+
+      let expectedTokens = ["string", "▁the"]
+
+      let tokenIds = tokenizer.tokenIds(from: expectedTokens)
+      expectNoDifference(tokenIds, [315, 302])
+
+      let tokens = tokenizer.tokens(from: tokenIds)
+      expectNoDifference(tokens, expectedTokens)
+    }
+
+    @Test
+    func `Unk Token Id For Non-Existent Token`() throws {
+      let tokenizer = try NeedleSentencepieceTokenizer(modelURL: self.modelURL)
+      expectNoDifference(
+        tokenizer.tokenIds(from: ["shdkjhdksahdiiwsubdnuiwsduybsw"]),
+        [tokenizer.unkTokenId]
+      )
+    }
+
+    @Test
+    func `Empty Token For Non-Existent Token Id`() throws {
+      let tokenizer = try NeedleSentencepieceTokenizer(modelURL: self.modelURL)
+      expectNoDifference(tokenizer.tokens(from: [287_399_329]), [""])
     }
   }
 #endif

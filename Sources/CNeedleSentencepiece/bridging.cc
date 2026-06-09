@@ -1,178 +1,167 @@
 #include "bridging.h"
 
+#include <cstddef>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <string>
 #include <vector>
 
 #include "sentencepiece_processor.h"
 
+#include <sys/stat.h>
+
 namespace {
-
-// Allocates a heap buffer of `count` ints initialized from the source vector.
-// The caller is responsible for `free()`-ing the returned pointer (matching
-// the existing C ABI contract: "caller must free the returned array").
-int *ToHeapIntArray(const std::vector<int> &values) {
-  const size_t byteCount = values.size() * sizeof(int);
-  int *buffer = static_cast<int *>(std::malloc(byteCount));
-  if (buffer == nullptr) {
-    return nullptr;
-  }
-  std::memcpy(buffer, values.data(), byteCount);
-  return buffer;
+    struct NeedleSPHandle {
+        std::unique_ptr<sentencepiece::SentencePieceProcessor> processor;
+    };
 }
-
-// Allocates a heap copy of a std::string. The caller is responsible for
-// `free()`-ing the returned pointer (matching the existing C ABI contract).
-char *ToHeapCString(const std::string &value) {
-  char *buffer = static_cast<char *>(std::malloc(value.size() + 1));
-  if (buffer == nullptr) {
-    return nullptr;
-  }
-  std::memcpy(buffer, value.data(), value.size());
-  buffer[value.size()] = '\0';
-  return buffer;
-}
-
-} // namespace
 
 extern "C" {
 
-// NB: The processor is allocated with `malloc` (not `new`) and constructed
-// in place via placement new. This keeps the ABI compatible with the existing
-// Swift call site, which calls `UnsafeMutableRawPointer.deallocate()` (i.e.
-// `free()`) in its deinit rather than `spm_free_sentencepiece_processor`.
-void *spm_new_sentencepiece_processor() {
-  void *storage = std::malloc(sizeof(sentencepiece::SentencePieceProcessor));
-  if (storage == nullptr) {
+static thread_local std::string last_error_message;
+
+static void set_error_message(const sentencepiece::util::Status& status) {
+    last_error_message = status.error_message();
+}
+
+const char* needle_last_error_message() {
+    return last_error_message.c_str();
+}
+
+needle_sp_t needle_sp_init_from_file(const char* model_file) {
+    if (!model_file) {
+        last_error_message = "model file path should not be null";
+        return nullptr;
+    }
+
+    struct stat st;
+    if (stat(model_file, &st) != 0 || !S_ISREG(st.st_mode)) {
+        last_error_message = std::string(model_file) + ": file not found";
+        return nullptr;
+    }
+
+    const auto handle = new NeedleSPHandle{std::make_unique<sentencepiece::SentencePieceProcessor>()};
+    const auto result = handle->processor->Load(model_file);
+    if (result.ok()) return handle;
+    set_error_message(result);
+    delete handle;
     return nullptr;
-  }
-  return new (storage) sentencepiece::SentencePieceProcessor();
 }
 
-void spm_free_sentencepiece_processor(void *ptr_inst) {
-  if (ptr_inst == nullptr) {
-    return;
-  }
-  auto *processor = static_cast<sentencepiece::SentencePieceProcessor *>(ptr_inst);
-  processor->~SentencePieceProcessor();
-  std::free(ptr_inst);
+int* needle_sp_encode(needle_sp_t tokenizer, const char* text, size_t* size) {
+    const auto* handle = static_cast<NeedleSPHandle*>(tokenizer);
+    if (!handle || !text || !size) return nullptr;
+
+    std::vector<int> ids;
+    const auto status = handle->processor->Encode(text, &ids);
+    if (!status.ok()) {
+        set_error_message(status);
+        return nullptr;
+    }
+
+    *size = ids.size();
+    if (ids.empty()) return nullptr;
+
+    auto* buffer = static_cast<int*>(std::malloc(sizeof(int) * ids.size()));
+    if (!buffer) return nullptr;
+    std::memcpy(buffer, ids.data(), sizeof(int) * ids.size());
+    return buffer;
 }
 
-bool spm_load_model(void *ptr_inst, const char *model_file) {
-  if (ptr_inst == nullptr || model_file == nullptr) {
-    return false;
-  }
-  auto *processor = static_cast<sentencepiece::SentencePieceProcessor *>(ptr_inst);
-  return processor->Load(model_file).ok();
+const char* needle_sp_decode(
+    needle_sp_t tokenizer,
+    const int* token_ids,
+    size_t token_ids_size,
+    size_t* size
+) {
+    const auto* handle = static_cast<NeedleSPHandle*>(tokenizer);
+    if (!handle || !token_ids) return nullptr;
+
+    std::vector<int> ids(token_ids, token_ids + token_ids_size);
+    std::string decoded;
+    const auto status = handle->processor->Decode(ids, &decoded);
+    if (!status.ok()) {
+        set_error_message(status);
+        if (size) *size = 0;
+        return nullptr;
+    }
+
+    if (size) *size = decoded.size();
+    if (decoded.empty()) {
+        return nullptr;
+    }
+
+    auto* buffer = static_cast<char*>(std::malloc(decoded.size() + 1));
+    if (!buffer) return nullptr;
+    std::memcpy(buffer, decoded.c_str(), decoded.size() + 1);
+    return buffer;
 }
 
-char *spm_normalize(void *ptr_inst, const char *text) {
-  if (ptr_inst == nullptr || text == nullptr) {
-    return nullptr;
-  }
-  auto *processor = static_cast<sentencepiece::SentencePieceProcessor *>(ptr_inst);
-  std::string normalized;
-  if (!processor->Normalize(text, &normalized).ok()) {
-    return nullptr;
-  }
-  return ToHeapCString(normalized);
+int needle_sp_unk_token_id(needle_sp_t tokenizer) {
+    const auto* handle = static_cast<NeedleSPHandle*>(tokenizer);
+    if (!handle) return -1;
+    return handle->processor->unk_id();
 }
 
-int *spm_encode(void *ptr_inst, const char *text, int *size) {
-  if (ptr_inst == nullptr || text == nullptr || size == nullptr) {
-    return nullptr;
-  }
-  auto *processor = static_cast<sentencepiece::SentencePieceProcessor *>(ptr_inst);
-  std::vector<int> ids;
-  if (!processor->Encode(text, &ids).ok()) {
-    return nullptr;
-  }
-  *size = static_cast<int>(ids.size());
-  return ToHeapIntArray(ids);
+int needle_sp_bos_token_id(needle_sp_t tokenizer) {
+    const auto* handle = static_cast<NeedleSPHandle*>(tokenizer);
+    if (!handle) return -1;
+    return handle->processor->bos_id();
 }
 
-void spm_set_encode_extra_options(void *ptr_inst, const char *extra_option) {
-  if (ptr_inst == nullptr || extra_option == nullptr) {
-    return;
-  }
-  auto *processor = static_cast<sentencepiece::SentencePieceProcessor *>(ptr_inst);
-  processor->SetEncodeExtraOptions(extra_option).IgnoreError();
+int needle_sp_eos_token_id(needle_sp_t tokenizer) {
+    const auto* handle = static_cast<NeedleSPHandle*>(tokenizer);
+    if (!handle) return -1;
+    return handle->processor->eos_id();
 }
 
-char *spm_decode(void *ptr_inst, const int *ids, int size) {
-  if (ptr_inst == nullptr || ids == nullptr || size < 0) {
-    return nullptr;
-  }
-  auto *processor = static_cast<sentencepiece::SentencePieceProcessor *>(ptr_inst);
-  std::vector<int> idVector(ids, ids + size);
-  std::string detokenized;
-  if (!processor->Decode(idVector, &detokenized).ok()) {
-    return nullptr;
-  }
-  return ToHeapCString(detokenized);
+int needle_sp_pad_token_id(needle_sp_t tokenizer) {
+    const auto* handle = static_cast<NeedleSPHandle*>(tokenizer);
+    if (!handle) return -1;
+    return handle->processor->pad_id();
 }
 
-void spm_set_decode_extra_options(void *ptr_inst, const char *extra_option) {
-  if (ptr_inst == nullptr || extra_option == nullptr) {
-    return;
-  }
-  auto *processor = static_cast<sentencepiece::SentencePieceProcessor *>(ptr_inst);
-  processor->SetDecodeExtraOptions(extra_option).IgnoreError();
+int needle_sp_tokens_to_ids(
+    needle_sp_t tokenizer,
+    const char** tokens,
+    int* token_ids,
+    size_t size
+) {
+    const auto* handle = static_cast<NeedleSPHandle*>(tokenizer);
+    if (!handle || !tokens || !token_ids) return -1;
+
+    for (size_t i = 0; i < size; i++) {
+        token_ids[i] = handle->processor->PieceToId(tokens[i]);
+    }
+    return 0;
 }
 
-char *spm_id_to_piece(void *ptr_inst, int id) {
-  if (ptr_inst == nullptr) {
-    return nullptr;
-  }
-  auto *processor = static_cast<sentencepiece::SentencePieceProcessor *>(ptr_inst);
-  if (!processor->status().ok()) {
-    return nullptr;
-  }
-  return ToHeapCString(processor->IdToPiece(id));
+int needle_sp_ids_to_tokens(
+    needle_sp_t tokenizer,
+    const int* token_ids,
+    char** tokens,
+    size_t size
+) {
+    const auto* handle = static_cast<NeedleSPHandle*>(tokenizer);
+    if (!handle || !tokens || !token_ids) return -1;
+
+    const auto piece_size = static_cast<size_t>(handle->processor->GetPieceSize());
+    for (size_t i = 0; i < size; i++) {
+        const auto id = token_ids[i];
+        if (id < 0 || static_cast<size_t>(id) >= piece_size) {
+            tokens[i][0] = '\0';
+            continue;
+        }
+        const auto& token = handle->processor->IdToPiece(id);
+        std::strncpy(tokens[i], token.c_str(), token.size());
+        tokens[i][token.size()] = '\0';
+    }
+    return 0;
 }
 
-int spm_piece_to_id(void *ptr_inst, const char *piece) {
-  if (ptr_inst == nullptr || piece == nullptr) {
-    return -1;
-  }
-  auto *processor = static_cast<sentencepiece::SentencePieceProcessor *>(ptr_inst);
-  if (!processor->status().ok()) {
-    return -1;
-  }
-  return processor->PieceToId(piece);
-}
-
-int spm_unk_id(void *ptr_inst) {
-  if (ptr_inst == nullptr) {
-    return -1;
-  }
-  auto *processor = static_cast<sentencepiece::SentencePieceProcessor *>(ptr_inst);
-  return processor->unk_id();
-}
-
-int spm_bos_id(void *ptr_inst) {
-  if (ptr_inst == nullptr) {
-    return -1;
-  }
-  auto *processor = static_cast<sentencepiece::SentencePieceProcessor *>(ptr_inst);
-  return processor->bos_id();
-}
-
-int spm_eos_id(void *ptr_inst) {
-  if (ptr_inst == nullptr) {
-    return -1;
-  }
-  auto *processor = static_cast<sentencepiece::SentencePieceProcessor *>(ptr_inst);
-  return processor->eos_id();
-}
-
-int spm_pad_id(void *ptr_inst) {
-  if (ptr_inst == nullptr) {
-    return -1;
-  }
-  auto *processor = static_cast<sentencepiece::SentencePieceProcessor *>(ptr_inst);
-  return processor->pad_id();
+void needle_sp_destroy(needle_sp_t tokenizer) {
+    if (tokenizer) delete static_cast<NeedleSPHandle*>(tokenizer);
 }
 
 } // extern "C"
