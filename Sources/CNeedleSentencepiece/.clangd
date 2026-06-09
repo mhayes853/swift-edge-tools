@@ -1,0 +1,14 @@
+CompileFlags:
+  Add:
+    - -std=c++17
+    - -DHAVE_PTHREAD=1
+    - -I.
+    - -Isentencepiece
+    - -Isentencepiece/src
+    - -Isentencepiece/src/builtin_pb
+    - -Isentencepiece/third_party/protobuf-lite
+    - -Iinclude
+
+Diagnostics:
+  Suppress:
+    - -Wdeprecated-declarations
