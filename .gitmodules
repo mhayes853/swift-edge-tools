@@ -1,0 +1,4 @@
+[submodule "Sources/CNeedleSentencepiece/sentencepiece"]
+	path = Sources/CNeedleSentencepiece/sentencepiece
+	url = https://github.com/google/sentencepiece
+	branch = master

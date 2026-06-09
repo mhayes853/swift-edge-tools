@@ -1,6 +1,6 @@
 #if SwiftNeedleSentencepiece
   import Foundation
-  private import Sentencepiece
+  import CNeedleSentencepiece
 
   // MARK: - NeedleSentencepieceTokenizer
 

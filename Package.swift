@@ -61,11 +61,71 @@ let package = Package(
           package: "swift-xgrammar",
           condition: .when(traits: ["SwiftNeedleXGrammar"])
         ),
-        .target(name: "Sentencepiece", condition: .when(traits: ["SwiftNeedleSentencepiece"]))
+        .target(
+          name: "CNeedleSentencepiece",
+          condition: .when(traits: ["SwiftNeedleSentencepiece"])
+        )
       ],
       swiftSettings: [.enableExperimentalFeature("LifetimeDependence")]
     ),
-    .binaryTarget(name: "Sentencepiece", path: "bin/sentencepiece.xcframework.zip"),
+    .target(
+      name: "CNeedleSentencepiece",
+      path: "Sources/CNeedleSentencepiece",
+      sources: [
+        "bridging.cc",
+        "sentencepiece/src/bpe_model.cc",
+        "sentencepiece/src/char_model.cc",
+        "sentencepiece/src/error.cc",
+        "sentencepiece/src/filesystem.cc",
+        "sentencepiece/src/model_factory.cc",
+        "sentencepiece/src/model_interface.cc",
+        "sentencepiece/src/normalizer.cc",
+        "sentencepiece/src/sentencepiece_processor.cc",
+        "sentencepiece/src/unigram_model.cc",
+        "sentencepiece/src/util.cc",
+        "sentencepiece/src/word_model.cc",
+        "sentencepiece/src/builtin_pb/sentencepiece.pb.cc",
+        "sentencepiece/src/builtin_pb/sentencepiece_model.pb.cc",
+        "sentencepiece/src/builtin_pb/sentencepiece.pb.h",
+        "sentencepiece/src/builtin_pb/sentencepiece_model.pb.h",
+        "sentencepiece/third_party/absl/flags/flag.cc",
+        "sentencepiece/third_party/protobuf-lite/arena.cc",
+        "sentencepiece/third_party/protobuf-lite/arenastring.cc",
+        "sentencepiece/third_party/protobuf-lite/bytestream.cc",
+        "sentencepiece/third_party/protobuf-lite/coded_stream.cc",
+        "sentencepiece/third_party/protobuf-lite/common.cc",
+        "sentencepiece/third_party/protobuf-lite/extension_set.cc",
+        "sentencepiece/third_party/protobuf-lite/generated_enum_util.cc",
+        "sentencepiece/third_party/protobuf-lite/generated_message_table_driven_lite.cc",
+        "sentencepiece/third_party/protobuf-lite/generated_message_util.cc",
+        "sentencepiece/third_party/protobuf-lite/implicit_weak_message.cc",
+        "sentencepiece/third_party/protobuf-lite/int128.cc",
+        "sentencepiece/third_party/protobuf-lite/io_win32.cc",
+        "sentencepiece/third_party/protobuf-lite/message_lite.cc",
+        "sentencepiece/third_party/protobuf-lite/parse_context.cc",
+        "sentencepiece/third_party/protobuf-lite/repeated_field.cc",
+        "sentencepiece/third_party/protobuf-lite/status.cc",
+        "sentencepiece/third_party/protobuf-lite/statusor.cc",
+        "sentencepiece/third_party/protobuf-lite/stringpiece.cc",
+        "sentencepiece/third_party/protobuf-lite/stringprintf.cc",
+        "sentencepiece/third_party/protobuf-lite/structurally_valid.cc",
+        "sentencepiece/third_party/protobuf-lite/strutil.cc",
+        "sentencepiece/third_party/protobuf-lite/time.cc",
+        "sentencepiece/third_party/protobuf-lite/wire_format_lite.cc",
+        "sentencepiece/third_party/protobuf-lite/zero_copy_stream.cc",
+        "sentencepiece/third_party/protobuf-lite/zero_copy_stream_impl.cc",
+        "sentencepiece/third_party/protobuf-lite/zero_copy_stream_impl_lite.cc"
+      ],
+      publicHeadersPath: "include",
+      cxxSettings: [
+        .define("HAVE_PTHREAD=1"),
+        .headerSearchPath("."),
+        .headerSearchPath("sentencepiece"),
+        .headerSearchPath("sentencepiece/src"),
+        .headerSearchPath("sentencepiece/src/builtin_pb"),
+        .headerSearchPath("sentencepiece/third_party/protobuf-lite")
+      ]
+    ),
     .macro(
       name: "NeedleMacros",
       dependencies: [
@@ -91,5 +151,6 @@ let package = Package(
       resources: [.copy("Resources")]
     )
   ],
-  swiftLanguageModes: [.v6]
+  swiftLanguageModes: [.v6],
+  cxxLanguageStandard: .cxx17
 )
