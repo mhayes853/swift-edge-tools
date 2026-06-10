@@ -171,7 +171,7 @@ let package = Package(
         .product(name: "CustomDump", package: "swift-custom-dump")
       ],
       exclude: ["NeedleGenerationSchemaTests/__Snapshots__"],
-      resources: [.copy("Resources")]
+      resources: [.process("Resources")]
     )
   ],
   swiftLanguageModes: [.v6],

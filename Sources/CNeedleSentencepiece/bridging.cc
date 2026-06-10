@@ -110,14 +110,12 @@ int needle_sp_tokenizer_bos_token_id(needle_sp_tokenizer_t tokenizer) {
 
 int needle_sp_tokenizer_eos_token_id(needle_sp_tokenizer_t tokenizer) {
     const auto* handle = static_cast<NeedleSPHandle*>(tokenizer);
-    if (!handle) return -1;
-    return handle->processor->eos_id();
+    return !handle ? -1 : handle->processor->eos_id();
 }
 
 int needle_sp_tokenizer_pad_token_id(needle_sp_tokenizer_t tokenizer) {
     const auto* handle = static_cast<NeedleSPHandle*>(tokenizer);
-    if (!handle) return -1;
-    return handle->processor->pad_id();
+    return !handle ? -1 : handle->processor->pad_id();
 }
 
 size_t needle_sp_tokenizer_vocab_size(needle_sp_tokenizer_t tokenizer) {

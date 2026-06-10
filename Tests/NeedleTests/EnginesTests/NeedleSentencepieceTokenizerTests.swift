@@ -69,5 +69,40 @@
       let tokenizer = try NeedleSentencepieceTokenizer(modelURL: self.modelURL)
       expectNoDifference(tokenizer.tokens(from: [287_399_329]), [""])
     }
+
+    #if SwiftNeedleTokenizers
+      @Test
+      func `HF Unknown Token String Is Not Nil`() throws {
+        let tokenizer = try NeedleSentencepieceTokenizer(modelURL: self.modelURL)
+        expectNoDifference(tokenizer.unknownToken, "<unk>")
+      }
+
+      @Test
+      func `HF Convert Token To Id Returns Unk For Unk Token`() throws {
+        let tokenizer = try NeedleSentencepieceTokenizer(modelURL: self.modelURL)
+        expectNoDifference(tokenizer.convertTokenToId("<unk>"), tokenizer.unkTokenId)
+      }
+
+      @Test
+      func `HF Convert Token To Id Returns Nil For Non Existent Token`() throws {
+        let tokenizer = try NeedleSentencepieceTokenizer(modelURL: self.modelURL)
+        expectNoDifference(
+          tokenizer.convertTokenToId("shdkjhdksahdiiwsubdnuiwsduybsw"),
+          nil as Int?
+        )
+      }
+
+      @Test
+      func `HF Convert Id To Token Returns Nil For Unknown Token Id`() throws {
+        let tokenizer = try NeedleSentencepieceTokenizer(modelURL: self.modelURL)
+        expectNoDifference(tokenizer.convertIdToToken(3), nil as String?)
+      }
+
+      @Test
+      func `HF Convert Id To Token Returns Nil For Non Existent Token Id`() throws {
+        let tokenizer = try NeedleSentencepieceTokenizer(modelURL: self.modelURL)
+        expectNoDifference(tokenizer.convertIdToToken(287_399_329), nil as String?)
+      }
+    #endif
   }
 #endif

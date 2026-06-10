@@ -123,11 +123,15 @@
       }
 
       public func convertTokenToId(_ token: String) -> Int? {
-        self.tokenIds(from: [token]).first.map { Int($0) }
+        guard token != self.unknownToken else { return self.unkTokenId }
+        guard let id = self.tokenIds(from: [token]).first.map({ Int($0) }) else { return nil }
+        return id == self.unkTokenId ? nil : id
       }
 
       public func convertIdToToken(_ id: Int) -> String? {
-        self.tokens(from: [NeedleToken.ID(id)]).first
+        guard id != self.unkTokenId else { return nil }
+        guard let token = self.tokens(from: [id]).first, !token.isEmpty else { return nil }
+        return token
       }
 
       public var bosToken: String? {
@@ -139,7 +143,7 @@
       }
 
       public var unknownToken: String? {
-        self.convertIdToToken(self.unkTokenId)
+        self.tokens(from: [self.unkTokenId]).first
       }
 
       public var unknownTokenId: Int? {
