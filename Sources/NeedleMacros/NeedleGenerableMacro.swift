@@ -55,7 +55,7 @@ public enum NeedleGenerableMacro: ExtensionMacro, MemberMacro, MemberAttributeMa
     return [
       try ExtensionDeclSyntax(
         """
-        extension \(raw: typeName): NeedleCore.NeedleGenerable {}
+        extension \(raw: typeName): NeedleGenerable {}
         """
       )
     ]
@@ -145,14 +145,14 @@ public enum NeedleGenerableMacro: ExtensionMacro, MemberMacro, MemberAttributeMa
     if activeProperties.isEmpty {
       if objectMetadataArguments.isEmpty {
         return """
-          \(raw: modifierPrefix)static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+          \(raw: modifierPrefix)static var needleGenerationSchema: NeedleGenerationSchema {
             .object(valueSchema: .object())
           }
           """
       }
 
       return """
-        \(raw: modifierPrefix)static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+        \(raw: modifierPrefix)static var needleGenerationSchema: NeedleGenerationSchema {
           .object(\(raw: objectMetadataArguments), valueSchema: .object())
         }
         """
@@ -161,7 +161,7 @@ public enum NeedleGenerableMacro: ExtensionMacro, MemberMacro, MemberAttributeMa
     if requiredProperties.isEmpty {
       if objectMetadataArguments.isEmpty {
         return """
-          \(raw: modifierPrefix)static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+          \(raw: modifierPrefix)static var needleGenerationSchema: NeedleGenerationSchema {
             .object(
               valueSchema: .object(
                 properties: [
@@ -174,7 +174,7 @@ public enum NeedleGenerableMacro: ExtensionMacro, MemberMacro, MemberAttributeMa
       }
 
       return """
-        \(raw: modifierPrefix)static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+        \(raw: modifierPrefix)static var needleGenerationSchema: NeedleGenerationSchema {
           .object(
             \(raw: objectMetadataArguments),
             valueSchema: .object(
@@ -189,7 +189,7 @@ public enum NeedleGenerableMacro: ExtensionMacro, MemberMacro, MemberAttributeMa
 
     if objectMetadataArguments.isEmpty {
       return """
-        \(raw: modifierPrefix)static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+        \(raw: modifierPrefix)static var needleGenerationSchema: NeedleGenerationSchema {
           .object(
             valueSchema: .object(
               properties: [
@@ -203,7 +203,7 @@ public enum NeedleGenerableMacro: ExtensionMacro, MemberMacro, MemberAttributeMa
     }
 
     return """
-      \(raw: modifierPrefix)static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+      \(raw: modifierPrefix)static var needleGenerationSchema: NeedleGenerationSchema {
         .object(
           \(raw: objectMetadataArguments),
           valueSchema: .object(
@@ -238,14 +238,14 @@ public enum NeedleGenerableMacro: ExtensionMacro, MemberMacro, MemberAttributeMa
 
     if assignments.isEmpty {
       return """
-        \(raw: modifierPrefix)init(needleValue: NeedleCore.NeedleValue) throws {
+        \(raw: modifierPrefix)init(needleValue: NeedleValue) throws {
           _ = try _needleRequireObjectValue(needleValue)
         }
         """
     }
 
     return """
-      \(raw: modifierPrefix)init(needleValue: NeedleCore.NeedleValue) throws {
+      \(raw: modifierPrefix)init(needleValue: NeedleValue) throws {
         let object = try _needleRequireObjectValue(needleValue)
         \(raw: assignments)
       }

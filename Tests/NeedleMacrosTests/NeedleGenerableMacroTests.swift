@@ -19,7 +19,7 @@ extension BaseTestSuite {
         struct Person {
           var name: String
 
-          static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+          static var needleGenerationSchema: NeedleGenerationSchema {
             .object(
               description: "Person payload",
               valueSchema: .object(
@@ -31,13 +31,13 @@ extension BaseTestSuite {
             )
           }
 
-          init(needleValue: NeedleCore.NeedleValue) throws {
+          init(needleValue: NeedleValue) throws {
             let object = try _needleRequireObjectValue(needleValue)
             self.name = try String(needleValue: _needleValue(object, forKey: "name"))
           }
         }
 
-        extension Person: NeedleCore.NeedleGenerable {
+        extension Person: NeedleGenerable {
         }
         """
       }
@@ -60,7 +60,7 @@ extension BaseTestSuite {
           struct Inner {
             var name: String
 
-            static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+            static var needleGenerationSchema: NeedleGenerationSchema {
               .object(
                 valueSchema: .object(
                   properties: [
@@ -71,14 +71,14 @@ extension BaseTestSuite {
               )
             }
 
-            init(needleValue: NeedleCore.NeedleValue) throws {
+            init(needleValue: NeedleValue) throws {
               let object = try _needleRequireObjectValue(needleValue)
               self.name = try String(needleValue: _needleValue(object, forKey: "name"))
             }
           }
         }
 
-        extension Outer.Inner: NeedleCore.NeedleGenerable {
+        extension Outer.Inner: NeedleGenerable {
         }
         """
       }
@@ -99,7 +99,7 @@ extension BaseTestSuite {
         struct Person {
           var name: String
 
-          static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+          static var needleGenerationSchema: NeedleGenerationSchema {
             .object(
               valueSchema: .object(
                 properties: [
@@ -110,13 +110,13 @@ extension BaseTestSuite {
             )
           }
 
-          init(needleValue: NeedleCore.NeedleValue) throws {
+          init(needleValue: NeedleValue) throws {
             let object = try _needleRequireObjectValue(needleValue)
             self.name = try String(needleValue: _needleValue(object, forKey: "name"))
           }
         }
 
-        extension Person: NeedleCore.NeedleGenerable {
+        extension Person: NeedleGenerable {
         }
         """
       }
@@ -137,7 +137,7 @@ extension BaseTestSuite {
         struct Person {
           var name: String
 
-          static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+          static var needleGenerationSchema: NeedleGenerationSchema {
             .object(
               valueSchema: .object(
                 properties: [
@@ -148,13 +148,13 @@ extension BaseTestSuite {
             )
           }
 
-          init(needleValue: NeedleCore.NeedleValue) throws {
+          init(needleValue: NeedleValue) throws {
             let object = try _needleRequireObjectValue(needleValue)
             self.name = try String(needleValue: _needleValue(object, forKey: "name"))
           }
         }
 
-        extension Person: NeedleCore.NeedleGenerable {
+        extension Person: NeedleGenerable {
         }
         """
       }
@@ -175,7 +175,7 @@ extension BaseTestSuite {
         struct Person {
           var firstName: String
 
-          static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+          static var needleGenerationSchema: NeedleGenerationSchema {
             .object(
               valueSchema: .object(
                 properties: [
@@ -186,13 +186,13 @@ extension BaseTestSuite {
             )
           }
 
-          init(needleValue: NeedleCore.NeedleValue) throws {
+          init(needleValue: NeedleValue) throws {
             let object = try _needleRequireObjectValue(needleValue)
             self.firstName = try String(needleValue: _needleValue(object, forKey: "first_name"))
           }
         }
 
-        extension Person: NeedleCore.NeedleGenerable {
+        extension Person: NeedleGenerable {
         }
         """
       }
@@ -213,7 +213,7 @@ extension BaseTestSuite {
         struct Payload {
           var name: String
 
-          static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+          static var needleGenerationSchema: NeedleGenerationSchema {
             .object(
               valueSchema: .object(
                 properties: [
@@ -224,13 +224,13 @@ extension BaseTestSuite {
             )
           }
 
-          init(needleValue: NeedleCore.NeedleValue) throws {
+          init(needleValue: NeedleValue) throws {
             let object = try _needleRequireObjectValue(needleValue)
             self.name = try String(needleValue: _needleValue(object, forKey: "display_name"))
           }
         }
 
-        extension Payload: NeedleCore.NeedleGenerable {
+        extension Payload: NeedleGenerable {
         }
         """
       }
@@ -251,17 +251,17 @@ extension BaseTestSuite {
         struct Payload {
           var internalID: String?
 
-          static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+          static var needleGenerationSchema: NeedleGenerationSchema {
             .object(valueSchema: .object())
           }
 
-          init(needleValue: NeedleCore.NeedleValue) throws {
+          init(needleValue: NeedleValue) throws {
             let object = try _needleRequireObjectValue(needleValue)
             self.internalID = nil
           }
         }
 
-        extension Payload: NeedleCore.NeedleGenerable {
+        extension Payload: NeedleGenerable {
         }
         """
       }
@@ -284,7 +284,7 @@ extension BaseTestSuite {
           @StreamParseableMember(key: "name")
           var name: String
 
-          static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+          static var needleGenerationSchema: NeedleGenerationSchema {
             .object(
               valueSchema: .object(
                 properties: [
@@ -295,13 +295,13 @@ extension BaseTestSuite {
             )
           }
 
-          init(needleValue: NeedleCore.NeedleValue) throws {
+          init(needleValue: NeedleValue) throws {
             let object = try _needleRequireObjectValue(needleValue)
             self.name = try String(needleValue: _needleValue(object, forKey: "display_name"))
           }
         }
 
-        extension Payload: NeedleCore.NeedleGenerable {
+        extension Payload: NeedleGenerable {
         }
         """
       }
@@ -324,17 +324,17 @@ extension BaseTestSuite {
           @StreamParseableIgnored
           var internalID: String?
 
-          static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+          static var needleGenerationSchema: NeedleGenerationSchema {
             .object(valueSchema: .object())
           }
 
-          init(needleValue: NeedleCore.NeedleValue) throws {
+          init(needleValue: NeedleValue) throws {
             let object = try _needleRequireObjectValue(needleValue)
             self.internalID = nil
           }
         }
 
-        extension Payload: NeedleCore.NeedleGenerable {
+        extension Payload: NeedleGenerable {
         }
         """
       }
@@ -355,7 +355,7 @@ extension BaseTestSuite {
         struct Person {
           var name: String
 
-          static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+          static var needleGenerationSchema: NeedleGenerationSchema {
             .object(
               valueSchema: .object(
                 properties: [
@@ -366,13 +366,13 @@ extension BaseTestSuite {
             )
           }
 
-          init(needleValue: NeedleCore.NeedleValue) throws {
+          init(needleValue: NeedleValue) throws {
             let object = try _needleRequireObjectValue(needleValue)
             self.name = try String(needleValue: _needleValue(object, forKey: "name"))
           }
         }
 
-        extension Person: NeedleCore.NeedleGenerable {
+        extension Person: NeedleGenerable {
         }
         """
       }
@@ -393,7 +393,7 @@ extension BaseTestSuite {
         struct Person {
           var name: String
 
-          static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+          static var needleGenerationSchema: NeedleGenerationSchema {
             .object(
               valueSchema: .object(
                 properties: [
@@ -404,13 +404,13 @@ extension BaseTestSuite {
             )
           }
 
-          init(needleValue: NeedleCore.NeedleValue) throws {
+          init(needleValue: NeedleValue) throws {
             let object = try _needleRequireObjectValue(needleValue)
             self.name = try String(needleValue: _needleValue(object, forKey: "name"))
           }
         }
 
-        extension Person: NeedleCore.NeedleGenerable {
+        extension Person: NeedleGenerable {
         }
         """
       }
@@ -434,7 +434,7 @@ extension BaseTestSuite {
           var confidence: Double?
           var isVisible: Bool?
 
-          static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+          static var needleGenerationSchema: NeedleGenerationSchema {
             .object(
               valueSchema: .object(
                 properties: [
@@ -445,14 +445,14 @@ extension BaseTestSuite {
             )
           }
 
-          init(needleValue: NeedleCore.NeedleValue) throws {
+          init(needleValue: NeedleValue) throws {
             let object = try _needleRequireObjectValue(needleValue)
             self.confidence = try Optional<Double>(needleValue: _needleValue(object, forKey: "confidence"))
             self.isVisible = try Optional<Bool>(needleValue: _needleValue(object, forKey: "isVisible"))
           }
         }
 
-        extension Payload: NeedleCore.NeedleGenerable {
+        extension Payload: NeedleGenerable {
         }
         """
       }
@@ -476,7 +476,7 @@ extension BaseTestSuite {
           var tags: [String]
           var metadata: [String: Int]
 
-          static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+          static var needleGenerationSchema: NeedleGenerationSchema {
             .object(
               valueSchema: .object(
                 properties: [
@@ -488,14 +488,14 @@ extension BaseTestSuite {
             )
           }
 
-          init(needleValue: NeedleCore.NeedleValue) throws {
+          init(needleValue: NeedleValue) throws {
             let object = try _needleRequireObjectValue(needleValue)
             self.tags = try [String](needleValue: _needleValue(object, forKey: "tags"))
             self.metadata = try [String: Int](needleValue: _needleValue(object, forKey: "metadata"))
           }
         }
 
-        extension Payload: NeedleCore.NeedleGenerable {
+        extension Payload: NeedleGenerable {
         }
         """
       }
@@ -730,7 +730,7 @@ extension BaseTestSuite {
           var title: String?
           var count: Int?
 
-          static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+          static var needleGenerationSchema: NeedleGenerationSchema {
             .object(
               valueSchema: .object(
                 properties: [
@@ -741,14 +741,14 @@ extension BaseTestSuite {
             )
           }
 
-          init(needleValue: NeedleCore.NeedleValue) throws {
+          init(needleValue: NeedleValue) throws {
             let object = try _needleRequireObjectValue(needleValue)
             self.title = try Optional<String>(needleValue: _needleValue(object, forKey: "title"))
             self.count = try Optional<Int>(needleValue: _needleValue(object, forKey: "count"))
           }
         }
 
-        extension Payload: NeedleCore.NeedleGenerable {
+        extension Payload: NeedleGenerable {
         }
         """
       }
@@ -815,7 +815,7 @@ extension BaseTestSuite {
         struct Payload {
           var values: [[String]]
 
-          static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+          static var needleGenerationSchema: NeedleGenerationSchema {
             .object(
               valueSchema: .object(
                 properties: [
@@ -826,13 +826,13 @@ extension BaseTestSuite {
             )
           }
 
-          init(needleValue: NeedleCore.NeedleValue) throws {
+          init(needleValue: NeedleValue) throws {
             let object = try _needleRequireObjectValue(needleValue)
             self.values = try [[String]](needleValue: _needleValue(object, forKey: "values"))
           }
         }
 
-        extension Payload: NeedleCore.NeedleGenerable {
+        extension Payload: NeedleGenerable {
         }
         """
       }
@@ -876,7 +876,7 @@ extension BaseTestSuite {
         struct Payload {
           var payload: [String: [String: [String: Int]]]
 
-          static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+          static var needleGenerationSchema: NeedleGenerationSchema {
             .object(
               valueSchema: .object(
                 properties: [
@@ -887,13 +887,13 @@ extension BaseTestSuite {
             )
           }
 
-          init(needleValue: NeedleCore.NeedleValue) throws {
+          init(needleValue: NeedleValue) throws {
             let object = try _needleRequireObjectValue(needleValue)
             self.payload = try [String: [String: [String: Int]]](needleValue: _needleValue(object, forKey: "payload"))
           }
         }
 
-        extension Payload: NeedleCore.NeedleGenerable {
+        extension Payload: NeedleGenerable {
         }
         """
       }
@@ -983,16 +983,16 @@ extension BaseTestSuite {
         struct Payload {
           var internalID: String = "default"
 
-          static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+          static var needleGenerationSchema: NeedleGenerationSchema {
             .object(valueSchema: .object())
           }
 
-          init(needleValue: NeedleCore.NeedleValue) throws {
+          init(needleValue: NeedleValue) throws {
             _ = try _needleRequireObjectValue(needleValue)
           }
         }
 
-        extension Payload: NeedleCore.NeedleGenerable {
+        extension Payload: NeedleGenerable {
         }
         """
       }
@@ -1043,7 +1043,7 @@ extension BaseTestSuite {
             self.name = "custom"
           }
 
-          static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+          static var needleGenerationSchema: NeedleGenerationSchema {
             .object(
               valueSchema: .object(
                 properties: [
@@ -1055,7 +1055,7 @@ extension BaseTestSuite {
           }
         }
 
-        extension Payload: NeedleCore.NeedleGenerable {
+        extension Payload: NeedleGenerable {
         }
         """
       }
@@ -1080,7 +1080,7 @@ extension BaseTestSuite {
         struct Payload {
           var user: User
 
-          static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+          static var needleGenerationSchema: NeedleGenerationSchema {
             .object(
               valueSchema: .object(
                 properties: [
@@ -1091,7 +1091,7 @@ extension BaseTestSuite {
             )
           }
 
-          init(needleValue: NeedleCore.NeedleValue) throws {
+          init(needleValue: NeedleValue) throws {
             let object = try _needleRequireObjectValue(needleValue)
             self.user = try User(needleValue: _needleValue(object, forKey: "user"))
           }
@@ -1099,7 +1099,7 @@ extension BaseTestSuite {
         struct User {
           var name: String
 
-          static var needleGenerationSchema: NeedleCore.NeedleGenerationSchema {
+          static var needleGenerationSchema: NeedleGenerationSchema {
             .object(
               valueSchema: .object(
                 properties: [
@@ -1110,16 +1110,16 @@ extension BaseTestSuite {
             )
           }
 
-          init(needleValue: NeedleCore.NeedleValue) throws {
+          init(needleValue: NeedleValue) throws {
             let object = try _needleRequireObjectValue(needleValue)
             self.name = try String(needleValue: _needleValue(object, forKey: "name"))
           }
         }
 
-        extension Payload: NeedleCore.NeedleGenerable {
+        extension Payload: NeedleGenerable {
         }
 
-        extension User: NeedleCore.NeedleGenerable {
+        extension User: NeedleGenerable {
         }
         """
       }

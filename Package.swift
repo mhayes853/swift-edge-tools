@@ -14,8 +14,7 @@ let package = Package(
     .visionOS(.v1)
   ],
   products: [
-    .library(name: "Needle", targets: ["Needle"]),
-    .library(name: "NeedleCore", targets: ["NeedleCore"])
+    .library(name: "Needle", targets: ["Needle"])
   ],
   traits: [
     .trait(name: "SwiftNeedleXGrammar", description: "XGrammar-powered structured generation."),
@@ -53,10 +52,10 @@ let package = Package(
     .package(url: "https://github.com/huggingface/swift-transformers", from: "1.3.0")
   ],
   targets: [
-    .target(name: "Needle", dependencies: ["NeedleCore", "NeedleMacros"]),
     .target(
-      name: "NeedleCore",
+      name: "Needle",
       dependencies: [
+        "NeedleMacros",
         .product(name: "MLX", package: "mlx-swift", condition: .when(traits: ["SwiftNeedleMLX"])),
         .product(name: "MLXNN", package: "mlx-swift", condition: .when(traits: ["SwiftNeedleMLX"])),
         .product(

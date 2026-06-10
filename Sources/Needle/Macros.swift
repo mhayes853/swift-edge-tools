@@ -1,5 +1,3 @@
-import NeedleCore
-
 // MARK: - Macros
 
 /// Generates ``NeedleGenerable`` support for a struct.

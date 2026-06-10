@@ -10,7 +10,7 @@
 
     public init(matcher: Matcher) {
       self.matcher = matcher
-      self.bitmaskTable = NeedleCore.bitmaskTable()
+      self.bitmaskTable = Needle.bitmaskTable()
     }
 
     public mutating func prompt(_ prompt: MLXArray) {
