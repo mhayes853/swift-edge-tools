@@ -12,7 +12,7 @@
     @Test
     func `Sentinel Token Ids`() throws {
       let tokenizer = try NeedleSentencepieceTokenizer(modelURL: self.modelURL)
-      expectNoDifference(tokenizer.unkTokenId, 3)
+      expectNoDifference(tokenizer.unknownTokenId, 3)
       expectNoDifference(tokenizer.bosTokenId, 2)
       expectNoDifference(tokenizer.eosTokenId, 1)
       expectNoDifference(tokenizer.padTokenId, 0)
@@ -60,7 +60,7 @@
       let tokenizer = try NeedleSentencepieceTokenizer(modelURL: self.modelURL)
       expectNoDifference(
         tokenizer.tokenIds(from: ["shdkjhdksahdiiwsubdnuiwsduybsw"]),
-        [tokenizer.unkTokenId]
+        [tokenizer.unknownTokenId]
       )
     }
 
@@ -80,7 +80,7 @@
       @Test
       func `HF Convert Token To Id Returns Unk For Unk Token`() throws {
         let tokenizer = try NeedleSentencepieceTokenizer(modelURL: self.modelURL)
-        expectNoDifference(tokenizer.convertTokenToId("<unk>"), tokenizer.unkTokenId)
+        expectNoDifference(tokenizer.convertTokenToId("<unk>"), tokenizer.unknownTokenId)
       }
 
       @Test

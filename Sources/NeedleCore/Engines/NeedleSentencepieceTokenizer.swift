@@ -1,33 +1,15 @@
 #if SwiftNeedleSentencepiece
   import Foundation
   import CNeedleSentencepiece
-  #if SwiftNeedleTokenizers
-    import Tokenizers
-    import Hub
-  #endif
+  import Tokenizers
+  import Hub
 
   // MARK: - NeedleSentencepieceTokenizer
 
-  public final class NeedleSentencepieceTokenizer {
+  public final class NeedleSentencepieceTokenizer: TokenizingModel {
     private static let tokenBufferSize = 256
 
     public let tokenizer: needle_sp_tokenizer_t
-
-    public var unkTokenId: NeedleToken.ID {
-      Int(needle_sp_tokenizer_unk_token_id(self.tokenizer))
-    }
-
-    public var bosTokenId: Int? {
-      Int(needle_sp_tokenizer_bos_token_id(self.tokenizer))
-    }
-
-    public var eosTokenId: Int? {
-      Int(needle_sp_tokenizer_eos_token_id(self.tokenizer))
-    }
-
-    public var padTokenId: NeedleToken.ID {
-      Int(needle_sp_tokenizer_pad_token_id(self.tokenizer))
-    }
 
     public var vocabSize: Int {
       needle_sp_tokenizer_vocab_size(self.tokenizer)
@@ -102,6 +84,52 @@
       defer { str?.deallocate() }
       return str.map { String(cString: $0) } ?? ""
     }
+
+    public func tokenize(text: String) -> [String] {
+      self.tokens(from: self.encode(text: text))
+    }
+
+    public func convertTokenToId(_ token: String) -> Int? {
+      guard token != self.unknownToken else { return self.unknownTokenId }
+      guard let id = self.tokenIds(from: [token]).first.map({ Int($0) }) else { return nil }
+      return id == self.unknownTokenId ? nil : id
+    }
+
+    public func convertIdToToken(_ id: Int) -> String? {
+      guard id != self.unknownTokenId else { return nil }
+      guard let token = self.tokens(from: [id]).first, !token.isEmpty else { return nil }
+      return token
+    }
+
+    public var bosToken: String? {
+      self.bosTokenId.flatMap(self.convertIdToToken)
+    }
+
+    public var bosTokenId: NeedleToken.ID? {
+      Int(needle_sp_tokenizer_bos_token_id(self.tokenizer))
+    }
+
+    public var eosToken: String? {
+      self.eosTokenId.flatMap(self.convertIdToToken)
+    }
+
+    public var eosTokenId: NeedleToken.ID? {
+      Int(needle_sp_tokenizer_eos_token_id(self.tokenizer))
+    }
+
+    public var unknownToken: String? {
+      self.unknownTokenId.flatMap { self.tokens(from: [$0]).first }
+    }
+
+    public var unknownTokenId: Int? {
+      Int(needle_sp_tokenizer_unk_token_id(self.tokenizer))
+    }
+
+    public var padTokenId: NeedleToken.ID {
+      Int(needle_sp_tokenizer_pad_token_id(self.tokenizer))
+    }
+
+    public var fuseUnknownTokens: Bool { false }
   }
 
   // MARK: - NeedleSentencepieceTokenizerError
@@ -113,44 +141,4 @@
       self.message = String(cString: needle_sp_last_error_message())
     }
   }
-
-  // MARK: - PreTrainedTokenizerModel
-
-  #if SwiftNeedleTokenizers
-    extension NeedleSentencepieceTokenizer: TokenizingModel {
-      public func tokenize(text: String) -> [String] {
-        self.tokens(from: self.encode(text: text))
-      }
-
-      public func convertTokenToId(_ token: String) -> Int? {
-        guard token != self.unknownToken else { return self.unkTokenId }
-        guard let id = self.tokenIds(from: [token]).first.map({ Int($0) }) else { return nil }
-        return id == self.unkTokenId ? nil : id
-      }
-
-      public func convertIdToToken(_ id: Int) -> String? {
-        guard id != self.unkTokenId else { return nil }
-        guard let token = self.tokens(from: [id]).first, !token.isEmpty else { return nil }
-        return token
-      }
-
-      public var bosToken: String? {
-        self.bosTokenId.flatMap(self.convertIdToToken)
-      }
-
-      public var eosToken: String? {
-        self.eosTokenId.flatMap(self.convertIdToToken)
-      }
-
-      public var unknownToken: String? {
-        self.tokens(from: [self.unkTokenId]).first
-      }
-
-      public var unknownTokenId: Int? {
-        self.unkTokenId
-      }
-
-      public var fuseUnknownTokens: Bool { false }
-    }
-  #endif
 #endif
