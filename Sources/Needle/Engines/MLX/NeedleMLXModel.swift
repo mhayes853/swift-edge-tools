@@ -72,19 +72,6 @@
     }
   }
 
-  // MARK: - Prompt Formatting
-
-  extension NeedleMLXModel {
-    public static func input(
-      from prompt: NeedlePrompt,
-      using tokenizer: borrowing some TokenizingModel
-    ) throws -> LMInput {
-      let tokenStrings = try tokenizer.tokenize(text: prompt.formatted())
-      let tokens = tokenStrings.compactMap(tokenizer.convertTokenToId)
-      return LMInput(text: LMInput.Text(tokens: MLXArray(tokens)))
-    }
-  }
-
   // MARK: - SimpleAttentionNetwork
 
   private final class NeedleSimpleAttentionNetwork: Module {
