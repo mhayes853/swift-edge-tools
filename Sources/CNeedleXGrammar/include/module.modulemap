@@ -1,4 +1,6 @@
 module CNeedleXGrammar {
     header "bridging.h"
+    header "dlpack/dlpack.h"
+
     export *
 }
