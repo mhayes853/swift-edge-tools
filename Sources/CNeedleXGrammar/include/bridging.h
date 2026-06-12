@@ -1,0 +1,4 @@
+#ifndef __NEEDLE_XGRAMMAR_BRIDGING_H__
+#define __NEEDLE_XGRAMMAR_BRIDGING_H__
+
+#endif

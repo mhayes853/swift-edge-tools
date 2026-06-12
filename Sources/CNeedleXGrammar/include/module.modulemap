@@ -1,0 +1,4 @@
+module CNeedleXGrammar {
+    header "bridging.h"
+    export *
+}

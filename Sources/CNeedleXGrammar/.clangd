@@ -1,0 +1,8 @@
+CompileFlags:
+  Add:
+    - -I.
+    - -Iinclude
+
+Diagnostics:
+  Suppress:
+    - -Wdeprecated-declarations

@@ -46,10 +46,10 @@ let package = Package(
     .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.18.7"),
     .package(url: "https://github.com/pointfreeco/swift-custom-dump", from: "1.3.3"),
     .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.31.3"),
-    .package(url: "https://github.com/mattt/swift-xgrammar", from: "0.1.0"),
     .package(url: "https://github.com/pointfreeco/swift-macro-testing", from: "0.6.5"),
     .package(url: "https://github.com/swiftlang/swift-syntax", "600.0.0"..<"603.0.0"),
-    .package(url: "https://github.com/huggingface/swift-transformers", from: "1.3.0")
+    .package(url: "https://github.com/huggingface/swift-transformers", from: "1.3.0"),
+    .package(url: "https://github.com/mlc-ai/xgrammar", from: "0.2.2")
   ],
   targets: [
     .target(
@@ -68,11 +68,7 @@ let package = Package(
           package: "mlx-swift-lm",
           condition: .when(traits: ["SwiftNeedleMLX"])
         ),
-        .product(
-          name: "XGrammar",
-          package: "swift-xgrammar",
-          condition: .when(traits: ["SwiftNeedleXGrammar"])
-        ),
+        .target(name: "CNeedleXGrammar", condition: .when(traits: ["SwiftNeedleXGrammar"])),
         .product(
           name: "Tokenizers",
           package: "swift-transformers",
@@ -89,6 +85,11 @@ let package = Package(
         )
       ],
       swiftSettings: [.enableExperimentalFeature("LifetimeDependence")]
+    ),
+    .target(
+      name: "CNeedleXGrammar",
+      dependencies: [.product(name: "XGrammar", package: "xgrammar")],
+      publicHeadersPath: "include"
     ),
     .target(
       name: "CNeedleSentencepiece",

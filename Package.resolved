@@ -1,5 +1,5 @@
 {
-  "originHash" : "b7dad1820a1b85c1bcc9fbbcfcc598d04f4a67892098732392e482e9addf0710",
+  "originHash" : "568f677df5643288e5b6727abb284328776d616cf9b96346b919ebb0cedb9f5a",
   "pins" : [
     {
       "identity" : "eventsource",
@@ -155,21 +155,21 @@
       }
     },
     {
-      "identity" : "swift-xgrammar",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/mattt/swift-xgrammar",
-      "state" : {
-        "revision" : "e0f2de361aa4891dbca5113629bc90ab8e5c3888",
-        "version" : "0.1.0"
-      }
-    },
-    {
       "identity" : "xctest-dynamic-overlay",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/pointfreeco/xctest-dynamic-overlay",
       "state" : {
         "revision" : "dfd70507def84cb5fb821278448a262c6ff2bbad",
         "version" : "1.9.0"
+      }
+    },
+    {
+      "identity" : "xgrammar",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/mlc-ai/xgrammar",
+      "state" : {
+        "revision" : "4d145cc13d878c751ebeed36af1c013074be76bc",
+        "version" : "0.2.2"
       }
     },
     {

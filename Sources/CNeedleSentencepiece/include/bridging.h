@@ -1,4 +1,5 @@
-#pragma once
+#ifndef __NEEDLE_SENTENCEPIECE_BRIDGING_H__
+#define __NEEDLE_SENTENCEPIECE_BRIDGING_H__
 
 #include <stdlib.h>
 #include <stdbool.h>
@@ -45,4 +46,5 @@ void needle_sp_tokenizer_destroy(needle_sp_tokenizer_t tokenizer);
 
 #ifdef __cplusplus
 }
+#endif
 #endif
