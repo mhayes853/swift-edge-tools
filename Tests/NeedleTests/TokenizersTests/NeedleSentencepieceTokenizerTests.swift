@@ -43,6 +43,13 @@
     }
 
     @Test
+    func `Encoded Vocab Snapshot`() throws {
+      let tokenizer = try NeedleSentencepieceTokenizer(modelURL: self.modelURL)
+      let vocab = tokenizer.encodedVocab()
+      assertSnapshot(of: vocab, as: .dump)
+    }
+
+    @Test
     func `Token Id Conversions`() throws {
       let tokenizer = try NeedleSentencepieceTokenizer(modelURL: self.modelURL)
 

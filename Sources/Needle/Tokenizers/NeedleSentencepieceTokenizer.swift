@@ -29,6 +29,13 @@
 
     deinit { needle_sp_tokenizer_destroy(self.tokenizer) }
 
+    public func encodedVocab() -> [String] {
+      self.withCCharStringBuffer(count: self.vocabSize) { buffer in
+        _ = needle_sp_tokenizer_encoded_vocab(self.tokenizer, buffer.baseAddress)
+        return Array(buffer).map { String(cString: $0!) }
+      }
+    }
+
     public func tokenIds(from tokens: [String]) -> [NeedleToken.ID] {
       let buffer = UnsafeMutablePointer<Int32>.allocate(capacity: tokens.count)
       defer { buffer.deallocate() }
@@ -44,28 +51,18 @@
     }
 
     public func tokens(from tokenIds: [NeedleToken.ID]) -> [String] {
-      let buffer = UnsafeMutableBufferPointer<UnsafeMutablePointer<CChar>?>
-        .allocate(capacity: tokenIds.count)
-      for i in 0..<buffer.count {
-        buffer[i] = .allocate(capacity: Self.tokenBufferSize)
+      self.withCCharStringBuffer(count: tokenIds.count) { buffer in
+        tokenIds.map { Int32($0) }
+          .withUnsafeBufferPointer { tokenIdsPtr in
+            _ = needle_sp_tokenizer_ids_to_tokens(
+              self.tokenizer,
+              tokenIdsPtr.baseAddress,
+              buffer.baseAddress,
+              buffer.count
+            )
+          }
+        return Array(buffer).map { String(cString: $0!) }
       }
-      defer {
-        for i in 0..<buffer.count {
-          buffer[i]?.deallocate()
-        }
-        buffer.deallocate()
-      }
-
-      _ = tokenIds.map { Int32($0) }
-        .withUnsafeBufferPointer { tokenIdsPtr in
-          needle_sp_tokenizer_ids_to_tokens(
-            self.tokenizer,
-            tokenIdsPtr.baseAddress,
-            buffer.baseAddress,
-            tokenIds.count
-          )
-        }
-      return Array(buffer).map { String(cString: $0!) }
     }
 
     public func encode(text: String) -> [NeedleToken.ID] {
@@ -130,6 +127,24 @@
     }
 
     public var fuseUnknownTokens: Bool { false }
+
+    private func withCCharStringBuffer<Result>(
+      count: Int,
+      _ body: (UnsafeMutableBufferPointer<UnsafeMutablePointer<CChar>?>) throws -> Result
+    ) rethrows -> Result {
+      let buffer = UnsafeMutableBufferPointer<UnsafeMutablePointer<CChar>?>
+        .allocate(capacity: count * MemoryLayout<CChar>.size)
+      for i in 0..<buffer.count {
+        buffer[i] = .allocate(capacity: Self.tokenBufferSize * MemoryLayout<CChar>.size)
+      }
+      defer {
+        for i in 0..<buffer.count {
+          buffer[i]?.deallocate()
+        }
+        buffer.deallocate()
+      }
+      return try body(buffer)
+    }
   }
 
   // MARK: - NeedleSentencepieceTokenizerError

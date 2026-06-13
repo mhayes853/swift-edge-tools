@@ -155,7 +155,18 @@ int needle_sp_tokenizer_ids_to_tokens(
             continue;
         }
         const auto& token = handle->processor->IdToPiece(id);
-        std::strncpy(tokens[i], token.c_str(), token.size());
+        std::strcpy(tokens[i], token.c_str());
+    }
+    return 0;
+}
+
+int needle_sp_tokenizer_encoded_vocab(needle_sp_tokenizer_t tokenizer, char** encoded_vocab) {
+    const auto* handle = static_cast<NeedleSPHandle*>(tokenizer);
+    if (!handle || !encoded_vocab) return -1;
+
+    for (size_t i = 0; i < needle_sp_tokenizer_vocab_size(tokenizer); i++) {
+        const auto& token = handle->processor->IdToPiece(i);
+        std::strcpy(encoded_vocab[i], token.c_str());
     }
     return 0;
 }
