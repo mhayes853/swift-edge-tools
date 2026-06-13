@@ -8,6 +8,9 @@
 extern "C" {
 #endif
 
+#define kNeedleXGrammarCompilerHardwareConcurrency -1
+#define kNeedleXGrammarCompilerNoMemoryLimit -1
+
 typedef void* needle_xgrammar_compiler_t;
 typedef void* needle_xgrammar_matcher_t;
 typedef void* needle_xgrammar_grammar_t;
