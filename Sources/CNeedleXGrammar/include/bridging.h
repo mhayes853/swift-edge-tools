@@ -26,7 +26,7 @@ needle_xgrammar_matcher_t needle_xgrammar_compile_matcher(
     needle_xgrammar_grammar_t grammar
 );
 needle_xgrammar_matcher_t needle_xgrammar_matcher_fork(needle_xgrammar_matcher_t matcher);
-int needle_xgrammar_matcher_next_bitmask(needle_xgrammar_matcher_t matcher, int* bitmask);
+int needle_xgrammar_matcher_bitmask(needle_xgrammar_matcher_t matcher, int* bitmask);
 int needle_xgrammar_matcher_accept_token(needle_xgrammar_matcher_t matcher, int token);
 int needle_xgrammar_matcher_is_completed(needle_xgrammar_matcher_t matcher);
 int needle_xgrammar_matcher_is_terminated(needle_xgrammar_matcher_t matcher);
