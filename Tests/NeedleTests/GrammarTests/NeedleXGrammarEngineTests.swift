@@ -7,10 +7,10 @@
   @Suite
   struct `NeedleXGrammarEngine tests` {
     private let engine: NeedleXGrammarEngine
-    private let tokenizer: NeedleSentencepieceTokenizer
+    private let tokenizer: NeedleSPTokenizingModel
 
     init() throws {
-      let tokenizer = try NeedleSentencepieceTokenizer(modelURL: .testTokenizerModel)
+      let tokenizer = try NeedleSPTokenizingModel(modelURL: .testTokenizerModel)
       self.tokenizer = tokenizer
       self.engine = try #require(NeedleXGrammarEngine(tokenizer: tokenizer))
     }
@@ -46,11 +46,11 @@
     @Suite
     struct `Matcher tests` {
       private let engine: NeedleXGrammarEngine
-      private let tokenizer: NeedleSentencepieceTokenizer
+      private let tokenizer: NeedleSPTokenizingModel
       private let eosToken: NeedleToken.ID
 
       init() throws {
-        let tokenizer = try NeedleSentencepieceTokenizer(modelURL: .testTokenizerModel)
+        let tokenizer = try NeedleSPTokenizingModel(modelURL: .testTokenizerModel)
         self.tokenizer = tokenizer
         self.eosToken = try #require(tokenizer.eosTokenId)
         self.engine = try #require(NeedleXGrammarEngine(tokenizer: tokenizer))

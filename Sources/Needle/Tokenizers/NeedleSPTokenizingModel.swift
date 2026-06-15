@@ -6,7 +6,7 @@
 
   // MARK: - NeedleSentencepieceTokenizer
 
-  public final class NeedleSentencepieceTokenizer: TokenizingModel {
+  public final class NeedleSPTokenizingModel: TokenizingModel {
     private static let tokenBufferSize = 256
 
     public let tokenizer: needle_sp_tokenizer_t

@@ -139,7 +139,7 @@
   #if SwiftNeedleSentencepiece
     extension NeedleXGrammarEngine {
       public convenience init?(
-        tokenizer: NeedleSentencepieceTokenizer,
+        tokenizer: NeedleSPTokenizingModel,
         configuration: Configuration = Configuration()
       ) {
         guard let eosTokenId = tokenizer.eosTokenId else { return nil }

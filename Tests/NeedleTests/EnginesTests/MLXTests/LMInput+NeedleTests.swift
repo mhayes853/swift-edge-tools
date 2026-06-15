@@ -11,7 +11,7 @@
   struct `LMInput+Needle tests` {
     @Test
     func `Needle Snapshot`() throws {
-      let tokenizer = try NeedleSentencepieceTokenizer(modelURL: .testTokenizerModel)
+      let tokenizer = try NeedleSPTokenizingModel(modelURL: .testTokenizerModel)
       let prompt = NeedlePrompt(
         system: "You are a helpful assistant who can send emails.",
         user: "Send an email to Henry.",
