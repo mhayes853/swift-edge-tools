@@ -7,9 +7,13 @@
   public final class NeedleXGrammarEngine: NeedleGrammarEngine {
     public let compiler: needle_xgrammar_compiler_t
 
-    public init(encodedVocab: [String], configuration: Configuration = Configuration()) {
+    public init(
+      encodedVocab: [String],
+      eosTokenId: NeedleToken.ID,
+      configuration: Configuration = Configuration()
+    ) {
       self.compiler = withCStringPointerBuffer(encodedVocab) { buffer in
-        needle_xgrammar_compiler_init(buffer.baseAddress, buffer.count)
+        needle_xgrammar_compiler_init(buffer.baseAddress, buffer.count, Int32(eosTokenId))
       }
       self.apply(configuration: configuration)
     }
@@ -95,11 +99,11 @@
 
       deinit { needle_xgrammar_matcher_destroy(self.matcher) }
 
-      public func isCompleted() -> Bool {
+      public var isCompleted: Bool {
         needle_xgrammar_matcher_is_completed(self.matcher).boolValue
       }
 
-      public func isTerminated() -> Bool {
+      public var isTerminated: Bool {
         needle_xgrammar_matcher_is_terminated(self.matcher).boolValue
       }
 
@@ -119,8 +123,9 @@
         return bitmask
       }
 
-      public func accept(tokenId: NeedleToken.ID) {
-        needle_xgrammar_matcher_accept_token(self.matcher, Int32(tokenId))
+      @discardableResult
+      public func accept(tokenId: NeedleToken.ID) -> Bool {
+        needle_xgrammar_matcher_accept_token(self.matcher, Int32(tokenId)).boolValue
       }
 
       public func fork() -> Matcher {

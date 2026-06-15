@@ -15,7 +15,11 @@ typedef void* needle_xgrammar_compiler_t;
 typedef void* needle_xgrammar_matcher_t;
 typedef void* needle_xgrammar_grammar_t;
 
-needle_xgrammar_compiler_t needle_xgrammar_compiler_init(const char** encoded_vocab, size_t vocab_size);
+needle_xgrammar_compiler_t needle_xgrammar_compiler_init(
+    const char** encoded_vocab,
+    size_t vocab_size,
+    int eos_token_id
+);
 void needle_xgrammar_compiler_set_memory_limit(needle_xgrammar_compiler_t compiler, int64_t limit);
 void needle_xgrammar_compiler_set_max_threads(needle_xgrammar_compiler_t compiler, int64_t threads);
 void needle_xgrammar_compiler_set_cache_enabled(needle_xgrammar_compiler_t compiler, int is_enabled);

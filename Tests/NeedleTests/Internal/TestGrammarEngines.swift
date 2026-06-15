@@ -12,7 +12,8 @@ struct AlwaysGrammarEngine: NeedleGrammarEngine {
       return mask
     }
 
-    func accept(tokenId: Int) {
+    func accept(tokenId: Int) -> Bool {
+      true
     }
   }
 
@@ -31,7 +32,8 @@ struct ConstantGrammarEngine: NeedleGrammarEngine {
       self.mask
     }
 
-    func accept(tokenId: Int) {
+    func accept(tokenId: Int) -> Bool {
+      true
     }
   }
 
