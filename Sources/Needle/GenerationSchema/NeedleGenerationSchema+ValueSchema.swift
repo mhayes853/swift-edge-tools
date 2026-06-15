@@ -348,6 +348,20 @@ extension NeedleGenerationSchema.ValueSchema {
     /// [contains](https://json-schema.org/draft/2020-12/json-schema-validation#name-contains)
     public var contains: NeedleGenerationSchema?
 
+    /// The minimum number of array elements that must match ``contains``.
+    ///
+    /// Has no effect when ``contains`` is not present.
+    ///
+    /// [minContains](https://json-schema.org/draft/2020-12/json-schema-validation#name-mincontains)
+    public var minContains: Int?
+
+    /// The maximum number of array elements that may match ``contains``.
+    ///
+    /// Has no effect when ``contains`` is not present.
+    ///
+    /// [maxContains](https://json-schema.org/draft/2020-12/json-schema-validation#name-maxcontains)
+    public var maxContains: Int?
+
     /// Creates an array-specific schema.
     ///
     /// - Parameters:
@@ -357,13 +371,17 @@ extension NeedleGenerationSchema.ValueSchema {
     ///   - maxItems: The maximum number of items allowed in the array.
     ///   - uniqueItems: A boolean that indicates whether all items in the array must be unique.
     ///   - contains: A schema that must be contained within the array.
+    ///   - minContains: The minimum number of array elements that must match ``contains``.
+    ///   - maxContains: The maximum number of array elements that may match ``contains``.
     public static func array(
       items: NeedleGenerationSchema? = nil,
       prefixItems: [NeedleGenerationSchema]? = nil,
       minItems: Int? = nil,
       maxItems: Int? = nil,
       uniqueItems: Bool? = nil,
-      contains: NeedleGenerationSchema? = nil
+      contains: NeedleGenerationSchema? = nil,
+      minContains: Int? = nil,
+      maxContains: Int? = nil
     ) -> Self {
       Self(
         items: items,
@@ -371,7 +389,9 @@ extension NeedleGenerationSchema.ValueSchema {
         minItems: minItems,
         maxItems: maxItems,
         uniqueItems: uniqueItems,
-        contains: contains
+        contains: contains,
+        minContains: minContains,
+        maxContains: maxContains
       )
     }
   }
@@ -385,13 +405,17 @@ extension NeedleGenerationSchema.ValueSchema {
   ///   - maxItems: The maximum number of items allowed in the array.
   ///   - uniqueItems: A boolean that indicates whether all items in the array must be unique.
   ///   - contains: A schema that must be contained within the array.
+  ///   - minContains: The minimum number of array elements that must match `contains`.
+  ///   - maxContains: The maximum number of array elements that may match `contains`.
   public static func array(
     items: NeedleGenerationSchema? = nil,
     prefixItems: [NeedleGenerationSchema]? = nil,
     minItems: Int? = nil,
     maxItems: Int? = nil,
     uniqueItems: Bool? = nil,
-    contains: NeedleGenerationSchema? = nil
+    contains: NeedleGenerationSchema? = nil,
+    minContains: Int? = nil,
+    maxContains: Int? = nil
   ) -> Self {
     .union(
       array: .array(
@@ -400,7 +424,9 @@ extension NeedleGenerationSchema.ValueSchema {
         minItems: minItems,
         maxItems: maxItems,
         uniqueItems: uniqueItems,
-        contains: contains
+        contains: contains,
+        minContains: minContains,
+        maxContains: maxContains
       )
     )
   }
@@ -448,6 +474,12 @@ extension NeedleGenerationSchema.ValueSchema {
     /// [propertyNames](https://json-schema.org/draft/2020-12/json-schema-validation#name-a-vocabulary-for-structural-validation)
     public var propertyNames: NeedleGenerationSchema?
 
+    /// A dictionary mapping property names to additional property names that are required when the
+    /// key property is present in the object.
+    ///
+    /// [dependentRequired](https://json-schema.org/draft/2020-12/json-schema-validation#name-dependentrequired)
+    public var dependentRequired: [Swift.String: [Swift.String]]?
+
     /// Creates an object-specific schema.
     ///
     /// - Parameters:
@@ -458,6 +490,7 @@ extension NeedleGenerationSchema.ValueSchema {
     ///   - additionalProperties: A schema that defines constraints for additional properties not defined on the object.
     ///   - patternProperties: A dictionary of regex patterns and their corresponding schemas for matching property names.
     ///   - propertyNames: A schema that defines constraints for property names.
+    ///   - dependentRequired: A dictionary mapping property names to additional property names that are required when the key property is present.
     public static func object(
       properties: [Swift.String: NeedleGenerationSchema]? = nil,
       required: [Swift.String]? = nil,
@@ -465,7 +498,8 @@ extension NeedleGenerationSchema.ValueSchema {
       maxProperties: Int? = nil,
       additionalProperties: NeedleGenerationSchema? = nil,
       patternProperties: [Swift.String: NeedleGenerationSchema]? = nil,
-      propertyNames: NeedleGenerationSchema? = nil
+      propertyNames: NeedleGenerationSchema? = nil,
+      dependentRequired: [Swift.String: [Swift.String]]? = nil
     ) -> Self {
       Self(
         properties: properties,
@@ -474,7 +508,8 @@ extension NeedleGenerationSchema.ValueSchema {
         maxProperties: maxProperties,
         additionalProperties: additionalProperties,
         patternProperties: patternProperties,
-        propertyNames: propertyNames
+        propertyNames: propertyNames,
+        dependentRequired: dependentRequired
       )
     }
   }
@@ -489,6 +524,7 @@ extension NeedleGenerationSchema.ValueSchema {
   ///   - additionalProperties: A schema that defines constraints for additional properties not defined on the object.
   ///   - patternProperties: A dictionary of regex patterns and their corresponding schemas for matching property names.
   ///   - propertyNames: A schema that defines constraints for property names.
+  ///   - dependentRequired: A dictionary mapping property names to additional property names that are required when the key property is present.
   public static func object(
     properties: [Swift.String: NeedleGenerationSchema]? = nil,
     required: [Swift.String]? = nil,
@@ -496,7 +532,8 @@ extension NeedleGenerationSchema.ValueSchema {
     maxProperties: Int? = nil,
     additionalProperties: NeedleGenerationSchema? = nil,
     patternProperties: [Swift.String: NeedleGenerationSchema]? = nil,
-    propertyNames: NeedleGenerationSchema? = nil
+    propertyNames: NeedleGenerationSchema? = nil,
+    dependentRequired: [Swift.String: [Swift.String]]? = nil
   ) -> Self {
     .union(
       object: .object(
@@ -506,7 +543,8 @@ extension NeedleGenerationSchema.ValueSchema {
         maxProperties: maxProperties,
         additionalProperties: additionalProperties,
         patternProperties: patternProperties,
-        propertyNames: propertyNames
+        propertyNames: propertyNames,
+        dependentRequired: dependentRequired
       )
     )
   }

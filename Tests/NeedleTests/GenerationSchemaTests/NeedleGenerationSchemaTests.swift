@@ -57,6 +57,51 @@ struct `NeedleGenerationSchema tests` {
     expectNoDifference(array, decodedValue)
   }
 
+  @Test(
+    arguments: [
+      (
+        NeedleGenerationSchema.ValueSchema.Array.array(
+          contains: NeedleGenerationSchema.object(valueSchema: .number()),
+          minContains: 1,
+          maxContains: 3
+        ),
+        #"{"contains":{"type":"number"},"maxContains":3,"minContains":1}"#
+      )
+    ]
+  )
+  func `Array Min And Max Contains JSON`(
+    array: NeedleGenerationSchema.ValueSchema.Array, json: String
+  ) throws {
+    let data = try Self.jsonEncoder.encode(array)
+    expectNoDifference(String(decoding: data, as: UTF8.self), json)
+
+    let decodedValue = try JSONDecoder()
+      .decode(NeedleGenerationSchema.ValueSchema.Array.self, from: data)
+    expectNoDifference(array, decodedValue)
+  }
+
+  @Test(
+    arguments: [
+      (
+        NeedleGenerationSchema.ValueSchema.Object.object(
+          properties: ["name": .string()],
+          dependentRequired: ["name": ["age"]]
+        ),
+        #"{"dependentRequired":{"name":["age"]},"properties":{"name":{"type":"string"}}}"#
+      )
+    ]
+  )
+  func `Object Dependent Required JSON`(
+    object: NeedleGenerationSchema.ValueSchema.Object, json: String
+  ) throws {
+    let data = try Self.jsonEncoder.encode(object)
+    expectNoDifference(String(decoding: data, as: UTF8.self), json)
+
+    let decodedValue = try JSONDecoder()
+      .decode(NeedleGenerationSchema.ValueSchema.Object.self, from: data)
+    expectNoDifference(object, decodedValue)
+  }
+
   @Test
   func `Union Type JSON`() throws {
     let value = NeedleGenerationSchema.union(string: .string(minLength: 10), bool: true)

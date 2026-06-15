@@ -63,7 +63,8 @@ public struct _NeedleGuideSchema {
     maxProperties: Int? = nil,
     additionalProperties: NeedleGenerationSchema? = nil,
     patternProperties: [Swift.String: NeedleGenerationSchema]? = nil,
-    propertyNames: NeedleGenerationSchema? = nil
+    propertyNames: NeedleGenerationSchema? = nil,
+    dependentRequired: [Swift.String: [Swift.String]]? = nil
   ) -> Self { Self() }
 
   public static func array(
@@ -72,7 +73,9 @@ public struct _NeedleGuideSchema {
     minItems: Int? = nil,
     maxItems: Int? = nil,
     uniqueItems: Bool? = nil,
-    contains: NeedleGenerationSchema? = nil
+    contains: NeedleGenerationSchema? = nil,
+    minContains: Int? = nil,
+    maxContains: Int? = nil
   ) -> Self { Self() }
 
   public static func custom(_ schema: NeedleGenerationSchema) -> Self { Self() }

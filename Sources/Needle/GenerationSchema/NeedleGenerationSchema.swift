@@ -493,6 +493,8 @@ extension NeedleGenerationSchema {
   ///   - maxItems: The maximum number of items allowed in the array.
   ///   - uniqueItems: A boolean that indicates whether all items in the array must be unique.
   ///   - contains: A schema that must be contained within the array.
+  ///   - minContains: The minimum number of array elements that must match `contains`.
+  ///   - maxContains: The maximum number of array elements that may match `contains`.
   ///   - default: The default value of the schema.
   ///   - readOnly: Indicates whether the value is managed exclusively by the owning authority.
   ///   - writeOnly: Indicates whether the value is present when retrieved from the owning authority.
@@ -516,6 +518,8 @@ extension NeedleGenerationSchema {
     maxItems: Int? = nil,
     uniqueItems: Bool? = nil,
     contains: NeedleGenerationSchema? = nil,
+    minContains: Int? = nil,
+    maxContains: Int? = nil,
     `default`: NeedleValue? = nil,
     readOnly: Bool? = nil,
     writeOnly: Bool? = nil,
@@ -540,7 +544,9 @@ extension NeedleGenerationSchema {
         minItems: minItems,
         maxItems: maxItems,
         uniqueItems: uniqueItems,
-        contains: contains
+        contains: contains,
+        minContains: minContains,
+        maxContains: maxContains
       ),
       default: `default`,
       readOnly: readOnly,
@@ -571,6 +577,7 @@ extension NeedleGenerationSchema {
   ///   - additionalProperties: A schema that defines constraints for additional properties not defined on the object.
   ///   - patternProperties: A dictionary of regex patterns and corresponding schemas for matching property names.
   ///   - propertyNames: A schema that defines constraints for property names.
+  ///   - dependentRequired: A dictionary mapping property names to additional property names that are required when the key property is present.
   ///   - default: The default value of the schema.
   ///   - readOnly: Indicates whether the value is managed exclusively by the owning authority.
   ///   - writeOnly: Indicates whether the value is present when retrieved from the owning authority.
@@ -595,6 +602,7 @@ extension NeedleGenerationSchema {
     additionalProperties: NeedleGenerationSchema? = nil,
     patternProperties: [String: NeedleGenerationSchema]? = nil,
     propertyNames: NeedleGenerationSchema? = nil,
+    dependentRequired: [String: [String]]? = nil,
     `default`: NeedleValue? = nil,
     readOnly: Bool? = nil,
     writeOnly: Bool? = nil,
@@ -620,7 +628,8 @@ extension NeedleGenerationSchema {
         maxProperties: maxProperties,
         additionalProperties: additionalProperties,
         patternProperties: patternProperties,
-        propertyNames: propertyNames
+        propertyNames: propertyNames,
+        dependentRequired: dependentRequired
       ),
       default: `default`,
       readOnly: readOnly,
@@ -908,6 +917,7 @@ private struct SerializeableObject: Codable {
   var additionalProperties: NeedleGenerationSchema?
   var patternProperties: [Swift.String: NeedleGenerationSchema]?
   var propertyNames: NeedleGenerationSchema?
+  var dependentRequired: [Swift.String: [Swift.String]]?
 
   var items: NeedleGenerationSchema?
   var prefixItems: [NeedleGenerationSchema]?
@@ -915,6 +925,8 @@ private struct SerializeableObject: Codable {
   var maxItems: Int?
   var uniqueItems: Bool?
   var contains: NeedleGenerationSchema?
+  var minContains: Int?
+  var maxContains: Int?
 
   var multipleOf: Numeric?
   var minimum: Numeric?
@@ -948,6 +960,8 @@ private struct SerializeableObject: Codable {
       self.maxItems = array.maxItems
       self.uniqueItems = array.uniqueItems
       self.contains = array.contains
+      self.minContains = array.minContains
+      self.maxContains = array.maxContains
     }
 
     if let integer = object.valueSchema?.integer {
@@ -979,6 +993,7 @@ private struct SerializeableObject: Codable {
       self.minProperties = object.minProperties
       self.maxProperties = object.maxProperties
       self.required = object.required
+      self.dependentRequired = object.dependentRequired
     }
 
     self.type = object.type
@@ -1064,7 +1079,9 @@ extension NeedleGenerationSchema.ValueSchema {
         minItems: serializeable.minItems,
         maxItems: serializeable.maxItems,
         uniqueItems: serializeable.uniqueItems,
-        contains: serializeable.contains
+        contains: serializeable.contains,
+        minContains: serializeable.minContains,
+        maxContains: serializeable.maxContains
       )
     }
     if type.contains(.integer) {
@@ -1100,7 +1117,8 @@ extension NeedleGenerationSchema.ValueSchema {
         maxProperties: serializeable.maxProperties,
         additionalProperties: serializeable.additionalProperties,
         patternProperties: serializeable.patternProperties,
-        propertyNames: serializeable.propertyNames
+        propertyNames: serializeable.propertyNames,
+        dependentRequired: serializeable.dependentRequired
       )
     }
     if type.contains(.null) {
