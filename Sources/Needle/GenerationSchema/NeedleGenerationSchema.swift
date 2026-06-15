@@ -18,12 +18,12 @@ extension NeedleGenerationSchema {
   public struct Object: Hashable, Sendable, Codable {
     /// The title of the schema.
     ///
-    /// [10.1](https://tools.ietf.org/html/draft-handrews-json-schema-validation-01#section-10.1)
+    /// [title](https://json-schema.org/draft/2020-12/json-schema-validation#name-title-and-description)
     public var title: String?
 
     /// The description of the schema.
     ///
-    /// [10.1](https://tools.ietf.org/html/draft-handrews-json-schema-validation-01#section-10.1)
+    /// [description](https://json-schema.org/draft/2020-12/json-schema-validation#name-title-and-description)
     public var description: String?
 
     /// The ``NeedleGenerationSchema/ValueSchema`` of this schema.
@@ -31,59 +31,59 @@ extension NeedleGenerationSchema {
 
     /// The ``NeedleGenerationSchema/ValueType`` of this schema.
     ///
-    /// [6.1.1](https://tools.ietf.org/html/draft-handrews-json-schema-validation-01#section-6.1.1)
+    /// [type](https://json-schema.org/draft/2020-12/json-schema-validation#name-type)
     public var type: ValueType? {
       self.valueSchema?.type
     }
 
     /// The default value of the schema.
     ///
-    /// [10.2](https://tools.ietf.org/html/draft-handrews-json-schema-validation-01#section-10.2)
+    /// [default](https://json-schema.org/draft/2020-12/json-schema-validation#name-default)
     public var `default`: NeedleValue?
 
     /// Indicates whether the value is managed exclusively by the owning authority.
     ///
-    /// [10.3](https://tools.ietf.org/html/draft-handrews-json-schema-validation-01#section-10.3)
+    /// [readOnly](https://json-schema.org/draft/2020-12/json-schema-validation#name-readonly-and-writeonly)
     public var readOnly: Bool?
 
     /// Indicates whether the or not the value is present when retrieved from the owning authority.
     ///
-    /// [10.3](https://tools.ietf.org/html/draft-handrews-json-schema-validation-01#section-10.3)
+    /// [writeOnly](https://json-schema.org/draft/2020-12/json-schema-validation#name-readonly-and-writeonly)
     public var writeOnly: Bool?
 
     /// A list of example values.
     ///
-    /// [10.4](https://tools.ietf.org/html/draft-handrews-json-schema-validation-01#section-10.4)
+    /// [examples](https://json-schema.org/draft/2020-12/json-schema-validation#name-examples)
     public var examples: [NeedleValue]?
 
     /// A list of allowed values.
     ///
-    /// [6.1.2](https://tools.ietf.org/html/draft-handrews-json-schema-validation-01#section-6.1.2)
+    /// [enum](https://json-schema.org/draft/2020-12/json-schema-validation#name-enum)
     public var `enum`: [NeedleValue]?
 
     /// The only allowed value.
     ///
-    /// [6.1.3](https://tools.ietf.org/html/draft-handrews-json-schema-validation-01#section-6.1.3)
+    /// [const](https://json-schema.org/draft/2020-12/json-schema-validation#name-const)
     public var const: NeedleValue?
 
     /// A list of schemas in which the value must match all of them.
     ///
-    /// [6.7.1](https://tools.ietf.org/html/draft-handrews-json-schema-validation-01#section-6.7.1)
+    /// [allOf](https://json-schema.org/draft/2020-12/json-schema-validation#name-a-vocabulary-for-structural-validation)
     public var allOf: [NeedleGenerationSchema]?
 
     /// A list of schemas in which the value must match at least one of them.
     ///
-    /// [6.7.2](https://tools.ietf.org/html/draft-handrews-json-schema-validation-01#section-6.7.2)
+    /// [anyOf](https://json-schema.org/draft/2020-12/json-schema-validation#name-a-vocabulary-for-structural-validation)
     public var anyOf: [NeedleGenerationSchema]?
 
     /// A list of schemas in which the value must match exactly one of them.
     ///
-    /// [6.7.3](https://tools.ietf.org/html/draft-handrews-json-schema-validation-01#section-6.7.3)
+    /// [oneOf](https://json-schema.org/draft/2020-12/json-schema-validation#name-a-vocabulary-for-structural-validation)
     public var oneOf: [NeedleGenerationSchema]?
 
     /// A schema that the value must not match.
     ///
-    /// [6.7.4](https://tools.ietf.org/html/draft-handrews-json-schema-validation-01#section-6.7.4)
+    /// [not](https://json-schema.org/draft/2020-12/json-schema-validation#name-a-vocabulary-for-structural-validation)
     public var not: NeedleGenerationSchema?
 
     /// A schema to use for control flow.
@@ -91,22 +91,22 @@ extension NeedleGenerationSchema {
     /// If the value matches the `if` schema, then it must also match the ``then`` schema. If the
     /// value fails to match the `if` schema, then it must match the ``else`` schema.
     ///
-    /// [6.6.1](https://tools.ietf.org/html/draft-handrews-json-schema-validation-01#section-6.6.1)
+    /// [if](https://json-schema.org/draft/2020-12/json-schema-validation#name-a-vocabulary-for-structural-validation)
     public var `if`: NeedleGenerationSchema?
 
     /// A schema to match against if a value successfully matches against ``if``.
     ///
-    /// [6.6.2](https://tools.ietf.org/html/draft-handrews-json-schema-validation-01#section-6.6.2)
+    /// [then](https://json-schema.org/draft/2020-12/json-schema-validation#name-a-vocabulary-for-structural-validation)
     public var then: NeedleGenerationSchema?
 
     /// A schema to match against if a value fails to match against ``if``.
     ///
-    /// [6.6.3](https://tools.ietf.org/html/draft-handrews-json-schema-validation-01#section-6.6.3)
+    /// [else](https://json-schema.org/draft/2020-12/json-schema-validation#name-a-vocabulary-for-structural-validation)
     public var `else`: NeedleGenerationSchema?
 
     /// A string containing information for validating values not confined with the JSON Schema specification.
     ///
-    /// [7](https://tools.ietf.org/html/draft-handrews-json-schema-validation-01#section-7)
+    /// [format](https://json-schema.org/draft/2020-12/json-schema-validation#name-vocabularies-for-semantic-c)
     public var format: String?
 
     /// Creates an object schema.
