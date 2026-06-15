@@ -14,10 +14,10 @@
 
 struct XGrammarCompilerHandle {
     xgrammar::TokenizerInfo tokenizer_info;
-    std::optional<xgrammar::GrammarCompiler> compiler;
-    int64_t memory_limit;
-    int64_t max_threads;
-    bool is_cache_enabled;
+    std::optional<xgrammar::GrammarCompiler> compiler = std::nullopt;
+    int64_t memory_limit = kNeedleXGrammarCompilerNoMemoryLimit;
+    int64_t max_threads = kNeedleXGrammarCompilerHardwareConcurrency;
+    bool is_cache_enabled = true;
 };
 
 struct XGrammarMatcherHandle {
@@ -145,13 +145,7 @@ needle_xgrammar_compiler_t needle_xgrammar_compiler_init(
         stop_token_ids,
         true
     );
-    return new XGrammarCompilerHandle{
-        tokenizer_info,
-        std::nullopt,
-        kNeedleXGrammarCompilerNoMemoryLimit,
-        kNeedleXGrammarCompilerHardwareConcurrency,
-        true
-    };
+    return new XGrammarCompilerHandle{tokenizer_info};
 }
 
 void needle_xgrammar_compiler_set_memory_limit(needle_xgrammar_compiler_t compiler, int64_t limit) {
@@ -195,7 +189,8 @@ needle_xgrammar_matcher_t needle_xgrammar_compile_matcher(
 
 needle_xgrammar_matcher_t needle_xgrammar_matcher_fork(needle_xgrammar_matcher_t matcher) {
     if (!matcher) return nullptr;
-    return new XGrammarMatcherHandle{static_cast<XGrammarMatcherHandle*>(matcher)->matcher.Fork()};
+    const auto handle = static_cast<XGrammarMatcherHandle*>(matcher);
+    return new XGrammarMatcherHandle{handle->matcher.Fork(), handle->bitmask_size};
 }
 
 int needle_xgrammar_matcher_bitmask(needle_xgrammar_matcher_t matcher, int* bitmask) {

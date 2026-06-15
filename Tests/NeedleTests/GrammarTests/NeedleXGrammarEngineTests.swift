@@ -64,9 +64,10 @@
 
       @Test
       func `Reset Restores Initial State`() async throws {
-        let matcher = try await self.engine.compile(tools: [.sendEmail])
+        let matcher = try await self.engine.compile(tools: [.getWeather])
+        let call = #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
 
-        for tokenId in self.tokenizer.encode(text: "hello world") {
+        for tokenId in self.encodedGrammarText(call) {
           matcher.accept(tokenId: tokenId)
         }
         expectNoDifference(matcher.accept(tokenId: self.eosToken), true)
@@ -102,12 +103,13 @@
 
       @Test
       func `Completion State Transitions`() async throws {
-        let matcher = try await self.engine.compile(tools: [.sendEmail])
+        let matcher = try await self.engine.compile(tools: [.getWeather])
+        let call = #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
 
         expectNoDifference(matcher.isCompleted, false)
         expectNoDifference(matcher.isTerminated, false)
 
-        for tokenId in self.tokenizer.encode(text: "hello world") {
+        for tokenId in self.encodedGrammarText(call) {
           expectNoDifference(matcher.accept(tokenId: tokenId), true)
         }
         expectNoDifference(matcher.isCompleted, true)
@@ -120,9 +122,11 @@
 
       @Test
       func `Fork Preserves Accept State`() async throws {
-        let matcher = try await self.engine.compile(tools: [.sendEmail])
+        let matcher = try await self.engine.compile(tools: [.getWeather])
 
-        let tokens = self.tokenizer.encode(text: "hello world")
+        let tokens = self.encodedGrammarText(
+          #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
+        )
         let forkPoint = tokens.count / 2
         guard !tokens.isEmpty, forkPoint > 0, forkPoint < tokens.count else {
           Issue.record("Tokenizer produced an unexpected token split for test text")
@@ -157,9 +161,10 @@
 
       @Test
       func `Bitmask Allows Eos After Completion`() async throws {
-        let matcher = try await self.engine.compile(tools: [.sendEmail])
+        let matcher = try await self.engine.compile(tools: [.getWeather])
+        let call = #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
 
-        for tokenId in self.tokenizer.encode(text: "hello world") {
+        for tokenId in self.encodedGrammarText(call) {
           expectNoDifference(matcher.accept(tokenId: tokenId), true)
         }
         expectNoDifference(matcher.isCompleted, true)
@@ -179,14 +184,10 @@
       func `Accepts Valid Complex Tool Call`() async throws {
         let matcher = try await self.engine.compile(tools: [.complexTool])
 
-        let call = """
-          <tool_call>[{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1,"BETA_LABEL":2},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}}]
-          """
+        let call =
+          #"<tool_call>[{"name":"complex_tool","arguments":{"config":{"flags":[true,false],"threshold":0.75},"count":3.5,"enabled":true,"labels":{"ALPHA":1,"BETA_LABEL":2},"mode":"execute","optional_note":null,"priority":4,"routing":{"region":"us-west"},"tags":["a","b"],"ticket_id":"ABC-12","title":"alpha","tuple_args":["alpha",2,true],"window":3}}]"#
 
-        for tokenId in self.tokenizer.encode(text: call) {
-          expectNoDifference(matcher.accept(tokenId: tokenId), true)
-        }
-        expectNoDifference(matcher.accept(tokenId: self.eosToken), true)
+        self.assertAccepts(call, matcher: matcher)
       }
 
       @Test
@@ -195,10 +196,7 @@
 
         let call = #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
 
-        for tokenId in self.tokenizer.encode(text: call) {
-          expectNoDifference(matcher.accept(tokenId: tokenId), true)
-        }
-        expectNoDifference(matcher.accept(tokenId: self.eosToken), true)
+        self.assertAccepts(call, matcher: matcher)
       }
 
       @Test
@@ -208,80 +206,57 @@
         let calls =
           #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Henry's Altar"}}]"#
 
-        for tokenId in self.tokenizer.encode(text: calls) {
-          expectNoDifference(matcher.accept(tokenId: tokenId), true)
-        }
-        expectNoDifference(matcher.accept(tokenId: self.eosToken), true)
+        self.assertAccepts(calls, matcher: matcher)
       }
 
       @Test
       func `Rejects Missing Required Field`() async throws {
         let matcher = try await self.engine.compile(tools: [.complexTool])
 
-        let call = """
-          <tool_call>[{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"]}}]
-          """
+        let call =
+          #"<tool_call>[{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"]}}]"#
 
-        for tokenId in self.tokenizer.encode(text: call) {
-          expectNoDifference(matcher.accept(tokenId: tokenId), true)
-        }
-        expectNoDifference(matcher.accept(tokenId: self.eosToken), false)
+        self.assertRejects(call, matcher: matcher)
       }
 
       @Test
       func `Rejects Wrong Type`() async throws {
         let matcher = try await self.engine.compile(tools: [.complexTool])
 
-        let call = """
-          <tool_call>[{"name":"complex_tool","arguments":{"title":"alpha","count":"3.5","enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}}]
-          """
+        let call =
+          #"<tool_call>[{"name":"complex_tool","arguments":{"title":"alpha","count":"3.5","enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}}]"#
 
-        for tokenId in self.tokenizer.encode(text: call) {
-          expectNoDifference(matcher.accept(tokenId: tokenId), true)
-        }
-        expectNoDifference(matcher.accept(tokenId: self.eosToken), false)
+        self.assertRejects(call, matcher: matcher)
       }
 
       @Test
       func `Rejects Invalid Pattern Properties`() async throws {
         let matcher = try await self.engine.compile(tools: [.complexTool])
 
-        let call = """
-          <tool_call>[{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"alpha":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}}]
-          """
+        let call =
+          #"<tool_call>[{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"alpha":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}}]"#
 
-        for tokenId in self.tokenizer.encode(text: call) {
-          expectNoDifference(matcher.accept(tokenId: tokenId), true)
-        }
-        expectNoDifference(matcher.accept(tokenId: self.eosToken), false)
+        self.assertRejects(call, matcher: matcher)
       }
 
       @Test
       func `Rejects Extra Property`() async throws {
         let matcher = try await self.engine.compile(tools: [.complexTool])
 
-        let call = """
-          <tool_call>[{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]},"extra":1}}]
-          """
+        let call =
+          #"<tool_call>[{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]},"extra":1}}]"#
 
-        for tokenId in self.tokenizer.encode(text: call) {
-          expectNoDifference(matcher.accept(tokenId: tokenId), true)
-        }
-        expectNoDifference(matcher.accept(tokenId: self.eosToken), false)
+        self.assertRejects(call, matcher: matcher)
       }
 
       @Test
       func `Rejects Malformed JSON`() async throws {
         let matcher = try await self.engine.compile(tools: [.complexTool])
 
-        let call = """
-          <tool_call>[{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}]
-          """
+        let call =
+          #"<tool_call>[{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}]"#
 
-        for tokenId in self.tokenizer.encode(text: call) {
-          expectNoDifference(matcher.accept(tokenId: tokenId), true)
-        }
-        expectNoDifference(matcher.accept(tokenId: self.eosToken), false)
+        self.assertRejects(call, matcher: matcher)
       }
 
       @Test
@@ -289,10 +264,44 @@
         let matcher = try await self.engine.compile(tools: [.getWeather])
 
         let call = #"<tool_call>[{"name":"not_a_real_tool","arguments":{"location":"Seoul"}}]"#
+        self.assertRejects(call, matcher: matcher)
+      }
 
-        for tokenId in self.tokenizer.encode(text: call) {
-          expectNoDifference(matcher.accept(tokenId: tokenId), true)
+      private func firstRejectedToken(
+        in text: String,
+        matcher: NeedleXGrammarEngine.Matcher
+      ) -> (index: Int, tokenId: NeedleToken.ID, token: String, prefix: String)? {
+        let tokenIds = self.encodedGrammarText(text)
+        for (index, tokenId) in tokenIds.enumerated() {
+          guard !matcher.accept(tokenId: tokenId) else { continue }
+          let token = self.tokenizer.tokens(from: [tokenId]).first ?? ""
+          let prefix = self.tokenizer.decode(tokenIds: tokenIds.prefix(index + 1))
+          return (index, tokenId, token, prefix)
         }
+        return nil
+      }
+
+      private func encodedGrammarText(_ text: String) -> [NeedleToken.ID] {
+        let tokenIds = self.tokenizer.encode(text: text)
+        guard let firstTokenId = tokenIds.first else { return tokenIds }
+        let firstToken = self.tokenizer.tokens(from: [firstTokenId]).first
+        let firstDecoded = self.tokenizer.decode(tokenIds: [firstTokenId])
+        guard firstToken == "▁", firstDecoded.isEmpty else { return tokenIds }
+        return Array(tokenIds.dropFirst())
+      }
+
+      private func assertAccepts(_ text: String, matcher: NeedleXGrammarEngine.Matcher) {
+        if let rejected = self.firstRejectedToken(in: text, matcher: matcher) {
+          Issue.record(
+            "Rejected token \(rejected.tokenId) '\(rejected.token)' at index \(rejected.index) for prefix: \(rejected.prefix)"
+          )
+          return
+        }
+        expectNoDifference(matcher.accept(tokenId: self.eosToken), true)
+      }
+
+      private func assertRejects(_ text: String, matcher: NeedleXGrammarEngine.Matcher) {
+        guard self.firstRejectedToken(in: text, matcher: matcher) == nil else { return }
         expectNoDifference(matcher.accept(tokenId: self.eosToken), false)
       }
     }

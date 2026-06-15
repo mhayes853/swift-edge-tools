@@ -39,6 +39,7 @@
         as: UTF8.self
       )
       let grammar = toolsJSON.withCString { needle_xgrammar_grammar_init($0) }
+      defer { needle_xgrammar_grammar_destroy(grammar) }
       return Matcher(matcher: needle_xgrammar_compile_matcher(self.compiler, grammar))
     }
   }
