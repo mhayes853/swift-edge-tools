@@ -12,10 +12,7 @@
     init() throws {
       let tokenizer = try NeedleSentencepieceTokenizer(modelURL: .testTokenizerModel)
       self.tokenizer = tokenizer
-      self.engine = NeedleXGrammarEngine(
-        encodedVocab: tokenizer.encodedVocab(),
-        eosTokenId: try #require(tokenizer.eosTokenId)
-      )
+      self.engine = try #require(NeedleXGrammarEngine(tokenizer: tokenizer))
     }
 
     @Test
@@ -56,10 +53,7 @@
         let tokenizer = try NeedleSentencepieceTokenizer(modelURL: .testTokenizerModel)
         self.tokenizer = tokenizer
         self.eosToken = try #require(tokenizer.eosTokenId)
-        self.engine = NeedleXGrammarEngine(
-          encodedVocab: tokenizer.encodedVocab(),
-          eosTokenId: self.eosToken
-        )
+        self.engine = try #require(NeedleXGrammarEngine(tokenizer: tokenizer))
       }
 
       @Test
@@ -305,9 +299,5 @@
         expectNoDifference(matcher.accept(tokenId: self.eosToken), false)
       }
     }
-  }
-
-  private enum NeedleXGrammarEngineTestError: Error {
-    case missingEosToken
   }
 #endif

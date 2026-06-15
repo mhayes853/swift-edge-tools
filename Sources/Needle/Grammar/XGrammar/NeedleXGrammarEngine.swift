@@ -134,4 +134,21 @@
       }
     }
   }
+
+  // MARK: - SP Tokenizer
+  #if SwiftNeedleSentencepiece
+    extension NeedleXGrammarEngine {
+      public convenience init?(
+        tokenizer: NeedleSentencepieceTokenizer,
+        configuration: Configuration = Configuration()
+      ) {
+        guard let eosTokenId = tokenizer.eosTokenId else { return nil }
+        self.init(
+          encodedVocab: tokenizer.encodedVocab(),
+          eosTokenId: eosTokenId,
+          configuration: configuration
+        )
+      }
+    }
+  #endif
 #endif
