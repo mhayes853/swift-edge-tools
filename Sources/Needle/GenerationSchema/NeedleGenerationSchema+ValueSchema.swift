@@ -318,79 +318,48 @@ extension NeedleGenerationSchema.ValueSchema {
 extension NeedleGenerationSchema.ValueSchema {
   /// An array-specific schema.
   public struct Array: Hashable, Sendable, Codable {
-    /// A method of defining items in an array-specific schema.
-    public enum Items: Hashable, Sendable, Codable {
-      /// The ``NeedleGenerationSchema`` that all items in the array must conform to.
-      case schemaForAll(NeedleGenerationSchema)
-
-      /// Individual ``NeedleGenerationSchema`` instances for each item in the array.
-      case itemsSchemas([NeedleGenerationSchema])
-
-      public func encode(to encoder: any Encoder) throws {
-        var container = encoder.singleValueContainer()
-        switch self {
-        case .schemaForAll(let schema): try container.encode(schema)
-        case .itemsSchemas(let schemas): try container.encode(schemas)
-        }
-      }
-
-      public init(from decoder: any Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        if let schema = try? container.decode(NeedleGenerationSchema.self) {
-          self = .schemaForAll(schema)
-        } else if let schemas = try? container.decode([NeedleGenerationSchema].self) {
-          self = .itemsSchemas(schemas)
-        } else {
-          throw DecodingError.dataCorruptedError(
-            in: container,
-            debugDescription: "Invalid array items schema"
-          )
-        }
-      }
-    }
-
-    /// The schema for the items in the array.
+    /// The schema applied to every element in the array.
     ///
-    /// [6.4.1](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-01#section-6.4.1)
-    public var items: Items?
+    /// [items](https://json-schema.org/draft/2020-12/json-schema-validation#name-items)
+    public var items: NeedleGenerationSchema?
 
-    /// A schema describing elements that are not covered by `items`.
+    /// An array of schemas, each applied to the element at the matching index.
     ///
-    /// [6.4.2](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-01#section-6.4.2)
-    public var additionalItems: NeedleGenerationSchema?
+    /// [prefixItems](https://json-schema.org/draft/2020-12/json-schema-validation#name-prefixitems)
+    public var prefixItems: [NeedleGenerationSchema]?
 
     /// The minimum number of items allowed in the array.
     ///
-    /// [6.4.4](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-01#section-6.4.4)
+    /// [minItems](https://json-schema.org/draft/2020-12/json-schema-validation#name-minitems)
     public var minItems: Int?
 
     /// The maximum number of items allowed in the array.
     ///
-    /// [6.4.3](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-01#section-6.4.3)
+    /// [maxItems](https://json-schema.org/draft/2020-12/json-schema-validation#name-maxitems)
     public var maxItems: Int?
 
     /// A boolean that indicates whether all items in the array must be unique.
     ///
-    /// [6.4.5](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-01#section-6.4.5)
+    /// [uniqueItems](https://json-schema.org/draft/2020-12/json-schema-validation#name-uniqueitems)
     public var uniqueItems: Bool?
 
     /// A schema that must be contained within the array.
     ///
-    /// [6.4.6](https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-01#section-6.4.6)
+    /// [contains](https://json-schema.org/draft/2020-12/json-schema-validation#name-contains)
     public var contains: NeedleGenerationSchema?
 
     /// Creates an array-specific schema.
     ///
     /// - Parameters:
-    ///   - items: The schema for the items in the array.
-    ///   - additionalItems: The schema for additional items in the array.
+    ///   - items: The schema applied to every element in the array.
+    ///   - prefixItems: An array of schemas applied to the element at the matching index.
     ///   - minItems: The minimum number of items allowed in the array.
     ///   - maxItems: The maximum number of items allowed in the array.
     ///   - uniqueItems: A boolean that indicates whether all items in the array must be unique.
     ///   - contains: A schema that must be contained within the array.
     public static func array(
-      items: Items? = nil,
-      additionalItems: NeedleGenerationSchema? = nil,
+      items: NeedleGenerationSchema? = nil,
+      prefixItems: [NeedleGenerationSchema]? = nil,
       minItems: Int? = nil,
       maxItems: Int? = nil,
       uniqueItems: Bool? = nil,
@@ -398,7 +367,7 @@ extension NeedleGenerationSchema.ValueSchema {
     ) -> Self {
       Self(
         items: items,
-        additionalItems: additionalItems,
+        prefixItems: prefixItems,
         minItems: minItems,
         maxItems: maxItems,
         uniqueItems: uniqueItems,
@@ -410,15 +379,15 @@ extension NeedleGenerationSchema.ValueSchema {
   /// Creates an array-specific schema.
   ///
   /// - Parameters:
-  ///   - items: The schema for the items in the array.
-  ///   - additionalItems: The schema for additional items in the array.
+  ///   - items: The schema applied to every element in the array.
+  ///   - prefixItems: An array of schemas applied to the element at the matching index.
   ///   - minItems: The minimum number of items allowed in the array.
   ///   - maxItems: The maximum number of items allowed in the array.
   ///   - uniqueItems: A boolean that indicates whether all items in the array must be unique.
   ///   - contains: A schema that must be contained within the array.
   public static func array(
-    items: Array.Items? = nil,
-    additionalItems: NeedleGenerationSchema? = nil,
+    items: NeedleGenerationSchema? = nil,
+    prefixItems: [NeedleGenerationSchema]? = nil,
     minItems: Int? = nil,
     maxItems: Int? = nil,
     uniqueItems: Bool? = nil,
@@ -427,7 +396,7 @@ extension NeedleGenerationSchema.ValueSchema {
     .union(
       array: .array(
         items: items,
-        additionalItems: additionalItems,
+        prefixItems: prefixItems,
         minItems: minItems,
         maxItems: maxItems,
         uniqueItems: uniqueItems,

@@ -487,8 +487,8 @@ extension NeedleGenerationSchema {
   /// - Parameters:
   ///   - title: The title of the schema.
   ///   - description: The description of the schema.
-  ///   - items: The schema for the items in the array.
-  ///   - additionalItems: A schema describing elements not covered by `items`.
+  ///   - items: The schema applied to every element in the array.
+  ///   - prefixItems: An array of schemas applied to the element at the matching index.
   ///   - minItems: The minimum number of items allowed in the array.
   ///   - maxItems: The maximum number of items allowed in the array.
   ///   - uniqueItems: A boolean that indicates whether all items in the array must be unique.
@@ -510,8 +510,8 @@ extension NeedleGenerationSchema {
   public static func array(
     title: String? = nil,
     description: String? = nil,
-    items: ValueSchema.Array.Items? = nil,
-    additionalItems: NeedleGenerationSchema? = nil,
+    items: NeedleGenerationSchema? = nil,
+    prefixItems: [NeedleGenerationSchema]? = nil,
     minItems: Int? = nil,
     maxItems: Int? = nil,
     uniqueItems: Bool? = nil,
@@ -536,7 +536,7 @@ extension NeedleGenerationSchema {
       description: description,
       valueSchema: .array(
         items: items,
-        additionalItems: additionalItems,
+        prefixItems: prefixItems,
         minItems: minItems,
         maxItems: maxItems,
         uniqueItems: uniqueItems,
@@ -909,8 +909,8 @@ private struct SerializeableObject: Codable {
   var patternProperties: [Swift.String: NeedleGenerationSchema]?
   var propertyNames: NeedleGenerationSchema?
 
-  var items: NeedleGenerationSchema.ValueSchema.Array.Items?
-  var additionalItems: NeedleGenerationSchema?
+  var items: NeedleGenerationSchema?
+  var prefixItems: [NeedleGenerationSchema]?
   var minItems: Int?
   var maxItems: Int?
   var uniqueItems: Bool?
@@ -943,7 +943,7 @@ private struct SerializeableObject: Codable {
 
     if let array = object.valueSchema?.array {
       self.items = array.items
-      self.additionalItems = array.additionalItems
+      self.prefixItems = array.prefixItems
       self.minItems = array.minItems
       self.maxItems = array.maxItems
       self.uniqueItems = array.uniqueItems
@@ -1060,7 +1060,7 @@ extension NeedleGenerationSchema.ValueSchema {
     if type.contains(.array) {
       self.array = .array(
         items: serializeable.items,
-        additionalItems: serializeable.additionalItems,
+        prefixItems: serializeable.prefixItems,
         minItems: serializeable.minItems,
         maxItems: serializeable.maxItems,
         uniqueItems: serializeable.uniqueItems,
@@ -1098,7 +1098,7 @@ extension NeedleGenerationSchema.ValueSchema {
         required: serializeable.required,
         minProperties: serializeable.minProperties,
         maxProperties: serializeable.maxProperties,
-        additionalProperties: serializeable.additionalItems,
+        additionalProperties: serializeable.additionalProperties,
         patternProperties: serializeable.patternProperties,
         propertyNames: serializeable.propertyNames
       )

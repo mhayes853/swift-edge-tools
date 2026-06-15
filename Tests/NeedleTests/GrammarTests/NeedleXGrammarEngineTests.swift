@@ -55,14 +55,11 @@
       init() throws {
         let tokenizer = try NeedleSentencepieceTokenizer(modelURL: .testTokenizerModel)
         self.tokenizer = tokenizer
+        self.eosToken = try #require(tokenizer.eosTokenId)
         self.engine = NeedleXGrammarEngine(
           encodedVocab: tokenizer.encodedVocab(),
-          eosTokenId: try #require(tokenizer.eosTokenId)
+          eosTokenId: self.eosToken
         )
-        guard let eos = tokenizer.eosTokenId else {
-          throw NeedleXGrammarEngineTestError.missingEosToken
-        }
-        self.eosToken = eos
       }
 
       @Test

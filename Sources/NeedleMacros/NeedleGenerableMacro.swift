@@ -847,13 +847,18 @@ extension NeedleGenerableMacro {
         with: "",
         options: .regularExpression
       )
-    let hasItemsArgument = normalizedArguments?.contains("items:") ?? false
+    let hasItemsArgument =
+      normalizedArguments?.contains(",items:") ?? false
+      || normalizedArguments?.hasPrefix("items:") ?? false
+    let hasPrefixItemsArgument =
+      normalizedArguments?.contains(",prefixItems:") ?? false
+      || normalizedArguments?.hasPrefix("prefixItems:") ?? false
 
     let resolvedItemSchemaExpression = "\(inferredElementTypeName).needleGenerationSchema"
-    let itemsArgument = "items: .schemaForAll(\(resolvedItemSchemaExpression))"
+    let itemsArgument = "items: \(resolvedItemSchemaExpression)"
 
     if let rawArguments, !rawArguments.isEmpty {
-      if hasItemsArgument {
+      if hasItemsArgument || hasPrefixItemsArgument {
         return rawArguments
       } else {
         return "\(itemsArgument), \(rawArguments)"
@@ -1161,13 +1166,7 @@ extension NeedleGenerableMacro {
     guard let itemsArgument = arguments.first(where: { $0.label?.text == "items" }) else {
       return nil
     }
-    guard let functionCall = itemsArgument.expression.as(FunctionCallExprSyntax.self) else {
-      return nil
-    }
-    let calledName = functionCall.calledExpression.trimmedDescription.split(separator: ".").last
-      .map(String.init)
-    guard calledName == "schemaForAll", let first = functionCall.arguments.first else { return nil }
-    return Self.parseSchemaSpecifier(from: first.expression)
+    return Self.parseSchemaSpecifier(from: itemsArgument.expression)
   }
 
   private static func objectAdditionalPropertiesSchemaSpecifier(

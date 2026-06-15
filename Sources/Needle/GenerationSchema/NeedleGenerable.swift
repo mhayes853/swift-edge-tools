@@ -211,7 +211,7 @@ extension UInt128: NeedleGenerable {
 
 extension Array: NeedleGenerable where Element: NeedleGenerable {
   public static var needleGenerationSchema: NeedleGenerationSchema {
-    .array(items: .schemaForAll(Element.needleGenerationSchema))
+    .array(items: Element.needleGenerationSchema)
   }
 }
 

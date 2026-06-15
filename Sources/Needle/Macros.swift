@@ -67,8 +67,8 @@ public struct _NeedleGuideSchema {
   ) -> Self { Self() }
 
   public static func array(
-    items: NeedleGenerationSchema.ValueSchema.Array.Items? = nil,
-    additionalItems: NeedleGenerationSchema? = nil,
+    items: NeedleGenerationSchema? = nil,
+    prefixItems: [NeedleGenerationSchema]? = nil,
     minItems: Int? = nil,
     maxItems: Int? = nil,
     uniqueItems: Bool? = nil,

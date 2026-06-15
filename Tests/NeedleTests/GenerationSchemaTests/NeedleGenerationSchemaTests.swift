@@ -30,26 +30,31 @@ struct `NeedleGenerationSchema tests` {
   @Test(
     arguments: [
       (
-        NeedleGenerationSchema.ValueSchema.Array.Items.schemaForAll(.object(valueSchema: .null)),
-        "{\"type\":\"null\"}"
+        NeedleGenerationSchema.ValueSchema.Array.array(
+          items: NeedleGenerationSchema.object(valueSchema: .null)
+        ),
+        #"{"items":{"type":"null"}}"#
       ),
       (
-        NeedleGenerationSchema.ValueSchema.Array.Items.itemsSchemas(
-          [.object(valueSchema: .null), .object(valueSchema: .boolean)]
+        NeedleGenerationSchema.ValueSchema.Array.array(
+          prefixItems: [
+            NeedleGenerationSchema.object(valueSchema: .null),
+            NeedleGenerationSchema.object(valueSchema: .boolean),
+          ]
         ),
-        "[{\"type\":\"null\"},{\"type\":\"boolean\"}]"
+        #"{"prefixItems":[{"type":"null"},{"type":"boolean"}]}"#
       )
     ]
   )
-  func `Array Type Items JSON`(items: NeedleGenerationSchema.ValueSchema.Array.Items, json: String)
-    throws
-  {
-    let data = try Self.jsonEncoder.encode(items)
+  func `Array Items And Prefix Items JSON`(
+    array: NeedleGenerationSchema.ValueSchema.Array, json: String
+  ) throws {
+    let data = try Self.jsonEncoder.encode(array)
     expectNoDifference(String(decoding: data, as: UTF8.self), json)
 
     let decodedValue = try JSONDecoder()
-      .decode(NeedleGenerationSchema.ValueSchema.Array.Items.self, from: data)
-    expectNoDifference(items, decodedValue)
+      .decode(NeedleGenerationSchema.ValueSchema.Array.self, from: data)
+    expectNoDifference(array, decodedValue)
   }
 
   @Test
@@ -123,7 +128,7 @@ struct `NeedleGenerationSchema tests` {
         title: "Array",
         description: "An array",
         valueSchema: .array(
-          items: .schemaForAll(.object(valueSchema: .string())),
+          items: .object(valueSchema: .string()),
           minItems: 10,
           uniqueItems: true
         )

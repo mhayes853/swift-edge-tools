@@ -45,17 +45,18 @@ extension NeedleToolDefinition {
         ),
         "window": .integer(minimum: 1, maximum: 5),
         "tuple_args": .array(
-          items: .itemsSchemas([.string(), .integer(), .bool()])
+          items: .boolean(false),
+          prefixItems: [.string(), .integer(), .bool()]
         ),
         "optional_note": .union(string: .string(), null: true),
         "tags": .array(
-          items: .schemaForAll(.string()),
+          items: .string(),
           uniqueItems: true
         ),
         "config": .object(
           properties: [
             "threshold": .number(),
-            "flags": .array(items: .schemaForAll(.bool()))
+            "flags": .array(items: .bool())
           ],
           required: ["threshold", "flags"],
           additionalProperties: .boolean(false)

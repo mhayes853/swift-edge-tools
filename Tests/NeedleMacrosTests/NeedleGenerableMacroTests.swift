@@ -480,7 +480,7 @@ extension BaseTestSuite {
             .object(
               valueSchema: .object(
                 properties: [
-                  "tags": .array(items: .schemaForAll(String.needleGenerationSchema), minItems: 1, uniqueItems: true),
+                  "tags": .array(items: String.needleGenerationSchema, minItems: 1, uniqueItems: true),
                     "metadata": .object(minProperties: 1, additionalProperties: Int.needleGenerationSchema)
                 ],
                 required: ["tags", "metadata"]
@@ -760,7 +760,7 @@ extension BaseTestSuite {
         """
         @NeedleGenerable
         struct Payload {
-          @NeedleGuide(.array(items: .schemaForAll(.string(minLength: 1))))
+          @NeedleGuide(.array(items: .string(minLength: 1)))
           var values: [Int]
         }
         """
@@ -768,8 +768,8 @@ extension BaseTestSuite {
         """
         @NeedleGenerable
         struct Payload {
-          @NeedleGuide(.array(items: .schemaForAll(.string(minLength: 1))))
-          ┬────────────────────────────────────────────────────────────────
+          @NeedleGuide(.array(items: .string(minLength: 1)))
+          ┬─────────────────────────────────────────────────
           ╰─ 🛑 @NeedleGuide(.string) can only be applied to properties of type String. Found 'values: Int'.
           var values: [Int]
         }
@@ -806,7 +806,7 @@ extension BaseTestSuite {
         """
         @NeedleGenerable
         struct Payload {
-          @NeedleGuide(.array(items: .schemaForAll(.array(items: .schemaForAll(.string(minLength: 1))))))
+          @NeedleGuide(.array(items: .array(items: .string(minLength: 1))))
           var values: [[String]]
         }
         """
@@ -819,7 +819,7 @@ extension BaseTestSuite {
             .object(
               valueSchema: .object(
                 properties: [
-                  "values": .array(items: .schemaForAll(.array(items: .schemaForAll(.string(minLength: 1)))))
+                  "values": .array(items: .array(items: .string(minLength: 1)))
                 ],
                 required: ["values"]
               )
@@ -844,7 +844,7 @@ extension BaseTestSuite {
         """
         @NeedleGenerable
         struct Payload {
-          @NeedleGuide(.array(items: .schemaForAll(.array(items: .schemaForAll(.string(minLength: 1))))))
+          @NeedleGuide(.array(items: .array(items: .string(minLength: 1))))
           var values: [[Int]]
         }
         """
@@ -852,8 +852,8 @@ extension BaseTestSuite {
         """
         @NeedleGenerable
         struct Payload {
-          @NeedleGuide(.array(items: .schemaForAll(.array(items: .schemaForAll(.string(minLength: 1))))))
-          ┬──────────────────────────────────────────────────────────────────────────────────────────────
+          @NeedleGuide(.array(items: .array(items: .string(minLength: 1))))
+          ┬────────────────────────────────────────────────────────────────
           ╰─ 🛑 @NeedleGuide(.string) can only be applied to properties of type String. Found 'values: Int'.
           var values: [[Int]]
         }
@@ -951,7 +951,7 @@ extension BaseTestSuite {
         """
         @NeedleGenerable
         struct Payload {
-          @NeedleGuide(.array(items: .schemaForAll(.array(items: .schemaForAll(.array(items: .schemaForAll(.string(minLength: 1))))))))
+          @NeedleGuide(.array(items: .array(items: .array(items: .string(minLength: 1)))))
           var values: [[[Int]]]
         }
         """
@@ -959,8 +959,8 @@ extension BaseTestSuite {
         """
         @NeedleGenerable
         struct Payload {
-          @NeedleGuide(.array(items: .schemaForAll(.array(items: .schemaForAll(.array(items: .schemaForAll(.string(minLength: 1))))))))
-          ┬────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+          @NeedleGuide(.array(items: .array(items: .array(items: .string(minLength: 1)))))
+          ┬───────────────────────────────────────────────────────────────────────────────
           ╰─ 🛑 @NeedleGuide(.string) can only be applied to properties of type String. Found 'values: Int'.
           var values: [[[Int]]]
         }
