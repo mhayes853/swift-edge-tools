@@ -5,6 +5,7 @@ extension Bool {
 }
 
 extension BinaryInteger {
+  @usableFromInline
   var boolValue: Bool {
     self == 0 ? false : true
   }
