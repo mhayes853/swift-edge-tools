@@ -18,7 +18,7 @@
     public init(modelURL: URL) throws {
       let nativePath = modelURL.withUnsafeFileSystemRepresentation { $0 }
       guard let tokenizer = needle_sp_tokenizer_init_from_file(nativePath) else {
-        throw NeedleSentencepieceTokenizerError()
+        throw NeedleSPTokenizingModelError()
       }
       self.tokenizer = tokenizer
     }
@@ -149,7 +149,7 @@
 
   // MARK: - NeedleSentencepieceTokenizerError
 
-  public struct NeedleSentencepieceTokenizerError: Hashable, Sendable, Error {
+  public struct NeedleSPTokenizingModelError: Hashable, Sendable, Error {
     public let message: String
 
     fileprivate init() {

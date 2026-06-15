@@ -136,6 +136,7 @@
   }
 
   // MARK: - SP Tokenizer
+
   #if SwiftNeedleSentencepiece
     extension NeedleXGrammarEngine {
       public convenience init?(

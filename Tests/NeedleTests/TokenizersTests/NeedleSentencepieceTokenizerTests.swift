@@ -20,7 +20,7 @@
 
     @Test
     func `Throws Error For Invalid URL`() {
-      let error = #expect(throws: NeedleSentencepieceTokenizerError.self) {
+      let error = #expect(throws: NeedleSPTokenizingModelError.self) {
         _ = try NeedleSPTokenizingModel(modelURL: .temporaryDirectory)
       }
       expectNoDifference(error?.message.lowercased().contains("file not found"), true)
