@@ -18,7 +18,7 @@
     private var cache: [any KVCache]?
     private let clock = ContinuousClock()
 
-    public init(
+    public convenience init(
       from url: URL,
       grammarConfiguration: NeedleXGrammarEngine.Configuration =
         NeedleXGrammarEngine.Configuration(),
@@ -30,7 +30,6 @@
       let tokenizer = try NeedleSPTokenizingModel(modelURL: url.appending(path: "tokenizer.model"))
       let grammarEngine = makeGrammarEngine(tokenizer, grammarConfiguration)
       guard let grammarEngine else { throw NeedleMLXEngineError.failedToLoadGrammarEngine }
-      self.grammarEngine = grammarEngine
 
       let configuration = try JSONDecoder()
         .decode(
@@ -39,10 +38,20 @@
         )
       let weights = try MLX.loadArrays(url: url.appending(path: "model.safetensors"))
         .mapValues { $0.asType(configuration.mlxDType) }
-      self.model = NeedleMLXModel(configuration: configuration)
-      try self.model.update(parameters: ModuleParameters.unflattened(weights), verify: .all)
+      let model = NeedleMLXModel(configuration: configuration)
+      try model.update(parameters: ModuleParameters.unflattened(weights), verify: .all)
 
+      self.init(tokenizer: tokenizer, model: model, grammarEngine: grammarEngine)
+    }
+
+    public init(
+      tokenizer: NeedleSPTokenizingModel,
+      model: NeedleMLXModel,
+      grammarEngine: NeedleXGrammarEngine
+    ) {
       self.tokenizer = tokenizer
+      self.model = model
+      self.grammarEngine = grammarEngine
     }
 
     public func prefill(prompt: NeedlePrefillablePrompt) throws -> NeedlePrefillMetrics {
