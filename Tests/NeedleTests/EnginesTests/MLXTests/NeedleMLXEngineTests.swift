@@ -29,7 +29,7 @@
       let generation = try engine.generate(
         prompt: prompt,
         matcher: matcher,
-        onToken: { print($0) }
+        onToken: { _ in }
       )
       let input = try LMInput.needle(prompt: prompt, using: self.engine.tokenizer)
       expectNoDifference(generation.prefillMetrics.tokens < input.text.tokens.size, true)

@@ -64,17 +64,19 @@
       var durationToFirstToken: Duration?
 
       var tokenIds = [NeedleToken.ID]()
-      for tokenId in tokenIterator {
-        let token = NeedleToken(
-          id: tokenId,
-          stringValue: self.tokenizer.decode(tokenIds: CollectionOfOne(tokenId))
-        )
-        durationToFirstToken = durationToFirstToken ?? decodeStart.duration(to: self.clock.now)
-        tokenIds.append(token.id)
-        onToken(token)
+      let ramUsageBytes = withMemoryUsage {
+        for tokenId in tokenIterator {
+          let token = NeedleToken(
+            id: tokenId,
+            stringValue: self.tokenizer.decode(tokenIds: CollectionOfOne(tokenId))
+          )
+          durationToFirstToken = durationToFirstToken ?? decodeStart.duration(to: self.clock.now)
+          tokenIds.append(token.id)
+          onToken(token)
 
-        if matcher.isTerminated {
-          break
+          if matcher.isTerminated {
+            break
+          }
         }
       }
 
@@ -85,7 +87,7 @@
           tokens: tokenIds.count,
           duration: decodeDuration,
           durationToFirstToken: durationToFirstToken ?? .zero,
-          ramUsageBytes: 0
+          ramUsageBytes: ramUsageBytes
         ),
         response: tokenizer.decode(tokenIds: tokenIds)
       )
@@ -115,21 +117,23 @@
     ) throws -> (TokenIterator, NeedlePrefillMetrics) {
       var tokenIterator: TokenIterator!
       let offset = self.cache?.first?.offset ?? 0
-      let prefillDuration = try self.clock.measure {
-        tokenIterator = try TokenIterator(
-          input: input,
-          model: self.model,
-          cache: self.cache,
-          processor: self.maskProcessor,
-          sampler: ArgMaxSampler()
-        )
+      let (prefillDuration, ramUsageBytes) = try withMemoryUsage {
+        try self.clock.measure {
+          tokenIterator = try TokenIterator(
+            input: input,
+            model: self.model,
+            cache: self.cache,
+            processor: self.maskProcessor,
+            sampler: ArgMaxSampler()
+          )
+        }
       }
       return (
         tokenIterator,
         NeedlePrefillMetrics(
           tokens: input.text.tokens.size - offset,
           duration: prefillDuration,
-          ramUsageBytes: 0
+          ramUsageBytes: ramUsageBytes
         )
       )
     }
@@ -142,6 +146,24 @@
   }
 
   // MARK: - Helpers
+
+  private func withMemoryUsage<R>(
+    _ body: () throws -> R
+  ) rethrows -> (R, Int64) {
+    let stream = Stream.defaultStream(.defaultDevice())
+    stream.synchronize()
+    let start = Memory.snapshot()
+    Memory.peakMemory = start.activeMemory
+    let result = try body()
+    stream.synchronize()
+    return (result, Int64(Memory.peakMemory - start.activeMemory))
+  }
+
+  private func withMemoryUsage(
+    _ body: () throws -> Void
+  ) rethrows -> Int64 {
+    try withMemoryUsage(body).1
+  }
 
   private final class BitaskLogitsProcessor: LogitProcessor {
     private var base: NeedleGrammarLogitsProcessor?
