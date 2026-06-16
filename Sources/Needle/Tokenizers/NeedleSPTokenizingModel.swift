@@ -16,7 +16,7 @@
     }
 
     public init(modelURL: URL) throws {
-      let nativePath = modelURL.withUnsafeFileSystemRepresentation { $0 }
+      let nativePath = modelURL.withUnsafeFileSystemRepresentation { String(cString: $0!) }
       guard let tokenizer = needle_sp_tokenizer_init_from_file(nativePath) else {
         throw NeedleSPTokenizingModelError()
       }

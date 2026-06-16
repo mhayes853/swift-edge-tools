@@ -20,10 +20,20 @@
 
     public let configuration: NeedleModelConfiguration
     private let model: NeedleSimpleAttentionNetwork
+    @ModuleInfo(key: "lm_head") private var lmHead: Linear
+
+    private var defaultPrefilledOutput: MLXArray {
+      .zeros([1, 0, self.configuration.dimensions])
+    }
 
     public init(configuration: NeedleModelConfiguration) {
       self.configuration = configuration
       self.model = NeedleSimpleAttentionNetwork(configuration: configuration)
+      self._lmHead.wrappedValue = Linear(
+        inputDimensions: configuration.dimensions,
+        outputDimensions: configuration.vocabularySize,
+        bias: false
+      )
     }
 
     public func prepare(
@@ -37,9 +47,9 @@
       var lastOutput: LMOutput?
       while y.tokens.size > 0 {
         let count = min(prefillStepSize, y.tokens.size)
-        lastOutput = self.model(
+        lastOutput = self(
           y[.newAxis, ..<count].tokens,
-          prefilledOutput: lastOutput?.state?.crossAttentionStates ?? .mlxNone,
+          prefilledOutput: lastOutput?.state?.crossAttentionStates ?? self.defaultPrefilledOutput,
           caches: self.caches(from: cache),
           forwardPhase: .prefill
         )
@@ -57,12 +67,27 @@
       cache: [any KVCache]?,
       state: LMOutput.State?
     ) -> LMOutput {
-      self.model(
+      self(
         input.tokens,
-        prefilledOutput: state?.crossAttentionStates ?? .mlxNone,
+        prefilledOutput: state?.crossAttentionStates ?? self.defaultPrefilledOutput,
         caches: cache.map(self.caches(from:)),
         forwardPhase: .decode
       )
+    }
+
+    private func callAsFunction(
+      _ input: MLXArray,
+      prefilledOutput: MLXArray,
+      caches: [(selfCache: any KVCache, crossCache: any KVCache)]?,
+      forwardPhase: ForwardPhase
+    ) -> LMOutput {
+      let output = self.model(
+        input,
+        prefilledOutput: prefilledOutput,
+        caches: caches,
+        forwardPhase: forwardPhase
+      )
+      return LMOutput(logits: self.lmHead(output.logits), state: output.state)
     }
 
     private func caches(
@@ -164,7 +189,7 @@
     init(configuration: NeedleModelConfiguration) {
       self._inputLayerNorm.wrappedValue = ZCRMSNorm(configuration: configuration)
       self._attention.wrappedValue = NeedleAttention(configuration: configuration)
-      self._attentionGate.wrappedValue = MLXArray(0)
+      self._attentionGate.wrappedValue = MLXArray([0])
     }
 
     func callAsFunction(
@@ -210,7 +235,7 @@
     ) -> MLXArray {
       let ropeFrequencies = RoPEFrequencies(
         inverse: self._inverseRope,
-        sequenceLength: x.dim(1),
+        sequenceLength: (caches?.first?.selfCache.offset ?? 0) + x.dim(1),
         dtype: x.dtype
       )
       var x = x
@@ -241,10 +266,10 @@
     init(configuration: NeedleModelConfiguration) {
       self._inputLayerNorm.wrappedValue = ZCRMSNorm(configuration: configuration)
       self._selfAttention.wrappedValue = NeedleAttention(configuration: configuration)
-      self._selfAttentionGate.wrappedValue = MLXArray(0)
+      self._selfAttentionGate.wrappedValue = MLXArray([0])
       self._crossAttentionNorm.wrappedValue = ZCRMSNorm(configuration: configuration)
       self._crossAttention.wrappedValue = NeedleAttention(configuration: configuration)
-      self._crossAttentionGate.wrappedValue = MLXArray(0)
+      self._crossAttentionGate.wrappedValue = MLXArray([0])
     }
 
     func callAsFunction(
@@ -265,9 +290,12 @@
         cache: selfCache
       )
 
-      let crossNormed = self.crossAttentionNorm(
-        gatedResidual(x, gate: self.selfAttentionGate, sublayer: selfAttention)
+      let gatedSelfAttention = gatedResidual(
+        x,
+        gate: self.selfAttentionGate,
+        sublayer: selfAttention
       )
+      let crossNormed = self.crossAttentionNorm(gatedSelfAttention)
       let crossAttention = self.crossAttention(
         q: crossNormed,
         kv: encoderOutput,
@@ -275,7 +303,11 @@
         ropeFrequencies: nil,
         cache: crossCache
       )
-      return gatedResidual(x, gate: self.crossAttentionGate, sublayer: crossAttention)
+      return gatedResidual(
+        gatedSelfAttention,
+        gate: self.crossAttentionGate,
+        sublayer: crossAttention
+      )
     }
   }
 
@@ -300,8 +332,14 @@
       self.headDimensions = configuration.attentionHeadDimensions
       self.scale = sqrt(1.0 / Float(configuration.attentionHeadDimensions))
 
-      self._queryNorm.wrappedValue = ZCRMSNorm(configuration: configuration)
-      self._keyNorm.wrappedValue = ZCRMSNorm(configuration: configuration)
+      self._queryNorm.wrappedValue = ZCRMSNorm(
+        dimensions: configuration.attentionHeadDimensions,
+        eps: configuration.rmsNormEps
+      )
+      self._keyNorm.wrappedValue = ZCRMSNorm(
+        dimensions: configuration.attentionHeadDimensions,
+        eps: configuration.rmsNormEps
+      )
 
       self._queryProjection.wrappedValue = Linear(
         inputDimensions: configuration.hiddenDimensions,
@@ -336,12 +374,12 @@
       var keys = self.keyProjection(kv)
       var values = self.valueProjection(kv)
 
-      queries = self.queryNorm(queries)
-      keys = self.keyNorm(keys)
       queries = unflatten(queries, axis: -1, shape: [self.heads, self.headDimensions])
         .transposed(0, 2, 1, 3)
       keys = unflatten(keys, axis: -1, shape: [self.kvHeads, self.headDimensions])
         .transposed(0, 2, 1, 3)
+      queries = self.queryNorm(queries)
+      keys = self.keyNorm(keys)
       values = unflatten(values, axis: -1, shape: [self.kvHeads, self.headDimensions])
         .transposed(0, 2, 1, 3)
 
@@ -374,12 +412,12 @@
 
     init(dimensions: Int, eps: Float) {
       self.eps = eps
-      self.weight = .ones([dimensions])
+      self.weight = .zeros([dimensions])
       super.init()
     }
 
     func callAsFunction(_ x: MLXArray) -> MLXArray {
-      (self.weight + 1) * x / rmsNorm(x, weight: self.weight, eps: self.eps)
+      rmsNorm(x, weight: 1.0 + self.weight.asType(x.dtype), eps: self.eps)
     }
   }
 
@@ -406,12 +444,12 @@
     func apply(to x: MLXArray, offset: Int?) -> MLXArray {
       let offset = offset ?? 0
       let sin = expandedDimensions(
-        self.sin[.ellipsis, offset..<offset + x.dim(1), .ellipsis],
-        axis: 2
+        self.sin[.ellipsis, offset..<(offset + x.dim(2)), 0...],
+        axis: 1
       )
       let cos = expandedDimensions(
-        self.cos[.ellipsis, offset..<offset + x.dim(1), .ellipsis],
-        axis: 2
+        self.cos[.ellipsis, offset..<(offset + x.dim(2)), 0...],
+        axis: 1
       )
       let half = x.dim(-1) / 2
       let rotated = concatenated([-x[.ellipsis, half...], x[.ellipsis, ..<half]], axis: -1)
@@ -419,19 +457,15 @@
     }
   }
 
-  // MARK: - Gated Residual
+  // MARK: - Helpers
 
   private func gatedResidual(_ x: MLXArray, gate: MLXArray, sublayer: MLXArray) -> MLXArray {
     x + sigmoid(gate).asType(sublayer.dtype) * sublayer
   }
 
-  // MARK: - Padding Mask
-
   private func paddingMask(inputIds: MLXArray, padTokenId: Int) -> MLXArray {
-    (inputIds .!= padTokenId)[0..., .newAxis, .newAxis, 0...]
+    (inputIds .!= padTokenId)[.ellipsis, .newAxis, .newAxis, 0...]
   }
-
-  // MARK: - ForwardPhase
 
   private enum ForwardPhase {
     case prefill, decode

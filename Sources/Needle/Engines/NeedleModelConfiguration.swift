@@ -16,7 +16,11 @@ public struct NeedleModelConfiguration: Hashable, Sendable {
   public let eosTokenId: Int
   public let unkTokenId: Int
   public let decoderStartTokenId: Int
-  public let dtype: String
+  private let _dtype: String?
+
+  public var dtype: String {
+    self._dtype ?? "bfloat16"
+  }
 
   public var attentionHeadDimensions: Int {
     self.dimensions / self.attentionHeads
@@ -46,6 +50,6 @@ extension NeedleModelConfiguration: Codable {
     case eosTokenId = "eos_token_id"
     case unkTokenId = "unk_token_id"
     case decoderStartTokenId = "decoder_start_token_id"
-    case dtype = "dtype"
+    case _dtype = "dtype"
   }
 }

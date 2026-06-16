@@ -1,6 +1,8 @@
 #if SwiftNeedleMLX
   import MLX
 
+  // MARK: - Init
+
   extension DType {
     public init?(string: String) {
       switch string {
@@ -20,6 +22,14 @@
       case "uint64": self = .uint64
       default: return nil
       }
+    }
+  }
+
+  // MARK: - Configuration
+
+  extension NeedleModelConfiguration {
+    public var mlxDType: DType {
+      DType(string: self.dtype) ?? .bfloat16
     }
   }
 #endif
