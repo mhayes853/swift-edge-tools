@@ -60,27 +60,31 @@
       let decodeStart = self.clock.now
       var durationToFirstToken: Duration?
 
-      var tokens = [NeedleToken]()
+      var tokenIds = [NeedleToken.ID]()
       for tokenId in tokenIterator {
         let token = NeedleToken(
           id: tokenId,
           stringValue: self.tokenizer.decode(tokenIds: CollectionOfOne(tokenId))
         )
-        durationToFirstToken = durationToFirstToken ?? self.clock.now.duration(to: decodeStart)
-        tokens.append(token)
+        durationToFirstToken = durationToFirstToken ?? decodeStart.duration(to: self.clock.now)
+        tokenIds.append(token.id)
         onToken(token)
+        
+        if matcher.isTerminated {
+          break
+        }
       }
 
-      let decodeDuration = self.clock.now.duration(to: decodeStart)
+      let decodeDuration = decodeStart.duration(to: self.clock.now)
       return NeedleEngineGeneration(
         prefillMetrics: prefillMetrics,
         decodeMetrics: NeedleDecodeMetrics(
-          tokens: tokens.count,
+          tokens: tokenIds.count,
           duration: decodeDuration,
           durationToFirstToken: durationToFirstToken ?? .zero,
           ramUsageBytes: 0
         ),
-        response: tokens.map(\.stringValue).joined()
+        response: tokenizer.decode(tokenIds: tokenIds)
       )
     }
 

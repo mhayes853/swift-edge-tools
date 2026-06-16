@@ -50,11 +50,29 @@
       )
       expectNoDifference(generation.prefillMetrics.tokens > prefillMetrics.tokens, true)
     }
+    
+    @Test
+    func `Ignores Prefill Tokens After Reset`() async throws {
+      let prefillMetrics = try self.engine.prefill(prompt: .prefill)
+      let matcher = try await self.engine.grammarEngine.compile(tools: [.sendEmail])
+      
+      self.engine.reset()
+      
+      var prompt = NeedlePrompt.prefill
+      prompt.user = "Send an email to Henry about his wonderful adventures"
+      
+      let generation = try self.engine.generate(
+        prompt: prompt,
+        matcher: matcher,
+        onToken: { _ in }
+      )
+      expectNoDifference(generation.prefillMetrics.tokens > prefillMetrics.tokens, true)
+    }
 
     @Test
     func `Generate Basics`() async throws {
       var prompt = NeedlePrompt.prefill
-      prompt.user = "Send an email to Henry"
+      prompt.user = "Send an email to Henry about his wonderful adventures"
 
       let matcher = try await self.engine.grammarEngine.compile(tools: [.sendEmail])
 

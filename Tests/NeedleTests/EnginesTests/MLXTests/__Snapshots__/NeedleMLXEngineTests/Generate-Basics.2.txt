@@ -1,1 +1,151 @@
-- 0 elements
+▿ 50 elements
+  ▿ NeedleToken
+    - id: 4
+    - stringValue: "<tool_call>"
+  ▿ NeedleToken
+    - id: 8071
+    - stringValue: "["
+  ▿ NeedleToken
+    - id: 271
+    - stringValue: "{\""
+  ▿ NeedleToken
+    - id: 294
+    - stringValue: "name"
+  ▿ NeedleToken
+    - id: 264
+    - stringValue: "\":\""
+  ▿ NeedleToken
+    - id: 8046
+    - stringValue: "s"
+  ▿ NeedleToken
+    - id: 8038
+    - stringValue: "e"
+  ▿ NeedleToken
+    - id: 354
+    - stringValue: "nd"
+  ▿ NeedleToken
+    - id: 8062
+    - stringValue: "_"
+  ▿ NeedleToken
+    - id: 8038
+    - stringValue: "e"
+  ▿ NeedleToken
+    - id: 553
+    - stringValue: "ma"
+  ▿ NeedleToken
+    - id: 8043
+    - stringValue: "i"
+  ▿ NeedleToken
+    - id: 8055
+    - stringValue: "l"
+  ▿ NeedleToken
+    - id: 8039
+    - stringValue: "\""
+  ▿ NeedleToken
+    - id: 263
+    - stringValue: ",\""
+  ▿ NeedleToken
+    - id: 393
+    - stringValue: "arguments"
+  ▿ NeedleToken
+    - id: 282
+    - stringValue: "\":{\""
+  ▿ NeedleToken
+    - id: 2876
+    - stringValue: "address"
+  ▿ NeedleToken
+    - id: 264
+    - stringValue: "\":\""
+  ▿ NeedleToken
+    - id: 441
+    - stringValue: "her"
+  ▿ NeedleToken
+    - id: 8064
+    - stringValue: "b"
+  ▿ NeedleToken
+    - id: 1117
+    - stringValue: "ull"
+  ▿ NeedleToken
+    - id: 8059
+    - stringValue: "}"
+  ▿ NeedleToken
+    - id: 8072
+    - stringValue: "]"
+  ▿ NeedleToken
+    - id: 265
+    - stringValue: "\",\""
+  ▿ NeedleToken
+    - id: 1519
+    - stringValue: "body"
+  ▿ NeedleToken
+    - id: 264
+    - stringValue: "\":\""
+  ▿ NeedleToken
+    - id: 8103
+    - stringValue: "H"
+  ▿ NeedleToken
+    - id: 637
+    - stringValue: "el"
+  ▿ NeedleToken
+    - id: 363
+    - stringValue: "lo"
+  ▿ NeedleToken
+    - id: 8052
+    - stringValue: ","
+  ▿ NeedleToken
+    - id: 485
+    - stringValue: "I"
+  ▿ NeedleToken
+    - id: 3744
+    - stringValue: "will"
+  ▿ NeedleToken
+    - id: 606
+    - stringValue: "be"
+  ▿ NeedleToken
+    - id: 3441
+    - stringValue: "there"
+  ▿ NeedleToken
+    - id: 362
+    - stringValue: "in"
+  ▿ NeedleToken
+    - id: 302
+    - stringValue: "the"
+  ▿ NeedleToken
+    - id: 289
+    - stringValue: "a"
+  ▿ NeedleToken
+    - id: 4926
+    - stringValue: "ful"
+  ▿ NeedleToken
+    - id: 456
+    - stringValue: "ly"
+  ▿ NeedleToken
+    - id: 284
+    - stringValue: ".\",\""
+  ▿ NeedleToken
+    - id: 979
+    - stringValue: "subject"
+  ▿ NeedleToken
+    - id: 264
+    - stringValue: "\":\""
+  ▿ NeedleToken
+    - id: 1355
+    - stringValue: "Ad"
+  ▿ NeedleToken
+    - id: 628
+    - stringValue: "vent"
+  ▿ NeedleToken
+    - id: 5646
+    - stringValue: "ures"
+  ▿ NeedleToken
+    - id: 953
+    - stringValue: "P"
+  ▿ NeedleToken
+    - id: 372
+    - stringValue: "et"
+  ▿ NeedleToken
+    - id: 1078
+    - stringValue: "up"
+  ▿ NeedleToken
+    - id: 503
+    - stringValue: "\"}}]"
