@@ -10,12 +10,12 @@
     public typealias GrammarEngine = NeedleXGrammarEngine
 
     public let grammarEngine: NeedleXGrammarEngine
+    public let tokenizer: NeedleSPTokenizingModel
+    public let model: NeedleMLXModel
 
-    private let tokenizer: NeedleSPTokenizingModel
-    private let model: NeedleMLXModel
     private let maskProcessor = BitaskLogitsProcessor()
-    private var tokenIterator: TokenIterator?
     private var prefilledInput: MLXArray?
+    private var cache: [any KVCache]?
     private let clock = ContinuousClock()
 
     public init(
@@ -46,10 +46,10 @@
     }
 
     public func prefill(prompt: NeedlePrefillablePrompt) throws -> NeedlePrefillMetrics {
+      self.cache = self.model.newCache(parameters: nil)
       let input = LMInput.needle(prompt: prompt, using: self.tokenizer)
-      let (tokenIterator, metrics) = try self.loadTokenIterator(input: input)
+      let (_, metrics) = try self.loadTokenIterator(input: input)
       self.prefilledInput = input.text.tokens
-      self.tokenIterator = tokenIterator
       return metrics
     }
 
@@ -92,8 +92,8 @@
     }
 
     public func reset() {
-      self.tokenIterator = nil
       self.prefilledInput = nil
+      self.cache = nil
       self.maskProcessor.use(matcher: nil)
     }
 
@@ -101,10 +101,11 @@
       prompt: NeedlePrompt
     ) throws -> (TokenIterator, NeedlePrefillMetrics) {
       let input = try LMInput.needle(prompt: prompt, using: self.tokenizer)
-      guard let tokenIterator else { return try self.loadTokenIterator(input: input) }
-      if self.prefilledInput?.isPrefix(of: input.text.tokens) ?? false {
-        let metrics = NeedlePrefillMetrics(tokens: 0, duration: .zero, ramUsageBytes: 0)
-        return (tokenIterator, metrics)
+      guard let prefilledInput else { return try self.loadTokenIterator(input: input) }
+
+      let isPrefilledPrefix = all(prefilledInput .== input.text.tokens[0..<prefilledInput.dim(0)])
+      if !isPrefilledPrefix.item(Bool.self) {
+        self.cache = nil
       }
       return try self.loadTokenIterator(input: input)
     }
@@ -113,11 +114,12 @@
       input: LMInput
     ) throws -> (TokenIterator, NeedlePrefillMetrics) {
       var tokenIterator: TokenIterator!
+      let offset = self.cache?.first?.offset ?? 0
       let prefillDuration = try self.clock.measure {
         tokenIterator = try TokenIterator(
           input: input,
           model: self.model,
-          cache: nil,
+          cache: self.cache,
           processor: self.maskProcessor,
           sampler: ArgMaxSampler()
         )
@@ -125,7 +127,7 @@
       return (
         tokenIterator,
         NeedlePrefillMetrics(
-          tokens: input.text.tokens.size,
+          tokens: input.text.tokens.size - offset,
           duration: prefillDuration,
           ramUsageBytes: 0
         )
@@ -158,12 +160,6 @@
 
     func didSample(token: MLXArray) {
       self.base?.didSample(token: token)
-    }
-  }
-
-  extension MLXArray {
-    fileprivate func isPrefix(of other: MLXArray) -> Bool {
-      MLX.all(self .== other[0..<self.dim(0)]).item(Bool.self)
     }
   }
 #endif

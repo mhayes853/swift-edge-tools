@@ -4,9 +4,10 @@
   import CustomDump
   import SnapshotTesting
   import IssueReporting
+  import MLXLMCommon
 
   @Suite(.serialized, .enabledIfXcode())
-  struct `NeedleMLXEnegine tests` {
+  struct `NeedleMLXEngine tests` {
     private let engine: NeedleMLXEngine
 
     init() async throws {
@@ -15,21 +16,24 @@
 
     @Test
     func `Prefill Basics`() throws {
-      let metrics = try engine.prefill(prompt: .base)
+      let metrics = try self.engine.prefill(prompt: .base)
       withExpectedIssue { assertSnapshot(of: metrics, as: .dump, record: .all) }
     }
 
     @Test
     func `Prefill Reduces Prefilled Tokens When Generating`() async throws {
-      let prefillMetrics = try engine.prefill(prompt: .base)
+      let prefillMetrics = try self.engine.prefill(prompt: .base)
 
       let matcher = try await self.engine.grammarEngine.compile(tools: [.sendEmail])
+      let prompt = NeedlePrompt(prefillable: .base, tools: [.sendEmail])
       let generation = try engine.generate(
-        prompt: NeedlePrompt(prefillable: .base, tools: [.sendEmail]),
+        prompt: prompt,
         matcher: matcher,
         onToken: { print($0) }
       )
-      expectNoDifference(generation.prefillMetrics.tokens < prefillMetrics.tokens, true)
+      let input = try LMInput.needle(prompt: prompt, using: self.engine.tokenizer)
+      expectNoDifference(generation.prefillMetrics.tokens < input.text.tokens.size, true)
+      expectNoDifference(prefillMetrics.tokens < input.text.tokens.size, true)
     }
 
     @Test
@@ -68,7 +72,25 @@
       let matcher = try await self.engine.grammarEngine.compile(tools: [.sendEmail])
 
       var tokens = [NeedleToken]()
-      let generation = try engine.generate(
+      let generation = try self.engine.generate(
+        prompt: NeedlePrompt(prefillable: .base, tools: [.sendEmail]),
+        matcher: matcher,
+        onToken: { tokens.append($0) }
+      )
+      withExpectedIssue {
+        assertSnapshot(of: generation, as: .dump, record: .all)
+        assertSnapshot(of: tokens, as: .dump, record: .all)
+      }
+    }
+    
+    @Test
+    func `Generate After Prefill`() async throws {
+      let matcher = try await self.engine.grammarEngine.compile(tools: [.sendEmail])
+      
+      _ = try self.engine.prefill(prompt: .base)
+
+      var tokens = [NeedleToken]()
+      let generation = try self.engine.generate(
         prompt: NeedlePrompt(prefillable: .base, tools: [.sendEmail]),
         matcher: matcher,
         onToken: { tokens.append($0) }

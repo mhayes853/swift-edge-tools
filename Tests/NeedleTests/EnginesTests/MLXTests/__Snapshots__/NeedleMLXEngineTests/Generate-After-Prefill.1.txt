@@ -1,0 +1,17 @@
+▿ NeedleEngineGeneration
+  ▿ decodeMetrics: NeedleDecodeMetrics
+    ▿ duration: 0.965231625 seconds
+      - _low: 965231625000000000
+      - _high: 0
+    ▿ durationToFirstToken: 0.020114375 seconds
+      - _low: 20114375000000000
+      - _high: 0
+    - ramUsageBytes: 0
+    - tokens: 54
+  ▿ prefillMetrics: NeedlePrefillMetrics
+    ▿ duration: 0.043813792 seconds
+      - _low: 43813792000000000
+      - _high: 0
+    - ramUsageBytes: 0
+    - tokens: 73
+  - response: "<tool_call>[{\"name\":\"send_email\",\"arguments\":{\"address\":\"Henry\'s wonderful adventures.\",\"body\":\"It was a helpful assistant, please helpful.\",\"subject\":\"Adventures\"}}]"
