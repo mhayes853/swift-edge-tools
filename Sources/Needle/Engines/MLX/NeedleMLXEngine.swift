@@ -15,6 +15,7 @@
     private let model: NeedleMLXModel
     private let maskProcessor = BitaskLogitsProcessor()
     private var tokenIterator: TokenIterator?
+    private var prefilledInput: MLXArray?
     private let clock = ContinuousClock()
 
     public init(
@@ -44,8 +45,10 @@
       self.tokenizer = tokenizer
     }
 
-    public func prefill(prompt: NeedlePrompt) throws -> NeedlePrefillMetrics {
-      let (tokenIterator, metrics) = try self.loadTokenIterator(prompt: prompt)
+    public func prefill(prompt: NeedlePrefillablePrompt) throws -> NeedlePrefillMetrics {
+      let input = LMInput.needle(prompt: prompt, using: self.tokenizer)
+      let (tokenIterator, metrics) = try self.loadTokenIterator(input: input)
+      self.prefilledInput = input.text.tokens
       self.tokenIterator = tokenIterator
       return metrics
     }
@@ -69,7 +72,7 @@
         durationToFirstToken = durationToFirstToken ?? decodeStart.duration(to: self.clock.now)
         tokenIds.append(token.id)
         onToken(token)
-        
+
         if matcher.isTerminated {
           break
         }
@@ -90,24 +93,25 @@
 
     public func reset() {
       self.tokenIterator = nil
+      self.prefilledInput = nil
       self.maskProcessor.use(matcher: nil)
     }
 
     private func loadGenerationTokenIterator(
       prompt: NeedlePrompt
     ) throws -> (TokenIterator, NeedlePrefillMetrics) {
-      if let tokenIterator {
+      let input = try LMInput.needle(prompt: prompt, using: self.tokenizer)
+      guard let tokenIterator else { return try self.loadTokenIterator(input: input) }
+      if self.prefilledInput?.isPrefix(of: input.text.tokens) ?? false {
         let metrics = NeedlePrefillMetrics(tokens: 0, duration: .zero, ramUsageBytes: 0)
         return (tokenIterator, metrics)
-      } else {
-        return try self.loadTokenIterator(prompt: prompt)
       }
+      return try self.loadTokenIterator(input: input)
     }
 
     private func loadTokenIterator(
-      prompt: NeedlePrompt
+      input: LMInput
     ) throws -> (TokenIterator, NeedlePrefillMetrics) {
-      let input = try LMInput.needle(prompt: prompt, using: self.tokenizer)
       var tokenIterator: TokenIterator!
       let prefillDuration = try self.clock.measure {
         tokenIterator = try TokenIterator(
@@ -135,7 +139,7 @@
     public static let failedToLoadGrammarEngine = Self()
   }
 
-  // MARK: - BitaskLogitsProcessor
+  // MARK: - Helpers
 
   private final class BitaskLogitsProcessor: LogitProcessor {
     private var base: NeedleGrammarLogitsProcessor?
@@ -154,6 +158,12 @@
 
     func didSample(token: MLXArray) {
       self.base?.didSample(token: token)
+    }
+  }
+
+  extension MLXArray {
+    fileprivate func isPrefix(of other: MLXArray) -> Bool {
+      MLX.all(self .== other[0..<self.dim(0)]).item(Bool.self)
     }
   }
 #endif

@@ -1,17 +1,17 @@
 ▿ NeedleEngineGeneration
   ▿ decodeMetrics: NeedleDecodeMetrics
-    ▿ duration: 0.930789042 seconds
-      - _low: 930789042000000000
+    ▿ duration: 1.002347583 seconds
+      - _low: 1002347583000000000
       - _high: 0
-    ▿ durationToFirstToken: 0.017264125 seconds
-      - _low: 17264125000000000
+    ▿ durationToFirstToken: 0.019574916 seconds
+      - _low: 19574916000000000
       - _high: 0
     - ramUsageBytes: 0
-    - tokens: 50
+    - tokens: 54
   ▿ prefillMetrics: NeedlePrefillMetrics
-    ▿ duration: 0.048115041 seconds
-      - _low: 48115041000000000
+    ▿ duration: 0.123069625 seconds
+      - _low: 123069625000000000
       - _high: 0
     - ramUsageBytes: 0
-    - tokens: 82
-  - response: "<tool_call>[{\"name\":\"send_email\",\"arguments\":{\"address\":\"herbull}]\",\"body\":\"Hello, I will be there in the afully.\",\"subject\":\"Adventures Petup\"}}]"
+    - tokens: 103
+  - response: "<tool_call>[{\"name\":\"send_email\",\"arguments\":{\"address\":\"Henry\'s wonderful adventures.\",\"body\":\"I have a question about your wonderful adventures.\",\"subject\":\"Adventures\"}}]"

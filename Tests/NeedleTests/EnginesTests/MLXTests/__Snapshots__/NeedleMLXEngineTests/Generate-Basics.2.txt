@@ -1,4 +1,4 @@
-▿ 50 elements
+▿ 54 elements
   ▿ NeedleToken
     - id: 4
     - stringValue: "<tool_call>"
@@ -12,8 +12,14 @@
     - id: 294
     - stringValue: "name"
   ▿ NeedleToken
-    - id: 264
-    - stringValue: "\":\""
+    - id: 8039
+    - stringValue: "\""
+  ▿ NeedleToken
+    - id: 8048
+    - stringValue: ":"
+  ▿ NeedleToken
+    - id: 8039
+    - stringValue: "\""
   ▿ NeedleToken
     - id: 8046
     - stringValue: "s"
@@ -57,23 +63,41 @@
     - id: 264
     - stringValue: "\":\""
   ▿ NeedleToken
-    - id: 441
-    - stringValue: "her"
+    - id: 8103
+    - stringValue: "H"
   ▿ NeedleToken
-    - id: 8064
-    - stringValue: "b"
+    - id: 381
+    - stringValue: "en"
   ▿ NeedleToken
-    - id: 1117
-    - stringValue: "ull"
+    - id: 1127
+    - stringValue: "ry"
   ▿ NeedleToken
-    - id: 8059
-    - stringValue: "}"
+    - id: 8066
+    - stringValue: "\'"
   ▿ NeedleToken
-    - id: 8072
-    - stringValue: "]"
+    - id: 8046
+    - stringValue: "s"
   ▿ NeedleToken
-    - id: 265
-    - stringValue: "\",\""
+    - id: 6996
+    - stringValue: "won"
+  ▿ NeedleToken
+    - id: 433
+    - stringValue: "der"
+  ▿ NeedleToken
+    - id: 4926
+    - stringValue: "ful"
+  ▿ NeedleToken
+    - id: 1746
+    - stringValue: "ad"
+  ▿ NeedleToken
+    - id: 628
+    - stringValue: "vent"
+  ▿ NeedleToken
+    - id: 5646
+    - stringValue: "ures"
+  ▿ NeedleToken
+    - id: 284
+    - stringValue: ".\",\""
   ▿ NeedleToken
     - id: 1519
     - stringValue: "body"
@@ -81,44 +105,41 @@
     - id: 264
     - stringValue: "\":\""
   ▿ NeedleToken
-    - id: 8103
-    - stringValue: "H"
-  ▿ NeedleToken
-    - id: 637
-    - stringValue: "el"
-  ▿ NeedleToken
-    - id: 363
-    - stringValue: "lo"
-  ▿ NeedleToken
-    - id: 8052
-    - stringValue: ","
-  ▿ NeedleToken
-    - id: 485
+    - id: 8084
     - stringValue: "I"
   ▿ NeedleToken
-    - id: 3744
-    - stringValue: "will"
-  ▿ NeedleToken
-    - id: 606
-    - stringValue: "be"
-  ▿ NeedleToken
-    - id: 3441
-    - stringValue: "there"
-  ▿ NeedleToken
-    - id: 362
-    - stringValue: "in"
-  ▿ NeedleToken
-    - id: 302
-    - stringValue: "the"
+    - id: 1788
+    - stringValue: "have"
   ▿ NeedleToken
     - id: 289
     - stringValue: "a"
   ▿ NeedleToken
+    - id: 1527
+    - stringValue: "question"
+  ▿ NeedleToken
+    - id: 1323
+    - stringValue: "about"
+  ▿ NeedleToken
+    - id: 3611
+    - stringValue: "your"
+  ▿ NeedleToken
+    - id: 6996
+    - stringValue: "won"
+  ▿ NeedleToken
+    - id: 433
+    - stringValue: "der"
+  ▿ NeedleToken
     - id: 4926
     - stringValue: "ful"
   ▿ NeedleToken
-    - id: 456
-    - stringValue: "ly"
+    - id: 1746
+    - stringValue: "ad"
+  ▿ NeedleToken
+    - id: 628
+    - stringValue: "vent"
+  ▿ NeedleToken
+    - id: 5646
+    - stringValue: "ures"
   ▿ NeedleToken
     - id: 284
     - stringValue: ".\",\""
@@ -137,15 +158,6 @@
   ▿ NeedleToken
     - id: 5646
     - stringValue: "ures"
-  ▿ NeedleToken
-    - id: 953
-    - stringValue: "P"
-  ▿ NeedleToken
-    - id: 372
-    - stringValue: "et"
-  ▿ NeedleToken
-    - id: 1078
-    - stringValue: "up"
   ▿ NeedleToken
     - id: 503
     - stringValue: "\"}}]"

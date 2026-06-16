@@ -14,10 +14,7 @@ public final class NeedleSession<Engine: NeedleEngine>: Sendable {
 
 extension NeedleSession {
   @discardableResult
-  public func prefill(
-    tools: sending [any NeedleTool],
-    prompt: String
-  ) async throws -> NeedlePrefillMetrics {
+  public func prefill(promptPrefix: String) async throws -> NeedlePrefillMetrics {
     fatalError()
   }
 

@@ -5,7 +5,11 @@ extension NeedleToolDefinition {
     name: "sendEmail",
     description: "Sends an email to someone.",
     arguments: .object(
-      properties: ["address": .string(), "subject": .string(), "body": .string()],
+      properties: [
+        "address": .string(description: "The recipient's email address."),
+        "subject": .string(),
+        "body": .string()
+      ],
       required: ["address", "subject", "body"]
     )
   )

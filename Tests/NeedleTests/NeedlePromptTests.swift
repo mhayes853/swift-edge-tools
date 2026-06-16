@@ -25,6 +25,7 @@ struct `NeedlePrompt tests` {
       "arguments":{\
       "properties":{\
       "address":{"type":"string"},"body":{"type":"string"},"subject":{"type":"string"}},\
+      "required":["address","subject","body"],\
       "type":"object"\
       },\
       "description":"Sends an email to someone.",\
