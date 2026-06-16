@@ -4,13 +4,11 @@
 
   // MARK: - NeedleGrammarLogitsProcessor
 
-  public struct NeedleGrammarLogitsProcessor<Matcher: NeedleGrammarMatcher>: LogitProcessor {
-    private var matcher: Matcher
-    private let bitmaskTable: MLXArray
+  public struct NeedleGrammarLogitsProcessor: LogitProcessor {
+    private var matcher: NeedleXGrammarEngine.Matcher
 
-    public init(matcher: Matcher) {
+    public init(matcher: NeedleXGrammarEngine.Matcher) {
       self.matcher = matcher
-      self.bitmaskTable = Needle.bitmaskTable()
     }
 
     public mutating func prompt(_ prompt: MLXArray) {
@@ -21,16 +19,22 @@
     }
 
     public func process(logits: MLXArray) -> MLXArray {
-      let vocabSize = logits.dim(1)
-      let table = self.bitmaskTable.asType(logits.dtype)
-      let mask = self.matcher.bitmask().storage.withUnsafeBytes { MLXArray($0)[.newAxis, 0...] }
-      return logits[0..., 0..<vocabSize] + table[mask].flattened(start: -2)[0..., 0..<vocabSize]
+      applyBitmaskMLX(logits: logits, mask: self.matcher.bitmask())
     }
+  }
+
+  // MARK: - Bitmask
+
+  public func applyBitmaskMLX(logits: MLXArray, mask: NeedleGrammarBitmask) -> MLXArray {
+    let vocabSize = logits.dim(1)
+    let table = MLXArray(bitmaskTable, [256, 8]).asType(logits.dtype)
+    let mask = mask.storage.withUnsafeBytes { MLXArray($0)[.newAxis, 0...] }
+    return logits[0..., 0..<vocabSize] + table[mask].flattened(start: -2)[0..., 0..<vocabSize]
   }
 
   // MARK: - Table
 
-  private func bitmaskTable() -> MLXArray {
+  private let bitmaskTable = {
     var values = [Float]()
     values.reserveCapacity(256 * 8)
     for byte in 0..<256 {
@@ -38,6 +42,6 @@
         values.append(((byte >> bit) & 1) != 0 ? 0 : -.infinity)
       }
     }
-    return MLXArray(values, [256, 8])
-  }
+    return values
+  }()
 #endif

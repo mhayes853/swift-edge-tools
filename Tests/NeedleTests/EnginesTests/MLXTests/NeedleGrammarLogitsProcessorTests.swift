@@ -15,13 +15,10 @@
       mask[0] = false
       mask[6] = false
 
-      let matcher = ConstantGrammarEngine.Matcher(mask: mask)
-      let processor = NeedleGrammarLogitsProcessor(matcher: matcher)
-
       let initialLogits = MLXArray(
         [4.32, 7.98, -1.28, 7.267, 8.1, -92.32, 0.02, 8.29] as [Float],
       )
-      let logits = processor.process(logits: initialLogits[.newAxis, 0...])
+      let logits = applyBitmaskMLX(logits: initialLogits[.newAxis, 0...], mask: mask)
       let filtered = logits[0].enumerated()
         .compactMap { (i, logit) in
           logit.item(Float.self) == -.infinity ? i : nil

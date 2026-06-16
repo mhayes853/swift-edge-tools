@@ -1,0 +1,6 @@
+▿ NeedlePrefillMetrics
+  ▿ duration: 0.0 seconds
+    - _low: 0
+    - _high: 0
+  - ramUsageBytes: 0
+  - tokens: 0

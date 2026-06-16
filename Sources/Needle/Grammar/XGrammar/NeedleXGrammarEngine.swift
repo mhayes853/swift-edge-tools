@@ -91,7 +91,7 @@
   // MARK: - Matcher
 
   extension NeedleXGrammarEngine {
-    public final class Matcher: NeedleGrammarMatcher {
+    public final class Matcher {
       public let matcher: needle_xgrammar_matcher_t
 
       public init(matcher: consuming needle_xgrammar_matcher_t) {

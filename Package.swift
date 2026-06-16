@@ -168,7 +168,12 @@ let package = Package(
       dependencies: [
         "Needle",
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
-        .product(name: "CustomDump", package: "swift-custom-dump")
+        .product(name: "CustomDump", package: "swift-custom-dump"),
+        .product(
+          name: "Hub",
+          package: "swift-transformers",
+          condition: .when(traits: ["SwiftNeedleTokenizers"])
+        )
       ],
       exclude: ["NeedleGenerationSchemaTests/__Snapshots__"],
       resources: [.process("Resources")]
