@@ -19,6 +19,7 @@
     }
 
     public let configuration: NeedleModelConfiguration
+
     private let model: NeedleSimpleAttentionNetwork
     @ModuleInfo(key: "lm_head") private var lmHead: Linear
 
@@ -41,14 +42,27 @@
       cache: [any KVCache],
       windowSize: Int?
     ) throws -> PrepareResult {
+      let output = try self.prepare(
+        input.text.tokens,
+        cache: cache,
+        windowSize: windowSize
+      )
+      return output.map { .logits($0) } ?? .tokens(input.text)
+    }
+
+    public func prepare(
+      _ tokens: MLXArray,
+      cache: [any KVCache],
+      windowSize: Int?,
+    ) throws -> LMOutput? {
       let prefillStepSize = windowSize ?? 512
-      var y = input.text
+      var y = tokens
 
       var lastOutput: LMOutput?
-      while y.tokens.size > 0 {
-        let count = min(prefillStepSize, y.tokens.size)
+      while y.size > 0 {
+        let count = min(prefillStepSize, y.size)
         lastOutput = self(
-          y[.newAxis, ..<count].tokens,
+          y[.newAxis, ..<count],
           prefilledOutput: lastOutput?.state?.crossAttentionStates ?? self.defaultPrefilledOutput,
           caches: self.caches(from: cache),
           forwardPhase: .prefill
@@ -57,9 +71,7 @@
       }
 
       eval(cache)
-
-      guard let lastOutput else { return .tokens(input.text) }
-      return .logits(lastOutput)
+      return lastOutput
     }
 
     public func callAsFunction(
@@ -128,7 +140,9 @@
         case .prefill:
           self.encode(input, previous: prefilledOutput)
         case .decode:
-          prefilledOutput
+          prefilledOutput.dim(1) == 0
+            ? self.encode(input, previous: prefilledOutput)
+            : prefilledOutput
         }
       let logits = self.decoder(
         self.embedding(input) * self.embedScale,

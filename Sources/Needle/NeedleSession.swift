@@ -10,23 +10,6 @@ public final class NeedleSession<Engine: NeedleEngine>: Sendable {
   }
 }
 
-// MARK: - Prefill
-
-extension NeedleSession {
-  @discardableResult
-  public func prefill(promptPrefix: String) async throws -> NeedlePrefillMetrics {
-    fatalError()
-  }
-
-  @discardableResult
-  public func prefill(
-    tools: (some NeedleStaticToolsCollection).Type,
-    prompt: String
-  ) async throws -> NeedlePrefillMetrics {
-    fatalError()
-  }
-}
-
 // MARK: - Reset
 
 extension NeedleSession {

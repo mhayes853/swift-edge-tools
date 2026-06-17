@@ -1,6 +1,0 @@
-▿ NeedlePrefillMetrics
-  ▿ duration: 0.058039584 seconds
-    - _low: 58039584000000000
-    - _high: 0
-  - ramUsageBytes: 92438592
-  - tokens: 30

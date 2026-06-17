@@ -1,4 +1,4 @@
-▿ 54 elements
+▿ 55 elements
   ▿ NeedleToken
     - id: 4
     - stringValue: "<tool_call>"
@@ -161,3 +161,6 @@
   ▿ NeedleToken
     - id: 503
     - stringValue: "\"}}]"
+  ▿ NeedleToken
+    - id: 1
+    - stringValue: ""

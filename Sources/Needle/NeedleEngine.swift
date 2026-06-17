@@ -5,8 +5,6 @@ public protocol NeedleEngine {
 
   var grammarEngine: GrammarEngine { get }
 
-  func prefill(prompt: NeedlePrefillablePrompt) throws -> NeedlePrefillMetrics
-
   func generate(
     prompt: NeedlePrompt,
     matcher: GrammarEngine.Matcher,

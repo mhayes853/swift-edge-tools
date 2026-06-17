@@ -13,10 +13,8 @@
     public let tokenizer: NeedleSPTokenizingModel
     public let model: NeedleMLXModel
 
-    private let maskProcessor = BitaskLogitsProcessor()
-    private var prefilledInput: MLXArray?
-    private var cache: [any KVCache]?
     private let clock = ContinuousClock()
+    private let sampler = ArgMaxSampler()
 
     public convenience init(
       from url: URL,
@@ -54,143 +52,99 @@
       self.grammarEngine = grammarEngine
     }
 
-    public func prefill(prompt: NeedlePrefillablePrompt) throws -> NeedlePrefillMetrics {
-      self.cache = self.model.newCache(parameters: nil)
-      let input = LMInput.needle(prompt: prompt, using: self.tokenizer)
-      let (_, metrics) = try self.loadTokenIterator(input: input)
-      self.prefilledInput = input.text.tokens
-      return metrics
-    }
-
     public func generate(
       prompt: NeedlePrompt,
       matcher: GrammarEngine.Matcher,
       onToken: (NeedleToken) -> Void
     ) throws -> NeedleEngineGeneration {
-      self.maskProcessor.use(matcher: matcher)
-      let (tokenIterator, prefillMetrics) = try self.loadGenerationTokenIterator(prompt: prompt)
-      let decodeStart = self.clock.now
-      var durationToFirstToken: Duration?
+      let memoryUsage = MLXMemoryUsage()
+      let generateStart = self.clock.now
+      let (cache, prefillOutput, prefillMetrics) = try self.prefill(prompt: prompt)
+      guard var output = prefillOutput else {
+        preconditionFailure("Model received empty input.")
+      }
+      matcher.reset()
+      var logits = output.logits
+      var state = output.state
+      var _durationToFirstToken: Duration?
 
       var tokenIds = [NeedleToken.ID]()
-      let ramUsageBytes = withMemoryUsage {
-        for tokenId in tokenIterator {
-          let token = NeedleToken(
-            id: tokenId,
-            stringValue: self.tokenizer.decode(tokenIds: CollectionOfOne(tokenId))
-          )
-          durationToFirstToken = durationToFirstToken ?? decodeStart.duration(to: self.clock.now)
-          tokenIds.append(token.id)
-          onToken(token)
-
-          if matcher.isTerminated {
-            break
-          }
+      while !matcher.isTerminated {
+        let (token, needleToken) = self.sampleToken(logits: logits, using: matcher)
+        _durationToFirstToken = _durationToFirstToken ?? generateStart.duration(to: self.clock.now)
+        tokenIds.append(needleToken.id)
+        guard matcher.accept(tokenId: needleToken.id) else {
+          throw NeedleMLXEngineError.grammarRejectedToken(token: needleToken)
         }
+        onToken(needleToken)
+
+        let inputText = LMInput.Text(tokens: token)
+        output = self.model(
+          inputText[text: .newAxis],
+          cache: cache,
+          state: state
+        )
+        state = output.state
+        logits = output.logits
       }
 
-      let decodeDuration = decodeStart.duration(to: self.clock.now)
+      let durationToFirstToken = _durationToFirstToken ?? .zero
       return NeedleEngineGeneration(
         prefillMetrics: prefillMetrics,
         decodeMetrics: NeedleDecodeMetrics(
           tokens: tokenIds.count,
-          duration: decodeDuration,
-          durationToFirstToken: durationToFirstToken ?? .zero,
-          ramUsageBytes: ramUsageBytes
+          duration: generateStart.duration(to: self.clock.now) - durationToFirstToken,
+          durationToFirstToken: durationToFirstToken,
+          ramUsageBytes: memoryUsage.stop()
         ),
         response: tokenizer.decode(tokenIds: tokenIds)
       )
     }
 
     public func reset() {
-      self.prefilledInput = nil
-      self.cache = nil
-      self.maskProcessor.use(matcher: nil)
     }
 
-    private func loadGenerationTokenIterator(
+    private func sampleToken(
+      logits: MLXArray,
+      using matcher: NeedleXGrammarEngine.Matcher
+    ) -> (MLXArray, NeedleToken) {
+      let logits = applyBitmaskMLX(logits: logits[0..., -1, 0...], mask: matcher.bitmask())
+      let token = self.sampler.sample(logits: logits)
+      let tokenId = token.item(NeedleToken.ID.self)
+      let tokenString = self.tokenizer.decode(tokenIds: CollectionOfOne(tokenId))
+      return (token, NeedleToken(id: tokenId, stringValue: tokenString))
+    }
+
+    private func prefill(
       prompt: NeedlePrompt
-    ) throws -> (TokenIterator, NeedlePrefillMetrics) {
+    ) throws -> ([any KVCache], LMOutput?, NeedlePrefillMetrics) {
       let input = try LMInput.needle(prompt: prompt, using: self.tokenizer)
-      guard let prefilledInput else { return try self.loadTokenIterator(input: input) }
-
-      let isPrefilledPrefix = all(prefilledInput .== input.text.tokens[0..<prefilledInput.dim(0)])
-      if !isPrefilledPrefix.item(Bool.self) {
-        self.cache = nil
+      let cache = self.model.newCache(parameters: nil)
+      let prefillStart = self.clock.now
+      let (output, memoryUsage) = try withMemoryUsage {
+        try self.model.prepare(input.text.tokens, cache: cache, windowSize: nil)
       }
-      return try self.loadTokenIterator(input: input)
-    }
-
-    private func loadTokenIterator(
-      input: LMInput
-    ) throws -> (TokenIterator, NeedlePrefillMetrics) {
-      var tokenIterator: TokenIterator!
-      let offset = self.cache?.first?.offset ?? 0
-      let (prefillDuration, ramUsageBytes) = try withMemoryUsage {
-        try self.clock.measure {
-          tokenIterator = try TokenIterator(
-            input: input,
-            model: self.model,
-            cache: self.cache,
-            processor: self.maskProcessor,
-            sampler: ArgMaxSampler()
-          )
-        }
-      }
-      return (
-        tokenIterator,
-        NeedlePrefillMetrics(
-          tokens: input.text.tokens.size - offset,
-          duration: prefillDuration,
-          ramUsageBytes: ramUsageBytes
-        )
+      let metrics = NeedlePrefillMetrics(
+        tokens: input.text.tokens.size,
+        duration: prefillStart.duration(to: self.clock.now),
+        ramUsageBytes: memoryUsage
       )
+      return (cache, output, metrics)
     }
   }
 
   // MARK: - NeedleMLXEngineError
 
   public struct NeedleMLXEngineError: Hashable, Error {
-    public static let failedToLoadGrammarEngine = Self()
-  }
+    public let message: String
 
-  // MARK: - Helpers
+    public static let failedToLoadGrammarEngine = Self(message: "Could not load grammar engine.")
 
-  private func withMemoryUsage<R>(
-    _ body: () throws -> R
-  ) rethrows -> (R, Int64) {
-    let stream = Stream.defaultStream(.defaultDevice())
-    stream.synchronize()
-    let start = Memory.snapshot()
-    Memory.peakMemory = start.activeMemory
-    let result = try body()
-    stream.synchronize()
-    return (result, Int64(Memory.peakMemory - start.activeMemory))
-  }
-
-  private func withMemoryUsage(
-    _ body: () throws -> Void
-  ) rethrows -> Int64 {
-    try withMemoryUsage(body).1
-  }
-
-  private final class BitaskLogitsProcessor: LogitProcessor {
-    private var base: NeedleGrammarLogitsProcessor?
-
-    func use(matcher: NeedleXGrammarEngine.Matcher?) {
-      self.base = matcher.map { NeedleGrammarLogitsProcessor(matcher: $0) }
-    }
-
-    func prompt(_ prompt: MLXArray) {
-      self.base?.prompt(prompt)
-    }
-
-    func process(logits: MLXArray) -> MLXArray {
-      self.base?.process(logits: logits) ?? logits
-    }
-
-    func didSample(token: MLXArray) {
-      self.base?.didSample(token: token)
+    public static func grammarRejectedToken(token: NeedleToken) -> Self {
+      Self(
+        message:
+          "Token (ID=\(token.id), VALUE=\(token.stringValue)) was rejected by the grammar matcher."
+      )
     }
   }
 #endif
