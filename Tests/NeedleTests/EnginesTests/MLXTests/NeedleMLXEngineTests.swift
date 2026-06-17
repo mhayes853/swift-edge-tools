@@ -24,10 +24,32 @@
         matcher: matcher,
         onToken: { tokens.append($0) }
       )
+      expectNoDifference(generation.wasStoped, false)
       withExpectedIssue {
         assertSnapshot(of: generation, as: .dump, record: .all)
         assertSnapshot(of: tokens, as: .dump, record: .all)
       }
+    }
+
+    @Test
+    func `Generate Stops And Returns Stopped Generation`() async throws {
+      let matcher = try await self.engine.grammarEngine.compile(tools: [.sendEmail])
+      let stopper = self.engine.stopper
+
+      var tokens = [NeedleToken]()
+      let generation = try self.engine.generate(
+        prompt: NeedlePrompt(prefillable: .base, tools: [.sendEmail]),
+        matcher: matcher,
+        onToken: {
+          tokens.append($0)
+          stopper()
+        }
+      )
+
+      expectNoDifference(generation.wasStoped, true)
+      expectNoDifference(tokens.count > 0, true)
+      expectNoDifference(generation.decodeMetrics.tokens, tokens.count)
+      expectNoDifference(generation.response.isEmpty, false)
     }
   }
 

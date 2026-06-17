@@ -3,6 +3,7 @@
   import MLXNN
   import MLXLMCommon
   import Foundation
+  import Atomics
 
   // MARK: - NeedleMLXEngine
 
@@ -13,6 +14,12 @@
     public let tokenizer: NeedleSPTokenizingModel
     public let model: NeedleMLXModel
 
+    public var stopper: NeedleEngineStopper {
+      let isStopped = self.isStopped
+      return NeedleEngineStopper { isStopped.store(true, ordering: .relaxed) }
+    }
+
+    private let isStopped = ManagedAtomic<Bool>(false)
     private let clock = ContinuousClock()
     private let sampler = ArgMaxSampler()
 
@@ -57,6 +64,7 @@
       matcher: GrammarEngine.Matcher,
       onToken: (NeedleToken) -> Void
     ) throws -> NeedleEngineGeneration {
+      self.isStopped.store(false, ordering: .relaxed)
       let memoryUsage = MLXMemoryUsage()
       let generateStart = self.clock.now
       let (cache, prefillOutput, prefillMetrics) = try self.prefill(prompt: prompt)
@@ -69,7 +77,7 @@
       var _durationToFirstToken: Duration?
 
       var tokenIds = [NeedleToken.ID]()
-      while !matcher.isTerminated {
+      while !matcher.isTerminated && !self.isStopped.load(ordering: .relaxed) {
         let (token, needleToken) = self.sampleToken(logits: logits, using: matcher)
         _durationToFirstToken = _durationToFirstToken ?? generateStart.duration(to: self.clock.now)
         tokenIds.append(needleToken.id)
@@ -79,11 +87,7 @@
         onToken(needleToken)
 
         let inputText = LMInput.Text(tokens: token)
-        output = self.model(
-          inputText[text: .newAxis],
-          cache: cache,
-          state: state
-        )
+        output = self.model(inputText[text: .newAxis], cache: cache, state: state)
         state = output.state
         logits = output.logits
       }
@@ -97,11 +101,13 @@
           durationToFirstToken: durationToFirstToken,
           ramUsageBytes: memoryUsage.stop()
         ),
+        wasStopped: self.isStopped.load(ordering: .relaxed),
         response: tokenizer.decode(tokenIds: tokenIds)
       )
     }
 
     public func reset() {
+      self.isStopped.store(false, ordering: .relaxed)
     }
 
     private func sampleToken(
