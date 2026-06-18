@@ -40,7 +40,7 @@ void needle_xgrammar_matcher_rollback(needle_xgrammar_matcher_t matcher, int num
 void needle_xgrammar_matcher_reset(needle_xgrammar_matcher_t matcher);
 void needle_xgrammar_matcher_destroy(needle_xgrammar_matcher_t matcher);
 
-needle_xgrammar_grammar_t needle_xgrammar_grammar_init(
+needle_xgrammar_grammar_t needle_xgrammar_grammar_init_with_range(
     const char* tools_json,
     int min_tool_calls,
     int max_tool_calls

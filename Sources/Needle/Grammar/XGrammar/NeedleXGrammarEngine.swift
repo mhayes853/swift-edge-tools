@@ -48,7 +48,7 @@
       let (minCalls, maxCalls) = self.toolCallInvocationRange.cRange
       guard minCalls >= 0 else { throw NeedleXGrammarEngineError.invalidToolInvocationRange }
       let grammar = toolsJSON.withCString {
-        needle_xgrammar_grammar_init($0, minCalls, maxCalls)
+        needle_xgrammar_grammar_init_with_range($0, minCalls, maxCalls)
       }
       defer { needle_xgrammar_grammar_destroy(grammar) }
       return Matcher(matcher: needle_xgrammar_compile_matcher(self.compiler, grammar))

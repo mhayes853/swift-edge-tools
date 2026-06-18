@@ -98,6 +98,11 @@ struct EbnfSyntax {
         return escaped;
     };
 
+    static std::string repeat_expression(const std::string& expression, int lo, int hi) {
+        if (hi == -1) return expression + "{" + std::to_string(lo) + ",}";
+        return expression + "{" + std::to_string(lo) + "," + std::to_string(hi) + "}";
+    }
+
     static EbnfSyntax from_string(const std::string& ebnf) {
         EbnfSyntax parsed;
 
@@ -302,6 +307,31 @@ static void add_call_body_rule(
     merged.rules["call_body"] = call_body_expr;
 }
 
+static std::string needle_tool_root_expression(int min_tool_calls, int max_tool_calls) {
+    const bool is_unbounded = max_tool_calls == kNeedleXGrammarToolCallsUnbounded;
+    const bool is_exact = max_tool_calls == kNeedleXGrammarToolCallsOnlyLowerBound;
+    const int min_repeats = std::max(0, min_tool_calls - 1);
+    const int max_repeats = is_unbounded ? -1 : std::max(min_repeats, max_tool_calls - 1);
+
+    const std::string separated_call = " (\",\" call_body)";
+
+    std::string call_body_expr;
+    if (is_exact && min_tool_calls == 0) {
+        call_body_expr = "";
+    } else if (min_tool_calls == 0) {
+        const int hi = is_unbounded ? -1 : max_repeats;
+        call_body_expr = " (call_body" + EbnfSyntax::repeat_expression(separated_call, 0, hi) + ")?";
+    } else if (is_exact) {
+        call_body_expr = min_repeats == 0
+            ? " call_body"
+            : " call_body" + EbnfSyntax::repeat_expression(separated_call, min_repeats, min_repeats);
+    } else {
+        call_body_expr =
+            " call_body" + EbnfSyntax::repeat_expression(separated_call, min_repeats, max_repeats);
+    }
+    return "\"<tool_call>[\"" + call_body_expr + " \"]\"";
+}
+
 static xgrammar::Grammar needle_tool_grammar(
     const std::vector<ToolDefinition>& tools,
     int min_tool_calls,
@@ -329,42 +359,7 @@ static xgrammar::Grammar needle_tool_grammar(
         return "(\"" + call_prefix + "\" " + args_rule_name + " \"}\")";
     });
 
-
-    std::string root_expr = "\"<tool_call>[\"";
-    const bool is_unbounded = max_tool_calls == kNeedleXGrammarToolCallsUnbounded;
-    const bool is_exact = max_tool_calls == kNeedleXGrammarToolCallsOnlyLowerBound;
-    const int min_repeats = std::max(0, min_tool_calls - 1);
-    const int max_repeats = is_unbounded ? -1 : std::max(min_repeats, max_tool_calls - 1);
-
-    std::string call_body_expr;
-    if (is_exact) {
-        if (min_tool_calls == 0) {
-            call_body_expr = "";
-        } else if (min_repeats == 0) {
-            call_body_expr = " call_body";
-        } else {
-            call_body_expr =
-                " call_body (\",\" call_body){" + std::to_string(min_repeats) + "}";
-        }
-    } else if (min_tool_calls == 0) {
-        std::string inner = "call_body";
-        if (is_unbounded) {
-            inner += " (\",\" call_body)*";
-        } else {
-            inner += " (\",\" call_body){0," + std::to_string(max_repeats) + "}";
-        }
-        call_body_expr = " (" + inner + ")?";
-    } else {
-        call_body_expr = " call_body";
-        if (is_unbounded) {
-            call_body_expr += " (\",\" call_body){" + std::to_string(min_repeats) + ",}";
-        } else {
-            call_body_expr += " (\",\" call_body){" + std::to_string(min_repeats) + ","
-                + std::to_string(max_repeats) + "}";
-        }
-    }
-    root_expr += call_body_expr + " \"]\"";
-    merged.rules["root"] = root_expr;
+    merged.rules["root"] = needle_tool_root_expression(min_tool_calls, max_tool_calls);
     merged.remove_unreachable_rules();
     return xgrammar::Grammar::FromEBNF(merged.ebnf());
 }
@@ -487,7 +482,7 @@ void needle_xgrammar_matcher_destroy(needle_xgrammar_matcher_t matcher) {
     if (matcher) delete static_cast<XGrammarMatcherHandle*>(matcher);
 }
 
-needle_xgrammar_grammar_t needle_xgrammar_grammar_init(
+needle_xgrammar_grammar_t needle_xgrammar_grammar_init_with_range(
     const char* tools_json,
     int min_tool_calls,
     int max_tool_calls
