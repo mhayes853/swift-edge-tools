@@ -112,7 +112,7 @@
 
       @Test
       func `Bounded Max One Rejects Two Tool Calls`() async throws {
-        let engine = try self.makeEngine(toolCallInvocationRange: .bounded(minimum: 0, maximum: 1))
+        let engine = try self.makeEngine(toolCallInvocationRange: .bounded(0...1))
         let matcher = try await engine.compile(tools: [.getWeather])
         let calls =
           #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#
@@ -121,7 +121,7 @@
 
       @Test
       func `Bounded Max One Accepts Empty And Single Tool Call`() async throws {
-        let engine = try self.makeEngine(toolCallInvocationRange: .bounded(minimum: 0, maximum: 1))
+        let engine = try self.makeEngine(toolCallInvocationRange: .bounded(0...1))
         let emptyMatcher = try await engine.compile(tools: [.getWeather])
         assertAccepts(
           #"<tool_call>[]"#,
@@ -140,7 +140,7 @@
 
       @Test
       func `Bounded Range Rejects Out Of Range Counts`() async throws {
-        let engine = try self.makeEngine(toolCallInvocationRange: .bounded(minimum: 2, maximum: 3))
+        let engine = try self.makeEngine(toolCallInvocationRange: .bounded(2...3))
         let singleMatcher = try await engine.compile(tools: [.getWeather])
         assertRejects(
           #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
@@ -159,7 +159,7 @@
 
       @Test
       func `Empty Tools Ignores Invocation Range`() async throws {
-        let engine = try self.makeEngine(toolCallInvocationRange: .bounded(minimum: 1, maximum: 1))
+        let engine = try self.makeEngine(toolCallInvocationRange: .bounded(1...1))
         let matcher = try await engine.compile(tools: [])
         assertAccepts(
           #"<tool_call>[]"#,
@@ -171,10 +171,10 @@
 
       @Test
       func `Tool Call Invocation Range Is Mutable On Engine`() throws {
-        let engine = try self.makeEngine(toolCallInvocationRange: .bounded(minimum: 2, maximum: 5))
-        expectNoDifference(engine.toolCallInvocationRange, .bounded(minimum: 2, maximum: 5))
-        engine.toolCallInvocationRange = .bounded(minimum: 1, maximum: 2)
-        expectNoDifference(engine.toolCallInvocationRange, .bounded(minimum: 1, maximum: 2))
+        let engine = try self.makeEngine(toolCallInvocationRange: .bounded(2...5))
+        expectNoDifference(engine.toolCallInvocationRange, .bounded(2...5))
+        engine.toolCallInvocationRange = .bounded(1...2)
+        expectNoDifference(engine.toolCallInvocationRange, .bounded(1...2))
       }
 
       @Test
@@ -202,6 +202,14 @@
           tokenizer: self.tokenizer,
           eosToken: self.eosToken
         )
+      }
+
+      @Test
+      func `Negative Minimum Tool Calls Throws Error`() async throws {
+        let engine = try self.makeEngine(toolCallInvocationRange: .unbounded(minimum: -1))
+        await #expect(throws: NeedleXGrammarEngineError.invalidToolInvocationRange) {
+          _ = try await engine.compile(tools: [.getWeather])
+        }
       }
     }
 

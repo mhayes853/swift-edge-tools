@@ -46,6 +46,7 @@
         as: UTF8.self
       )
       let (minCalls, maxCalls) = self.toolCallInvocationRange.cRange
+      guard minCalls >= 0 else { throw NeedleXGrammarEngineError.invalidToolInvocationRange }
       let grammar = toolsJSON.withCString {
         needle_xgrammar_grammar_init($0, minCalls, maxCalls)
       }
@@ -98,19 +99,44 @@
     }
   }
 
+  // MARK: - NeedleXGrammarEngineError
+
+  public enum NeedleXGrammarEngineError: Error, Hashable, Sendable {
+    case invalidToolInvocationRange
+  }
+
   // MARK: - ToolCallInvocationRange
 
   extension NeedleXGrammarEngine {
     public enum ToolCallInvocationRange: Hashable, Sendable {
       case unbounded(minimum: Int)
-      case bounded(minimum: Int, maximum: Int)
+      case bounded(ClosedRange<Int>)
       case exact(Int)
+
+      public static func unbounded(_ range: PartialRangeFrom<Int>) -> Self {
+        .unbounded(minimum: range.lowerBound)
+      }
+
+      public static func bounded(_ range: PartialRangeThrough<Int>) -> Self {
+        .bounded(0...range.upperBound)
+      }
+
+      public static func bounded(_ range: PartialRangeUpTo<Int>) -> Self {
+        .bounded(0..<range.upperBound)
+      }
+
+      public static func bounded(_ range: Range<Int>) -> Self {
+        .bounded(range.lowerBound...(range.upperBound - 1))
+      }
 
       fileprivate var cRange: (Int32, Int32) {
         switch self {
-        case .bounded(let minimum, let maximum): (Int32(minimum), Int32(maximum))
-        case .unbounded(let minimum): (Int32(minimum), kNeedleXGrammarToolCallsUnbounded)
-        case .exact(let count): (Int32(count), kNeedleXGrammarToolCallsOnlyLowerBound)
+        case .bounded(let range):
+          (Int32(range.lowerBound), Int32(range.upperBound))
+        case .unbounded(let minimum):
+          (Int32(minimum), kNeedleXGrammarToolCallsUnbounded)
+        case .exact(let count):
+          (Int32(count), kNeedleXGrammarToolCallsOnlyLowerBound)
         }
       }
     }
