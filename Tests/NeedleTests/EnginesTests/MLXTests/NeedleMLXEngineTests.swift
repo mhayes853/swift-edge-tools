@@ -55,8 +55,8 @@
 
   extension NeedlePrefillablePrompt {
     fileprivate static let base = Self(
-      system: "You are a helpful assistant who can send emails.",
-      user: "Send an email to Henry about his wonderful adventures."
+      system: "You are a helpful assistant who must send emails.",
+      user: "Send an email to Henry about his adventures."
     )
   }
 #endif

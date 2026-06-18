@@ -6,25 +6,32 @@
 
   public final class NeedleXGrammarEngine: NeedleGrammarEngine {
     public let compiler: needle_xgrammar_compiler_t
+    public var toolCallInvocationRange: ToolCallInvocationRange
 
     public init(
       encodedVocab: [String],
       eosTokenId: NeedleToken.ID,
-      configuration: Configuration = Configuration()
+      toolCallInvocationRange: ToolCallInvocationRange = .unbounded(minimum: 0),
+      configuration: CompilerConfiguration = CompilerConfiguration()
     ) {
       self.compiler = withCStringPointerBuffer(encodedVocab) { buffer in
         needle_xgrammar_compiler_init(buffer.baseAddress, buffer.count, Int32(eosTokenId))
       }
+      self.toolCallInvocationRange = toolCallInvocationRange
       self.apply(configuration: configuration)
     }
 
-    public init(compiler: consuming needle_xgrammar_compiler_t) {
+    public init(
+      compiler: consuming needle_xgrammar_compiler_t,
+      toolCallInvocationRange: ToolCallInvocationRange = .unbounded(minimum: 0)
+    ) {
       self.compiler = compiler
+      self.toolCallInvocationRange = toolCallInvocationRange
     }
 
     deinit { needle_xgrammar_compiler_destroy(self.compiler) }
 
-    public func apply(configuration: Configuration) {
+    public func apply(configuration: CompilerConfiguration) {
       needle_xgrammar_compiler_set_max_threads(self.compiler, configuration.maxThreads.value)
       needle_xgrammar_compiler_set_memory_limit(self.compiler, configuration.memoryLimit.value)
       needle_xgrammar_compiler_set_cache_enabled(
@@ -38,7 +45,10 @@
         decoding: JSONEncoder.needleTools.encode(tools.map { $0.normalized() }),
         as: UTF8.self
       )
-      let grammar = toolsJSON.withCString { needle_xgrammar_grammar_init($0) }
+      let (minCalls, maxCalls) = self.toolCallInvocationRange.cRange
+      let grammar = toolsJSON.withCString {
+        needle_xgrammar_grammar_init($0, minCalls, maxCalls)
+      }
       defer { needle_xgrammar_grammar_destroy(grammar) }
       return Matcher(matcher: needle_xgrammar_compile_matcher(self.compiler, grammar))
     }
@@ -47,7 +57,7 @@
   // MARK: - Configuration
 
   extension NeedleXGrammarEngine {
-    public struct Configuration: Hashable, Sendable {
+    public struct CompilerConfiguration: Hashable, Sendable {
       public enum MemoryLimit: Hashable, Sendable {
         case noLimit
         case limit(UInt32)
@@ -84,6 +94,22 @@
         self.memoryLimit = memoryLimit
         self.maxThreads = maxThreads
         self.isCacheEnabled = isCacheEnabled
+      }
+    }
+  }
+
+  // MARK: - ToolCallInvocationRange
+
+  extension NeedleXGrammarEngine {
+    public enum ToolCallInvocationRange: Hashable, Sendable {
+      case unbounded(minimum: Int)
+      case bounded(minimum: Int, maximum: Int)
+
+      fileprivate var cRange: (Int32, Int32) {
+        switch self {
+        case .bounded(let minimum, let maximum): (Int32(minimum), Int32(maximum))
+        case .unbounded(let minimum): (Int32(minimum), kNeedleXGrammarToolCallsUnbounded)
+        }
       }
     }
   }
@@ -141,7 +167,7 @@
     extension NeedleXGrammarEngine {
       public convenience init?(
         tokenizer: NeedleSPTokenizingModel,
-        configuration: Configuration = Configuration()
+        configuration: CompilerConfiguration = CompilerConfiguration()
       ) {
         guard let eosTokenId = tokenizer.eosTokenId else { return nil }
         self.init(

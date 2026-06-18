@@ -1,18 +1,18 @@
 ▿ NeedleEngineGeneration
   ▿ decodeMetrics: NeedleDecodeMetrics
-    ▿ duration: 1.15838275 seconds
-      - _low: 1158382750000000000
+    ▿ duration: 0.065592458 seconds
+      - _low: 65592458000000000
       - _high: 0
-    ▿ durationToFirstToken: 0.065341792 seconds
-      - _low: 65341792000000000
+    ▿ durationToFirstToken: 0.066882375 seconds
+      - _low: 66882375000000000
       - _high: 0
-    - ramUsageBytes: 253099879
-    - tokens: 55
+    - ramUsageBytes: 116429710
+    - tokens: 4
   ▿ prefillMetrics: NeedlePrefillMetrics
-    ▿ duration: 0.054722208 seconds
-      - _low: 54722208000000000
+    ▿ duration: 0.055518792 seconds
+      - _low: 55518792000000000
       - _high: 0
-    - ramUsageBytes: 75014001
-    - tokens: 137
-  - response: "<tool_call>[{\"name\":\"send_email\",\"arguments\":{\"address\":\"herbandfuld@gmail.com\",\"body\":\"I am writing to confirm that your wonderful adventures.\",\"subject\":\"Adventures\"}}]"
+    - ramUsageBytes: 116429174
+    - tokens: 134
+  - response: "<tool_call>[]"
   - wasStoped: false

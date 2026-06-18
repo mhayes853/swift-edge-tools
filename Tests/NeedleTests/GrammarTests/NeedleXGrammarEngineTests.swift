@@ -44,6 +44,170 @@
     }
 
     @Suite
+    struct `Range tests` {
+      private let tokenizer: NeedleSPTokenizingModel
+      private let eosToken: NeedleToken.ID
+
+      init() throws {
+        let tokenizer = try NeedleSPTokenizingModel(modelURL: .testTokenizerModel)
+        self.tokenizer = tokenizer
+        self.eosToken = try #require(tokenizer.eosTokenId)
+      }
+
+      private func makeEngine(
+        toolCallInvocationRange: NeedleXGrammarEngine.ToolCallInvocationRange =
+          .unbounded(minimum: 0)
+      ) throws -> NeedleXGrammarEngine {
+        let engine = try #require(NeedleXGrammarEngine(tokenizer: self.tokenizer))
+        engine.toolCallInvocationRange = toolCallInvocationRange
+        return engine
+      }
+
+      @Test
+      func `Default Unbounded Range Accepts Empty Tool Call List`() async throws {
+        let engine = try self.makeEngine()
+        let matcher = try await engine.compile(tools: [.getWeather])
+        let call = #"<tool_call>[]"#
+        self.assertAccepts(call, matcher: matcher)
+      }
+
+      @Test
+      func `Default Unbounded Range Accepts Multiple Tool Calls`() async throws {
+        let engine = try self.makeEngine()
+        let matcher = try await engine.compile(tools: [.getWeather])
+        let calls =
+          #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#
+        self.assertAccepts(calls, matcher: matcher)
+      }
+
+      @Test
+      func `Unbounded With Min One Rejects Empty Tool Call List`() async throws {
+        let engine = try self.makeEngine(toolCallInvocationRange: .unbounded(minimum: 1))
+        let matcher = try await engine.compile(tools: [.getWeather])
+        let call = #"<tool_call>[]"#
+        self.assertRejects(call, matcher: matcher)
+      }
+
+      @Test
+      func `Unbounded With Min One Accepts Single Tool Call`() async throws {
+        let engine = try self.makeEngine(toolCallInvocationRange: .unbounded(minimum: 1))
+        let matcher = try await engine.compile(tools: [.getWeather])
+        let call = #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
+        self.assertAccepts(call, matcher: matcher)
+      }
+
+      @Test
+      func `Bounded Max One Rejects Two Tool Calls`() async throws {
+        let engine = try self.makeEngine(toolCallInvocationRange: .bounded(minimum: 0, maximum: 1))
+        let matcher = try await engine.compile(tools: [.getWeather])
+        let calls =
+          #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#
+        self.assertRejects(calls, matcher: matcher)
+      }
+
+      @Test
+      func `Bounded Max One Accepts Empty And Single Tool Call`() async throws {
+        let engine = try self.makeEngine(toolCallInvocationRange: .bounded(minimum: 0, maximum: 1))
+        let emptyMatcher = try await engine.compile(tools: [.getWeather])
+        self.assertAccepts(#"<tool_call>[]"#, matcher: emptyMatcher)
+        let singleMatcher = try await engine.compile(tools: [.getWeather])
+        self.assertAccepts(
+          #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
+          matcher: singleMatcher
+        )
+      }
+
+      @Test
+      func `Bounded Range Rejects Out Of Range Counts`() async throws {
+        let engine = try self.makeEngine(toolCallInvocationRange: .bounded(minimum: 2, maximum: 3))
+        let singleMatcher = try await engine.compile(tools: [.getWeather])
+        self.assertRejects(
+          #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
+          matcher: singleMatcher
+        )
+        let pairMatcher = try await engine.compile(tools: [.getWeather])
+        self.assertAccepts(
+          #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#,
+          matcher: pairMatcher
+        )
+      }
+
+      @Test
+      func `Empty Tools Ignores Invocation Range`() async throws {
+        let engine = try self.makeEngine(toolCallInvocationRange: .bounded(minimum: 1, maximum: 1))
+        let matcher = try await engine.compile(tools: [])
+        self.assertAccepts(#"<tool_call>[]"#, matcher: matcher)
+      }
+
+      @Test
+      func `Tool Call Invocation Range Defaults To Unbounded Zero`() throws {
+        let engine = try self.makeEngine()
+        expectNoDifference(engine.toolCallInvocationRange, .unbounded(minimum: 0))
+      }
+
+      @Test
+      func `Tool Call Invocation Range Is Stored On Engine`() throws {
+        let engine = try self.makeEngine(toolCallInvocationRange: .bounded(minimum: 2, maximum: 5))
+        expectNoDifference(engine.toolCallInvocationRange, .bounded(minimum: 2, maximum: 5))
+      }
+
+      @Test
+      func `Tool Call Invocation Range Is Mutable On Engine`() throws {
+        let engine = try self.makeEngine()
+        engine.toolCallInvocationRange = .bounded(minimum: 1, maximum: 2)
+        expectNoDifference(engine.toolCallInvocationRange, .bounded(minimum: 1, maximum: 2))
+      }
+
+      @Test
+      func `Bounded Tool Call Invocation Range Is Hashable And Equatable`() {
+        let range1 = NeedleXGrammarEngine.ToolCallInvocationRange.bounded(minimum: 2, maximum: 5)
+        let range2 = NeedleXGrammarEngine.ToolCallInvocationRange.bounded(minimum: 2, maximum: 5)
+        let range3 = NeedleXGrammarEngine.ToolCallInvocationRange.bounded(minimum: 3, maximum: 5)
+        expectNoDifference(range1, range2)
+        expectNoDifference(range1 == range3, false)
+      }
+
+      private func firstRejectedToken(
+        in text: String,
+        matcher: NeedleXGrammarEngine.Matcher
+      ) -> (index: Int, tokenId: NeedleToken.ID, token: String, prefix: String)? {
+        let tokenIds = self.encodedGrammarText(text)
+        for (index, tokenId) in tokenIds.enumerated() {
+          guard !matcher.accept(tokenId: tokenId) else { continue }
+          let token = self.tokenizer.tokens(from: [tokenId]).first ?? ""
+          let prefix = self.tokenizer.decode(tokenIds: tokenIds.prefix(index + 1))
+          return (index, tokenId, token, prefix)
+        }
+        return nil
+      }
+
+      private func encodedGrammarText(_ text: String) -> [NeedleToken.ID] {
+        let tokenIds = self.tokenizer.encode(text: text)
+        guard let firstTokenId = tokenIds.first else { return tokenIds }
+        let firstToken = self.tokenizer.tokens(from: [firstTokenId]).first ?? ""
+        if firstToken.hasPrefix("▁") {
+          return Array(tokenIds.dropFirst())
+        }
+        return tokenIds
+      }
+
+      private func assertAccepts(_ text: String, matcher: NeedleXGrammarEngine.Matcher) {
+        if let rejected = self.firstRejectedToken(in: text, matcher: matcher) {
+          Issue.record(
+            "Rejected token \(rejected.tokenId) '\(rejected.token)' at index \(rejected.index) for prefix: \(rejected.prefix)"
+          )
+          return
+        }
+        expectNoDifference(matcher.accept(tokenId: self.eosToken), true)
+      }
+
+      private func assertRejects(_ text: String, matcher: NeedleXGrammarEngine.Matcher) {
+        guard self.firstRejectedToken(in: text, matcher: matcher) == nil else { return }
+        expectNoDifference(matcher.accept(tokenId: self.eosToken), false)
+      }
+    }
+
+    @Suite
     struct `Matcher tests` {
       private let engine: NeedleXGrammarEngine
       private let tokenizer: NeedleSPTokenizingModel

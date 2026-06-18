@@ -10,6 +10,7 @@ extern "C" {
 
 #define kNeedleXGrammarCompilerHardwareConcurrency -1
 #define kNeedleXGrammarCompilerNoMemoryLimit -1
+#define kNeedleXGrammarToolCallsUnbounded -1
 
 typedef void* needle_xgrammar_compiler_t;
 typedef void* needle_xgrammar_matcher_t;
@@ -38,7 +39,11 @@ void needle_xgrammar_matcher_rollback(needle_xgrammar_matcher_t matcher, int num
 void needle_xgrammar_matcher_reset(needle_xgrammar_matcher_t matcher);
 void needle_xgrammar_matcher_destroy(needle_xgrammar_matcher_t matcher);
 
-needle_xgrammar_grammar_t needle_xgrammar_grammar_init(const char* tools_json);
+needle_xgrammar_grammar_t needle_xgrammar_grammar_init(
+    const char* tools_json,
+    int min_tool_calls,
+    int max_tool_calls
+);
 void needle_xgrammar_grammar_destroy(needle_xgrammar_grammar_t grammar);
 
 #ifdef __cplusplus
