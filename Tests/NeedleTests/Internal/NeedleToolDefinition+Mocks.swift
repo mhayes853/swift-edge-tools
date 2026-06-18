@@ -3,10 +3,14 @@ import Needle
 extension NeedleToolDefinition {
   static let sendEmail = Self(
     name: "sendEmail",
-    description: "Sends an email to someone.",
+    description: "Sends an email to a recipient with an email address.",
     arguments: .object(
       properties: [
-        "address": .string(description: "The recipient's email address."),
+        "address": .string(
+          description: "The recipient's email address.",
+          pattern: "[a-z][a-z0-9]{1,10}@gmail\\.com",
+          examples: ["blob@gmail.com"]
+        ),
         "subject": .string(),
         "body": .string()
       ],
