@@ -6,9 +6,10 @@
 #include <regex>
 #include <string>
 #include <thread>
+#include <unordered_set>
+#include <vector>
 #include <dlpack/dlpack.h>
 #include <picojson/picojson.h>
-#include <unordered_set>
 #include <xgrammar/object.h>
 #include <xgrammar/grammar.h>
 #include <xgrammar/tokenizer_info.h>
@@ -27,6 +28,7 @@ struct XGrammarCompilerHandle {
 
 struct XGrammarMatcherHandle {
     xgrammar::GrammarMatcher matcher;
+    xgrammar::CompiledGrammar compiled_grammar;
     int32_t bitmask_size;
 };
 
@@ -408,6 +410,18 @@ void needle_xgrammar_compiler_set_cache_enabled(needle_xgrammar_compiler_t compi
     handle->is_cache_enabled = is_enabled;
 }
 
+int64_t needle_xgrammar_compiler_cache_size_bytes(needle_xgrammar_compiler_t compiler) {
+    if (!compiler) return 0;
+    const auto handle = static_cast<XGrammarCompilerHandle*>(compiler);
+    return handle->compiler ? handle->compiler->GetCacheSizeBytes() : 0;
+}
+
+int64_t needle_xgrammar_compiler_cache_limit_bytes(needle_xgrammar_compiler_t compiler) {
+    if (!compiler) return 0;
+    const auto handle = static_cast<XGrammarCompilerHandle*>(compiler);
+    return handle->compiler ? handle->compiler->CacheLimitBytes() : 0;
+}
+
 void needle_xgrammar_compiler_destroy(needle_xgrammar_compiler_t compiler) {
     if (compiler) delete static_cast<XGrammarCompilerHandle*>(compiler);
 }
@@ -423,13 +437,17 @@ needle_xgrammar_matcher_t needle_xgrammar_compile_matcher(
     const auto bitmask_size = xgrammar::GetBitmaskSize(
         compiler_handle->tokenizer_info.GetVocabSize()
     );
-    return new XGrammarMatcherHandle{xgrammar::GrammarMatcher(compiled), bitmask_size};
+    return new XGrammarMatcherHandle{xgrammar::GrammarMatcher(compiled), compiled, bitmask_size};
 }
 
 needle_xgrammar_matcher_t needle_xgrammar_matcher_fork(needle_xgrammar_matcher_t matcher) {
     if (!matcher) return nullptr;
     const auto handle = static_cast<XGrammarMatcherHandle*>(matcher);
-    return new XGrammarMatcherHandle{handle->matcher.Fork(), handle->bitmask_size};
+    return new XGrammarMatcherHandle{
+        handle->matcher.Fork(),
+        handle->compiled_grammar,
+        handle->bitmask_size
+    };
 }
 
 int needle_xgrammar_matcher_bitmask(needle_xgrammar_matcher_t matcher, int* bitmask) {
@@ -476,6 +494,12 @@ void needle_xgrammar_matcher_rollback(needle_xgrammar_matcher_t matcher, int num
 void needle_xgrammar_matcher_reset(needle_xgrammar_matcher_t matcher) {
     if (!matcher) return;
     static_cast<XGrammarMatcherHandle*>(matcher)->matcher.Reset();
+}
+
+int64_t needle_xgrammar_matcher_memory_size_bytes(needle_xgrammar_matcher_t matcher) {
+    if (!matcher) return 0;
+    const auto handle = static_cast<const XGrammarMatcherHandle*>(matcher);
+    return static_cast<int64_t>(handle->compiled_grammar.MemorySizeBytes());
 }
 
 void needle_xgrammar_matcher_destroy(needle_xgrammar_matcher_t matcher) {

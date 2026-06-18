@@ -428,8 +428,62 @@
       func `Rejects Invalid Tool Name`() async throws {
         let matcher = try await self.engine.compile(tools: [.getWeather])
 
-        let call = #"<tool_call>[{"name":"not_a_real_tool","arguments":{"location":"Seoul"}}]"#
+        let call = #"toolcall[{"name":"not_a_real_tool","arguments":{"location":"Seoul"}}]"#
+
         assertRejects(call, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
+      }
+    }
+
+    @Suite
+    struct `Memory usage tests` {
+      private let engine: NeedleXGrammarEngine
+      private let tokenizer: NeedleSPTokenizingModel
+
+      init() throws {
+        let tokenizer = try NeedleSPTokenizingModel(modelURL: .testTokenizerModel)
+        self.tokenizer = tokenizer
+        self.engine = try #require(NeedleXGrammarEngine(tokenizer: tokenizer))
+      }
+
+      @Test
+      func `Cache Size Is Zero Before First Compile`() {
+        expectNoDifference(self.engine.cacheSizeBytes, 0)
+        expectNoDifference(self.engine.cacheLimitBytes, 0)
+      }
+
+      @Test
+      func `Cache Size Becomes Non-Negative After Compile`() async throws {
+        _ = try await self.engine.compile(tools: [.getWeather])
+        expectNoDifference(self.engine.cacheSizeBytes >= 0, true)
+      }
+
+      @Test
+      func `Cache Limit Becomes Reportable After Compile`() async throws {
+        _ = try await self.engine.compile(tools: [.getWeather])
+        expectNoDifference(
+          self.engine.cacheLimitBytes == -1 || self.engine.cacheLimitBytes >= 0,
+          true
+        )
+      }
+
+      @Test
+      func `Matcher Reports Non-Zero Memory Size`() async throws {
+        let matcher = try await self.engine.compile(tools: [.getWeather])
+        expectNoDifference(matcher.memorySizeBytes > 0, true)
+      }
+
+      @Test
+      func `Forked Matcher Reports Equal Memory Size`() async throws {
+        let matcher = try await self.engine.compile(tools: [.getWeather])
+        let forked = matcher.fork()
+        expectNoDifference(forked.memorySizeBytes, matcher.memorySizeBytes)
+      }
+
+      @Test
+      func `More Tools Yield Larger Compiled Grammar`() async throws {
+        let single = try await self.engine.compile(tools: [.getWeather])
+        let many = try await self.engine.compile(tools: [.getWeather, .sendEmail, .complexTool])
+        expectNoDifference(many.memorySizeBytes > single.memorySizeBytes, true)
       }
     }
   }

@@ -8,6 +8,14 @@
     public let compiler: needle_xgrammar_compiler_t
     public var toolCallInvocationRange: ToolCallInvocationRange
 
+    public var cacheSizeBytes: Int64 {
+      needle_xgrammar_compiler_cache_size_bytes(self.compiler)
+    }
+
+    public var cacheLimitBytes: Int64 {
+      needle_xgrammar_compiler_cache_limit_bytes(self.compiler)
+    }
+
     public init(
       encodedVocab: [String],
       eosTokenId: NeedleToken.ID,
@@ -152,12 +160,6 @@
     public final class Matcher {
       public let matcher: needle_xgrammar_matcher_t
 
-      public init(matcher: consuming needle_xgrammar_matcher_t) {
-        self.matcher = matcher
-      }
-
-      deinit { needle_xgrammar_matcher_destroy(self.matcher) }
-
       public var isCompleted: Bool {
         needle_xgrammar_matcher_is_completed(self.matcher).boolValue
       }
@@ -165,6 +167,16 @@
       public var isTerminated: Bool {
         needle_xgrammar_matcher_is_terminated(self.matcher).boolValue
       }
+
+      public var memorySizeBytes: Int64 {
+        needle_xgrammar_matcher_memory_size_bytes(self.matcher)
+      }
+
+      public init(matcher: consuming needle_xgrammar_matcher_t) {
+        self.matcher = matcher
+      }
+
+      deinit { needle_xgrammar_matcher_destroy(self.matcher) }
 
       public func rollback(_ numTokens: Int) {
         needle_xgrammar_matcher_rollback(self.matcher, Int32(numTokens))
