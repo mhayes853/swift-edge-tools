@@ -5,7 +5,7 @@
   import MLX
 
   @Suite(.enabledIfXcode())
-  struct `NeedleGrammarLogitsProcessor tests` {
+  struct `ApplyBitmaskMLX tests` {
     @Test
     func `Filters Masked Tokens`() {
       var mask = NeedleGrammarBitmask(storage: [0, 0])

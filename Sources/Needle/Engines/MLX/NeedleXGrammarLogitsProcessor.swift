@@ -2,9 +2,9 @@
   import MLX
   import MLXLMCommon
 
-  // MARK: - NeedleGrammarLogitsProcessor
+  // MARK: - NeedleXGrammarLogitsProcessor
 
-  public struct NeedleGrammarLogitsProcessor: LogitProcessor {
+  public struct NeedleXGrammarLogitsProcessor: LogitProcessor {
     private var matcher: NeedleXGrammarEngine.Matcher
 
     public init(matcher: NeedleXGrammarEngine.Matcher) {
