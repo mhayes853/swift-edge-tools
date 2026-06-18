@@ -12,10 +12,6 @@ public struct NeedleModelConfiguration: Hashable, Sendable {
   public let ropeTheta: Float
   public let rmsNormEps: Float
   public let padTokenId: Int
-  public let bosTokenId: Int
-  public let eosTokenId: Int
-  public let unkTokenId: Int
-  public let decoderStartTokenId: Int
   private let _dtype: String?
 
   public var dtype: String {
@@ -46,10 +42,6 @@ extension NeedleModelConfiguration: Codable {
     case ropeTheta = "rope_theta"
     case rmsNormEps = "rms_norm_eps"
     case padTokenId = "pad_token_id"
-    case bosTokenId = "bos_token_id"
-    case eosTokenId = "eos_token_id"
-    case unkTokenId = "unk_token_id"
-    case decoderStartTokenId = "decoder_start_token_id"
     case _dtype = "dtype"
   }
 }
