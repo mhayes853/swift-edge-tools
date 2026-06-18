@@ -65,9 +65,11 @@
       onToken: (NeedleToken) -> Void
     ) throws -> NeedleEngineGeneration {
       self.isStopped.store(false, ordering: .relaxed)
+      try Task.checkCancellation()
       let memoryUsage = MLXMemoryUsage()
       let generateStart = self.clock.now
       let (cache, prefillOutput, prefillMetrics) = try self.prefill(prompt: prompt)
+      try Task.checkCancellation()
       guard var output = prefillOutput else {
         preconditionFailure("Model received empty input.")
       }
@@ -78,6 +80,7 @@
 
       var tokenIds = [NeedleToken.ID]()
       while !matcher.isTerminated && !self.isStopped.load(ordering: .relaxed) {
+        try Task.checkCancellation()
         let (token, needleToken) = self.sampleToken(logits: logits, using: matcher)
         _durationToFirstToken = _durationToFirstToken ?? generateStart.duration(to: self.clock.now)
         tokenIds.append(needleToken.id)

@@ -51,6 +51,24 @@
       expectNoDifference(generation.decodeMetrics.tokens, tokens.count)
       expectNoDifference(generation.response.isEmpty, false)
     }
+
+    @Test
+    func `Generate Cancels And Throws Cancellation Error`() async throws {
+      let prompt = NeedlePrompt(prefillable: .base, tools: [.sendEmail])
+
+      // NB: We send and never use the engine/matcher outside the task, so this is safe.
+      nonisolated(unsafe) let engine = self.engine
+      nonisolated(unsafe) let matcher = try await engine.grammarEngine.compile(tools: [.sendEmail])
+
+      let task = Task {
+        _ = try engine.generate(prompt: prompt, matcher: matcher) { _ in }
+      }
+
+      task.cancel()
+      await #expect(throws: CancellationError.self) {
+        _ = try await task.value
+      }
+    }
   }
 
   extension NeedlePrefillablePrompt {

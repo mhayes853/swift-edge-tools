@@ -60,6 +60,7 @@
 
       var lastOutput: LMOutput?
       while y.size > 0 {
+        try Task.checkCancellation()
         let count = min(prefillStepSize, y.size)
         lastOutput = self(
           y[.newAxis, ..<count],
