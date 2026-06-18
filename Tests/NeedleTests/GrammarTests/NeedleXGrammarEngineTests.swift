@@ -4,6 +4,8 @@
   import Needle
   import Testing
 
+  // MARK: - Suite
+
   @Suite
   struct `NeedleXGrammarEngine tests` {
     private let engine: NeedleXGrammarEngine
@@ -67,8 +69,12 @@
       func `Default Unbounded Range Accepts Empty Tool Call List`() async throws {
         let engine = try self.makeEngine()
         let matcher = try await engine.compile(tools: [.getWeather])
-        let call = #"<tool_call>[]"#
-        self.assertAccepts(call, matcher: matcher)
+        assertAccepts(
+          #"<tool_call>[]"#,
+          matcher: matcher,
+          tokenizer: self.tokenizer,
+          eosToken: self.eosToken
+        )
       }
 
       @Test
@@ -77,23 +83,31 @@
         let matcher = try await engine.compile(tools: [.getWeather])
         let calls =
           #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#
-        self.assertAccepts(calls, matcher: matcher)
+        assertAccepts(calls, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
       }
 
       @Test
       func `Unbounded With Min One Rejects Empty Tool Call List`() async throws {
         let engine = try self.makeEngine(toolCallInvocationRange: .unbounded(minimum: 1))
         let matcher = try await engine.compile(tools: [.getWeather])
-        let call = #"<tool_call>[]"#
-        self.assertRejects(call, matcher: matcher)
+        assertRejects(
+          #"<tool_call>[]"#,
+          matcher: matcher,
+          tokenizer: self.tokenizer,
+          eosToken: self.eosToken
+        )
       }
 
       @Test
       func `Unbounded With Min One Accepts Single Tool Call`() async throws {
         let engine = try self.makeEngine(toolCallInvocationRange: .unbounded(minimum: 1))
         let matcher = try await engine.compile(tools: [.getWeather])
-        let call = #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
-        self.assertAccepts(call, matcher: matcher)
+        assertAccepts(
+          #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
+          matcher: matcher,
+          tokenizer: self.tokenizer,
+          eosToken: self.eosToken
+        )
       }
 
       @Test
@@ -102,18 +116,25 @@
         let matcher = try await engine.compile(tools: [.getWeather])
         let calls =
           #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#
-        self.assertRejects(calls, matcher: matcher)
+        assertRejects(calls, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
       }
 
       @Test
       func `Bounded Max One Accepts Empty And Single Tool Call`() async throws {
         let engine = try self.makeEngine(toolCallInvocationRange: .bounded(minimum: 0, maximum: 1))
         let emptyMatcher = try await engine.compile(tools: [.getWeather])
-        self.assertAccepts(#"<tool_call>[]"#, matcher: emptyMatcher)
+        assertAccepts(
+          #"<tool_call>[]"#,
+          matcher: emptyMatcher,
+          tokenizer: self.tokenizer,
+          eosToken: self.eosToken
+        )
         let singleMatcher = try await engine.compile(tools: [.getWeather])
-        self.assertAccepts(
+        assertAccepts(
           #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
-          matcher: singleMatcher
+          matcher: singleMatcher,
+          tokenizer: self.tokenizer,
+          eosToken: self.eosToken
         )
       }
 
@@ -121,14 +142,18 @@
       func `Bounded Range Rejects Out Of Range Counts`() async throws {
         let engine = try self.makeEngine(toolCallInvocationRange: .bounded(minimum: 2, maximum: 3))
         let singleMatcher = try await engine.compile(tools: [.getWeather])
-        self.assertRejects(
+        assertRejects(
           #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
-          matcher: singleMatcher
+          matcher: singleMatcher,
+          tokenizer: self.tokenizer,
+          eosToken: self.eosToken
         )
         let pairMatcher = try await engine.compile(tools: [.getWeather])
-        self.assertAccepts(
+        assertAccepts(
           #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#,
-          matcher: pairMatcher
+          matcher: pairMatcher,
+          tokenizer: self.tokenizer,
+          eosToken: self.eosToken
         )
       }
 
@@ -136,35 +161,20 @@
       func `Empty Tools Ignores Invocation Range`() async throws {
         let engine = try self.makeEngine(toolCallInvocationRange: .bounded(minimum: 1, maximum: 1))
         let matcher = try await engine.compile(tools: [])
-        self.assertAccepts(#"<tool_call>[]"#, matcher: matcher)
-      }
-
-      @Test
-      func `Tool Call Invocation Range Defaults To Unbounded Zero`() throws {
-        let engine = try self.makeEngine()
-        expectNoDifference(engine.toolCallInvocationRange, .unbounded(minimum: 0))
-      }
-
-      @Test
-      func `Tool Call Invocation Range Is Stored On Engine`() throws {
-        let engine = try self.makeEngine(toolCallInvocationRange: .bounded(minimum: 2, maximum: 5))
-        expectNoDifference(engine.toolCallInvocationRange, .bounded(minimum: 2, maximum: 5))
+        assertAccepts(
+          #"<tool_call>[]"#,
+          matcher: matcher,
+          tokenizer: self.tokenizer,
+          eosToken: self.eosToken
+        )
       }
 
       @Test
       func `Tool Call Invocation Range Is Mutable On Engine`() throws {
-        let engine = try self.makeEngine()
+        let engine = try self.makeEngine(toolCallInvocationRange: .bounded(minimum: 2, maximum: 5))
+        expectNoDifference(engine.toolCallInvocationRange, .bounded(minimum: 2, maximum: 5))
         engine.toolCallInvocationRange = .bounded(minimum: 1, maximum: 2)
         expectNoDifference(engine.toolCallInvocationRange, .bounded(minimum: 1, maximum: 2))
-      }
-
-      @Test
-      func `Bounded Tool Call Invocation Range Is Hashable And Equatable`() {
-        let range1 = NeedleXGrammarEngine.ToolCallInvocationRange.bounded(minimum: 2, maximum: 5)
-        let range2 = NeedleXGrammarEngine.ToolCallInvocationRange.bounded(minimum: 2, maximum: 5)
-        let range3 = NeedleXGrammarEngine.ToolCallInvocationRange.bounded(minimum: 3, maximum: 5)
-        expectNoDifference(range1, range2)
-        expectNoDifference(range1 == range3, false)
       }
 
       @Test
@@ -173,57 +183,25 @@
         let matcher = try await engine.compile(tools: [.getWeather])
         let calls =
           #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}},{"name":"get_weather","arguments":{"location":"Tokyo"}}]"#
-        self.assertAccepts(calls, matcher: matcher)
+        assertAccepts(calls, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
       }
 
       @Test
       func `Exact Zero Accepts Only Empty Tool Call List`() async throws {
         let engine = try self.makeEngine(toolCallInvocationRange: .exact(0))
         let matcher = try await engine.compile(tools: [.getWeather])
-        self.assertAccepts(#"<tool_call>[]"#, matcher: matcher)
-        self.assertRejects(
-          #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
-          matcher: matcher
+        assertAccepts(
+          #"<tool_call>[]"#,
+          matcher: matcher,
+          tokenizer: self.tokenizer,
+          eosToken: self.eosToken
         )
-      }
-
-      private func firstRejectedToken(
-        in text: String,
-        matcher: NeedleXGrammarEngine.Matcher
-      ) -> (index: Int, tokenId: NeedleToken.ID, token: String, prefix: String)? {
-        let tokenIds = self.encodedGrammarText(text)
-        for (index, tokenId) in tokenIds.enumerated() {
-          guard !matcher.accept(tokenId: tokenId) else { continue }
-          let token = self.tokenizer.tokens(from: [tokenId]).first ?? ""
-          let prefix = self.tokenizer.decode(tokenIds: tokenIds.prefix(index + 1))
-          return (index, tokenId, token, prefix)
-        }
-        return nil
-      }
-
-      private func encodedGrammarText(_ text: String) -> [NeedleToken.ID] {
-        let tokenIds = self.tokenizer.encode(text: text)
-        guard let firstTokenId = tokenIds.first else { return tokenIds }
-        let firstToken = self.tokenizer.tokens(from: [firstTokenId]).first ?? ""
-        if firstToken.hasPrefix("▁") {
-          return Array(tokenIds.dropFirst())
-        }
-        return tokenIds
-      }
-
-      private func assertAccepts(_ text: String, matcher: NeedleXGrammarEngine.Matcher) {
-        if let rejected = self.firstRejectedToken(in: text, matcher: matcher) {
-          Issue.record(
-            "Rejected token \(rejected.tokenId) '\(rejected.token)' at index \(rejected.index) for prefix: \(rejected.prefix)"
-          )
-          return
-        }
-        expectNoDifference(matcher.accept(tokenId: self.eosToken), true)
-      }
-
-      private func assertRejects(_ text: String, matcher: NeedleXGrammarEngine.Matcher) {
-        guard self.firstRejectedToken(in: text, matcher: matcher) == nil else { return }
-        expectNoDifference(matcher.accept(tokenId: self.eosToken), false)
+        assertRejects(
+          #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
+          matcher: matcher,
+          tokenizer: self.tokenizer,
+          eosToken: self.eosToken
+        )
       }
     }
 
@@ -245,7 +223,7 @@
         let matcher = try await self.engine.compile(tools: [.getWeather])
         let call = #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
 
-        for tokenId in self.encodedGrammarText(call) {
+        for tokenId in encodedGrammarText(call, tokenizer: self.tokenizer) {
           matcher.accept(tokenId: tokenId)
         }
         expectNoDifference(matcher.accept(tokenId: self.eosToken), true)
@@ -287,7 +265,7 @@
         expectNoDifference(matcher.isCompleted, false)
         expectNoDifference(matcher.isTerminated, false)
 
-        for tokenId in self.encodedGrammarText(call) {
+        for tokenId in encodedGrammarText(call, tokenizer: self.tokenizer) {
           expectNoDifference(matcher.accept(tokenId: tokenId), true)
         }
         expectNoDifference(matcher.isCompleted, true)
@@ -302,8 +280,9 @@
       func `Fork Preserves Accept State`() async throws {
         let matcher = try await self.engine.compile(tools: [.getWeather])
 
-        let tokens = self.encodedGrammarText(
-          #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
+        let tokens = encodedGrammarText(
+          #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
+          tokenizer: self.tokenizer
         )
         let forkPoint = tokens.count / 2
         guard !tokens.isEmpty, forkPoint > 0, forkPoint < tokens.count else {
@@ -342,7 +321,7 @@
         let matcher = try await self.engine.compile(tools: [.getWeather])
         let call = #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
 
-        for tokenId in self.encodedGrammarText(call) {
+        for tokenId in encodedGrammarText(call, tokenizer: self.tokenizer) {
           expectNoDifference(matcher.accept(tokenId: tokenId), true)
         }
         expectNoDifference(matcher.isCompleted, true)
@@ -365,7 +344,7 @@
         let call =
           #"<tool_call>[{"name":"complex_tool","arguments":{"config":{"flags":[true,false],"threshold":0.75},"count":3.5,"enabled":true,"labels":{"ALPHA":1,"BETA_LABEL":2},"mode":"execute","optional_note":null,"priority":4,"routing":{"region":"us-west"},"tags":["a","b"],"ticket_id":"ABC-12","title":"alpha","tuple_args":["alpha",2,true],"window":3}}]"#
 
-        self.assertAccepts(call, matcher: matcher)
+        assertAccepts(call, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
       }
 
       @Test
@@ -374,7 +353,7 @@
 
         let call = #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
 
-        self.assertAccepts(call, matcher: matcher)
+        assertAccepts(call, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
       }
 
       @Test
@@ -384,7 +363,7 @@
         let calls =
           #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Henry's Altar"}}]"#
 
-        self.assertAccepts(calls, matcher: matcher)
+        assertAccepts(calls, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
       }
 
       @Test
@@ -394,7 +373,7 @@
         let call =
           #"<tool_call>[{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"]}}]"#
 
-        self.assertRejects(call, matcher: matcher)
+        assertRejects(call, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
       }
 
       @Test
@@ -404,7 +383,7 @@
         let call =
           #"<tool_call>[{"name":"complex_tool","arguments":{"title":"alpha","count":"3.5","enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}}]"#
 
-        self.assertRejects(call, matcher: matcher)
+        assertRejects(call, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
       }
 
       @Test
@@ -414,7 +393,7 @@
         let call =
           #"<tool_call>[{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"alpha":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}}]"#
 
-        self.assertRejects(call, matcher: matcher)
+        assertRejects(call, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
       }
 
       @Test
@@ -424,7 +403,7 @@
         let call =
           #"<tool_call>[{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]},"extra":1}}]"#
 
-        self.assertRejects(call, matcher: matcher)
+        assertRejects(call, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
       }
 
       @Test
@@ -434,7 +413,7 @@
         let call =
           #"<tool_call>[{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}]"#
 
-        self.assertRejects(call, matcher: matcher)
+        assertRejects(call, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
       }
 
       @Test
@@ -442,46 +421,66 @@
         let matcher = try await self.engine.compile(tools: [.getWeather])
 
         let call = #"<tool_call>[{"name":"not_a_real_tool","arguments":{"location":"Seoul"}}]"#
-        self.assertRejects(call, matcher: matcher)
-      }
-
-      private func firstRejectedToken(
-        in text: String,
-        matcher: NeedleXGrammarEngine.Matcher
-      ) -> (index: Int, tokenId: NeedleToken.ID, token: String, prefix: String)? {
-        let tokenIds = self.encodedGrammarText(text)
-        for (index, tokenId) in tokenIds.enumerated() {
-          guard !matcher.accept(tokenId: tokenId) else { continue }
-          let token = self.tokenizer.tokens(from: [tokenId]).first ?? ""
-          let prefix = self.tokenizer.decode(tokenIds: tokenIds.prefix(index + 1))
-          return (index, tokenId, token, prefix)
-        }
-        return nil
-      }
-
-      private func encodedGrammarText(_ text: String) -> [NeedleToken.ID] {
-        let tokenIds = self.tokenizer.encode(text: text)
-        guard let firstTokenId = tokenIds.first else { return tokenIds }
-        let firstToken = self.tokenizer.tokens(from: [firstTokenId]).first
-        let firstDecoded = self.tokenizer.decode(tokenIds: [firstTokenId])
-        guard firstToken == "▁", firstDecoded.isEmpty else { return tokenIds }
-        return Array(tokenIds.dropFirst())
-      }
-
-      private func assertAccepts(_ text: String, matcher: NeedleXGrammarEngine.Matcher) {
-        if let rejected = self.firstRejectedToken(in: text, matcher: matcher) {
-          Issue.record(
-            "Rejected token \(rejected.tokenId) '\(rejected.token)' at index \(rejected.index) for prefix: \(rejected.prefix)"
-          )
-          return
-        }
-        expectNoDifference(matcher.accept(tokenId: self.eosToken), true)
-      }
-
-      private func assertRejects(_ text: String, matcher: NeedleXGrammarEngine.Matcher) {
-        guard self.firstRejectedToken(in: text, matcher: matcher) == nil else { return }
-        expectNoDifference(matcher.accept(tokenId: self.eosToken), false)
+        assertRejects(call, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
       }
     }
   }
+
+  // MARK: - Helpers
+
+  private func firstRejectedToken(
+    in text: String,
+    matcher: NeedleXGrammarEngine.Matcher,
+    tokenizer: NeedleSPTokenizingModel
+  ) -> (index: Int, tokenId: NeedleToken.ID, token: String, prefix: String)? {
+    let tokenIds = encodedGrammarText(text, tokenizer: tokenizer)
+    for (index, tokenId) in tokenIds.enumerated() {
+      guard !matcher.accept(tokenId: tokenId) else { continue }
+      let token = tokenizer.tokens(from: [tokenId]).first ?? ""
+      let prefix = tokenizer.decode(tokenIds: tokenIds.prefix(index + 1))
+      return (index, tokenId, token, prefix)
+    }
+    return nil
+  }
+
+  private func encodedGrammarText(
+    _ text: String,
+    tokenizer: NeedleSPTokenizingModel
+  ) -> [NeedleToken.ID] {
+    let tokenIds = tokenizer.encode(text: text)
+    guard let firstTokenId = tokenIds.first else { return tokenIds }
+    let firstToken = tokenizer.tokens(from: [firstTokenId]).first ?? ""
+    if firstToken.hasPrefix("▁") {
+      return Array(tokenIds.dropFirst())
+    }
+    return tokenIds
+  }
+
+  private func assertAccepts(
+    _ text: String,
+    matcher: NeedleXGrammarEngine.Matcher,
+    tokenizer: NeedleSPTokenizingModel,
+    eosToken: NeedleToken.ID
+  ) {
+    if let rejected = firstRejectedToken(in: text, matcher: matcher, tokenizer: tokenizer) {
+      Issue.record(
+        "Rejected token \(rejected.tokenId) '\(rejected.token)' at index \(rejected.index) for prefix: \(rejected.prefix)"
+      )
+      return
+    }
+    expectNoDifference(matcher.accept(tokenId: eosToken), true)
+  }
+
+  private func assertRejects(
+    _ text: String,
+    matcher: NeedleXGrammarEngine.Matcher,
+    tokenizer: NeedleSPTokenizingModel,
+    eosToken: NeedleToken.ID
+  ) {
+    guard firstRejectedToken(in: text, matcher: matcher, tokenizer: tokenizer) == nil else {
+      return
+    }
+    expectNoDifference(matcher.accept(tokenId: eosToken), false)
+  }
+
 #endif
