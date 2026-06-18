@@ -23,10 +23,14 @@
 
     public init(
       compiler: consuming needle_xgrammar_compiler_t,
-      toolCallInvocationRange: ToolCallInvocationRange = .unbounded(minimum: 0)
+      toolCallInvocationRange: ToolCallInvocationRange = .unbounded(minimum: 0),
+      configuration: CompilerConfiguration? = nil
     ) {
       self.compiler = compiler
       self.toolCallInvocationRange = toolCallInvocationRange
+      if let configuration {
+        self.apply(configuration: configuration)
+      }
     }
 
     deinit { needle_xgrammar_compiler_destroy(self.compiler) }

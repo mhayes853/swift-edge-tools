@@ -25,15 +25,12 @@
 
     public convenience init(
       from url: URL,
-      grammarConfiguration: NeedleXGrammarEngine.CompilerConfiguration =
-        NeedleXGrammarEngine.CompilerConfiguration(),
-      makeGrammarEngine: (
-        NeedleSPTokenizingModel,
-        NeedleXGrammarEngine.CompilerConfiguration
-      ) -> NeedleXGrammarEngine? = { NeedleXGrammarEngine(tokenizer: $0, configuration: $1) }
+      grammarEngine: (NeedleSPTokenizingModel) -> NeedleXGrammarEngine? = {
+        NeedleXGrammarEngine(tokenizer: $0)
+      }
     ) throws {
       let tokenizer = try NeedleSPTokenizingModel(modelURL: url.appending(path: "tokenizer.model"))
-      let grammarEngine = makeGrammarEngine(tokenizer, grammarConfiguration)
+      let grammarEngine = grammarEngine(tokenizer)
       guard let grammarEngine else { throw NeedleMLXEngineError.failedToLoadGrammarEngine }
 
       let configuration = try JSONDecoder()
