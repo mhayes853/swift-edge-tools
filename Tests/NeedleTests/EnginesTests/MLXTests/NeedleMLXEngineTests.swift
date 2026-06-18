@@ -20,7 +20,7 @@
 
       var tokens = [NeedleToken]()
       let generation = try self.engine.generate(
-        prompt: NeedlePrompt(prefillable: .base, tools: [.sendEmail]),
+        prompt: Self.basePrompt,
         matcher: matcher,
         onToken: { tokens.append($0) }
       )
@@ -38,7 +38,7 @@
 
       var tokens = [NeedleToken]()
       let generation = try self.engine.generate(
-        prompt: NeedlePrompt(prefillable: .base, tools: [.sendEmail]),
+        prompt: Self.basePrompt,
         matcher: matcher,
         onToken: {
           tokens.append($0)
@@ -54,7 +54,7 @@
 
     @Test
     func `Generate Cancels And Throws Cancellation Error`() async throws {
-      let prompt = NeedlePrompt(prefillable: .base, tools: [.sendEmail])
+      let prompt = Self.basePrompt
 
       // NB: We send and never use the engine/matcher outside the task, so this is safe.
       nonisolated(unsafe) let engine = self.engine
@@ -71,10 +71,11 @@
     }
   }
 
-  extension NeedlePrefillablePrompt {
-    fileprivate static let base = Self(
+  extension `NeedleMLXEngine tests` {
+    fileprivate static let basePrompt = NeedlePrompt(
       system: "You are a helpful assistant who must send emails.",
-      user: "Send an email to Henry about his adventures."
+      user: "Send an email to Henry about his adventures.",
+      tools: [.sendEmail]
     )
   }
 #endif
