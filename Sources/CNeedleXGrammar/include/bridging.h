@@ -11,6 +11,7 @@ extern "C" {
 #define kNeedleXGrammarCompilerHardwareConcurrency -1
 #define kNeedleXGrammarCompilerNoMemoryLimit -1
 #define kNeedleXGrammarToolCallsUnbounded -1
+#define kNeedleXGrammarToolCallsOnlyLowerBound -2
 
 typedef void* needle_xgrammar_compiler_t;
 typedef void* needle_xgrammar_matcher_t;

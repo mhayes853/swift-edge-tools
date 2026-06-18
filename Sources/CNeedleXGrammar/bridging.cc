@@ -332,11 +332,21 @@ static xgrammar::Grammar needle_tool_grammar(
 
     std::string root_expr = "\"<tool_call>[\"";
     const bool is_unbounded = max_tool_calls == kNeedleXGrammarToolCallsUnbounded;
+    const bool is_exact = max_tool_calls == kNeedleXGrammarToolCallsOnlyLowerBound;
     const int min_repeats = std::max(0, min_tool_calls - 1);
     const int max_repeats = is_unbounded ? -1 : std::max(min_repeats, max_tool_calls - 1);
 
     std::string call_body_expr;
-    if (min_tool_calls == 0) {
+    if (is_exact) {
+        if (min_tool_calls == 0) {
+            call_body_expr = "";
+        } else if (min_repeats == 0) {
+            call_body_expr = " call_body";
+        } else {
+            call_body_expr =
+                " call_body (\",\" call_body){" + std::to_string(min_repeats) + "}";
+        }
+    } else if (min_tool_calls == 0) {
         std::string inner = "call_body";
         if (is_unbounded) {
             inner += " (\",\" call_body)*";
@@ -483,8 +493,9 @@ needle_xgrammar_grammar_t needle_xgrammar_grammar_init(
     int max_tool_calls
 ) {
     const auto is_unbounded = max_tool_calls == kNeedleXGrammarToolCallsUnbounded;
+    const auto is_exact = max_tool_calls == kNeedleXGrammarToolCallsOnlyLowerBound;
     const auto is_valid_range = min_tool_calls >= 0
-            && (min_tool_calls <= max_tool_calls || is_unbounded);
+            && (min_tool_calls <= max_tool_calls || is_unbounded || is_exact);
     if (!tools_json || !is_valid_range) return nullptr;
 
     std::string tools_json_string(tools_json);

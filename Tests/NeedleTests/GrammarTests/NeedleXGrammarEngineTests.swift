@@ -167,6 +167,26 @@
         expectNoDifference(range1 == range3, false)
       }
 
+      @Test
+      func `Exact Three Accepts Three Tool Calls`() async throws {
+        let engine = try self.makeEngine(toolCallInvocationRange: .exact(3))
+        let matcher = try await engine.compile(tools: [.getWeather])
+        let calls =
+          #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}},{"name":"get_weather","arguments":{"location":"Tokyo"}}]"#
+        self.assertAccepts(calls, matcher: matcher)
+      }
+
+      @Test
+      func `Exact Zero Accepts Only Empty Tool Call List`() async throws {
+        let engine = try self.makeEngine(toolCallInvocationRange: .exact(0))
+        let matcher = try await engine.compile(tools: [.getWeather])
+        self.assertAccepts(#"<tool_call>[]"#, matcher: matcher)
+        self.assertRejects(
+          #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
+          matcher: matcher
+        )
+      }
+
       private func firstRejectedToken(
         in text: String,
         matcher: NeedleXGrammarEngine.Matcher

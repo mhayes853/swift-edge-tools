@@ -104,11 +104,13 @@
     public enum ToolCallInvocationRange: Hashable, Sendable {
       case unbounded(minimum: Int)
       case bounded(minimum: Int, maximum: Int)
+      case exact(Int)
 
       fileprivate var cRange: (Int32, Int32) {
         switch self {
         case .bounded(let minimum, let maximum): (Int32(minimum), Int32(maximum))
         case .unbounded(let minimum): (Int32(minimum), kNeedleXGrammarToolCallsUnbounded)
+        case .exact(let count): (Int32(count), kNeedleXGrammarToolCallsOnlyLowerBound)
         }
       }
     }
