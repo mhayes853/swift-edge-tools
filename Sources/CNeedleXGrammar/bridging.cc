@@ -331,7 +331,7 @@ static std::string needle_tool_root_expression(int min_tool_calls, int max_tool_
         call_body_expr =
             " call_body" + EbnfSyntax::repeat_expression(separated_call, min_repeats, max_repeats);
     }
-    return "\"<tool_call>[\"" + call_body_expr + " \"]\"";
+    return "\"<tool_call> [\" " + call_body_expr + " \"]\"";
 }
 
 static xgrammar::Grammar needle_tool_grammar(
@@ -339,7 +339,7 @@ static xgrammar::Grammar needle_tool_grammar(
     int min_tool_calls,
     int max_tool_calls
 ) {
-    if (tools.empty()) return xgrammar::Grammar::FromEBNF("root ::= \"<tool_call>[]\"");
+    if (tools.empty()) return xgrammar::Grammar::FromEBNF("root ::= \"<tool_call> []\"");
 
     std::vector<std::pair<std::string, EbnfSyntax>> tool_rule_sets;
     tool_rule_sets.reserve(tools.size());

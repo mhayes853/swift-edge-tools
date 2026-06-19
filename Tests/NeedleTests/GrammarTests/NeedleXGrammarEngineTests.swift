@@ -70,7 +70,7 @@
         let engine = try self.makeEngine()
         let matcher = try await engine.compile(tools: [.getWeather])
         assertAccepts(
-          #"<tool_call>[]"#,
+          #"<tool_call> []"#,
           matcher: matcher,
           tokenizer: self.tokenizer,
           eosToken: self.eosToken
@@ -82,7 +82,7 @@
         let engine = try self.makeEngine()
         let matcher = try await engine.compile(tools: [.getWeather])
         let calls =
-          #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#
+          #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#
         assertAccepts(calls, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
       }
 
@@ -91,7 +91,7 @@
         let engine = try self.makeEngine(toolCallInvocationRange: .unbounded(minimum: 1))
         let matcher = try await engine.compile(tools: [.getWeather])
         assertRejects(
-          #"<tool_call>[]"#,
+          #"<tool_call> []"#,
           matcher: matcher,
           tokenizer: self.tokenizer,
           eosToken: self.eosToken
@@ -103,7 +103,7 @@
         let engine = try self.makeEngine(toolCallInvocationRange: .unbounded(minimum: 1))
         let matcher = try await engine.compile(tools: [.getWeather])
         assertAccepts(
-          #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
+          #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
           matcher: matcher,
           tokenizer: self.tokenizer,
           eosToken: self.eosToken
@@ -115,7 +115,7 @@
         let engine = try self.makeEngine(toolCallInvocationRange: .bounded(0...1))
         let matcher = try await engine.compile(tools: [.getWeather])
         let calls =
-          #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#
+          #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#
         assertRejects(calls, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
       }
 
@@ -124,14 +124,14 @@
         let engine = try self.makeEngine(toolCallInvocationRange: .bounded(0...1))
         let emptyMatcher = try await engine.compile(tools: [.getWeather])
         assertAccepts(
-          #"<tool_call>[]"#,
+          #"<tool_call> []"#,
           matcher: emptyMatcher,
           tokenizer: self.tokenizer,
           eosToken: self.eosToken
         )
         let singleMatcher = try await engine.compile(tools: [.getWeather])
         assertAccepts(
-          #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
+          #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
           matcher: singleMatcher,
           tokenizer: self.tokenizer,
           eosToken: self.eosToken
@@ -143,14 +143,14 @@
         let engine = try self.makeEngine(toolCallInvocationRange: .bounded(2...3))
         let singleMatcher = try await engine.compile(tools: [.getWeather])
         assertRejects(
-          #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
+          #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
           matcher: singleMatcher,
           tokenizer: self.tokenizer,
           eosToken: self.eosToken
         )
         let pairMatcher = try await engine.compile(tools: [.getWeather])
         assertAccepts(
-          #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#,
+          #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#,
           matcher: pairMatcher,
           tokenizer: self.tokenizer,
           eosToken: self.eosToken
@@ -162,7 +162,7 @@
         let engine = try self.makeEngine(toolCallInvocationRange: .bounded(1...1))
         let matcher = try await engine.compile(tools: [])
         assertAccepts(
-          #"<tool_call>[]"#,
+          #"<tool_call> []"#,
           matcher: matcher,
           tokenizer: self.tokenizer,
           eosToken: self.eosToken
@@ -182,7 +182,7 @@
         let engine = try self.makeEngine(toolCallInvocationRange: .exact(3))
         let matcher = try await engine.compile(tools: [.getWeather])
         let calls =
-          #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}},{"name":"get_weather","arguments":{"location":"Tokyo"}}]"#
+          #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}},{"name":"get_weather","arguments":{"location":"Tokyo"}}]"#
         assertAccepts(calls, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
       }
 
@@ -191,13 +191,13 @@
         let engine = try self.makeEngine(toolCallInvocationRange: .exact(0))
         let matcher = try await engine.compile(tools: [.getWeather])
         assertAccepts(
-          #"<tool_call>[]"#,
+          #"<tool_call> []"#,
           matcher: matcher,
           tokenizer: self.tokenizer,
           eosToken: self.eosToken
         )
         assertRejects(
-          #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
+          #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
           matcher: matcher,
           tokenizer: self.tokenizer,
           eosToken: self.eosToken
@@ -229,7 +229,7 @@
       @Test
       func `Reset Restores Initial State`() async throws {
         let matcher = try await self.engine.compile(tools: [.getWeather])
-        let call = #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
+        let call = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
 
         for tokenId in encodedGrammarText(call, tokenizer: self.tokenizer) {
           matcher.accept(tokenId: tokenId)
@@ -268,7 +268,7 @@
       @Test
       func `Completion State Transitions`() async throws {
         let matcher = try await self.engine.compile(tools: [.getWeather])
-        let call = #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
+        let call = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
 
         expectNoDifference(matcher.isCompleted, false)
         expectNoDifference(matcher.isTerminated, false)
@@ -289,7 +289,7 @@
         let matcher = try await self.engine.compile(tools: [.getWeather])
 
         let tokens = encodedGrammarText(
-          #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
+          #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
           tokenizer: self.tokenizer
         )
         let forkPoint = tokens.count / 2
@@ -327,7 +327,7 @@
       @Test
       func `Bitmask Allows Eos After Completion`() async throws {
         let matcher = try await self.engine.compile(tools: [.getWeather])
-        let call = #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
+        let call = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
 
         for tokenId in encodedGrammarText(call, tokenizer: self.tokenizer) {
           expectNoDifference(matcher.accept(tokenId: tokenId), true)
@@ -350,7 +350,7 @@
         let matcher = try await self.engine.compile(tools: [.complexTool])
 
         let call =
-          #"<tool_call>[{"name":"complex_tool","arguments":{"config":{"flags":[true,false],"threshold":0.75},"count":3.5,"enabled":true,"labels":{"ALPHA":1,"BETA_LABEL":2},"mode":"execute","optional_note":null,"priority":4,"routing":{"region":"us-west"},"tags":["a","b"],"ticket_id":"ABC-12","title":"alpha","tuple_args":["alpha",2,true],"window":3}}]"#
+          #"<tool_call> [{"name":"complex_tool","arguments":{"config":{"flags":[true,false],"threshold":0.75},"count":3.5,"enabled":true,"labels":{"ALPHA":1,"BETA_LABEL":2},"mode":"execute","optional_note":null,"priority":4,"routing":{"region":"us-west"},"tags":["a","b"],"ticket_id":"ABC-12","title":"alpha","tuple_args":["alpha",2,true],"window":3}}]"#
 
         assertAccepts(call, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
       }
@@ -359,7 +359,7 @@
       func `Accepts Valid Simple Tool Call`() async throws {
         let matcher = try await self.engine.compile(tools: [.getWeather])
 
-        let call = #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
+        let call = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
 
         assertAccepts(call, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
       }
@@ -369,7 +369,7 @@
         let matcher = try await self.engine.compile(tools: [.getWeather])
 
         let calls =
-          #"<tool_call>[{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Henry's Altar"}}]"#
+          #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Henry's Altar"}}]"#
 
         assertAccepts(calls, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
       }
@@ -379,7 +379,7 @@
         let matcher = try await self.engine.compile(tools: [.complexTool])
 
         let call =
-          #"<tool_call>[{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"]}}]"#
+          #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"]}}]"#
 
         assertRejects(call, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
       }
@@ -389,7 +389,7 @@
         let matcher = try await self.engine.compile(tools: [.complexTool])
 
         let call =
-          #"<tool_call>[{"name":"complex_tool","arguments":{"title":"alpha","count":"3.5","enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}}]"#
+          #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":"3.5","enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}}]"#
 
         assertRejects(call, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
       }
@@ -399,7 +399,7 @@
         let matcher = try await self.engine.compile(tools: [.complexTool])
 
         let call =
-          #"<tool_call>[{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"alpha":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}}]"#
+          #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"alpha":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}}]"#
 
         assertRejects(call, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
       }
@@ -409,7 +409,7 @@
         let matcher = try await self.engine.compile(tools: [.complexTool])
 
         let call =
-          #"<tool_call>[{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]},"extra":1}}]"#
+          #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]},"extra":1}}]"#
 
         assertRejects(call, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
       }
@@ -419,7 +419,7 @@
         let matcher = try await self.engine.compile(tools: [.complexTool])
 
         let call =
-          #"<tool_call>[{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}]"#
+          #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}]"#
 
         assertRejects(call, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
       }
@@ -428,7 +428,7 @@
       func `Rejects Invalid Tool Name`() async throws {
         let matcher = try await self.engine.compile(tools: [.getWeather])
 
-        let call = #"toolcall[{"name":"not_a_real_tool","arguments":{"location":"Seoul"}}]"#
+        let call = #"toolcall [{"name":"not_a_real_tool","arguments":{"location":"Seoul"}}]"#
 
         assertRejects(call, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
       }
