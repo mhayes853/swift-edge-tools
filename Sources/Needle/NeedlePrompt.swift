@@ -19,6 +19,6 @@ public struct NeedlePrompt: Hashable, Sendable {
       decoding: JSONEncoder.needleTools.encode(tools.map { $0.normalized() }),
       as: UTF8.self
     )
-    return "\(self.system)\(separator)\(self.user)<tools>\(toolsSchema)</s>"
+    return "\(self.system)\(separator)\(self.user)<tools>\(toolsSchema)"
   }
 }

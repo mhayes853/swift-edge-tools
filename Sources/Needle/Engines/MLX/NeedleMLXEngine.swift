@@ -38,9 +38,9 @@
           NeedleModelConfiguration.self,
           from: Data(contentsOf: url.appending(path: "config.json"))
         )
-      let weights = try MLX.loadArrays(url: url.appending(path: "model.safetensors"))
-        .mapValues { $0.asType(configuration.mlxDType) }
+      var weights = try MLX.loadArrays(url: url.appending(path: "model.safetensors"))
       let model = NeedleMLXModel(configuration: configuration)
+      weights = model.sanitize(weights: weights)
       try model.update(parameters: ModuleParameters.unflattened(weights), verify: .all)
 
       self.init(tokenizer: tokenizer, model: model, grammarEngine: grammarEngine)

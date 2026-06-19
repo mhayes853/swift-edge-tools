@@ -9,32 +9,23 @@
   // MARK: - NeedleMLXModel
 
   public final class NeedleMLXModel: Module, LanguageModel, KVCacheDimensionProvider {
-    private static let attentionLayersPerDecoder = 2
-
     public var kvHeads: [Int] {
-      [Int](
-        repeating: self.configuration.kvHeads,
-        count: self.configuration.hiddenLayers * Self.attentionLayersPerDecoder
-      )
+      [Int](repeating: self.configuration.kvHeads, count: self.configuration.hiddenLayers)
     }
 
     public let configuration: NeedleModelConfiguration
 
     private let model: NeedleSimpleAttentionNetwork
-    @ModuleInfo(key: "lm_head") private var lmHead: Linear
+    private var crossAttentionMask: MLXArray?
+    private var crossAttentionKV: [ProjectedAttentionKV]?
 
-    private var defaultPrefilledOutput: MLXArray {
+    private var defaultEncoderOutput: MLXArray {
       .zeros([1, 0, self.configuration.dimensions])
     }
 
     public init(configuration: NeedleModelConfiguration) {
       self.configuration = configuration
       self.model = NeedleSimpleAttentionNetwork(configuration: configuration)
-      self._lmHead.wrappedValue = Linear(
-        inputDimensions: configuration.dimensions,
-        outputDimensions: configuration.vocabularySize,
-        bias: false
-      )
     }
 
     public func prepare(
@@ -42,11 +33,7 @@
       cache: [any KVCache],
       windowSize: Int?
     ) throws -> PrepareResult {
-      let output = try self.prepare(
-        input.text.tokens,
-        cache: cache,
-        windowSize: windowSize
-      )
+      let output = try self.prepare(input.text.tokens, cache: cache, windowSize: windowSize)
       return output.map { .logits($0) } ?? .tokens(input.text)
     }
 
@@ -55,24 +42,33 @@
       cache: [any KVCache],
       windowSize: Int?,
     ) throws -> LMOutput? {
-      let prefillStepSize = windowSize ?? 512
-      var y = tokens
+      try Task.checkCancellation()
 
-      var lastOutput: LMOutput?
-      while y.size > 0 {
-        try Task.checkCancellation()
-        let count = min(prefillStepSize, y.size)
-        lastOutput = self(
-          y[.newAxis, ..<count],
-          prefilledOutput: lastOutput?.state?.crossAttentionStates ?? self.defaultPrefilledOutput,
-          caches: self.caches(from: cache),
-          forwardPhase: .prefill
-        )
-        y = y[count...]
-      }
+      let encoderInput = tokens[.newAxis, 0...]
+      let encoderMask = paddingMask(
+        inputIds: encoderInput,
+        padTokenId: self.configuration.padTokenId
+      )
+      self.crossAttentionMask = encoderMask
 
+      let encoderOutput = self.model.encode(
+        encoderInput,
+        previous: self.defaultEncoderOutput,
+        mask: encoderMask
+      )
+      let crossAttentionKV = self.model.precomputeCrossAttention(encoderOutput: encoderOutput)
+      self.crossAttentionKV = crossAttentionKV
+
+      let output = self.model.decode(
+        MLXArray([self.configuration.decoderStartTokenId])[.newAxis, 0...],
+        crossAttentionMask: encoderMask,
+        precomputedCrossAttention: crossAttentionKV,
+        caches: cache
+      )
+
+      try Task.checkCancellation()
       eval(cache)
-      return lastOutput
+      return self.finalOutput(from: output, encoderOutput: encoderOutput)
     }
 
     public func callAsFunction(
@@ -80,44 +76,41 @@
       cache: [any KVCache]?,
       state: LMOutput.State?
     ) -> LMOutput {
-      self(
+      let encoderOutput = state?.crossAttentionStates ?? self.defaultEncoderOutput
+      let precomputedCrossAttention =
+        self.crossAttentionKV ?? self.model.precomputeCrossAttention(encoderOutput: encoderOutput)
+      let output = self.model.decode(
         input.tokens,
-        prefilledOutput: state?.crossAttentionStates ?? self.defaultPrefilledOutput,
-        caches: cache.map(self.caches(from:)),
-        forwardPhase: .decode
+        crossAttentionMask: self.crossAttentionMask,
+        precomputedCrossAttention: precomputedCrossAttention,
+        caches: cache
       )
+      return self.finalOutput(from: output, encoderOutput: encoderOutput)
     }
 
-    private func callAsFunction(
-      _ input: MLXArray,
-      prefilledOutput: MLXArray,
-      caches: [(selfCache: any KVCache, crossCache: any KVCache)]?,
-      forwardPhase: ForwardPhase
-    ) -> LMOutput {
-      let output = self.model(
-        input,
-        prefilledOutput: prefilledOutput,
-        caches: caches,
-        forwardPhase: forwardPhase
-      )
-      return LMOutput(logits: self.lmHead(output.logits), state: output.state)
+    public func sanitize(weights: [String: MLXArray]) -> [String: MLXArray] {
+      var weights = weights
+      weights.removeValue(forKey: "lm_head.weight")
+      return weights
     }
 
-    private func caches(
-      from caches: [any KVCache]
-    ) -> [(selfCache: any KVCache, crossCache: any KVCache)] {
-      stride(from: 0, to: caches.count, by: 2).map { (caches[$0], caches[$0 + 1]) }
+    private func finalOutput(from output: LMOutput, encoderOutput: MLXArray) -> LMOutput {
+      LMOutput(logits: output.logits, state: LMOutput.State(crossAttentionStates: encoderOutput))
     }
   }
 
   // MARK: - SimpleAttentionNetwork
+
+  private struct ProjectedAttentionKV {
+    let keys: MLXArray
+    let values: MLXArray
+  }
 
   private final class NeedleSimpleAttentionNetwork: Module {
     @ModuleInfo(key: "embed_tokens") var embedding: Embedding
     let encoder: NeedleEncoder
     let decoder: NeedleDecoder
     private let embedScale: Float
-    private let padTokenId: Int
 
     init(configuration: NeedleModelConfiguration) {
       self.encoder = NeedleEncoder(configuration: configuration)
@@ -127,38 +120,32 @@
         dimensions: configuration.dimensions
       )
       self.embedScale = sqrt(Float(configuration.dimensions))
-      self.padTokenId = configuration.padTokenId
     }
 
-    func callAsFunction(
-      _ input: MLXArray,
-      prefilledOutput: MLXArray,
-      caches: [(selfCache: any KVCache, crossCache: any KVCache)]?,
-      forwardPhase: ForwardPhase
-    ) -> LMOutput {
-      let prefilled =
-        switch forwardPhase {
-        case .prefill:
-          self.encode(input, previous: prefilledOutput)
-        case .decode:
-          prefilledOutput.dim(1) == 0
-            ? self.encode(input, previous: prefilledOutput)
-            : prefilledOutput
-        }
-      let logits = self.decoder(
-        self.embedding(input) * self.embedScale,
-        encoderOutput: prefilled,
-        selfMask: .causal,
-        crossMask: .none,
-        caches: caches
-      )
-      return LMOutput(logits: logits, state: LMOutput.State(crossAttentionStates: prefilled))
-    }
-
-    private func encode(_ input: MLXArray, previous: MLXArray) -> MLXArray {
-      let mask = paddingMask(inputIds: input, padTokenId: self.padTokenId)
+    func encode(_ input: MLXArray, previous: MLXArray, mask: MLXArray) -> MLXArray {
       let encoded = self.encoder(self.embedding(input) * self.embedScale, mask: .array(mask))
       return concatenated([previous, encoded], axis: 1)
+    }
+
+    func decode(
+      _ input: MLXArray,
+      crossAttentionMask: MLXArray?,
+      precomputedCrossAttention: [ProjectedAttentionKV],
+      caches: [any KVCache]?
+    ) -> LMOutput {
+      let hiddenStates = self.decoder(
+        self.embedding(input) * self.embedScale,
+        selfMask: .causal,
+        crossMask: crossAttentionMask.map { .array($0) } ?? .none,
+        precomputedCrossAttention: precomputedCrossAttention,
+        caches: caches
+      )
+      let logits = self.embedding.asLinear(hiddenStates)
+      return LMOutput(logits: logits)
+    }
+
+    func precomputeCrossAttention(encoderOutput: MLXArray) -> [ProjectedAttentionKV] {
+      self.decoder.precomputeCrossAttention(encoderOutput: encoderOutput)
     }
   }
 
@@ -243,30 +230,33 @@
 
     func callAsFunction(
       _ x: MLXArray,
-      encoderOutput: MLXArray,
       selfMask: MLXFast.ScaledDotProductAttentionMaskMode,
       crossMask: MLXFast.ScaledDotProductAttentionMaskMode,
-      caches: [(selfCache: any KVCache, crossCache: any KVCache)]?,
+      precomputedCrossAttention: [ProjectedAttentionKV],
+      caches: [any KVCache]?,
     ) -> MLXArray {
       let ropeFrequencies = RoPEFrequencies(
         inverse: self._inverseRope,
-        sequenceLength: (caches?.first?.selfCache.offset ?? 0) + x.dim(1),
+        sequenceLength: (caches?.first?.offset ?? 0) + x.dim(1),
         dtype: x.dtype
       )
       var x = x
       let caches = caches ?? Array(repeating: nil, count: self.layers.count)
-      for (layer, caches) in zip(self.layers, caches) {
+      for (index, (layer, caches)) in zip(self.layers, caches).enumerated() {
         x = layer(
           x,
-          encoderOutput: encoderOutput,
           selfMask: selfMask,
           crossMask: crossMask,
+          precomputedCrossAttention: precomputedCrossAttention[index],
           ropeFrequencies: ropeFrequencies,
-          selfCache: caches?.selfCache,
-          crossCache: caches?.crossCache
+          cache: caches
         )
       }
       return self.finalNorm(x)
+    }
+
+    func precomputeCrossAttention(encoderOutput: MLXArray) -> [ProjectedAttentionKV] {
+      self.layers.map { $0.precomputeCrossAttention(encoderOutput: encoderOutput) }
     }
   }
 
@@ -289,12 +279,11 @@
 
     func callAsFunction(
       _ x: MLXArray,
-      encoderOutput: MLXArray,
       selfMask: MLXFast.ScaledDotProductAttentionMaskMode,
       crossMask: MLXFast.ScaledDotProductAttentionMaskMode,
+      precomputedCrossAttention: ProjectedAttentionKV,
       ropeFrequencies: RoPEFrequencies,
-      selfCache: (any KVCache)?,
-      crossCache: (any KVCache)?
+      cache: (any KVCache)?
     ) -> MLXArray {
       let selfNormed = self.inputLayerNorm(x)
       let selfAttention = self.selfAttention(
@@ -302,7 +291,7 @@
         kv: selfNormed,
         mask: selfMask,
         ropeFrequencies: ropeFrequencies,
-        cache: selfCache
+        cache: cache
       )
 
       let gatedSelfAttention = gatedResidual(
@@ -313,10 +302,10 @@
       let crossNormed = self.crossAttentionNorm(gatedSelfAttention)
       let crossAttention = self.crossAttention(
         q: crossNormed,
-        kv: encoderOutput,
+        projectedKV: precomputedCrossAttention,
         mask: crossMask,
         ropeFrequencies: nil,
-        cache: crossCache
+        cache: nil
       )
       return gatedResidual(
         gatedSelfAttention,
@@ -324,9 +313,13 @@
         sublayer: crossAttention
       )
     }
+
+    func precomputeCrossAttention(encoderOutput: MLXArray) -> ProjectedAttentionKV {
+      self.crossAttention.project(kv: encoderOutput)
+    }
   }
 
-  // MARK: - MultiheadAttention
+  // MARK: - Attention
 
   private final class NeedleAttention: Module {
     let heads: Int
@@ -385,28 +378,57 @@
       ropeFrequencies: RoPEFrequencies?,
       cache: (any KVCache)?
     ) -> MLXArray {
-      var queries = self.queryProjection(q)
+      var projectedKV = self.project(kv: kv)
+
+      if let ropeFrequencies {
+        projectedKV = ProjectedAttentionKV(
+          keys: ropeFrequencies.apply(to: projectedKV.keys, offset: cache?.offset),
+          values: projectedKV.values
+        )
+      }
+
+      return self.callAsFunction(
+        q: q,
+        projectedKV: projectedKV,
+        mask: mask,
+        ropeFrequencies: ropeFrequencies,
+        cache: cache
+      )
+    }
+
+    func project(kv: MLXArray) -> ProjectedAttentionKV {
       var keys = self.keyProjection(kv)
       var values = self.valueProjection(kv)
 
-      queries = unflatten(queries, axis: -1, shape: [self.heads, self.headDimensions])
-        .transposed(0, 2, 1, 3)
       keys = unflatten(keys, axis: -1, shape: [self.kvHeads, self.headDimensions])
         .transposed(0, 2, 1, 3)
-      queries = self.queryNorm(queries)
-      keys = self.keyNorm(keys)
       values = unflatten(values, axis: -1, shape: [self.kvHeads, self.headDimensions])
         .transposed(0, 2, 1, 3)
+      keys = self.keyNorm(keys)
+
+      return ProjectedAttentionKV(keys: keys, values: values)
+    }
+
+    func callAsFunction(
+      q: MLXArray,
+      projectedKV: ProjectedAttentionKV,
+      mask: MLXFast.ScaledDotProductAttentionMaskMode,
+      ropeFrequencies: RoPEFrequencies?,
+      cache: (any KVCache)?
+    ) -> MLXArray {
+      var queries = self.queryProjection(q)
+      queries = unflatten(queries, axis: -1, shape: [self.heads, self.headDimensions])
+        .transposed(0, 2, 1, 3)
+      queries = self.queryNorm(queries)
 
       if let ropeFrequencies {
         queries = ropeFrequencies.apply(to: queries, offset: cache?.offset)
-        keys = ropeFrequencies.apply(to: keys, offset: cache?.offset)
       }
 
       let output = attentionWithCacheUpdate(
         queries: queries,
-        keys: keys,
-        values: values,
+        keys: projectedKV.keys,
+        values: projectedKV.values,
         cache: cache,
         scale: self.scale,
         mask: mask
@@ -480,9 +502,5 @@
 
   private func paddingMask(inputIds: MLXArray, padTokenId: Int) -> MLXArray {
     (inputIds .!= padTokenId)[.ellipsis, .newAxis, .newAxis, 0...]
-  }
-
-  private enum ForwardPhase {
-    case prefill, decode
   }
 #endif

@@ -1,4 +1,4 @@
-▿ 42 elements
+▿ 45 elements
   ▿ NeedleToken
     - id: 4
     - stringValue: "<tool_call>"
@@ -36,20 +36,14 @@
     - id: 264
     - stringValue: "\":\""
   ▿ NeedleToken
-    - id: 4306
-    - stringValue: "the"
+    - id: 280
+    - stringValue: "he"
   ▿ NeedleToken
-    - id: 295
-    - stringValue: "se"
+    - id: 1665
+    - stringValue: "nder"
   ▿ NeedleToken
-    - id: 4926
-    - stringValue: "ful"
-  ▿ NeedleToken
-    - id: 456
-    - stringValue: "ly"
-  ▿ NeedleToken
-    - id: 8049
-    - stringValue: "d"
+    - id: 1127
+    - stringValue: "ry"
   ▿ NeedleToken
     - id: 8181
     - stringValue: "@"
@@ -75,7 +69,16 @@
     - id: 264
     - stringValue: "\":\""
   ▿ NeedleToken
-    - id: 8084
+    - id: 8103
+    - stringValue: "H"
+  ▿ NeedleToken
+    - id: 8043
+    - stringValue: "i"
+  ▿ NeedleToken
+    - id: 8052
+    - stringValue: ","
+  ▿ NeedleToken
+    - id: 485
     - stringValue: "I"
   ▿ NeedleToken
     - id: 1788
@@ -84,14 +87,20 @@
     - id: 289
     - stringValue: "a"
   ▿ NeedleToken
-    - id: 1527
-    - stringValue: "question"
+    - id: 1746
+    - stringValue: "ad"
   ▿ NeedleToken
-    - id: 1323
-    - stringValue: "about"
+    - id: 628
+    - stringValue: "vent"
   ▿ NeedleToken
-    - id: 3611
-    - stringValue: "your"
+    - id: 5646
+    - stringValue: "ures"
+  ▿ NeedleToken
+    - id: 345
+    - stringValue: "for"
+  ▿ NeedleToken
+    - id: 302
+    - stringValue: "the"
   ▿ NeedleToken
     - id: 1746
     - stringValue: "ad"

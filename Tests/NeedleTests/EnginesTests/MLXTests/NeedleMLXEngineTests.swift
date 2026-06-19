@@ -73,7 +73,7 @@
 
   extension `NeedleMLXEngine tests` {
     fileprivate static let basePrompt = NeedlePrompt(
-      system: "You are a helpful assistant who must send emails.",
+      system: "",
       user: "Send an email to Henry about his adventures.",
       tools: [.sendEmail]
     )

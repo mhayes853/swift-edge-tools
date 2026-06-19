@@ -3,7 +3,6 @@
 #include <cstddef>
 #include <cstdlib>
 #include <cstring>
-#include <memory>
 #include <string>
 #include <vector>
 
@@ -12,7 +11,7 @@
 #include <sys/stat.h>
 
 struct NeedleSPHandle {
-    std::unique_ptr<sentencepiece::SentencePieceProcessor> processor;
+    sentencepiece::SentencePieceProcessor processor;
 };
 
 extern "C" {
@@ -39,8 +38,8 @@ needle_sp_tokenizer_t needle_sp_tokenizer_init_from_file(const char* model_file)
         return nullptr;
     }
 
-    const auto handle = new NeedleSPHandle{std::make_unique<sentencepiece::SentencePieceProcessor>()};
-    const auto result = handle->processor->Load(model_file);
+    const auto handle = new NeedleSPHandle{};
+    const auto result = handle->processor.Load(model_file);
     if (result.ok()) return handle;
     set_error_message(result);
     delete handle;
@@ -52,7 +51,7 @@ int* needle_sp_tokenizer_encode(needle_sp_tokenizer_t tokenizer, const char* tex
     if (!handle || !text || !size) return nullptr;
 
     std::vector<int> ids;
-    const auto status = handle->processor->Encode(text, &ids);
+    const auto status = handle->processor.Encode(text, &ids);
     if (!status.ok()) {
         set_error_message(status);
         return nullptr;
@@ -78,7 +77,7 @@ const char* needle_sp_tokenizer_decode(
 
     std::vector<int> ids(token_ids, token_ids + token_ids_size);
     std::string decoded;
-    const auto status = handle->processor->Decode(ids, &decoded);
+    const auto status = handle->processor.Decode(ids, &decoded);
     if (!status.ok()) {
         set_error_message(status);
         if (size) *size = 0;
@@ -99,28 +98,28 @@ const char* needle_sp_tokenizer_decode(
 int needle_sp_tokenizer_unk_token_id(needle_sp_tokenizer_t tokenizer) {
     const auto* handle = static_cast<NeedleSPHandle*>(tokenizer);
     if (!handle) return -1;
-    return handle->processor->unk_id();
+    return handle->processor.unk_id();
 }
 
 int needle_sp_tokenizer_bos_token_id(needle_sp_tokenizer_t tokenizer) {
     const auto* handle = static_cast<NeedleSPHandle*>(tokenizer);
     if (!handle) return -1;
-    return handle->processor->bos_id();
+    return handle->processor.bos_id();
 }
 
 int needle_sp_tokenizer_eos_token_id(needle_sp_tokenizer_t tokenizer) {
     const auto* handle = static_cast<NeedleSPHandle*>(tokenizer);
-    return !handle ? -1 : handle->processor->eos_id();
+    return !handle ? -1 : handle->processor.eos_id();
 }
 
 int needle_sp_tokenizer_pad_token_id(needle_sp_tokenizer_t tokenizer) {
     const auto* handle = static_cast<NeedleSPHandle*>(tokenizer);
-    return !handle ? -1 : handle->processor->pad_id();
+    return !handle ? -1 : handle->processor.pad_id();
 }
 
 size_t needle_sp_tokenizer_vocab_size(needle_sp_tokenizer_t tokenizer) {
     const auto* handle = static_cast<NeedleSPHandle*>(tokenizer);
-    return !handle ? 0 : handle->processor->GetPieceSize();
+    return !handle ? 0 : handle->processor.GetPieceSize();
 }
 
 int needle_sp_tokenizer_tokens_to_ids(
@@ -133,7 +132,7 @@ int needle_sp_tokenizer_tokens_to_ids(
     if (!handle || !tokens || !token_ids) return -1;
 
     for (size_t i = 0; i < size; i++) {
-        token_ids[i] = handle->processor->PieceToId(tokens[i]);
+        token_ids[i] = handle->processor.PieceToId(tokens[i]);
     }
     return 0;
 }
@@ -147,14 +146,14 @@ int needle_sp_tokenizer_ids_to_tokens(
     const auto* handle = static_cast<NeedleSPHandle*>(tokenizer);
     if (!handle || !tokens || !token_ids) return -1;
 
-    const auto piece_size = static_cast<size_t>(handle->processor->GetPieceSize());
+    const auto piece_size = static_cast<size_t>(handle->processor.GetPieceSize());
     for (size_t i = 0; i < size; i++) {
         const auto id = token_ids[i];
         if (id < 0 || static_cast<size_t>(id) >= piece_size) {
             tokens[i][0] = '\0';
             continue;
         }
-        const auto& token = handle->processor->IdToPiece(id);
+        const auto& token = handle->processor.IdToPiece(id);
         std::strcpy(tokens[i], token.c_str());
     }
     return 0;
@@ -165,7 +164,7 @@ int needle_sp_tokenizer_encoded_vocab(needle_sp_tokenizer_t tokenizer, char** en
     if (!handle || !encoded_vocab) return -1;
 
     for (size_t i = 0; i < needle_sp_tokenizer_vocab_size(tokenizer); i++) {
-        const auto& token = handle->processor->IdToPiece(i);
+        const auto& token = handle->processor.IdToPiece(i);
         std::strcpy(encoded_vocab[i], token.c_str());
     }
     return 0;
