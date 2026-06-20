@@ -2,7 +2,7 @@
 
 public protocol NeedleEngine {
   associatedtype GrammarEngine: NeedleGrammarEngine
-  associatedtype GenerateParameters
+  associatedtype GenerateParameters: NeedleEngineGenerateParameters
 
   var grammarEngine: GrammarEngine { get }
 
@@ -16,6 +16,12 @@ public protocol NeedleEngine {
   ) throws -> NeedleEngineGeneration
 
   func reset()
+}
+
+// MARK: - NeedleEngineGenerateParemeters
+
+public protocol NeedleEngineGenerateParameters {
+  static var `default`: Self { get }
 }
 
 // MARK: - NeedleEngineStopper

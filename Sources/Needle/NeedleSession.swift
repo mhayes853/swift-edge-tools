@@ -36,7 +36,8 @@ public struct NeedleSessionStaticGeneration<Collection: NeedleStaticToolsCollect
 extension NeedleSession {
   public func generate(
     tools: sending [any NeedleTool],
-    with prompt: String
+    with prompt: String,
+    parameters: Engine.GenerateParameters = .default
   ) async throws -> NeedleSessionDynamicGeneration {
     fatalError()
   }
@@ -44,6 +45,7 @@ extension NeedleSession {
   public func generate<Collection: NeedleStaticToolsCollection>(
     tools: Collection.Type,
     with prompt: String,
+    parameters: Engine.GenerateParameters = .default
   ) async throws -> NeedleSessionStaticGeneration<Collection> {
     fatalError()
   }
@@ -81,14 +83,16 @@ extension NeedleSessionStream: AsyncSequence {
 extension NeedleSession {
   public func stream(
     tools: sending [any NeedleTool],
-    with prompt: String
+    with prompt: String,
+    parameters: Engine.GenerateParameters = .default
   ) -> NeedleSessionStream<NeedleDynamicToolCalls> {
     fatalError()
   }
 
   public func stream<Collection: NeedleStaticToolsCollection>(
     tools: Collection.Type,
-    with prompt: String
+    with prompt: String,
+    parameters: Engine.GenerateParameters = .default
   ) -> NeedleSessionStream<NeedleStaticToolCalls<Collection>> {
     fatalError()
   }

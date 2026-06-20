@@ -10,7 +10,11 @@
   public final class NeedleMLXEngine: NeedleEngine {
     public typealias GrammarEngine = NeedleXGrammarEngine
 
-    public struct GenerateParamaters {
+    public struct GenerateParamaters: NeedleEngineGenerateParameters {
+      public static var `default`: Self {
+        Self()
+      }
+
       public var sampler: LogitSampler
       public var processor: LogitProcessor?
       public var maxTokens: Int?
