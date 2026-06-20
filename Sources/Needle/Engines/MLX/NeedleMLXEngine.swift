@@ -147,11 +147,7 @@
     }
 
     public func reset() {
-      for cache in self.cache {
-        guard let cache = cache as? BaseKVCache else { continue }
-        cache.offset = 0
-        cache.state = []
-      }
+      self.cache = self.model.newCache(parameters: nil)
       self.isStopped.store(false, ordering: .relaxed)
     }
 
