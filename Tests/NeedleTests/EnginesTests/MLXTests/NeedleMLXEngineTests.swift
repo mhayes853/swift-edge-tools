@@ -4,6 +4,7 @@
   import CustomDump
   import SnapshotTesting
   import IssueReporting
+  import MLX
   import MLXLMCommon
 
   @Suite(.serialized, .enabledIfXcode())
@@ -22,6 +23,7 @@
       let generation = try self.engine.generate(
         prompt: Self.basePrompt,
         matcher: matcher,
+        parameters: NeedleMLXEngine.GenerateParamaters(),
         onToken: { tokens.append($0) }
       )
       expectNoDifference(generation.wasStoped, false)
@@ -40,6 +42,7 @@
       let generation = try self.engine.generate(
         prompt: Self.basePrompt,
         matcher: matcher,
+        parameters: NeedleMLXEngine.GenerateParamaters(),
         onToken: {
           tokens.append($0)
           stopper()
@@ -61,13 +64,52 @@
       nonisolated(unsafe) let matcher = try await engine.grammarEngine.compile(tools: [.sendEmail])
 
       let task = Task {
-        _ = try engine.generate(prompt: prompt, matcher: matcher) { _ in }
+        _ = try engine.generate(
+          prompt: prompt,
+          matcher: matcher,
+          parameters: NeedleMLXEngine.GenerateParamaters(),
+        ) { _ in }
       }
 
       task.cancel()
       await #expect(throws: CancellationError.self) {
         _ = try await task.value
       }
+    }
+
+    @Test
+    func `Generate With 4 Bit KV Cache Quantization`() async throws {
+      let matcher = try await self.engine.grammarEngine.compile(tools: [.sendEmail])
+
+      var tokens = [NeedleToken]()
+      let generation = try self.engine.generate(
+        prompt: Self.basePrompt,
+        matcher: matcher,
+        parameters: NeedleMLXEngine.GenerateParamaters(kvCacheQuantizationBits: 4),
+        onToken: { tokens.append($0) }
+      )
+      expectNoDifference(generation.wasStoped, false)
+      withExpectedIssue {
+        assertSnapshot(of: generation, as: .dump, record: .all)
+        assertSnapshot(of: tokens, as: .dump, record: .all)
+      }
+    }
+
+    @Test
+    func `Generate Invokes Custom Logit Processor`() async throws {
+      let matcher = try await self.engine.grammarEngine.compile(tools: [.sendEmail])
+      let processor = CountingLogitProcessor()
+
+      _ = try self.engine.generate(
+        prompt: Self.basePrompt,
+        matcher: matcher,
+        parameters: NeedleMLXEngine.GenerateParamaters(processor: processor),
+        onToken: { _ in }
+      )
+
+      expectNoDifference(processor.promptCalls, 1)
+      expectNoDifference(processor.processCalls > 0, true)
+      expectNoDifference(processor.didSampleCalls, processor.processCalls)
     }
   }
 
@@ -77,5 +119,26 @@
       user: "Send an email to Henry about his adventures.",
       tools: [.sendEmail]
     )
+  }
+
+  // MARK: - CountingLogitProcessor
+
+  private final class CountingLogitProcessor: LogitProcessor, @unchecked Sendable {
+    var promptCalls = 0
+    var processCalls = 0
+    var didSampleCalls = 0
+
+    func prompt(_ prompt: MLXArray) {
+      self.promptCalls += 1
+    }
+
+    func process(logits: MLXArray) -> MLXArray {
+      self.processCalls += 1
+      return logits
+    }
+
+    func didSample(token: MLXArray) {
+      self.didSampleCalls += 1
+    }
   }
 #endif

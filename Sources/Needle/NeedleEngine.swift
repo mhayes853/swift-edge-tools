@@ -2,6 +2,7 @@
 
 public protocol NeedleEngine {
   associatedtype GrammarEngine: NeedleGrammarEngine
+  associatedtype GenerateParameters
 
   var grammarEngine: GrammarEngine { get }
 
@@ -10,6 +11,7 @@ public protocol NeedleEngine {
   func generate(
     prompt: NeedlePrompt,
     matcher: GrammarEngine.Matcher,
+    parameters: GenerateParameters,
     onToken: (NeedleToken) -> Void
   ) throws -> NeedleEngineGeneration
 

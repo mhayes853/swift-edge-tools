@@ -1,0 +1,139 @@
+▿ 46 elements
+  ▿ NeedleToken
+    - id: 4
+    - stringValue: "<tool_call>"
+  ▿ NeedleToken
+    - id: 356
+    - stringValue: "[{\""
+  ▿ NeedleToken
+    - id: 294
+    - stringValue: "name"
+  ▿ NeedleToken
+    - id: 264
+    - stringValue: "\":\""
+  ▿ NeedleToken
+    - id: 818
+    - stringValue: "send"
+  ▿ NeedleToken
+    - id: 8062
+    - stringValue: "_"
+  ▿ NeedleToken
+    - id: 820
+    - stringValue: "email"
+  ▿ NeedleToken
+    - id: 265
+    - stringValue: "\",\""
+  ▿ NeedleToken
+    - id: 393
+    - stringValue: "arguments"
+  ▿ NeedleToken
+    - id: 282
+    - stringValue: "\":{\""
+  ▿ NeedleToken
+    - id: 2876
+    - stringValue: "address"
+  ▿ NeedleToken
+    - id: 264
+    - stringValue: "\":\""
+  ▿ NeedleToken
+    - id: 280
+    - stringValue: "he"
+  ▿ NeedleToken
+    - id: 1665
+    - stringValue: "nder"
+  ▿ NeedleToken
+    - id: 8061
+    - stringValue: "y"
+  ▿ NeedleToken
+    - id: 8181
+    - stringValue: "@"
+  ▿ NeedleToken
+    - id: 8057
+    - stringValue: "g"
+  ▿ NeedleToken
+    - id: 497
+    - stringValue: "mail"
+  ▿ NeedleToken
+    - id: 8063
+    - stringValue: "."
+  ▿ NeedleToken
+    - id: 869
+    - stringValue: "com"
+  ▿ NeedleToken
+    - id: 265
+    - stringValue: "\",\""
+  ▿ NeedleToken
+    - id: 1519
+    - stringValue: "body"
+  ▿ NeedleToken
+    - id: 264
+    - stringValue: "\":\""
+  ▿ NeedleToken
+    - id: 8103
+    - stringValue: "H"
+  ▿ NeedleToken
+    - id: 8043
+    - stringValue: "i"
+  ▿ NeedleToken
+    - id: 8052
+    - stringValue: ","
+  ▿ NeedleToken
+    - id: 485
+    - stringValue: "I"
+  ▿ NeedleToken
+    - id: 647
+    - stringValue: "am"
+  ▿ NeedleToken
+    - id: 1746
+    - stringValue: "ad"
+  ▿ NeedleToken
+    - id: 628
+    - stringValue: "vent"
+  ▿ NeedleToken
+    - id: 5646
+    - stringValue: "ures"
+  ▿ NeedleToken
+    - id: 8063
+    - stringValue: "."
+  ▿ NeedleToken
+    - id: 1105
+    - stringValue: "please"
+  ▿ NeedleToken
+    - id: 6171
+    - stringValue: "confirm"
+  ▿ NeedleToken
+    - id: 3611
+    - stringValue: "your"
+  ▿ NeedleToken
+    - id: 1746
+    - stringValue: "ad"
+  ▿ NeedleToken
+    - id: 628
+    - stringValue: "vent"
+  ▿ NeedleToken
+    - id: 5646
+    - stringValue: "ures"
+  ▿ NeedleToken
+    - id: 284
+    - stringValue: ".\",\""
+  ▿ NeedleToken
+    - id: 979
+    - stringValue: "subject"
+  ▿ NeedleToken
+    - id: 264
+    - stringValue: "\":\""
+  ▿ NeedleToken
+    - id: 1355
+    - stringValue: "Ad"
+  ▿ NeedleToken
+    - id: 628
+    - stringValue: "vent"
+  ▿ NeedleToken
+    - id: 5646
+    - stringValue: "ures"
+  ▿ NeedleToken
+    - id: 503
+    - stringValue: "\"}}]"
+  ▿ NeedleToken
+    - id: 1
+    - stringValue: ""
