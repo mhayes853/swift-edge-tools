@@ -97,7 +97,8 @@
           ramUsageBytes: memoryUsage.stop()
         ),
         wasStopped: self.isStopped.load(ordering: .relaxed),
-        response: tokenizer.decode(tokenIds: tokenIds)
+        response: tokenizer.decode(tokenIds: tokenIds),
+        metadata: [:]
       )
     }
 

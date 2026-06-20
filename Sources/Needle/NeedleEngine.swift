@@ -32,21 +32,38 @@ public struct NeedleEngineStopper: Sendable {
 
 // MARK: - NeedleEngineGeneration
 
-public struct NeedleEngineGeneration: Hashable, Sendable {
-  public let prefillMetrics: NeedlePrefillMetrics
-  public let decodeMetrics: NeedleDecodeMetrics
-  public let wasStoped: Bool
-  public let response: String
+public struct NeedleEngineGeneration: Sendable {
+  public var prefillMetrics: NeedlePrefillMetrics
+  public var decodeMetrics: NeedleDecodeMetrics
+  public var wasStoped: Bool
+  public var response: String
+  public var metadata: [MetadataKey: any Sendable]
 
   public init(
     prefillMetrics: NeedlePrefillMetrics,
     decodeMetrics: NeedleDecodeMetrics,
     wasStopped: Bool,
-    response: String
+    response: String,
+    metadata: [MetadataKey: any Sendable]
   ) {
     self.prefillMetrics = prefillMetrics
     self.decodeMetrics = decodeMetrics
     self.wasStoped = wasStopped
     self.response = response
+    self.metadata = metadata
+  }
+}
+
+extension NeedleEngineGeneration {
+  public struct MetadataKey: Hashable, Sendable, RawRepresentable, ExpressibleByStringLiteral {
+    public var rawValue: String
+
+    public init(rawValue: String) {
+      self.rawValue = rawValue
+    }
+
+    public init(stringLiteral value: StringLiteralType) {
+      self.init(rawValue: value)
+    }
   }
 }
