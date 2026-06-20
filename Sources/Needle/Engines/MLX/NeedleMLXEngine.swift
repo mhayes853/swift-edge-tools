@@ -65,20 +65,17 @@
       try Task.checkCancellation()
       let memoryUsage = MLXMemoryUsage()
       let generateStart = self.clock.now
+
       let (cache, prefillOutput, prefillMetrics) = try self.prefill(prompt: prompt)
       try Task.checkCancellation()
-      guard var output = prefillOutput else {
-        preconditionFailure("Model received empty input.")
-      }
+      guard var output = prefillOutput else { preconditionFailure("Model received empty input.") }
       matcher.reset()
-      var logits = output.logits
-      var state = output.state
       var _durationToFirstToken: Duration?
 
       var tokenIds = [NeedleToken.ID]()
       while !matcher.isTerminated && !self.isStopped.load(ordering: .relaxed) {
         try Task.checkCancellation()
-        let (token, needleToken) = self.sampleToken(logits: logits, using: matcher)
+        let (token, needleToken) = self.sampleToken(logits: output.logits, using: matcher)
         _durationToFirstToken = _durationToFirstToken ?? generateStart.duration(to: self.clock.now)
         tokenIds.append(needleToken.id)
         guard matcher.accept(tokenId: needleToken.id) else {
@@ -87,9 +84,7 @@
         onToken(needleToken)
 
         let inputText = LMInput.Text(tokens: token)
-        output = self.model(inputText[text: .newAxis], cache: cache, state: state)
-        state = output.state
-        logits = output.logits
+        output = self.model(inputText[text: .newAxis], cache: cache, state: output.state)
       }
 
       let durationToFirstToken = _durationToFirstToken ?? .zero

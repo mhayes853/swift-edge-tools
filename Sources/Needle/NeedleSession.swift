@@ -5,8 +5,10 @@ public final class NeedleSession<Engine: NeedleEngine>: Sendable {
     false
   }
 
-  public init(engine: sending Engine, instructions: String) {
+  public let instructions: String
 
+  public init(engine: sending Engine, instructions: String = "") {
+    self.instructions = instructions
   }
 }
 
