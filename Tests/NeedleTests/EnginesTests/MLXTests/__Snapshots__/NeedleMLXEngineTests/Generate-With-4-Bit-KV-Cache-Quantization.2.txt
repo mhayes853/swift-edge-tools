@@ -4,7 +4,7 @@
     - stringValue: "<tool_call>"
   ▿ NeedleToken
     - id: 356
-    - stringValue: "[{\""
+    - stringValue: " [{\""
   ▿ NeedleToken
     - id: 294
     - stringValue: "name"
@@ -79,13 +79,13 @@
     - stringValue: ","
   ▿ NeedleToken
     - id: 485
-    - stringValue: "I"
+    - stringValue: " I"
   ▿ NeedleToken
     - id: 647
-    - stringValue: "am"
+    - stringValue: " am"
   ▿ NeedleToken
     - id: 1746
-    - stringValue: "ad"
+    - stringValue: " ad"
   ▿ NeedleToken
     - id: 628
     - stringValue: "vent"
@@ -97,16 +97,16 @@
     - stringValue: "."
   ▿ NeedleToken
     - id: 1105
-    - stringValue: "please"
+    - stringValue: " please"
   ▿ NeedleToken
     - id: 6171
-    - stringValue: "confirm"
+    - stringValue: " confirm"
   ▿ NeedleToken
     - id: 3611
-    - stringValue: "your"
+    - stringValue: " your"
   ▿ NeedleToken
     - id: 1746
-    - stringValue: "ad"
+    - stringValue: " ad"
   ▿ NeedleToken
     - id: 628
     - stringValue: "vent"

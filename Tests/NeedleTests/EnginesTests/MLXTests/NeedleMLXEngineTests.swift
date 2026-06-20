@@ -23,7 +23,7 @@
       let generation = try self.engine.generate(
         prompt: Self.basePrompt,
         matcher: matcher,
-        parameters: NeedleMLXEngine.GenerateParamaters(),
+        parameters: .default,
         onToken: { tokens.append($0) }
       )
       expectNoDifference(generation.wasStoped, false)
@@ -31,6 +31,22 @@
         assertSnapshot(of: generation, as: .dump, record: .all)
         assertSnapshot(of: tokens, as: .dump, record: .all)
       }
+    }
+
+    @Test
+    func `Generate Streamed Response Matches Final Response`() async throws {
+      let matcher = try await self.engine.grammarEngine.compile(tools: [.sendEmail])
+
+      var tokens = [NeedleToken]()
+      let generation = try self.engine.generate(
+        prompt: Self.basePrompt,
+        matcher: matcher,
+        parameters: .default,
+        onToken: { tokens.append($0) }
+      )
+
+      let streamedResponse = tokens.map(\.stringValue).joined()
+      expectNoDifference(streamedResponse, generation.response)
     }
 
     @Test
@@ -42,7 +58,7 @@
       let generation = try self.engine.generate(
         prompt: Self.basePrompt,
         matcher: matcher,
-        parameters: NeedleMLXEngine.GenerateParamaters(),
+        parameters: .default,
         onToken: {
           tokens.append($0)
           stopper()
@@ -67,7 +83,7 @@
         _ = try engine.generate(
           prompt: prompt,
           matcher: matcher,
-          parameters: NeedleMLXEngine.GenerateParamaters(),
+          parameters: .default,
         ) { _ in }
       }
 

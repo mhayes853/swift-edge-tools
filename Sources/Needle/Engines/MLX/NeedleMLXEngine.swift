@@ -101,20 +101,21 @@
       matcher.reset()
       var _durationToFirstToken: Duration?
 
-      var tokenIds = [NeedleToken.ID]()
+      var detokenizer = StreamingDetokenizer(tokenizer: self.tokenizer)
       while !matcher.isTerminated
         && !self.isStopped.load(ordering: .relaxed)
-        && tokenIds.count < (parameters.maxTokens ?? .max)
+        && detokenizer.tokenIds.count < (parameters.maxTokens ?? .max)
       {
         try Task.checkCancellation()
         let logits = processor?.process(logits: output.logits) ?? output.logits
-        let (token, needleToken) = self.sampleToken(
+        let (token, tokenId) = self.sampleToken(
           logits: logits,
-          using: matcher,
-          and: parameters.sampler
+          and: parameters.sampler,
+          matcher: matcher
         )
         _durationToFirstToken = _durationToFirstToken ?? generateStart.duration(to: self.clock.now)
-        tokenIds.append(needleToken.id)
+        let tokenString = detokenizer.decode(tokenId: tokenId)
+        let needleToken = NeedleToken(id: tokenId, stringValue: tokenString)
         guard matcher.accept(tokenId: needleToken.id) else {
           throw NeedleMLXEngineError.grammarRejectedToken(token: needleToken)
         }
@@ -135,13 +136,13 @@
       return NeedleEngineGeneration(
         prefillMetrics: prefillMetrics,
         decodeMetrics: NeedleDecodeMetrics(
-          tokens: tokenIds.count,
+          tokens: detokenizer.tokenIds.count,
           duration: generateStart.duration(to: self.clock.now) - durationToFirstToken,
           durationToFirstToken: durationToFirstToken,
           ramUsageBytes: memoryUsage.stop()
         ),
         wasStopped: self.isStopped.load(ordering: .relaxed),
-        response: tokenizer.decode(tokenIds: tokenIds),
+        response: self.tokenizer.decode(tokenIds: detokenizer.tokenIds),
         metadata: [:]
       )
     }
@@ -153,14 +154,13 @@
 
     private func sampleToken(
       logits: MLXArray,
-      using matcher: NeedleXGrammarEngine.Matcher,
-      and sampler: any LogitSampler
-    ) -> (MLXArray, NeedleToken) {
+      and sampler: any LogitSampler,
+      matcher: NeedleXGrammarEngine.Matcher
+    ) -> (MLXArray, NeedleToken.ID) {
       let logits = applyBitmaskMLX(logits: logits[0..., -1, 0...], mask: matcher.bitmask())
       let token = sampler.sample(logits: logits)
       let tokenId = token.item(NeedleToken.ID.self)
-      let tokenString = self.tokenizer.decode(tokenIds: CollectionOfOne(tokenId))
-      return (token, NeedleToken(id: tokenId, stringValue: tokenString))
+      return (token, tokenId)
     }
 
     private func prefill(
@@ -180,6 +180,39 @@
         ramUsageBytes: memoryUsage
       )
       return (output, metrics)
+    }
+
+  }
+
+  // MARK: - StreamingDetokenizer
+
+  private struct StreamingDetokenizer {
+    private static let replacementCharacter = "\u{fffd}"
+
+    private let tokenizer: NeedleSPTokenizingModel
+    private(set) var tokenIds = [NeedleToken.ID]()
+    private(set) var streamedResponse = ""
+
+    init(tokenizer: NeedleSPTokenizingModel) {
+      self.tokenizer = tokenizer
+    }
+
+    mutating func decode(tokenId: NeedleToken.ID) -> String {
+      self.tokenIds.append(tokenId)
+      let decodedResponse = self.tokenizer.decode(tokenIds: self.tokenIds)
+      guard decodedResponse.hasPrefix(self.streamedResponse) else {
+        self.streamedResponse = decodedResponse
+        return decodedResponse
+      }
+
+      let startIndex = decodedResponse.index(
+        decodedResponse.startIndex,
+        offsetBy: self.streamedResponse.count
+      )
+      let tokenString = String(decodedResponse[startIndex...])
+      guard !tokenString.hasSuffix(Self.replacementCharacter) else { return "" }
+      self.streamedResponse = decodedResponse
+      return tokenString
     }
   }
 
