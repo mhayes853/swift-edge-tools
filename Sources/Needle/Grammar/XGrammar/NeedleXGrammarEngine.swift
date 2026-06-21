@@ -16,6 +16,10 @@
       needle_xgrammar_compiler_cache_limit_bytes(self.compiler)
     }
 
+    public func clearCache() {
+      needle_xgrammar_compiler_clear_cache(self.compiler)
+    }
+
     public init(
       encodedVocab: [String],
       eosTokenId: NeedleToken.ID,

@@ -422,6 +422,12 @@ int64_t needle_xgrammar_compiler_cache_limit_bytes(needle_xgrammar_compiler_t co
     return handle->compiler ? handle->compiler->CacheLimitBytes() : 0;
 }
 
+void needle_xgrammar_compiler_clear_cache(needle_xgrammar_compiler_t compiler) {
+    if (!compiler) return;
+    const auto handle = static_cast<XGrammarCompilerHandle*>(compiler);
+    if (handle->compiler) handle->compiler->ClearCache();
+}
+
 void needle_xgrammar_compiler_destroy(needle_xgrammar_compiler_t compiler) {
     if (compiler) delete static_cast<XGrammarCompilerHandle*>(compiler);
 }
