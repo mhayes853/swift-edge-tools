@@ -22,6 +22,14 @@ public final class NeedleSession<Engine: NeedleEngine>: Sendable {
     self.state = RecursiveLock(State(engine: engine, systemPrompt: systemPrompt))
   }
 
+  public func withEngine<T, E: Error>(
+    perform body: (Engine) throws(E) -> sending T
+  ) throws(E) -> sending T {
+    try self.state.withLock { (state: inout sending State) throws(E) -> sending T in
+      try body(state.engine)
+    }
+  }
+
   public func reset() {
     self.state.withLock {
       $0.engine.reset()
