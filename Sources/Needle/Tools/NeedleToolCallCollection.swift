@@ -1,12 +1,12 @@
-// MARK: - NeedleDynamicToolInvocations
+// MARK: - NeedleToolCalls
 
-public struct NeedleDynamicToolCalls: Sendable {
+public struct NeedleToolCallCollection: Sendable {
   private let elements: [Element]
 }
 
 // MARK: - Collection
 
-extension NeedleDynamicToolCalls: Collection {
+extension NeedleToolCallCollection: Collection {
   public typealias Index = Int
 
   public func index(after i: Int) -> Int { i + 1 }
@@ -18,16 +18,13 @@ extension NeedleDynamicToolCalls: Collection {
   }
 }
 
-extension NeedleDynamicToolCalls: RandomAccessCollection {}
+extension NeedleToolCallCollection: RandomAccessCollection {}
 
 // MARK: - Element
 
-extension NeedleDynamicToolCalls {
+extension NeedleToolCallCollection {
   public struct Element: Sendable {
-
-    public func result<Tool: NeedleTool>(
-      of tool: Tool.Type
-    ) -> Result<NeedleToolCall<Tool>, any Error>? {
+    public func call<Tool: NeedleTool>(for tool: Tool.Type) -> NeedleToolCall<Tool>? {
       nil
     }
   }

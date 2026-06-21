@@ -40,14 +40,9 @@ public final class NeedleSession<Engine: NeedleEngine>: Sendable {
 
 // MARK: - Generate
 
-public struct NeedleSessionDynamicGeneration: Sendable {
+public struct NeedleSessionGeneration: Sendable {
   public let engineGeneration: NeedleEngineGeneration
-  public let toolCalls: NeedleDynamicToolCalls
-}
-
-public struct NeedleSessionStaticGeneration<Collection: NeedleStaticToolsCollection> {
-  public let engineGeneration: NeedleEngineGeneration
-  public let toolCalls: NeedleStaticToolCalls<Collection>
+  public let toolCalls: NeedleToolCallCollection
 }
 
 extension NeedleSession {
@@ -55,24 +50,20 @@ extension NeedleSession {
     tools: sending [any NeedleTool],
     with prompt: String,
     parameters: Engine.GenerateParameters = .default
-  ) async throws -> NeedleSessionDynamicGeneration {
-    fatalError()
-  }
-
-  public func generate<Collection: NeedleStaticToolsCollection>(
-    tools: Collection.Type,
-    with prompt: String,
-    parameters: Engine.GenerateParameters = .default
-  ) async throws -> NeedleSessionStaticGeneration<Collection> {
+  ) async throws -> NeedleSessionGeneration {
     fatalError()
   }
 }
 
 // MARK: - Stream
 
-public struct NeedleSessionStream<ToolCalls>: Sendable {
-  public var finalValue: ToolCalls {
+public final class NeedleSessionStream: Sendable {
+  public var finalGeneration: NeedleSessionGeneration {
     get async throws { fatalError() }
+  }
+
+  public var result: Result<NeedleSessionGeneration, any Error>? {
+    nil
   }
 
   public func stop() {
@@ -82,12 +73,14 @@ public struct NeedleSessionStream<ToolCalls>: Sendable {
 
 extension NeedleSessionStream: AsyncSequence {
   public struct AsyncIterator: AsyncIteratorProtocol {
-    public func next() async throws -> NeedleToken? {
+    public func next() async throws -> NeedleToolCallCollection.Element? {
       nil
     }
 
     @available(iOS 18.0, macOS 15.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-    public func next(isolation actor: isolated (any Actor)?) async throws -> NeedleToken? {
+    public func next(
+      isolation actor: isolated (any Actor)?
+    ) async throws -> NeedleToolCallCollection.Element? {
       nil
     }
   }
@@ -97,20 +90,38 @@ extension NeedleSessionStream: AsyncSequence {
   }
 }
 
+extension NeedleSessionStream {
+  public struct Tokens: AsyncSequence {
+    public struct AsyncIterator: AsyncIteratorProtocol {
+      public func next() async throws -> NeedleToken? {
+        nil
+      }
+
+      @available(iOS 18.0, macOS 15.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
+      public func next(
+        isolation actor: isolated (any Actor)?
+      ) async throws -> NeedleToken? {
+        nil
+      }
+    }
+
+    public func makeAsyncIterator() -> AsyncIterator {
+      AsyncIterator()
+    }
+
+  }
+
+  public var tokens: Tokens {
+    Tokens()
+  }
+}
+
 extension NeedleSession {
   public func stream(
     tools: sending [any NeedleTool],
     with prompt: String,
     parameters: Engine.GenerateParameters = .default
-  ) -> NeedleSessionStream<NeedleDynamicToolCalls> {
-    fatalError()
-  }
-
-  public func stream<Collection: NeedleStaticToolsCollection>(
-    tools: Collection.Type,
-    with prompt: String,
-    parameters: Engine.GenerateParameters = .default
-  ) -> NeedleSessionStream<NeedleStaticToolCalls<Collection>> {
+  ) -> NeedleSessionStream {
     fatalError()
   }
 }
