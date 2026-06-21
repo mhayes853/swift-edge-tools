@@ -5,7 +5,7 @@ public protocol NeedleEngine {
   associatedtype GenerateParameters: NeedleEngineGenerateParameters
 
   nonisolated(nonsending) func grammarMatcher(
-    for tools: some Sequence<NeedleToolDefinition>,
+    for tools: sending some Sequence<NeedleToolDefinition>,
     parameters: GenerateParameters
   ) async throws -> GrammarMatcher
 

@@ -86,10 +86,10 @@
     }
 
     public nonisolated(nonsending) func grammarMatcher(
-      for tools: some Sequence<NeedleToolDefinition>,
+      for tools: sending some Sequence<NeedleToolDefinition>,
       parameters: GenerateParamaters
     ) async throws -> NeedleXGrammarEngine.Matcher {
-      try self.grammarEngine.compile(tools: tools, range: parameters.toolCallInvocationRange)
+      try await self.grammarEngine.compile(tools: tools, range: parameters.toolCallInvocationRange)
     }
 
     public func generate(

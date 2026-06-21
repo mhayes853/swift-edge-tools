@@ -51,10 +51,10 @@
       )
     }
 
-    public func compile(
+    public nonisolated(nonsending) func compile(
       tools: some Sequence<NeedleToolDefinition>,
       range: ToolCallInvocationRange = .unbounded(minimum: 0)
-    ) throws -> Matcher {
+    ) async throws -> Matcher {
       let toolsJSON = String(
         decoding: tools.lazy.map { $0.normalized() }.needlePromptEncoded(),
         as: UTF8.self
