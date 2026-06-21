@@ -85,16 +85,8 @@
       self.cache = model.newCache(parameters: nil)
     }
 
-    public nonisolated(nonsending) func grammarMatcher(
-      for tools: sending some Sequence<NeedleToolDefinition>,
-      parameters: GenerateParamaters
-    ) async throws -> NeedleXGrammarEngine.Matcher {
-      try await self.grammarEngine.compile(tools: tools, range: parameters.toolCallInvocationRange)
-    }
-
     public func generate(
       prompt: NeedlePrompt,
-      matcher: NeedleXGrammarEngine.Matcher,
       parameters: GenerateParamaters,
       onToken: (NeedleToken) -> Void
     ) throws -> NeedleEngineGeneration {
@@ -103,6 +95,11 @@
       Stream.defaultStream(.defaultDevice()).synchronize()
       let generationStartSnapshot = Memory.snapshot()
       let generateStart = self.clock.now
+
+      let matcher = try self.grammarEngine.compile(
+        tools: prompt.tools,
+        range: parameters.toolCallInvocationRange
+      )
 
       var processor = parameters.processor
       let (prefillOutput, prefillMetrics, postPrefillSnapshot) =

@@ -1,19 +1,12 @@
 // MARK: - NeedleEngine
 
 public protocol NeedleEngine {
-  associatedtype GrammarMatcher
   associatedtype GenerateParameters: NeedleEngineGenerateParameters
-
-  nonisolated(nonsending) func grammarMatcher(
-    for tools: sending some Sequence<NeedleToolDefinition>,
-    parameters: GenerateParameters
-  ) async throws -> GrammarMatcher
 
   var stopper: NeedleEngineStopper { get }
 
   func generate(
     prompt: NeedlePrompt,
-    matcher: GrammarMatcher,
     parameters: GenerateParameters,
     onToken: (NeedleToken) -> Void
   ) throws -> NeedleEngineGeneration

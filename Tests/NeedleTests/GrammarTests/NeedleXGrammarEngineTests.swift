@@ -18,30 +18,30 @@
     }
 
     @Test
-    func `Compile Tools With Empty Tools Array`() async {
-      await #expect(throws: Never.self) {
-        _ = try await self.engine.compile(tools: [])
+    func `Compile Tools With Empty Tools Array`() {
+      #expect(throws: Never.self) {
+        _ = try self.engine.compile(tools: [])
       }
     }
 
     @Test
-    func `Compile Tools With Single Tool`() async {
-      await #expect(throws: Never.self) {
-        _ = try await self.engine.compile(tools: [.sendEmail])
+    func `Compile Tools With Single Tool`() {
+      #expect(throws: Never.self) {
+        _ = try self.engine.compile(tools: [.sendEmail])
       }
     }
 
     @Test
-    func `Compile Tools With Multiple Tools`() async {
-      await #expect(throws: Never.self) {
-        _ = try await self.engine.compile(tools: [.sendEmail, .getWeather])
+    func `Compile Tools With Multiple Tools`() {
+      #expect(throws: Never.self) {
+        _ = try self.engine.compile(tools: [.sendEmail, .getWeather])
       }
     }
 
     @Test
-    func `Compile Tools With Complex Tool`() async {
-      await #expect(throws: Never.self) {
-        _ = try await self.engine.compile(tools: [.complexTool])
+    func `Compile Tools With Complex Tool`() {
+      #expect(throws: Never.self) {
+        _ = try self.engine.compile(tools: [.complexTool])
       }
     }
 
@@ -61,9 +61,9 @@
       }
 
       @Test
-      func `Default Unbounded Range Accepts Empty Tool Call List`() async throws {
+      func `Default Unbounded Range Accepts Empty Tool Call List`() throws {
         let engine = try self.makeEngine()
-        let matcher = try await engine.compile(tools: [.getWeather])
+        let matcher = try engine.compile(tools: [.getWeather])
         assertAccepts(
           #"<tool_call> []"#,
           matcher: matcher,
@@ -73,18 +73,18 @@
       }
 
       @Test
-      func `Default Unbounded Range Accepts Multiple Tool Calls`() async throws {
+      func `Default Unbounded Range Accepts Multiple Tool Calls`() throws {
         let engine = try self.makeEngine()
-        let matcher = try await engine.compile(tools: [.getWeather])
+        let matcher = try engine.compile(tools: [.getWeather])
         let calls =
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#
         assertAccepts(calls, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
       }
 
       @Test
-      func `Unbounded With Min One Rejects Empty Tool Call List`() async throws {
+      func `Unbounded With Min One Rejects Empty Tool Call List`() throws {
         let engine = try self.makeEngine()
-        let matcher = try await engine.compile(tools: [.getWeather], range: .unbounded(minimum: 1))
+        let matcher = try engine.compile(tools: [.getWeather], range: .unbounded(minimum: 1))
         assertRejects(
           #"<tool_call> []"#,
           matcher: matcher,
@@ -94,9 +94,9 @@
       }
 
       @Test
-      func `Unbounded With Min One Accepts Single Tool Call`() async throws {
+      func `Unbounded With Min One Accepts Single Tool Call`() throws {
         let engine = try self.makeEngine()
-        let matcher = try await engine.compile(tools: [.getWeather], range: .unbounded(minimum: 1))
+        let matcher = try engine.compile(tools: [.getWeather], range: .unbounded(minimum: 1))
         assertAccepts(
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
           matcher: matcher,
@@ -106,25 +106,25 @@
       }
 
       @Test
-      func `Bounded Max One Rejects Two Tool Calls`() async throws {
+      func `Bounded Max One Rejects Two Tool Calls`() throws {
         let engine = try self.makeEngine()
-        let matcher = try await engine.compile(tools: [.getWeather], range: .bounded(0...1))
+        let matcher = try engine.compile(tools: [.getWeather], range: .bounded(0...1))
         let calls =
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#
         assertRejects(calls, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
       }
 
       @Test
-      func `Bounded Max One Accepts Empty And Single Tool Call`() async throws {
+      func `Bounded Max One Accepts Empty And Single Tool Call`() throws {
         let engine = try self.makeEngine()
-        let emptyMatcher = try await engine.compile(tools: [.getWeather], range: .bounded(0...1))
+        let emptyMatcher = try engine.compile(tools: [.getWeather], range: .bounded(0...1))
         assertAccepts(
           #"<tool_call> []"#,
           matcher: emptyMatcher,
           tokenizer: self.tokenizer,
           eosToken: self.eosToken
         )
-        let singleMatcher = try await engine.compile(tools: [.getWeather], range: .bounded(0...1))
+        let singleMatcher = try engine.compile(tools: [.getWeather], range: .bounded(0...1))
         assertAccepts(
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
           matcher: singleMatcher,
@@ -134,9 +134,9 @@
       }
 
       @Test
-      func `Bounded Range Rejects Out Of Range Counts`() async throws {
+      func `Bounded Range Rejects Out Of Range Counts`() throws {
         let engine = try self.makeEngine()
-        let singleMatcher = try await engine.compile(tools: [.getWeather], range: .bounded(2...3))
+        let singleMatcher = try engine.compile(tools: [.getWeather], range: .bounded(2...3))
         assertRejects(
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
           matcher: singleMatcher,
@@ -144,7 +144,7 @@
           eosToken: self.eosToken
         )
 
-        let pairMatcher = try await engine.compile(tools: [.getWeather], range: .bounded(2...3))
+        let pairMatcher = try engine.compile(tools: [.getWeather], range: .bounded(2...3))
         assertAccepts(
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#,
           matcher: pairMatcher,
@@ -154,9 +154,9 @@
       }
 
       @Test
-      func `Empty Tools Ignores Invocation Range`() async throws {
+      func `Empty Tools Ignores Invocation Range`() throws {
         let engine = try self.makeEngine()
-        let matcher = try await engine.compile(tools: [], range: .bounded(1...1))
+        let matcher = try engine.compile(tools: [], range: .bounded(1...1))
         assertAccepts(
           #"<tool_call> []"#,
           matcher: matcher,
@@ -166,9 +166,9 @@
       }
 
       @Test
-      func `Compile Accepts Explicit Tool Call Invocation Range`() async throws {
+      func `Compile Accepts Explicit Tool Call Invocation Range`() throws {
         let engine = try self.makeEngine()
-        let matcher = try await engine.compile(tools: [.getWeather], range: .exact(0))
+        let matcher = try engine.compile(tools: [.getWeather], range: .exact(0))
         assertAccepts(
           #"<tool_call> []"#,
           matcher: matcher,
@@ -178,18 +178,18 @@
       }
 
       @Test
-      func `Exact Three Accepts Three Tool Calls`() async throws {
+      func `Exact Three Accepts Three Tool Calls`() throws {
         let engine = try self.makeEngine()
-        let matcher = try await engine.compile(tools: [.getWeather], range: .exact(3))
+        let matcher = try engine.compile(tools: [.getWeather], range: .exact(3))
         let calls =
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}},{"name":"get_weather","arguments":{"location":"Tokyo"}}]"#
         assertAccepts(calls, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
       }
 
       @Test
-      func `Exact Zero Accepts Only Empty Tool Call List`() async throws {
+      func `Exact Zero Accepts Only Empty Tool Call List`() throws {
         let engine = try self.makeEngine()
-        let matcher = try await engine.compile(tools: [.getWeather], range: .exact(0))
+        let matcher = try engine.compile(tools: [.getWeather], range: .exact(0))
         assertAccepts(
           #"<tool_call> []"#,
           matcher: matcher,
@@ -205,10 +205,10 @@
       }
 
       @Test
-      func `Negative Minimum Tool Calls Throws Error`() async throws {
+      func `Negative Minimum Tool Calls Throws Error`() throws {
         let engine = try self.makeEngine()
-        await #expect(throws: NeedleXGrammarEngineError.invalidToolInvocationRange) {
-          _ = try await engine.compile(tools: [.getWeather], range: .unbounded(minimum: -1))
+        #expect(throws: NeedleXGrammarEngineError.invalidToolInvocationRange) {
+          _ = try engine.compile(tools: [.getWeather], range: .unbounded(minimum: -1))
         }
       }
     }
@@ -227,8 +227,8 @@
       }
 
       @Test
-      func `Reset Restores Initial State`() async throws {
-        let matcher = try await self.engine.compile(tools: [.getWeather])
+      func `Reset Restores Initial State`() throws {
+        let matcher = try self.engine.compile(tools: [.getWeather])
         let call = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
 
         for tokenId in encodedGrammarText(call, tokenizer: self.tokenizer) {
@@ -244,8 +244,8 @@
       }
 
       @Test
-      func `Rollback Allows Accepting Alternative Branch`() async throws {
-        let matcher = try await self.engine.compile(tools: [.sendEmail, .getWeather])
+      func `Rollback Allows Accepting Alternative Branch`() throws {
+        let matcher = try self.engine.compile(tools: [.sendEmail, .getWeather])
 
         let firstBitmask = matcher.bitmask()
         let firstAllowedIndex = firstBitmask.storage
@@ -266,8 +266,8 @@
       }
 
       @Test
-      func `Completion State Transitions`() async throws {
-        let matcher = try await self.engine.compile(tools: [.getWeather])
+      func `Completion State Transitions`() throws {
+        let matcher = try self.engine.compile(tools: [.getWeather])
         let call = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
 
         expectNoDifference(matcher.isCompleted, false)
@@ -285,8 +285,8 @@
       }
 
       @Test
-      func `Fork Preserves Accept State`() async throws {
-        let matcher = try await self.engine.compile(tools: [.getWeather])
+      func `Fork Preserves Accept State`() throws {
+        let matcher = try self.engine.compile(tools: [.getWeather])
 
         let tokens = encodedGrammarText(
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
@@ -317,16 +317,16 @@
       }
 
       @Test
-      func `Bitmask Disallows Eos Before Completion`() async throws {
-        let matcher = try await self.engine.compile(tools: [.sendEmail])
+      func `Bitmask Disallows Eos Before Completion`() throws {
+        let matcher = try self.engine.compile(tools: [.sendEmail])
 
         let bitmask = matcher.bitmask()
         expectNoDifference(bitmask[self.eosToken], false)
       }
 
       @Test
-      func `Bitmask Allows Eos After Completion`() async throws {
-        let matcher = try await self.engine.compile(tools: [.getWeather])
+      func `Bitmask Allows Eos After Completion`() throws {
+        let matcher = try self.engine.compile(tools: [.getWeather])
         let call = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
 
         for tokenId in encodedGrammarText(call, tokenizer: self.tokenizer) {
@@ -339,15 +339,15 @@
       }
 
       @Test
-      func `Bitmask Has Expected Size`() async throws {
-        let matcher = try await self.engine.compile(tools: [.sendEmail])
+      func `Bitmask Has Expected Size`() throws {
+        let matcher = try self.engine.compile(tools: [.sendEmail])
         let bitmask = matcher.bitmask()
         expectNoDifference(bitmask.count, self.tokenizer.vocabSize)
       }
 
       @Test
-      func `Accepts Valid Complex Tool Call`() async throws {
-        let matcher = try await self.engine.compile(tools: [.complexTool])
+      func `Accepts Valid Complex Tool Call`() throws {
+        let matcher = try self.engine.compile(tools: [.complexTool])
 
         let call =
           #"<tool_call> [{"name":"complex_tool","arguments":{"config":{"flags":[true,false],"threshold":0.75},"count":3.5,"enabled":true,"labels":{"ALPHA":1,"BETA_LABEL":2},"mode":"execute","optional_note":null,"priority":4,"routing":{"region":"us-west"},"tags":["a","b"],"ticket_id":"ABC-12","title":"alpha","tuple_args":["alpha",2,true],"window":3}}]"#
@@ -356,8 +356,8 @@
       }
 
       @Test
-      func `Accepts Valid Simple Tool Call`() async throws {
-        let matcher = try await self.engine.compile(tools: [.getWeather])
+      func `Accepts Valid Simple Tool Call`() throws {
+        let matcher = try self.engine.compile(tools: [.getWeather])
 
         let call = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
 
@@ -365,8 +365,8 @@
       }
 
       @Test
-      func `Accepts Multiple Consecutive Tool Calls`() async throws {
-        let matcher = try await self.engine.compile(tools: [.getWeather])
+      func `Accepts Multiple Consecutive Tool Calls`() throws {
+        let matcher = try self.engine.compile(tools: [.getWeather])
 
         let calls =
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Henry's Altar"}}]"#
@@ -375,8 +375,8 @@
       }
 
       @Test
-      func `Rejects Missing Required Field`() async throws {
-        let matcher = try await self.engine.compile(tools: [.complexTool])
+      func `Rejects Missing Required Field`() throws {
+        let matcher = try self.engine.compile(tools: [.complexTool])
 
         let call =
           #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"]}}]"#
@@ -385,8 +385,8 @@
       }
 
       @Test
-      func `Rejects Wrong Type`() async throws {
-        let matcher = try await self.engine.compile(tools: [.complexTool])
+      func `Rejects Wrong Type`() throws {
+        let matcher = try self.engine.compile(tools: [.complexTool])
 
         let call =
           #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":"3.5","enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}}]"#
@@ -395,8 +395,8 @@
       }
 
       @Test
-      func `Rejects Invalid Pattern Properties`() async throws {
-        let matcher = try await self.engine.compile(tools: [.complexTool])
+      func `Rejects Invalid Pattern Properties`() throws {
+        let matcher = try self.engine.compile(tools: [.complexTool])
 
         let call =
           #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"alpha":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}}]"#
@@ -405,8 +405,8 @@
       }
 
       @Test
-      func `Rejects Extra Property`() async throws {
-        let matcher = try await self.engine.compile(tools: [.complexTool])
+      func `Rejects Extra Property`() throws {
+        let matcher = try self.engine.compile(tools: [.complexTool])
 
         let call =
           #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]},"extra":1}}]"#
@@ -415,8 +415,8 @@
       }
 
       @Test
-      func `Rejects Malformed JSON`() async throws {
-        let matcher = try await self.engine.compile(tools: [.complexTool])
+      func `Rejects Malformed JSON`() throws {
+        let matcher = try self.engine.compile(tools: [.complexTool])
 
         let call =
           #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}]"#
@@ -425,8 +425,8 @@
       }
 
       @Test
-      func `Rejects Invalid Tool Name`() async throws {
-        let matcher = try await self.engine.compile(tools: [.getWeather])
+      func `Rejects Invalid Tool Name`() throws {
+        let matcher = try self.engine.compile(tools: [.getWeather])
 
         let call = #"toolcall [{"name":"not_a_real_tool","arguments":{"location":"Seoul"}}]"#
 
@@ -452,14 +452,14 @@
       }
 
       @Test
-      func `Cache Size Becomes Non-Negative After Compile`() async throws {
-        _ = try await self.engine.compile(tools: [.getWeather])
+      func `Cache Size Becomes Non-Negative After Compile`() throws {
+        _ = try self.engine.compile(tools: [.getWeather])
         expectNoDifference(self.engine.cacheSizeBytes >= 0, true)
       }
 
       @Test
-      func `Cache Limit Becomes Reportable After Compile`() async throws {
-        _ = try await self.engine.compile(tools: [.getWeather])
+      func `Cache Limit Becomes Reportable After Compile`() throws {
+        _ = try self.engine.compile(tools: [.getWeather])
         expectNoDifference(
           self.engine.cacheLimitBytes == -1 || self.engine.cacheLimitBytes >= 0,
           true
@@ -467,22 +467,22 @@
       }
 
       @Test
-      func `Matcher Reports Non-Zero Memory Size`() async throws {
-        let matcher = try await self.engine.compile(tools: [.getWeather])
+      func `Matcher Reports Non-Zero Memory Size`() throws {
+        let matcher = try self.engine.compile(tools: [.getWeather])
         expectNoDifference(matcher.memorySizeBytes > 0, true)
       }
 
       @Test
-      func `Forked Matcher Reports Equal Memory Size`() async throws {
-        let matcher = try await self.engine.compile(tools: [.getWeather])
+      func `Forked Matcher Reports Equal Memory Size`() throws {
+        let matcher = try self.engine.compile(tools: [.getWeather])
         let forked = matcher.fork()
         expectNoDifference(forked.memorySizeBytes, matcher.memorySizeBytes)
       }
 
       @Test
-      func `More Tools Yield Larger Compiled Grammar`() async throws {
-        let single = try await self.engine.compile(tools: [.getWeather])
-        let many = try await self.engine.compile(tools: [.getWeather, .sendEmail, .complexTool])
+      func `More Tools Yield Larger Compiled Grammar`() throws {
+        let single = try self.engine.compile(tools: [.getWeather])
+        let many = try self.engine.compile(tools: [.getWeather, .sendEmail, .complexTool])
         expectNoDifference(many.memorySizeBytes > single.memorySizeBytes, true)
       }
     }

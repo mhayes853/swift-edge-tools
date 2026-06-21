@@ -17,12 +17,9 @@
 
     @Test
     func `Generate Basics`() async throws {
-      let matcher = try await self.engine.grammarMatcher(for: [.sendEmail], parameters: .default)
-
       var tokens = [NeedleToken]()
       let generation = try self.engine.generate(
         prompt: Self.basePrompt,
-        matcher: matcher,
         parameters: .default,
         onToken: { tokens.append($0) }
       )
@@ -36,12 +33,9 @@
 
     @Test
     func `Generate Streamed Response Matches Final Response`() async throws {
-      let matcher = try await self.engine.grammarMatcher(for: [.sendEmail], parameters: .default)
-
       var tokens = [NeedleToken]()
       let generation = try self.engine.generate(
         prompt: Self.basePrompt,
-        matcher: matcher,
         parameters: .default,
         onToken: { tokens.append($0) }
       )
@@ -53,13 +47,11 @@
 
     @Test
     func `Generate Stops And Returns Stopped Generation`() async throws {
-      let matcher = try await self.engine.grammarMatcher(for: [.sendEmail], parameters: .default)
       let stopper = self.engine.stopper
 
       var tokens = [NeedleToken]()
       let generation = try self.engine.generate(
         prompt: Self.basePrompt,
-        matcher: matcher,
         parameters: .default,
         onToken: {
           tokens.append($0)
@@ -77,15 +69,11 @@
     func `Generate Cancels And Throws Cancellation Error`() async throws {
       let prompt = Self.basePrompt
 
-      // NB: We send and never use the engine/matcher outside the task, so this is safe.
+      // NB: We send and never use the engine outside the task, so this is safe.
       nonisolated(unsafe) let engine = self.engine
-      nonisolated(unsafe) let matcher = try await engine.grammarMatcher(
-        for: [.sendEmail],
-        parameters: .default
-      )
 
       let task = Task {
-        _ = try engine.generate(prompt: prompt, matcher: matcher, parameters: .default) { _ in }
+        _ = try engine.generate(prompt: prompt, parameters: .default) { _ in }
       }
 
       task.cancel()
@@ -96,12 +84,9 @@
 
     @Test
     func `Generate With 4 Bit KV Cache Quantization`() async throws {
-      let matcher = try await self.engine.grammarMatcher(for: [.sendEmail], parameters: .default)
-
       var tokens = [NeedleToken]()
       let generation = try self.engine.generate(
         prompt: Self.basePrompt,
-        matcher: matcher,
         parameters: NeedleMLXEngine.GenerateParamaters(kvCacheQuantizationBits: 4),
         onToken: { tokens.append($0) }
       )
@@ -115,12 +100,10 @@
 
     @Test
     func `Generate Invokes Custom Logit Processor`() async throws {
-      let matcher = try await self.engine.grammarMatcher(for: [.sendEmail], parameters: .default)
       let processor = CountingLogitProcessor()
 
       _ = try self.engine.generate(
         prompt: Self.basePrompt,
-        matcher: matcher,
         parameters: NeedleMLXEngine.GenerateParamaters(processor: processor),
         onToken: { _ in }
       )
@@ -128,19 +111,6 @@
       expectNoDifference(processor.promptCalls, 1)
       expectNoDifference(processor.processCalls > 0, true)
       expectNoDifference(processor.didSampleCalls, processor.processCalls)
-    }
-
-    @Test
-    func `Grammar Matcher Uses Tool Call Invocation Range From Parameters`() async throws {
-      let matcher = try await self.engine.grammarMatcher(
-        for: [.sendEmail],
-        parameters: NeedleMLXEngine.GenerateParamaters(toolCallInvocationRange: .exact(0))
-      )
-
-      let prompt =
-        #"<tool_call> [{"name":"send_email","arguments":{"address":"blob@gmail.com","subject":"Subject","body":"Body"}}]"#
-      let encoded = self.engine.tokenizer.encode(text: prompt)
-      expectNoDifference(encoded.allSatisfy { matcher.accept(tokenId: $0) }, false)
     }
   }
 
