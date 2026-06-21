@@ -1,27 +1,5 @@
 #if SwiftNeedleMLX
   import MLX
-  import MLXLMCommon
-
-  // MARK: - NeedleXGrammarLogitsProcessor
-
-  public struct NeedleXGrammarLogitsProcessor: LogitProcessor {
-    private var matcher: NeedleXGrammarEngine.Matcher
-
-    public init(matcher: NeedleXGrammarEngine.Matcher) {
-      self.matcher = matcher
-    }
-
-    public mutating func prompt(_ prompt: MLXArray) {
-    }
-
-    public mutating func didSample(token: MLXArray) {
-      self.matcher.accept(tokenId: token.item(Int.self))
-    }
-
-    public func process(logits: MLXArray) -> MLXArray {
-      applyBitmaskMLX(logits: logits, mask: self.matcher.bitmask())
-    }
-  }
 
   // MARK: - Bitmask
 
