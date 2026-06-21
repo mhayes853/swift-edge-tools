@@ -1,12 +1,12 @@
 ▿ NeedleEngineGeneration
   ▿ decodeMetrics: NeedleDecodeMetrics
-    ▿ duration: 0.768209334 seconds
-      - _low: 768209334000000000
+    ▿ duration: 0.853238 seconds
+      - _low: 853238000000000000
       - _high: 0
-    ▿ durationToFirstToken: 0.062166958 seconds
-      - _low: 62166958000000000
+    ▿ durationToFirstToken: 0.164020458 seconds
+      - _low: 164020458000000000
       - _high: 0
-    - tokens: 52
+    - tokens: 57
   ▿ metadata: 3 key/value pairs
     ▿ (2 elements)
       ▿ key: NeedleMetadataKey
@@ -20,27 +20,27 @@ Cache:  2K           (2272)
     ▿ (2 elements)
       ▿ key: NeedleMetadataKey
         - rawValue: "MLXEnginePostDecodeMemorySnapshot"
-      ▿ value: Peak:   90M          (94631988)
-Active: 56M          (58775396)
-Cache:  68M          (72155210)
-        - activeMemory: 58775396
-        - cacheMemory: 72155210
-        - peakMemory: 94631988
+      ▿ value: Peak:   113M         (118723648)
+Active: 56M          (59430768)
+Cache:  81M          (85271020)
+        - activeMemory: 59430768
+        - cacheMemory: 85271020
+        - peakMemory: 118723648
     ▿ (2 elements)
       ▿ key: NeedleMetadataKey
         - rawValue: "MLXEnginePostPrefillMemorySnapshot"
-      ▿ value: Peak:   90M          (94397844)
-Active: 53M          (55861032)
-Cache:  54M          (57415658)
-        - activeMemory: 55861032
-        - cacheMemory: 57415658
-        - peakMemory: 94397844
+      ▿ value: Peak:   113M         (118723648)
+Active: 53M          (56450916)
+Cache:  66M          (70223068)
+        - activeMemory: 56450916
+        - cacheMemory: 70223068
+        - peakMemory: 118723648
   ▿ prefillMetrics: NeedlePrefillMetrics
-    ▿ duration: 0.053273666 seconds
-      - _low: 53273666000000000
+    ▿ duration: 0.130070292 seconds
+      - _low: 130070292000000000
       - _high: 0
-    - tokens: 120
-  ▿ tokens: 52 elements
+    - tokens: 132
+  ▿ tokens: 57 elements
     ▿ NeedleToken
       - id: 4
       - stringValue: "<tool_call>"
@@ -189,11 +189,26 @@ Cache:  54M          (57415658)
       - id: 8072
       - stringValue: "]"
     ▿ NeedleToken
-      - id: 263
-      - stringValue: ",\""
+      - id: 403
+      - stringValue: "}}]"
     ▿ NeedleToken
       - id: 403
       - stringValue: "}}]"
+    ▿ NeedleToken
+      - id: 4744
+      - stringValue: "les"
+    ▿ NeedleToken
+      - id: 8039
+      - stringValue: "\""
+    ▿ NeedleToken
+      - id: 8059
+      - stringValue: "}"
+    ▿ NeedleToken
+      - id: 8059
+      - stringValue: "}"
+    ▿ NeedleToken
+      - id: 8072
+      - stringValue: "]"
     ▿ NeedleToken
       - id: 1
       - stringValue: ""

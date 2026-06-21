@@ -57,8 +57,8 @@
     }
 
     public func compile(tools: [NeedleToolDefinition]) async throws -> Matcher {
-      let toolsJSON = try String(
-        decoding: JSONEncoder.needleTools.encode(tools.map { $0.normalized() }),
+      let toolsJSON = String(
+        decoding: tools.map { $0.normalized() }.needlePromptEncoded(),
         as: UTF8.self
       )
       let (minCalls, maxCalls) = self.toolCallInvocationRange.cRange

@@ -1,46 +1,46 @@
 ▿ NeedleEngineGeneration
   ▿ decodeMetrics: NeedleDecodeMetrics
-    ▿ duration: 1.108993375 seconds
-      - _low: 1108993375000000000
+    ▿ duration: 1.249080041 seconds
+      - _low: 1249080041000000000
       - _high: 0
-    ▿ durationToFirstToken: 0.061504916 seconds
-      - _low: 61504916000000000
+    ▿ durationToFirstToken: 0.044721792 seconds
+      - _low: 44721792000000000
       - _high: 0
-    - tokens: 52
+    - tokens: 57
   ▿ metadata: 3 key/value pairs
     ▿ (2 elements)
       ▿ key: NeedleMetadataKey
         - rawValue: "MLXEngineGenerationStartMemorySnapshot"
-      ▿ value: Peak:   2K           (2560)
+      ▿ value: Peak:   113M         (118723648)
 Active: 0K           (288)
-Cache:  2K           (2272)
+Cache:  137M         (144701500)
         - activeMemory: 288
-        - cacheMemory: 2272
-        - peakMemory: 2560
+        - cacheMemory: 144701500
+        - peakMemory: 118723648
     ▿ (2 elements)
       ▿ key: NeedleMetadataKey
         - rawValue: "MLXEnginePostDecodeMemorySnapshot"
-      ▿ value: Peak:   84M          (88768404)
-Active: 53M          (56017348)
-Cache:  70M          (74281958)
-        - activeMemory: 56017348
-        - cacheMemory: 74281958
-        - peakMemory: 88768404
+      ▿ value: Peak:   113M         (118723648)
+Active: 53M          (56235760)
+Cache:  84M          (88553934)
+        - activeMemory: 56235760
+        - cacheMemory: 88553934
+        - peakMemory: 118723648
     ▿ (2 elements)
       ▿ key: NeedleMetadataKey
         - rawValue: "MLXEnginePostPrefillMemorySnapshot"
-      ▿ value: Peak:   84M          (88768404)
-Active: 53M          (55861032)
-Cache:  54M          (56712950)
-        - activeMemory: 55861032
-        - cacheMemory: 56712950
-        - peakMemory: 88768404
+      ▿ value: Peak:   113M         (118723648)
+Active: 53M          (56303460)
+Cache:  84M          (88398328)
+        - activeMemory: 56303460
+        - cacheMemory: 88398328
+        - peakMemory: 118723648
   ▿ prefillMetrics: NeedlePrefillMetrics
-    ▿ duration: 0.052694583 seconds
-      - _low: 52694583000000000
+    ▿ duration: 0.039607583 seconds
+      - _low: 39607583000000000
       - _high: 0
-    - tokens: 120
-  ▿ tokens: 52 elements
+    - tokens: 132
+  ▿ tokens: 57 elements
     ▿ NeedleToken
       - id: 4
       - stringValue: "<tool_call>"
@@ -189,11 +189,26 @@ Cache:  54M          (56712950)
       - id: 8072
       - stringValue: "]"
     ▿ NeedleToken
-      - id: 263
-      - stringValue: ",\""
+      - id: 403
+      - stringValue: "}}]"
     ▿ NeedleToken
       - id: 403
       - stringValue: "}}]"
+    ▿ NeedleToken
+      - id: 4744
+      - stringValue: "les"
+    ▿ NeedleToken
+      - id: 8039
+      - stringValue: "\""
+    ▿ NeedleToken
+      - id: 8059
+      - stringValue: "}"
+    ▿ NeedleToken
+      - id: 8059
+      - stringValue: "}"
+    ▿ NeedleToken
+      - id: 8072
+      - stringValue: "]"
     ▿ NeedleToken
       - id: 1
       - stringValue: ""

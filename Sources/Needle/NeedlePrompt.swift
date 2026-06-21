@@ -13,10 +13,10 @@ public struct NeedlePrompt: Hashable, Sendable {
     self.tools = tools
   }
 
-  public func formatted() throws -> String {
+  public func formatted() -> String {
     let separator = self.system.isEmpty || self.user.isEmpty ? "" : "\n\n"
-    let toolsSchema = try String(
-      decoding: JSONEncoder.needleTools.encode(tools.map { $0.normalized() }),
+    let toolsSchema = String(
+      decoding: tools.map { $0.normalized() }.needlePromptEncoded(),
       as: UTF8.self
     )
     return "\(self.system)\(separator)\(self.user)<tools>\(toolsSchema)"
