@@ -44,34 +44,20 @@ public struct NeedleEngineGeneration: Sendable {
   public var prefillMetrics: NeedlePrefillMetrics
   public var decodeMetrics: NeedleDecodeMetrics
   public var wasStoped: Bool
-  public var response: String
-  public var metadata: [MetadataKey: any Sendable]
+  public var tokens: [NeedleToken]
+  public var metadata: NeedleMetadata
 
   public init(
     prefillMetrics: NeedlePrefillMetrics,
     decodeMetrics: NeedleDecodeMetrics,
     wasStopped: Bool,
-    response: String,
-    metadata: [MetadataKey: any Sendable]
+    tokens: [NeedleToken],
+    metadata: NeedleMetadata = [:]
   ) {
     self.prefillMetrics = prefillMetrics
     self.decodeMetrics = decodeMetrics
     self.wasStoped = wasStopped
-    self.response = response
+    self.tokens = tokens
     self.metadata = metadata
-  }
-}
-
-extension NeedleEngineGeneration {
-  public struct MetadataKey: Hashable, Sendable, RawRepresentable, ExpressibleByStringLiteral {
-    public var rawValue: String
-
-    public init(rawValue: String) {
-      self.rawValue = rawValue
-    }
-
-    public init(stringLiteral value: StringLiteralType) {
-      self.init(rawValue: value)
-    }
   }
 }

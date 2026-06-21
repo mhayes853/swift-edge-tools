@@ -29,7 +29,7 @@
       expectNoDifference(generation.wasStoped, false)
       withExpectedIssue {
         assertSnapshot(of: generation, as: .dump, record: .all)
-        assertSnapshot(of: tokens, as: .dump, record: .all)
+        assertSnapshot(of: generation.tokens.map(\.stringValue).joined(), as: .dump, record: .all)
       }
     }
 
@@ -46,7 +46,8 @@
       )
 
       let streamedResponse = tokens.map(\.stringValue).joined()
-      expectNoDifference(streamedResponse, generation.response)
+      let finalResponse = generation.tokens.map(\.stringValue).joined()
+      expectNoDifference(streamedResponse, finalResponse)
     }
 
     @Test
@@ -68,7 +69,7 @@
       expectNoDifference(generation.wasStoped, true)
       expectNoDifference(tokens.count > 0, true)
       expectNoDifference(generation.decodeMetrics.tokens, tokens.count)
-      expectNoDifference(generation.response.isEmpty, false)
+      expectNoDifference(generation.tokens.isEmpty, false)
     }
 
     @Test
@@ -107,7 +108,7 @@
       expectNoDifference(generation.wasStoped, false)
       withExpectedIssue {
         assertSnapshot(of: generation, as: .dump, record: .all)
-        assertSnapshot(of: tokens, as: .dump, record: .all)
+        assertSnapshot(of: generation.tokens.map(\.stringValue).joined(), as: .dump, record: .all)
       }
     }
 
@@ -132,7 +133,7 @@
   extension `NeedleMLXEngine tests` {
     fileprivate static let basePrompt = NeedlePrompt(
       system: "",
-      user: "Send an email to Henry about his adventures.",
+      user: "Send an email to Henry asking him to go on an adventure.",
       tools: [.sendEmail]
     )
   }

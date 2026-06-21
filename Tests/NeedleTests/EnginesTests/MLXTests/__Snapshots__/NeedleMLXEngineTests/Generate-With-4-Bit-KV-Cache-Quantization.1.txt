@@ -1,19 +1,175 @@
 ▿ NeedleEngineGeneration
   ▿ decodeMetrics: NeedleDecodeMetrics
-    ▿ duration: 1.015029 seconds
-      - _low: 1015029000000000000
+    ▿ duration: 1.096950292 seconds
+      - _low: 1096950292000000000
       - _high: 0
-    ▿ durationToFirstToken: 0.06393025 seconds
-      - _low: 63930250000000000
+    ▿ durationToFirstToken: 0.041732292 seconds
+      - _low: 41732292000000000
       - _high: 0
-    - ramUsageBytes: 89298000
-    - tokens: 46
+    - ramUsageBytes: 81488572
+    - tokens: 52
   - metadata: 0 key/value pairs
   ▿ prefillMetrics: NeedlePrefillMetrics
-    ▿ duration: 0.052344167 seconds
-      - _low: 52344167000000000
+    ▿ duration: 0.037332666 seconds
+      - _low: 37332666000000000
       - _high: 0
-    - ramUsageBytes: 89297536
-    - tokens: 116
-  - response: "<tool_call> [{\"name\":\"send_email\",\"arguments\":{\"address\":\"hendery@gmail.com\",\"body\":\"Hi, I am adventures. please confirm your adventures.\",\"subject\":\"Adventures\"}}]"
+    - ramUsageBytes: 64122100
+    - tokens: 120
+  ▿ tokens: 52 elements
+    ▿ NeedleToken
+      - id: 4
+      - stringValue: "<tool_call>"
+    ▿ NeedleToken
+      - id: 356
+      - stringValue: " [{\""
+    ▿ NeedleToken
+      - id: 294
+      - stringValue: "name"
+    ▿ NeedleToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ NeedleToken
+      - id: 818
+      - stringValue: "send"
+    ▿ NeedleToken
+      - id: 8062
+      - stringValue: "_"
+    ▿ NeedleToken
+      - id: 820
+      - stringValue: "email"
+    ▿ NeedleToken
+      - id: 265
+      - stringValue: "\",\""
+    ▿ NeedleToken
+      - id: 393
+      - stringValue: "arguments"
+    ▿ NeedleToken
+      - id: 282
+      - stringValue: "\":{\""
+    ▿ NeedleToken
+      - id: 2876
+      - stringValue: "address"
+    ▿ NeedleToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ NeedleToken
+      - id: 280
+      - stringValue: "he"
+    ▿ NeedleToken
+      - id: 1665
+      - stringValue: "nder"
+    ▿ NeedleToken
+      - id: 8061
+      - stringValue: "y"
+    ▿ NeedleToken
+      - id: 8181
+      - stringValue: "@"
+    ▿ NeedleToken
+      - id: 8057
+      - stringValue: "g"
+    ▿ NeedleToken
+      - id: 497
+      - stringValue: "mail"
+    ▿ NeedleToken
+      - id: 8063
+      - stringValue: "."
+    ▿ NeedleToken
+      - id: 869
+      - stringValue: "com"
+    ▿ NeedleToken
+      - id: 265
+      - stringValue: "\",\""
+    ▿ NeedleToken
+      - id: 1519
+      - stringValue: "body"
+    ▿ NeedleToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ NeedleToken
+      - id: 8076
+      - stringValue: "C"
+    ▿ NeedleToken
+      - id: 837
+      - stringValue: "ould"
+    ▿ NeedleToken
+      - id: 885
+      - stringValue: " you"
+    ▿ NeedleToken
+      - id: 1105
+      - stringValue: " please"
+    ▿ NeedleToken
+      - id: 3245
+      - stringValue: " go"
+    ▿ NeedleToken
+      - id: 442
+      - stringValue: " on"
+    ▿ NeedleToken
+      - id: 439
+      - stringValue: " an"
+    ▿ NeedleToken
+      - id: 1746
+      - stringValue: " ad"
+    ▿ NeedleToken
+      - id: 628
+      - stringValue: "vent"
+    ▿ NeedleToken
+      - id: 491
+      - stringValue: "ure"
+    ▿ NeedleToken
+      - id: 8105
+      - stringValue: "?"
+    ▿ NeedleToken
+      - id: 8071
+      - stringValue: "["
+    ▿ NeedleToken
+      - id: 271
+      - stringValue: "{\""
+    ▿ NeedleToken
+      - id: 8052
+      - stringValue: ","
+    ▿ NeedleToken
+      - id: 8039
+      - stringValue: "\""
+    ▿ NeedleToken
+      - id: 8046
+      - stringValue: "s"
+    ▿ NeedleToken
+      - id: 427
+      - stringValue: "ub"
+    ▿ NeedleToken
+      - id: 8079
+      - stringValue: "j"
+    ▿ NeedleToken
+      - id: 8038
+      - stringValue: "e"
+    ▿ NeedleToken
+      - id: 8051
+      - stringValue: "c"
+    ▿ NeedleToken
+      - id: 8040
+      - stringValue: "t"
+    ▿ NeedleToken
+      - id: 8039
+      - stringValue: "\""
+    ▿ NeedleToken
+      - id: 8048
+      - stringValue: ":"
+    ▿ NeedleToken
+      - id: 8039
+      - stringValue: "\""
+    ▿ NeedleToken
+      - id: 8059
+      - stringValue: "}"
+    ▿ NeedleToken
+      - id: 8072
+      - stringValue: "]"
+    ▿ NeedleToken
+      - id: 263
+      - stringValue: ",\""
+    ▿ NeedleToken
+      - id: 403
+      - stringValue: "}}]"
+    ▿ NeedleToken
+      - id: 1
+      - stringValue: ""
   - wasStoped: false

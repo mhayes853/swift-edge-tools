@@ -102,6 +102,7 @@
       var _durationToFirstToken: Duration?
 
       var detokenizer = StreamingDetokenizer(tokenizer: self.tokenizer)
+      var generatedTokens = [NeedleToken]()
       while !matcher.isTerminated
         && !self.isStopped.load(ordering: .relaxed)
         && detokenizer.tokenIds.count < (parameters.maxTokens ?? .max)
@@ -116,6 +117,7 @@
         _durationToFirstToken = _durationToFirstToken ?? generateStart.duration(to: self.clock.now)
         let tokenString = detokenizer.decode(tokenId: tokenId)
         let needleToken = NeedleToken(id: tokenId, stringValue: tokenString)
+        generatedTokens.append(needleToken)
         guard matcher.accept(tokenId: needleToken.id) else {
           throw NeedleMLXEngineError.grammarRejectedToken(token: needleToken)
         }
@@ -136,14 +138,13 @@
       return NeedleEngineGeneration(
         prefillMetrics: prefillMetrics,
         decodeMetrics: NeedleDecodeMetrics(
-          tokens: detokenizer.tokenIds.count,
+          tokens: generatedTokens.count,
           duration: generateStart.duration(to: self.clock.now) - durationToFirstToken,
           durationToFirstToken: durationToFirstToken,
           ramUsageBytes: memoryUsage.stop()
         ),
         wasStopped: self.isStopped.load(ordering: .relaxed),
-        response: self.tokenizer.decode(tokenIds: detokenizer.tokenIds),
-        metadata: [:]
+        tokens: generatedTokens
       )
     }
 
