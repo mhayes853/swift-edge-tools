@@ -4,9 +4,8 @@
 
   // MARK: - NeedleXGrammarEngine
 
-  public final class NeedleXGrammarEngine: NeedleGrammarEngine {
+  public final class NeedleXGrammarEngine {
     public let compiler: needle_xgrammar_compiler_t
-    public var toolCallInvocationRange: ToolCallInvocationRange
 
     public var cacheSizeBytes: Int64 {
       needle_xgrammar_compiler_cache_size_bytes(self.compiler)
@@ -23,23 +22,19 @@
     public init(
       encodedVocab: [String],
       eosTokenId: NeedleToken.ID,
-      toolCallInvocationRange: ToolCallInvocationRange = .unbounded(minimum: 0),
       configuration: CompilerConfiguration = CompilerConfiguration()
     ) {
       self.compiler = withCStringPointerBuffer(encodedVocab) { buffer in
         needle_xgrammar_compiler_init(buffer.baseAddress, buffer.count, Int32(eosTokenId))
       }
-      self.toolCallInvocationRange = toolCallInvocationRange
       self.apply(configuration: configuration)
     }
 
     public init(
       compiler: consuming needle_xgrammar_compiler_t,
-      toolCallInvocationRange: ToolCallInvocationRange = .unbounded(minimum: 0),
       configuration: CompilerConfiguration? = nil
     ) {
       self.compiler = compiler
-      self.toolCallInvocationRange = toolCallInvocationRange
       if let configuration {
         self.apply(configuration: configuration)
       }
@@ -56,12 +51,15 @@
       )
     }
 
-    public func compile(tools: [NeedleToolDefinition]) async throws -> Matcher {
+    public func compile(
+      tools: some Sequence<NeedleToolDefinition>,
+      range: ToolCallInvocationRange = .unbounded(minimum: 0)
+    ) throws -> Matcher {
       let toolsJSON = String(
-        decoding: tools.map { $0.normalized() }.needlePromptEncoded(),
+        decoding: tools.lazy.map { $0.normalized() }.needlePromptEncoded(),
         as: UTF8.self
       )
-      let (minCalls, maxCalls) = self.toolCallInvocationRange.cRange
+      let (minCalls, maxCalls) = range.cRange
       guard minCalls >= 0 else { throw NeedleXGrammarEngineError.invalidToolInvocationRange }
       let grammar = toolsJSON.withCString {
         needle_xgrammar_grammar_init_with_range($0, minCalls, maxCalls)

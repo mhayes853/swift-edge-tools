@@ -8,8 +8,6 @@
   // MARK: - NeedleMLXEngine
 
   public final class NeedleMLXEngine: NeedleEngine {
-    public typealias GrammarEngine = NeedleXGrammarEngine
-
     public struct GenerateParamaters: NeedleEngineGenerateParameters {
       public static var `default`: Self {
         Self()
@@ -17,6 +15,7 @@
 
       public var sampler: LogitSampler
       public var processor: LogitProcessor?
+      public var toolCallInvocationRange: NeedleXGrammarEngine.ToolCallInvocationRange
       public var maxTokens: Int?
       public var kvCacheQuantizationBits: Int?
       public var kvCacheQuantizationGroupSize: Int
@@ -24,12 +23,15 @@
       public init(
         sampler: any LogitSampler = ArgMaxSampler(),
         processor: (any LogitProcessor)? = nil,
+        toolCallInvocationRange: NeedleXGrammarEngine.ToolCallInvocationRange =
+          .unbounded(minimum: 0),
         maxTokens: Int? = 1024,
         kvCacheQuantizationBits: Int? = nil,
         kvCacheQuantizationGroupSize: Int = 64
       ) {
         self.sampler = sampler
         self.processor = processor
+        self.toolCallInvocationRange = toolCallInvocationRange
         self.maxTokens = maxTokens
         self.kvCacheQuantizationBits = kvCacheQuantizationBits
         self.kvCacheQuantizationGroupSize = kvCacheQuantizationGroupSize
@@ -83,9 +85,16 @@
       self.cache = model.newCache(parameters: nil)
     }
 
+    public nonisolated(nonsending) func grammarMatcher(
+      for tools: some Sequence<NeedleToolDefinition>,
+      parameters: GenerateParamaters
+    ) async throws -> NeedleXGrammarEngine.Matcher {
+      try self.grammarEngine.compile(tools: tools, range: parameters.toolCallInvocationRange)
+    }
+
     public func generate(
       prompt: NeedlePrompt,
-      matcher: GrammarEngine.Matcher,
+      matcher: NeedleXGrammarEngine.Matcher,
       parameters: GenerateParamaters,
       onToken: (NeedleToken) -> Void
     ) throws -> NeedleEngineGeneration {

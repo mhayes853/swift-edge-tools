@@ -56,13 +56,8 @@
         self.eosToken = try #require(tokenizer.eosTokenId)
       }
 
-      private func makeEngine(
-        toolCallInvocationRange: NeedleXGrammarEngine.ToolCallInvocationRange =
-          .unbounded(minimum: 0)
-      ) throws -> NeedleXGrammarEngine {
-        let engine = try #require(NeedleXGrammarEngine(tokenizer: self.tokenizer))
-        engine.toolCallInvocationRange = toolCallInvocationRange
-        return engine
+      private func makeEngine() throws -> NeedleXGrammarEngine {
+        try #require(NeedleXGrammarEngine(tokenizer: self.tokenizer))
       }
 
       @Test
@@ -88,8 +83,8 @@
 
       @Test
       func `Unbounded With Min One Rejects Empty Tool Call List`() async throws {
-        let engine = try self.makeEngine(toolCallInvocationRange: .unbounded(minimum: 1))
-        let matcher = try await engine.compile(tools: [.getWeather])
+        let engine = try self.makeEngine()
+        let matcher = try engine.compile(tools: [.getWeather], range: .unbounded(minimum: 1))
         assertRejects(
           #"<tool_call> []"#,
           matcher: matcher,
@@ -100,8 +95,8 @@
 
       @Test
       func `Unbounded With Min One Accepts Single Tool Call`() async throws {
-        let engine = try self.makeEngine(toolCallInvocationRange: .unbounded(minimum: 1))
-        let matcher = try await engine.compile(tools: [.getWeather])
+        let engine = try self.makeEngine()
+        let matcher = try engine.compile(tools: [.getWeather], range: .unbounded(minimum: 1))
         assertAccepts(
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
           matcher: matcher,
@@ -112,8 +107,8 @@
 
       @Test
       func `Bounded Max One Rejects Two Tool Calls`() async throws {
-        let engine = try self.makeEngine(toolCallInvocationRange: .bounded(0...1))
-        let matcher = try await engine.compile(tools: [.getWeather])
+        let engine = try self.makeEngine()
+        let matcher = try engine.compile(tools: [.getWeather], range: .bounded(0...1))
         let calls =
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#
         assertRejects(calls, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
@@ -121,15 +116,15 @@
 
       @Test
       func `Bounded Max One Accepts Empty And Single Tool Call`() async throws {
-        let engine = try self.makeEngine(toolCallInvocationRange: .bounded(0...1))
-        let emptyMatcher = try await engine.compile(tools: [.getWeather])
+        let engine = try self.makeEngine()
+        let emptyMatcher = try engine.compile(tools: [.getWeather], range: .bounded(0...1))
         assertAccepts(
           #"<tool_call> []"#,
           matcher: emptyMatcher,
           tokenizer: self.tokenizer,
           eosToken: self.eosToken
         )
-        let singleMatcher = try await engine.compile(tools: [.getWeather])
+        let singleMatcher = try engine.compile(tools: [.getWeather], range: .bounded(0...1))
         assertAccepts(
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
           matcher: singleMatcher,
@@ -140,15 +135,16 @@
 
       @Test
       func `Bounded Range Rejects Out Of Range Counts`() async throws {
-        let engine = try self.makeEngine(toolCallInvocationRange: .bounded(2...3))
-        let singleMatcher = try await engine.compile(tools: [.getWeather])
+        let engine = try self.makeEngine()
+        let singleMatcher = try engine.compile(tools: [.getWeather], range: .bounded(2...3))
         assertRejects(
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
           matcher: singleMatcher,
           tokenizer: self.tokenizer,
           eosToken: self.eosToken
         )
-        let pairMatcher = try await engine.compile(tools: [.getWeather])
+
+        let pairMatcher = try engine.compile(tools: [.getWeather], range: .bounded(2...3))
         assertAccepts(
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#,
           matcher: pairMatcher,
@@ -159,8 +155,8 @@
 
       @Test
       func `Empty Tools Ignores Invocation Range`() async throws {
-        let engine = try self.makeEngine(toolCallInvocationRange: .bounded(1...1))
-        let matcher = try await engine.compile(tools: [])
+        let engine = try self.makeEngine()
+        let matcher = try engine.compile(tools: [], range: .bounded(1...1))
         assertAccepts(
           #"<tool_call> []"#,
           matcher: matcher,
@@ -170,17 +166,21 @@
       }
 
       @Test
-      func `Tool Call Invocation Range Is Mutable On Engine`() throws {
-        let engine = try self.makeEngine(toolCallInvocationRange: .bounded(2...5))
-        expectNoDifference(engine.toolCallInvocationRange, .bounded(2...5))
-        engine.toolCallInvocationRange = .bounded(1...2)
-        expectNoDifference(engine.toolCallInvocationRange, .bounded(1...2))
+      func `Compile Accepts Explicit Tool Call Invocation Range`() async throws {
+        let engine = try self.makeEngine()
+        let matcher = try engine.compile(tools: [.getWeather], range: .exact(0))
+        assertAccepts(
+          #"<tool_call> []"#,
+          matcher: matcher,
+          tokenizer: self.tokenizer,
+          eosToken: self.eosToken
+        )
       }
 
       @Test
       func `Exact Three Accepts Three Tool Calls`() async throws {
-        let engine = try self.makeEngine(toolCallInvocationRange: .exact(3))
-        let matcher = try await engine.compile(tools: [.getWeather])
+        let engine = try self.makeEngine()
+        let matcher = try engine.compile(tools: [.getWeather], range: .exact(3))
         let calls =
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}},{"name":"get_weather","arguments":{"location":"Tokyo"}}]"#
         assertAccepts(calls, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
@@ -188,8 +188,8 @@
 
       @Test
       func `Exact Zero Accepts Only Empty Tool Call List`() async throws {
-        let engine = try self.makeEngine(toolCallInvocationRange: .exact(0))
-        let matcher = try await engine.compile(tools: [.getWeather])
+        let engine = try self.makeEngine()
+        let matcher = try engine.compile(tools: [.getWeather], range: .exact(0))
         assertAccepts(
           #"<tool_call> []"#,
           matcher: matcher,
@@ -206,9 +206,9 @@
 
       @Test
       func `Negative Minimum Tool Calls Throws Error`() async throws {
-        let engine = try self.makeEngine(toolCallInvocationRange: .unbounded(minimum: -1))
-        await #expect(throws: NeedleXGrammarEngineError.invalidToolInvocationRange) {
-          _ = try await engine.compile(tools: [.getWeather])
+        let engine = try self.makeEngine()
+        #expect(throws: NeedleXGrammarEngineError.invalidToolInvocationRange) {
+          _ = try engine.compile(tools: [.getWeather], range: .unbounded(minimum: -1))
         }
       }
     }
