@@ -9,5 +9,5 @@ public protocol NeedleStaticToolsCollection<Output> {
 // MARK: - NeedleStaticToolsCollectionOutput
 
 public protocol NeedleStaticToolsCollectionOutput {
-  func call<Tool: NeedleTool>(for tool: Tool.Type) -> NeedleToolCallOf<Tool>?
+  func call<Tool: NeedleTool>(for tool: Tool.Type) -> NeedleToolCall<Tool>?
 }

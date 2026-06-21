@@ -1,25 +1,37 @@
-// MARK: - NeedleToolCallOf
-
-public typealias NeedleToolCallOf<Tool: NeedleTool> = NeedleToolCall<Tool.Input, Tool.Output>
-
-// MARK: - NeedleRawToolCall
-
-public typealias NeedleRawToolCall = NeedleToolCall<NeedleValue, NeedleValue>
-
 // MARK: - NeedleToolCall
 
-public struct NeedleToolCall<Input: ConvertibleFromNeedleValue, Output> {
-  public let name: String
-  public let input: Input
-  public let output: Output
+public final class NeedleToolCall<Tool: NeedleTool>: Sendable {
+  private struct State {
+    let input: Tool.Input
+    let tool: Tool
+    var status = NeedleToolCallStatus<Tool.Output>.idle
+  }
 
-  public init(name: String, input: Input, output: Output) {
-    self.name = name
-    self.input = input
-    self.output = output
+  private let state: Lock<State>
+
+  public var input: Tool.Input {
+    self.state.withLock { $0.input }
+  }
+
+  public var status: NeedleToolCallStatus<Tool.Output> {
+    self.state.withLock { $0.status }
+  }
+
+  public init(tool: sending Tool, input: sending Tool.Input) {
+    self.state = Lock(State(input: input, tool: tool))
+  }
+
+  public func invoke() async throws -> Tool.Output {
+    fatalError()
   }
 }
 
-extension NeedleToolCall: Sendable where Input: Sendable, Output: Sendable {}
-extension NeedleToolCall: Equatable where Input: Equatable, Output: Equatable {}
-extension NeedleToolCall: Hashable where Input: Hashable, Output: Hashable {}
+// MARK: - NeedleToolCallStatus
+
+public enum NeedleToolCallStatus<Output> {
+  case idle
+  case running
+  case finished(Result<Output, any Error>)
+}
+
+extension NeedleToolCallStatus: Sendable where Output: Sendable {}

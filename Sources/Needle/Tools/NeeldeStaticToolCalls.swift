@@ -24,13 +24,13 @@ extension NeedleStaticToolCalls: RandomAccessCollection {}
 
 extension NeedleStaticToolCalls {
   public struct Element: Sendable {
-    public var result: Result<Collection.Output, any Error> {
+    public var status: NeedleToolCallStatus<Collection.Output> {
       fatalError()
     }
 
     public func result<Tool: NeedleTool>(
       of tool: Tool.Type
-    ) -> Result<NeedleToolCallOf<Tool>, any Error>? {
+    ) -> Result<NeedleToolCall<Tool>, any Error>? {
       nil
     }
   }

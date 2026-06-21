@@ -41,14 +41,12 @@ public final class NeedleSession<Engine: NeedleEngine>: Sendable {
 // MARK: - Generate
 
 public struct NeedleSessionDynamicGeneration: Sendable {
-  public let prefillMetrics: NeedlePrefillMetrics
-  public let decodeMetrics: NeedleDecodeMetrics
+  public let engineGeneration: NeedleEngineGeneration
   public let toolCalls: NeedleDynamicToolCalls
 }
 
 public struct NeedleSessionStaticGeneration<Collection: NeedleStaticToolsCollection> {
-  public let prefillMetrics: NeedlePrefillMetrics
-  public let decodeMetrics: NeedleDecodeMetrics
+  public let engineGeneration: NeedleEngineGeneration
   public let toolCalls: NeedleStaticToolCalls<Collection>
 }
 

@@ -27,7 +27,7 @@ extension NeedleDynamicToolCalls {
 
     public func result<Tool: NeedleTool>(
       of tool: Tool.Type
-    ) -> Result<NeedleToolCallOf<Tool>, any Error>? {
+    ) -> Result<NeedleToolCall<Tool>, any Error>? {
       nil
     }
   }
