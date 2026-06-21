@@ -1,21 +1,32 @@
 // MARK: - NeedleSession
 
 public final class NeedleSession<Engine: NeedleEngine>: Sendable {
+  private struct State {
+    var isResponding = false
+    let engine: Engine
+    var systemPrompt: String
+  }
+
   public var isResponding: Bool {
-    false
+    self.state.withLock { $0.isResponding }
   }
 
-  public let instructions: String
+  private let state: RecursiveLock<State>
 
-  public init(engine: sending Engine, instructions: String = "") {
-    self.instructions = instructions
+  public var systemPrompt: String {
+    get { self.state.withLock { $0.systemPrompt } }
+    set { self.state.withLock { $0.systemPrompt = newValue } }
   }
-}
 
-// MARK: - Reset
+  public init(engine: sending Engine, systemPrompt: String = "") {
+    self.state = RecursiveLock(State(engine: engine, systemPrompt: systemPrompt))
+  }
 
-extension NeedleSession {
   public func reset() {
+    self.state.withLock {
+      $0.engine.reset()
+      $0.isResponding = false
+    }
   }
 }
 
