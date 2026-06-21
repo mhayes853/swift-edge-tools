@@ -1,1 +1,28 @@
-- "<tool_call> [{\"name\":\"send_email\",\"arguments\":{\"address\":\"hendery@gmail.com\",\"body\":\"Could you please go on an adventure?[{\",\"subject\":\"}],\"}}]"
+▿ 3 key/value pairs
+  ▿ (2 elements)
+    ▿ key: NeedleMetadataKey
+      - rawValue: "MLXEngineGenerationStartMemorySnapshot"
+    ▿ value: Peak:   2K           (2560)
+Active: 0K           (288)
+Cache:  2K           (2272)
+      - activeMemory: 288
+      - cacheMemory: 2272
+      - peakMemory: 2560
+  ▿ (2 elements)
+    ▿ key: NeedleMetadataKey
+      - rawValue: "MLXEnginePostDecodeMemorySnapshot"
+    ▿ value: Peak:   84M          (88768404)
+Active: 53M          (56017348)
+Cache:  70M          (74281958)
+      - activeMemory: 56017348
+      - cacheMemory: 74281958
+      - peakMemory: 88768404
+  ▿ (2 elements)
+    ▿ key: NeedleMetadataKey
+      - rawValue: "MLXEnginePostPrefillMemorySnapshot"
+    ▿ value: Peak:   84M          (88768404)
+Active: 53M          (55861032)
+Cache:  54M          (56712950)
+      - activeMemory: 55861032
+      - cacheMemory: 56712950
+      - peakMemory: 88768404

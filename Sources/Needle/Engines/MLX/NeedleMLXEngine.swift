@@ -91,11 +91,13 @@
     ) throws -> NeedleEngineGeneration {
       self.isStopped.store(false, ordering: .relaxed)
       try Task.checkCancellation()
-      let memoryUsage = MLXMemoryUsage()
+      Stream.defaultStream(.defaultDevice()).synchronize()
+      let generationStartSnapshot = Memory.snapshot()
       let generateStart = self.clock.now
 
       var processor = parameters.processor
-      let (prefillOutput, prefillMetrics) = try self.prefill(prompt: prompt, processor: &processor)
+      let (prefillOutput, prefillMetrics, postPrefillSnapshot) =
+        try self.prefill(prompt: prompt, processor: &processor)
       try Task.checkCancellation()
       guard var output = prefillOutput else { preconditionFailure("Model received empty input.") }
       matcher.reset()
@@ -135,16 +137,22 @@
       }
 
       let durationToFirstToken = _durationToFirstToken ?? .zero
+      Stream.defaultStream(.defaultDevice()).synchronize()
+      let postDecodeSnapshot = Memory.snapshot()
+      var metadata = NeedleMetadata()
+      metadata.mlxEngineGenerationStartMemorySnapshot = generationStartSnapshot
+      metadata.mlxEnginePostPrefillMemorySnapshot = postPrefillSnapshot
+      metadata.mlxEnginePostDecodeMemorySnapshot = postDecodeSnapshot
       return NeedleEngineGeneration(
         prefillMetrics: prefillMetrics,
         decodeMetrics: NeedleDecodeMetrics(
           tokens: generatedTokens.count,
           duration: generateStart.duration(to: self.clock.now) - durationToFirstToken,
-          durationToFirstToken: durationToFirstToken,
-          ramUsageBytes: memoryUsage.stop()
+          durationToFirstToken: durationToFirstToken
         ),
         wasStopped: self.isStopped.load(ordering: .relaxed),
-        tokens: generatedTokens
+        tokens: generatedTokens,
+        metadata: metadata
       )
     }
 
@@ -167,20 +175,19 @@
     private func prefill(
       prompt: NeedlePrompt,
       processor: inout (any LogitProcessor)?
-    ) throws -> (LMOutput?, NeedlePrefillMetrics) {
+    ) throws -> (LMOutput?, NeedlePrefillMetrics, Memory.Snapshot) {
       let input = try LMInput.needle(prompt: prompt, using: self.tokenizer)
 
       let prefillStart = self.clock.now
       processor?.prompt(input.text.tokens)
-      let (output, memoryUsage) = try withMemoryUsage {
-        try self.model.prepare(input.text.tokens, cache: self.cache, windowSize: nil)
-      }
+      let output = try self.model.prepare(input.text.tokens, cache: self.cache, windowSize: nil)
       let metrics = NeedlePrefillMetrics(
         tokens: input.text.tokens.size,
-        duration: prefillStart.duration(to: self.clock.now),
-        ramUsageBytes: memoryUsage
+        duration: prefillStart.duration(to: self.clock.now)
       )
-      return (output, metrics)
+      Stream.defaultStream(.defaultDevice()).synchronize()
+      let snapshot = Memory.snapshot()
+      return (output, metrics, snapshot)
     }
 
   }

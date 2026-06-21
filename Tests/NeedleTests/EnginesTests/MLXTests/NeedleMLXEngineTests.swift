@@ -29,6 +29,7 @@
       expectNoDifference(generation.wasStoped, false)
       withExpectedIssue {
         assertSnapshot(of: generation, as: .dump, record: .all)
+        assertSnapshot(of: generation.metadata, as: .dump, record: .all)
         assertSnapshot(of: generation.tokens.map(\.stringValue).joined(), as: .dump, record: .all)
       }
     }
@@ -108,6 +109,7 @@
       expectNoDifference(generation.wasStoped, false)
       withExpectedIssue {
         assertSnapshot(of: generation, as: .dump, record: .all)
+        assertSnapshot(of: generation.metadata, as: .dump, record: .all)
         assertSnapshot(of: generation.tokens.map(\.stringValue).joined(), as: .dump, record: .all)
       }
     }
