@@ -41,7 +41,8 @@
     public let grammarEngine: NeedleXGrammarEngine
     public let tokenizer: NeedleSPTokenizingModel
     public let model: NeedleMLXModel
-    private var cache: [any KVCache]
+    private var kvCache: [any KVCache]
+    private let matcherPool: MatcherPool
 
     public var stopper: NeedleEngineStopper {
       let isStopped = self.isStopped
@@ -82,7 +83,8 @@
       self.tokenizer = tokenizer
       self.model = model
       self.grammarEngine = grammarEngine
-      self.cache = model.newCache(parameters: nil)
+      self.kvCache = model.newCache(parameters: nil)
+      self.matcherPool = MatcherPool()
     }
 
     public func generate(
@@ -96,9 +98,10 @@
       let generationStartSnapshot = Memory.snapshot()
       let generateStart = self.clock.now
 
-      let matcher = try self.grammarEngine.compile(
+      let matcher = try self.matcherPool.matcher(
         tools: prompt.tools,
-        range: parameters.toolCallInvocationRange
+        range: parameters.toolCallInvocationRange,
+        compilingWith: self.grammarEngine
       )
 
       var processor = parameters.processor
@@ -133,13 +136,13 @@
         processor?.didSample(token: token)
 
         maybeQuantizeKVCache(
-          cache: &self.cache,
+          cache: &self.kvCache,
           kvBits: parameters.kvCacheQuantizationBits,
           kvGroupSize: parameters.kvCacheQuantizationGroupSize
         )
 
         let inputText = LMInput.Text(tokens: token)
-        output = self.model(inputText[text: .newAxis], cache: self.cache, state: output.state)
+        output = self.model(inputText[text: .newAxis], cache: self.kvCache, state: output.state)
       }
 
       let durationToFirstToken = _durationToFirstToken ?? .zero
@@ -163,8 +166,14 @@
     }
 
     public func reset() {
-      self.cache = self.model.newCache(parameters: nil)
+      self.kvCache = self.model.newCache(parameters: nil)
       self.isStopped.store(false, ordering: .relaxed)
+    }
+
+    public func clearCaches() {
+      self.kvCache = self.model.newCache(parameters: nil)
+      self.matcherPool.clear()
+      self.grammarEngine.clearCache()
     }
 
     private func sampleToken(
@@ -186,7 +195,7 @@
 
       let prefillStart = self.clock.now
       processor?.prompt(input.text.tokens)
-      let output = try self.model.prepare(input.text.tokens, cache: self.cache, windowSize: nil)
+      let output = try self.model.prepare(input.text.tokens, cache: self.kvCache, windowSize: nil)
       let metrics = NeedlePrefillMetrics(
         tokens: input.text.tokens.size,
         duration: prefillStart.duration(to: self.clock.now)
@@ -195,7 +204,59 @@
       let snapshot = Memory.snapshot()
       return (output, metrics, snapshot)
     }
+  }
 
+  // MARK: - MatcherPool
+
+  extension NeedleMLXEngine {
+    private final class MatcherPool {
+      private struct Key: Hashable, Sendable {
+        let tools: [NeedleToolDefinition]
+        let range: NeedleXGrammarEngine.ToolCallInvocationRange
+      }
+
+      private let maxCount: Int
+      private var entries = [Key: NeedleXGrammarEngine.Matcher]()
+      private var order = [Key]()
+
+      init(maxCount: Int = 8) {
+        self.maxCount = maxCount
+      }
+
+      func matcher(
+        tools: some Sequence<NeedleToolDefinition>,
+        range: NeedleXGrammarEngine.ToolCallInvocationRange,
+        compilingWith engine: NeedleXGrammarEngine
+      ) throws -> NeedleXGrammarEngine.Matcher {
+        let key = Key(tools: tools.map { $0.normalized() }, range: range)
+        if let cached = self.entries[key] {
+          self.touch(key)
+          return cached
+        }
+        let matcher = try engine.compile(tools: key.tools, range: key.range)
+        self.insert(key, matcher)
+        return matcher
+      }
+
+      func clear() {
+        self.entries.removeAll()
+        self.order.removeAll()
+      }
+
+      private func touch(_ key: Key) {
+        self.order.removeAll { $0 == key }
+        self.order.append(key)
+      }
+
+      private func insert(_ key: Key, _ matcher: NeedleXGrammarEngine.Matcher) {
+        if self.entries.count >= self.maxCount, let lru = self.order.first {
+          self.entries.removeValue(forKey: lru)
+          self.order.removeFirst()
+        }
+        self.entries[key] = matcher
+        self.order.append(key)
+      }
+    }
   }
 
   // MARK: - StreamingDetokenizer
