@@ -5,7 +5,7 @@
   // MARK: - NeedleFMTool
 
   @available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0, *)
-  public struct NeedleFMTool<Base: Tool>: NeedleTool where Base.Arguments: Generable {
+  public struct NeedleFMTool<Base: Tool>: NeedleTool {
     public typealias Input = NeedleFMToolInput<Base.Arguments>
     public typealias Output = Base.Output
 
@@ -27,7 +27,7 @@
       try! JSONDecoder()
         .decode(
           NeedleGenerationSchema.self,
-          from: Data(Base.Arguments.generationSchema.debugDescription.utf8)
+          from: Data(self.base.parameters.debugDescription.utf8)
         )
     }
 
@@ -39,7 +39,9 @@
   // MARK: - NeedleFMToolInput
 
   @available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0, *)
-  public struct NeedleFMToolInput<Arguments: Generable>: ConvertibleFromNeedleValue {
+  public struct NeedleFMToolInput<
+    Arguments: ConvertibleFromGeneratedContent
+  >: ConvertibleFromNeedleValue {
     public let arguments: Arguments
     public let needleValue: NeedleValue
 
