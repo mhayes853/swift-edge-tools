@@ -25,8 +25,15 @@ public final class NeedleToolCall<Tool: NeedleTool>: Sendable, Observable {
   private let registrar = ObservationRegistrar()
 
   public var input: Tool.Input {
-    get { self.state.withLock { $0.input } }
-    set { self.state.withLock { $0.input = newValue } }
+    get {
+      self.registrar.access(self, keyPath: \.input)
+      return self.state.withLock { $0.input }
+    }
+    set {
+      self.registrar.withMutation(of: self, keyPath: \.input) {
+        self.state.withLock { $0.input = newValue }
+      }
+    }
   }
 
   public let tool: Tool
