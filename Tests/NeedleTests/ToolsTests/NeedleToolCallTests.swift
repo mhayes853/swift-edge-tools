@@ -25,7 +25,7 @@ struct `NeedleToolCall tests` {
   @Test
   func `Status Is Running While Tool Is Executing`() async throws {
     let call = NeedleToolCall(
-      tool: CountingTool(duration: .milliseconds(300), output: "done"),
+      tool: DelayedCountingTool(duration: .milliseconds(300), output: "done"),
       input: ""
     )
 
@@ -37,7 +37,7 @@ struct `NeedleToolCall tests` {
 
   @Test
   func `Invoke Deduplicates Concurrent Calls`() async throws {
-    let tool = CountingTool(duration: .milliseconds(200), output: "result")
+    let tool = DelayedCountingTool(duration: .milliseconds(200), output: "result")
     let call = NeedleToolCall(tool: tool, input: "")
 
     async let a = try await call.invoke()
@@ -52,7 +52,7 @@ struct `NeedleToolCall tests` {
 
   @Test
   func `Invoke Returns Cached Result After Completion`() async throws {
-    let tool = CountingTool(duration: .milliseconds(0), output: "cached")
+    let tool = DelayedCountingTool(duration: .milliseconds(0), output: "cached")
     let call = NeedleToolCall(tool: tool, input: "")
 
     let first = try await call.invoke()
@@ -144,127 +144,5 @@ struct `NeedleToolCall tests` {
 
     call.input = "new"
     didChange.withLock { expectNoDifference($0, true) }
-  }
-}
-
-// MARK: - Helpers
-
-private struct EchoTool: NeedleTool {
-  typealias Input = String
-  typealias Output = String
-
-  let name = "echo"
-  let description = "Returns a fixed string."
-
-  func invoke(input: String) async throws -> sending String {
-    "echo: \(input)"
-  }
-}
-
-private struct CountingTool: NeedleTool {
-  typealias Input = String
-  typealias Output = String
-
-  let name = "counting"
-  let description = "Counts invocations."
-  let duration: Duration
-  let output: String
-  let counter = AtomicCounter()
-
-  var invokeCount: Int { self.counter.value }
-
-  func invoke(input: String) async throws -> sending String {
-    self.counter.increment()
-    if self.duration > .zero {
-      try await Task.sleep(for: self.duration)
-    }
-    return self.output
-  }
-}
-
-private struct ThrowingTool: NeedleTool {
-  typealias Input = String
-  typealias Output = String
-
-  let name = "throwing"
-  let description = "Always throws."
-  let error: any Error
-
-  func invoke(input: String) async throws -> sending String {
-    throw self.error
-  }
-}
-
-private struct CountingThrowingTool: NeedleTool {
-  typealias Input = String
-  typealias Output = String
-
-  let name = "countingThrowing"
-  let description = "Counts invocations and always throws."
-  let duration: Duration
-  let error: any Error
-  let counter = AtomicCounter()
-
-  var invokeCount: Int { self.counter.value }
-
-  func invoke(input: String) async throws -> sending String {
-    self.counter.increment()
-    if self.duration > .zero {
-      try await Task.sleep(for: self.duration)
-    }
-    throw self.error
-  }
-}
-
-private struct CancellableTool: NeedleTool {
-  typealias Input = String
-  typealias Output = String
-
-  let name = "cancellable"
-  let description = "Participates in cooperative cancellation."
-  let duration: Duration
-
-  func invoke(input: String) async throws -> sending String {
-    try await Task.sleep(for: self.duration)
-    return "done"
-  }
-}
-
-private struct ToolError: Error, Equatable {
-  let message: String
-}
-
-private final class AtomicCounter: Sendable {
-  private let counter = Lock(0)
-
-  var value: Int {
-    self.counter.withLock { $0 }
-  }
-
-  func increment() {
-    self.counter.withLock { $0 += 1 }
-  }
-}
-
-extension NeedleToolCallStatus {
-  var isIdle: Bool {
-    switch self {
-    case .idle: true
-    default: false
-    }
-  }
-
-  var isRunning: Bool {
-    switch self {
-    case .running: true
-    default: false
-    }
-  }
-
-  var result: Result<Output, any Error>? {
-    switch self {
-    case .finished(let result): result
-    default: nil
-    }
   }
 }
