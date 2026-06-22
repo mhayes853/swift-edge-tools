@@ -4,35 +4,32 @@ import Observation
 // MARK: - NeedleSession
 
 public final class NeedleSession<Engine: NeedleEngine>: Sendable, Observable {
-  private struct State {
-    let engine: Engine
-    var systemPrompt: String
-  }
-
-  private let state: RecursiveLock<State>
+  private let engine: RecursiveLock<Engine>
+  private let _systemPrompt: Lock<String>
   private let observationRegistrar = ObservationRegistrar()
 
   public var systemPrompt: String {
     get {
       self.observationRegistrar.access(self, keyPath: \.systemPrompt)
-      return self.state.withLock { $0.systemPrompt }
+      return self._systemPrompt.withLock { $0 }
     }
     set {
       self.observationRegistrar.withMutation(of: self, keyPath: \.systemPrompt) {
-        self.state.withLock { $0.systemPrompt = newValue }
+        self._systemPrompt.withLock { $0 = newValue }
       }
     }
   }
 
   public init(engine: sending Engine, systemPrompt: String = "") {
-    self.state = RecursiveLock(State(engine: engine, systemPrompt: systemPrompt))
+    self.engine = RecursiveLock(engine)
+    self._systemPrompt = Lock(systemPrompt)
   }
 
   public func withEngine<T, E: Error>(
     perform body: (Engine) throws(E) -> sending T
   ) throws(E) -> sending T {
-    try self.state.withLock { (state: inout sending State) throws(E) -> sending T in
-      try body(state.engine)
+    try self.engine.withLock { (engine: inout sending Engine) throws(E) -> sending T in
+      try body(engine)
     }
   }
 
@@ -341,7 +338,8 @@ private struct ToolCallParseState {
     let initialScanIndex = self.scanIndex ?? self.buffer.startIndex
     var scanIndex = initialScanIndex
     while scanIndex < self.buffer.endIndex {
-      guard let idx = self.buffer[scanIndex...].firstIndex(where: { Self.isBoundaryChar($0) }) else {
+      guard let idx = self.buffer[scanIndex...].firstIndex(where: { Self.isBoundaryChar($0) })
+      else {
         self.scanIndex = self.buffer.endIndex
         break
       }
