@@ -33,6 +33,41 @@ extension NeedleToolCallCollection: RangeReplaceableCollection {
   }
 }
 
+// MARK: - Strongly Typed Mutators
+
+extension NeedleToolCallCollection {
+  public mutating func append<Tool: NeedleTool>(_ toolCall: NeedleToolCall<Tool>) {
+    self.append(AnyNeedleToolCall(toolCall))
+  }
+
+  public mutating func append<Tool: NeedleTool>(
+    contentsOf toolCalls: some Collection<NeedleToolCall<Tool>>
+  ) {
+    self.append(contentsOf: toolCalls.lazy.map(AnyNeedleToolCall.init))
+  }
+
+  public mutating func insert<Tool: NeedleTool>(
+    _ toolCall: NeedleToolCall<Tool>,
+    at index: Int
+  ) {
+    self.insert(AnyNeedleToolCall(toolCall), at: index)
+  }
+
+  public mutating func insert<Tool: NeedleTool>(
+    contentsOf toolCalls: some Collection<NeedleToolCall<Tool>>,
+    at index: Int
+  ) {
+    self.insert(contentsOf: toolCalls.lazy.map(AnyNeedleToolCall.init), at: index)
+  }
+
+  public mutating func replaceSubrange<Tool: NeedleTool>(
+    _ subrange: Range<Int>,
+    with toolCalls: some Collection<NeedleToolCall<Tool>>
+  ) {
+    self.replaceSubrange(subrange, with: toolCalls.lazy.map(AnyNeedleToolCall.init))
+  }
+}
+
 // MARK: - Invoke
 
 extension NeedleToolCallCollection {
