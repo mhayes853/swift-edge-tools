@@ -1,12 +1,13 @@
 // MARK: - NeedleToolCalls
 
 public struct NeedleToolCallCollection: Sendable {
-  private let elements: [Element]
+  private var elements: [Element]
 }
 
 // MARK: - Collection
 
 extension NeedleToolCallCollection: Collection {
+  public typealias Element = AnyNeedleToolCall
   public typealias Index = Int
 
   public func index(after i: Int) -> Int { i + 1 }
@@ -19,13 +20,15 @@ extension NeedleToolCallCollection: Collection {
 }
 
 extension NeedleToolCallCollection: RandomAccessCollection {}
+extension NeedleToolCallCollection: RangeReplaceableCollection {
+  public init() {
+    self.elements = []
+  }
 
-// MARK: - Element
-
-extension NeedleToolCallCollection {
-  public struct Element: Sendable {
-    public func call<Tool: NeedleTool>(for tool: Tool.Type) -> NeedleToolCall<Tool>? {
-      nil
-    }
+  public mutating func replaceSubrange(
+    _ subrange: Range<Int>,
+    with newElements: some Collection<Element>
+  ) {
+    self.elements.replaceSubrange(subrange, with: newElements)
   }
 }
