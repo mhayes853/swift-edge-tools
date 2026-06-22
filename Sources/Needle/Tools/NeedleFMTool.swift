@@ -31,7 +31,7 @@
         )
     }
 
-    public func invoke(input: Input) async throws -> sending Base.Output {
+    public func invoke(input: Input) async throws -> Base.Output {
       try await self.base.call(arguments: input.arguments)
     }
   }

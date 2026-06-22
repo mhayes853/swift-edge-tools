@@ -4,13 +4,13 @@ import Foundation
 
 public protocol NeedleTool<Input, Output>: Sendable {
   associatedtype Input: ConvertibleFromNeedleValue & Sendable
-  associatedtype Output
+  associatedtype Output: Sendable
 
   var name: String { get }
   var description: String { get }
   var arguments: NeedleGenerationSchema { get }
 
-  func invoke(input: Input) async throws -> sending Output
+  func invoke(input: Input) async throws -> Output
 }
 
 extension NeedleTool where Input: NeedleGenerable {

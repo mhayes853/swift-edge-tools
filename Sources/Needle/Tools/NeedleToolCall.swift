@@ -1,12 +1,28 @@
+import Foundation
+import Observation
+
 // MARK: - NeedleToolCall
 
-public final class NeedleToolCall<Tool: NeedleTool>: Sendable {
+public final class NeedleToolCall<Tool: NeedleTool>: Sendable, Observable {
+  private enum Status {
+    case idle
+    case running(Task<Tool.Output?, any Error>)
+    case finished(Result<Tool.Output, any Error>)
+  }
+
+  private enum InvokeAction {
+    case awaitTask(Task<Tool.Output?, any Error>)
+    case returnResult(Result<Tool.Output, any Error>)
+  }
+
   private struct State {
-    var status = NeedleToolCallStatus<Tool.Output>.idle
+    var status = Status.idle
     var input: Tool.Input
+    var task: Task<Void, any Error>?
   }
 
   private let state: Lock<State>
+  private let registrar = ObservationRegistrar()
 
   public var input: Tool.Input {
     get { self.state.withLock { $0.input } }
@@ -16,7 +32,14 @@ public final class NeedleToolCall<Tool: NeedleTool>: Sendable {
   public let tool: Tool
 
   public var status: NeedleToolCallStatus<Tool.Output> {
-    self.state.withLock { $0.status }
+    self.registrar.access(self, keyPath: \.status)
+    return self.state.withLock {
+      switch $0.status {
+      case .idle: .idle
+      case .running: .running
+      case .finished(let result): .finished(result)
+      }
+    }
   }
 
   public init(tool: Tool, input: Tool.Input) {
@@ -24,14 +47,64 @@ public final class NeedleToolCall<Tool: NeedleTool>: Sendable {
     self.state = Lock(State(input: input))
   }
 
-  public func invoke() async throws -> sending Tool.Output {
-    fatalError()
+  deinit {
+    self.state.withLock {
+      switch $0.status {
+      case .running(let task): task.cancel()
+      default: break
+      }
+    }
+  }
+
+  public func invoke() async throws -> Tool.Output {
+    let action: InvokeAction = self.state.withLock { state in
+      switch state.status {
+      case .idle:
+        let task = Task { [weak self] in try await self?.run() }
+        self.registrar.withMutation(of: self, keyPath: \.status) {
+          state.status = .running(task)
+        }
+        return .awaitTask(task)
+      case .running(let task):
+        return .awaitTask(task)
+      case .finished(let result):
+        return .returnResult(result)
+      }
+    }
+
+    switch action {
+    case .awaitTask(let task):
+      let output = try await withTaskCancellationHandler {
+        try await task.value
+      } onCancel: {
+        task.cancel()
+      }
+      guard let output else { throw CancellationError() }
+      return output
+    case .returnResult(let result):
+      return try result.get()
+    }
+  }
+
+  private func run() async throws -> Tool.Output {
+    do {
+      let output = try await self.tool.invoke(input: self.input)
+      self.registrar.withMutation(of: self, keyPath: \.status) {
+        self.state.withLock { $0.status = .finished(.success(output)) }
+      }
+      return output
+    } catch {
+      self.registrar.withMutation(of: self, keyPath: \.status) {
+        self.state.withLock { $0.status = .finished(.failure(error)) }
+      }
+      throw error
+    }
   }
 }
 
 // MARK: - AnyNeedleToolCall
 
-public final class AnyNeedleToolCall: Sendable {
+public final class AnyNeedleToolCall: Sendable, Observable {
   public var tool: any NeedleTool {
     self.base._tool
   }
