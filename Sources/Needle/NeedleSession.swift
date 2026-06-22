@@ -43,7 +43,8 @@ extension NeedleSession {
     tools: [any NeedleTool],
     with prompt: String,
     overriding systemPrompt: String? = nil,
-    parameters: Engine.GenerateParameters = .default
+    parameters: Engine.GenerateParameters = .default,
+    shouldInvokeTools: Bool = true
   ) async throws -> NeedleSessionGeneration {
     fatalError()
   }
@@ -114,7 +115,8 @@ extension NeedleSession {
     tools: [any NeedleTool],
     with prompt: String,
     overriding systemPrompt: String? = nil,
-    parameters: Engine.GenerateParameters = .default
+    parameters: Engine.GenerateParameters = .default,
+    shouldInvokeTools: Bool = true
   ) -> NeedleSessionStream {
     fatalError()
   }
