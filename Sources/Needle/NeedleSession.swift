@@ -112,6 +112,7 @@ public final class NeedleSessionStream: Sendable, Observable {
           tools: tools.map(\.definition)
         )
         let generation = try session.withEngine { engine in
+          engine.reset()
           var parseState = ToolCallParseState(tools: tools)
           return try engine.generate(prompt: prompt, parameters: parameters) { token in
             self.state.withLock {
