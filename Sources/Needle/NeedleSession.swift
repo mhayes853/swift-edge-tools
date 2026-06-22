@@ -54,7 +54,14 @@ extension NeedleSession {
     parameters: sending Engine.GenerateParameters = .default,
     shouldInvokeTools: Bool = true
   ) async throws -> NeedleSessionGeneration {
-    fatalError()
+    let stream = self.stream(
+      tools: tools,
+      with: prompt,
+      systemPromptOverride: systemPromptOverride,
+      parameters: parameters,
+      shouldInvokeTools: shouldInvokeTools
+    )
+    return try await stream.finalGeneration
   }
 }
 
@@ -95,7 +102,7 @@ public final class NeedleSessionStream: Sendable, Observable {
     }
   }
 
-  init<Engine: NeedleEngine>(
+  fileprivate init<Engine: NeedleEngine>(
     session: NeedleSession<Engine>,
     tools: [any NeedleTool],
     with prompt: String,

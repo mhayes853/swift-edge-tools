@@ -38,6 +38,59 @@
     }
 
     @Test
+    func `Generate Returns Successfully With Parsed Tool Call`() async throws {
+      let tokenizer = try NeedleSPTokenizingModel(modelURL: .testTokenizerModel)
+      let rawToolCall = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
+      let toolTokens = rawToolCall.tokenize(using: tokenizer)
+      let engine = MockEngine(script: toolTokens.map { .token($0) } + [.finish])
+      let session = NeedleSession(engine: engine)
+
+      let generation = try await session.generate(tools: [WeatherTool()], with: "weather?")
+
+      expectNoDifference(generation.engineGeneration.tokens, toolTokens)
+      expectNoDifference(generation.engineGeneration.wasStoped, false)
+      expectNoDifference(generation.toolCalls.count, 1)
+      expectNoDifference(generation.toolCalls[0].tool.name, "get_weather")
+      let args = try #require(generation.toolCalls[0].input as? WeatherArgs)
+      expectNoDifference(args.location, "Seoul")
+    }
+
+    @Test
+    func `Generate Throws When Engine Errors`() async throws {
+      let tokenizer = try NeedleSPTokenizingModel(modelURL: .testTokenizerModel)
+      let tokens = "hi".tokenize(using: tokenizer)
+      let error = ToolError(message: "boom")
+      let engine = MockEngine(script: tokens.map { .token($0) } + [.error(error)])
+      let session = NeedleSession(engine: engine)
+
+      await #expect(throws: ToolError.self) {
+        _ = try await session.generate(tools: [], with: "hi")
+      }
+    }
+
+    @Test
+    func `Generate Propagates Task Cancellation`() async throws {
+      let tokenizer = try NeedleSPTokenizingModel(modelURL: .testTokenizerModel)
+      let firstToken = "a a".tokenize(using: tokenizer).first!
+      let engine = MockEngine.live()
+      engine.push(.token(firstToken))
+      let session = NeedleSession(engine: engine)
+
+      let task = Task {
+        try await session.generate(tools: [], with: "hi")
+      }
+
+      await Task.yield()
+      task.cancel()
+      engine.push(.finish)
+      engine.push(nil)
+
+      await #expect(throws: CancellationError.self) {
+        _ = try await task.value
+      }
+    }
+
+    @Test
     func `Final Generation Throws When Engine Errors`() async throws {
       let tokenizer = try NeedleSPTokenizingModel(modelURL: .testTokenizerModel)
       let tokens = "hi".tokenize(using: tokenizer)
