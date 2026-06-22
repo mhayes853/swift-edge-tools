@@ -1,6 +1,6 @@
 // MARK: - NeedleEngine
 
-public protocol NeedleEngine {
+public protocol NeedleEngine: SendableMetatype {
   associatedtype GenerateParameters: NeedleEngineGenerateParameters
 
   var stopper: NeedleEngineStopper { get }

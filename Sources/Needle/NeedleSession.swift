@@ -1,3 +1,4 @@
+import Foundation
 import Observation
 
 // MARK: - NeedleSession
@@ -52,8 +53,8 @@ extension NeedleSession {
   public func generate(
     tools: [any NeedleTool],
     with prompt: String,
-    overriding systemPrompt: String? = nil,
-    parameters: Engine.GenerateParameters = .default,
+    systemPromptOverride: String? = nil,
+    parameters: sending Engine.GenerateParameters = .default,
     shouldInvokeTools: Bool = true
   ) async throws -> NeedleSessionGeneration {
     fatalError()
@@ -64,61 +65,206 @@ extension NeedleSession {
 
 public final class NeedleSessionStream: Sendable, Observable {
   public var finalGeneration: NeedleSessionGeneration {
-    get async throws { fatalError() }
+    get async throws {
+      let task = self.state.withLock { $0.task! }  // NB: Task is set in init, so this is fine.
+      let stopper = self.stopper
+      return try await withTaskCancellationHandler {
+        let generation = try await task.value
+        try Task.checkCancellation()
+        return generation
+      } onCancel: {
+        stopper()
+        task.cancel()
+      }
+    }
+  }
+
+  public var isResponding: Bool {
+    self.result == nil
   }
 
   public var result: Result<NeedleSessionGeneration, any Error>? {
-    nil
+    self.registrar.access(self, keyPath: \.result)
+    return self.state.withLock { $0.result }
   }
 
+  private let state = Lock(State())
   private let registrar = ObservationRegistrar()
+  private let stopper: NeedleEngineStopper
+
+  deinit {
+    self.state.withLock { state in
+      state.task?.cancel()
+    }
+  }
+
+  init<Engine: NeedleEngine>(
+    session: NeedleSession<Engine>,
+    tools: [any NeedleTool],
+    with prompt: String,
+    systemPrompt: String,
+    parameters: sending Engine.GenerateParameters,
+    shouldInvokeTools: Bool
+  ) {
+    self.stopper = session.withEngine { $0.stopper }
+    let task = Task<NeedleSessionGeneration, any Error> {
+      do {
+        let prompt = NeedlePrompt(
+          system: systemPrompt,
+          user: prompt,
+          tools: tools.map(\.definition)
+        )
+        let generation = try session.withEngine { engine in
+          var parseState = ToolCallParseState(tools: tools)
+          return try engine.generate(prompt: prompt, parameters: parameters) { token in
+            self.state.withLock {
+              $0.emitToken(token: token)
+              if let call = parseState.accept(token: token) {
+                $0.emitToolCall(call, shouldInvoke: shouldInvokeTools)
+              }
+            }
+          }
+        }
+        return self.state.withLock { state in
+          let sessionGeneration = NeedleSessionGeneration(
+            engineGeneration: generation,
+            toolCalls: state.toolCalls
+          )
+          self.registrar.withMutation(of: self, keyPath: \.result) {
+            state.finish(with: .success(sessionGeneration))
+          }
+          return sessionGeneration
+        }
+      } catch {
+        self.state.withLock { state in
+          self.registrar.withMutation(of: self, keyPath: \.result) {
+            state.finish(with: .failure(error))
+          }
+        }
+        throw error
+      }
+    }
+    self.state.withLock { $0.task = task }
+  }
 
   public func stop() {
-
+    self.stopper()
   }
 }
 
 extension NeedleSessionStream: AsyncSequence {
   public struct AsyncIterator: AsyncIteratorProtocol {
-    public func next() async throws -> NeedleToolCallCollection.Element? {
-      nil
+    fileprivate var base: AsyncThrowingStream<AnyNeedleToolCall, any Error>.AsyncIterator
+
+    public mutating func next() async throws -> NeedleToolCallCollection.Element? {
+      try await self.base.next()
     }
 
     @available(iOS 18.0, macOS 15.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-    public func next(
+    public mutating func next(
       isolation actor: isolated (any Actor)?
     ) async throws -> NeedleToolCallCollection.Element? {
-      nil
+      try await self.base.next(isolation: actor)
     }
   }
 
   public func makeAsyncIterator() -> AsyncIterator {
-    AsyncIterator()
+    AsyncIterator(base: self.state.withLock { $0.toolCallStream() }.makeAsyncIterator())
   }
 }
 
 extension NeedleSessionStream {
   public struct Tokens: AsyncSequence {
+    fileprivate let stream: NeedleSessionStream
+
     public struct AsyncIterator: AsyncIteratorProtocol {
-      public func next() async throws -> NeedleToken? {
-        nil
+      fileprivate var base: AsyncThrowingStream<NeedleToken, any Error>.AsyncIterator
+
+      public mutating func next() async throws -> NeedleToken? {
+        try await self.base.next()
       }
 
       @available(iOS 18.0, macOS 15.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-      public func next(
+      public mutating func next(
         isolation actor: isolated (any Actor)?
       ) async throws -> NeedleToken? {
-        nil
+        try await self.base.next(isolation: actor)
       }
     }
 
     public func makeAsyncIterator() -> AsyncIterator {
-      AsyncIterator()
+      AsyncIterator(base: self.stream.state.withLock { $0.tokenStream() }.makeAsyncIterator())
     }
   }
 
   public var tokens: Tokens {
-    Tokens()
+    Tokens(stream: self)
+  }
+}
+
+extension NeedleSessionStream {
+  private struct State {
+    private(set) var result: Result<NeedleSessionGeneration, any Error>?
+    private var tokenContinuations = [AsyncThrowingStream<NeedleToken, any Error>.Continuation]()
+    private var toolsContinuations = [
+      AsyncThrowingStream<AnyNeedleToolCall, any Error>.Continuation
+    ]()
+    private(set) var toolCalls = NeedleToolCallCollection()
+    private var toolInvocationTasks = [Task<Void, Never>]()
+    var task: Task<NeedleSessionGeneration, any Error>?
+
+    mutating func tokenStream() -> AsyncThrowingStream<NeedleToken, any Error> {
+      let (stream, continuation) = AsyncThrowingStream<NeedleToken, any Error>.makeStream()
+      self.tokenContinuations.append(continuation)
+      return stream
+    }
+
+    func emitToken(token: NeedleToken) {
+      for continuation in self.tokenContinuations {
+        continuation.yield(token)
+      }
+    }
+
+    mutating func toolCallStream() -> AsyncThrowingStream<AnyNeedleToolCall, any Error> {
+      let (stream, continuation) = AsyncThrowingStream<AnyNeedleToolCall, any Error>.makeStream()
+      self.toolsContinuations.append(continuation)
+      for call in self.toolCalls {
+        continuation.yield(call)
+      }
+      return stream
+    }
+
+    mutating func emitToolCall(_ toolCall: AnyNeedleToolCall, shouldInvoke: Bool) {
+      self.toolCalls.append(toolCall)
+      if shouldInvoke {
+        Task { _ = try await toolCall.invoke() }
+      }
+      for continuation in self.toolsContinuations {
+        continuation.yield(toolCall)
+      }
+    }
+
+    mutating func finish(with result: Result<NeedleSessionGeneration, any Error>) {
+      self.result = result
+      switch result {
+      case .success:
+        for continuation in self.tokenContinuations {
+          continuation.finish()
+        }
+        for continuation in self.toolsContinuations {
+          continuation.finish()
+        }
+      case .failure(let error):
+        for continuation in self.tokenContinuations {
+          continuation.finish(throwing: error)
+        }
+        for continuation in self.toolsContinuations {
+          continuation.finish(throwing: error)
+        }
+      }
+      self.tokenContinuations.removeAll()
+      self.toolsContinuations.removeAll()
+    }
   }
 }
 
@@ -126,10 +272,157 @@ extension NeedleSession {
   public func stream(
     tools: [any NeedleTool],
     with prompt: String,
-    overriding systemPrompt: String? = nil,
-    parameters: Engine.GenerateParameters = .default,
+    systemPromptOverride: String? = nil,
+    parameters: sending Engine.GenerateParameters = .default,
     shouldInvokeTools: Bool = true
   ) -> NeedleSessionStream {
-    fatalError()
+    NeedleSessionStream(
+      session: self,
+      tools: tools,
+      with: prompt,
+      systemPrompt: systemPromptOverride ?? self.systemPrompt,
+      parameters: parameters,
+      shouldInvokeTools: shouldInvokeTools
+    )
   }
+}
+
+// MARK: - Parse State
+
+private struct ToolCallParseState {
+  private enum Phase {
+    case outsideBlock
+    case insideArray
+  }
+
+  private static let opener = "<tool_call>"
+
+  private let toolsByName: [String: any NeedleTool]
+  private var phase = Phase.outsideBlock
+  private var buffer = ""
+  private var hasSeenArrayOpen = false
+  private var braceDepth = 0
+  private var currentObjectStart: String.Index?
+  private var scanIndex: String.Index?
+
+  init(tools: [any NeedleTool]) {
+    var byName = [String: any NeedleTool]()
+    for tool in tools {
+      byName[tool.name] = tool
+    }
+    self.toolsByName = byName
+  }
+
+  mutating func accept(token: NeedleToken) -> AnyNeedleToolCall? {
+    self.buffer.append(token.stringValue)
+    switch self.phase {
+    case .outsideBlock:
+      return self.handleOutsideBlock()
+    case .insideArray:
+      return self.handleInsideArray()
+    }
+  }
+
+  private mutating func handleOutsideBlock() -> AnyNeedleToolCall? {
+    guard let range = self.buffer.range(of: Self.opener) else { return nil }
+    self.buffer.removeSubrange(..<range.upperBound)
+    self.phase = .insideArray
+    return self.handleInsideArray()
+  }
+
+  private mutating func handleInsideArray() -> AnyNeedleToolCall? {
+    if !self.hasSeenArrayOpen {
+      guard let bracketIndex = self.buffer.firstIndex(of: "[") else { return nil }
+      self.buffer.removeSubrange(..<bracketIndex)
+      self.hasSeenArrayOpen = true
+      self.scanIndex = self.buffer.startIndex
+    }
+
+    let initialScanIndex = self.scanIndex ?? self.buffer.startIndex
+    var scanIndex = initialScanIndex
+    while scanIndex < self.buffer.endIndex {
+      guard let idx = self.buffer[scanIndex...].firstIndex(where: { Self.isBoundaryChar($0) }) else {
+        self.scanIndex = self.buffer.endIndex
+        break
+      }
+      let ch = self.buffer[idx]
+      let nextIdx = self.buffer.index(after: idx)
+
+      switch ch {
+      case "{":
+        if self.braceDepth == 0 {
+          self.currentObjectStart = idx
+        }
+        self.braceDepth += 1
+        scanIndex = nextIdx
+
+      case "}":
+        if self.braceDepth > 0 {
+          self.braceDepth -= 1
+          if self.braceDepth == 0, let start = self.currentObjectStart {
+            let objectRange = start..<nextIdx
+            let objectString = String(self.buffer[objectRange])
+            self.buffer.removeSubrange(..<nextIdx)
+            self.currentObjectStart = nil
+            self.scanIndex = self.buffer.startIndex
+            if let call = self.parseAndBuild(objectString: objectString) {
+              return call
+            }
+            scanIndex = self.buffer.startIndex
+          } else {
+            scanIndex = nextIdx
+          }
+        } else {
+          scanIndex = nextIdx
+        }
+
+      case "]":
+        if self.braceDepth == 0 {
+          self.buffer.removeSubrange(..<nextIdx)
+          self.reset()
+          return nil
+        }
+        scanIndex = nextIdx
+
+      default:
+        break
+      }
+    }
+
+    self.scanIndex = scanIndex
+
+    return nil
+  }
+
+  private static func isBoundaryChar(_ c: Character) -> Bool {
+    c == "{" || c == "}" || c == "]"
+  }
+
+  private mutating func reset() {
+    self.phase = .outsideBlock
+    self.hasSeenArrayOpen = false
+    self.braceDepth = 0
+    self.currentObjectStart = nil
+    self.scanIndex = nil
+    self.buffer.removeAll(keepingCapacity: true)
+  }
+
+  private func parseAndBuild(objectString: String) -> AnyNeedleToolCall? {
+    guard let data = objectString.data(using: .utf8) else { return nil }
+    guard let value = try? JSONDecoder().decode(ParsedToolCall.self, from: data) else {
+      return nil
+    }
+    guard let tool = self.toolsByName[value.name] else { return nil }
+
+    func open<Tool: NeedleTool>(_ concrete: Tool) -> AnyNeedleToolCall? {
+      guard let typed = try? Tool.Input(needleValue: value.arguments) else { return nil }
+      return AnyNeedleToolCall(NeedleToolCall(tool: concrete, input: typed))
+    }
+    return open(tool)
+  }
+}
+
+private struct ParsedToolCall: Codable {
+  let name: String
+  let arguments: NeedleValue
 }
