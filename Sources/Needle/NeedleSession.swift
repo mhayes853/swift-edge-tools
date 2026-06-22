@@ -2,13 +2,8 @@
 
 public final class NeedleSession<Engine: NeedleEngine>: Sendable {
   private struct State {
-    var isResponding = false
     let engine: Engine
     var systemPrompt: String
-  }
-
-  public var isResponding: Bool {
-    self.state.withLock { $0.isResponding }
   }
 
   private let state: RecursiveLock<State>
@@ -31,10 +26,7 @@ public final class NeedleSession<Engine: NeedleEngine>: Sendable {
   }
 
   public func reset() {
-    self.state.withLock {
-      $0.engine.reset()
-      $0.isResponding = false
-    }
+    self.withEngine { $0.reset() }
   }
 }
 
@@ -46,9 +38,11 @@ public struct NeedleSessionGeneration: Sendable {
 }
 
 extension NeedleSession {
+  @concurrent
   public func generate(
     tools: sending [any NeedleTool],
     with prompt: String,
+    overriding systemPrompt: String? = nil,
     parameters: Engine.GenerateParameters = .default
   ) async throws -> NeedleSessionGeneration {
     fatalError()
@@ -120,6 +114,7 @@ extension NeedleSession {
   public func stream(
     tools: sending [any NeedleTool],
     with prompt: String,
+    overriding systemPrompt: String? = nil,
     parameters: Engine.GenerateParameters = .default
   ) -> NeedleSessionStream {
     fatalError()
