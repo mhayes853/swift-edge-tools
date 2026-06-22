@@ -1,16 +1,26 @@
+import Observation
+
 // MARK: - NeedleSession
 
-public final class NeedleSession<Engine: NeedleEngine>: Sendable {
+public final class NeedleSession<Engine: NeedleEngine>: Sendable, Observable {
   private struct State {
     let engine: Engine
     var systemPrompt: String
   }
 
   private let state: RecursiveLock<State>
+  private let observationRegistrar = ObservationRegistrar()
 
   public var systemPrompt: String {
-    get { self.state.withLock { $0.systemPrompt } }
-    set { self.state.withLock { $0.systemPrompt = newValue } }
+    get {
+      self.observationRegistrar.access(self, keyPath: \.systemPrompt)
+      return self.state.withLock { $0.systemPrompt }
+    }
+    set {
+      self.observationRegistrar.withMutation(of: self, keyPath: \.systemPrompt) {
+        self.state.withLock { $0.systemPrompt = newValue }
+      }
+    }
   }
 
   public init(engine: sending Engine, systemPrompt: String = "") {
@@ -52,7 +62,7 @@ extension NeedleSession {
 
 // MARK: - Stream
 
-public final class NeedleSessionStream: Sendable {
+public final class NeedleSessionStream: Sendable, Observable {
   public var finalGeneration: NeedleSessionGeneration {
     get async throws { fatalError() }
   }
@@ -60,6 +70,8 @@ public final class NeedleSessionStream: Sendable {
   public var result: Result<NeedleSessionGeneration, any Error>? {
     nil
   }
+
+  private let registrar = ObservationRegistrar()
 
   public func stop() {
 
