@@ -5,7 +5,7 @@
   // MARK: - NeedleFMTool
 
   @available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0, *)
-  public struct NeedleFMTool<Base: Tool>: NeedleTool {
+  public struct NeedleFMTool<Base: Tool>: NeedleTool where Base.Arguments: Sendable {
     public typealias Input = NeedleFMToolInput<Base.Arguments>
     public typealias Output = Base.Output
 
@@ -31,7 +31,7 @@
         )
     }
 
-    public func invoke(input: sending Input) async throws -> sending Base.Output {
+    public func invoke(input: Input) async throws -> sending Base.Output {
       try await self.base.call(arguments: input.arguments)
     }
   }
@@ -40,8 +40,8 @@
 
   @available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0, *)
   public struct NeedleFMToolInput<
-    Arguments: ConvertibleFromGeneratedContent
-  >: ConvertibleFromNeedleValue {
+    Arguments: ConvertibleFromGeneratedContent & Sendable
+  >: ConvertibleFromNeedleValue, Sendable {
     public let arguments: Arguments
     public let needleValue: NeedleValue
 
@@ -55,9 +55,6 @@
       self.init(arguments: try Arguments(generatedContent), needleValue: needleValue)
     }
   }
-
-  @available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0, *)
-  extension NeedleFMToolInput: Sendable where Arguments: Sendable {}
 
   @available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0, *)
   extension NeedleFMToolInput: Equatable where Arguments: Equatable {}

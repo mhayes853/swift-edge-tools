@@ -40,7 +40,7 @@ public struct NeedleSessionGeneration: Sendable {
 extension NeedleSession {
   @concurrent
   public func generate(
-    tools: sending [any NeedleTool],
+    tools: [any NeedleTool],
     with prompt: String,
     overriding systemPrompt: String? = nil,
     parameters: Engine.GenerateParameters = .default
@@ -102,7 +102,6 @@ extension NeedleSessionStream {
     public func makeAsyncIterator() -> AsyncIterator {
       AsyncIterator()
     }
-
   }
 
   public var tokens: Tokens {
@@ -112,7 +111,7 @@ extension NeedleSessionStream {
 
 extension NeedleSession {
   public func stream(
-    tools: sending [any NeedleTool],
+    tools: [any NeedleTool],
     with prompt: String,
     overriding systemPrompt: String? = nil,
     parameters: Engine.GenerateParameters = .default
