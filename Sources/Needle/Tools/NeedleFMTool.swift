@@ -51,8 +51,7 @@
     }
 
     public init(needleValue: NeedleValue) throws {
-      let jsonData = try JSONEncoder().encode(needleValue)
-      let generatedContent = try GeneratedContent(json: String(decoding: jsonData, as: UTF8.self))
+      let generatedContent = try GeneratedContent(needleValue: needleValue)
       self.init(arguments: try Arguments(generatedContent), needleValue: needleValue)
     }
   }
@@ -65,4 +64,14 @@
 
   @available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0, *)
   extension NeedleFMToolInput: Hashable where Arguments: Hashable {}
+
+  // MARK: - GeneratedContent Helper
+
+  @available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0, *)
+  extension GeneratedContent: ConvertibleFromNeedleValue {
+    public init(needleValue: NeedleValue) throws {
+      let jsonData = try JSONEncoder().encode(needleValue)
+      try self.init(json: String(decoding: jsonData, as: UTF8.self))
+    }
+  }
 #endif
