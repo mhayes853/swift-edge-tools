@@ -19,25 +19,19 @@ let package = Package(
   traits: [
     .trait(name: "SwiftNeedleXGrammar", description: "XGrammar-powered structured generation."),
     .trait(
-      name: "SwiftNeedleTokenizers",
-      description: "Hugging Face tokenizers support via swift-transformers."
-    ),
-    .trait(
       name: "SwiftNeedleSentencepiece",
-      description: "Sentencepiece tokenizer implementation.",
-      enabledTraits: ["SwiftNeedleTokenizers"]
+      description: "Pretrained Sentencepiece tokenizer support."
     ),
     .trait(
       name: "SwiftNeedleMLX",
       description: "MLX Support.",
-      enabledTraits: ["SwiftNeedleSentencepiece"]
+      enabledTraits: ["SwiftNeedleXGrammar"]
     ),
     .default(
       enabledTraits: [
         "SwiftNeedleXGrammar",
         "SwiftNeedleMLX",
-        "SwiftNeedleSentencepiece",
-        "SwiftNeedleTokenizers"
+        "SwiftNeedleSentencepiece"
       ]
     )
   ],
@@ -72,12 +66,12 @@ let package = Package(
         .product(
           name: "Tokenizers",
           package: "swift-transformers",
-          condition: .when(traits: ["SwiftNeedleTokenizers"])
+          condition: .when(traits: ["SwiftNeedleMLX"])
         ),
         .product(
           name: "Hub",
           package: "swift-transformers",
-          condition: .when(traits: ["SwiftNeedleTokenizers"])
+          condition: .when(traits: ["SwiftNeedleMLX"])
         ),
         .target(
           name: "CNeedleSentencepiece",
@@ -172,7 +166,7 @@ let package = Package(
         .product(
           name: "Hub",
           package: "swift-transformers",
-          condition: .when(traits: ["SwiftNeedleTokenizers"])
+          condition: .when(traits: ["SwiftNeedleMLX"])
         )
       ],
       exclude: ["NeedleGenerationSchemaTests/__Snapshots__"],

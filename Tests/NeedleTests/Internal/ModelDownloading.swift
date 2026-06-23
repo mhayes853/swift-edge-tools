@@ -1,4 +1,4 @@
-#if SwiftNeedleTokenizers
+#if canImport(Tokenizers) && canImport(Hub)
   import Hub
   import Foundation
 

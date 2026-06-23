@@ -1,4 +1,4 @@
-#if SwiftNeedleMLX && SwiftNeedleTokenizers
+#if SwiftNeedleMLX
   import Foundation
   import MLX
   import MLXLMCommon

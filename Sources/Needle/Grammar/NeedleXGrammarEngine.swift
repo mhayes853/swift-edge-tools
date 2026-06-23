@@ -2,7 +2,7 @@
   import CNeedleXGrammar
   import Foundation
 
-  #if SwiftNeedleTokenizers
+  #if canImport(Tokenizers)
     import Tokenizers
   #endif
 
@@ -211,9 +211,9 @@
     }
   }
 
-  // MARK: - SP Tokenizer
+  // MARK: - Tokenizer Convenience Init
 
-  #if SwiftNeedleTokenizers
+  #if canImport(Tokenizers)
     extension NeedleXGrammarEngine {
       public convenience init?(
         tokenizer: any Tokenizer,
