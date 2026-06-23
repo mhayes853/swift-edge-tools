@@ -391,59 +391,35 @@ private struct ToolCallParseState {
   }
 
   private mutating func handleInsideArray() -> AnyNeedleToolCall? {
-    if !self.hasSeenArrayOpen {
-      guard let bracketIndex = self.buffer.firstIndex(of: "[") else { return nil }
-      self.buffer.removeSubrange(..<bracketIndex)
-      self.hasSeenArrayOpen = true
-      self.scanIndex = self.buffer.startIndex
-    }
+    guard self.consumeArrayOpenBracketIfNeeded() else { return nil }
 
-    let initialScanIndex = self.scanIndex ?? self.buffer.startIndex
-    var scanIndex = initialScanIndex
+    var scanIndex = self.scanIndex ?? self.buffer.startIndex
     while scanIndex < self.buffer.endIndex {
-      guard let idx = self.buffer[scanIndex...].firstIndex(where: { Self.isBoundaryChar($0) })
+      guard
+        let boundaryIndex = self.buffer[scanIndex...].firstIndex(where: \.isNeedleBoundary)
       else {
         self.scanIndex = self.buffer.endIndex
-        break
+        return nil
       }
-      let ch = self.buffer[idx]
-      let nextIdx = self.buffer.index(after: idx)
+      let nextIndex = self.buffer.index(after: boundaryIndex)
 
-      switch ch {
+      switch self.buffer[boundaryIndex] {
       case "{":
-        if self.braceDepth == 0 {
-          self.currentObjectStart = idx
-        }
-        self.braceDepth += 1
-        scanIndex = nextIdx
+        self.openBrace(at: boundaryIndex)
+        scanIndex = nextIndex
 
       case "}":
-        if self.braceDepth > 0 {
-          self.braceDepth -= 1
-          if self.braceDepth == 0, let start = self.currentObjectStart {
-            let objectRange = start..<nextIdx
-            let objectString = String(self.buffer[objectRange])
-            self.buffer.removeSubrange(..<nextIdx)
-            self.currentObjectStart = nil
-            self.scanIndex = self.buffer.startIndex
-            if let call = self.parseAndBuild(objectString: objectString) {
-              return call
-            }
-            scanIndex = self.buffer.startIndex
-          } else {
-            scanIndex = nextIdx
-          }
-        } else {
-          scanIndex = nextIdx
+        if let call = self.closeBrace(at: nextIndex) {
+          return call
         }
+        scanIndex = nextIndex
 
       case "]":
         if self.braceDepth == 0 {
-          self.buffer.removeSubrange(..<nextIdx)
-          self.reset()
+          self.buffer.removeSubrange(..<nextIndex)
           return nil
         }
-        scanIndex = nextIdx
+        scanIndex = nextIndex
 
       default:
         break
@@ -451,21 +427,35 @@ private struct ToolCallParseState {
     }
 
     self.scanIndex = scanIndex
-
     return nil
   }
 
-  private static func isBoundaryChar(_ c: Character) -> Bool {
-    c == "{" || c == "}" || c == "]"
+  private mutating func consumeArrayOpenBracketIfNeeded() -> Bool {
+    guard !self.hasSeenArrayOpen else { return true }
+    guard let bracketIndex = self.buffer.firstIndex(of: "[") else { return false }
+    self.buffer.removeSubrange(..<bracketIndex)
+    self.hasSeenArrayOpen = true
+    self.scanIndex = self.buffer.startIndex
+    return true
   }
 
-  private mutating func reset() {
-    self.phase = .outsideBlock
-    self.hasSeenArrayOpen = false
-    self.braceDepth = 0
+  private mutating func openBrace(at index: String.Index) {
+    if self.braceDepth == 0 {
+      self.currentObjectStart = index
+    }
+    self.braceDepth += 1
+  }
+
+  private mutating func closeBrace(at nextIndex: String.Index) -> AnyNeedleToolCall? {
+    guard self.braceDepth > 0 else { return nil }
+    self.braceDepth -= 1
+    guard self.braceDepth == 0, let start = self.currentObjectStart else { return nil }
+
+    let objectString = String(self.buffer[start..<nextIndex])
+    self.buffer.removeSubrange(..<nextIndex)
     self.currentObjectStart = nil
-    self.scanIndex = nil
-    self.buffer.removeAll(keepingCapacity: true)
+    self.scanIndex = self.buffer.startIndex
+    return self.parseAndBuild(objectString: objectString)
   }
 
   private func parseAndBuild(objectString: String) -> AnyNeedleToolCall? {
@@ -480,6 +470,12 @@ private struct ToolCallParseState {
       return AnyNeedleToolCall(NeedleToolCall(tool: concrete, input: typed))
     }
     return open(tool)
+  }
+}
+
+extension Character {
+  fileprivate var isNeedleBoundary: Bool {
+    ["{", "}", "]"].contains(self)
   }
 }
 

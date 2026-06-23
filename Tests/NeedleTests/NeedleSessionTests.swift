@@ -56,6 +56,32 @@
     }
 
     @Test
+    func `Generate Returns Successfully With Parsed Tool Call With Nested Objects And Arrays`()
+      async throws
+    {
+      let tokenizer = try NeedleSPTokenizingModel(modelURL: .testTokenizerModel)
+      let rawToolCall =
+        #"<tool_call> [{"name":"plan_trip","arguments":{"destination":{"city":"Tokyo","country":"Japan"},"activities":[{"name":"Sushi","duration":2},{"name":"Temple","duration":3}],"tags":["food","culture"]}}]"#
+      let toolTokens = rawToolCall.tokenize(using: tokenizer)
+      let engine = MockEngine(script: toolTokens.map { .token($0) } + [.finish])
+      let session = NeedleSession(engine: engine)
+
+      let generation = try await session.generate(tools: [PlanTripTool()], with: "trip?")
+
+      expectNoDifference(generation.toolCalls.count, 1)
+      expectNoDifference(generation.toolCalls[0].tool.name, "plan_trip")
+      let args = try #require(generation.toolCalls[0].input as? PlanTripArgs)
+      expectNoDifference(args.destination.city, "Tokyo")
+      expectNoDifference(args.destination.country, "Japan")
+      expectNoDifference(args.activities.count, 2)
+      expectNoDifference(args.activities[0].name, "Sushi")
+      expectNoDifference(args.activities[0].duration, 2)
+      expectNoDifference(args.activities[1].name, "Temple")
+      expectNoDifference(args.activities[1].duration, 3)
+      expectNoDifference(args.tags, ["food", "culture"])
+    }
+
+    @Test
     func `Generate Throws When Engine Errors`() async throws {
       let tokenizer = try NeedleSPTokenizingModel(modelURL: .testTokenizerModel)
       let tokens = "hi".tokenize(using: tokenizer)
@@ -388,6 +414,27 @@
     var location: String
   }
 
+  // MARK: - PlanTripArgs
+
+  @NeedleGenerable
+  private struct PlanTripArgs: Equatable {
+    var destination: Destination
+    var activities: [Activity]
+    var tags: [String]
+  }
+
+  @NeedleGenerable
+  private struct Destination: Equatable {
+    var city: String
+    var country: String
+  }
+
+  @NeedleGenerable
+  private struct Activity: Equatable {
+    var name: String
+    var duration: Int
+  }
+
   // MARK: - WeatherTool
 
   private struct WeatherTool: NeedleTool {
@@ -399,6 +446,20 @@
 
     func invoke(input: WeatherArgs) async throws -> sending String {
       "Sunny in \(input.location)"
+    }
+  }
+
+  // MARK: - PlanTripTool
+
+  private struct PlanTripTool: NeedleTool {
+    typealias Input = PlanTripArgs
+    typealias Output = String
+
+    let name = "plan_trip"
+    let description = "Plans a trip to a destination with activities."
+
+    func invoke(input: PlanTripArgs) async throws -> sending String {
+      "Trip to \(input.destination.city) with \(input.activities.count) activities"
     }
   }
 
