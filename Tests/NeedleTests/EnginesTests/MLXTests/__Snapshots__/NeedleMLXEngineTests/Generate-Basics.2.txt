@@ -11,18 +11,18 @@ Cache:  2K           (2272)
   ▿ (2 elements)
     ▿ key: NeedleMetadataKey
       - rawValue: "MLXEnginePostDecodeMemorySnapshot"
-    ▿ value: Peak:   116M         (122555352)
-Active: 56M          (59365232)
-Cache:  83M          (88025848)
-      - activeMemory: 59365232
-      - cacheMemory: 88025848
-      - peakMemory: 122555352
+    ▿ value: Peak:   93M          (97918992)
+Active: 56M          (59709296)
+Cache:  65M          (68860090)
+      - activeMemory: 59709296
+      - cacheMemory: 68860090
+      - peakMemory: 97918992
   ▿ (2 elements)
     ▿ key: NeedleMetadataKey
       - rawValue: "MLXEnginePostPrefillMemorySnapshot"
-    ▿ value: Peak:   116M         (122555352)
-Active: 53M          (56385380)
-Cache:  69M          (72977896)
-      - activeMemory: 56385380
-      - cacheMemory: 72977896
-      - peakMemory: 122555352
+    ▿ value: Peak:   93M          (97918992)
+Active: 54M          (56729444)
+Cache:  51M          (53807402)
+      - activeMemory: 56729444
+      - cacheMemory: 53807402
+      - peakMemory: 97918992

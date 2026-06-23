@@ -34,7 +34,7 @@
     }
 
     private func assertTokensSnapshot(system: String, user: String) throws {
-      let tokenizer = try NeedleSPTokenizingModel(modelURL: .testTokenizerModel)
+      let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
       let input = try LMInput.needle(
         prompt: NeedlePrompt(system: system, user: user, tools: [.sendEmail]),
         using: tokenizer

@@ -27,7 +27,7 @@
       withExpectedIssue {
         assertSnapshot(of: generation, as: .dump, record: .all)
         assertSnapshot(of: generation.metadata, as: .dump, record: .all)
-        assertSnapshot(of: generation.tokens.map(\.stringValue).joined(), as: .dump, record: .all)
+        assertSnapshot(of: generation.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
       }
     }
 
@@ -94,7 +94,7 @@
       withExpectedIssue {
         assertSnapshot(of: generation, as: .dump, record: .all)
         assertSnapshot(of: generation.metadata, as: .dump, record: .all)
-        assertSnapshot(of: generation.tokens.map(\.stringValue).joined(), as: .dump, record: .all)
+        assertSnapshot(of: generation.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
       }
     }
 
@@ -117,7 +117,7 @@
         )
         assertSnapshot(
           of: generation.engineGeneration.tokens.map(\.stringValue).joined(),
-          as: .dump,
+          as: .lines,
           record: .all
         )
       }
@@ -173,12 +173,18 @@
   private struct SendEmailTool: NeedleTool {
     @NeedleGenerable
     struct Input: Sendable {
+      @NeedleGuide(
+        .string(pattern: /[a-z][a-z0-9]{1,10}@gmail\.com/),
+        description: "The recipient's email address."
+      )
       var address: String
+
+      @NeedleGuide(description: "The subject of an email.")
       var subject: String
+
+      @NeedleGuide(description: "The content of an email.")
       var body: String
     }
-    
-    typealias Output = String
 
     let name = "sendEmail"
     let description = "Sends an email to a recipient with an email address."

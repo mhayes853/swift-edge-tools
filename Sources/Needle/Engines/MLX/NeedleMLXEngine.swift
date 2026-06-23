@@ -4,6 +4,7 @@
   import MLXLMCommon
   import Foundation
   import Atomics
+  import Tokenizers
 
   // MARK: - NeedleMLXEngine
 
@@ -39,7 +40,7 @@
     }
 
     public let grammarEngine: NeedleXGrammarEngine
-    public let tokenizer: NeedleSPTokenizingModel
+    public let tokenizer: any Tokenizers.Tokenizer
     public let model: NeedleMLXModel
     private var kvCache: [any KVCache]
     private let matcherPool: MatcherPool
@@ -54,11 +55,11 @@
 
     public convenience init(
       from url: URL,
-      grammarEngine: (NeedleSPTokenizingModel) -> NeedleXGrammarEngine? = {
+      grammarEngine: (NeedleSPTokenizer) -> NeedleXGrammarEngine? = {
         NeedleXGrammarEngine(tokenizer: $0)
       }
     ) throws {
-      let tokenizer = try NeedleSPTokenizingModel(modelURL: url.appending(path: "tokenizer.model"))
+      let tokenizer = try NeedleSPTokenizer(modelURL: url.appending(path: "tokenizer.model"))
       let grammarEngine = grammarEngine(tokenizer)
       guard let grammarEngine else { throw NeedleMLXEngineError.failedToLoadGrammarEngine }
 
@@ -76,7 +77,7 @@
     }
 
     public init(
-      tokenizer: NeedleSPTokenizingModel,
+      tokenizer: any Tokenizers.Tokenizer,
       model: NeedleMLXModel,
       grammarEngine: NeedleXGrammarEngine
     ) {
@@ -262,17 +263,17 @@
   private struct StreamingDetokenizer {
     private static let replacementCharacter = "\u{fffd}"
 
-    private let tokenizer: NeedleSPTokenizingModel
+    private let tokenizer: any Tokenizers.Tokenizer
     private(set) var tokenIds = [NeedleToken.ID]()
     private(set) var streamedResponse = ""
 
-    init(tokenizer: NeedleSPTokenizingModel) {
+    init(tokenizer: any Tokenizers.Tokenizer) {
       self.tokenizer = tokenizer
     }
 
     mutating func decode(tokenId: NeedleToken.ID) -> String {
       self.tokenIds.append(tokenId)
-      let decodedResponse = self.tokenizer.decode(tokenIds: self.tokenIds)
+      let decodedResponse = self.tokenizer.decode(tokens: self.tokenIds)
       guard decodedResponse.hasPrefix(self.streamedResponse) else {
         self.streamedResponse = decodedResponse
         return decodedResponse

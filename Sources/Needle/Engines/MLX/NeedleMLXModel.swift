@@ -4,7 +4,6 @@
   import MLXLLM
   import MLXLMCommon
   import Foundation
-  import Tokenizers
 
   // MARK: - NeedleMLXModel
 

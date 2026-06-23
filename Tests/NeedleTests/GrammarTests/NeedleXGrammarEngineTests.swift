@@ -9,10 +9,10 @@
   @Suite
   struct `NeedleXGrammarEngine tests` {
     private let engine: NeedleXGrammarEngine
-    private let tokenizer: NeedleSPTokenizingModel
+    private let tokenizer: NeedleSPTokenizer
 
     init() throws {
-      let tokenizer = try NeedleSPTokenizingModel(modelURL: .testTokenizerModel)
+      let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
       self.tokenizer = tokenizer
       self.engine = try #require(NeedleXGrammarEngine(tokenizer: tokenizer))
     }
@@ -47,11 +47,11 @@
 
     @Suite
     struct `Range tests` {
-      private let tokenizer: NeedleSPTokenizingModel
+      private let tokenizer: NeedleSPTokenizer
       private let eosToken: NeedleToken.ID
 
       init() throws {
-        let tokenizer = try NeedleSPTokenizingModel(modelURL: .testTokenizerModel)
+        let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
         self.tokenizer = tokenizer
         self.eosToken = try #require(tokenizer.eosTokenId)
       }
@@ -216,11 +216,11 @@
     @Suite
     struct `Matcher tests` {
       private let engine: NeedleXGrammarEngine
-      private let tokenizer: NeedleSPTokenizingModel
+      private let tokenizer: NeedleSPTokenizer
       private let eosToken: NeedleToken.ID
 
       init() throws {
-        let tokenizer = try NeedleSPTokenizingModel(modelURL: .testTokenizerModel)
+        let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
         self.tokenizer = tokenizer
         self.eosToken = try #require(tokenizer.eosTokenId)
         self.engine = try #require(NeedleXGrammarEngine(tokenizer: tokenizer))
@@ -342,7 +342,7 @@
       func `Bitmask Has Expected Size`() throws {
         let matcher = try self.engine.compile(tools: [.sendEmail])
         let bitmask = matcher.bitmask()
-        expectNoDifference(bitmask.count, self.tokenizer.vocabSize)
+        expectNoDifference(bitmask.count, self.tokenizer.encodedVocab().count)
       }
 
       @Test
@@ -437,10 +437,10 @@
     @Suite
     struct `Memory usage tests` {
       private let engine: NeedleXGrammarEngine
-      private let tokenizer: NeedleSPTokenizingModel
+      private let tokenizer: NeedleSPTokenizer
 
       init() throws {
-        let tokenizer = try NeedleSPTokenizingModel(modelURL: .testTokenizerModel)
+        let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
         self.tokenizer = tokenizer
         self.engine = try #require(NeedleXGrammarEngine(tokenizer: tokenizer))
       }
@@ -493,13 +493,13 @@
   private func firstRejectedToken(
     in text: String,
     matcher: NeedleXGrammarEngine.Matcher,
-    tokenizer: NeedleSPTokenizingModel
+    tokenizer: NeedleSPTokenizer
   ) -> (index: Int, tokenId: NeedleToken.ID, token: String, prefix: String)? {
     let tokenIds = encodedGrammarText(text, tokenizer: tokenizer)
     for (index, tokenId) in tokenIds.enumerated() {
       guard !matcher.accept(tokenId: tokenId) else { continue }
-      let token = tokenizer.tokens(from: [tokenId]).first ?? ""
-      let prefix = tokenizer.decode(tokenIds: tokenIds.prefix(index + 1))
+      let token = tokenizer.convertIdToToken(tokenId) ?? ""
+      let prefix = tokenizer.decode(tokens: Array(tokenIds.prefix(index + 1)))
       return (index, tokenId, token, prefix)
     }
     return nil
@@ -507,11 +507,11 @@
 
   private func encodedGrammarText(
     _ text: String,
-    tokenizer: NeedleSPTokenizingModel
+    tokenizer: NeedleSPTokenizer
   ) -> [NeedleToken.ID] {
     let tokenIds = tokenizer.encode(text: text)
     guard let firstTokenId = tokenIds.first else { return tokenIds }
-    let firstToken = tokenizer.tokens(from: [firstTokenId]).first ?? ""
+    let firstToken = tokenizer.convertIdToToken(firstTokenId) ?? ""
     if firstToken.hasPrefix("▁") {
       return Array(tokenIds.dropFirst())
     }
@@ -521,7 +521,7 @@
   private func assertAccepts(
     _ text: String,
     matcher: NeedleXGrammarEngine.Matcher,
-    tokenizer: NeedleSPTokenizingModel,
+    tokenizer: NeedleSPTokenizer,
     eosToken: NeedleToken.ID
   ) {
     if let rejected = firstRejectedToken(in: text, matcher: matcher, tokenizer: tokenizer) {
@@ -536,7 +536,7 @@
   private func assertRejects(
     _ text: String,
     matcher: NeedleXGrammarEngine.Matcher,
-    tokenizer: NeedleSPTokenizingModel,
+    tokenizer: NeedleSPTokenizer,
     eosToken: NeedleToken.ID
   ) {
     guard firstRejectedToken(in: text, matcher: matcher, tokenizer: tokenizer) == nil else {

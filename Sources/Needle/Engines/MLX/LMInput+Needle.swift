@@ -7,10 +7,9 @@
   extension LMInput {
     public static func needle(
       prompt: NeedlePrompt,
-      using tokenizer: some TokenizingModel
+      using tokenizer: some Tokenizers.Tokenizer
     ) throws -> Self {
-      let tokenStrings = tokenizer.tokenize(text: prompt.formatted())
-      let tokens = tokenStrings.compactMap(tokenizer.convertTokenToId)
+      let tokens = tokenizer.encode(text: prompt.formatted(), addSpecialTokens: false)
       return LMInput(text: LMInput.Text(tokens: MLXArray(tokens)))
     }
   }

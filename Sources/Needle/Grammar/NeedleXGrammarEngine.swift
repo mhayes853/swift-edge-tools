@@ -212,7 +212,7 @@
   #if SwiftNeedleSentencepiece
     extension NeedleXGrammarEngine {
       public convenience init?(
-        tokenizer: NeedleSPTokenizingModel,
+        tokenizer: NeedleSPTokenizer,
         configuration: CompilerConfiguration = CompilerConfiguration()
       ) {
         guard let eosTokenId = tokenizer.eosTokenId else { return nil }
