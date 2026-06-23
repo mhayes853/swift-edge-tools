@@ -104,7 +104,7 @@ public final class NeedleSessionStream: Sendable, Observable {
     return self.state.withLock { $0.toolCalls }
   }
 
-  private let state = Lock(State())
+  private let state = RecursiveLock(State())
   private let registrar = ObservationRegistrar()
   private let stopper: NeedleEngineStopper
 
@@ -193,7 +193,11 @@ extension NeedleSessionStream: AsyncSequence {
   }
 
   public func makeAsyncIterator() -> AsyncIterator {
-    AsyncIterator(base: self.state.withLock { $0.toolCallStream() }.makeAsyncIterator())
+    let (stream, continuation, id) = self.state.withLock { $0.takeToolCallStream() }
+    continuation.onTermination = { [weak self] _ in
+      self?.state.withLock { $0.removeTokenContinuation(id: id) }
+    }
+    return AsyncIterator(base: stream.makeAsyncIterator())
   }
 }
 
@@ -217,7 +221,11 @@ extension NeedleSessionStream {
     }
 
     public func makeAsyncIterator() -> AsyncIterator {
-      AsyncIterator(base: self.stream.state.withLock { $0.tokenStream() }.makeAsyncIterator())
+      let (tokenStream, continuation, id) = self.stream.state.withLock { $0.takeTokenStream() }
+      continuation.onTermination = { [weak stream] _ in
+        stream?.state.withLock { $0.removeToolContinuation(id: id) }
+      }
+      return AsyncIterator(base: tokenStream.makeAsyncIterator())
     }
   }
 
@@ -227,12 +235,14 @@ extension NeedleSessionStream {
 }
 
 extension NeedleSessionStream {
-  private struct State {
+  fileprivate struct State {
     private(set) var status: NeedleSessionStream.Status = .awaitingExecution
-    private var tokenContinuations = [AsyncThrowingStream<NeedleToken, any Error>.Continuation]()
-    private var toolsContinuations = [
-      AsyncThrowingStream<AnyNeedleToolCall, any Error>.Continuation
-    ]()
+    private var tokenContinuations =
+      [Int: AsyncThrowingStream<NeedleToken, any Error>.Continuation]()
+    private var toolsContinuations =
+      [Int: AsyncThrowingStream<AnyNeedleToolCall, any Error>.Continuation]()
+    private var nextTokenContinuationID = 0
+    private var nextToolContinuationID = 0
     private(set) var toolCalls = NeedleToolCallCollection()
     private var toolInvocationTasks = [Task<Void, Never>]()
     var task: Task<NeedleSessionGeneration, any Error>?
@@ -243,25 +253,45 @@ extension NeedleSessionStream {
       }
     }
 
-    mutating func tokenStream() -> AsyncThrowingStream<NeedleToken, any Error> {
+    mutating func takeTokenStream() -> (
+      AsyncThrowingStream<NeedleToken, any Error>,
+      AsyncThrowingStream<NeedleToken, any Error>.Continuation,
+      Int
+    ) {
       let (stream, continuation) = AsyncThrowingStream<NeedleToken, any Error>.makeStream()
-      self.tokenContinuations.append(continuation)
-      return stream
+      let id = self.nextTokenContinuationID
+      self.nextTokenContinuationID += 1
+      self.tokenContinuations[id] = continuation
+      return (stream, continuation, id)
     }
 
-    func emitToken(token: NeedleToken) {
-      for continuation in self.tokenContinuations {
-        continuation.yield(token)
-      }
-    }
-
-    mutating func toolCallStream() -> AsyncThrowingStream<AnyNeedleToolCall, any Error> {
+    mutating func takeToolCallStream() -> (
+      AsyncThrowingStream<AnyNeedleToolCall, any Error>,
+      AsyncThrowingStream<AnyNeedleToolCall, any Error>.Continuation,
+      Int
+    ) {
       let (stream, continuation) = AsyncThrowingStream<AnyNeedleToolCall, any Error>.makeStream()
-      self.toolsContinuations.append(continuation)
+      let id = self.nextToolContinuationID
+      self.nextToolContinuationID += 1
+      self.toolsContinuations[id] = continuation
       for call in self.toolCalls {
         continuation.yield(call)
       }
-      return stream
+      return (stream, continuation, id)
+    }
+
+    mutating func removeTokenContinuation(id: Int) {
+      self.tokenContinuations.removeValue(forKey: id)
+    }
+
+    mutating func removeToolContinuation(id: Int) {
+      self.toolsContinuations.removeValue(forKey: id)
+    }
+
+    func emitToken(token: NeedleToken) {
+      for continuation in self.tokenContinuations.values {
+        continuation.yield(token)
+      }
     }
 
     mutating func emitToolCall(_ toolCall: AnyNeedleToolCall, shouldInvoke: Bool) {
@@ -269,7 +299,7 @@ extension NeedleSessionStream {
       if shouldInvoke {
         Task { _ = try await toolCall.invoke() }
       }
-      for continuation in self.toolsContinuations {
+      for continuation in self.toolsContinuations.values {
         continuation.yield(toolCall)
       }
     }
@@ -278,17 +308,17 @@ extension NeedleSessionStream {
       self.status = .finished(result)
       switch result {
       case .success:
-        for continuation in self.tokenContinuations {
+        for continuation in self.tokenContinuations.values {
           continuation.finish()
         }
-        for continuation in self.toolsContinuations {
+        for continuation in self.toolsContinuations.values {
           continuation.finish()
         }
       case .failure(let error):
-        for continuation in self.tokenContinuations {
+        for continuation in self.tokenContinuations.values {
           continuation.finish(throwing: error)
         }
-        for continuation in self.toolsContinuations {
+        for continuation in self.toolsContinuations.values {
           continuation.finish(throwing: error)
         }
       }
