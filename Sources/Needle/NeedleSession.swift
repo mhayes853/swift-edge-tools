@@ -86,7 +86,7 @@ extension NeedleSession {
 
 // MARK: - Stream
 
-public final class NeedleSessionStream: Sendable, Observable {
+public final class NeedleSessionStream: Sendable, Observable, Identifiable {
   public enum Status: Sendable {
     case awaitingExecution
     case generating
