@@ -82,16 +82,6 @@
       try self.tokenizer.withLock { tokenizer throws(E) in try body(tokenizer) }
     }
 
-    public func encodedVocab() -> [String] {
-      let vocabSize = self.vocabSize
-      return self.withCCharStringBuffer(count: vocabSize) { buffer in
-        self.withRawTokenizer { tokenizer in
-          _ = needle_sp_tokenizer_encoded_vocab(tokenizer, buffer.baseAddress)
-        }
-        return Array(buffer.prefix(vocabSize)).map { String(cString: $0!) }
-      }
-    }
-
     public func encode(text: String) -> [Int] {
       self.encode(text: text, addSpecialTokens: true)
     }
@@ -189,12 +179,6 @@
       additionalContext: [String: any Sendable]?
     ) throws -> [Int] {
       throw TokenizerError.missingChatTemplate
-    }
-
-    private var vocabSize: Int {
-      self.withRawTokenizer { tokenizer in
-        needle_sp_tokenizer_vocab_size(tokenizer)
-      }
     }
 
     private var padTokenId: NeedleToken.ID {

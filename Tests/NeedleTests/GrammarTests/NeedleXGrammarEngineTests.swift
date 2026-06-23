@@ -342,7 +342,7 @@
       func `Bitmask Has Expected Size`() throws {
         let matcher = try self.engine.compile(tools: [.sendEmail])
         let bitmask = matcher.bitmask()
-        expectNoDifference(bitmask.count, self.tokenizer.encodedVocab().count)
+        expectNoDifference(bitmask.count, 8192)
       }
 
       @Test

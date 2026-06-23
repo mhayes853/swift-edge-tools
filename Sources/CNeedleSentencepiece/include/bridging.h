@@ -42,8 +42,6 @@ int needle_sp_tokenizer_ids_to_tokens(
     size_t size
 );
 
-int needle_sp_tokenizer_encoded_vocab(needle_sp_tokenizer_t tokenizer, char** encoded_vocab);
-
 void needle_sp_tokenizer_destroy(needle_sp_tokenizer_t tokenizer);
 
 #ifdef __cplusplus
