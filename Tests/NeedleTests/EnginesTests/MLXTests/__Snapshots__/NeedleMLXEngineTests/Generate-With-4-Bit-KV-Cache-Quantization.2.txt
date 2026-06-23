@@ -2,27 +2,27 @@
   ▿ (2 elements)
     ▿ key: NeedleMetadataKey
       - rawValue: "MLXEngineGenerationStartMemorySnapshot"
-    ▿ value: Peak:   96M          (100747104)
+    ▿ value: Peak:   100M         (104971386)
 Active: 0K           (288)
-Cache:  122M         (128569628)
+Cache:  123M         (129409026)
       - activeMemory: 288
-      - cacheMemory: 128569628
-      - peakMemory: 100747104
+      - cacheMemory: 129409026
+      - peakMemory: 104971386
   ▿ (2 elements)
     ▿ key: NeedleMetadataKey
       - rawValue: "MLXEnginePostDecodeMemorySnapshot"
-    ▿ value: Peak:   96M          (100747104)
-Active: 53M          (56366832)
-Cache:  69M          (72393540)
-      - activeMemory: 56366832
-      - cacheMemory: 72393540
-      - peakMemory: 100747104
+    ▿ value: Peak:   100M         (104971386)
+Active: 53M          (56284912)
+Cache:  70M          (73405890)
+      - activeMemory: 56284912
+      - cacheMemory: 73405890
+      - peakMemory: 104971386
   ▿ (2 elements)
     ▿ key: NeedleMetadataKey
       - rawValue: "MLXEnginePostPrefillMemorySnapshot"
-    ▿ value: Peak:   96M          (100747104)
-Active: 53M          (56516452)
-Cache:  68M          (72053464)
-      - activeMemory: 56516452
-      - cacheMemory: 72053464
-      - peakMemory: 100747104
+    ▿ value: Peak:   100M         (104971386)
+Active: 53M          (56418148)
+Cache:  69M          (72991166)
+      - activeMemory: 56418148
+      - cacheMemory: 72991166
+      - peakMemory: 104971386

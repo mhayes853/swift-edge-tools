@@ -133,9 +133,9 @@
       }
 
       @Test
-      func `HF Convert Id To Token Returns Nil For Unknown Token Id`() throws {
+      func `HF Convert Id To Token Returns Unkk For Unknown Token Id`() throws {
         let tokenizer = try NeedleSPTokenizer(modelURL: self.modelURL)
-        expectNoDifference(tokenizer.convertIdToToken(3), nil as String?)
+        expectNoDifference(tokenizer.convertIdToToken(3), tokenizer.unknownToken)
       }
 
       @Test

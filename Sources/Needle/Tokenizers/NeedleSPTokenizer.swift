@@ -33,7 +33,7 @@
     }
 
     public var unknownToken: String? {
-      self.unknownTokenId.flatMap { self.tokens(from: [$0]).first }
+      self.unknownTokenId.flatMap(self.convertIdToToken)
     }
 
     public var unknownTokenId: Int? {
@@ -122,15 +122,23 @@
     }
 
     public func convertTokenToId(_ token: String) -> Int? {
-      guard token != self.unknownToken else { return self.unknownTokenId }
-      guard let id = self.tokenIds(from: [token]).first else { return nil }
-      return id == self.unknownTokenId ? nil : id
+      self.convertTokensToIds([token])[0]
+    }
+
+    public func convertTokensToIds(_ tokens: [String]) -> [Int?] {
+      zip(tokens, self.tokenIds(from: tokens))
+        .map { token, id in
+          guard token != self.unknownToken else { return id }
+          return id == self.unknownTokenId ? nil : id
+        }
     }
 
     public func convertIdToToken(_ id: Int) -> String? {
-      guard id != self.unknownTokenId else { return nil }
-      guard let token = self.tokens(from: [id]).first, !token.isEmpty else { return nil }
-      return token
+      self.convertIdsToTokens([id])[0]
+    }
+
+    public func convertIdsToTokens(_ ids: [Int]) -> [String?] {
+      self.tokens(from: ids).map { $0.isEmpty ? nil : $0 }
     }
 
     public func applyChatTemplate(messages: [Message]) throws -> [Int] {

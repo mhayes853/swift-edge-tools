@@ -55,7 +55,7 @@
 
     public convenience init(
       from url: URL,
-      grammarEngine: (NeedleSPTokenizer) -> NeedleXGrammarEngine? = {
+      grammarEngine: (any Tokenizers.Tokenizer) -> NeedleXGrammarEngine? = {
         NeedleXGrammarEngine(tokenizer: $0)
       }
     ) throws {

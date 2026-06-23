@@ -2,6 +2,10 @@
   import CNeedleXGrammar
   import Foundation
 
+  #if SwiftNeedleTokenizers
+    import Tokenizers
+  #endif
+
   // MARK: - NeedleXGrammarEngine
 
   public final class NeedleXGrammarEngine {
@@ -209,15 +213,15 @@
 
   // MARK: - SP Tokenizer
 
-  #if SwiftNeedleSentencepiece
+  #if SwiftNeedleTokenizers
     extension NeedleXGrammarEngine {
       public convenience init?(
-        tokenizer: NeedleSPTokenizer,
+        tokenizer: any Tokenizer,
         configuration: CompilerConfiguration = CompilerConfiguration()
       ) {
         guard let eosTokenId = tokenizer.eosTokenId else { return nil }
         self.init(
-          encodedVocab: tokenizer.encodedVocab(),
+          encodedVocab: tokenizer.convertIdsToTokens(Array(0..<8192)).compactMap { $0 },
           eosTokenId: eosTokenId,
           configuration: configuration
         )
