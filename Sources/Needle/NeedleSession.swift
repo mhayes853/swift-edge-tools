@@ -99,6 +99,11 @@ public final class NeedleSessionStream: Sendable, Observable {
     return self.state.withLock { $0.status }
   }
 
+  public var toolCalls: NeedleToolCallCollection {
+    self.registrar.access(self, keyPath: \.toolCalls)
+    return self.state.withLock { $0.toolCalls }
+  }
+
   private let state = Lock(State())
   private let registrar = ObservationRegistrar()
   private let stopper: NeedleEngineStopper
@@ -134,10 +139,12 @@ public final class NeedleSessionStream: Sendable, Observable {
           }
           var parseState = ToolCallParseState(tools: tools)
           return try engine.generate(prompt: prompt, parameters: parameters) { token in
-            self.state.withLock {
-              $0.emitToken(token: token)
+            self.state.withLock { state in
+              state.emitToken(token: token)
               if let call = parseState.accept(token: token) {
-                $0.emitToolCall(call, shouldInvoke: shouldInvokeTools)
+                self.registrar.withMutation(of: self, keyPath: \.toolCalls) {
+                  state.emitToolCall(call, shouldInvoke: shouldInvokeTools)
+                }
               }
             }
           }

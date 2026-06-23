@@ -242,6 +242,27 @@
     }
 
     @Test
+    func `Tool Calls Are Observable On Stream`() async throws {
+      let tokenizer = try NeedleSPTokenizingModel(modelURL: .testTokenizerModel)
+      let rawToolCall = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
+      let toolTokens = rawToolCall.tokenize(using: tokenizer)
+      let engine = MockEngine(script: toolTokens.map { .token($0) } + [.finish])
+      let session = NeedleSession(engine: engine)
+
+      let stream = session.stream(tools: [WeatherTool()], with: "weather?")
+
+      let didChange = Lock(false)
+      withObservationTracking {
+        _ = stream.toolCalls
+      } onChange: {
+        didChange.withLock { $0 = true }
+      }
+
+      _ = try await stream.finalGeneration
+      didChange.withLock { expectNoDifference($0, true) }
+    }
+
+    @Test
     func `Status Is Awaiting Execution Before Generation Starts`() async throws {
       let engine = MockEngine.live()
       let session = NeedleSession(engine: engine)
