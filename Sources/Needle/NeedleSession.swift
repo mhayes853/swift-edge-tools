@@ -516,7 +516,7 @@ private struct ToolCallParseState {
 
     func open<Tool: NeedleTool>(_ concrete: Tool) -> AnyNeedleToolCall? {
       guard let typed = try? Tool.Input(needleValue: value.arguments) else { return nil }
-      return AnyNeedleToolCall(NeedleToolCall(tool: concrete, input: typed))
+      return AnyNeedleToolCall(NeedleToolCall(id: NeedleToolCallID(), tool: concrete, input: typed))
     }
     return open(tool)
   }

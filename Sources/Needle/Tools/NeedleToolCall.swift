@@ -1,9 +1,39 @@
 import Foundation
 import Observation
 
+// MARK: - NeedleToolCallID
+
+public struct NeedleToolCallID:
+  Hashable, Sendable, RawRepresentable, Codable, ExpressibleByStringLiteral
+{
+  public var rawValue: String
+
+  public init(rawValue: String) {
+    self.rawValue = rawValue
+  }
+
+  public init() {
+    self.init(rawValue: UUID().uuidString)
+  }
+
+  public init(stringLiteral value: StringLiteralType) {
+    self.init(rawValue: value)
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    self.rawValue = try container.decode(String.self)
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(self.rawValue)
+  }
+}
+
 // MARK: - NeedleToolCall
 
-public final class NeedleToolCall<Tool: NeedleTool>: Sendable, Observable {
+public final class NeedleToolCall<Tool: NeedleTool>: Sendable, Observable, Identifiable {
   private enum Status {
     case idle
     case running(Task<Tool.Output?, any Error>)
@@ -36,6 +66,7 @@ public final class NeedleToolCall<Tool: NeedleTool>: Sendable, Observable {
     }
   }
 
+  public let id: NeedleToolCallID
   public let tool: Tool
 
   public var status: NeedleToolCallStatus<Tool.Output> {
@@ -49,7 +80,8 @@ public final class NeedleToolCall<Tool: NeedleTool>: Sendable, Observable {
     }
   }
 
-  public init(tool: Tool, input: Tool.Input) {
+  public init(id: NeedleToolCallID, tool: Tool, input: Tool.Input) {
+    self.id = id
     self.tool = tool
     self.state = Lock(State(input: input))
   }
@@ -111,7 +143,7 @@ public final class NeedleToolCall<Tool: NeedleTool>: Sendable, Observable {
 
 // MARK: - AnyNeedleToolCall
 
-public final class AnyNeedleToolCall: Sendable, Observable {
+public final class AnyNeedleToolCall: Sendable, Observable, Identifiable {
   public var tool: any NeedleTool {
     self.base._tool
   }
@@ -123,6 +155,10 @@ public final class AnyNeedleToolCall: Sendable, Observable {
 
   public var status: NeedleToolCallStatus<Any> {
     self.base._status
+  }
+
+  public var id: NeedleToolCallID {
+    self.base._id
   }
 
   private let base: _AnyNeedleToolCall
@@ -141,6 +177,7 @@ public final class AnyNeedleToolCall: Sendable, Observable {
 }
 
 private protocol _AnyNeedleToolCall: Sendable {
+  var _id: NeedleToolCallID { get }
   var _tool: any NeedleTool { get }
   var _input: any ConvertibleFromNeedleValue & Sendable { get nonmutating set }
   var _status: NeedleToolCallStatus<Any> { get }
@@ -148,6 +185,8 @@ private protocol _AnyNeedleToolCall: Sendable {
 }
 
 extension NeedleToolCall: _AnyNeedleToolCall {
+  var _id: NeedleToolCallID { self.id }
+
   var _tool: any NeedleTool { self.tool }
 
   var _input: any ConvertibleFromNeedleValue & Sendable {

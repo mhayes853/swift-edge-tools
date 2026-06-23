@@ -8,13 +8,13 @@ import Testing
 struct `NeedleToolCall tests` {
   @Test
   func `Status Starts As Idle`() {
-    let call = NeedleToolCall(tool: EchoTool(), input: "hello")
+    let call = NeedleToolCall(id: NeedleToolCallID(), tool: EchoTool(), input: "hello")
     expectNoDifference(call.status.isIdle, true)
   }
 
   @Test
   func `Invoke Returns Output And Status Becomes Finished`() async throws {
-    let call = NeedleToolCall(tool: EchoTool(), input: "hello")
+    let call = NeedleToolCall(id: NeedleToolCallID(), tool: EchoTool(), input: "hello")
     let output = try await call.invoke()
 
     let expectedOutput = "echo: hello"
@@ -25,6 +25,7 @@ struct `NeedleToolCall tests` {
   @Test
   func `Status Is Running While Tool Is Executing`() async throws {
     let call = NeedleToolCall(
+      id: NeedleToolCallID(),
       tool: DelayedCountingTool(duration: .milliseconds(300), output: "done"),
       input: ""
     )
@@ -38,7 +39,7 @@ struct `NeedleToolCall tests` {
   @Test
   func `Invoke Deduplicates Concurrent Calls`() async throws {
     let tool = DelayedCountingTool(duration: .milliseconds(200), output: "result")
-    let call = NeedleToolCall(tool: tool, input: "")
+    let call = NeedleToolCall(id: NeedleToolCallID(), tool: tool, input: "")
 
     async let a = try await call.invoke()
     async let b = try await call.invoke()
@@ -53,7 +54,7 @@ struct `NeedleToolCall tests` {
   @Test
   func `Invoke Returns Cached Result After Completion`() async throws {
     let tool = DelayedCountingTool(duration: .milliseconds(0), output: "cached")
-    let call = NeedleToolCall(tool: tool, input: "")
+    let call = NeedleToolCall(id: NeedleToolCallID(), tool: tool, input: "")
 
     let first = try await call.invoke()
     let second = try await call.invoke()
@@ -66,6 +67,7 @@ struct `NeedleToolCall tests` {
   @Test
   func `Invoke Propagates Errors And Status Becomes Finished With Failure`() async throws {
     let call = NeedleToolCall(
+      id: NeedleToolCallID(),
       tool: ThrowingTool(error: ToolError(message: "boom")),
       input: ""
     )
@@ -84,7 +86,7 @@ struct `NeedleToolCall tests` {
       duration: .milliseconds(50),
       error: ToolError(message: "failed")
     )
-    let call = NeedleToolCall(tool: tool, input: "")
+    let call = NeedleToolCall(id: NeedleToolCallID(), tool: tool, input: "")
 
     await #expect(throws: ToolError.self) {
       _ = try await call.invoke()
@@ -99,6 +101,7 @@ struct `NeedleToolCall tests` {
   @Test
   func `Cancellation Returns CancellationError`() async throws {
     let call = NeedleToolCall(
+      id: NeedleToolCallID(),
       tool: CancellableTool(duration: .seconds(10)),
       input: ""
     )
@@ -118,7 +121,7 @@ struct `NeedleToolCall tests` {
 
   @Test
   func `Status Is Observable`() async throws {
-    let call = NeedleToolCall(tool: EchoTool(), input: "blob")
+    let call = NeedleToolCall(id: NeedleToolCallID(), tool: EchoTool(), input: "blob")
 
     let didChange = Lock(false)
     withObservationTracking {
@@ -133,7 +136,7 @@ struct `NeedleToolCall tests` {
 
   @Test
   func `Input Is Observable`() {
-    let call = NeedleToolCall(tool: EchoTool(), input: "blob")
+    let call = NeedleToolCall(id: NeedleToolCallID(), tool: EchoTool(), input: "blob")
 
     let didChange = Lock(false)
     withObservationTracking {
