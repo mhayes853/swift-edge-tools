@@ -1,0 +1,188 @@
+▿ NeedleSessionGeneration
+  ▿ engineGeneration: NeedleEngineGeneration
+    ▿ decodeMetrics: NeedleDecodeMetrics
+      ▿ duration: 1.420243083 seconds
+        - _low: 1420243083000000000
+        - _high: 0
+      ▿ durationToFirstToken: 0.215281917 seconds
+        - _low: 215281917000000000
+        - _high: 0
+      - tokens: 47
+    ▿ metadata: 3 key/value pairs
+      ▿ (2 elements)
+        ▿ key: NeedleMetadataKey
+          - rawValue: "MLXEngineGenerationStartMemorySnapshot"
+        ▿ value: Peak:   2K           (2560)
+Active: 0K           (288)
+Cache:  2K           (2272)
+          - activeMemory: 288
+          - cacheMemory: 2272
+          - peakMemory: 2560
+      ▿ (2 elements)
+        ▿ key: NeedleMetadataKey
+          - rawValue: "MLXEnginePostDecodeMemorySnapshot"
+        ▿ value: Peak:   106M         (111174060)
+Active: 55M          (57907004)
+Cache:  65M          (69187594)
+          - activeMemory: 57907004
+          - cacheMemory: 69187594
+          - peakMemory: 111174060
+      ▿ (2 elements)
+        ▿ key: NeedleMetadataKey
+          - rawValue: "MLXEnginePostPrefillMemorySnapshot"
+        ▿ value: Peak:   90M          (95235260)
+Active: 52M          (55090784)
+Cache:  47M          (50040386)
+          - activeMemory: 55090784
+          - cacheMemory: 50040386
+          - peakMemory: 95235260
+    ▿ prefillMetrics: NeedlePrefillMetrics
+      ▿ duration: 0.141322708 seconds
+        - _low: 141322708000000000
+        - _high: 0
+      - tokens: 80
+    ▿ tokens: 47 elements
+      ▿ NeedleToken
+        - id: 4
+        - stringValue: "<tool_call>"
+      ▿ NeedleToken
+        - id: 356
+        - stringValue: " [{\""
+      ▿ NeedleToken
+        - id: 294
+        - stringValue: "name"
+      ▿ NeedleToken
+        - id: 264
+        - stringValue: "\":\""
+      ▿ NeedleToken
+        - id: 818
+        - stringValue: "send"
+      ▿ NeedleToken
+        - id: 8062
+        - stringValue: "_"
+      ▿ NeedleToken
+        - id: 820
+        - stringValue: "email"
+      ▿ NeedleToken
+        - id: 265
+        - stringValue: "\",\""
+      ▿ NeedleToken
+        - id: 393
+        - stringValue: "arguments"
+      ▿ NeedleToken
+        - id: 282
+        - stringValue: "\":{\""
+      ▿ NeedleToken
+        - id: 2876
+        - stringValue: "address"
+      ▿ NeedleToken
+        - id: 264
+        - stringValue: "\":\""
+      ▿ NeedleToken
+        - id: 8103
+        - stringValue: "H"
+      ▿ NeedleToken
+        - id: 381
+        - stringValue: "en"
+      ▿ NeedleToken
+        - id: 1127
+        - stringValue: "ry"
+      ▿ NeedleToken
+        - id: 265
+        - stringValue: "\",\""
+      ▿ NeedleToken
+        - id: 1519
+        - stringValue: "body"
+      ▿ NeedleToken
+        - id: 264
+        - stringValue: "\":\""
+      ▿ NeedleToken
+        - id: 500
+        - stringValue: "as"
+      ▿ NeedleToken
+        - id: 741
+        - stringValue: "king"
+      ▿ NeedleToken
+        - id: 5956
+        - stringValue: " him"
+      ▿ NeedleToken
+        - id: 314
+        - stringValue: " to"
+      ▿ NeedleToken
+        - id: 3245
+        - stringValue: " go"
+      ▿ NeedleToken
+        - id: 442
+        - stringValue: " on"
+      ▿ NeedleToken
+        - id: 439
+        - stringValue: " an"
+      ▿ NeedleToken
+        - id: 1746
+        - stringValue: " ad"
+      ▿ NeedleToken
+        - id: 628
+        - stringValue: "vent"
+      ▿ NeedleToken
+        - id: 491
+        - stringValue: "ure"
+      ▿ NeedleToken
+        - id: 8063
+        - stringValue: "."
+      ▿ NeedleToken
+        - id: 8071
+        - stringValue: "["
+      ▿ NeedleToken
+        - id: 271
+        - stringValue: "{\""
+      ▿ NeedleToken
+        - id: 8052
+        - stringValue: ","
+      ▿ NeedleToken
+        - id: 8039
+        - stringValue: "\""
+      ▿ NeedleToken
+        - id: 8046
+        - stringValue: "s"
+      ▿ NeedleToken
+        - id: 427
+        - stringValue: "ub"
+      ▿ NeedleToken
+        - id: 8079
+        - stringValue: "j"
+      ▿ NeedleToken
+        - id: 8038
+        - stringValue: "e"
+      ▿ NeedleToken
+        - id: 8051
+        - stringValue: "c"
+      ▿ NeedleToken
+        - id: 8040
+        - stringValue: "t"
+      ▿ NeedleToken
+        - id: 8039
+        - stringValue: "\""
+      ▿ NeedleToken
+        - id: 8048
+        - stringValue: ":"
+      ▿ NeedleToken
+        - id: 8039
+        - stringValue: "\""
+      ▿ NeedleToken
+        - id: 8059
+        - stringValue: "}"
+      ▿ NeedleToken
+        - id: 8072
+        - stringValue: "]"
+      ▿ NeedleToken
+        - id: 263
+        - stringValue: ",\""
+      ▿ NeedleToken
+        - id: 403
+        - stringValue: "}}]"
+      ▿ NeedleToken
+        - id: 1
+        - stringValue: ""
+    - wasStoped: false
+  ▿ toolCalls: NeedleToolCallCollection
+    - elements: 0 elements

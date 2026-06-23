@@ -94,6 +94,11 @@
       return weights
     }
 
+    public func reset() {
+      self.crossAttentionKV = nil
+      self.crossAttentionMask = nil
+    }
+
     private func finalOutput(from output: LMOutput, encoderOutput: MLXArray) -> LMOutput {
       LMOutput(logits: output.logits, state: LMOutput.State(crossAttentionStates: encoderOutput))
     }

@@ -99,6 +99,31 @@
     }
 
     @Test
+    func `Generate Through NeedleSession`() async throws {
+      // NB: We send and never use the engine outside the session, so this is safe.
+      nonisolated(unsafe) let engine = self.engine
+      let session = NeedleSession(engine: engine)
+      let generation = try await session.generate(
+        tools: [SendEmailTool()],
+        with: Self.basePrompt.user
+      )
+      expectNoDifference(generation.engineGeneration.wasStoped, false)
+      withExpectedIssue {
+        assertSnapshot(of: generation, as: .dump, record: .all)
+        assertSnapshot(
+          of: generation.engineGeneration.metadata,
+          as: .dump,
+          record: .all
+        )
+        assertSnapshot(
+          of: generation.engineGeneration.tokens.map(\.stringValue).joined(),
+          as: .dump,
+          record: .all
+        )
+      }
+    }
+
+    @Test
     func `Generate Invokes Custom Logit Processor`() async throws {
       let processor = CountingLogitProcessor()
 
@@ -140,6 +165,26 @@
 
     func didSample(token: MLXArray) {
       self.didSampleCalls += 1
+    }
+  }
+
+  // MARK: - SendEmailTool
+
+  private struct SendEmailTool: NeedleTool {
+    @NeedleGenerable
+    struct Input: Sendable {
+      var address: String
+      var subject: String
+      var body: String
+    }
+    
+    typealias Output = String
+
+    let name = "sendEmail"
+    let description = "Sends an email to a recipient with an email address."
+
+    func invoke(input: Input) async throws -> String {
+      "Sent email to \(input.address)"
     }
   }
 #endif

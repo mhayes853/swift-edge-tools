@@ -94,8 +94,7 @@
     ) throws -> NeedleEngineGeneration {
       self.isStopped.store(false, ordering: .relaxed)
       try Task.checkCancellation()
-      Stream.defaultStream(.defaultDevice()).synchronize()
-      let generationStartSnapshot = Memory.snapshot()
+      let generationStartSnapshot = Memory.synchronizedSnapshot()
       let generateStart = self.clock.now
 
       let matcher = try self.matcherPool.matcher(
@@ -146,8 +145,7 @@
       }
 
       let durationToFirstToken = _durationToFirstToken ?? .zero
-      Stream.defaultStream(.defaultDevice()).synchronize()
-      let postDecodeSnapshot = Memory.snapshot()
+      let postDecodeSnapshot = Memory.synchronizedSnapshot()
       var metadata = NeedleMetadata()
       metadata.mlxEngineGenerationStartMemorySnapshot = generationStartSnapshot
       metadata.mlxEnginePostPrefillMemorySnapshot = postPrefillSnapshot
@@ -167,6 +165,7 @@
 
     public func reset() {
       self.kvCache = self.model.newCache(parameters: nil)
+      self.model.reset()
       self.isStopped.store(false, ordering: .relaxed)
     }
 
@@ -200,8 +199,7 @@
         tokens: input.text.tokens.size,
         duration: prefillStart.duration(to: self.clock.now)
       )
-      Stream.defaultStream(.defaultDevice()).synchronize()
-      let snapshot = Memory.snapshot()
+      let snapshot = Memory.synchronizedSnapshot()
       return (output, metrics, snapshot)
     }
   }
@@ -288,6 +286,15 @@
       guard !tokenString.hasSuffix(Self.replacementCharacter) else { return "" }
       self.streamedResponse = decodedResponse
       return tokenString
+    }
+  }
+
+  // MARK: - Synchronized Memory Snapshot
+
+  extension Memory {
+    fileprivate static func synchronizedSnapshot() -> Snapshot {
+      Stream.defaultStream(.defaultDevice()).synchronize()
+      return Self.snapshot()
     }
   }
 
