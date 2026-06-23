@@ -202,6 +202,41 @@
     }
 
     @Test
+    func `Stopping Before Generation Starts Returns An Empty Stopped Generation`() async throws {
+      let engine = MockEngine.live()
+      let session = NeedleSession(engine: engine)
+
+      let stream = session.stream(tools: [], with: "hi")
+      stream.stop()
+
+      let generation = try await stream.finalGeneration
+      expectNoDifference(generation.engineGeneration.isEmpty, true)
+      expectNoDifference(generation.toolCalls.count, 0)
+      expectNoDifference(engine.generateCallCount, 0)
+      expectNoDifference(stream.status.isFinished, true)
+    }
+
+    @Test
+    func `Stopping Before Generation Starts Updates Status Observation`() async throws {
+      let engine = MockEngine.live()
+      let session = NeedleSession(engine: engine)
+
+      let stream = session.stream(tools: [], with: "hi")
+
+      let didChange = Lock(false)
+      withObservationTracking {
+        _ = stream.status
+      } onChange: {
+        didChange.withLock { $0 = true }
+      }
+
+      stream.stop()
+      _ = try await stream.finalGeneration
+
+      didChange.withLock { expectNoDifference($0, true) }
+    }
+
+    @Test
     func `Tools Are Parsed Incremental Without Waiting For Model Stop`() async throws {
       let tokenizer = try NeedleSPTokenizingModel(modelURL: .testTokenizerModel)
       let rawToolCall = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
@@ -286,6 +321,57 @@
 
       _ = try await stream.finalGeneration
       didChange.withLock { expectNoDifference($0, true) }
+    }
+
+    @Test
+    func `Active Streams Are Observable`() async throws {
+      let tokenizer = try NeedleSPTokenizingModel(modelURL: .testTokenizerModel)
+      let tokens = "hi".tokenize(using: tokenizer)
+      let engine = MockEngine(script: tokens.map { .token($0) } + [.finish])
+      let session = NeedleSession(engine: engine)
+
+      let didChange = Lock(false)
+      withObservationTracking {
+        _ = session.activeStreams
+      } onChange: {
+        didChange.withLock { $0 = true }
+      }
+
+      let stream = session.stream(tools: [], with: "hi")
+      didChange.withLock { expectNoDifference($0, true) }
+
+      _ = try await stream.finalGeneration
+    }
+
+    @Test
+    func `Active Streams Track Concurrent Streams And Remove On Finish`() async throws {
+      let engine = MockEngine.live()
+      let session = NeedleSession(engine: engine)
+
+      let stream1 = session.stream(tools: [], with: "hi")
+      try await Task.sleep(for: .milliseconds(50))
+
+      let stream2 = session.stream(tools: [], with: "hi")
+
+      let activeStreams = session.activeStreams
+      expectNoDifference(activeStreams.count, 2)
+      expectNoDifference(activeStreams.contains { $0 === stream1 }, true)
+      expectNoDifference(activeStreams.contains { $0 === stream2 }, true)
+
+      engine.push(.finish)
+      engine.push(nil)
+      _ = try await stream1.finalGeneration
+
+      let activeStreamsAfterFirst = session.activeStreams
+      expectNoDifference(activeStreamsAfterFirst.count, 1)
+      expectNoDifference(activeStreamsAfterFirst.contains { $0 === stream1 }, false)
+      expectNoDifference(activeStreamsAfterFirst.contains { $0 === stream2 }, true)
+
+      engine.push(.finish)
+      engine.push(nil)
+      _ = try await stream2.finalGeneration
+
+      expectNoDifference(session.activeStreams.count, 0)
     }
 
     @Test
@@ -492,7 +578,7 @@
 
   // MARK: - MockEngine
 
-  private final class MockEngine: NeedleEngine, Sendable {
+    private final class MockEngine: NeedleEngine, Sendable {
     struct GenerateParameters: NeedleEngineGenerateParameters {
       static let `default` = GenerateParameters()
     }
@@ -543,7 +629,12 @@
     }
 
     private let storage: Storage
+    private let _generateCallCount = Lock(0)
     let stopper: NeedleEngineStopper
+
+    var generateCallCount: Int {
+      self._generateCallCount.withLock { $0 }
+    }
 
     init() {
       let storage = Storage()
@@ -574,6 +665,7 @@
       parameters: GenerateParameters,
       onToken: (NeedleToken) -> Void
     ) throws -> NeedleEngineGeneration {
+      self._generateCallCount.withLock { $0 += 1 }
       self.storage.resetStop()
       var emittedTokens: [NeedleToken] = []
       var wasStopped = false

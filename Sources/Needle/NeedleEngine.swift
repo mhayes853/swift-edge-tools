@@ -57,3 +57,20 @@ public struct NeedleEngineGeneration: Sendable {
     self.metadata = metadata
   }
 }
+
+extension NeedleEngineGeneration {
+  public static let empty = Self(
+    prefillMetrics: NeedlePrefillMetrics(tokens: 0, duration: .zero),
+    decodeMetrics: NeedleDecodeMetrics(tokens: 0, duration: .zero, durationToFirstToken: .zero),
+    wasStopped: true,
+    tokens: []
+  )
+
+  public var isEmpty: Bool {
+    self.prefillMetrics == Self.empty.prefillMetrics
+      && self.decodeMetrics == Self.empty.decodeMetrics
+      && self.wasStoped
+      && self.tokens.isEmpty
+      && self.metadata.isEmpty
+  }
+}

@@ -6,6 +6,7 @@ import Observation
 public final class NeedleSession<Engine: NeedleEngine>: Sendable, Observable {
   private let engine: RecursiveLock<Engine>
   private let _systemPrompt: Lock<String>
+  private let _activeStreams: Lock<[NeedleSessionStream]>
   private let observationRegistrar = ObservationRegistrar()
 
   public var systemPrompt: String {
@@ -20,9 +21,19 @@ public final class NeedleSession<Engine: NeedleEngine>: Sendable, Observable {
     }
   }
 
+  public var isResponding: Bool {
+    !self.activeStreams.isEmpty
+  }
+
+  public var activeStreams: [NeedleSessionStream] {
+    self.observationRegistrar.access(self, keyPath: \.activeStreams)
+    return self._activeStreams.withLock { $0 }
+  }
+
   public init(engine: sending Engine, systemPrompt: String = "") {
     self.engine = RecursiveLock(engine)
     self._systemPrompt = Lock(systemPrompt)
+    self._activeStreams = Lock([])
   }
 
   public func withEngine<T, E: Error>(
@@ -35,6 +46,14 @@ public final class NeedleSession<Engine: NeedleEngine>: Sendable, Observable {
 
   public func reset() {
     self.withEngine { $0.reset() }
+  }
+
+  fileprivate func removeActiveStream(_ stream: NeedleSessionStream) {
+    self._activeStreams.withLock { activeStreams in
+      self.observationRegistrar.withMutation(of: self, keyPath: \.activeStreams) {
+        activeStreams.removeAll { $0 === stream }
+      }
+    }
   }
 }
 
@@ -77,13 +96,12 @@ public final class NeedleSessionStream: Sendable, Observable {
   public var finalGeneration: NeedleSessionGeneration {
     get async throws {
       let task = self.state.withLock { $0.task! }  // NB: Task is set in init, so this is fine.
-      let stopper = self.stopper
       return try await withTaskCancellationHandler {
         let generation = try await task.value
         try Task.checkCancellation()
         return generation
       } onCancel: {
-        stopper()
+        self.stop()
         task.cancel()
       }
     }
@@ -106,7 +124,6 @@ public final class NeedleSessionStream: Sendable, Observable {
 
   private let state = RecursiveLock(State())
   private let registrar = ObservationRegistrar()
-  private let stopper: NeedleEngineStopper
 
   deinit {
     self.state.withLock { state in
@@ -122,7 +139,6 @@ public final class NeedleSessionStream: Sendable, Observable {
     parameters: sending Engine.GenerateParameters,
     shouldInvokeTools: Bool
   ) {
-    self.stopper = session.withEngine { $0.stopper }
     let task = Task<NeedleSessionGeneration, any Error> {
       do {
         let prompt = NeedlePrompt(
@@ -130,13 +146,22 @@ public final class NeedleSessionStream: Sendable, Observable {
           user: prompt,
           tools: tools.map(\.definition)
         )
-        let generation = try session.withEngine { engine in
+        let generation: NeedleEngineGeneration = try session.withEngine { engine in
           engine.reset()
-          self.state.withLock { state in
-            self.registrar.withMutation(of: self, keyPath: \.status) {
-              state.beginGenerating()
+          let shouldGenerate = self.state.withLock { state in
+            if state.wasStoppedBeforeGeneration {
+              self.registrar.withMutation(of: self, keyPath: \.status) {
+                state.beginGenerating(stopper: nil)
+              }
+              return false
             }
+            self.registrar.withMutation(of: self, keyPath: \.status) {
+              state.beginGenerating(stopper: engine.stopper)
+            }
+            return true
           }
+          guard shouldGenerate else { return .empty }
+
           var parseState = ToolCallParseState(tools: tools)
           return try engine.generate(prompt: prompt, parameters: parameters) { token in
             self.state.withLock { state in
@@ -149,7 +174,7 @@ public final class NeedleSessionStream: Sendable, Observable {
             }
           }
         }
-        return self.state.withLock { state in
+        let sessionGeneration = self.state.withLock { state in
           let sessionGeneration = NeedleSessionGeneration(
             engineGeneration: generation,
             toolCalls: state.toolCalls
@@ -159,12 +184,15 @@ public final class NeedleSessionStream: Sendable, Observable {
           }
           return sessionGeneration
         }
+        session.removeActiveStream(self)
+        return sessionGeneration
       } catch {
         self.state.withLock { state in
           self.registrar.withMutation(of: self, keyPath: \.status) {
             state.finish(with: .failure(error))
           }
         }
+        session.removeActiveStream(self)
         throw error
       }
     }
@@ -172,7 +200,8 @@ public final class NeedleSessionStream: Sendable, Observable {
   }
 
   public func stop() {
-    self.stopper()
+    let stopper = self.state.withLock { $0.stop() }
+    stopper?()
   }
 }
 
@@ -235,8 +264,10 @@ extension NeedleSessionStream {
 }
 
 extension NeedleSessionStream {
-  fileprivate struct State {
+  private struct State {
     private(set) var status: NeedleSessionStream.Status = .awaitingExecution
+    private(set) var stopper: NeedleEngineStopper?
+    private(set) var wasStoppedBeforeGeneration = false
     private var tokenContinuations =
       [Int: AsyncThrowingStream<NeedleToken, any Error>.Continuation]()
     private var toolsContinuations =
@@ -247,9 +278,22 @@ extension NeedleSessionStream {
     private var toolInvocationTasks = [Task<Void, Never>]()
     var task: Task<NeedleSessionGeneration, any Error>?
 
-    mutating func beginGenerating() {
+    mutating func beginGenerating(stopper: NeedleEngineStopper?) {
       if case .awaitingExecution = self.status {
+        self.stopper = stopper
         self.status = .generating
+      }
+    }
+
+    mutating func stop() -> NeedleEngineStopper? {
+      switch self.status {
+      case .awaitingExecution:
+        self.wasStoppedBeforeGeneration = true
+        return nil
+      case .generating:
+        return self.stopper
+      case .finished:
+        return nil
       }
     }
 
@@ -305,6 +349,7 @@ extension NeedleSessionStream {
     }
 
     mutating func finish(with result: Result<NeedleSessionGeneration, any Error>) {
+      self.stopper = nil
       self.status = .finished(result)
       switch result {
       case .success:
@@ -336,7 +381,7 @@ extension NeedleSession {
     parameters: sending Engine.GenerateParameters = .default,
     shouldInvokeTools: Bool = true
   ) -> NeedleSessionStream {
-    NeedleSessionStream(
+    let stream = NeedleSessionStream(
       session: self,
       tools: tools,
       with: prompt,
@@ -344,6 +389,10 @@ extension NeedleSession {
       parameters: parameters,
       shouldInvokeTools: shouldInvokeTools
     )
+    self.observationRegistrar.withMutation(of: self, keyPath: \.activeStreams) {
+      self._activeStreams.withLock { $0.append(stream) }
+    }
+    return stream
   }
 }
 
