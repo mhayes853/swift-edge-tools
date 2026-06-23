@@ -222,7 +222,7 @@
     }
 
     @Test
-    func `Result Is Observable`() async throws {
+    func `Status Is Observable`() async throws {
       let tokenizer = try NeedleSPTokenizingModel(modelURL: .testTokenizerModel)
       let tokens = "hi".tokenize(using: tokenizer)
       let engine = MockEngine(script: tokens.map { .token($0) } + [.finish])
@@ -232,7 +232,7 @@
 
       let didChange = Lock(false)
       withObservationTracking {
-        _ = stream.result
+        _ = stream.status
       } onChange: {
         didChange.withLock { $0 = true }
       }
@@ -242,7 +242,18 @@
     }
 
     @Test
-    func `Result Is Nil While Engine Is Still Streaming`() async throws {
+    func `Status Is Awaiting Execution Before Generation Starts`() async throws {
+      let engine = MockEngine.live()
+      let session = NeedleSession(engine: engine)
+
+      let stream = session.stream(tools: [], with: "hi")
+
+      expectNoDifference(stream.status.isAwaitingExecution, true)
+      expectNoDifference(stream.isGenerating, false)
+    }
+
+    @Test
+    func `Status Is Generating While Engine Streams Tokens`() async throws {
       let tokenizer = try NeedleSPTokenizingModel(modelURL: .testTokenizerModel)
       let firstToken = "a a".tokenize(using: tokenizer).first!
       let engine = MockEngine.live()
@@ -252,9 +263,7 @@
       let stream = session.stream(tools: [], with: "hi")
 
       try await Task.sleep(for: .milliseconds(50))
-      let isNil = stream.result == nil
-      expectNoDifference(isNil, true)
-      expectNoDifference(stream.isResponding, true)
+      expectNoDifference(stream.isGenerating, true)
 
       engine.push(.finish)
       engine.push(nil)
@@ -262,7 +271,7 @@
     }
 
     @Test
-    func `Result Is Success When Engine Responds Successfully`() async throws {
+    func `Status Is Finished With Success When Engine Responds Successfully`() async throws {
       let tokenizer = try NeedleSPTokenizingModel(modelURL: .testTokenizerModel)
       let tokens = "hi".tokenize(using: tokenizer)
       let engine = MockEngine(script: tokens.map { .token($0) } + [.finish])
@@ -271,19 +280,18 @@
       let stream = session.stream(tools: [], with: "hi")
       let generation = try await stream.finalGeneration
 
-      guard case .success(let resultGeneration) = stream.result else {
-        Issue.record("Expected result to be .success, got \(String(describing: stream.result))")
-        return
-      }
+      expectNoDifference(stream.status.isFinished, true)
+
+      let resultGeneration = try #require(try? stream.status.result?.get())
       expectNoDifference(
         resultGeneration.engineGeneration.tokens,
         generation.engineGeneration.tokens
       )
-      expectNoDifference(stream.isResponding, false)
+      expectNoDifference(stream.isGenerating, false)
     }
 
     @Test
-    func `Result Is Failure When Engine Errors`() async throws {
+    func `Status Is Finished With Failure When Engine Errors`() async throws {
       let tokenizer = try NeedleSPTokenizingModel(modelURL: .testTokenizerModel)
       let tokens = "hi".tokenize(using: tokenizer)
       let error = ToolError(message: "boom")
@@ -295,11 +303,12 @@
       await #expect(throws: ToolError.self) {
         _ = try await stream.finalGeneration
       }
-      guard case .failure(let resultError) = stream.result else {
-        Issue.record("Expected result to be .failure, got \(String(describing: stream.result))")
-        return
+      expectNoDifference(stream.status.isFinished, true)
+
+      let resultError = #expect(throws: ToolError.self) {
+        _ = try stream.status.result?.get()
       }
-      expectNoDifference((resultError as? ToolError)?.message, error.message)
+      expectNoDifference(resultError?.message, error.message)
     }
 
     @Test

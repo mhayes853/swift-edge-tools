@@ -198,3 +198,28 @@ extension NeedleToolCallStatus {
     }
   }
 }
+
+// MARK: - NeedleSessionStream.Status
+
+extension NeedleSessionStream.Status {
+  var isAwaitingExecution: Bool {
+    switch self {
+    case .awaitingExecution: true
+    default: false
+    }
+  }
+
+  var isFinished: Bool {
+    switch self {
+    case .finished: true
+    default: false
+    }
+  }
+
+  var result: Result<NeedleSessionGeneration, any Error>? {
+    switch self {
+    case .finished(let result): result
+    default: nil
+    }
+  }
+}

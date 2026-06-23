@@ -68,6 +68,12 @@ extension NeedleSession {
 // MARK: - Stream
 
 public final class NeedleSessionStream: Sendable, Observable {
+  public enum Status: Sendable {
+    case awaitingExecution
+    case generating
+    case finished(Result<NeedleSessionGeneration, any Error>)
+  }
+
   public var finalGeneration: NeedleSessionGeneration {
     get async throws {
       let task = self.state.withLock { $0.task! }  // NB: Task is set in init, so this is fine.
@@ -83,13 +89,14 @@ public final class NeedleSessionStream: Sendable, Observable {
     }
   }
 
-  public var isResponding: Bool {
-    self.result == nil
+  public var isGenerating: Bool {
+    if case .generating = self.status { return true }
+    return false
   }
 
-  public var result: Result<NeedleSessionGeneration, any Error>? {
-    self.registrar.access(self, keyPath: \.result)
-    return self.state.withLock { $0.result }
+  public var status: Status {
+    self.registrar.access(self, keyPath: \.status)
+    return self.state.withLock { $0.status }
   }
 
   private let state = Lock(State())
@@ -120,6 +127,11 @@ public final class NeedleSessionStream: Sendable, Observable {
         )
         let generation = try session.withEngine { engine in
           engine.reset()
+          self.state.withLock { state in
+            self.registrar.withMutation(of: self, keyPath: \.status) {
+              state.beginGenerating()
+            }
+          }
           var parseState = ToolCallParseState(tools: tools)
           return try engine.generate(prompt: prompt, parameters: parameters) { token in
             self.state.withLock {
@@ -135,14 +147,14 @@ public final class NeedleSessionStream: Sendable, Observable {
             engineGeneration: generation,
             toolCalls: state.toolCalls
           )
-          self.registrar.withMutation(of: self, keyPath: \.result) {
+          self.registrar.withMutation(of: self, keyPath: \.status) {
             state.finish(with: .success(sessionGeneration))
           }
           return sessionGeneration
         }
       } catch {
         self.state.withLock { state in
-          self.registrar.withMutation(of: self, keyPath: \.result) {
+          self.registrar.withMutation(of: self, keyPath: \.status) {
             state.finish(with: .failure(error))
           }
         }
@@ -209,7 +221,7 @@ extension NeedleSessionStream {
 
 extension NeedleSessionStream {
   private struct State {
-    private(set) var result: Result<NeedleSessionGeneration, any Error>?
+    private(set) var status: NeedleSessionStream.Status = .awaitingExecution
     private var tokenContinuations = [AsyncThrowingStream<NeedleToken, any Error>.Continuation]()
     private var toolsContinuations = [
       AsyncThrowingStream<AnyNeedleToolCall, any Error>.Continuation
@@ -217,6 +229,12 @@ extension NeedleSessionStream {
     private(set) var toolCalls = NeedleToolCallCollection()
     private var toolInvocationTasks = [Task<Void, Never>]()
     var task: Task<NeedleSessionGeneration, any Error>?
+
+    mutating func beginGenerating() {
+      if case .awaitingExecution = self.status {
+        self.status = .generating
+      }
+    }
 
     mutating func tokenStream() -> AsyncThrowingStream<NeedleToken, any Error> {
       let (stream, continuation) = AsyncThrowingStream<NeedleToken, any Error>.makeStream()
@@ -250,7 +268,7 @@ extension NeedleSessionStream {
     }
 
     mutating func finish(with result: Result<NeedleSessionGeneration, any Error>) {
-      self.result = result
+      self.status = .finished(result)
       switch result {
       case .success:
         for continuation in self.tokenContinuations {
