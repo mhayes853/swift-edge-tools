@@ -60,12 +60,12 @@
 
     public var fuseUnknownTokens: Bool { false }
 
-    public init(modelURL: URL) throws {
+    public convenience init(modelURL: URL) throws {
       let nativePath = modelURL.withUnsafeFileSystemRepresentation { String(cString: $0!) }
       guard let tokenizer = needle_sp_tokenizer_init_from_file(nativePath) else {
         throw NeedleSPTokenizerError()
       }
-      self.tokenizer = RecursiveLock(tokenizer)
+      self.init(tokenizer: tokenizer)
     }
 
     public init(tokenizer: consuming sending needle_sp_tokenizer_t) {
