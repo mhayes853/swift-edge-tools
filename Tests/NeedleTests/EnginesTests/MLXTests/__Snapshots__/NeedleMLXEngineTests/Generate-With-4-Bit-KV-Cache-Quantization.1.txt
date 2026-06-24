@@ -1,43 +1,43 @@
 ▿ NeedleEngineGeneration
   ▿ decodeMetrics: NeedleDecodeMetrics
-    ▿ duration: 1.478879292 seconds
-      - _low: 1478879292000000000
+    ▿ duration: 1.285190375 seconds
+      - _low: 1285190375000000000
       - _high: 0
-    ▿ durationToFirstToken: 0.129535208 seconds
-      - _low: 129535208000000000
+    ▿ durationToFirstToken: 0.115309333 seconds
+      - _low: 115309333000000000
       - _high: 0
     - tokens: 57
   ▿ metadata: 3 key/value pairs
     ▿ (2 elements)
       ▿ key: NeedleMetadataKey
         - rawValue: "MLXEngineGenerationStartMemorySnapshot"
-      ▿ value: Peak:   100M         (105287546)
+      ▿ value: Peak:   96M          (101018720)
 Active: 0K           (288)
-Cache:  116M         (121636632)
+Cache:  114M         (119690012)
         - activeMemory: 288
-        - cacheMemory: 121636632
-        - peakMemory: 105287546
+        - cacheMemory: 119690012
+        - peakMemory: 101018720
     ▿ (2 elements)
       ▿ key: NeedleMetadataKey
         - rawValue: "MLXEnginePostDecodeMemorySnapshot"
-      ▿ value: Peak:   100M         (105287546)
+      ▿ value: Peak:   96M          (101018720)
 Active: 53M          (56579824)
-Cache:  62M          (65266040)
+Cache:  60M          (63267524)
         - activeMemory: 56579824
-        - cacheMemory: 65266040
-        - peakMemory: 105287546
+        - cacheMemory: 63267524
+        - peakMemory: 101018720
     ▿ (2 elements)
       ▿ key: NeedleMetadataKey
         - rawValue: "MLXEnginePostPrefillMemorySnapshot"
-      ▿ value: Peak:   100M         (105287546)
-Active: 54M          (56729444)
-Cache:  61M          (64907476)
-        - activeMemory: 56729444
-        - cacheMemory: 64907476
-        - peakMemory: 105287546
+      ▿ value: Peak:   96M          (101018720)
+Active: 54M          (56713060)
+Cache:  60M          (62977240)
+        - activeMemory: 56713060
+        - cacheMemory: 62977240
+        - peakMemory: 101018720
   ▿ prefillMetrics: NeedlePrefillMetrics
-    ▿ duration: 0.042267209 seconds
-      - _low: 42267209000000000
+    ▿ duration: 0.038126459 seconds
+      - _low: 38126459000000000
       - _high: 0
     - tokens: 132
   ▿ tokens: 57 elements

@@ -1126,3 +1126,390 @@ extension BaseTestSuite {
     }
   }
 }
+
+// MARK: - NeedleGuide examples tests
+
+extension BaseTestSuite {
+  @Suite
+  struct `NeedleGuide examples tests` {
+    @Test
+    func `Applies String Examples`() {
+      assertMacro {
+        """
+        @NeedleGenerable
+        struct Person {
+          @NeedleGuide(.string(minLength: 1), examples: ["Ada", "Grace"])
+          var firstName: String
+        }
+        """
+      } expansion: {
+        """
+        struct Person {
+          var firstName: String
+
+          static var needleGenerationSchema: NeedleGenerationSchema {
+            .object(
+              valueSchema: .object(
+                properties: [
+                  "firstName": _needleMergeGenerationSchema(.string(minLength: 1), examples: ["Ada", "Grace"])
+                ],
+                required: ["firstName"]
+              )
+            )
+          }
+
+          init(needleValue: NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.firstName = try String(needleValue: _needleValue(object, forKey: "firstName"))
+          }
+        }
+
+        extension Person: NeedleGenerable {
+        }
+        """
+      }
+    }
+
+    @Test
+    func `Applies Number Examples`() {
+      assertMacro {
+        """
+        @NeedleGenerable
+        struct Measurement {
+          @NeedleGuide(.number(minimum: 0), examples: [1.5, 3.14])
+          var value: Double
+        }
+        """
+      } expansion: {
+        """
+        struct Measurement {
+          var value: Double
+
+          static var needleGenerationSchema: NeedleGenerationSchema {
+            .object(
+              valueSchema: .object(
+                properties: [
+                  "value": _needleMergeGenerationSchema(.number(minimum: 0), examples: [1.5, 3.14])
+                ],
+                required: ["value"]
+              )
+            )
+          }
+
+          init(needleValue: NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.value = try Double(needleValue: _needleValue(object, forKey: "value"))
+          }
+        }
+
+        extension Measurement: NeedleGenerable {
+        }
+        """
+      }
+    }
+
+    @Test
+    func `Applies Integer Examples`() {
+      assertMacro {
+        """
+        @NeedleGenerable
+        struct Person {
+          @NeedleGuide(.integer(minimum: 0, maximum: 120), examples: [21, 42])
+          var age: Int
+        }
+        """
+      } expansion: {
+        """
+        struct Person {
+          var age: Int
+
+          static var needleGenerationSchema: NeedleGenerationSchema {
+            .object(
+              valueSchema: .object(
+                properties: [
+                  "age": _needleMergeGenerationSchema(.integer(minimum: 0, maximum: 120), examples: [21, 42])
+                ],
+                required: ["age"]
+              )
+            )
+          }
+
+          init(needleValue: NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.age = try Int(needleValue: _needleValue(object, forKey: "age"))
+          }
+        }
+
+        extension Person: NeedleGenerable {
+        }
+        """
+      }
+    }
+
+    @Test
+    func `Applies Boolean Examples`() {
+      assertMacro {
+        """
+        @NeedleGenerable
+        struct Feature {
+          @NeedleGuide(.boolean, examples: [true])
+          var isEnabled: Bool
+        }
+        """
+      } expansion: {
+        """
+        struct Feature {
+          var isEnabled: Bool
+
+          static var needleGenerationSchema: NeedleGenerationSchema {
+            .object(
+              valueSchema: .object(
+                properties: [
+                  "isEnabled": _needleMergeGenerationSchema(.bool(), examples: [true])
+                ],
+                required: ["isEnabled"]
+              )
+            )
+          }
+
+          init(needleValue: NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.isEnabled = try Bool(needleValue: _needleValue(object, forKey: "isEnabled"))
+          }
+        }
+
+        extension Feature: NeedleGenerable {
+        }
+        """
+      }
+    }
+
+    @Test
+    func `Applies Array Examples`() {
+      assertMacro {
+        """
+        @NeedleGenerable
+        struct Post {
+          @NeedleGuide(.array(items: .string(), minItems: 1), examples: [["a", "b"]])
+          var tags: [String]
+        }
+        """
+      } expansion: {
+        """
+        struct Post {
+          var tags: [String]
+
+          static var needleGenerationSchema: NeedleGenerationSchema {
+            .object(
+              valueSchema: .object(
+                properties: [
+                  "tags": _needleMergeGenerationSchema(.array(items: .string(), minItems: 1), examples: [["a", "b"]])
+                ],
+                required: ["tags"]
+              )
+            )
+          }
+
+          init(needleValue: NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.tags = try [String](needleValue: _needleValue(object, forKey: "tags"))
+          }
+        }
+
+        extension Post: NeedleGenerable {
+        }
+        """
+      }
+    }
+
+    @Test
+    func `Applies Object Examples`() {
+      assertMacro {
+        """
+        @NeedleGenerable
+        struct Payload {
+          @NeedleGuide(.object(additionalProperties: .string()), examples: [["k": "v"]])
+          var metadata: [String: String]
+        }
+        """
+      } expansion: {
+        """
+        struct Payload {
+          var metadata: [String: String]
+
+          static var needleGenerationSchema: NeedleGenerationSchema {
+            .object(
+              valueSchema: .object(
+                properties: [
+                  "metadata": _needleMergeGenerationSchema(.object(additionalProperties: .string()), examples: [["k": "v"]])
+                ],
+                required: ["metadata"]
+              )
+            )
+          }
+
+          init(needleValue: NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.metadata = try [String: String](needleValue: _needleValue(object, forKey: "metadata"))
+          }
+        }
+
+        extension Payload: NeedleGenerable {
+        }
+        """
+      }
+    }
+
+    @Test
+    func `Applies Examples On Inferred Schema`() {
+      assertMacro {
+        """
+        @NeedleGenerable
+        struct Person {
+          @NeedleGuide(description: "Given name", examples: ["Ada", "Grace"])
+          var firstName: String
+        }
+        """
+      } expansion: {
+        """
+        struct Person {
+          var firstName: String
+
+          static var needleGenerationSchema: NeedleGenerationSchema {
+            .object(
+              valueSchema: .object(
+                properties: [
+                  "firstName": _needleMergeGenerationSchema(String.needleGenerationSchema, description: "Given name", examples: ["Ada", "Grace"])
+                ],
+                required: ["firstName"]
+              )
+            )
+          }
+
+          init(needleValue: NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.firstName = try String(needleValue: _needleValue(object, forKey: "firstName"))
+          }
+        }
+
+        extension Person: NeedleGenerable {
+        }
+        """
+      }
+    }
+
+    @Test
+    func `Combines Examples With Description And Key`() {
+      assertMacro {
+        """
+        @NeedleGenerable
+        struct Person {
+          @NeedleGuide(.string(minLength: 1), key: "first_name", description: "Given name", examples: ["Ada"])
+          var firstName: String
+        }
+        """
+      } expansion: {
+        """
+        struct Person {
+          var firstName: String
+
+          static var needleGenerationSchema: NeedleGenerationSchema {
+            .object(
+              valueSchema: .object(
+                properties: [
+                  "first_name": _needleMergeGenerationSchema(.string(minLength: 1), description: "Given name", examples: ["Ada"])
+                ],
+                required: ["first_name"]
+              )
+            )
+          }
+
+          init(needleValue: NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.firstName = try String(needleValue: _needleValue(object, forKey: "first_name"))
+          }
+        }
+
+        extension Person: NeedleGenerable {
+        }
+        """
+      }
+    }
+
+    @Test
+    func `Omits Examples When Not Provided`() {
+      assertMacro {
+        """
+        @NeedleGenerable
+        struct Person {
+          @NeedleGuide(.string(minLength: 1))
+          var firstName: String
+        }
+        """
+      } expansion: {
+        """
+        struct Person {
+          var firstName: String
+
+          static var needleGenerationSchema: NeedleGenerationSchema {
+            .object(
+              valueSchema: .object(
+                properties: [
+                  "firstName": .string(minLength: 1)
+                ],
+                required: ["firstName"]
+              )
+            )
+          }
+
+          init(needleValue: NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.firstName = try String(needleValue: _needleValue(object, forKey: "firstName"))
+          }
+        }
+
+        extension Person: NeedleGenerable {
+        }
+        """
+      }
+    }
+
+    @Test
+    func `Emits Bool When Boolean Guide Has No Examples`() {
+      assertMacro {
+        """
+        @NeedleGenerable
+        struct Feature {
+          @NeedleGuide(.boolean)
+          var isEnabled: Bool
+        }
+        """
+      } expansion: {
+        """
+        struct Feature {
+          var isEnabled: Bool
+
+          static var needleGenerationSchema: NeedleGenerationSchema {
+            .object(
+              valueSchema: .object(
+                properties: [
+                  "isEnabled": .bool()
+                ],
+                required: ["isEnabled"]
+              )
+            )
+          }
+
+          init(needleValue: NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.isEnabled = try Bool(needleValue: _needleValue(object, forKey: "isEnabled"))
+          }
+        }
+
+        extension Feature: NeedleGenerable {
+        }
+        """
+      }
+    }
+  }
+}

@@ -19,7 +19,8 @@ public macro NeedleIgnored() =
 public macro NeedleGuide(
   _ schema: _NeedleGuideSchema = .inferred,
   key: Swift.String? = nil,
-  description: String? = nil
+  description: String? = nil,
+  examples: [NeedleValue]? = nil
 ) = #externalMacro(module: "NeedleMacros", type: "NeedleGuideMacro")
 
 public struct _NeedleGuideSchema {
@@ -86,7 +87,8 @@ public struct _NeedleGuideSchema {
 public func _needleMergeGenerationSchema(
   _ schema: NeedleGenerationSchema,
   title: String? = nil,
-  description: String? = nil
+  description: String? = nil,
+  examples: [NeedleValue]? = nil
 ) -> NeedleGenerationSchema {
   guard case .object(var object) = schema else { return schema }
   if let title {
@@ -94,6 +96,9 @@ public func _needleMergeGenerationSchema(
   }
   if let description {
     object.description = description
+  }
+  if let examples {
+    object.examples = examples
   }
   return .object(object)
 }

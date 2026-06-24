@@ -361,6 +361,7 @@ extension NeedleGenerableMacro {
     let attribute: AttributeSyntax
     let key: String?
     let description: String?
+    let examples: String?
     let schemaSpecifier: SchemaSpecifier
   }
 
@@ -500,7 +501,8 @@ extension NeedleGenerableMacro {
     let schemaExpression = Self.schemaExpressionWithDescription(
       schemaExpression: overriddenSchemaExpression,
       typeName: typeName,
-      description: propertySelection?.description
+      description: propertySelection?.description,
+      examples: propertySelection?.examples
     )
 
     return StoredProperty(
@@ -871,12 +873,19 @@ extension NeedleGenerableMacro {
   private static func schemaExpressionWithDescription(
     schemaExpression: String?,
     typeName: String,
-    description: String?
+    description: String?,
+    examples: String?
   ) -> String? {
-    guard let description else { return schemaExpression }
+    guard description != nil || examples != nil else { return schemaExpression }
     let expression = schemaExpression ?? "\(typeName).needleGenerationSchema"
-    return
-      "_needleMergeGenerationSchema(\(expression), description: \(Self.quotedStringLiteral(description)))"
+    var arguments = [String]()
+    if let description {
+      arguments.append("description: \(Self.quotedStringLiteral(description))")
+    }
+    if let examples {
+      arguments.append("examples: \(examples)")
+    }
+    return "_needleMergeGenerationSchema(\(expression), \(arguments.joined(separator: ", ")))"
   }
 
   private static func parseTypeName(_ typeName: String) -> ParsedTypeName {
@@ -1019,12 +1028,14 @@ extension NeedleGenerableMacro {
         attribute: attribute,
         key: nil,
         description: nil,
+        examples: nil,
         schemaSpecifier: .inferred
       )
     }
 
     var key: String?
     var description: String?
+    var examples: String?
     var schemaSpecifier: SchemaSpecifier = .inferred
 
     for argument in arguments {
@@ -1050,6 +1061,8 @@ extension NeedleGenerableMacro {
             return nil
           }
           description = value
+        case "examples":
+          examples = argument.expression.trimmedDescription
         default:
           Self.diagnoseInvalidNeedleGuideAttribute(
             in: attribute,
@@ -1076,6 +1089,7 @@ extension NeedleGenerableMacro {
       attribute: attribute,
       key: key,
       description: description,
+      examples: examples,
       schemaSpecifier: schemaSpecifier
     )
   }

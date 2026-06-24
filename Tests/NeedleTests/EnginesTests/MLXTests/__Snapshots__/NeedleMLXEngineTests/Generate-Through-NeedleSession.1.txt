@@ -1,44 +1,44 @@
 ▿ NeedleSessionGeneration
   ▿ engineGeneration: NeedleEngineGeneration
     ▿ decodeMetrics: NeedleDecodeMetrics
-      ▿ duration: 0.823883 seconds
-        - _low: 823883000000000000
+      ▿ duration: 0.743233708 seconds
+        - _low: 743233708000000000
         - _high: 0
-      ▿ durationToFirstToken: 0.170793333 seconds
-        - _low: 170793333000000000
+      ▿ durationToFirstToken: 0.166908459 seconds
+        - _low: 166908459000000000
         - _high: 0
       - tokens: 42
     ▿ metadata: 3 key/value pairs
       ▿ (2 elements)
         ▿ key: NeedleMetadataKey
           - rawValue: "MLXEngineGenerationStartMemorySnapshot"
-        ▿ value: Peak:   100M         (105287546)
+        ▿ value: Peak:   117M         (123193060)
 Active: 0K           (288)
-Cache:  124M         (130234232)
+Cache:  134M         (140862148)
           - activeMemory: 288
-          - cacheMemory: 130234232
-          - peakMemory: 105287546
+          - cacheMemory: 140862148
+          - peakMemory: 123193060
       ▿ (2 elements)
         ▿ key: NeedleMetadataKey
           - rawValue: "MLXEnginePostDecodeMemorySnapshot"
-        ▿ value: Peak:   100M         (105287546)
-Active: 56M          (59742188)
-Cache:  77M          (81652396)
-          - activeMemory: 59742188
-          - cacheMemory: 81652396
-          - peakMemory: 105287546
+        ▿ value: Peak:   117M         (123193060)
+Active: 56M          (59693036)
+Cache:  84M          (88411128)
+          - activeMemory: 59693036
+          - cacheMemory: 88411128
+          - peakMemory: 123193060
       ▿ (2 elements)
         ▿ key: NeedleMetadataKey
           - rawValue: "MLXEnginePostPrefillMemorySnapshot"
-        ▿ value: Peak:   100M         (105287546)
-Active: 54M          (56762352)
-Cache:  79M          (83583656)
-          - activeMemory: 56762352
-          - cacheMemory: 83583656
-          - peakMemory: 105287546
+        ▿ value: Peak:   117M         (123193060)
+Active: 54M          (56680784)
+Cache:  87M          (91423380)
+          - activeMemory: 56680784
+          - cacheMemory: 91423380
+          - peakMemory: 123193060
     ▿ prefillMetrics: NeedlePrefillMetrics
-      ▿ duration: 0.062038583 seconds
-        - _low: 62038583000000000
+      ▿ duration: 0.061193333 seconds
+        - _low: 61193333000000000
         - _high: 0
       - tokens: 136
     ▿ tokens: 42 elements
@@ -174,7 +174,7 @@ Cache:  79M          (83583656)
       ▿ AnyNeedleToolCall
         ▿ base: NeedleToolCall<SendEmailTool>
           ▿ id: NeedleToolCallID
-            - rawValue: "580D7213-4AD1-4DA6-9914-E7D147A45A79"
+            - rawValue: "92DA734A-FB79-48BB-BB58-43A1F75B7AA3"
           ▿ registrar: ObservationRegistrar
             ▿ extent: Extent
               ▿ context: Context
