@@ -153,7 +153,7 @@ public final class AnyNeedleToolCall: Sendable, Observable, Identifiable {
     set { self.base._input = newValue }
   }
 
-  public var status: NeedleToolCallStatus<Any> {
+  public var status: NeedleToolCallStatus<any Sendable> {
     self.base._status
   }
 
@@ -171,7 +171,7 @@ public final class AnyNeedleToolCall: Sendable, Observable, Identifiable {
     self.base as? NeedleToolCall<Tool>
   }
 
-  public func invoke() async throws -> sending Any {
+  public func invoke() async throws -> any Sendable {
     try await self.base._invoke()
   }
 }
@@ -180,13 +180,12 @@ private protocol _AnyNeedleToolCall: Sendable {
   var _id: NeedleToolCallID { get }
   var _tool: any NeedleTool { get }
   var _input: any ConvertibleFromNeedleValue & Sendable { get nonmutating set }
-  var _status: NeedleToolCallStatus<Any> { get }
-  func _invoke() async throws -> sending Any
+  var _status: NeedleToolCallStatus<any Sendable> { get }
+  func _invoke() async throws -> any Sendable
 }
 
 extension NeedleToolCall: _AnyNeedleToolCall {
   var _id: NeedleToolCallID { self.id }
-
   var _tool: any NeedleTool { self.tool }
 
   var _input: any ConvertibleFromNeedleValue & Sendable {
@@ -199,15 +198,11 @@ extension NeedleToolCall: _AnyNeedleToolCall {
     }
   }
 
-  var _status: NeedleToolCallStatus<Any> {
-    switch self.status {
-    case .idle: .idle
-    case .running: .running
-    case .finished(let result): .finished(result.map { $0 })
-    }
+  var _status: NeedleToolCallStatus<any Sendable> {
+    self.status.map { $0 }
   }
 
-  func _invoke() async throws -> sending Any {
+  func _invoke() async throws -> any Sendable {
     try await self.invoke()
   }
 }
@@ -218,6 +213,17 @@ public enum NeedleToolCallStatus<Output> {
   case idle
   case running
   case finished(Result<Output, any Error>)
+
+  public func map<T, E: Error>(
+    _ body: (Output) throws(E) -> T
+  ) throws(E) -> NeedleToolCallStatus<T> {
+    switch self {
+    case .idle: .idle
+    case .running: .running
+    case .finished(.success(let output)): .finished(.success(try body(output)))
+    case .finished(.failure(let error)): .finished(.failure(error))
+    }
+  }
 }
 
 extension NeedleToolCallStatus: Sendable where Output: Sendable {}

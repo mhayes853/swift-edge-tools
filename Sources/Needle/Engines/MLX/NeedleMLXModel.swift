@@ -18,6 +18,7 @@
     @ModuleInfo(key: "lm_head") private var lmHead: Embedding?
     private var crossAttentionMask: MLXArray?
     private var crossAttentionKV: [ProjectedAttentionKV]?
+    private var encoderOutput: MLXArray?
 
     private var defaultEncoderOutput: MLXArray {
       .zeros([1, 0, self.configuration.dimensions])
@@ -27,9 +28,7 @@
       self.configuration = configuration
       self.model = NeedleSimpleAttentionNetwork(configuration: configuration)
 
-      if configuration.tieWordEmbeddings {
-        self._lmHead.wrappedValue = nil
-      } else {
+      if !configuration.tieWordEmbeddings {
         self._lmHead.wrappedValue = Embedding(
           embeddingCount: configuration.vocabularySize,
           dimensions: configuration.dimensions
@@ -67,6 +66,7 @@
       )
       let crossAttentionKV = self.model.precomputeCrossAttention(encoderOutput: encoderOutput)
       self.crossAttentionKV = crossAttentionKV
+      self.encoderOutput = encoderOutput
 
       let output = self.model.decode(
         MLXArray([self.configuration.decoderStartTokenId])[.newAxis, 0...],
@@ -85,7 +85,7 @@
       cache: [any KVCache]?,
       state: LMOutput.State?
     ) -> LMOutput {
-      let encoderOutput = state?.crossAttentionStates ?? self.defaultEncoderOutput
+      let encoderOutput = state?.crossAttentionStates ?? self.encoderOutput ?? self.defaultEncoderOutput
       let precomputedCrossAttention =
         self.crossAttentionKV ?? self.model.precomputeCrossAttention(encoderOutput: encoderOutput)
       let output = self.model.decode(
@@ -121,6 +121,7 @@
     }
 
     public func reset() {
+      self.encoderOutput = nil
       self.crossAttentionKV = nil
       self.crossAttentionMask = nil
     }

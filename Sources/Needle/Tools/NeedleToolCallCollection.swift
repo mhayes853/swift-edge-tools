@@ -68,6 +68,14 @@ extension NeedleToolCallCollection {
   }
 }
 
+// MARK: - Strongly Typed Accessor
+
+extension NeedleToolCallCollection {
+  public subscript<Tool: NeedleTool>(index: Int, as type: Tool.Type) -> NeedleToolCall<Tool>? {
+    self[index].as(type)
+  }
+}
+
 // MARK: - Invoke
 
 extension NeedleToolCallCollection {
