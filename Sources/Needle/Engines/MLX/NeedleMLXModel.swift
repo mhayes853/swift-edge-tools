@@ -15,6 +15,7 @@
     public let configuration: NeedleModelConfiguration
 
     private let model: NeedleSimpleAttentionNetwork
+    @ModuleInfo(key: "lm_head") private var lmHead: Embedding?
     private var crossAttentionMask: MLXArray?
     private var crossAttentionKV: [ProjectedAttentionKV]?
 
@@ -25,6 +26,15 @@
     public init(configuration: NeedleModelConfiguration) {
       self.configuration = configuration
       self.model = NeedleSimpleAttentionNetwork(configuration: configuration)
+
+      if configuration.tieWordEmbeddings {
+        self._lmHead.wrappedValue = nil
+      } else {
+        self._lmHead.wrappedValue = Embedding(
+          embeddingCount: configuration.vocabularySize,
+          dimensions: configuration.dimensions
+        )
+      }
     }
 
     public func prepare(
@@ -87,9 +97,26 @@
       return self.finalOutput(from: output, encoderOutput: encoderOutput)
     }
 
+    public func loadWeights(from url: URL) throws {
+      try self.loadWeights(weights: MLX.loadArrays(url: url))
+    }
+
+    public func loadWeights(data: Data) throws {
+      try self.loadWeights(weights: MLX.loadArrays(data: data))
+    }
+
+    public func loadWeights(weights: [String: MLXArray]) throws {
+      try self.update(
+        parameters: ModuleParameters.unflattened(self.sanitize(weights: weights)),
+        verify: .all
+      )
+    }
+
     public func sanitize(weights: [String: MLXArray]) -> [String: MLXArray] {
       var weights = weights
-      weights.removeValue(forKey: "lm_head.weight")
+      if self.configuration.tieWordEmbeddings {
+        weights.removeValue(forKey: "lm_head.weight")
+      }
       return weights
     }
 
@@ -98,8 +125,11 @@
       self.crossAttentionMask = nil
     }
 
-    private func finalOutput(from output: LMOutput, encoderOutput: MLXArray) -> LMOutput {
-      LMOutput(logits: output.logits, state: LMOutput.State(crossAttentionStates: encoderOutput))
+    private func finalOutput(from output: MLXArray, encoderOutput: MLXArray) -> LMOutput {
+      LMOutput(
+        logits: (self.lmHead ?? self.model.embedding).asLinear(output),
+        state: LMOutput.State(crossAttentionStates: encoderOutput)
+      )
     }
   }
 
@@ -115,6 +145,10 @@
     let encoder: NeedleEncoder
     let decoder: NeedleDecoder
     private let embedScale: Float
+
+    var embeddingModule: ModuleInfo<Embedding> {
+      self._embedding
+    }
 
     init(configuration: NeedleModelConfiguration) {
       self.encoder = NeedleEncoder(configuration: configuration)
@@ -136,16 +170,14 @@
       crossAttentionMask: MLXArray?,
       precomputedCrossAttention: [ProjectedAttentionKV],
       caches: [any KVCache]?
-    ) -> LMOutput {
-      let hiddenStates = self.decoder(
+    ) -> MLXArray {
+      self.decoder(
         self.embedding(input) * self.embedScale,
         selfMask: .causal,
         crossMask: crossAttentionMask.map { .array($0) } ?? .none,
         precomputedCrossAttention: precomputedCrossAttention,
         caches: caches
       )
-      let logits = self.embedding.asLinear(hiddenStates)
-      return LMOutput(logits: logits)
     }
 
     func precomputeCrossAttention(encoderOutput: MLXArray) -> [ProjectedAttentionKV] {

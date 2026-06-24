@@ -13,6 +13,7 @@ public struct NeedleModelConfiguration: Hashable, Sendable {
   public let rmsNormEps: Float
   public let padTokenId: NeedleToken.ID
   public let decoderStartTokenId: NeedleToken.ID
+  public var tieWordEmbeddings: Bool
   private let _dtype: String?
 
   public var dtype: String {
@@ -44,6 +45,7 @@ extension NeedleModelConfiguration: Codable {
     case rmsNormEps = "rms_norm_eps"
     case padTokenId = "pad_token_id"
     case decoderStartTokenId = "decoder_start_token_id"
+    case tieWordEmbeddings = "tie_word_embeddings"
     case _dtype = "dtype"
   }
 }

@@ -1,10 +1,10 @@
 ▿ NeedleEngineGeneration
   ▿ decodeMetrics: NeedleDecodeMetrics
-    ▿ duration: 1.282047291 seconds
-      - _low: 1282047291000000000
+    ▿ duration: 0.959647166 seconds
+      - _low: 959647166000000000
       - _high: 0
-    ▿ durationToFirstToken: 0.128154834 seconds
-      - _low: 128154834000000000
+    ▿ durationToFirstToken: 0.132421584 seconds
+      - _low: 132421584000000000
       - _high: 0
     - tokens: 57
   ▿ metadata: 3 key/value pairs
@@ -12,32 +12,32 @@
       ▿ key: NeedleMetadataKey
         - rawValue: "MLXEngineGenerationStartMemorySnapshot"
       ▿ value: Peak:   96M          (100986720)
-Active: 0K           (288)
-Cache:  108M         (113752834)
-        - activeMemory: 288
-        - cacheMemory: 113752834
+Active: 0K           (568)
+Cache:  111M         (116825194)
+        - activeMemory: 568
+        - cacheMemory: 116825194
         - peakMemory: 100986720
     ▿ (2 elements)
       ▿ key: NeedleMetadataKey
         - rawValue: "MLXEnginePostDecodeMemorySnapshot"
-      ▿ value: Peak:   96M          (100986720)
-Active: 53M          (56548336)
-Cache:  57M          (60277378)
-        - activeMemory: 56548336
-        - cacheMemory: 60277378
-        - peakMemory: 100986720
+      ▿ value: Peak:   104M         (109357688)
+Active: 64M          (68098184)
+Cache:  54M          (57198106)
+        - activeMemory: 68098184
+        - cacheMemory: 57198106
+        - peakMemory: 109357688
     ▿ (2 elements)
       ▿ key: NeedleMetadataKey
         - rawValue: "MLXEnginePostPrefillMemorySnapshot"
       ▿ value: Peak:   96M          (100986720)
-Active: 54M          (56696676)
-Cache:  56M          (59743446)
-        - activeMemory: 56696676
-        - cacheMemory: 59743446
+Active: 54M          (56664188)
+Cache:  57M          (60243494)
+        - activeMemory: 56664188
+        - cacheMemory: 60243494
         - peakMemory: 100986720
   ▿ prefillMetrics: NeedlePrefillMetrics
-    ▿ duration: 0.047999584 seconds
-      - _low: 47999584000000000
+    ▿ duration: 0.03967075 seconds
+      - _low: 39670750000000000
       - _high: 0
     - tokens: 132
   ▿ tokens: 57 elements
@@ -84,8 +84,8 @@ Cache:  56M          (59743446)
       - id: 1665
       - stringValue: "nder"
     ▿ NeedleToken
-      - id: 8061
-      - stringValue: "y"
+      - id: 1127
+      - stringValue: "ry"
     ▿ NeedleToken
       - id: 8181
       - stringValue: "@"

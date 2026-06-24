@@ -55,6 +55,7 @@
 
     public convenience init(
       from url: URL,
+      editConfiguration: (inout NeedleModelConfiguration) -> Void = { _ in },
       grammarEngine: (any Tokenizers.Tokenizer) -> NeedleXGrammarEngine? = {
         NeedleXGrammarEngine(tokenizer: $0)
       }
@@ -63,15 +64,14 @@
       let grammarEngine = grammarEngine(tokenizer)
       guard let grammarEngine else { throw NeedleMLXEngineError.failedToLoadGrammarEngine }
 
-      let configuration = try JSONDecoder()
+      var configuration = try JSONDecoder()
         .decode(
           NeedleModelConfiguration.self,
           from: Data(contentsOf: url.appending(path: "config.json"))
         )
-      var weights = try MLX.loadArrays(url: url.appending(path: "model.safetensors"))
+      editConfiguration(&configuration)
       let model = NeedleMLXModel(configuration: configuration)
-      weights = model.sanitize(weights: weights)
-      try model.update(parameters: ModuleParameters.unflattened(weights), verify: .all)
+      try model.loadWeights(from: url.appending(path: "model.safetensors"))
 
       self.init(tokenizer: tokenizer, model: model, grammarEngine: grammarEngine)
     }

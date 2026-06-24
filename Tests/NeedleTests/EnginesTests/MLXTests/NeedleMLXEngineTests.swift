@@ -99,6 +99,29 @@
     }
 
     @Test
+    func `Generate With Untied Word Embeddings`() async throws {
+      let engine = try await NeedleMLXEngine(
+        from: downloadNeedleHF(),
+        editConfiguration: { configuration in
+          configuration.tieWordEmbeddings = false
+        }
+      )
+
+      var tokens = [NeedleToken]()
+      let generation = try engine.generate(
+        prompt: Self.basePrompt,
+        parameters: .default,
+        onToken: { tokens.append($0) }
+      )
+      expectNoDifference(generation.wasStopped, false)
+      withExpectedIssue {
+        assertSnapshot(of: generation, as: .dump, record: .all)
+        assertSnapshot(of: generation.metadata, as: .dump, record: .all)
+        assertSnapshot(of: generation.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
+      }
+    }
+
+    @Test
     func `Generate Through NeedleSession`() async throws {
       // NB: We send and never use the engine outside the session, so this is safe.
       nonisolated(unsafe) let engine = self.engine
