@@ -362,6 +362,7 @@ extension NeedleGenerableMacro {
     let key: String?
     let description: String?
     let examples: String?
+    let examplesExpression: ExprSyntax?
     let schemaSpecifier: SchemaSpecifier
   }
 
@@ -504,6 +505,15 @@ extension NeedleGenerableMacro {
       description: propertySelection?.description,
       examples: propertySelection?.examples
     )
+
+    if let propertySelection {
+      Self.validateExamplesType(
+        propertySelection,
+        parsedType: parsedType,
+        propertyName: propertyName,
+        context: context
+      )
+    }
 
     return StoredProperty(
       name: propertyName,
@@ -1029,6 +1039,7 @@ extension NeedleGenerableMacro {
         key: nil,
         description: nil,
         examples: nil,
+        examplesExpression: nil,
         schemaSpecifier: .inferred
       )
     }
@@ -1036,6 +1047,7 @@ extension NeedleGenerableMacro {
     var key: String?
     var description: String?
     var examples: String?
+    var examplesExpression: ExprSyntax?
     var schemaSpecifier: SchemaSpecifier = .inferred
 
     for argument in arguments {
@@ -1063,6 +1075,7 @@ extension NeedleGenerableMacro {
           description = value
         case "examples":
           examples = argument.expression.trimmedDescription
+          examplesExpression = argument.expression
         default:
           Self.diagnoseInvalidNeedleGuideAttribute(
             in: attribute,
@@ -1090,6 +1103,7 @@ extension NeedleGenerableMacro {
       key: key,
       description: description,
       examples: examples,
+      examplesExpression: examplesExpression,
       schemaSpecifier: schemaSpecifier
     )
   }
@@ -1538,5 +1552,279 @@ extension NeedleGenerableMacro {
         )
       )
     )
+  }
+}
+
+// MARK: - Examples type validation
+
+extension NeedleGenerableMacro {
+  fileprivate enum ExampleValueType: Hashable {
+    case string
+    case integer
+    case number
+    case boolean
+    case null
+    case array
+    case object
+
+    var isContainer: Bool {
+      self == .array || self == .object
+    }
+  }
+
+  fileprivate struct NeedleGuideExamplesTypeMismatchWarning: DiagnosticMessage {
+    let propertyName: String
+    let expectedType: String
+    let actualType: String
+    let exampleText: String
+
+    var message: String {
+      "@NeedleGuide examples for '\(propertyName)' have type '\(actualType)' but the schema expects '\(expectedType)' (example: \(exampleText))"
+    }
+    var severity: DiagnosticSeverity { .warning }
+    var diagnosticID: MessageID {
+      MessageID(domain: "NeedleMacros", id: "NeedleGuideExamplesTypeMismatch")
+    }
+  }
+
+  private static func validateExamplesType(
+    _ selection: NeedleGuideSelection,
+    parsedType: ParsedTypeName,
+    propertyName: String,
+    context: some MacroExpansionContext
+  ) {
+    guard let examplesExpression = selection.examplesExpression,
+      let topLevelExpected = Self.expectedValueType(
+        for: selection.schemaSpecifier,
+        parsedType: parsedType
+      )
+    else { return }
+
+    if case .custom = selection.schemaSpecifier { return }
+
+    let innerElementTypeName: String? = parsedType.arrayElementTypeName
+    let innerValueTypeName: String? = parsedType.dictionaryValueTypeName
+
+    Self.validateExamplesArray(
+      examplesExpression,
+      expected: topLevelExpected,
+      innerSchema: Self.innerSchema(for: selection.schemaSpecifier),
+      innerElementTypeName: innerElementTypeName,
+      innerValueTypeName: innerValueTypeName,
+      propertyName: propertyName,
+      attribute: selection.attribute,
+      context: context
+    )
+  }
+
+  private static func validateExamplesArray(
+    _ expression: ExprSyntax,
+    expected: ExampleValueType,
+    innerSchema: SchemaSpecifier?,
+    innerElementTypeName: String?,
+    innerValueTypeName: String?,
+    propertyName: String,
+    attribute: AttributeSyntax,
+    context: some MacroExpansionContext
+  ) {
+    guard let arrayExpression = expression.as(ArrayExprSyntax.self) else { return }
+
+    for element in arrayExpression.elements {
+      Self.validateExampleElement(
+        element.expression,
+        expected: expected,
+        innerSchema: innerSchema,
+        innerElementTypeName: innerElementTypeName,
+        innerValueTypeName: innerValueTypeName,
+        propertyName: propertyName,
+        attribute: attribute,
+        context: context
+      )
+    }
+  }
+
+  private static func validateExampleElement(
+    _ expression: ExprSyntax,
+    expected: ExampleValueType,
+    innerSchema: SchemaSpecifier?,
+    innerElementTypeName: String?,
+    innerValueTypeName: String?,
+    propertyName: String,
+    attribute: AttributeSyntax,
+    context: some MacroExpansionContext
+  ) {
+    if expected == .null { return }
+    let actual = Self.classifyLiteral(expression)
+    guard let actual else { return }
+    if actual == .null { return }
+
+    if expected == .array, let innerArray = expression.as(ArrayExprSyntax.self) {
+      let elementExpected = Self.resolveInnerExpectedType(
+        innerSchema: innerSchema,
+        fallbackTypeName: innerElementTypeName
+      )
+      if let elementExpected {
+        for element in innerArray.elements {
+          Self.validateExampleElement(
+            element.expression,
+            expected: elementExpected,
+            innerSchema: nil,
+            innerElementTypeName: nil,
+            innerValueTypeName: nil,
+            propertyName: propertyName,
+            attribute: attribute,
+            context: context
+          )
+        }
+      }
+      return
+    }
+
+    if expected == .object, let dict = expression.as(DictionaryExprSyntax.self) {
+      let valueExpected = Self.resolveInnerExpectedType(
+        innerSchema: innerSchema,
+        fallbackTypeName: innerValueTypeName
+      )
+      if let valueExpected, case .elements(let elements) = dict.content {
+        for element in elements {
+          Self.validateExampleElement(
+            element.value,
+            expected: valueExpected,
+            innerSchema: nil,
+            innerElementTypeName: nil,
+            innerValueTypeName: nil,
+            propertyName: propertyName,
+            attribute: attribute,
+            context: context
+          )
+        }
+      }
+      return
+    }
+
+    guard !Self.isCompatible(actual: actual, expected: expected) else { return }
+
+    Self.emitMismatchWarning(
+      expression: expression,
+      actual: actual,
+      expected: expected,
+      propertyName: propertyName,
+      context: context
+    )
+  }
+
+  private static func emitMismatchWarning(
+    expression: ExprSyntax,
+    actual: ExampleValueType,
+    expected: ExampleValueType,
+    propertyName: String,
+    context: some MacroExpansionContext
+  ) {
+    let actualType = Self.valueTypeName(actual)
+    let expectedType = Self.valueTypeName(expected)
+
+    context.diagnose(
+      Diagnostic(
+        node: expression,
+        message: NeedleGuideExamplesTypeMismatchWarning(
+          propertyName: propertyName,
+          expectedType: expectedType,
+          actualType: actualType,
+          exampleText: expression.trimmedDescription
+        )
+      )
+    )
+  }
+
+  private static func innerSchema(for specifier: SchemaSpecifier) -> SchemaSpecifier? {
+    switch specifier {
+    case .array(_, let itemSchema): return itemSchema
+    case .object(_, let additionalPropertiesSchema): return additionalPropertiesSchema
+    default: return nil
+    }
+  }
+
+  private static func resolveInnerExpectedType(
+    innerSchema: SchemaSpecifier?,
+    fallbackTypeName: String?
+  ) -> ExampleValueType? {
+    if let innerSchema {
+      switch innerSchema {
+      case .string: return .string
+      case .number: return .number
+      case .integer: return .integer
+      case .boolean: return .boolean
+      case .array: return .array
+      case .object: return .object
+      case .inferred:
+        guard let fallbackTypeName else { return nil }
+        return Self.inferredValueType(from: Self.parseTypeName(fallbackTypeName))
+      case .custom: return nil
+      }
+    }
+    guard let fallbackTypeName else { return nil }
+    return Self.inferredValueType(from: Self.parseTypeName(fallbackTypeName))
+  }
+
+  fileprivate static func classifyLiteral(
+    _ expression: ExprSyntax
+  ) -> ExampleValueType? {
+    if expression.is(StringLiteralExprSyntax.self) { return .string }
+    if expression.is(IntegerLiteralExprSyntax.self) { return .integer }
+    if expression.is(FloatLiteralExprSyntax.self) { return .number }
+    if expression.is(BooleanLiteralExprSyntax.self) { return .boolean }
+    if expression.is(NilLiteralExprSyntax.self) { return .null }
+    if expression.is(ArrayExprSyntax.self) { return .array }
+    if expression.is(DictionaryExprSyntax.self) { return .object }
+    return nil
+  }
+
+  fileprivate static func isCompatible(
+    actual: ExampleValueType,
+    expected: ExampleValueType
+  ) -> Bool {
+    if actual == expected { return true }
+    if actual == .integer && expected == .number { return true }
+    return false
+  }
+
+  fileprivate static func valueTypeName(
+    _ type: ExampleValueType
+  ) -> String {
+    switch type {
+    case .string: "string"
+    case .integer: "integer"
+    case .number: "number"
+    case .boolean: "boolean"
+    case .array: "array"
+    case .object: "object"
+    case .null: "null"
+    }
+  }
+
+  private static func expectedValueType(
+    for specifier: SchemaSpecifier,
+    parsedType: ParsedTypeName
+  ) -> ExampleValueType? {
+    switch specifier {
+    case .string: .string
+    case .number: .number
+    case .integer: .integer
+    case .boolean: .boolean
+    case .array: .array
+    case .object: .object
+    case .inferred: Self.inferredValueType(from: parsedType)
+    case .custom: nil
+    }
+  }
+
+  private static func inferredValueType(
+    from parsedType: ParsedTypeName
+  ) -> ExampleValueType? {
+    if Self.stringSemanticTypes.contains(parsedType.base) { return .string }
+    if Self.booleanSemanticTypes.contains(parsedType.base) { return .boolean }
+    if Self.integerSemanticTypes.contains(parsedType.base) { return .integer }
+    if Self.numberSemanticTypes.contains(parsedType.base) { return .number }
+    return nil
   }
 }

@@ -1513,3 +1513,504 @@ extension BaseTestSuite {
     }
   }
 }
+
+// MARK: - NeedleGuide examples type-warning tests
+
+extension BaseTestSuite {
+  @Suite
+  struct `NeedleGuide examples type-warning tests` {
+    @Test
+    func `Warns On String Example For Integer Schema`() {
+      assertMacro {
+        """
+        @NeedleGenerable
+        struct Person {
+          @NeedleGuide(.integer(), examples: ["1", "2"])
+          var age: Int
+        }
+        """
+      } diagnostics: {
+        """
+        @NeedleGenerable
+        struct Person {
+          @NeedleGuide(.integer(), examples: ["1", "2"])
+                                                   ┬──
+                                              │    ╰─ ⚠️ @NeedleGuide examples for 'age' have type 'string' but the schema expects 'integer' (example: "2")
+                                              ┬──
+                                              ╰─ ⚠️ @NeedleGuide examples for 'age' have type 'string' but the schema expects 'integer' (example: "1")
+          var age: Int
+        }
+        """
+      } expansion: {
+        """
+        struct Person {
+          var age: Int
+
+          static var needleGenerationSchema: NeedleGenerationSchema {
+            .object(
+              valueSchema: .object(
+                properties: [
+                  "age": _needleMergeGenerationSchema(.integer(), examples: ["1", "2"])
+                ],
+                required: ["age"]
+              )
+            )
+          }
+
+          init(needleValue: NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.age = try Int(needleValue: _needleValue(object, forKey: "age"))
+          }
+        }
+
+        extension Person: NeedleGenerable {
+        }
+        """
+      }
+    }
+
+    @Test
+    func `Warns On Integer Example For String Schema`() {
+      assertMacro {
+        """
+        @NeedleGenerable
+        struct Person {
+          @NeedleGuide(.string(), examples: [1, 2])
+          var firstName: String
+        }
+        """
+      } diagnostics: {
+        """
+        @NeedleGenerable
+        struct Person {
+          @NeedleGuide(.string(), examples: [1, 2])
+                                                ┬
+                                             │  ╰─ ⚠️ @NeedleGuide examples for 'firstName' have type 'integer' but the schema expects 'string' (example: 2)
+                                             ┬
+                                             ╰─ ⚠️ @NeedleGuide examples for 'firstName' have type 'integer' but the schema expects 'string' (example: 1)
+          var firstName: String
+        }
+        """
+      } expansion: {
+        """
+        struct Person {
+          var firstName: String
+
+          static var needleGenerationSchema: NeedleGenerationSchema {
+            .object(
+              valueSchema: .object(
+                properties: [
+                  "firstName": _needleMergeGenerationSchema(.string(), examples: [1, 2])
+                ],
+                required: ["firstName"]
+              )
+            )
+          }
+
+          init(needleValue: NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.firstName = try String(needleValue: _needleValue(object, forKey: "firstName"))
+          }
+        }
+
+        extension Person: NeedleGenerable {
+        }
+        """
+      }
+    }
+
+    @Test
+    func `Warns On Boolean Example For Number Schema`() {
+      assertMacro {
+        """
+        @NeedleGenerable
+        struct Measurement {
+          @NeedleGuide(.number(), examples: [true])
+          var value: Double
+        }
+        """
+      } diagnostics: {
+        """
+        @NeedleGenerable
+        struct Measurement {
+          @NeedleGuide(.number(), examples: [true])
+                                             ┬───
+                                             ╰─ ⚠️ @NeedleGuide examples for 'value' have type 'boolean' but the schema expects 'number' (example: true)
+          var value: Double
+        }
+        """
+      } expansion: {
+        """
+        struct Measurement {
+          var value: Double
+
+          static var needleGenerationSchema: NeedleGenerationSchema {
+            .object(
+              valueSchema: .object(
+                properties: [
+                  "value": _needleMergeGenerationSchema(.number(), examples: [true])
+                ],
+                required: ["value"]
+              )
+            )
+          }
+
+          init(needleValue: NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.value = try Double(needleValue: _needleValue(object, forKey: "value"))
+          }
+        }
+
+        extension Measurement: NeedleGenerable {
+        }
+        """
+      }
+    }
+
+    @Test
+    func `Allows Integer Examples For Number Schema`() {
+      assertMacro {
+        """
+        @NeedleGenerable
+        struct Measurement {
+          @NeedleGuide(.number(), examples: [1, 2])
+          var value: Double
+        }
+        """
+      } expansion: {
+        """
+        struct Measurement {
+          var value: Double
+
+          static var needleGenerationSchema: NeedleGenerationSchema {
+            .object(
+              valueSchema: .object(
+                properties: [
+                  "value": _needleMergeGenerationSchema(.number(), examples: [1, 2])
+                ],
+                required: ["value"]
+              )
+            )
+          }
+
+          init(needleValue: NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.value = try Double(needleValue: _needleValue(object, forKey: "value"))
+          }
+        }
+
+        extension Measurement: NeedleGenerable {
+        }
+        """
+      }
+    }
+
+    @Test
+    func `Warns On Number Example For Integer Schema`() {
+      assertMacro {
+        """
+        @NeedleGenerable
+        struct Person {
+          @NeedleGuide(.integer(), examples: [3.14])
+          var age: Int
+        }
+        """
+      } diagnostics: {
+        """
+        @NeedleGenerable
+        struct Person {
+          @NeedleGuide(.integer(), examples: [3.14])
+                                              ┬───
+                                              ╰─ ⚠️ @NeedleGuide examples for 'age' have type 'number' but the schema expects 'integer' (example: 3.14)
+          var age: Int
+        }
+        """
+      } expansion: {
+        """
+        struct Person {
+          var age: Int
+
+          static var needleGenerationSchema: NeedleGenerationSchema {
+            .object(
+              valueSchema: .object(
+                properties: [
+                  "age": _needleMergeGenerationSchema(.integer(), examples: [3.14])
+                ],
+                required: ["age"]
+              )
+            )
+          }
+
+          init(needleValue: NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.age = try Int(needleValue: _needleValue(object, forKey: "age"))
+          }
+        }
+
+        extension Person: NeedleGenerable {
+        }
+        """
+      }
+    }
+
+    @Test
+    func `Warns On Inferred Guide Against Property Type`() {
+      assertMacro {
+        """
+        @NeedleGenerable
+        struct Person {
+          @NeedleGuide(examples: [true])
+          var firstName: String
+        }
+        """
+      } diagnostics: {
+        """
+        @NeedleGenerable
+        struct Person {
+          @NeedleGuide(examples: [true])
+                                  ┬───
+                                  ╰─ ⚠️ @NeedleGuide examples for 'firstName' have type 'boolean' but the schema expects 'string' (example: true)
+          var firstName: String
+        }
+        """
+      } expansion: {
+        """
+        struct Person {
+          var firstName: String
+
+          static var needleGenerationSchema: NeedleGenerationSchema {
+            .object(
+              valueSchema: .object(
+                properties: [
+                  "firstName": _needleMergeGenerationSchema(String.needleGenerationSchema, examples: [true])
+                ],
+                required: ["firstName"]
+              )
+            )
+          }
+
+          init(needleValue: NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.firstName = try String(needleValue: _needleValue(object, forKey: "firstName"))
+          }
+        }
+
+        extension Person: NeedleGenerable {
+        }
+        """
+      }
+    }
+
+    @Test
+    func `Warns On Array Item Mismatch`() {
+      assertMacro {
+        """
+        @NeedleGenerable
+        struct Post {
+          @NeedleGuide(.array(items: .string()), examples: [[1, 2]])
+          var tags: [String]
+        }
+        """
+      } diagnostics: {
+        """
+        @NeedleGenerable
+        struct Post {
+          @NeedleGuide(.array(items: .string()), examples: [[1, 2]])
+                                                                ┬
+                                                             │  ╰─ ⚠️ @NeedleGuide examples for 'tags' have type 'integer' but the schema expects 'string' (example: 2)
+                                                             ┬
+                                                             ╰─ ⚠️ @NeedleGuide examples for 'tags' have type 'integer' but the schema expects 'string' (example: 1)
+          var tags: [String]
+        }
+        """
+      } expansion: {
+        """
+        struct Post {
+          var tags: [String]
+
+          static var needleGenerationSchema: NeedleGenerationSchema {
+            .object(
+              valueSchema: .object(
+                properties: [
+                  "tags": _needleMergeGenerationSchema(.array(items: .string()), examples: [[1, 2]])
+                ],
+                required: ["tags"]
+              )
+            )
+          }
+
+          init(needleValue: NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.tags = try [String](needleValue: _needleValue(object, forKey: "tags"))
+          }
+        }
+
+        extension Post: NeedleGenerable {
+        }
+        """
+      }
+    }
+
+    @Test
+    func `Warns On Object Value Mismatch`() {
+      assertMacro {
+        """
+        @NeedleGenerable
+        struct Payload {
+          @NeedleGuide(.object(additionalProperties: .integer()), examples: [["k": "v"]])
+          var metadata: [String: Int]
+        }
+        """
+      } diagnostics: {
+        """
+        @NeedleGenerable
+        struct Payload {
+          @NeedleGuide(.object(additionalProperties: .integer()), examples: [["k": "v"]])
+                                                                                   ┬──
+                                                                                   ╰─ ⚠️ @NeedleGuide examples for 'metadata' have type 'string' but the schema expects 'integer' (example: "v")
+          var metadata: [String: Int]
+        }
+        """
+      } expansion: {
+        """
+        struct Payload {
+          var metadata: [String: Int]
+
+          static var needleGenerationSchema: NeedleGenerationSchema {
+            .object(
+              valueSchema: .object(
+                properties: [
+                  "metadata": _needleMergeGenerationSchema(.object(additionalProperties: .integer()), examples: [["k": "v"]])
+                ],
+                required: ["metadata"]
+              )
+            )
+          }
+
+          init(needleValue: NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.metadata = try [String: Int](needleValue: _needleValue(object, forKey: "metadata"))
+          }
+        }
+
+        extension Payload: NeedleGenerable {
+        }
+        """
+      }
+    }
+
+    @Test
+    func `Skips Unresolvable Example`() {
+      assertMacro {
+        """
+        @NeedleGenerable
+        struct Person {
+          @NeedleGuide(.string(), examples: someArray)
+          var firstName: String
+        }
+        """
+      } expansion: {
+        """
+        struct Person {
+          var firstName: String
+
+          static var needleGenerationSchema: NeedleGenerationSchema {
+            .object(
+              valueSchema: .object(
+                properties: [
+                  "firstName": _needleMergeGenerationSchema(.string(), examples: someArray)
+                ],
+                required: ["firstName"]
+              )
+            )
+          }
+
+          init(needleValue: NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.firstName = try String(needleValue: _needleValue(object, forKey: "firstName"))
+          }
+        }
+
+        extension Person: NeedleGenerable {
+        }
+        """
+      }
+    }
+
+    @Test
+    func `Skips Custom Schema Examples Check`() {
+      assertMacro {
+        """
+        @NeedleGenerable
+        struct Person {
+          @NeedleGuide(.custom(.string()), examples: [1, 2])
+          var firstName: String
+        }
+        """
+      } expansion: {
+        """
+        struct Person {
+          var firstName: String
+
+          static var needleGenerationSchema: NeedleGenerationSchema {
+            .object(
+              valueSchema: .object(
+                properties: [
+                  "firstName": _needleMergeGenerationSchema(.string(), examples: [1, 2])
+                ],
+                required: ["firstName"]
+              )
+            )
+          }
+
+          init(needleValue: NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.firstName = try String(needleValue: _needleValue(object, forKey: "firstName"))
+          }
+        }
+
+        extension Person: NeedleGenerable {
+        }
+        """
+      }
+    }
+
+    @Test
+    func `Allows Null Example`() {
+      assertMacro {
+        """
+        @NeedleGenerable
+        struct Person {
+          @NeedleGuide(.string(), examples: [nil, "a"])
+          var firstName: String
+        }
+        """
+      } expansion: {
+        """
+        struct Person {
+          var firstName: String
+
+          static var needleGenerationSchema: NeedleGenerationSchema {
+            .object(
+              valueSchema: .object(
+                properties: [
+                  "firstName": _needleMergeGenerationSchema(.string(), examples: [nil, "a"])
+                ],
+                required: ["firstName"]
+              )
+            )
+          }
+
+          init(needleValue: NeedleValue) throws {
+            let object = try _needleRequireObjectValue(needleValue)
+            self.firstName = try String(needleValue: _needleValue(object, forKey: "firstName"))
+          }
+        }
+
+        extension Person: NeedleGenerable {
+        }
+        """
+      }
+    }
+  }
+}
