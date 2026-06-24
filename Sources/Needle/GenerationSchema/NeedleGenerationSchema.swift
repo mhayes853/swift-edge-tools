@@ -1130,9 +1130,3 @@ extension NeedleGenerationSchema.ValueSchema {
   }
 }
 
-extension NeedleGenerationSchema.ValueType {
-  fileprivate var containedTypes: [Self] {
-    let allTypes = [Self.integer, .string, .boolean, .array, .object, .number, .null]
-    return allTypes.filter { self.contains($0) }
-  }
-}

@@ -234,12 +234,6 @@
       return tokenIds.filter { !specialTokenIds.contains($0) }
     }
 
-    private static func sendingTokenizer(
-      _ tokenizer: consuming needle_sp_tokenizer_t
-    ) -> sending needle_sp_tokenizer_t {
-      UnsafeMutableRawPointer(bitPattern: Int(bitPattern: tokenizer))!
-    }
-
     private func withCCharStringBuffer<Result>(
       count: Int,
       _ body: (UnsafeMutableBufferPointer<UnsafeMutablePointer<CChar>?>) throws -> Result
