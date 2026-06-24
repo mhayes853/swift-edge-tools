@@ -380,6 +380,9 @@ extension NeedleSession {
     parameters: sending Engine.GenerateParameters = .default,
     shouldInvokeTools: Bool = true
   ) -> NeedleSessionStream {
+    if let message = duplicateToolNameError(Set(tools.map(\.name))) {
+      preconditionFailure(message)
+    }
     let stream = NeedleSessionStream(
       session: self,
       tools: tools,
@@ -393,6 +396,24 @@ extension NeedleSession {
     }
     return stream
   }
+}
+
+// MARK: - Duplicate Tool Name Error
+
+package func duplicateToolNameError(_ names: Set<String>) -> String? {
+  var grouped = [String: [String]]()
+  for name in names {
+    grouped[name.snakeCased(), default: []].append(name)
+  }
+  let duplicates = grouped.filter { $0.value.count > 1 }
+  guard !duplicates.isEmpty else { return nil }
+  return
+    duplicates
+    .sorted { $0.key < $1.key }
+    .map { normalized, originals in
+      "The names \(originals.sorted().map { "'\($0)'" }.joined(separator: " and ")) all normalize to '\(normalized)'."
+    }
+    .joined(separator: "\n")
 }
 
 // MARK: - Parse State

@@ -612,7 +612,7 @@
 
   // MARK: - MockEngine
 
-    private final class MockEngine: NeedleEngine, Sendable {
+  private final class MockEngine: NeedleEngine, Sendable {
     struct GenerateParameters: NeedleEngineGenerateParameters {
       static let `default` = GenerateParameters()
     }
@@ -734,5 +734,62 @@
     }
 
     func reset() {}
+  }
+
+  // MARK: - GetWeatherTool
+
+  private struct GetWeatherTool: NeedleTool {
+    typealias Input = String
+    typealias Output = String
+
+    let name = "GetWeather"
+    let description = ""
+
+    func invoke(input: String) async throws -> sending String { "" }
+  }
+
+  // MARK: - Identical Snake Case Tool
+
+  private struct GETWEATHERTOOL: NeedleTool {
+    typealias Input = String
+    typealias Output = String
+
+    let name = "GETWEATHER"
+    let description = ""
+
+    func invoke(input: String) async throws -> sending String { "" }
+  }
+
+  // MARK: - Duplicate Tool Name Precondition
+
+  @Suite
+  struct `Duplicate Tool Name Precondition tests` {
+    @Test
+    func `Stream With Duplicate Tool Names Causes Precondition Failure`() async {
+      await #expect(processExitsWith: .failure) {
+        let session = NeedleSession(engine: MockEngine())
+        _ = session.stream(
+          tools: [CamelCaseWeatherTool(), GetWeatherTool()],
+          with: "hi"
+        )
+      }
+    }
+
+    @Test
+    func `Duplicate Tool Name Error`() throws {
+      let message = try #require(
+        duplicateToolNameError(["getWeather", "GetWeather", "get_weather"])
+      )
+      #expect(message.contains("'getWeather'"))
+      #expect(message.contains("'GetWeather'"))
+      #expect(message.contains("'get_weather'"))
+      #expect(message.contains("normalize to 'get_weather'"))
+    }
+
+    @Test
+    func `No Error For Unique Names`() {
+      let message = duplicateToolNameError(["getWeather", "planTrip"])
+      #expect(message == nil)
+    }
   }
 #endif
