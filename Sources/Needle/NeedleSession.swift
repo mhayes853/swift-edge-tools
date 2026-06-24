@@ -275,7 +275,6 @@ extension NeedleSessionStream {
     private var nextTokenContinuationID = 0
     private var nextToolContinuationID = 0
     private(set) var toolCalls = NeedleToolCallCollection()
-    private var toolInvocationTasks = [Task<Void, Never>]()
     var task: Task<NeedleSessionGeneration, any Error>?
 
     mutating func beginGenerating(stopper: NeedleEngineStopper?) {
@@ -417,7 +416,7 @@ private struct ToolCallParseState {
   init(tools: [any NeedleTool]) {
     var byName = [String: any NeedleTool]()
     for tool in tools {
-      byName[tool.name] = tool
+      byName[tool.name.snakeCased()] = tool
     }
     self.toolsByName = byName
   }

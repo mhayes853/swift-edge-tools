@@ -39,7 +39,7 @@ public struct NeedleEngineStopper: Sendable {
 public struct NeedleEngineGeneration: Sendable {
   public var prefillMetrics: NeedlePrefillMetrics
   public var decodeMetrics: NeedleDecodeMetrics
-  public var wasStoped: Bool
+  public var wasStopped: Bool
   public var tokens: [NeedleToken]
   public var metadata: NeedleMetadata
 
@@ -52,7 +52,7 @@ public struct NeedleEngineGeneration: Sendable {
   ) {
     self.prefillMetrics = prefillMetrics
     self.decodeMetrics = decodeMetrics
-    self.wasStoped = wasStopped
+    self.wasStopped = wasStopped
     self.tokens = tokens
     self.metadata = metadata
   }
@@ -69,7 +69,7 @@ extension NeedleEngineGeneration {
   public var isEmpty: Bool {
     self.prefillMetrics == Self.empty.prefillMetrics
       && self.decodeMetrics == Self.empty.decodeMetrics
-      && self.wasStoped
+      && self.wasStopped
       && self.tokens.isEmpty
       && self.metadata.isEmpty
   }

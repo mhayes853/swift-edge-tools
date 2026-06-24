@@ -23,7 +23,7 @@
         parameters: .default,
         onToken: { tokens.append($0) }
       )
-      expectNoDifference(generation.wasStoped, false)
+      expectNoDifference(generation.wasStopped, false)
       withExpectedIssue {
         assertSnapshot(of: generation, as: .dump, record: .all)
         assertSnapshot(of: generation.metadata, as: .dump, record: .all)
@@ -59,7 +59,7 @@
         }
       )
 
-      expectNoDifference(generation.wasStoped, true)
+      expectNoDifference(generation.wasStopped, true)
       expectNoDifference(tokens.count > 0, true)
       expectNoDifference(generation.decodeMetrics.tokens, tokens.count)
       expectNoDifference(generation.tokens.isEmpty, false)
@@ -90,7 +90,7 @@
         parameters: NeedleMLXEngine.GenerateParamaters(kvCacheQuantizationBits: 4),
         onToken: { tokens.append($0) }
       )
-      expectNoDifference(generation.wasStoped, false)
+      expectNoDifference(generation.wasStopped, false)
       withExpectedIssue {
         assertSnapshot(of: generation, as: .dump, record: .all)
         assertSnapshot(of: generation.metadata, as: .dump, record: .all)
@@ -107,7 +107,7 @@
         tools: [SendEmailTool()],
         with: Self.basePrompt.user
       )
-      expectNoDifference(generation.engineGeneration.wasStoped, false)
+      expectNoDifference(generation.engineGeneration.wasStopped, false)
       withExpectedIssue {
         assertSnapshot(of: generation, as: .dump, record: .all)
         assertSnapshot(

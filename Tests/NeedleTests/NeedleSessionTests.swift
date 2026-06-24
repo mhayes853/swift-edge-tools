@@ -33,7 +33,7 @@
       let generation = try await stream.finalGeneration
 
       expectNoDifference(generation.engineGeneration.tokens, tokens)
-      expectNoDifference(generation.engineGeneration.wasStoped, false)
+      expectNoDifference(generation.engineGeneration.wasStopped, false)
       expectNoDifference(generation.toolCalls.count, 0)
     }
 
@@ -48,7 +48,7 @@
       let generation = try await session.generate(tools: [WeatherTool()], with: "weather?")
 
       expectNoDifference(generation.engineGeneration.tokens, toolTokens)
-      expectNoDifference(generation.engineGeneration.wasStoped, false)
+      expectNoDifference(generation.engineGeneration.wasStopped, false)
       expectNoDifference(generation.toolCalls.count, 1)
       expectNoDifference(generation.toolCalls[0].tool.name, "get_weather")
       let args = try #require(generation.toolCalls[0].input as? WeatherArgs)
@@ -197,7 +197,7 @@
       engine.push(nil)
 
       let generation = try await generationTask.value
-      expectNoDifference(generation.engineGeneration.wasStoped, true)
+      expectNoDifference(generation.engineGeneration.wasStopped, true)
       expectNoDifference(generation.engineGeneration.tokens, [firstToken])
     }
 
@@ -341,6 +341,26 @@
       didChange.withLock { expectNoDifference($0, true) }
 
       _ = try await stream.finalGeneration
+    }
+
+    @Test
+    func `Tool Call Parsed When Tool Name Differs From Snake Cased`() async throws {
+      let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+      let rawToolCall =
+        #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
+      let toolTokens = rawToolCall.tokenize(using: tokenizer)
+      let engine = MockEngine(script: toolTokens.map { .token($0) } + [.finish])
+      let session = NeedleSession(engine: engine)
+
+      let generation = try await session.generate(
+        tools: [CamelCaseWeatherTool()],
+        with: "weather?"
+      )
+
+      expectNoDifference(generation.toolCalls.count, 1)
+      expectNoDifference(generation.toolCalls[0].tool.name, "getWeather")
+      let args = try #require(generation.toolCalls[0].input as? WeatherArgs)
+      expectNoDifference(args.location, "Seoul")
     }
 
     @Test
@@ -528,6 +548,20 @@
     typealias Output = String
 
     let name = "get_weather"
+    let description = "Gets the current weather for a location."
+
+    func invoke(input: WeatherArgs) async throws -> sending String {
+      "Sunny in \(input.location)"
+    }
+  }
+
+  // MARK: - CamelCaseWeatherTool
+
+  private struct CamelCaseWeatherTool: NeedleTool {
+    typealias Input = WeatherArgs
+    typealias Output = String
+
+    let name = "getWeather"
     let description = "Gets the current weather for a location."
 
     func invoke(input: WeatherArgs) async throws -> sending String {
