@@ -1,28 +1,78 @@
-▿ 3 key/value pairs
+▿ 5 key/value pairs
+  ▿ (2 elements)
+    ▿ key: NeedleMetadataKey
+      - rawValue: "MLXEngineGenerationConfidence"
+    - value: 0.93615663
   ▿ (2 elements)
     ▿ key: NeedleMetadataKey
       - rawValue: "MLXEngineGenerationStartMemorySnapshot"
-    ▿ value: Peak:   117M         (123193060)
+    ▿ value: Peak:   108M         (113655694)
 Active: 0K           (288)
-Cache:  134M         (140862148)
+Cache:  125M         (131860398)
       - activeMemory: 288
-      - cacheMemory: 140862148
-      - peakMemory: 123193060
+      - cacheMemory: 131860398
+      - peakMemory: 113655694
   ▿ (2 elements)
     ▿ key: NeedleMetadataKey
       - rawValue: "MLXEnginePostDecodeMemorySnapshot"
-    ▿ value: Peak:   117M         (123193060)
-Active: 56M          (59693036)
-Cache:  84M          (88411128)
-      - activeMemory: 59693036
-      - cacheMemory: 88411128
-      - peakMemory: 123193060
+    ▿ value: Peak:   108M         (113655694)
+Active: 56M          (59742124)
+Cache:  76M          (79917346)
+      - activeMemory: 59742124
+      - cacheMemory: 79917346
+      - peakMemory: 113655694
   ▿ (2 elements)
     ▿ key: NeedleMetadataKey
       - rawValue: "MLXEnginePostPrefillMemorySnapshot"
-    ▿ value: Peak:   117M         (123193060)
-Active: 54M          (56680784)
-Cache:  87M          (91423380)
-      - activeMemory: 56680784
-      - cacheMemory: 91423380
-      - peakMemory: 123193060
+    ▿ value: Peak:   108M         (113655694)
+Active: 54M          (56713488)
+Cache:  79M          (82945982)
+      - activeMemory: 56713488
+      - cacheMemory: 82945982
+      - peakMemory: 113655694
+  ▿ (2 elements)
+    ▿ key: NeedleMetadataKey
+      - rawValue: "MLXEngineTokenUncertainties"
+    ▿ value: 42 elements
+      - 0.0
+      - 0.03517568
+      - 3.5762787e-06
+      - 0.0
+      - 2.3841858e-07
+      - 0.0
+      - 1.1920929e-07
+      - 1.6450882e-05
+      - 1.847744e-05
+      - 0.0
+      - 0.022453964
+      - 8.940697e-06
+      - 0.23144263
+      - 0.09533757
+      - 0.22900343
+      - 0.054371953
+      - 0.0
+      - 2.8133392e-05
+      - 0.0
+      - 0.0008434057
+      - 1.66893e-06
+      - 0.016782999
+      - 0.0003774166
+      - 0.39024377
+      - 0.28462183
+      - 0.0038642287
+      - 0.0052660704
+      - 0.10854399
+      - 0.028580546
+      - 0.07797587
+      - 0.0026090145
+      - 9.763241e-05
+      - 9.608269e-05
+      - 0.38760477
+      - 0.42645735
+      - 1.9073486e-05
+      - 0.003558576
+      - 0.09333253
+      - 0.00031900406
+      - 0.0017130971
+      - 0.18065196
+      - 0.0

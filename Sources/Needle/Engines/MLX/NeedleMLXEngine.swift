@@ -114,17 +114,22 @@
 
       var detokenizer = StreamingDetokenizer(tokenizer: self.tokenizer)
       var generatedTokens = [NeedleToken]()
+      var entropy = EntropyState()
       while !matcher.isTerminated
         && !self.isStopped.load(ordering: .relaxed)
         && detokenizer.tokenIds.count < (parameters.maxTokens ?? .max)
       {
         try Task.checkCancellation()
-        let logits = processor?.process(logits: output.logits) ?? output.logits
-        let (token, tokenId) = self.sampleToken(
-          logits: logits,
-          and: parameters.sampler,
-          matcher: matcher
+        let processedLogits = processor?.process(logits: output.logits) ?? output.logits
+        let logits = applyBitmaskMLX(
+          logits: processedLogits[0..., -1, 0...],
+          mask: matcher.bitmask()
         )
+        entropy.add(tokenUncertaintyMLX(logits: logits))
+
+        let token = parameters.sampler.sample(logits: logits)
+        let tokenId = token.item(NeedleToken.ID.self)
+
         _durationToFirstToken = _durationToFirstToken ?? generateStart.duration(to: self.clock.now)
         let tokenString = detokenizer.decode(tokenId: tokenId)
         let needleToken = NeedleToken(id: tokenId, stringValue: tokenString)
@@ -151,6 +156,8 @@
       metadata.mlxEngineGenerationStartMemorySnapshot = generationStartSnapshot
       metadata.mlxEnginePostPrefillMemorySnapshot = postPrefillSnapshot
       metadata.mlxEnginePostDecodeMemorySnapshot = postDecodeSnapshot
+      metadata.mlxEngineGenerationConfidence = entropy.meanConfidence()
+      metadata.mlxEngineTokenUncertainties = entropy.tokenUncertainties
       return NeedleEngineGeneration(
         prefillMetrics: prefillMetrics,
         decodeMetrics: NeedleDecodeMetrics(
@@ -174,17 +181,6 @@
       self.kvCache = self.model.newCache(parameters: nil)
       self.matcherPool.clear()
       self.grammarEngine.clearCache()
-    }
-
-    private func sampleToken(
-      logits: MLXArray,
-      and sampler: any LogitSampler,
-      matcher: NeedleXGrammarEngine.Matcher
-    ) -> (MLXArray, NeedleToken.ID) {
-      let logits = applyBitmaskMLX(logits: logits[0..., -1, 0...], mask: matcher.bitmask())
-      let token = sampler.sample(logits: logits)
-      let tokenId = token.item(NeedleToken.ID.self)
-      return (token, tokenId)
     }
 
     private func prefill(
@@ -287,6 +283,24 @@
       guard !tokenString.hasSuffix(Self.replacementCharacter) else { return "" }
       self.streamedResponse = decodedResponse
       return tokenString
+    }
+  }
+
+  // MARK: - EntropyState
+
+  private struct EntropyState {
+    private(set) var tokenUncertainties = [Float]()
+    private var totalSum: Float = 0
+    private var totalCount: Int = 0
+
+    mutating func add(_ uncertainty: Float) {
+      self.tokenUncertainties.append(uncertainty)
+      self.totalSum += uncertainty
+      self.totalCount += 1
+    }
+
+    func meanConfidence() -> Float? {
+      self.totalCount > 0 ? 1 - (self.totalSum / Float(self.totalCount)) : nil
     }
   }
 

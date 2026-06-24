@@ -12,6 +12,12 @@
 
     public static let mlxEnginePostDecodeMemorySnapshot =
       NeedleMetadataKey(rawValue: "MLXEnginePostDecodeMemorySnapshot")
+
+    public static let mlxEngineGenerationConfidence =
+      NeedleMetadataKey(rawValue: "MLXEngineGenerationConfidence")
+
+    public static let mlxEngineTokenUncertainties =
+      NeedleMetadataKey(rawValue: "MLXEngineTokenUncertainties")
   }
 
   // MARK: - NeedleMetadata (MLX)
@@ -30,6 +36,16 @@
     public var mlxEnginePostDecodeMemorySnapshot: Memory.Snapshot? {
       get { self[.mlxEnginePostDecodeMemorySnapshot] as? Memory.Snapshot }
       set { self[.mlxEnginePostDecodeMemorySnapshot] = newValue }
+    }
+
+    public var mlxEngineGenerationConfidence: Float? {
+      get { self[.mlxEngineGenerationConfidence] as? Float }
+      set { self[.mlxEngineGenerationConfidence] = newValue }
+    }
+
+    public var mlxEngineTokenUncertainties: [Float]? {
+      get { self[.mlxEngineTokenUncertainties] as? [Float] }
+      set { self[.mlxEngineTokenUncertainties] = newValue }
     }
   }
 #endif

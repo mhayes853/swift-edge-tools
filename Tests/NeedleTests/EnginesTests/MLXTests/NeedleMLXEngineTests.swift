@@ -160,6 +160,24 @@
       expectNoDifference(processor.processCalls > 0, true)
       expectNoDifference(processor.didSampleCalls, processor.processCalls)
     }
+
+    @Test
+    func `Generate Records Mean Confidence In Range Zero To One`() async throws {
+      let generation = try self.engine.generate(
+        prompt: Self.basePrompt,
+        parameters: .default,
+        onToken: { _ in }
+      )
+
+      let confidence = try #require(generation.metadata.mlxEngineGenerationConfidence)
+      expectNoDifference((0...1).contains(confidence), true)
+
+      let perToken = try #require(generation.metadata.mlxEngineTokenUncertainties)
+      expectNoDifference(perToken.count, generation.tokens.count)
+      for uncertainty in perToken {
+        expectNoDifference((0...1).contains(uncertainty), true)
+      }
+    }
   }
 
   extension `NeedleMLXEngine tests` {
