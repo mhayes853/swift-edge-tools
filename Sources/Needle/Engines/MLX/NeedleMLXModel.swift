@@ -85,7 +85,8 @@
       cache: [any KVCache]?,
       state: LMOutput.State?
     ) -> LMOutput {
-      let encoderOutput = state?.crossAttentionStates ?? self.encoderOutput ?? self.defaultEncoderOutput
+      let encoderOutput =
+        state?.crossAttentionStates ?? self.encoderOutput ?? self.defaultEncoderOutput
       let precomputedCrossAttention =
         self.crossAttentionKV ?? self.model.precomputeCrossAttention(encoderOutput: encoderOutput)
       let output = self.model.decode(
@@ -182,7 +183,7 @@
     }
 
     func precomputeCrossAttention(encoderOutput: MLXArray) -> [ProjectedAttentionKV] {
-      self.decoder.precomputeCrossAttention(encoderOutput: encoderOutput)
+      self.decoder.layers.map { $0.crossAttention.project(kv: encoderOutput) }
     }
   }
 
@@ -291,10 +292,6 @@
       }
       return self.finalNorm(x)
     }
-
-    func precomputeCrossAttention(encoderOutput: MLXArray) -> [ProjectedAttentionKV] {
-      self.layers.map { $0.precomputeCrossAttention(encoderOutput: encoderOutput) }
-    }
   }
 
   private final class NeedleDecoderBlock: Module {
@@ -349,10 +346,6 @@
         gate: self.crossAttentionGate,
         sublayer: crossAttention
       )
-    }
-
-    func precomputeCrossAttention(encoderOutput: MLXArray) -> ProjectedAttentionKV {
-      self.crossAttention.project(kv: encoderOutput)
     }
   }
 

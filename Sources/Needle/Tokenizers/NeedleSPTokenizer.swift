@@ -36,7 +36,7 @@
       self.unknownTokenId.flatMap(self.convertIdToToken)
     }
 
-    public var unknownTokenId: Int? {
+    public var unknownTokenId: NeedleToken.ID? {
       self.tokenizer.withLock { tokenizer in
         Int(needle_sp_tokenizer_unk_token_id(tokenizer))
       }
@@ -44,13 +44,13 @@
 
     public var toolsToken: String { "<tools>" }
 
-    public var toolsTokenId: Int? {
+    public var toolsTokenId: NeedleToken.ID? {
       self.convertTokenToId(self.toolsToken)
     }
 
     public var toolCallToken: String { "<tool_call>" }
 
-    public var toolCallTokenId: Int? {
+    public var toolCallTokenId: NeedleToken.ID? {
       self.convertTokenToId(self.toolCallToken)
     }
 
