@@ -95,7 +95,7 @@ public final class NeedleToolCall<Tool: NeedleTool>: Sendable, Observable, Ident
     }
   }
 
-  public func invoke() async throws -> Tool.Output {
+  public func invokeIfNecessary() async throws -> Tool.Output {
     let action: InvokeAction = self.state.withLock { state in
       switch state.status {
       case .idle:
@@ -171,8 +171,8 @@ public final class AnyNeedleToolCall: Sendable, Observable, Identifiable {
     self.base as? NeedleToolCall<Tool>
   }
 
-  public func invoke() async throws -> any Sendable {
-    try await self.base._invoke()
+  public func invokeIfNecessary() async throws -> any Sendable {
+    try await self.base._invokeIfNecessary()
   }
 }
 
@@ -181,7 +181,7 @@ private protocol _AnyNeedleToolCall: Sendable {
   var _tool: any NeedleTool { get }
   var _input: any ConvertibleFromNeedleValue & Sendable { get nonmutating set }
   var _status: NeedleToolCallStatus<any Sendable> { get }
-  func _invoke() async throws -> any Sendable
+  func _invokeIfNecessary() async throws -> any Sendable
 }
 
 extension NeedleToolCall: _AnyNeedleToolCall {
@@ -202,8 +202,8 @@ extension NeedleToolCall: _AnyNeedleToolCall {
     self.status.map { $0 }
   }
 
-  func _invoke() async throws -> any Sendable {
-    try await self.invoke()
+  func _invokeIfNecessary() async throws -> any Sendable {
+    try await self.invokeIfNecessary()
   }
 }
 

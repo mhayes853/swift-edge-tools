@@ -79,45 +79,28 @@ extension NeedleToolCallCollection {
 // MARK: - Invoke
 
 extension NeedleToolCallCollection {
-  public struct InvocationError: Error, Sendable {
-    public let failures: [Failure]
-
-    public init(failures: [Failure]) {
-      self.failures = failures
-    }
-
-    public struct Failure: Sendable {
-      public let toolCall: AnyNeedleToolCall
-      public let error: any Error
-
-      public init(toolCall: AnyNeedleToolCall, error: any Error) {
-        self.toolCall = toolCall
-        self.error = error
-      }
-    }
+  public struct InvokeOutcome: Sendable {
+    public let tool: any NeedleTool
+    public let result: Result<any Sendable, any Error>
   }
 
-  public func invokeAll() async throws {
-    try await self.invokeAll(where: { _ in true })
+  public func invokeAllIfNecessary() async -> [InvokeOutcome] {
+    await self.invokeAllIfNecessary(where: { _ in true })
   }
 
-  public func invokeAll(where predicate: (Element) -> Bool) async throws {
-    let failures = await withTaskGroup(of: InvocationError.Failure?.self) { group in
+  public func invokeAllIfNecessary(where predicate: (Element) -> Bool) async -> [InvokeOutcome] {
+    await withTaskGroup(of: InvokeOutcome.self) { group in
       for call in self.filter(predicate) {
         group.addTask {
           do {
-            _ = try await call.invoke()
-            return nil
+            let output = try await call.invokeIfNecessary()
+            return InvokeOutcome(tool: call.tool, result: .success(output))
           } catch {
-            return InvocationError.Failure(toolCall: call, error: error)
+            return InvokeOutcome(tool: call.tool, result: .failure(error))
           }
         }
       }
-      return await group.reduce(into: [InvocationError.Failure?]()) { $0.append($1) }
-        .compactMap { $0 }
-    }
-    if !failures.isEmpty {
-      throw InvocationError(failures: failures)
+      return await group.reduce(into: [InvokeOutcome]()) { $0.append($1) }
     }
   }
 }

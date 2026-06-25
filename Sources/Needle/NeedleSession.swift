@@ -340,7 +340,7 @@ extension NeedleSessionStream {
     mutating func emitToolCall(_ toolCall: AnyNeedleToolCall, shouldInvoke: Bool) {
       self.toolCalls.append(toolCall)
       if shouldInvoke {
-        Task { _ = try await toolCall.invoke() }
+        Task { _ = try await toolCall.invokeIfNecessary() }
       }
       for continuation in self.toolsContinuations.values {
         continuation.yield(toolCall)

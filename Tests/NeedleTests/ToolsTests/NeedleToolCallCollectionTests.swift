@@ -14,8 +14,9 @@ struct `NeedleToolCallCollection tests` {
     collection.append(call1)
     collection.append(call2)
 
-    try await collection.invokeAll()
+    let results = await collection.invokeAllIfNecessary()
 
+    expectNoDifference(results.count, 2)
     expectNoDifference(call1.status.isFinished, true)
     expectNoDifference(call2.status.isFinished, true)
   }
@@ -30,14 +31,16 @@ struct `NeedleToolCallCollection tests` {
     collection.append(matchingCall)
     collection.append(nonMatchingCall)
 
-    try await collection.invokeAll(where: { $0.tool.name == "match" })
+    let results = await collection.invokeAllIfNecessary(where: { $0.tool.name == "match" })
 
+    expectNoDifference(results.count, 1)
+    expectNoDifference(results.first?.tool.name, "match")
     expectNoDifference(matchingTool.invokeCount, 1)
     expectNoDifference(nonMatchingTool.invokeCount, 0)
   }
 
   @Test
-  func `InvokeAll Throws Aggregate Error When Some Tools Fail`() async throws {
+  func `InvokeAll Returns Mixed Results When Some Tools Fail`() async throws {
     var collection = NeedleToolCallCollection()
     let successTool = CountingTool(name: "success", output: "ok")
     let failureTool = ThrowingTool(name: "failure", error: ToolError(message: "boom"))
@@ -46,31 +49,43 @@ struct `NeedleToolCallCollection tests` {
     collection.append(failureCall)
     collection.append(successCall)
 
-    let error = await #expect(throws: NeedleToolCallCollection.InvocationError.self) {
-      try await collection.invokeAll()
-    }
+    let results = await collection.invokeAllIfNecessary()
 
-    expectNoDifference(error?.failures.count, 1)
-    expectNoDifference(error?.failures.first?.toolCall.tool.name, "failure")
+    expectNoDifference(results.count, 2)
+    let failures = results.filter { $0.tool.name == "failure" }
+    let successes = results.filter { $0.tool.name == "success" }
+    expectNoDifference(failures.count, 1)
+    expectNoDifference(successes.count, 1)
+    let failureError: ToolError = {
+      guard let result = failures.first?.result else { return ToolError(message: "missing") }
+      if case .failure(let error) = result, let cast = error as? ToolError {
+        return cast
+      }
+      return ToolError(message: "unexpected success")
+    }()
+    expectNoDifference(failureError.message, "boom")
     expectNoDifference(successTool.invokeCount, 1)
   }
 
   @Test
-  func `InvokeAll Does Not Throw When No Tools Match`() async throws {
+  func `InvokeAll Does Not Invoke When No Tools Match`() async throws {
     var collection = NeedleToolCallCollection()
     let tool = CountingTool(name: "skip", output: "no")
     collection.append(NeedleToolCall(id: NeedleToolCallID(), tool: tool, input: ""))
 
-    try await collection.invokeAll(where: { _ in false })
+    let results = await collection.invokeAllIfNecessary(where: { _ in false })
 
+    expectNoDifference(results.count, 0)
     expectNoDifference(tool.invokeCount, 0)
   }
 
   @Test
-  func `InvokeAll Does Not Throw On Empty Collection`() async throws {
+  func `InvokeAll Returns Empty Array For Empty Collection`() async throws {
     let collection = NeedleToolCallCollection()
 
-    try await collection.invokeAll()
+    let results = await collection.invokeAllIfNecessary()
+
+    expectNoDifference(results.count, 0)
   }
 
   @Test
@@ -84,7 +99,7 @@ struct `NeedleToolCallCollection tests` {
       NeedleToolCall(id: NeedleToolCallID(), tool: ProbeTool(probe: probe), input: "")
     )
 
-    try await collection.invokeAll()
+    _ = await collection.invokeAllIfNecessary()
 
     expectNoDifference(probe.maxConcurrent, 2)
   }
