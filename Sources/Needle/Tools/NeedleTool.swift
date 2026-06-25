@@ -59,9 +59,9 @@ extension NeedleToolDefinition {
   ///
   /// Order for a schema object:
   ///   1. `type` (if non-empty)
-  ///   2. generic annotation keywords: `title, description, default, readOnly,
-  ///      writeOnly, examples, enum, const, allOf, anyOf, oneOf, not, if, then,
-  ///      else, format` (each omitted when nil)
+  ///   2. generic annotation keywords: `title, description, default, examples,
+  ///      enum, const, allOf, anyOf, oneOf, not, if, then, else` (each omitted
+  ///      when nil)
   ///   3. type-specific keys in JSON Schema order, branched on `type`:
   ///      - object: `properties, required, minProperties, maxProperties,
   ///        additionalProperties, patternProperties, propertyNames,
@@ -194,16 +194,6 @@ private struct JSONWriter {
         writer.writeStringKey("default")
         writer.writeValue(defaultValue)
       }
-      if let readOnly = object.readOnly {
-        separator()
-        writer.writeStringKey("readOnly")
-        writer.writeBool(readOnly)
-      }
-      if let writeOnly = object.writeOnly {
-        separator()
-        writer.writeStringKey("writeOnly")
-        writer.writeBool(writeOnly)
-      }
       if let examples = object.examples {
         separator()
         writer.writeStringKey("examples")
@@ -254,12 +244,6 @@ private struct JSONWriter {
         writer.writeStringKey("else")
         writer.writeSchema(elseClause)
       }
-      if let format = object.format {
-        separator()
-        writer.writeStringKey("format")
-        writer.writeString(format)
-      }
-
       if let array = object.valueSchema?.array {
         if let items = array.items {
           separator()

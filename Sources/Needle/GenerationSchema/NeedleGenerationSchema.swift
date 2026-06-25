@@ -41,16 +41,6 @@ extension NeedleGenerationSchema {
     /// [default](https://json-schema.org/draft/2020-12/json-schema-validation#name-default)
     public var `default`: NeedleValue?
 
-    /// Indicates whether the value is managed exclusively by the owning authority.
-    ///
-    /// [readOnly](https://json-schema.org/draft/2020-12/json-schema-validation#name-readonly-and-writeonly)
-    public var readOnly: Bool?
-
-    /// Indicates whether the or not the value is present when retrieved from the owning authority.
-    ///
-    /// [writeOnly](https://json-schema.org/draft/2020-12/json-schema-validation#name-readonly-and-writeonly)
-    public var writeOnly: Bool?
-
     /// A list of example values.
     ///
     /// [examples](https://json-schema.org/draft/2020-12/json-schema-validation#name-examples)
@@ -104,11 +94,6 @@ extension NeedleGenerationSchema {
     /// [else](https://json-schema.org/draft/2020-12/json-schema-validation#name-a-vocabulary-for-structural-validation)
     public var `else`: NeedleGenerationSchema?
 
-    /// A string containing information for validating values not confined with the JSON Schema specification.
-    ///
-    /// [format](https://json-schema.org/draft/2020-12/json-schema-validation#name-vocabularies-for-semantic-c)
-    public var format: String?
-
     /// Creates an object schema.
     ///
     /// - Parameters:
@@ -116,8 +101,6 @@ extension NeedleGenerationSchema {
     ///   - description: The description of the schema.
     ///   - valueSchema: The ``NeedleGenerationSchema/ValueSchema`` of this schema.
     ///   - default: The default value of the schema.
-    ///   - readOnly: Indicates whether the value is managed exclusively by the owning authority.
-    ///   - writeOnly: Indicates whether the or not the value is present when retrieved from the owning authority.
     ///   - examples: A list of example values.
     ///   - enum: A list of allowed values.
     ///   - const: The only allowed value.
@@ -128,14 +111,11 @@ extension NeedleGenerationSchema {
     ///   - if: A schema to use for control flow.
     ///   - then: A schema to match against if a value successfully matches against ``if``.
     ///   - else: A schema to match against if a value fails to match against ``if``.
-    ///   - format: A string containing information for validating values not confined with the JSON Schema specification.
     public init(
       title: String? = nil,
       description: String? = nil,
       valueSchema: ValueSchema?,
       `default`: NeedleValue? = nil,
-      readOnly: Bool? = nil,
-      writeOnly: Bool? = nil,
       examples: [NeedleValue]? = nil,
       `enum`: [NeedleValue]? = nil,
       const: NeedleValue? = nil,
@@ -145,14 +125,11 @@ extension NeedleGenerationSchema {
       not: NeedleGenerationSchema? = nil,
       `if`: NeedleGenerationSchema? = nil,
       then: NeedleGenerationSchema? = nil,
-      `else`: NeedleGenerationSchema? = nil,
-      format: String? = nil
+      `else`: NeedleGenerationSchema? = nil
     ) {
       self.title = title
       self.description = description
       self.`default` = `default`
-      self.readOnly = readOnly
-      self.writeOnly = writeOnly
       self.examples = examples
       self.valueSchema = valueSchema
       self.`enum` = `enum`
@@ -164,7 +141,6 @@ extension NeedleGenerationSchema {
       self.`if` = `if`
       self.then = then
       self.`else` = `else`
-      self.format = format
     }
   }
 
@@ -175,8 +151,6 @@ extension NeedleGenerationSchema {
   ///   - description: The description of the schema.
   ///   - valueSchema: The ``NeedleGenerationSchema/ValueSchema`` of this schema.
   ///   - default: The default value of the schema.
-  ///   - readOnly: Indicates whether the value is managed exclusively by the owning authority.
-  ///   - writeOnly: Indicates whether the or not the value is present when retrieved from the owning authority.
   ///   - examples: A list of example values.
   ///   - enum: A list of allowed values.
   ///   - const: The only allowed value.
@@ -187,14 +161,11 @@ extension NeedleGenerationSchema {
   ///   - if: A schema to use for control flow.
   ///   - then: A schema to match against if a value successfully matches against ``Object/if``.
   ///   - else: A schema to match against if a value fails to match against ``Object/if``.
-  ///   - format: A string containing information for validating values not confined with the JSON Schema specification.
   public static func object(
     title: String? = nil,
     description: String? = nil,
     valueSchema: ValueSchema?,
     `default`: NeedleValue? = nil,
-    readOnly: Bool? = nil,
-    writeOnly: Bool? = nil,
     examples: [NeedleValue]? = nil,
     `enum`: [NeedleValue]? = nil,
     const: NeedleValue? = nil,
@@ -204,8 +175,7 @@ extension NeedleGenerationSchema {
     not: NeedleGenerationSchema? = nil,
     `if`: NeedleGenerationSchema? = nil,
     then: NeedleGenerationSchema? = nil,
-    `else`: NeedleGenerationSchema? = nil,
-    format: String? = nil
+    `else`: NeedleGenerationSchema? = nil
   ) -> Self {
     .object(
       Object(
@@ -213,8 +183,6 @@ extension NeedleGenerationSchema {
         description: description,
         valueSchema: valueSchema,
         default: `default`,
-        readOnly: readOnly,
-        writeOnly: writeOnly,
         examples: examples,
         enum: `enum`,
         const: const,
@@ -224,8 +192,7 @@ extension NeedleGenerationSchema {
         not: not,
         if: `if`,
         then: then,
-        else: `else`,
-        format: format
+        else: `else`
       )
     )
   }
@@ -235,8 +202,6 @@ extension NeedleGenerationSchema {
     description: String? = nil,
     valueSchema: ValueSchema,
     `default`: NeedleValue? = nil,
-    readOnly: Bool? = nil,
-    writeOnly: Bool? = nil,
     examples: [NeedleValue]? = nil,
     `enum`: [NeedleValue]? = nil,
     const: NeedleValue? = nil,
@@ -246,16 +211,13 @@ extension NeedleGenerationSchema {
     not: NeedleGenerationSchema? = nil,
     `if`: NeedleGenerationSchema? = nil,
     then: NeedleGenerationSchema? = nil,
-    `else`: NeedleGenerationSchema? = nil,
-    format: String? = nil
+    `else`: NeedleGenerationSchema? = nil
   ) -> Self {
     .object(
       title: title,
       description: description,
       valueSchema: valueSchema,
       default: `default`,
-      readOnly: readOnly,
-      writeOnly: writeOnly,
       examples: examples,
       enum: `enum`,
       const: const,
@@ -265,8 +227,7 @@ extension NeedleGenerationSchema {
       not: not,
       if: `if`,
       then: then,
-      else: `else`,
-      format: format
+      else: `else`
     )
   }
 
@@ -279,8 +240,6 @@ extension NeedleGenerationSchema {
   ///   - maxLength: The maximum length of the string.
   ///   - pattern: A regular expression that the string must match.
   ///   - default: The default value of the schema.
-  ///   - readOnly: Indicates whether the value is managed exclusively by the owning authority.
-  ///   - writeOnly: Indicates whether the value is present when retrieved from the owning authority.
   ///   - examples: A list of example values.
   ///   - enum: A list of allowed values.
   ///   - const: The only allowed value.
@@ -291,7 +250,6 @@ extension NeedleGenerationSchema {
   ///   - if: A schema to use for control flow.
   ///   - then: A schema to match against if a value successfully matches against ``Object/if``.
   ///   - else: A schema to match against if a value fails to match against ``Object/if``.
-  ///   - format: A string containing information for validating values not confined with the JSON Schema specification.
   public static func string(
     title: String? = nil,
     description: String? = nil,
@@ -299,8 +257,6 @@ extension NeedleGenerationSchema {
     maxLength: Int? = nil,
     pattern: String? = nil,
     `default`: NeedleValue? = nil,
-    readOnly: Bool? = nil,
-    writeOnly: Bool? = nil,
     examples: [NeedleValue]? = nil,
     `enum`: [NeedleValue]? = nil,
     const: NeedleValue? = nil,
@@ -310,16 +266,13 @@ extension NeedleGenerationSchema {
     not: NeedleGenerationSchema? = nil,
     `if`: NeedleGenerationSchema? = nil,
     then: NeedleGenerationSchema? = nil,
-    `else`: NeedleGenerationSchema? = nil,
-    format: String? = nil
+    `else`: NeedleGenerationSchema? = nil
   ) -> Self {
     .typed(
       title: title,
       description: description,
       valueSchema: .string(minLength: minLength, maxLength: maxLength, pattern: pattern),
       default: `default`,
-      readOnly: readOnly,
-      writeOnly: writeOnly,
       examples: examples,
       enum: `enum`,
       const: const,
@@ -329,8 +282,7 @@ extension NeedleGenerationSchema {
       not: not,
       if: `if`,
       then: then,
-      else: `else`,
-      format: format
+      else: `else`
     )
   }
 
@@ -345,8 +297,6 @@ extension NeedleGenerationSchema {
   ///   - maximum: The maximum value (inclusive) of the number.
   ///   - exclusiveMaximum: The maximum value (exclusive) of the number.
   ///   - default: The default value of the schema.
-  ///   - readOnly: Indicates whether the value is managed exclusively by the owning authority.
-  ///   - writeOnly: Indicates whether the value is present when retrieved from the owning authority.
   ///   - examples: A list of example values.
   ///   - enum: A list of allowed values.
   ///   - const: The only allowed value.
@@ -357,7 +307,6 @@ extension NeedleGenerationSchema {
   ///   - if: A schema to use for control flow.
   ///   - then: A schema to match against if a value successfully matches against ``Object/if``.
   ///   - else: A schema to match against if a value fails to match against ``Object/if``.
-  ///   - format: A string containing information for validating values not confined with the JSON Schema specification.
   public static func number(
     title: String? = nil,
     description: String? = nil,
@@ -367,8 +316,6 @@ extension NeedleGenerationSchema {
     maximum: Double? = nil,
     exclusiveMaximum: Double? = nil,
     `default`: NeedleValue? = nil,
-    readOnly: Bool? = nil,
-    writeOnly: Bool? = nil,
     examples: [NeedleValue]? = nil,
     `enum`: [NeedleValue]? = nil,
     const: NeedleValue? = nil,
@@ -378,8 +325,7 @@ extension NeedleGenerationSchema {
     not: NeedleGenerationSchema? = nil,
     `if`: NeedleGenerationSchema? = nil,
     then: NeedleGenerationSchema? = nil,
-    `else`: NeedleGenerationSchema? = nil,
-    format: String? = nil
+    `else`: NeedleGenerationSchema? = nil
   ) -> Self {
     .typed(
       title: title,
@@ -392,8 +338,6 @@ extension NeedleGenerationSchema {
         exclusiveMaximum: exclusiveMaximum
       ),
       default: `default`,
-      readOnly: readOnly,
-      writeOnly: writeOnly,
       examples: examples,
       enum: `enum`,
       const: const,
@@ -403,8 +347,7 @@ extension NeedleGenerationSchema {
       not: not,
       if: `if`,
       then: then,
-      else: `else`,
-      format: format
+      else: `else`
     )
   }
 
@@ -419,8 +362,6 @@ extension NeedleGenerationSchema {
   ///   - maximum: The maximum value (inclusive) of the integer.
   ///   - exclusiveMaximum: The maximum value (exclusive) of the integer.
   ///   - default: The default value of the schema.
-  ///   - readOnly: Indicates whether the value is managed exclusively by the owning authority.
-  ///   - writeOnly: Indicates whether the value is present when retrieved from the owning authority.
   ///   - examples: A list of example values.
   ///   - enum: A list of allowed values.
   ///   - const: The only allowed value.
@@ -431,7 +372,6 @@ extension NeedleGenerationSchema {
   ///   - if: A schema to use for control flow.
   ///   - then: A schema to match against if a value successfully matches against ``Object/if``.
   ///   - else: A schema to match against if a value fails to match against ``Object/if``.
-  ///   - format: A string containing information for validating values not confined with the JSON Schema specification.
   public static func integer(
     title: String? = nil,
     description: String? = nil,
@@ -441,8 +381,6 @@ extension NeedleGenerationSchema {
     maximum: Int? = nil,
     exclusiveMaximum: Int? = nil,
     `default`: NeedleValue? = nil,
-    readOnly: Bool? = nil,
-    writeOnly: Bool? = nil,
     examples: [NeedleValue]? = nil,
     `enum`: [NeedleValue]? = nil,
     const: NeedleValue? = nil,
@@ -452,8 +390,7 @@ extension NeedleGenerationSchema {
     not: NeedleGenerationSchema? = nil,
     `if`: NeedleGenerationSchema? = nil,
     then: NeedleGenerationSchema? = nil,
-    `else`: NeedleGenerationSchema? = nil,
-    format: String? = nil
+    `else`: NeedleGenerationSchema? = nil
   ) -> Self {
     .typed(
       title: title,
@@ -466,8 +403,6 @@ extension NeedleGenerationSchema {
         exclusiveMaximum: exclusiveMaximum
       ),
       default: `default`,
-      readOnly: readOnly,
-      writeOnly: writeOnly,
       examples: examples,
       enum: `enum`,
       const: const,
@@ -477,8 +412,7 @@ extension NeedleGenerationSchema {
       not: not,
       if: `if`,
       then: then,
-      else: `else`,
-      format: format
+      else: `else`
     )
   }
 
@@ -496,8 +430,6 @@ extension NeedleGenerationSchema {
   ///   - minContains: The minimum number of array elements that must match `contains`.
   ///   - maxContains: The maximum number of array elements that may match `contains`.
   ///   - default: The default value of the schema.
-  ///   - readOnly: Indicates whether the value is managed exclusively by the owning authority.
-  ///   - writeOnly: Indicates whether the value is present when retrieved from the owning authority.
   ///   - examples: A list of example values.
   ///   - enum: A list of allowed values.
   ///   - const: The only allowed value.
@@ -508,7 +440,6 @@ extension NeedleGenerationSchema {
   ///   - if: A schema to use for control flow.
   ///   - then: A schema to match against if a value successfully matches against ``Object/if``.
   ///   - else: A schema to match against if a value fails to match against ``Object/if``.
-  ///   - format: A string containing information for validating values not confined with the JSON Schema specification.
   public static func array(
     title: String? = nil,
     description: String? = nil,
@@ -521,8 +452,6 @@ extension NeedleGenerationSchema {
     minContains: Int? = nil,
     maxContains: Int? = nil,
     `default`: NeedleValue? = nil,
-    readOnly: Bool? = nil,
-    writeOnly: Bool? = nil,
     examples: [NeedleValue]? = nil,
     `enum`: [NeedleValue]? = nil,
     const: NeedleValue? = nil,
@@ -532,8 +461,7 @@ extension NeedleGenerationSchema {
     not: NeedleGenerationSchema? = nil,
     `if`: NeedleGenerationSchema? = nil,
     then: NeedleGenerationSchema? = nil,
-    `else`: NeedleGenerationSchema? = nil,
-    format: String? = nil
+    `else`: NeedleGenerationSchema? = nil
   ) -> Self {
     .typed(
       title: title,
@@ -549,8 +477,6 @@ extension NeedleGenerationSchema {
         maxContains: maxContains
       ),
       default: `default`,
-      readOnly: readOnly,
-      writeOnly: writeOnly,
       examples: examples,
       enum: `enum`,
       const: const,
@@ -560,8 +486,7 @@ extension NeedleGenerationSchema {
       not: not,
       if: `if`,
       then: then,
-      else: `else`,
-      format: format
+      else: `else`
     )
   }
 
@@ -579,8 +504,6 @@ extension NeedleGenerationSchema {
   ///   - propertyNames: A schema that defines constraints for property names.
   ///   - dependentRequired: A dictionary mapping property names to additional property names that are required when the key property is present.
   ///   - default: The default value of the schema.
-  ///   - readOnly: Indicates whether the value is managed exclusively by the owning authority.
-  ///   - writeOnly: Indicates whether the value is present when retrieved from the owning authority.
   ///   - examples: A list of example values.
   ///   - enum: A list of allowed values.
   ///   - const: The only allowed value.
@@ -591,7 +514,6 @@ extension NeedleGenerationSchema {
   ///   - if: A schema to use for control flow.
   ///   - then: A schema to match against if a value successfully matches against ``Object/if``.
   ///   - else: A schema to match against if a value fails to match against ``Object/if``.
-  ///   - format: A string containing information for validating values not confined with the JSON Schema specification.
   public static func object(
     title: String? = nil,
     description: String? = nil,
@@ -604,8 +526,6 @@ extension NeedleGenerationSchema {
     propertyNames: NeedleGenerationSchema? = nil,
     dependentRequired: [String: [String]]? = nil,
     `default`: NeedleValue? = nil,
-    readOnly: Bool? = nil,
-    writeOnly: Bool? = nil,
     examples: [NeedleValue]? = nil,
     `enum`: [NeedleValue]? = nil,
     const: NeedleValue? = nil,
@@ -615,8 +535,7 @@ extension NeedleGenerationSchema {
     not: NeedleGenerationSchema? = nil,
     `if`: NeedleGenerationSchema? = nil,
     then: NeedleGenerationSchema? = nil,
-    `else`: NeedleGenerationSchema? = nil,
-    format: String? = nil
+    `else`: NeedleGenerationSchema? = nil
   ) -> Self {
     .typed(
       title: title,
@@ -632,8 +551,6 @@ extension NeedleGenerationSchema {
         dependentRequired: dependentRequired
       ),
       default: `default`,
-      readOnly: readOnly,
-      writeOnly: writeOnly,
       examples: examples,
       enum: `enum`,
       const: const,
@@ -643,8 +560,7 @@ extension NeedleGenerationSchema {
       not: not,
       if: `if`,
       then: then,
-      else: `else`,
-      format: format
+      else: `else`
     )
   }
 
@@ -654,8 +570,6 @@ extension NeedleGenerationSchema {
   ///   - title: The title of the schema.
   ///   - description: The description of the schema.
   ///   - default: The default value of the schema.
-  ///   - readOnly: Indicates whether the value is managed exclusively by the owning authority.
-  ///   - writeOnly: Indicates whether the value is present when retrieved from the owning authority.
   ///   - examples: A list of example values.
   ///   - enum: A list of allowed values.
   ///   - const: The only allowed value.
@@ -666,13 +580,10 @@ extension NeedleGenerationSchema {
   ///   - if: A schema to use for control flow.
   ///   - then: A schema to match against if a value successfully matches against ``Object/if``.
   ///   - else: A schema to match against if a value fails to match against ``Object/if``.
-  ///   - format: A string containing information for validating values not confined with the JSON Schema specification.
   public static func null(
     title: String? = nil,
     description: String? = nil,
     `default`: NeedleValue? = nil,
-    readOnly: Bool? = nil,
-    writeOnly: Bool? = nil,
     examples: [NeedleValue]? = nil,
     `enum`: [NeedleValue]? = nil,
     const: NeedleValue? = nil,
@@ -682,16 +593,13 @@ extension NeedleGenerationSchema {
     not: NeedleGenerationSchema? = nil,
     `if`: NeedleGenerationSchema? = nil,
     then: NeedleGenerationSchema? = nil,
-    `else`: NeedleGenerationSchema? = nil,
-    format: String? = nil
+    `else`: NeedleGenerationSchema? = nil
   ) -> Self {
     .typed(
       title: title,
       description: description,
       valueSchema: .null,
       default: `default`,
-      readOnly: readOnly,
-      writeOnly: writeOnly,
       examples: examples,
       enum: `enum`,
       const: const,
@@ -701,8 +609,7 @@ extension NeedleGenerationSchema {
       not: not,
       if: `if`,
       then: then,
-      else: `else`,
-      format: format
+      else: `else`
     )
   }
 
@@ -712,8 +619,6 @@ extension NeedleGenerationSchema {
   ///   - title: The title of the schema.
   ///   - description: The description of the schema.
   ///   - default: The default value of the schema.
-  ///   - readOnly: Indicates whether the value is managed exclusively by the owning authority.
-  ///   - writeOnly: Indicates whether the value is present when retrieved from the owning authority.
   ///   - examples: A list of example values.
   ///   - enum: A list of allowed values.
   ///   - const: The only allowed value.
@@ -724,13 +629,10 @@ extension NeedleGenerationSchema {
   ///   - if: A schema to use for control flow.
   ///   - then: A schema to match against if a value successfully matches against ``Object/if``.
   ///   - else: A schema to match against if a value fails to match against ``Object/if``.
-  ///   - format: A string containing information for validating values not confined with the JSON Schema specification.
   public static func bool(
     title: String? = nil,
     description: String? = nil,
     `default`: NeedleValue? = nil,
-    readOnly: Bool? = nil,
-    writeOnly: Bool? = nil,
     examples: [NeedleValue]? = nil,
     `enum`: [NeedleValue]? = nil,
     const: NeedleValue? = nil,
@@ -740,16 +642,13 @@ extension NeedleGenerationSchema {
     not: NeedleGenerationSchema? = nil,
     `if`: NeedleGenerationSchema? = nil,
     then: NeedleGenerationSchema? = nil,
-    `else`: NeedleGenerationSchema? = nil,
-    format: String? = nil
+    `else`: NeedleGenerationSchema? = nil
   ) -> Self {
     .typed(
       title: title,
       description: description,
       valueSchema: .boolean,
       default: `default`,
-      readOnly: readOnly,
-      writeOnly: writeOnly,
       examples: examples,
       enum: `enum`,
       const: const,
@@ -759,8 +658,7 @@ extension NeedleGenerationSchema {
       not: not,
       if: `if`,
       then: then,
-      else: `else`,
-      format: format
+      else: `else`
     )
   }
 
@@ -777,8 +675,6 @@ extension NeedleGenerationSchema {
   ///   - object: Object-specific constraints included in the union.
   ///   - null: Whether the union includes the null type.
   ///   - default: The default value of the schema.
-  ///   - readOnly: Indicates whether the value is managed exclusively by the owning authority.
-  ///   - writeOnly: Indicates whether the value is present when retrieved from the owning authority.
   ///   - examples: A list of example values.
   ///   - enum: A list of allowed values.
   ///   - const: The only allowed value.
@@ -789,7 +685,6 @@ extension NeedleGenerationSchema {
   ///   - if: A schema to use for control flow.
   ///   - then: A schema to match against if a value successfully matches against ``Object/if``.
   ///   - else: A schema to match against if a value fails to match against ``Object/if``.
-  ///   - format: A string containing information for validating values not confined with the JSON Schema specification.
   public static func union(
     title: String? = nil,
     description: String? = nil,
@@ -801,8 +696,6 @@ extension NeedleGenerationSchema {
     object: ValueSchema.Object? = nil,
     null: Bool = false,
     `default`: NeedleValue? = nil,
-    readOnly: Bool? = nil,
-    writeOnly: Bool? = nil,
     examples: [NeedleValue]? = nil,
     `enum`: [NeedleValue]? = nil,
     const: NeedleValue? = nil,
@@ -812,8 +705,7 @@ extension NeedleGenerationSchema {
     not: NeedleGenerationSchema? = nil,
     `if`: NeedleGenerationSchema? = nil,
     then: NeedleGenerationSchema? = nil,
-    `else`: NeedleGenerationSchema? = nil,
-    format: String? = nil
+    `else`: NeedleGenerationSchema? = nil
   ) -> Self {
     .typed(
       title: title,
@@ -828,8 +720,6 @@ extension NeedleGenerationSchema {
         isNullable: null
       ),
       default: `default`,
-      readOnly: readOnly,
-      writeOnly: writeOnly,
       examples: examples,
       enum: `enum`,
       const: const,
@@ -839,8 +729,7 @@ extension NeedleGenerationSchema {
       not: not,
       if: `if`,
       then: then,
-      else: `else`,
-      format: format
+      else: `else`
     )
   }
 }
@@ -892,8 +781,6 @@ private struct SerializeableObject: Codable {
   var title: String?
   var description: String?
   var `default`: NeedleValue?
-  var readOnly: Bool?
-  var writeOnly: Bool?
   var examples: [NeedleValue]?
 
   var `enum`: [NeedleValue]?
@@ -907,8 +794,6 @@ private struct SerializeableObject: Codable {
   var `if`: NeedleGenerationSchema?
   var then: NeedleGenerationSchema?
   var `else`: NeedleGenerationSchema?
-
-  var format: String?
 
   var properties: [Swift.String: NeedleGenerationSchema]?
   var required: [Swift.String]?
@@ -942,6 +827,7 @@ private struct SerializeableObject: Codable {
     self.title = object.title
     self.description = object.description
     self.default = object.default
+    self.examples = object.examples
     self.allOf = object.allOf
     self.anyOf = object.anyOf
     self.oneOf = object.oneOf
@@ -949,7 +835,6 @@ private struct SerializeableObject: Codable {
     self.if = object.if
     self.then = object.then
     self.else = object.else
-    self.format = object.format
     self.enum = object.enum
     self.const = object.const
 
@@ -993,6 +878,7 @@ private struct SerializeableObject: Codable {
       self.minProperties = object.minProperties
       self.maxProperties = object.maxProperties
       self.required = object.required
+      self.propertyNames = object.propertyNames
       self.dependentRequired = object.dependentRequired
     }
 
@@ -1050,8 +936,6 @@ extension NeedleGenerationSchema.Object {
       description: serializeable.description,
       valueSchema: NeedleGenerationSchema.ValueSchema(serializeable: serializeable),
       default: serializeable.default,
-      readOnly: serializeable.readOnly,
-      writeOnly: serializeable.writeOnly,
       examples: serializeable.examples,
       enum: serializeable.enum,
       const: serializeable.const,
@@ -1061,8 +945,7 @@ extension NeedleGenerationSchema.Object {
       not: serializeable.not,
       if: serializeable.if,
       then: serializeable.then,
-      else: serializeable.else,
-      format: serializeable.format
+      else: serializeable.else
     )
   }
 }
@@ -1129,4 +1012,3 @@ extension NeedleGenerationSchema.ValueSchema {
     }
   }
 }
-
