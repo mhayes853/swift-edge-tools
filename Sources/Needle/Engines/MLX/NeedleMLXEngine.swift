@@ -114,7 +114,7 @@
 
       var detokenizer = StreamingDetokenizer(tokenizer: self.tokenizer)
       var generatedTokens = [NeedleToken]()
-      var entropy = EntropyState()
+      var confidence = ConfidenceState()
       while !matcher.isTerminated
         && !self.isStopped.load(ordering: .relaxed)
         && detokenizer.tokenIds.count < (parameters.maxTokens ?? .max)
@@ -125,7 +125,7 @@
           logits: processedLogits[0..., -1, 0...],
           mask: matcher.bitmask()
         )
-        entropy.add(tokenUncertaintyMLX(logits: logits))
+        confidence.add(logits: logits)
 
         let token = parameters.sampler.sample(logits: logits)
         let tokenId = token.item(NeedleToken.ID.self)
@@ -156,8 +156,8 @@
       metadata.mlxEngineGenerationStartMemorySnapshot = generationStartSnapshot
       metadata.mlxEnginePostPrefillMemorySnapshot = postPrefillSnapshot
       metadata.mlxEnginePostDecodeMemorySnapshot = postDecodeSnapshot
-      metadata.mlxEngineGenerationConfidence = entropy.meanConfidence()
-      metadata.mlxEngineTokenUncertainties = entropy.tokenUncertainties
+      metadata.mlxEngineGenerationConfidence = confidence.mean
+      metadata.mlxEngineTokenUncertainties = confidence.tokenUncertainties
       return NeedleEngineGeneration(
         prefillMetrics: prefillMetrics,
         decodeMetrics: NeedleDecodeMetrics(
@@ -283,24 +283,6 @@
       guard !tokenString.hasSuffix(Self.replacementCharacter) else { return "" }
       self.streamedResponse = decodedResponse
       return tokenString
-    }
-  }
-
-  // MARK: - EntropyState
-
-  private struct EntropyState {
-    private(set) var tokenUncertainties = [Float]()
-    private var totalSum: Float = 0
-    private var totalCount: Int = 0
-
-    mutating func add(_ uncertainty: Float) {
-      self.tokenUncertainties.append(uncertainty)
-      self.totalSum += uncertainty
-      self.totalCount += 1
-    }
-
-    func meanConfidence() -> Float? {
-      self.totalCount > 0 ? 1 - (self.totalSum / Float(self.totalCount)) : nil
     }
   }
 
