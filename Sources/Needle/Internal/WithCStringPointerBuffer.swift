@@ -1,6 +1,4 @@
-import Foundation
-
-func withCStringPointerBuffer<Result>(
+func withCopiedCStringPointerBuffer<Result>(
   _ strings: [String],
   _ body: (UnsafeMutableBufferPointer<UnsafePointer<CChar>?>) throws -> Result
 ) rethrows -> Result {

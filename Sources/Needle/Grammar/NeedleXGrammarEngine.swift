@@ -28,7 +28,7 @@
       eosTokenId: NeedleToken.ID,
       configuration: CompilerConfiguration = CompilerConfiguration()
     ) {
-      self.compiler = withCStringPointerBuffer(encodedVocab) { buffer in
+      self.compiler = withCopiedCStringPointerBuffer(encodedVocab) { buffer in
         needle_xgrammar_compiler_init(buffer.baseAddress, buffer.count, Int32(eosTokenId))
       }
       self.apply(configuration: configuration)
