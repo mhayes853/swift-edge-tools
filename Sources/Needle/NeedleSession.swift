@@ -4,9 +4,9 @@ import Observation
 // MARK: - NeedleSession
 
 public final class NeedleSession<Engine: NeedleEngine>: Sendable, Observable {
-  private let engine: RecursiveLock<Engine>
+  fileprivate let engineActor: EngineActor<Engine>
   private let _systemPrompt: Lock<String>
-  private let _activeStreams: Lock<[NeedleSessionStream]>
+  private let _activeStreams = Lock([NeedleSessionStream]())
   private let observationRegistrar = ObservationRegistrar()
 
   public var systemPrompt: String {
@@ -31,21 +31,12 @@ public final class NeedleSession<Engine: NeedleEngine>: Sendable, Observable {
   }
 
   public init(engine: sending Engine, systemPrompt: String = "") {
-    self.engine = RecursiveLock(engine)
+    self.engineActor = EngineActor(engine)
     self._systemPrompt = Lock(systemPrompt)
-    self._activeStreams = Lock([])
   }
 
-  public func withEngine<T, E: Error>(
-    perform body: (Engine) throws(E) -> sending T
-  ) throws(E) -> sending T {
-    try self.engine.withLock { (engine: inout sending Engine) throws(E) -> sending T in
-      try body(engine)
-    }
-  }
-
-  public func reset() {
-    self.withEngine { $0.reset() }
+  public func reset() async {
+    await self.engineActor.reset()
   }
 
   fileprivate func removeActiveStream(_ stream: NeedleSessionStream) {
@@ -54,6 +45,38 @@ public final class NeedleSession<Engine: NeedleEngine>: Sendable, Observable {
         activeStreams.removeAll { $0 === stream }
       }
     }
+  }
+}
+
+// MARK: - EngineActor
+
+private actor EngineActor<Engine: NeedleEngine> {
+  private let engine: Engine
+
+  init(_ engine: consuming sending Engine) {
+    self.engine = engine
+  }
+
+  func reset() {
+    self.engine.reset()
+  }
+
+  func run(
+    prompt: NeedlePrompt,
+    parameters: sending Engine.GenerateParameters,
+    shouldGenerate: Bool,
+    onStopper: sending @escaping (NeedleEngineStopper) -> Void,
+    onToken: sending @escaping (NeedleToken) -> Void
+  ) throws -> NeedleEngineGeneration {
+    self.engine.reset()
+    let stopper = self.engine.stopper
+    onStopper(stopper)
+    guard shouldGenerate else { return .empty }
+    return try self.engine.generate(
+      prompt: prompt,
+      parameters: parameters,
+      onToken: onToken
+    )
   }
 }
 
@@ -135,63 +158,91 @@ public final class NeedleSessionStream: Sendable, Observable, Identifiable {
     shouldInvokeTools: Bool
   ) {
     let task = Task<NeedleSessionGeneration, any Error> {
-      do {
-        let prompt = NeedlePrompt(
-          system: systemPrompt,
-          user: prompt,
-          tools: tools.map(\.definition)
-        )
-        let generation: NeedleEngineGeneration = try session.withEngine { engine in
-          engine.reset()
-          let shouldGenerate = self.state.withLock { state in
-            if state.wasStoppedBeforeGeneration {
-              self.registrar.withMutation(of: self, keyPath: \.status) {
-                state.beginGenerating(stopper: nil)
-              }
-              return false
-            }
-            self.registrar.withMutation(of: self, keyPath: \.status) {
-              state.beginGenerating(stopper: engine.stopper)
-            }
-            return true
-          }
-          guard shouldGenerate else { return .empty }
-
-          var parseState = ToolCallParseState(tools: tools)
-          return try engine.generate(prompt: prompt, parameters: parameters) { token in
-            self.state.withLock { state in
-              state.emitToken(token: token)
-              if let call = parseState.accept(token: token) {
-                self.registrar.withMutation(of: self, keyPath: \.toolCalls) {
-                  state.emitToolCall(call, shouldInvoke: shouldInvokeTools)
-                }
-              }
-            }
-          }
-        }
-        let sessionGeneration = self.state.withLock { state in
-          let sessionGeneration = NeedleSessionGeneration(
-            engineGeneration: generation,
-            toolCalls: state.toolCalls
-          )
-          self.registrar.withMutation(of: self, keyPath: \.status) {
-            state.finish(with: .success(sessionGeneration))
-          }
-          return sessionGeneration
-        }
-        session.removeActiveStream(self)
-        return sessionGeneration
-      } catch {
-        self.state.withLock { state in
-          self.registrar.withMutation(of: self, keyPath: \.status) {
-            state.finish(with: .failure(error))
-          }
-        }
-        session.removeActiveStream(self)
-        throw error
-      }
+      // NB: This is safe, the compiler must assume the worst when it can't infer isolation
+      // regions fully, but at most the params get sent into the engine actor where they are
+      // consumed via engine generation and nothing else.
+      nonisolated(unsafe) let parameters = parameters
+      return try await self.runGeneration(
+        session: session,
+        tools: tools,
+        prompt: prompt,
+        systemPrompt: systemPrompt,
+        parameters: parameters,
+        shouldInvokeTools: shouldInvokeTools
+      )
     }
     self.state.withLock { $0.task = task }
+  }
+
+  private func runGeneration<Engine: NeedleEngine>(
+    session: NeedleSession<Engine>,
+    tools: [any NeedleTool],
+    prompt: String,
+    systemPrompt: String,
+    parameters: sending Engine.GenerateParameters,
+    shouldInvokeTools: Bool
+  ) async throws -> NeedleSessionGeneration {
+    do {
+      let needlePrompt = NeedlePrompt(
+        system: systemPrompt,
+        user: prompt,
+        tools: tools.map(\.definition)
+      )
+      let shouldGenerate = self.state.withLock { state in
+        if state.wasStoppedBeforeGeneration {
+          self.registrar.withMutation(of: self, keyPath: \.status) {
+            state.beginGenerating(stopper: nil)
+          }
+          return false
+        }
+        return true
+      }
+      var parseState = ToolCallParseState(tools: tools)
+      let generation: NeedleEngineGeneration = try await session.engineActor.run(
+        prompt: needlePrompt,
+        parameters: parameters,
+        shouldGenerate: shouldGenerate,
+        onStopper: { [weak self] stopper in
+          guard let self else { return }
+          self.state.withLock { state in
+            self.registrar.withMutation(of: self, keyPath: \.status) {
+              state.beginGenerating(stopper: stopper)
+            }
+          }
+        },
+        onToken: { [weak self] token in
+          guard let self else { return }
+          self.state.withLock { state in
+            state.emitToken(token: token)
+            if let call = parseState.accept(token: token) {
+              self.registrar.withMutation(of: self, keyPath: \.toolCalls) {
+                state.emitToolCall(call, shouldInvoke: shouldInvokeTools)
+              }
+            }
+          }
+        }
+      )
+      let sessionGeneration = self.state.withLock { state in
+        let sessionGeneration = NeedleSessionGeneration(
+          engineGeneration: generation,
+          toolCalls: state.toolCalls
+        )
+        self.registrar.withMutation(of: self, keyPath: \.status) {
+          state.finish(with: .success(sessionGeneration))
+        }
+        return sessionGeneration
+      }
+      session.removeActiveStream(self)
+      return sessionGeneration
+    } catch {
+      self.state.withLock { state in
+        self.registrar.withMutation(of: self, keyPath: \.status) {
+          state.finish(with: .failure(error))
+        }
+      }
+      session.removeActiveStream(self)
+      throw error
+    }
   }
 
   public func stop() {
@@ -413,7 +464,7 @@ package func duplicateToolNameError(_ names: Set<String>) -> String? {
 
 // MARK: - Parse State
 
-private struct ToolCallParseState {
+private struct ToolCallParseState: Sendable {
   private enum Phase {
     case outsideBlock
     case insideArray
