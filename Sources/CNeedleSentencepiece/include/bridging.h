@@ -11,6 +11,7 @@ extern "C" {
 typedef void* needle_sp_tokenizer_t;
 
 needle_sp_tokenizer_t needle_sp_tokenizer_init_from_file(const char* model_file);
+needle_sp_tokenizer_t needle_sp_tokenizer_init_from_data(const char* data, size_t size);
 
 const char* needle_sp_last_error_message();
 

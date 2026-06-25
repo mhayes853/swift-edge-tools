@@ -135,5 +135,40 @@
       let tokenizer = try NeedleSPTokenizer(modelURL: self.modelURL)
       expectNoDifference(tokenizer.convertIdToToken(287_399_329), nil as String?)
     }
+
+    @Test
+    func `Init From Data Produces Equivalent Tokenizer To Init From URL`() throws {
+      let data = try Data(contentsOf: self.modelURL)
+      let urlTokenizer = try NeedleSPTokenizer(modelURL: self.modelURL)
+      let dataTokenizer = try NeedleSPTokenizer(data: data)
+
+      expectNoDifference(dataTokenizer.unknownTokenId, urlTokenizer.unknownTokenId)
+      expectNoDifference(dataTokenizer.bosTokenId, urlTokenizer.bosTokenId)
+      expectNoDifference(dataTokenizer.eosTokenId, urlTokenizer.eosTokenId)
+      expectNoDifference(dataTokenizer.eosToken, urlTokenizer.eosToken)
+      expectNoDifference(dataTokenizer.bosToken, urlTokenizer.bosToken)
+      expectNoDifference(dataTokenizer.unknownToken, urlTokenizer.unknownToken)
+
+      let text = "Hello world this is a test"
+      expectNoDifference(
+        dataTokenizer.encode(text: text),
+        urlTokenizer.encode(text: text)
+      )
+    }
+
+    @Test
+    func `Init From Data Throws On Garbage Bytes`() {
+      let error = #expect(throws: NeedleSPTokenizerError.self) {
+        _ = try NeedleSPTokenizer(data: Data([0x00, 0x01, 0x02, 0x03]))
+      }
+      expectNoDifference(error?.message.isEmpty, false)
+    }
+
+    @Test
+    func `Init From Empty Data Throws`() {
+      #expect(throws: NeedleSPTokenizerError.self) {
+        _ = try NeedleSPTokenizer(data: Data())
+      }
+    }
   }
 #endif

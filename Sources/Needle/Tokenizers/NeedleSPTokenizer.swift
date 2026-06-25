@@ -8,7 +8,7 @@
   public final class NeedleSPTokenizer: Tokenizer {
     private static let tokenBufferSize = 256
 
-    private let tokenizer: RecursiveLock<needle_sp_tokenizer_t>
+    private let tokenizer: Lock<needle_sp_tokenizer_t>
 
     public var hasChatTemplate: Bool { false }
 
@@ -17,7 +17,7 @@
     }
 
     public var bosTokenId: NeedleToken.ID? {
-      self.withRawTokenizer { tokenizer in
+      self.tokenizer.withLock { tokenizer in
         Int(needle_sp_tokenizer_bos_token_id(tokenizer))
       }
     }
@@ -27,7 +27,7 @@
     }
 
     public var eosTokenId: NeedleToken.ID? {
-      self.withRawTokenizer { tokenizer in
+      self.tokenizer.withLock { tokenizer in
         Int(needle_sp_tokenizer_eos_token_id(tokenizer))
       }
     }
@@ -37,22 +37,18 @@
     }
 
     public var unknownTokenId: Int? {
-      self.withRawTokenizer { tokenizer in
+      self.tokenizer.withLock { tokenizer in
         Int(needle_sp_tokenizer_unk_token_id(tokenizer))
       }
     }
 
-    public var toolsToken: String {
-      "<tools>"
-    }
+    public var toolsToken: String { "<tools>" }
 
     public var toolsTokenId: Int? {
       self.convertTokenToId(self.toolsToken)
     }
 
-    public var toolCallToken: String {
-      "<tool_call>"
-    }
+    public var toolCallToken: String { "<tool_call>" }
 
     public var toolCallTokenId: Int? {
       self.convertTokenToId(self.toolCallToken)
@@ -68,18 +64,24 @@
       self.init(tokenizer: tokenizer)
     }
 
+    public convenience init(data: Data) throws {
+      let tokenizer = try data.withUnsafeBytes { rawBuffer in
+        guard let base = rawBuffer.baseAddress else { throw NeedleSPTokenizerError() }
+        let bytes = base.assumingMemoryBound(to: CChar.self)
+        guard let tokenizer = needle_sp_tokenizer_init_from_data(bytes, rawBuffer.count) else {
+          throw NeedleSPTokenizerError()
+        }
+        return tokenizer
+      }
+      self.init(tokenizer: tokenizer)
+    }
+
     public init(tokenizer: consuming sending needle_sp_tokenizer_t) {
-      self.tokenizer = RecursiveLock(tokenizer)
+      self.tokenizer = Lock(tokenizer)
     }
 
     deinit {
       self.tokenizer.withLock { needle_sp_tokenizer_destroy($0) }
-    }
-
-    public func withRawTokenizer<T, E: Error>(
-      _ body: (needle_sp_tokenizer_t) throws(E) -> sending T
-    ) throws(E) -> sending T {
-      try self.tokenizer.withLock { tokenizer throws(E) in try body(tokenizer) }
     }
 
     public func encode(text: String) -> [Int] {
@@ -91,7 +93,7 @@
     }
 
     public func encode(text: String, addSpecialTokens: Bool) -> [Int] {
-      self.withRawTokenizer { tokenizer in
+      self.tokenizer.withLock { tokenizer in
         var size = 0
         let tokenIds = needle_sp_tokenizer_encode(tokenizer, text, &size)
         defer { tokenIds?.deallocate() }
@@ -182,13 +184,13 @@
     }
 
     private var padTokenId: NeedleToken.ID {
-      self.withRawTokenizer { tokenizer in
+      self.tokenizer.withLock { tokenizer in
         Int(needle_sp_tokenizer_pad_token_id(tokenizer))
       }
     }
 
     private func tokenIds(from tokens: [String]) -> [Int] {
-      self.withRawTokenizer { tokenizer in
+      self.tokenizer.withLock { tokenizer in
         tokens.map { token in
           Int(token.withCString { needle_sp_tokenizer_token_to_id(tokenizer, $0) })
         }
@@ -196,11 +198,11 @@
     }
 
     private func tokens(from tokenIds: [Int]) -> [String] {
-      withUnsafeTemporaryAllocation(
-        of: CChar.self,
-        capacity: Self.tokenBufferSize
-      ) { buffer in
-        self.withRawTokenizer { tokenizer in
+      self.tokenizer.withLock { tokenizer in
+        withUnsafeTemporaryAllocation(
+          of: CChar.self,
+          capacity: Self.tokenBufferSize
+        ) { buffer in
           tokenIds.map { tokenId in
             let result = needle_sp_tokenizer_id_to_token(
               tokenizer,

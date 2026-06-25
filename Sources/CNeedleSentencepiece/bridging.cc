@@ -8,6 +8,8 @@
 
 #include "sentencepiece_processor.h"
 
+#include "third_party/absl/strings/string_view.h"
+
 #include <sys/stat.h>
 
 struct NeedleSPHandle {
@@ -40,6 +42,20 @@ needle_sp_tokenizer_t needle_sp_tokenizer_init_from_file(const char* model_file)
 
     const auto handle = new NeedleSPHandle{};
     const auto result = handle->processor.Load(model_file);
+    if (result.ok()) return handle;
+    set_error_message(result);
+    delete handle;
+    return nullptr;
+}
+
+needle_sp_tokenizer_t needle_sp_tokenizer_init_from_data(const char* data, size_t size) {
+    if (!data || size == 0) {
+        last_error_message = "model data should not be empty";
+        return nullptr;
+    }
+
+    const auto handle = new NeedleSPHandle{};
+    const auto result = handle->processor.LoadFromSerializedProto(absl::string_view(data, size));
     if (result.ok()) return handle;
     set_error_message(result);
     delete handle;
