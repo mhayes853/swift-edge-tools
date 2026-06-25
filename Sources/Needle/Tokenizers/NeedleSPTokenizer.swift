@@ -188,35 +188,29 @@
     }
 
     private func tokenIds(from tokens: [String]) -> [Int] {
-      let buffer = UnsafeMutablePointer<Int32>.allocate(capacity: tokens.count)
-      defer { buffer.deallocate() }
-      _ = withCStringPointerBuffer(tokens) { tokensPtr in
-        self.withRawTokenizer { tokenizer in
-          needle_sp_tokenizer_tokens_to_ids(
-            tokenizer,
-            UnsafeMutablePointer(mutating: tokensPtr.baseAddress),
-            buffer,
-            tokens.count
-          )
+      self.withRawTokenizer { tokenizer in
+        tokens.map { token in
+          Int(token.withCString { needle_sp_tokenizer_token_to_id(tokenizer, $0) })
         }
       }
-      return (0..<tokens.count).map { Int(buffer[$0]) }
     }
 
     private func tokens(from tokenIds: [Int]) -> [String] {
-      self.withCCharStringBuffer(count: tokenIds.count) { buffer in
-        tokenIds.map(Int32.init)
-          .withUnsafeBufferPointer { tokenIdsPtr in
-            self.withRawTokenizer { tokenizer in
-              _ = needle_sp_tokenizer_ids_to_tokens(
-                tokenizer,
-                tokenIdsPtr.baseAddress,
-                buffer.baseAddress,
-                buffer.count
-              )
-            }
+      withUnsafeTemporaryAllocation(
+        of: CChar.self,
+        capacity: Self.tokenBufferSize
+      ) { buffer in
+        self.withRawTokenizer { tokenizer in
+          tokenIds.map { tokenId in
+            let result = needle_sp_tokenizer_id_to_token(
+              tokenizer,
+              Int32(tokenId),
+              buffer.baseAddress,
+              buffer.count
+            )
+            return result == 0 ? String(cString: buffer.baseAddress!) : ""
           }
-        return Array(buffer.prefix(tokenIds.count)).map { String(cString: $0!) }
+        }
       }
     }
 
@@ -232,24 +226,6 @@
       .compactMap { $0 }
       guard !specialTokenIds.isEmpty else { return tokenIds }
       return tokenIds.filter { !specialTokenIds.contains($0) }
-    }
-
-    private func withCCharStringBuffer<Result>(
-      count: Int,
-      _ body: (UnsafeMutableBufferPointer<UnsafeMutablePointer<CChar>?>) throws -> Result
-    ) rethrows -> Result {
-      let buffer = UnsafeMutableBufferPointer<UnsafeMutablePointer<CChar>?>
-        .allocate(capacity: count * MemoryLayout<CChar>.size)
-      for i in 0..<buffer.count {
-        buffer[i] = .allocate(capacity: Self.tokenBufferSize * MemoryLayout<CChar>.size)
-      }
-      defer {
-        for i in 0..<buffer.count {
-          buffer[i]?.deallocate()
-        }
-        buffer.deallocate()
-      }
-      return try body(buffer)
     }
   }
 

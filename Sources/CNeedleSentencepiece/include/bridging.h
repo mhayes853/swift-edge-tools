@@ -29,17 +29,12 @@ int needle_sp_tokenizer_pad_token_id(needle_sp_tokenizer_t tokenizer);
 
 size_t needle_sp_tokenizer_vocab_size(needle_sp_tokenizer_t tokenizer);
 
-int needle_sp_tokenizer_tokens_to_ids(
+int needle_sp_tokenizer_token_to_id(needle_sp_tokenizer_t tokenizer, const char* token);
+int needle_sp_tokenizer_id_to_token(
     needle_sp_tokenizer_t tokenizer,
-    const char** tokens,
-    int* token_ids,
-    size_t size
-);
-int needle_sp_tokenizer_ids_to_tokens(
-    needle_sp_tokenizer_t tokenizer,
-    const int* token_ids,
-    char** tokens,
-    size_t size
+    int token_id,
+    char* out_token,
+    size_t out_token_size
 );
 
 void needle_sp_tokenizer_destroy(needle_sp_tokenizer_t tokenizer);

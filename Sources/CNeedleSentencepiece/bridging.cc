@@ -122,40 +122,28 @@ size_t needle_sp_tokenizer_vocab_size(needle_sp_tokenizer_t tokenizer) {
     return !handle ? 0 : handle->processor.GetPieceSize();
 }
 
-int needle_sp_tokenizer_tokens_to_ids(
-    needle_sp_tokenizer_t tokenizer,
-    const char** tokens,
-    int* token_ids,
-    size_t size
-) {
+int needle_sp_tokenizer_token_to_id(needle_sp_tokenizer_t tokenizer, const char* token) {
     const auto* handle = static_cast<NeedleSPHandle*>(tokenizer);
-    if (!handle || !tokens || !token_ids) return -1;
-
-    for (size_t i = 0; i < size; i++) {
-        token_ids[i] = handle->processor.PieceToId(tokens[i]);
-    }
-    return 0;
+    if (!handle || !token) return -1;
+    return handle->processor.PieceToId(token);
 }
 
-int needle_sp_tokenizer_ids_to_tokens(
+int needle_sp_tokenizer_id_to_token(
     needle_sp_tokenizer_t tokenizer,
-    const int* token_ids,
-    char** tokens,
-    size_t size
+    int token_id,
+    char* out_token,
+    size_t out_token_size
 ) {
     const auto* handle = static_cast<NeedleSPHandle*>(tokenizer);
-    if (!handle || !tokens || !token_ids) return -1;
+    if (!handle || !out_token || out_token_size == 0) return -1;
 
     const auto piece_size = static_cast<size_t>(handle->processor.GetPieceSize());
-    for (size_t i = 0; i < size; i++) {
-        const auto id = token_ids[i];
-        if (id < 0 || static_cast<size_t>(id) >= piece_size) {
-            tokens[i][0] = '\0';
-            continue;
-        }
-        const auto& token = handle->processor.IdToPiece(id);
-        std::strcpy(tokens[i], token.c_str());
+    if (token_id < 0 || static_cast<size_t>(token_id) >= piece_size) {
+        return -1;
     }
+
+    const auto& piece = handle->processor.IdToPiece(token_id);
+    std::snprintf(out_token, out_token_size, "%s", piece.c_str());
     return 0;
 }
 
