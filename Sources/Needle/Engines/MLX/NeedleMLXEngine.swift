@@ -114,7 +114,7 @@
 
       var detokenizer = StreamingDetokenizer(tokenizer: self.tokenizer)
       var generatedTokens = [NeedleToken]()
-      var confidence = ConfidenceState()
+      var confidence = NeedleMLXConfidenceState()
       while !matcher.isTerminated
         && !self.isStopped.load(ordering: .relaxed)
         && detokenizer.tokenIds.count < (parameters.maxTokens ?? .max)

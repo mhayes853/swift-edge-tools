@@ -107,11 +107,6 @@ public final class NeedleSessionStream: Sendable, Observable, Identifiable {
     }
   }
 
-  public var isGenerating: Bool {
-    if case .generating = self.status { return true }
-    return false
-  }
-
   public var status: Status {
     self.registrar.access(self, keyPath: \.status)
     return self.state.withLock { $0.status }
@@ -381,7 +376,7 @@ extension NeedleSession {
     shouldInvokeTools: Bool = true
   ) -> NeedleSessionStream {
     if let message = duplicateToolNameError(Set(tools.map(\.name))) {
-      preconditionFailure(message)
+      assertionFailure(message)
     }
     let stream = NeedleSessionStream(
       session: self,

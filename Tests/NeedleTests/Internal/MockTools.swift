@@ -209,6 +209,13 @@ extension NeedleSessionStream.Status {
     }
   }
 
+  var isGenerating: Bool {
+    switch self {
+    case .generating: true
+    default: false
+    }
+  }
+
   var isFinished: Bool {
     switch self {
     case .finished: true

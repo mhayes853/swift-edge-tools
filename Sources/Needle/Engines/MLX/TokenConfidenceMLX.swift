@@ -4,7 +4,7 @@
 
   // MARK: - ConfidenceState
 
-  struct ConfidenceState {
+  struct NeedleMLXConfidenceState {
     private(set) var tokenUncertainties = [Float]()
     private var totalSum: Float = 0
 

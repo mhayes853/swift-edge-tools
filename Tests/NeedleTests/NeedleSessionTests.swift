@@ -402,7 +402,6 @@
       let stream = session.stream(tools: [], with: "hi")
 
       expectNoDifference(stream.status.isAwaitingExecution, true)
-      expectNoDifference(stream.isGenerating, false)
     }
 
     @Test
@@ -416,7 +415,7 @@
       let stream = session.stream(tools: [], with: "hi")
 
       try await Task.sleep(for: .milliseconds(50))
-      expectNoDifference(stream.isGenerating, true)
+      expectNoDifference(stream.status.isGenerating, true)
 
       engine.push(.finish)
       engine.push(nil)
@@ -440,7 +439,7 @@
         resultGeneration.engineGeneration.tokens,
         generation.engineGeneration.tokens
       )
-      expectNoDifference(stream.isGenerating, false)
+      expectNoDifference(stream.status.isGenerating, false)
     }
 
     @Test
