@@ -48,38 +48,6 @@ public final class NeedleSession<Engine: NeedleEngine>: Sendable, Observable {
   }
 }
 
-// MARK: - EngineActor
-
-private actor EngineActor<Engine: NeedleEngine> {
-  private let engine: Engine
-
-  init(_ engine: consuming sending Engine) {
-    self.engine = engine
-  }
-
-  func reset() {
-    self.engine.reset()
-  }
-
-  func run(
-    prompt: NeedlePrompt,
-    parameters: sending Engine.GenerateParameters,
-    shouldGenerate: Bool,
-    onStopper: sending @escaping (NeedleEngineStopper) -> Void,
-    onToken: sending @escaping (NeedleToken) -> Void
-  ) throws -> NeedleEngineGeneration {
-    self.engine.reset()
-    let stopper = self.engine.stopper
-    onStopper(stopper)
-    guard shouldGenerate else { return .empty }
-    return try self.engine.generate(
-      prompt: prompt,
-      parameters: parameters,
-      onToken: onToken
-    )
-  }
-}
-
 // MARK: - Generate
 
 public struct NeedleSessionGeneration: Sendable {
@@ -140,7 +108,7 @@ public final class NeedleSessionStream: Sendable, Observable, Identifiable {
     return self.state.withLock { $0.toolCalls }
   }
 
-  private let state = RecursiveLock(State())
+  private let state = Lock(State())
   private let registrar = ObservationRegistrar()
 
   deinit {
@@ -269,8 +237,11 @@ extension NeedleSessionStream: AsyncSequence {
 
   public func makeAsyncIterator() -> AsyncIterator {
     let (stream, continuation, id) = self.state.withLock { $0.takeToolCallStream() }
-    continuation.onTermination = { [weak self] _ in
-      self?.state.withLock { $0.removeTokenContinuation(id: id) }
+    continuation.onTermination = { [weak self] reason in
+      switch reason {
+      case .cancelled: self?.state.withLock { $0.removeTokenContinuation(id: id) }
+      default: break
+      }
     }
     return AsyncIterator(base: stream.makeAsyncIterator())
   }
@@ -297,8 +268,11 @@ extension NeedleSessionStream {
 
     public func makeAsyncIterator() -> AsyncIterator {
       let (tokenStream, continuation, id) = self.stream.state.withLock { $0.takeTokenStream() }
-      continuation.onTermination = { [weak stream] _ in
-        stream?.state.withLock { $0.removeToolContinuation(id: id) }
+      continuation.onTermination = { [weak stream] reason in
+        switch reason {
+        case .cancelled: stream?.state.withLock { $0.removeToolContinuation(id: id) }
+        default: break
+        }
       }
       return AsyncIterator(base: tokenStream.makeAsyncIterator())
     }
@@ -441,6 +415,38 @@ extension NeedleSession {
       self._activeStreams.withLock { $0.append(stream) }
     }
     return stream
+  }
+}
+
+// MARK: - EngineActor
+
+private actor EngineActor<Engine: NeedleEngine> {
+  private let engine: Engine
+
+  init(_ engine: consuming sending Engine) {
+    self.engine = engine
+  }
+
+  func reset() {
+    self.engine.reset()
+  }
+
+  func run(
+    prompt: NeedlePrompt,
+    parameters: sending Engine.GenerateParameters,
+    shouldGenerate: Bool,
+    onStopper: sending @escaping (NeedleEngineStopper) -> Void,
+    onToken: sending @escaping (NeedleToken) -> Void
+  ) throws -> NeedleEngineGeneration {
+    self.engine.reset()
+    let stopper = self.engine.stopper
+    onStopper(stopper)
+    guard shouldGenerate else { return .empty }
+    return try self.engine.generate(
+      prompt: prompt,
+      parameters: parameters,
+      onToken: onToken
+    )
   }
 }
 
