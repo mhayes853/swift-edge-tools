@@ -93,8 +93,8 @@
       parameters: GenerateParamaters,
       onToken: (NeedleToken) -> Void
     ) throws -> NeedleEngineGeneration {
-      self.isStopped.store(false, ordering: .relaxed)
       try Task.checkCancellation()
+      guard !self.isStopped.load(ordering: .relaxed) else { return .empty }
       let generationStartSnapshot = Memory.synchronizedSnapshot()
       let generateStart = self.clock.now
 
