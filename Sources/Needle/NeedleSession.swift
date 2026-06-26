@@ -62,7 +62,7 @@ extension NeedleSession {
     with prompt: String,
     systemPromptOverride: String? = nil,
     parameters: sending Engine.GenerateParameters = .default,
-    shouldInvokeTools: Bool = true
+    shouldInvokeTools: sending @escaping (AnyNeedleToolCall) -> Bool = { _ in true }
   ) async throws -> NeedleSessionGeneration {
     let stream = self.stream(
       tools: tools,
@@ -123,13 +123,14 @@ public final class NeedleSessionStream: Sendable, Observable, Identifiable {
     with prompt: String,
     systemPrompt: String,
     parameters: sending Engine.GenerateParameters,
-    shouldInvokeTools: Bool
+    shouldInvokeTools: sending @escaping (AnyNeedleToolCall) -> Bool
   ) {
     let task = Task {
       // NB: This is safe, the compiler must assume the worst when it can't infer isolation
       // regions fully, but at most the params get sent into the engine actor where they are
       // consumed via engine generation and nothing else.
       nonisolated(unsafe) let parameters = parameters
+      nonisolated(unsafe) let shouldInvokeTools = shouldInvokeTools
       return try await self.runGeneration(
         session: session,
         tools: tools,
@@ -148,7 +149,7 @@ public final class NeedleSessionStream: Sendable, Observable, Identifiable {
     prompt: String,
     systemPrompt: String,
     parameters: sending Engine.GenerateParameters,
-    shouldInvokeTools: Bool
+    shouldInvokeTools: sending @escaping (AnyNeedleToolCall) -> Bool
   ) async throws -> NeedleSessionGeneration {
     do {
       let needlePrompt = NeedlePrompt(
@@ -357,9 +358,9 @@ extension NeedleSessionStream {
       }
     }
 
-    mutating func emitToolCall(_ toolCall: AnyNeedleToolCall, shouldInvoke: Bool) {
+    mutating func emitToolCall(_ toolCall: AnyNeedleToolCall, shouldInvoke: (AnyNeedleToolCall) -> Bool) {
       self.toolCalls.append(toolCall)
-      if shouldInvoke {
+      if shouldInvoke(toolCall) {
         Task { _ = try await toolCall.invokeIfNecessary() }
       }
       for continuation in self.toolsContinuations.values {
@@ -398,7 +399,7 @@ extension NeedleSession {
     with prompt: String,
     systemPromptOverride: String? = nil,
     parameters: sending Engine.GenerateParameters = .default,
-    shouldInvokeTools: Bool = true
+    shouldInvokeTools: sending @escaping (AnyNeedleToolCall) -> Bool = { _ in true }
   ) -> NeedleSessionStream {
     if let message = duplicateToolNameError(tools.map(\.name)) {
       assertionFailure(message)

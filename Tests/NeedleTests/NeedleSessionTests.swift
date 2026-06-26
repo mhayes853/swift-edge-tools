@@ -474,7 +474,7 @@
       let stream = session.stream(
         tools: [WeatherTool()],
         with: "weather?",
-        shouldInvokeTools: false
+        shouldInvokeTools: { _ in false }
       )
 
       var collected = NeedleToolCallCollection()
@@ -497,7 +497,7 @@
       let stream = session.stream(
         tools: [BlockingWeatherTool()],
         with: "weather?",
-        shouldInvokeTools: true
+        shouldInvokeTools: { _ in true }
       )
 
       var collected = NeedleToolCallCollection()
