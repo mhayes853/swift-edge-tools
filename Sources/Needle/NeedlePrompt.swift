@@ -1,7 +1,3 @@
-import Foundation
-
-// MARK: - NeedlePrompt
-
 public struct NeedlePrompt: Hashable, Sendable {
   public var system: String
   public var user: String
