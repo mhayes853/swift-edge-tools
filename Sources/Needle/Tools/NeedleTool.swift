@@ -454,7 +454,7 @@ private struct JSONWriter {
     self.buffer.append(Self.quote)
     for byte in value.utf8 {
       switch byte {
-      case Self.quote: self.buffer.append(contentsOf: #""#.utf8)
+      case Self.quote: self.buffer.append(contentsOf: #"\""#.utf8)
       case Self.backslash: self.buffer.append(contentsOf: #"\\"#.utf8)
       case Self.backspace: self.buffer.append(contentsOf: #"\b"#.utf8)
       case Self.formFeed: self.buffer.append(contentsOf: #"\f"#.utf8)

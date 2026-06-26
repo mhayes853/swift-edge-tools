@@ -510,6 +510,24 @@
       let isIdleOrRunning = status.isIdle || status.isRunning
       expectNoDifference(isIdleOrRunning, true)
     }
+
+    @Test
+    func `Generate Parses Tool Call When JSON Strings Contain Braces And Brackets`() async throws {
+      let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+      let rawToolCall =
+        #"<tool_call> [{"name":"record_note","arguments":{"text":"literal}_and]_inside_string","title":"{draft}"}}]"#
+      let toolTokens = rawToolCall.tokenize(using: tokenizer)
+      let engine = MockEngine(script: toolTokens.map { .token($0) } + [.finish])
+      let session = NeedleSession(engine: engine)
+
+      let generation = try await session.generate(tools: [RecordNoteTool()], with: "note?")
+
+      expectNoDifference(generation.toolCalls.count, 1)
+      guard generation.toolCalls.count == 1 else { return }
+      let args = try #require(generation.toolCalls[0].input as? RecordNoteArgs)
+      expectNoDifference(args.text, "literal}_and]_inside_string")
+      expectNoDifference(args.title, "{draft}")
+    }
   }
 
   // MARK: - WeatherArgs
@@ -538,6 +556,12 @@
   private struct Activity: Equatable {
     var name: String
     var duration: Int
+  }
+
+  @NeedleGenerable
+  private struct RecordNoteArgs: Equatable {
+    var text: String
+    var title: String
   }
 
   // MARK: - WeatherTool
@@ -579,6 +603,18 @@
 
     func invoke(input: PlanTripArgs) async throws -> sending String {
       "Trip to \(input.destination.city) with \(input.activities.count) activities"
+    }
+  }
+
+  private struct RecordNoteTool: NeedleTool {
+    typealias Input = RecordNoteArgs
+    typealias Output = String
+
+    let name = "record_note"
+    let description = "Records a note."
+
+    func invoke(input: RecordNoteArgs) async throws -> sending String {
+      "\(input.title): \(input.text)"
     }
   }
 
@@ -789,6 +825,14 @@
     func `No Error For Unique Names`() {
       let message = duplicateToolNameError(["getWeather", "planTrip"])
       #expect(message == nil)
+    }
+
+    @Test
+    func `Duplicate Tool Name Error Detects Identical Names`() throws {
+      let message = try #require(duplicateToolNameError(["get_weather", "get_weather"]))
+
+      #expect(message.contains("'get_weather'"))
+      #expect(message.contains("normalize to 'get_weather'"))
     }
   }
 #endif

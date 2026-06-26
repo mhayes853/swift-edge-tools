@@ -239,7 +239,7 @@ extension NeedleSessionStream: AsyncSequence {
     let (stream, continuation, id) = self.state.withLock { $0.takeToolCallStream() }
     continuation.onTermination = { [weak self] reason in
       switch reason {
-      case .cancelled: self?.state.withLock { $0.removeTokenContinuation(id: id) }
+      case .cancelled: self?.state.withLock { $0.removeToolContinuation(id: id) }
       default: break
       }
     }
@@ -270,7 +270,7 @@ extension NeedleSessionStream {
       let (tokenStream, continuation, id) = self.stream.state.withLock { $0.takeTokenStream() }
       continuation.onTermination = { [weak stream] reason in
         switch reason {
-        case .cancelled: stream?.state.withLock { $0.removeToolContinuation(id: id) }
+        case .cancelled: stream?.state.withLock { $0.removeTokenContinuation(id: id) }
         default: break
         }
       }
@@ -400,7 +400,7 @@ extension NeedleSession {
     parameters: sending Engine.GenerateParameters = .default,
     shouldInvokeTools: Bool = true
   ) -> NeedleSessionStream {
-    if let message = duplicateToolNameError(Set(tools.map(\.name))) {
+    if let message = duplicateToolNameError(tools.map(\.name)) {
       assertionFailure(message)
     }
     let stream = NeedleSessionStream(
@@ -448,7 +448,7 @@ private actor EngineActor<Engine: NeedleEngine> {
 
 // MARK: - Duplicate Tool Name Error
 
-package func duplicateToolNameError(_ names: Set<String>) -> String? {
+package func duplicateToolNameError(_ names: some Sequence<String>) -> String? {
   var grouped = [String: [String]]()
   for name in names {
     grouped[name.snakeCased(), default: []].append(name)
@@ -472,6 +472,11 @@ private struct ToolCallParseState: Sendable {
     case insideArray
   }
 
+  private enum JSONStringState {
+    case outsideString
+    case insideString(isEscaping: Bool)
+  }
+
   private static let opener = "<tool_call>"
 
   private let toolsByName: [String: any NeedleTool]
@@ -481,6 +486,7 @@ private struct ToolCallParseState: Sendable {
   private var braceDepth = 0
   private var currentObjectStart: String.Index?
   private var scanIndex: String.Index?
+  private var jsonStringState = JSONStringState.outsideString
 
   init(tools: [any NeedleTool]) {
     var byName = [String: any NeedleTool]()
@@ -510,17 +516,19 @@ private struct ToolCallParseState: Sendable {
 
     var scanIndex = self.scanIndex ?? self.buffer.startIndex
     while scanIndex < self.buffer.endIndex {
-      guard
-        let boundaryIndex = self.buffer[scanIndex...].firstIndex(where: \.isNeedleBoundary)
-      else {
-        self.scanIndex = self.buffer.endIndex
-        return nil
-      }
-      let nextIndex = self.buffer.index(after: boundaryIndex)
+      let character = self.buffer[scanIndex]
+      let nextIndex = self.buffer.index(after: scanIndex)
 
-      switch self.buffer[boundaryIndex] {
+      self.updateJSONStringState(for: character)
+
+      guard self.shouldTreatAsBoundary(character) else {
+        scanIndex = nextIndex
+        continue
+      }
+
+      switch character {
       case "{":
-        self.openBrace(at: boundaryIndex)
+        self.openBrace(at: scanIndex)
         scanIndex = nextIndex
 
       case "}":
@@ -543,6 +551,28 @@ private struct ToolCallParseState: Sendable {
 
     self.scanIndex = scanIndex
     return nil
+  }
+
+  private mutating func updateJSONStringState(for character: Character) {
+    switch (self.jsonStringState, character) {
+    case (.outsideString, "\""):
+      self.jsonStringState = .insideString(isEscaping: false)
+    case (.insideString(let isEscaping), "\\"):
+      self.jsonStringState = .insideString(isEscaping: !isEscaping)
+    case (.insideString(let isEscaping), "\""):
+      self.jsonStringState = isEscaping ? .insideString(isEscaping: false) : .outsideString
+    case (.insideString, _):
+      self.jsonStringState = .insideString(isEscaping: false)
+    case (.outsideString, _):
+      break
+    }
+  }
+
+  private func shouldTreatAsBoundary(_ character: Character) -> Bool {
+    if case .insideString = self.jsonStringState {
+      return false
+    }
+    return character.isNeedleBoundary
   }
 
   private mutating func consumeArrayOpenBracketIfNeeded() -> Bool {
