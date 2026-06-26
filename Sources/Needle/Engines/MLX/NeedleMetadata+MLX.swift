@@ -1,7 +1,7 @@
 #if SwiftNeedleMLX
   import MLX
 
-  // MARK: - NeedleMetadataKey (MLX)
+  // MARK: - NeedleMetadataKey
 
   extension NeedleMetadataKey {
     public static let mlxEngineGenerationStartMemorySnapshot =
@@ -16,11 +16,11 @@
     public static let mlxEngineGenerationConfidence =
       NeedleMetadataKey(rawValue: "MLXEngineGenerationConfidence")
 
-    public static let mlxEngineTokenUncertainties =
-      NeedleMetadataKey(rawValue: "MLXEngineTokenUncertainties")
+    public static let mlxEnginePerTokenConfidences =
+      NeedleMetadataKey(rawValue: "MLXEnginePerTokenConfidences")
   }
 
-  // MARK: - NeedleMetadata (MLX)
+  // MARK: - NeedleMetadata
 
   extension NeedleMetadata {
     public var mlxEngineGenerationStartMemorySnapshot: Memory.Snapshot? {
@@ -43,9 +43,9 @@
       set { self[.mlxEngineGenerationConfidence] = newValue }
     }
 
-    public var mlxEngineTokenUncertainties: [Float]? {
-      get { self[.mlxEngineTokenUncertainties] as? [Float] }
-      set { self[.mlxEngineTokenUncertainties] = newValue }
+    public var mlxEnginePerTokenConfidences: [Float]? {
+      get { self[.mlxEnginePerTokenConfidences] as? [Float] }
+      set { self[.mlxEnginePerTokenConfidences] = newValue }
     }
   }
 #endif

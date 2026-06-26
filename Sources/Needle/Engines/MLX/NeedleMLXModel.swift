@@ -148,10 +148,6 @@
     let decoder: NeedleDecoder
     private let embedScale: Float
 
-    var embeddingModule: ModuleInfo<Embedding> {
-      self._embedding
-    }
-
     init(configuration: NeedleModelConfiguration) {
       self.encoder = NeedleEncoder(configuration: configuration)
       self.decoder = NeedleDecoder(configuration: configuration)

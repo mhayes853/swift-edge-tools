@@ -157,7 +157,7 @@
       metadata.mlxEnginePostPrefillMemorySnapshot = postPrefillSnapshot
       metadata.mlxEnginePostDecodeMemorySnapshot = postDecodeSnapshot
       metadata.mlxEngineGenerationConfidence = confidence.mean
-      metadata.mlxEngineTokenUncertainties = confidence.tokenUncertainties
+      metadata.mlxEnginePerTokenConfidences = confidence.perTokenConfidences
       return NeedleEngineGeneration(
         prefillMetrics: prefillMetrics,
         decodeMetrics: NeedleDecodeMetrics(

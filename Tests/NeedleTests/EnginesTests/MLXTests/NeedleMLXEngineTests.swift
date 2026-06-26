@@ -172,7 +172,7 @@
       let confidence = try #require(generation.metadata.mlxEngineGenerationConfidence)
       expectNoDifference((0...1).contains(confidence), true)
 
-      let perToken = try #require(generation.metadata.mlxEngineTokenUncertainties)
+      let perToken = try #require(generation.metadata.mlxEnginePerTokenConfidences)
       expectNoDifference(perToken.count, generation.tokens.count)
       for uncertainty in perToken {
         expectNoDifference((0...1).contains(uncertainty), true)
