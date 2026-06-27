@@ -127,8 +127,8 @@ public final class NeedleSessionStream: Sendable, Observable, Identifiable {
   ) {
     let task = Task {
       // NB: This is safe, the compiler must assume the worst when it can't infer isolation
-      // regions fully, but at most the params get sent into the engine actor where they are
-      // consumed via engine generation and nothing else.
+      // regions fully, but at most the params/tools predicate get sent into the engine actor
+      // where they are consumed via engine generation and nothing else.
       nonisolated(unsafe) let parameters = parameters
       nonisolated(unsafe) let shouldInvokeTools = shouldInvokeTools
       return try await self.runGeneration(
@@ -358,7 +358,10 @@ extension NeedleSessionStream {
       }
     }
 
-    mutating func emitToolCall(_ toolCall: AnyNeedleToolCall, shouldInvoke: (AnyNeedleToolCall) -> Bool) {
+    mutating func emitToolCall(
+      _ toolCall: AnyNeedleToolCall,
+      shouldInvoke: (AnyNeedleToolCall) -> Bool
+    ) {
       self.toolCalls.append(toolCall)
       if shouldInvoke(toolCall) {
         Task { _ = try await toolCall.invokeIfNecessary() }
@@ -440,8 +443,7 @@ private actor EngineActor<Engine: NeedleEngine> {
     onToken: sending @escaping (NeedleToken) -> Void
   ) throws -> NeedleEngineGeneration {
     self.engine.reset()
-    let stopper = self.engine.stopper
-    onStopper(stopper)
+    onStopper(self.engine.stopper)
     guard shouldGenerate else { return .empty }
     return try self.engine.generate(prompt: prompt, parameters: parameters, onToken: onToken)
   }
