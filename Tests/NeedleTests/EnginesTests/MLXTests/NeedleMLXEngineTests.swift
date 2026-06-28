@@ -87,7 +87,7 @@
       var tokens = [NeedleToken]()
       let generation = try self.engine.generate(
         prompt: Self.basePrompt,
-        parameters: NeedleMLXEngine.GenerateParamaters(kvCacheQuantizationBits: 4),
+        parameters: NeedleMLXEngine.GenerateParameters(kvCacheQuantizationBits: 4),
         onToken: { tokens.append($0) }
       )
       expectNoDifference(generation.wasStopped, false)
@@ -152,7 +152,7 @@
 
       _ = try self.engine.generate(
         prompt: Self.basePrompt,
-        parameters: NeedleMLXEngine.GenerateParamaters(processor: processor),
+        parameters: NeedleMLXEngine.GenerateParameters(processor: processor),
         onToken: { _ in }
       )
 

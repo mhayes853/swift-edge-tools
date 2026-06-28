@@ -9,7 +9,7 @@
   // MARK: - NeedleMLXEngine
 
   public final class NeedleMLXEngine: NeedleEngine {
-    public struct GenerateParamaters: NeedleEngineGenerateParameters {
+    public struct GenerateParameters: NeedleEngineGenerateParameters {
       public static var `default`: Self {
         Self()
       }
@@ -20,6 +20,7 @@
       public var maxTokens: Int?
       public var kvCacheQuantizationBits: Int?
       public var kvCacheQuantizationGroupSize: Int
+      public var synchronizeStreamForMemorySnapshots: Bool
 
       public init(
         sampler: any LogitSampler = ArgMaxSampler(),
@@ -28,7 +29,8 @@
           .unbounded(minimum: 0),
         maxTokens: Int? = 1024,
         kvCacheQuantizationBits: Int? = nil,
-        kvCacheQuantizationGroupSize: Int = 64
+        kvCacheQuantizationGroupSize: Int = 64,
+        synchronizeStreamForMemorySnapshots: Bool = true
       ) {
         self.sampler = sampler
         self.processor = processor
@@ -36,6 +38,7 @@
         self.maxTokens = maxTokens
         self.kvCacheQuantizationBits = kvCacheQuantizationBits
         self.kvCacheQuantizationGroupSize = kvCacheQuantizationGroupSize
+        self.synchronizeStreamForMemorySnapshots = synchronizeStreamForMemorySnapshots
       }
     }
 
@@ -99,12 +102,14 @@
 
     public func generate(
       prompt: NeedlePrompt,
-      parameters: GenerateParamaters,
+      parameters: GenerateParameters,
       onToken: (NeedleToken) -> Void
     ) throws -> NeedleEngineGeneration {
       try Task.checkCancellation()
       guard !self.isStopped.load(ordering: .relaxed) else { return .empty }
-      let generationStartSnapshot = Memory.synchronizedSnapshot()
+      let generationStartSnapshot = Memory.synchronizedSnapshot(
+        synchronize: parameters.synchronizeStreamForMemorySnapshots
+      )
       let generateStart = self.clock.now
 
       let matcher = try self.matcherPool.matcher(
@@ -114,8 +119,11 @@
       )
 
       var processor = parameters.processor
-      let (prefillOutput, prefillMetrics, postPrefillSnapshot) =
-        try self.prefill(prompt: prompt, processor: &processor)
+      let (prefillOutput, prefillMetrics, postPrefillSnapshot) = try self.prefill(
+        prompt: prompt,
+        processor: &processor,
+        synchronize: parameters.synchronizeStreamForMemorySnapshots
+      )
       try Task.checkCancellation()
       guard var output = prefillOutput else { preconditionFailure("Model received empty input.") }
       matcher.reset()
@@ -161,7 +169,9 @@
       }
 
       let durationToFirstToken = _durationToFirstToken ?? .zero
-      let postDecodeSnapshot = Memory.synchronizedSnapshot()
+      let postDecodeSnapshot = Memory.synchronizedSnapshot(
+        synchronize: parameters.synchronizeStreamForMemorySnapshots
+      )
       var metadata = NeedleMetadata()
       metadata.mlxEngineGenerationStartMemorySnapshot = generationStartSnapshot
       metadata.mlxEnginePostPrefillMemorySnapshot = postPrefillSnapshot
@@ -195,7 +205,8 @@
 
     private func prefill(
       prompt: NeedlePrompt,
-      processor: inout (any LogitProcessor)?
+      processor: inout (any LogitProcessor)?,
+      synchronize: Bool
     ) throws -> (LMOutput?, NeedlePrefillMetrics, Memory.Snapshot) {
       let input = try LMInput.needle(prompt: prompt, using: self.tokenizer)
       guard input.text.tokens.size <= self.model.configuration.encoderMaxLength else {
@@ -212,7 +223,7 @@
         tokens: input.text.tokens.size,
         duration: prefillStart.duration(to: self.clock.now)
       )
-      let snapshot = Memory.synchronizedSnapshot()
+      let snapshot = Memory.synchronizedSnapshot(synchronize: synchronize)
       return (output, metrics, snapshot)
     }
   }
@@ -305,8 +316,10 @@
   // MARK: - Synchronized Memory Snapshot
 
   extension Memory {
-    fileprivate static func synchronizedSnapshot() -> Snapshot {
-      Stream.defaultStream(.defaultDevice()).synchronize()
+    fileprivate static func synchronizedSnapshot(synchronize: Bool) -> Snapshot {
+      if synchronize {
+        Stream.defaultStream(.defaultDevice()).synchronize()
+      }
       return Self.snapshot()
     }
   }
