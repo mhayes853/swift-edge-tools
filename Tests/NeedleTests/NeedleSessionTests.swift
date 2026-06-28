@@ -23,6 +23,30 @@
     }
 
     @Test
+    func `Tokenize Forwards Tool Definitions And Prompt To The Engine`() async throws {
+      let expectedTokens = (0..<6).map { NeedleToken(id: $0, stringValue: "t\($0)") }
+      let tool = WeatherTool()
+      let capturedPrompt = Lock<NeedlePrompt?>(nil)
+      let engine = MockEngine { prompt in
+        capturedPrompt.withLock { $0 = prompt }
+        return expectedTokens
+      }
+      let session = NeedleSession(engine: engine, systemPrompt: "sys")
+
+      let tokens = await session.tokenize(
+        tools: [tool],
+        with: "hi",
+        systemPromptOverride: nil
+      )
+
+      expectNoDifference(tokens, expectedTokens)
+
+      let prompt = try #require(capturedPrompt.withLock { $0 })
+      let expectedPrompt = NeedlePrompt(system: "sys", user: "hi", tools: [tool.definition])
+      expectNoDifference(prompt, expectedPrompt)
+    }
+
+    @Test
     func `Final Generation Returns Successfully When No Errors Occur`() async throws {
       let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
       let tokens = "Hello, world!".tokenize(using: tokenizer)
@@ -699,6 +723,7 @@
 
     private let storage: Storage
     private let _generateCallCount = Lock(0)
+    private let tokenizeHandler: (@Sendable (NeedlePrompt) -> [NeedleToken])?
     let stopper: NeedleEngineStopper
 
     var generateCallCount: Int {
@@ -708,12 +733,14 @@
     init() {
       let storage = Storage()
       self.storage = storage
+      self.tokenizeHandler = nil
       self.stopper = NeedleEngineStopper { storage.stop() }
     }
 
     init(script: [Event]) {
       let storage = Storage()
       self.storage = storage
+      self.tokenizeHandler = nil
       self.stopper = NeedleEngineStopper { storage.stop() }
       for event in script {
         storage.push(event)
@@ -721,12 +748,19 @@
       storage.push(nil)
     }
 
+    init(tokenize: @escaping @Sendable (NeedlePrompt) -> [NeedleToken]) {
+      let storage = Storage()
+      self.storage = storage
+      self.tokenizeHandler = tokenize
+      self.stopper = NeedleEngineStopper { storage.stop() }
+    }
+
     static func live() -> MockEngine {
       MockEngine()
     }
 
     func tokenize(prompt: NeedlePrompt) -> [NeedleToken] {
-      []
+      self.tokenizeHandler?(prompt) ?? []
     }
 
     func push(_ event: Event?) {

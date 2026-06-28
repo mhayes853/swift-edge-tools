@@ -39,6 +39,35 @@ public final class NeedleSession<Engine: NeedleEngine>: Sendable, Observable {
     await self.engineActor.reset()
   }
 
+  public func tokenize(
+    tools: [any NeedleTool],
+    with prompt: String,
+    systemPromptOverride: String?
+  ) async -> [NeedleToken] {
+    await self.tokenize(
+      tools: tools.map(\.definition),
+      with: prompt,
+      systemPromptOverride: systemPromptOverride
+    )
+  }
+
+  public func tokenize(
+    tools: [NeedleToolDefinition],
+    with prompt: String,
+    systemPromptOverride: String?
+  ) async -> [NeedleToken] {
+    let prompt = NeedlePrompt(
+      system: systemPromptOverride ?? self.systemPrompt,
+      user: prompt,
+      tools: tools
+    )
+    return await self.tokenize(prompt: prompt)
+  }
+
+  public func tokenize(prompt: NeedlePrompt) async -> [NeedleToken] {
+    await self.engineActor.tokenize(prompt: prompt)
+  }
+
   fileprivate func removeActiveStream(_ stream: NeedleSessionStream) {
     self._activeStreams.withLock { activeStreams in
       self.observationRegistrar.withMutation(of: self, keyPath: \.activeStreams) {
@@ -433,6 +462,10 @@ private actor EngineActor<Engine: NeedleEngine> {
 
   func reset() {
     self.engine.reset()
+  }
+
+  func tokenize(prompt: NeedlePrompt) -> [NeedleToken] {
+    self.engine.tokenize(prompt: prompt)
   }
 
   func run(
