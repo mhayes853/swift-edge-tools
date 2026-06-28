@@ -118,6 +118,7 @@
       while !matcher.isTerminated
         && !self.isStopped.load(ordering: .relaxed)
         && detokenizer.tokenIds.count < (parameters.maxTokens ?? .max)
+        && generatedTokens.last?.id != self.tokenizer.eosTokenId
       {
         try Task.checkCancellation()
         let processedLogits = processor?.process(logits: output.logits) ?? output.logits
@@ -188,6 +189,12 @@
       processor: inout (any LogitProcessor)?
     ) throws -> (LMOutput?, NeedlePrefillMetrics, Memory.Snapshot) {
       let input = try LMInput.needle(prompt: prompt, using: self.tokenizer)
+      guard input.text.tokens.size <= self.model.configuration.encoderMaxLength else {
+        throw NeedleMLXEngineError.contextLengthExceeded(
+          tokens: input.text.tokens.size,
+          maximum: self.model.configuration.encoderMaxLength
+        )
+      }
 
       let prefillStart = self.clock.now
       processor?.prompt(input.text.tokens)
@@ -307,6 +314,10 @@
         message:
           "Token (ID=\(token.id), VALUE=\(token.stringValue)) was rejected by the grammar matcher."
       )
+    }
+
+    public static func contextLengthExceeded(tokens: Int, maximum: Int) -> Self {
+      Self(message: "Prompt token count (\(tokens)) exceeds the model context length (\(maximum)).")
     }
   }
 #endif

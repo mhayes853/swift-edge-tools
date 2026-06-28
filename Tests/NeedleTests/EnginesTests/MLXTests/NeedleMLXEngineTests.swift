@@ -178,6 +178,24 @@
         expectNoDifference((0...1).contains(uncertainty), true)
       }
     }
+
+    @Test
+    func `Generate Throws When Prompt Exceeds Context Length`() async throws {
+      let prompt = NeedlePrompt(
+        system: "",
+        user: String(repeating: "token ", count: 2_000),
+        tools: [.sendEmail]
+      )
+
+      let error = #expect(throws: NeedleMLXEngineError.self) {
+        _ = try self.engine.generate(
+          prompt: prompt,
+          parameters: .default,
+          onToken: { _ in }
+        )
+      }
+      expectNoDifference(error?.message.contains("context length"), true)
+    }
   }
 
   extension `NeedleMLXEngine tests` {

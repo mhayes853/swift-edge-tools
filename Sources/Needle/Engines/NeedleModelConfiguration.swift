@@ -14,6 +14,8 @@ public struct NeedleModelConfiguration: Hashable, Sendable {
   public let padTokenId: NeedleToken.ID
   public let decoderStartTokenId: NeedleToken.ID
   public var tieWordEmbeddings: Bool
+  private let maxSeqLen: Int?
+  private let maxPositionEmbeddings: Int?
   private let _dtype: String?
 
   public var dtype: String {
@@ -26,6 +28,10 @@ public struct NeedleModelConfiguration: Hashable, Sendable {
 
   public var kvDimensions: Int {
     self.kvHeads * self.attentionHeadDimensions
+  }
+
+  public var encoderMaxLength: Int {
+    self.maxSeqLen ?? self.maxPositionEmbeddings ?? 1024
   }
 }
 
@@ -46,6 +52,8 @@ extension NeedleModelConfiguration: Codable {
     case padTokenId = "pad_token_id"
     case decoderStartTokenId = "decoder_start_token_id"
     case tieWordEmbeddings = "tie_word_embeddings"
+    case maxSeqLen = "max_seq_len"
+    case maxPositionEmbeddings = "max_position_embeddings"
     case _dtype = "dtype"
   }
 }
