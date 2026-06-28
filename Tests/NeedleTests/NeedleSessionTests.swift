@@ -725,6 +725,10 @@
       MockEngine()
     }
 
+    func tokenize(prompt: NeedlePrompt) -> [NeedleToken] {
+      []
+    }
+
     func push(_ event: Event?) {
       self.storage.push(event)
     }

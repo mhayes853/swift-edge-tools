@@ -5,6 +5,8 @@ public protocol NeedleEngine: SendableMetatype {
 
   var stopper: NeedleEngineStopper { get }
 
+  func tokenize(prompt: NeedlePrompt) -> [NeedleToken]
+
   func generate(
     prompt: NeedlePrompt,
     parameters: GenerateParameters,

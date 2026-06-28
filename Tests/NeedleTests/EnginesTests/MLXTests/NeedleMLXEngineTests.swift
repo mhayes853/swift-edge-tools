@@ -196,6 +196,11 @@
       }
       expectNoDifference(error?.message.contains("context length"), true)
     }
+
+    @Test
+    func `Tokenize Base`() {
+      assertSnapshot(of: self.engine.tokenize(prompt: Self.basePrompt), as: .dump)
+    }
   }
 
   extension `NeedleMLXEngine tests` {

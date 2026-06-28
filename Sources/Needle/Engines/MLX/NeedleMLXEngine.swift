@@ -88,6 +88,15 @@
       self.matcherPool = MatcherPool()
     }
 
+    public func tokenize(prompt: NeedlePrompt) -> [NeedleToken] {
+      let tokenIds = self.tokenizer.encode(text: prompt.formatted())
+      let tokens = self.tokenizer.convertIdsToTokens(tokenIds)
+      return zip(tokenIds, tokens)
+        .compactMap { (tokenId, token) in
+          token.map { NeedleToken(id: tokenId, stringValue: $0) }
+        }
+    }
+
     public func generate(
       prompt: NeedlePrompt,
       parameters: GenerateParamaters,
