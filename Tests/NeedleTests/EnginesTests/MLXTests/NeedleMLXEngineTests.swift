@@ -1,4 +1,4 @@
-#if MLX && XGrammar
+#if MLX && XGrammar && canImport(MLX)
   import Needle
   import Testing
   import CustomDump
@@ -19,12 +19,12 @@
     func `Generate Basics`() async throws {
       var tokens = [NeedleToken]()
       let generation = try self.engine.generate(
-        prompt: Self.basePrompt,
+        prompt: .sendAdventureEmail,
         parameters: .default,
         onToken: { tokens.append($0) }
       )
       expectNoDifference(generation.wasStopped, false)
-      withExpectedIssue {
+      withKnownIssue {
         assertSnapshot(of: generation, as: .dump, record: .all)
         assertSnapshot(of: generation.metadata, as: .dump, record: .all)
         assertSnapshot(of: generation.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
@@ -35,7 +35,7 @@
     func `Generate Streamed Response Matches Final Response`() async throws {
       var tokens = [NeedleToken]()
       let generation = try self.engine.generate(
-        prompt: Self.basePrompt,
+        prompt: .sendAdventureEmail,
         parameters: .default,
         onToken: { tokens.append($0) }
       )
@@ -51,7 +51,7 @@
 
       var tokens = [NeedleToken]()
       let generation = try self.engine.generate(
-        prompt: Self.basePrompt,
+        prompt: .sendAdventureEmail,
         parameters: .default,
         onToken: {
           tokens.append($0)
@@ -67,7 +67,7 @@
 
     @Test
     func `Generate Cancels And Throws Cancellation Error`() async throws {
-      let prompt = Self.basePrompt
+      let prompt = NeedlePrompt.sendAdventureEmail
 
       // NB: We send and never use the engine outside the task, so this is safe.
       nonisolated(unsafe) let engine = self.engine
@@ -86,12 +86,12 @@
     func `Generate With 4 Bit KV Cache Quantization`() async throws {
       var tokens = [NeedleToken]()
       let generation = try self.engine.generate(
-        prompt: Self.basePrompt,
+        prompt: .sendAdventureEmail,
         parameters: NeedleMLXEngine.GenerateParameters(kvCacheQuantizationBits: 4),
         onToken: { tokens.append($0) }
       )
       expectNoDifference(generation.wasStopped, false)
-      withExpectedIssue {
+      withKnownIssue {
         assertSnapshot(of: generation, as: .dump, record: .all)
         assertSnapshot(of: generation.metadata, as: .dump, record: .all)
         assertSnapshot(of: generation.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
@@ -109,12 +109,12 @@
 
       var tokens = [NeedleToken]()
       let generation = try engine.generate(
-        prompt: Self.basePrompt,
+        prompt: .sendAdventureEmail,
         parameters: .default,
         onToken: { tokens.append($0) }
       )
       expectNoDifference(generation.wasStopped, false)
-      withExpectedIssue {
+      withKnownIssue {
         assertSnapshot(of: generation, as: .dump, record: .all)
         assertSnapshot(of: generation.metadata, as: .dump, record: .all)
         assertSnapshot(of: generation.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
@@ -128,10 +128,10 @@
       let session = NeedleSession(engine: engine)
       let generation = try await session.generate(
         tools: [SendEmailTool()],
-        with: Self.basePrompt.user
+        with: NeedlePrompt.sendAdventureEmail.user
       )
       expectNoDifference(generation.engineGeneration.wasStopped, false)
-      withExpectedIssue {
+      withKnownIssue {
         assertSnapshot(of: generation, as: .dump, record: .all)
         assertSnapshot(
           of: generation.engineGeneration.metadata,
@@ -151,7 +151,7 @@
       let processor = CountingLogitProcessor()
 
       _ = try self.engine.generate(
-        prompt: Self.basePrompt,
+        prompt: .sendAdventureEmail,
         parameters: NeedleMLXEngine.GenerateParameters(processor: processor),
         onToken: { _ in }
       )
@@ -164,7 +164,7 @@
     @Test
     func `Generate Records Mean Confidence In Range Zero To One`() async throws {
       let generation = try self.engine.generate(
-        prompt: Self.basePrompt,
+        prompt: .sendAdventureEmail,
         parameters: .default,
         onToken: { _ in }
       )
@@ -199,21 +199,13 @@
 
     @Test
     func `Tokenize Base`() {
-      assertSnapshot(of: self.engine.tokenize(prompt: Self.basePrompt), as: .dump)
+      assertSnapshot(of: self.engine.tokenize(prompt: .sendAdventureEmail), as: .dump)
     }
-  }
-
-  extension `NeedleMLXEngine tests` {
-    fileprivate static let basePrompt = NeedlePrompt(
-      system: "",
-      user: "Send an email to Henry asking him to go on an adventure.",
-      tools: [.sendEmail]
-    )
   }
 
   // MARK: - CountingLogitProcessor
 
-  private final class CountingLogitProcessor: LogitProcessor, @unchecked Sendable {
+  final class CountingLogitProcessor: LogitProcessor, @unchecked Sendable {
     var promptCalls = 0
     var processCalls = 0
     var didSampleCalls = 0
@@ -229,32 +221,6 @@
 
     func didSample(token: MLXArray) {
       self.didSampleCalls += 1
-    }
-  }
-
-  // MARK: - SendEmailTool
-
-  private struct SendEmailTool: NeedleTool {
-    @NeedleGenerable
-    struct Input: Sendable {
-      @NeedleGuide(
-        .string(pattern: /[a-z][a-z0-9]{1,10}@gmail\.com/),
-        description: "The recipient's email address."
-      )
-      var address: String
-
-      @NeedleGuide(description: "The subject of an email.")
-      var subject: String
-
-      @NeedleGuide(description: "The content of an email.")
-      var body: String
-    }
-
-    let name = "sendEmail"
-    let description = "Sends an email to a recipient with an email address."
-
-    func invoke(input: Input) async throws -> String {
-      "Sent email to \(input.address)"
     }
   }
 #endif

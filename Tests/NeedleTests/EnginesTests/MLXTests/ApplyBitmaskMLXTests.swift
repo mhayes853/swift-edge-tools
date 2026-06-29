@@ -1,4 +1,4 @@
-#if MLX
+#if MLX && canImport(MLX)
   import CustomDump
   import Needle
   import Testing

@@ -1,4 +1,4 @@
-#if MLX
+#if MLX && canImport(MLX)
   import MLX
   import MLXNN
   import MLXLMCommon
@@ -90,12 +90,7 @@
     }
 
     public func tokenize(prompt: NeedlePrompt) -> [NeedleToken] {
-      let tokenIds = self.tokenizer.encode(text: prompt.formatted())
-      let tokens = self.tokenizer.convertIdsToTokens(tokenIds)
-      return zip(tokenIds, tokens)
-        .compactMap { (tokenId, token) in
-          token.map { NeedleToken(id: tokenId, stringValue: $0) }
-        }
+      prompt.tokenized(using: self.tokenizer)
     }
 
     public func generate(

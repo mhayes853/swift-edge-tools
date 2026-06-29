@@ -1,4 +1,4 @@
-#if MLX
+#if MLX && canImport(MLX)
   import MLX
 
   public func applyBitmaskMLX(logits: MLXArray, mask: NeedleGrammarBitmask) -> MLXArray {

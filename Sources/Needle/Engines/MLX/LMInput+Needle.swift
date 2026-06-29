@@ -1,4 +1,4 @@
-#if MLX
+#if MLX && canImport(MLX)
   import Foundation
   import MLX
   import MLXLMCommon

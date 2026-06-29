@@ -30,7 +30,7 @@ struct `NeedleToolCall tests` {
       input: ""
     )
 
-    Task { try await call.invokeIfNecessary() }
+    _ = Task { try await call.invokeIfNecessary() }
 
     try await Task.sleep(for: .milliseconds(100))
     expectNoDifference(call.status.isRunning, true)

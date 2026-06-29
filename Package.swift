@@ -19,8 +19,9 @@ let package = Package(
   traits: [
     .trait(name: "XGrammar", description: "XGrammar-powered structured generation."),
     .trait(name: "Sentencepiece", description: "Pretrained Sentencepiece tokenizer support."),
-    .trait(name: "MLX", description: "Provides an MLX Engine.", enabledTraits: ["XGrammar"]),
-    .default(enabledTraits: ["XGrammar", "MLX", "Sentencepiece"])
+    .trait(name: "MLX", description: "MLX Engine Support.", enabledTraits: ["XGrammar"]),
+    .trait(name: "CoreAI", description: "CoreAI Engine Support.", enabledTraits: ["XGrammar"]),
+    .default(enabledTraits: ["XGrammar", "MLX", "Sentencepiece", "CoreAI"])
   ],
   dependencies: [
     .package(url: "https://github.com/ml-explore/mlx-swift-lm", from: "3.31.3"),
@@ -46,7 +47,11 @@ let package = Package(
           package: "swift-transformers",
           condition: .when(traits: ["MLX"])
         ),
-        .product(name: "Hub", package: "swift-transformers", condition: .when(traits: ["MLX"])),
+        .product(
+          name: "Hub",
+          package: "swift-transformers",
+          condition: .when(traits: ["MLX", "CoreAI"])
+        ),
         .target(name: "CNeedleSentencepiece", condition: .when(traits: ["Sentencepiece"]))
       ],
     ),

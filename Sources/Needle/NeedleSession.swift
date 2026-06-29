@@ -397,7 +397,7 @@ extension NeedleSessionStream {
     ) {
       self.toolCalls.append(toolCall)
       if shouldInvoke(toolCall) {
-        Task { _ = try await toolCall.invokeIfNecessary() }
+        _ = Task { _ = try await toolCall.invokeIfNecessary() }
       }
       for continuation in self.toolsContinuations.values {
         continuation.yield(toolCall)

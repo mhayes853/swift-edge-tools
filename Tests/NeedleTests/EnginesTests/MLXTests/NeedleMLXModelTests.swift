@@ -1,4 +1,4 @@
-#if MLX
+#if MLX && canImport(MLX)
   import CustomDump
   import Foundation
   import IssueReporting
@@ -24,7 +24,7 @@
     @Test
     func `TokenIterator Usage`() async throws {
       var iterator = try TokenIterator(
-        input: try LMInput.needle(prompt: Self.basePrompt, using: self.tokenizer),
+        input: try LMInput.needle(prompt: .sendAdventureEmail, using: self.tokenizer),
         model: self.model,
         parameters: Self.parameters
       )
@@ -42,12 +42,6 @@
   }
 
   extension `NeedleMLXModel tests` {
-    fileprivate static let basePrompt = NeedlePrompt(
-      system: "",
-      user: "Send an email to Henry asking him to go on an adventure.",
-      tools: [.sendEmail]
-    )
-
     fileprivate static let parameters = GenerateParameters(maxTokens: 512, temperature: 0)
   }
 #endif

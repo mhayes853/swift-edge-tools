@@ -1,10 +1,10 @@
 ▿ NeedleEngineGeneration
   ▿ decodeMetrics: NeedleDecodeMetrics
-    ▿ duration: 0.888621792 seconds
-      - _low: 888621792000000000
+    ▿ duration: 0.937225375 seconds
+      - _low: 937225375000000000
       - _high: 0
-    ▿ durationToFirstToken: 0.141921333 seconds
-      - _low: 141921333000000000
+    ▿ durationToFirstToken: 0.193289083 seconds
+      - _low: 193289083000000000
       - _high: 0
     - tokens: 57
   ▿ metadata: 5 key/value pairs
@@ -85,24 +85,24 @@ Cache:  2K           (2272)
     ▿ (2 elements)
       ▿ key: NeedleMetadataKey
         - rawValue: "MLXEnginePostDecodeMemorySnapshot"
-      ▿ value: Peak:   79M          (83292742)
-Active: 57M          (59840496)
-Cache:  43M          (45760046)
-        - activeMemory: 59840496
-        - cacheMemory: 45760046
-        - peakMemory: 83292742
+      ▿ value: Peak:   99M          (104412592)
+Active: 56M          (59660272)
+Cache:  72M          (75661408)
+        - activeMemory: 59660272
+        - cacheMemory: 75661408
+        - peakMemory: 104412592
     ▿ (2 elements)
       ▿ key: NeedleMetadataKey
         - rawValue: "MLXEnginePostPrefillMemorySnapshot"
-      ▿ value: Peak:   67M          (70963742)
-Active: 54M          (56860532)
-Cache:  26M          (27524906)
-        - activeMemory: 56860532
-        - cacheMemory: 27524906
-        - peakMemory: 70963742
+      ▿ value: Peak:   99M          (104412592)
+Active: 54M          (56680308)
+Cache:  57M          (60613084)
+        - activeMemory: 56680308
+        - cacheMemory: 60613084
+        - peakMemory: 104412592
   ▿ prefillMetrics: NeedlePrefillMetrics
-    ▿ duration: 0.05170125 seconds
-      - _low: 51701250000000000
+    ▿ duration: 0.105010375 seconds
+      - _low: 105010375000000000
       - _high: 0
     - tokens: 132
   ▿ tokens: 57 elements
