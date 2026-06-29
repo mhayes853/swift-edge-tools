@@ -1,1 +1,1 @@
-<tool_call> [{"name":"send_email","arguments":{"body":"Where should we go on an adventure?[{"name":"pattern's"}]","subject":"Hello","address":"Henry, Italian, Italian, Italian, Italian, Italian, and the adventure of the new apartment's cropped, solored, and the new place of the new apartment is finema, pleasewn.getretonas.","cc":"hendery@mail.com"}}]
+<tool_call> [{"name":"send_email","arguments":{"body":"Hey, could you please go on an adventure?[{"name":"my_address"}]","subject":"Henry","address":"Henry"}}]

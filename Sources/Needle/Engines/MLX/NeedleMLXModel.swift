@@ -523,7 +523,7 @@
   // MARK: - Helpers
 
   private func gatedResidual(_ x: MLXArray, gate: MLXArray, sublayer: MLXArray) -> MLXArray {
-    x + sigmoid(gate).asType(sublayer.dtype) * sublayer
+    clip(x + sigmoid(gate).asType(sublayer.dtype) * sublayer, min: -65500.0, max: 65500.0)
   }
 
   private func paddingMask(inputIds: MLXArray, padTokenId: Int) -> MLXArray {
