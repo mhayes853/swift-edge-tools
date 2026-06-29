@@ -426,6 +426,7 @@
       let stream = session.stream(tools: [], with: "hi")
 
       expectNoDifference(stream.status.isAwaitingExecution, true)
+      stream.stop()
     }
 
     @Test
