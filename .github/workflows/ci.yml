@@ -20,6 +20,8 @@ jobs:
         config: ["debug", "release"]
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Select Xcode ${{ matrix.xcode }}
         run: sudo xcode-select -s /Applications/Xcode_${{ matrix.xcode }}.app
       - name: Run ${{ matrix.config }} tests
@@ -30,6 +32,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: "Test Swift Package on Linux"
         run: swift test --disable-experimental-prebuilts --traits XGrammar,Sentencepiece
 
@@ -38,6 +42,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: "Test Swift Package on Android"
         uses: swift-android-sdk/swift-android-action@v2
         with:
@@ -50,6 +56,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Install Swift 6.3.0
         uses: swift-actions/setup-swift@v3
         with:
@@ -68,6 +76,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: "Setup Swift on Windows"
         uses: compnerd/gha-setup-swift@main
         with:
