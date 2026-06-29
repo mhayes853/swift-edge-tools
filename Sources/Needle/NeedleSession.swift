@@ -39,6 +39,18 @@ public final class NeedleSession<Engine: NeedleEngine>: Sendable, Observable {
     await self.engineActor.reset()
   }
 
+  fileprivate func removeActiveStream(_ stream: NeedleSessionStream) {
+    self._activeStreams.withLock { activeStreams in
+      self.observationRegistrar.withMutation(of: self, keyPath: \.activeStreams) {
+        activeStreams.removeAll { $0 === stream }
+      }
+    }
+  }
+}
+
+// MARK: - Tokenize
+
+extension NeedleSession {
   public func tokenize(
     tools: [any NeedleTool],
     with prompt: String,
@@ -66,14 +78,6 @@ public final class NeedleSession<Engine: NeedleEngine>: Sendable, Observable {
 
   public func tokenize(prompt: NeedlePrompt) async -> [NeedleToken] {
     await self.engineActor.tokenize(prompt: prompt)
-  }
-
-  fileprivate func removeActiveStream(_ stream: NeedleSessionStream) {
-    self._activeStreams.withLock { activeStreams in
-      self.observationRegistrar.withMutation(of: self, keyPath: \.activeStreams) {
-        activeStreams.removeAll { $0 === stream }
-      }
-    }
   }
 }
 
