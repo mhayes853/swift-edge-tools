@@ -45,7 +45,6 @@
     public let grammarEngine: NeedleXGrammarEngine
     public let tokenizer: any Tokenizers.Tokenizer
     public let model: NeedleMLXModel
-    private var kvCache: [any KVCache]
     private let matcherPool: MatcherPool
 
     public var stopper: NeedleEngineStopper {
@@ -87,7 +86,6 @@
       self.tokenizer = tokenizer
       self.model = model
       self.grammarEngine = grammarEngine
-      self.kvCache = model.newCache(parameters: nil)
       self.matcherPool = MatcherPool()
     }
 
@@ -119,8 +117,10 @@
       )
 
       var processor = parameters.processor
+      var cache = self.model.newCache(parameters: nil)
       let (prefillOutput, prefillMetrics, postPrefillSnapshot) = try self.prefill(
         prompt: prompt,
+        cache: cache,
         processor: &processor,
         synchronize: parameters.synchronizeStreamForMemorySnapshots
       )
@@ -159,13 +159,13 @@
         processor?.didSample(token: token)
 
         maybeQuantizeKVCache(
-          cache: &self.kvCache,
+          cache: &cache,
           kvBits: parameters.kvCacheQuantizationBits,
           kvGroupSize: parameters.kvCacheQuantizationGroupSize
         )
 
         let inputText = LMInput.Text(tokens: token)
-        output = self.model(inputText[text: .newAxis], cache: self.kvCache, state: output.state)
+        output = self.model(inputText[text: .newAxis], cache: cache, state: output.state)
       }
 
       let durationToFirstToken = _durationToFirstToken ?? .zero
@@ -192,19 +192,18 @@
     }
 
     public func reset() {
-      self.kvCache = self.model.newCache(parameters: nil)
       self.model.reset()
       self.isStopped.store(false, ordering: .relaxed)
     }
 
     public func clearCaches() {
-      self.kvCache = self.model.newCache(parameters: nil)
       self.matcherPool.clear()
       self.grammarEngine.clearCache()
     }
 
     private func prefill(
       prompt: NeedlePrompt,
+      cache: [any KVCache],
       processor: inout (any LogitProcessor)?,
       synchronize: Bool
     ) throws -> (LMOutput?, NeedlePrefillMetrics, Memory.Snapshot) {
@@ -218,7 +217,7 @@
 
       let prefillStart = self.clock.now
       processor?.prompt(input.text.tokens)
-      let output = try self.model.prepare(input.text.tokens, cache: self.kvCache, windowSize: nil)
+      let output = try self.model.prepare(input.text.tokens, cache: cache, windowSize: nil)
       let metrics = NeedlePrefillMetrics(
         tokens: input.text.tokens.size,
         duration: prefillStart.duration(to: self.clock.now)
