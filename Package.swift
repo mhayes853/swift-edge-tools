@@ -18,22 +18,9 @@ let package = Package(
   ],
   traits: [
     .trait(name: "XGrammar", description: "XGrammar-powered structured generation."),
-    .trait(
-      name: "Sentencepiece",
-      description: "Pretrained Sentencepiece tokenizer support."
-    ),
-    .trait(
-      name: "MLX",
-      description: "MLX Support.",
-      enabledTraits: ["XGrammar"]
-    ),
-    .default(
-      enabledTraits: [
-        "XGrammar",
-        "MLX",
-        "Sentencepiece"
-      ]
-    )
+    .trait(name: "Sentencepiece", description: "Pretrained Sentencepiece tokenizer support."),
+    .trait(name: "MLX", description: "Provides an MLX Engine.", enabledTraits: ["XGrammar"]),
+    .default(enabledTraits: ["XGrammar", "MLX", "Sentencepiece"])
   ],
   dependencies: [
     .package(url: "https://github.com/ml-explore/mlx-swift-lm", from: "3.31.3"),
@@ -51,33 +38,17 @@ let package = Package(
         "NeedleMacros",
         .product(name: "MLX", package: "mlx-swift", condition: .when(traits: ["MLX"])),
         .product(name: "MLXNN", package: "mlx-swift", condition: .when(traits: ["MLX"])),
-        .product(
-          name: "MLXLLM",
-          package: "mlx-swift-lm",
-          condition: .when(traits: ["MLX"])
-        ),
-        .product(
-          name: "MLXLMCommon",
-          package: "mlx-swift-lm",
-          condition: .when(traits: ["MLX"])
-        ),
+        .product(name: "MLXLLM", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),
+        .product(name: "MLXLMCommon", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),
         .target(name: "CNeedleXGrammar", condition: .when(traits: ["XGrammar"])),
         .product(
           name: "Tokenizers",
           package: "swift-transformers",
           condition: .when(traits: ["MLX"])
         ),
-        .product(
-          name: "Hub",
-          package: "swift-transformers",
-          condition: .when(traits: ["MLX"])
-        ),
-        .target(
-          name: "CNeedleSentencepiece",
-          condition: .when(traits: ["Sentencepiece"])
-        )
+        .product(name: "Hub", package: "swift-transformers", condition: .when(traits: ["MLX"])),
+        .target(name: "CNeedleSentencepiece", condition: .when(traits: ["Sentencepiece"]))
       ],
-      swiftSettings: [.enableExperimentalFeature("LifetimeDependence")]
     ),
     .target(
       name: "CNeedleXGrammar",
