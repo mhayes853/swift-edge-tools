@@ -1,4 +1,4 @@
-#if canImport(Tokenizers) && SwiftNeedleSentencepiece
+#if canImport(Tokenizers) && Sentencepiece
   import Foundation
   import CNeedleSentencepiece
   import Tokenizers

@@ -1,4 +1,4 @@
-#if SwiftNeedleSentencepiece
+#if Sentencepiece
   import CustomDump
   import Foundation
   import Needle

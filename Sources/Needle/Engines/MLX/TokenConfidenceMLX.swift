@@ -1,4 +1,4 @@
-#if SwiftNeedleMLX
+#if MLX
   import Foundation
   import MLX
 

@@ -1,4 +1,4 @@
-#if SwiftNeedleMLX
+#if MLX
   import MLX
 
   public func applyBitmaskMLX(logits: MLXArray, mask: NeedleGrammarBitmask) -> MLXArray {

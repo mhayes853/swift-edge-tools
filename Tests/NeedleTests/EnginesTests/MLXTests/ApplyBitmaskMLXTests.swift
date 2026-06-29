@@ -1,4 +1,4 @@
-#if SwiftNeedleMLX
+#if MLX
   import CustomDump
   import Needle
   import Testing

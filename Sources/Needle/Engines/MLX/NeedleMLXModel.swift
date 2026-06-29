@@ -1,4 +1,4 @@
-#if SwiftNeedleMLX
+#if MLX
   import MLX
   import MLXNN
   import MLXLLM

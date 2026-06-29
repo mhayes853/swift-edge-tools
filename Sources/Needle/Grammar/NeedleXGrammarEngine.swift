@@ -1,4 +1,4 @@
-#if SwiftNeedleXGrammar
+#if XGrammar
   import CNeedleXGrammar
   import Foundation
 

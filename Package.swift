@@ -17,21 +17,21 @@ let package = Package(
     .library(name: "Needle", targets: ["Needle"])
   ],
   traits: [
-    .trait(name: "SwiftNeedleXGrammar", description: "XGrammar-powered structured generation."),
+    .trait(name: "XGrammar", description: "XGrammar-powered structured generation."),
     .trait(
-      name: "SwiftNeedleSentencepiece",
+      name: "Sentencepiece",
       description: "Pretrained Sentencepiece tokenizer support."
     ),
     .trait(
-      name: "SwiftNeedleMLX",
+      name: "MLX",
       description: "MLX Support.",
-      enabledTraits: ["SwiftNeedleXGrammar"]
+      enabledTraits: ["XGrammar"]
     ),
     .default(
       enabledTraits: [
-        "SwiftNeedleXGrammar",
-        "SwiftNeedleMLX",
-        "SwiftNeedleSentencepiece"
+        "XGrammar",
+        "MLX",
+        "Sentencepiece"
       ]
     )
   ],
@@ -50,32 +50,32 @@ let package = Package(
       name: "Needle",
       dependencies: [
         "NeedleMacros",
-        .product(name: "MLX", package: "mlx-swift", condition: .when(traits: ["SwiftNeedleMLX"])),
-        .product(name: "MLXNN", package: "mlx-swift", condition: .when(traits: ["SwiftNeedleMLX"])),
+        .product(name: "MLX", package: "mlx-swift", condition: .when(traits: ["MLX"])),
+        .product(name: "MLXNN", package: "mlx-swift", condition: .when(traits: ["MLX"])),
         .product(
           name: "MLXLLM",
           package: "mlx-swift-lm",
-          condition: .when(traits: ["SwiftNeedleMLX"])
+          condition: .when(traits: ["MLX"])
         ),
         .product(
           name: "MLXLMCommon",
           package: "mlx-swift-lm",
-          condition: .when(traits: ["SwiftNeedleMLX"])
+          condition: .when(traits: ["MLX"])
         ),
-        .target(name: "CNeedleXGrammar", condition: .when(traits: ["SwiftNeedleXGrammar"])),
+        .target(name: "CNeedleXGrammar", condition: .when(traits: ["XGrammar"])),
         .product(
           name: "Tokenizers",
           package: "swift-transformers",
-          condition: .when(traits: ["SwiftNeedleMLX"])
+          condition: .when(traits: ["MLX"])
         ),
         .product(
           name: "Hub",
           package: "swift-transformers",
-          condition: .when(traits: ["SwiftNeedleMLX"])
+          condition: .when(traits: ["MLX"])
         ),
         .target(
           name: "CNeedleSentencepiece",
-          condition: .when(traits: ["SwiftNeedleSentencepiece"])
+          condition: .when(traits: ["Sentencepiece"])
         )
       ],
       swiftSettings: [.enableExperimentalFeature("LifetimeDependence")]
@@ -166,7 +166,7 @@ let package = Package(
         .product(
           name: "Hub",
           package: "swift-transformers",
-          condition: .when(traits: ["SwiftNeedleMLX"])
+          condition: .when(traits: ["MLX"])
         )
       ],
       exclude: ["NeedleGenerationSchemaTests/__Snapshots__"],

@@ -1,7 +1,7 @@
-#if SwiftNeedleSentencepiece
+#if Sentencepiece
   @_exported import CNeedleSentencepiece
 #endif
 
-#if SwiftNeedleXGrammar
+#if XGrammar
   @_exported import CNeedleXGrammar
 #endif

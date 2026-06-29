@@ -1,4 +1,4 @@
-#if SwiftNeedleSentencepiece
+#if Sentencepiece
   import Needle
   import Tokenizers
   import Testing

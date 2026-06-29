@@ -1,4 +1,4 @@
-#if SwiftNeedleMLX && SwiftNeedleXGrammar
+#if MLX && XGrammar
   import Needle
   import Testing
   import CustomDump
