@@ -42,8 +42,7 @@ let package = Package(
     .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.31.3"),
     .package(url: "https://github.com/pointfreeco/swift-macro-testing", from: "0.6.5"),
     .package(url: "https://github.com/swiftlang/swift-syntax", "600.0.0"..<"603.0.0"),
-    .package(url: "https://github.com/huggingface/swift-transformers", from: "1.3.0"),
-    .package(url: "https://github.com/mlc-ai/xgrammar", from: "0.2.2")
+    .package(url: "https://github.com/huggingface/swift-transformers", from: "1.3.0")
   ],
   targets: [
     .target(
@@ -82,8 +81,40 @@ let package = Package(
     ),
     .target(
       name: "CNeedleXGrammar",
-      dependencies: [.product(name: "XGrammar", package: "xgrammar")],
-      publicHeadersPath: "include"
+      path: "Sources/CNeedleXGrammar",
+      sources: [
+        "bridging.cc",
+        "xgrammar/cpp/compiled_grammar.cc",
+        "xgrammar/cpp/config.cc",
+        "xgrammar/cpp/earley_parser.cc",
+        "xgrammar/cpp/fsm.cc",
+        "xgrammar/cpp/fsm_builder.cc",
+        "xgrammar/cpp/grammar.cc",
+        "xgrammar/cpp/grammar_builder.cc",
+        "xgrammar/cpp/grammar_compiler.cc",
+        "xgrammar/cpp/grammar_functor.cc",
+        "xgrammar/cpp/grammar_matcher.cc",
+        "xgrammar/cpp/grammar_parser.cc",
+        "xgrammar/cpp/grammar_printer.cc",
+        "xgrammar/cpp/json_schema_converter.cc",
+        "xgrammar/cpp/json_schema_converter_ext.cc",
+        "xgrammar/cpp/regex_converter.cc",
+        "xgrammar/cpp/structural_tag.cc",
+        "xgrammar/cpp/testing.cc",
+        "xgrammar/cpp/tokenizer_info.cc",
+        "xgrammar/cpp/support/logging.cc",
+        "xgrammar/cpp/support/recursion_guard.cc"
+      ],
+      publicHeadersPath: "include",
+      cxxSettings: [
+        .headerSearchPath("."),
+        .headerSearchPath("xgrammar/include"),
+        .headerSearchPath("xgrammar/cpp"),
+        .headerSearchPath("xgrammar/3rdparty/dlpack/include"),
+        .headerSearchPath("xgrammar/3rdparty/picojson"),
+        .define("XGRAMMAR_ENABLE_LOG_DEBUG", to: "0"),
+        .define("XGRAMMAR_ENABLE_CPPTRACE", to: "0")
+      ]
     ),
     .target(
       name: "CNeedleSentencepiece",

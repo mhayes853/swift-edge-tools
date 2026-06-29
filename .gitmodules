@@ -2,3 +2,6 @@
 	path = Sources/CNeedleSentencepiece/sentencepiece
 	url = https://github.com/google/sentencepiece
 	branch = master
+[submodule "Sources/CNeedleXGrammar/xgrammar"]
+	path = Sources/CNeedleXGrammar/xgrammar
+	url = https://github.com/mlc-ai/xgrammar.git

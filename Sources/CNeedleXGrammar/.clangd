@@ -2,7 +2,7 @@ CompileFlags:
   Add:
     - -I.
     - -Iinclude
-    - -I../../.build/checkouts/xgrammar/include
+    - -Ixgrammar/include
     - -std=c++20
 
 Diagnostics:
