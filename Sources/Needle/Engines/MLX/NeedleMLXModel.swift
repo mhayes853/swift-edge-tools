@@ -275,7 +275,8 @@
         dtype: x.dtype
       )
       var x = x
-      let caches = caches ?? Array(repeating: nil, count: self.layers.count)
+      let optionalCaches = caches?.map { $0 as (any KVCache)? }
+      let caches = optionalCaches ?? Array(repeating: nil, count: self.layers.count)
       for (index, (layer, caches)) in zip(self.layers, caches).enumerated() {
         x = layer(
           x,
