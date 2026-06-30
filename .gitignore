@@ -8,3 +8,10 @@ DerivedData/
 .netrc
 /.swift-needle-tests/
 .swift-version
+
+__pycache__/
+*.pyc
+*.egg-info
+.pytest_cache/
+.venv
+python/build
