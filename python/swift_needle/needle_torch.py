@@ -123,7 +123,7 @@ class NeedleDecoder(nn.Module):
             encoder_projected_v=encoder_projected_v,
             k_cache=typing.cast(torch.Tensor, self.k_cache),
             v_cache=typing.cast(torch.Tensor, self.v_cache),
-            cache_offset=int(typing.cast(torch.Tensor, self.cache_offset).item()),
+            cache_offset=typing.cast(torch.Tensor, self.cache_offset),
         )
         typing.cast(torch.Tensor, self.cache_offset).add_(input_ids.shape[1])
         return _project_logits(
@@ -141,15 +141,29 @@ class _RoPEFrequencies:
 
     def __init__(self, inverse: torch.Tensor, seq_len: int, dtype: torch.dtype):
         positions = torch.arange(0, seq_len, dtype=torch.float32, device=inverse.device)
+        self._initialize(inverse, positions, dtype)
+
+    @classmethod
+    def from_positions(
+        cls, inverse: torch.Tensor, positions: torch.Tensor, dtype: torch.dtype
+    ) -> "_RoPEFrequencies":
+        rope = cls.__new__(cls)
+        rope._initialize(
+            inverse, positions.to(device=inverse.device, dtype=torch.float32), dtype
+        )
+        return rope
+
+    def _initialize(
+        self, inverse: torch.Tensor, positions: torch.Tensor, dtype: torch.dtype
+    ) -> None:
         frequencies = positions[:, None] * inverse[None, :]
         embeddings = torch.cat([frequencies, frequencies], dim=-1)
         self.sin = torch.sin(embeddings)[None, :].to(device=inverse.device, dtype=dtype)
         self.cos = torch.cos(embeddings)[None, :].to(device=inverse.device, dtype=dtype)
 
-    def apply(self, x: torch.Tensor, offset: int = 0) -> torch.Tensor:
-        seq_len = x.shape[2]
-        sin = self.sin[..., offset : offset + seq_len, :].unsqueeze(1)
-        cos = self.cos[..., offset : offset + seq_len, :].unsqueeze(1)
+    def apply(self, x: torch.Tensor) -> torch.Tensor:
+        sin = self.sin.unsqueeze(1)
+        cos = self.cos.unsqueeze(1)
         half = x.shape[-1] // 2
         rotated = torch.cat([-x[..., half:], x[..., :half]], dim=-1)
         return (x * cos) + (rotated * sin)
@@ -177,12 +191,11 @@ class _NeedleSimpleAttentionNetwork(nn.Module):
         encoder_projected_v: torch.Tensor,
         k_cache: torch.Tensor,
         v_cache: torch.Tensor,
-        cache_offset: int,
+        cache_offset: torch.Tensor,
     ) -> torch.Tensor:
         x = self.embed_tokens(x) * self.embed_scale
         return self.decoder(
             x,
-            self_mask=_causal_mask(x.shape[1], device=x.device),
             cross_mask=cross_mask,
             encoder_projected_k=encoder_projected_k,
             encoder_projected_v=encoder_projected_v,
@@ -220,23 +233,35 @@ class _NeedleDecoder(nn.Module):
                 dimensions=configuration.attention_head_dimensions,
                 theta=configuration.rope_theta,
             ),
+            persistent=False,
         )
 
     def forward(
         self,
         x: torch.Tensor,
-        self_mask: torch.Tensor,
         cross_mask: torch.Tensor,
         encoder_projected_k: torch.Tensor,
         encoder_projected_v: torch.Tensor,
         k_cache: torch.Tensor,
         v_cache: torch.Tensor,
-        cache_offset: int,
+        cache_offset: torch.Tensor,
     ) -> torch.Tensor:
-        rope = _RoPEFrequencies(
+        next_cache_offset = _next_cache_offset(
+            cache_offset, x.shape[1], k_cache.shape[3]
+        )
+        rope = _RoPEFrequencies.from_positions(
             inverse=typing.cast(torch.Tensor, self.inverse_rope),
-            seq_len=cache_offset + x.shape[1],
+            positions=torch.arange(
+                x.shape[1], device=x.device, dtype=cache_offset.dtype
+            )
+            + cache_offset.to(device=x.device),
             dtype=x.dtype,
+        )
+        self_mask = _decoder_self_mask(
+            query_length=x.shape[1],
+            max_tokens=k_cache.shape[3],
+            cache_offset=next_cache_offset,
+            device=x.device,
         )
         for index, layer in enumerate(self.layers):
             x = layer(
@@ -273,7 +298,7 @@ class _NeedleDecoderBlock(nn.Module):
         rope: _RoPEFrequencies,
         layer_k_cache: torch.Tensor,
         layer_v_cache: torch.Tensor,
-        cache_offset: int,
+        cache_offset: torch.Tensor,
     ) -> torch.Tensor:
         self_normed = self.input_layernorm(x)
         self_attention = self.self_attn(
@@ -312,6 +337,7 @@ class _NeedleEncoder(nn.Module):
                 dimensions=configuration.attention_head_dimensions,
                 theta=configuration.rope_theta,
             ),
+            persistent=False,
         )
 
     def forward(self, x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
@@ -378,11 +404,11 @@ class _NeedleAttention(nn.Module):
         rope: _RoPEFrequencies | None = None,
         layer_k_cache: torch.Tensor | None = None,
         layer_v_cache: torch.Tensor | None = None,
-        cache_offset: int = 0,
+        cache_offset: torch.Tensor | None = None,
     ) -> torch.Tensor:
         projected_k, projected_v = self.project_kv(kv)
         if rope is not None:
-            projected_k = rope.apply(projected_k, offset=cache_offset)
+            projected_k = rope.apply(projected_k)
         return self.forward_with_projected_kv(
             q=q,
             projected_k=projected_k,
@@ -403,7 +429,7 @@ class _NeedleAttention(nn.Module):
         rope: _RoPEFrequencies | None = None,
         layer_k_cache: torch.Tensor | None = None,
         layer_v_cache: torch.Tensor | None = None,
-        cache_offset: int = 0,
+        cache_offset: torch.Tensor | None = None,
     ) -> torch.Tensor:
         batch, seq_len, _ = q.shape
         q = self.q_norm(
@@ -413,15 +439,18 @@ class _NeedleAttention(nn.Module):
         )
 
         if rope is not None:
-            q = rope.apply(q, offset=cache_offset)
+            q = rope.apply(q)
 
-        if layer_k_cache is not None and layer_v_cache is not None:
+        if (
+            layer_k_cache is not None
+            and layer_v_cache is not None
+            and cache_offset is not None
+        ):
             keys, values = _update_kv_cache(
                 layer_k_cache,
                 layer_v_cache,
                 projected_k,
                 projected_v,
-                cache_offset,
             )
         else:
             keys = projected_k
@@ -480,12 +509,6 @@ class _ZCRMSNorm(nn.Module):
         return torch.rms_norm(x, (x.shape[-1],), 1 + self.weight.to(x.dtype), self.eps)
 
 
-def _causal_mask(seq_len: int, device: torch.device) -> torch.Tensor:
-    return torch.ones((seq_len, seq_len), dtype=torch.bool, device=device).tril()[
-        None, None, :, :
-    ]
-
-
 def _gated_residual(
     x: torch.Tensor, gate: torch.Tensor, sublayer: torch.Tensor
 ) -> torch.Tensor:
@@ -513,13 +536,45 @@ def _update_kv_cache(
     v_cache: torch.Tensor,
     projected_k: torch.Tensor,
     projected_v: torch.Tensor,
-    cache_offset: int,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     seq_len = projected_k.shape[2]
-    end = cache_offset + seq_len
-    if end > k_cache.shape[2]:
-        raise ValueError(f"Decoder cache capacity exceeded: {end} > {k_cache.shape[2]}")
+    start = k_cache.shape[2] - seq_len
+    updated_k = torch.roll(k_cache, shifts=-seq_len, dims=2)
+    updated_v = torch.roll(v_cache, shifts=-seq_len, dims=2)
+    updated_k = torch.ops.aten.slice_scatter.default(
+        updated_k, projected_k, 2, start, k_cache.shape[2], 1
+    )
+    updated_v = torch.ops.aten.slice_scatter.default(
+        updated_v, projected_v, 2, start, v_cache.shape[2], 1
+    )
+    k_cache.copy_(updated_k)
+    v_cache.copy_(updated_v)
+    return updated_k, updated_v
 
-    k_cache[:, :, cache_offset:end, :] = projected_k
-    v_cache[:, :, cache_offset:end, :] = projected_v
-    return k_cache[:, :, :end, :], v_cache[:, :, :end, :]
+
+def _next_cache_offset(
+    cache_offset: torch.Tensor, query_length: int, max_tokens: int
+) -> torch.Tensor:
+    return torch.minimum(
+        cache_offset + torch.tensor(query_length, device=cache_offset.device),
+        torch.tensor(max_tokens, device=cache_offset.device, dtype=cache_offset.dtype),
+    )
+
+
+def _decoder_self_mask(
+    query_length: int,
+    max_tokens: int,
+    cache_offset: torch.Tensor,
+    device: torch.device,
+) -> torch.Tensor:
+    query_positions = (
+        torch.arange(query_length, device=device, dtype=cache_offset.dtype)
+        + cache_offset
+        - query_length
+    )
+    key_positions = torch.arange(max_tokens, device=device, dtype=cache_offset.dtype)
+    valid_key_positions = key_positions >= (max_tokens - cache_offset)
+    causal_positions = query_positions[:, None] >= (
+        key_positions[None, :] - (max_tokens - cache_offset)
+    )
+    return (causal_positions & valid_key_positions[None, :])[None, None, :, :]
