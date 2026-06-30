@@ -1,5 +1,5 @@
 [project]
-name = "python"
+name = "swift_needle"
 version = "0.1.0"
 description = ""
 requires-python = ">=3.9"
@@ -13,5 +13,5 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["python"]
-package-dir = {python = "."}
+packages = ["swift_needle"]
+package-dir = {swift_needle = "swift_needle"}

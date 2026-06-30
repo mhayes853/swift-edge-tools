@@ -1,40 +1,159 @@
 import math
 import typing
+from dataclasses import dataclass
 
 import torch
 from torch import nn
 
 from .needle_configuration import NeedleModelConfiguation
 
-_NEEDLE_MAX_TOKENS = 1024
+
+@dataclass
+class NeedleEncodeHiddenState:
+    encoder_output: torch.Tensor
+    cross_attention_mask: torch.Tensor
+    encoder_projected_k: torch.Tensor
+    encoder_projected_v: torch.Tensor
 
 
 class Needle(nn.Module):
     def __init__(self, configuration: NeedleModelConfiguation):
         super().__init__()
-        self.lm_head = nn.Embedding(
-            num_embeddings=configuration.vocabulary_size,
-            embedding_dim=configuration.dimensions,
-        )
+        self.configuration = configuration
         self.model = _NeedleSimpleAttentionNetwork(configuration)
-        self.register_buffer(
+        self.cache = _NeedleDecoderCache(
+            self,
+            decoder_layers=configuration.decoder_layers,
+            kv_heads=configuration.kv_heads,
+            head_dimensions=configuration.attention_head_dimensions,
+            max_tokens=configuration.encoder_max_length,
+        )
+        self.lm_head = (
+            None
+            if configuration.tie_word_embeddings
+            else nn.Linear(
+                configuration.dimensions,
+                configuration.vocabulary_size,
+                bias=False,
+            )
+        )
+
+    def reset(self) -> None:
+        self.cache.reset()
+
+    def encode(self, input_ids: torch.Tensor) -> NeedleEncodeHiddenState:
+        encoder_mask = _padding_mask(input_ids, self.configuration.pad_token_id)
+        encoder_output = self.model.encode(input_ids, mask=encoder_mask)
+        encoder_projected_k, encoder_projected_v = self.model.project_encoder_kv(
+            encoder_output
+        )
+        return NeedleEncodeHiddenState(
+            encoder_output=encoder_output,
+            cross_attention_mask=encoder_mask,
+            encoder_projected_k=encoder_projected_k,
+            encoder_projected_v=encoder_projected_v,
+        )
+
+    def decode(
+        self, input_ids: torch.Tensor, encode_state: NeedleEncodeHiddenState
+    ) -> torch.Tensor:
+        if input_ids.shape[0] != 1:
+            raise ValueError(
+                f"Needle.decode() expects batch size 1, got {input_ids.shape[0]}"
+            )
+        hidden_state = self.model.decode(
+            input_ids,
+            cross_mask=encode_state.cross_attention_mask,
+            encoder_projected_k=encode_state.encoder_projected_k,
+            encoder_projected_v=encode_state.encoder_projected_v,
+            cache=self.cache,
+        )
+        return self.project_logits(hidden_state)
+
+    def forward(
+        self, encoder_input_ids: torch.Tensor, decoder_input_ids: torch.Tensor
+    ) -> torch.Tensor:
+        self.reset()
+        return self.decode(decoder_input_ids, self.encode(encoder_input_ids))
+
+    def project_logits(self, hidden_state: torch.Tensor) -> torch.Tensor:
+        if self.lm_head is not None:
+            return self.lm_head(hidden_state)
+        return nn.functional.linear(hidden_state, self.model.embed_tokens.weight)
+
+
+class _NeedleLayerKVCache:
+    def __init__(self, parent: "_NeedleDecoderCache", layer_index: int):
+        self.parent = parent
+        self.layer_index = layer_index
+
+    @property
+    def offset(self) -> int:
+        return self.parent.offset
+
+    def reset(self) -> None:
+        self.parent.offset = 0
+
+    def update(
+        self, keys: torch.Tensor, values: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        offset = self.offset
+        seq_len = keys.shape[2]
+        end = offset + seq_len
+
+        if end > self.parent.max_tokens:
+            raise ValueError(
+                f"Decoder cache capacity exceeded: {end} > {self.parent.max_tokens}"
+            )
+
+        layer_k = self.parent.k[self.layer_index]
+        layer_v = self.parent.v[self.layer_index]
+        layer_k[:, :, offset:end, :] = keys
+        layer_v[:, :, offset:end, :] = values
+        self.parent.offset = end
+        return layer_k[:, :, :end, :], layer_v[:, :, :end, :]
+
+
+class _NeedleDecoderCache:
+    def __init__(
+        self,
+        owner: nn.Module,
+        *,
+        decoder_layers: int,
+        kv_heads: int,
+        head_dimensions: int,
+        max_tokens: int,
+    ):
+        self.owner = owner
+        self.decoder_layers = decoder_layers
+        self.kv_heads = kv_heads
+        self.head_dimensions = head_dimensions
+        self.max_tokens = max_tokens
+        self.offset = 0
+        owner.register_buffer(
             "k_cache",
-            torch.zeros(
-                configuration.decoder_layers,
-                1,
-                _NEEDLE_MAX_TOKENS,
-                configuration.dimensions,
-            ),
+            torch.zeros((decoder_layers, 1, kv_heads, max_tokens, head_dimensions)),
         )
-        self.register_buffer(
+        owner.register_buffer(
             "v_cache",
-            torch.zeros(
-                configuration.decoder_layers,
-                1,
-                _NEEDLE_MAX_TOKENS,
-                configuration.dimensions,
-            ),
+            torch.zeros((decoder_layers, 1, kv_heads, max_tokens, head_dimensions)),
         )
+
+    @property
+    def k(self) -> torch.Tensor:
+        return typing.cast(torch.Tensor, self.owner.k_cache)
+
+    @property
+    def v(self) -> torch.Tensor:
+        return typing.cast(torch.Tensor, self.owner.v_cache)
+
+    def reset(self) -> None:
+        self.offset = 0
+        self.k.zero_()
+        self.v.zero_()
+
+    def layer(self, layer_index: int) -> _NeedleLayerKVCache:
+        return _NeedleLayerKVCache(self, layer_index)
 
 
 class _RoPEFrequencies:
@@ -44,11 +163,11 @@ class _RoPEFrequencies:
         return 1.0 / (theta ** (positions / dimensions))
 
     def __init__(self, inverse: torch.Tensor, seq_len: int, dtype: torch.dtype):
-        positions = torch.arange(0, seq_len, dtype=torch.float32)
+        positions = torch.arange(0, seq_len, dtype=torch.float32, device=inverse.device)
         frequencies = positions[:, None] * inverse[None, :]
         embeddings = torch.cat([frequencies, frequencies], dim=-1)
-        self.sin = torch.sin(embeddings)[None, :].to(dtype)
-        self.cos = torch.cos(embeddings)[None, :].to(dtype)
+        self.sin = torch.sin(embeddings)[None, :].to(device=inverse.device, dtype=dtype)
+        self.cos = torch.cos(embeddings)[None, :].to(device=inverse.device, dtype=dtype)
 
     def apply(self, x: torch.Tensor, offset: int = 0) -> torch.Tensor:
         seq_len = x.shape[2]
@@ -73,24 +192,22 @@ class _NeedleSimpleAttentionNetwork(nn.Module):
     def encode(self, x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         return self.encoder(self.embed_tokens(x) * self.embed_scale, mask=mask)
 
-    def forward(
+    def decode(
         self,
         x: torch.Tensor,
         cross_mask: torch.Tensor,
         encoder_projected_k: torch.Tensor,
         encoder_projected_v: torch.Tensor,
-        k_cache: torch.Tensor,
-        v_cache: torch.Tensor,
+        cache: _NeedleDecoderCache,
     ) -> torch.Tensor:
         x = self.embed_tokens(x) * self.embed_scale
         return self.decoder(
             x,
-            self_mask=_causal_mask(x.shape[1]),
+            self_mask=_causal_mask(x.shape[1], device=x.device),
             cross_mask=cross_mask,
             encoder_projected_k=encoder_projected_k,
             encoder_projected_v=encoder_projected_v,
-            k_cache=k_cache,
-            v_cache=v_cache,
+            cache=cache,
         )
 
     def project_encoder_kv(
@@ -116,9 +233,12 @@ class _NeedleDecoder(nn.Module):
             ]
         )
         self.norm = _ZCRMSNorm.from_configuration(configuration)
-        self.inverse_rope = _RoPEFrequencies.inverse(
-            dimensions=configuration.attention_head_dimensions,
-            theta=configuration.rope_theta,
+        self.register_buffer(
+            "inverse_rope",
+            _RoPEFrequencies.inverse(
+                dimensions=configuration.attention_head_dimensions,
+                theta=configuration.rope_theta,
+            ),
         )
 
     def forward(
@@ -128,16 +248,14 @@ class _NeedleDecoder(nn.Module):
         cross_mask: torch.Tensor,
         encoder_projected_k: torch.Tensor,
         encoder_projected_v: torch.Tensor,
-        k_cache: torch.Tensor,
-        v_cache: torch.Tensor,
+        cache: _NeedleDecoderCache,
     ) -> torch.Tensor:
         rope = _RoPEFrequencies(
-            inverse=self.inverse_rope,
-            seq_len=k_cache[0].shape[2] + x.shape[1],
+            inverse=typing.cast(torch.Tensor, self.inverse_rope),
+            seq_len=cache.layer(0).offset + x.shape[1],
             dtype=x.dtype,
         )
-        layers = enumerate(zip(self.layers, k_cache, v_cache))
-        for index, (layer, k_cache, v_cache) in layers:
+        for index, layer in enumerate(self.layers):
             x = layer(
                 x,
                 self_mask=self_mask,
@@ -145,8 +263,7 @@ class _NeedleDecoder(nn.Module):
                 encoder_projected_k=encoder_projected_k[index],
                 encoder_projected_v=encoder_projected_v[index],
                 rope=rope,
-                k_cache=k_cache,
-                v_cache=v_cache,
+                cache=cache.layer(index),
             )
         return self.norm(x)
 
@@ -169,8 +286,7 @@ class _NeedleDecoderBlock(nn.Module):
         encoder_projected_k: torch.Tensor,
         encoder_projected_v: torch.Tensor,
         rope: _RoPEFrequencies,
-        k_cache: torch.Tensor,
-        v_cache: torch.Tensor,
+        cache: _NeedleLayerKVCache,
     ) -> torch.Tensor:
         self_normed = self.input_layernorm(x)
         self_attention = self.self_attn(
@@ -178,12 +294,11 @@ class _NeedleDecoderBlock(nn.Module):
             kv=self_normed,
             mask=self_mask,
             rope=rope,
-            k_cache=k_cache,
-            v_cache=v_cache,
+            cache=cache,
         )
         hidden_state = _gated_residual(x, self.self_attn_gate, self_attention)
         cross_normed = self.encoder_attn_layer_norm(hidden_state)
-        cross_attention = self.encoder_attn(
+        cross_attention = self.encoder_attn.forward_with_projected_kv(
             q=cross_normed,
             projected_k=encoder_projected_k,
             projected_v=encoder_projected_v,
@@ -202,14 +317,19 @@ class _NeedleEncoder(nn.Module):
             ]
         )
         self.final_norm = _ZCRMSNorm.from_configuration(configuration)
-        self.inverse_rope = _RoPEFrequencies.inverse(
-            dimensions=configuration.attention_head_dimensions,
-            theta=configuration.rope_theta,
+        self.register_buffer(
+            "inverse_rope",
+            _RoPEFrequencies.inverse(
+                dimensions=configuration.attention_head_dimensions,
+                theta=configuration.rope_theta,
+            ),
         )
 
     def forward(self, x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         rope = _RoPEFrequencies(
-            inverse=self.inverse_rope, seq_len=x.shape[1], dtype=x.dtype
+            inverse=typing.cast(torch.Tensor, self.inverse_rope),
+            seq_len=x.shape[1],
+            dtype=x.dtype,
         )
         for layer in self.layers:
             x = layer(x, mask=mask, rope=rope)
@@ -267,21 +387,18 @@ class _NeedleAttention(nn.Module):
         kv: torch.Tensor,
         mask: torch.Tensor | None,
         rope: _RoPEFrequencies | None = None,
-        k_cache: torch.Tensor | None = None,
-        v_cache: torch.Tensor | None = None,
+        cache: _NeedleLayerKVCache | None = None,
     ) -> torch.Tensor:
         projected_k, projected_v = self.project_kv(kv)
         if rope is not None:
-            offset = 0 if k_cache is None else k_cache.shape[2]
-            projected_k = rope.apply(projected_k, offset)
+            projected_k = rope.apply(projected_k, offset=cache.offset if cache else 0)
         return self.forward_with_projected_kv(
             q=q,
             projected_k=projected_k,
             projected_v=projected_v,
             mask=mask,
             rope=rope,
-            k_cache=k_cache,
-            v_cache=v_cache,
+            cache=cache,
         )
 
     def forward_with_projected_kv(
@@ -291,8 +408,7 @@ class _NeedleAttention(nn.Module):
         projected_v: torch.Tensor,
         mask: torch.Tensor | None,
         rope: _RoPEFrequencies | None = None,
-        k_cache: torch.Tensor | None = None,
-        v_cache: torch.Tensor | None = None,
+        cache: _NeedleLayerKVCache | None = None,
     ) -> torch.Tensor:
         batch, seq_len, _ = q.shape
         q = self.q_norm(
@@ -301,16 +417,11 @@ class _NeedleAttention(nn.Module):
             .transpose(1, 2)
         )
 
-        cache_offset = 0 if k_cache is None else k_cache.shape[2]
         if rope is not None:
-            q = rope.apply(q, offset=cache_offset)
+            q = rope.apply(q, offset=cache.offset if cache else 0)
 
-        if k_cache is not None and v_cache is not None:
-            end = cache_offset + seq_len
-            k_cache[:, :, cache_offset:end, :] = projected_k
-            v_cache[:, :, cache_offset:end, :] = projected_v
-            keys = k_cache[:, :, :end, :]
-            values = v_cache[:, :, :end, :]
+        if cache is not None:
+            keys, values = cache.update(projected_k, projected_v)
         else:
             keys = projected_k
             values = projected_v
@@ -365,11 +476,13 @@ class _ZCRMSNorm(nn.Module):
         self.eps = eps
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return torch.rms_norm(x, x.shape, 1 + self.weight.to(x.dtype), self.eps)
+        return torch.rms_norm(x, (x.shape[-1],), 1 + self.weight.to(x.dtype), self.eps)
 
 
-def _causal_mask(seq_len: int) -> torch.Tensor:
-    return torch.ones((seq_len, seq_len), dtype=torch.bool).tril()[None, None, :, :]
+def _causal_mask(seq_len: int, device: torch.device) -> torch.Tensor:
+    return torch.ones((seq_len, seq_len), dtype=torch.bool, device=device).tril()[
+        None, None, :, :
+    ]
 
 
 def _gated_residual(
