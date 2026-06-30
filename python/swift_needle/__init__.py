@@ -1,2 +1,2 @@
-from .needle_configuration import NeedleModelConfiguation
-from .needle_torch import Needle, NeedleEncodeHiddenState
+from .needle_configuration import *
+from .needle_torch import *

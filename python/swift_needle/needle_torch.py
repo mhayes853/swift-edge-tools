@@ -1,6 +1,5 @@
 import math
 import typing
-from dataclasses import dataclass
 
 import torch
 from torch import nn
@@ -8,26 +7,11 @@ from torch import nn
 from .needle_configuration import NeedleModelConfiguation
 
 
-@dataclass
-class NeedleEncodeHiddenState:
-    encoder_output: torch.Tensor
-    cross_attention_mask: torch.Tensor
-    encoder_projected_k: torch.Tensor
-    encoder_projected_v: torch.Tensor
-
-
 class Needle(nn.Module):
     def __init__(self, configuration: NeedleModelConfiguation):
         super().__init__()
         self.configuration = configuration
         self.model = _NeedleSimpleAttentionNetwork(configuration)
-        self.cache = _NeedleDecoderCache(
-            self,
-            decoder_layers=configuration.decoder_layers,
-            kv_heads=configuration.kv_heads,
-            head_dimensions=configuration.attention_head_dimensions,
-            max_tokens=configuration.encoder_max_length,
-        )
         self.lm_head = (
             None
             if configuration.tie_word_embeddings
@@ -37,123 +21,116 @@ class Needle(nn.Module):
                 bias=False,
             )
         )
+        object.__setattr__(self, "_encoder_export", NeedleEncoder(self))
+        object.__setattr__(self, "_decoder_export", NeedleDecoder(self))
+
+    @property
+    def encoder(self) -> "NeedleEncoder":
+        return typing.cast(NeedleEncoder, self._encoder_export)
+
+    @property
+    def decoder(self) -> "NeedleDecoder":
+        return typing.cast(NeedleDecoder, self._decoder_export)
 
     def reset(self) -> None:
-        self.cache.reset()
+        self.decoder.reset()
 
-    def encode(self, input_ids: torch.Tensor) -> NeedleEncodeHiddenState:
+    def forward(
+        self, encoder_input_ids: torch.Tensor, decoder_input_ids: torch.Tensor
+    ) -> torch.Tensor:
+        cross_attention_mask, encoder_projected_k, encoder_projected_v = self.encoder(
+            encoder_input_ids
+        )
+        self.reset()
+        return self.decoder(
+            decoder_input_ids,
+            cross_attention_mask,
+            encoder_projected_k,
+            encoder_projected_v,
+        )
+
+
+class NeedleEncoder(nn.Module):
+    def __init__(self, needle: Needle):
+        super().__init__()
+        self.configuration = needle.configuration
+        self.model = needle.model
+
+    def forward(
+        self, input_ids: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         encoder_mask = _padding_mask(input_ids, self.configuration.pad_token_id)
         encoder_output = self.model.encode(input_ids, mask=encoder_mask)
         encoder_projected_k, encoder_projected_v = self.model.project_encoder_kv(
             encoder_output
         )
-        return NeedleEncodeHiddenState(
-            encoder_output=encoder_output,
-            cross_attention_mask=encoder_mask,
-            encoder_projected_k=encoder_projected_k,
-            encoder_projected_v=encoder_projected_v,
-        )
+        return encoder_mask, encoder_projected_k, encoder_projected_v
 
-    def decode(
-        self, input_ids: torch.Tensor, encode_state: NeedleEncodeHiddenState
+
+class NeedleDecoder(nn.Module):
+    def __init__(self, needle: Needle):
+        super().__init__()
+        self.configuration = needle.configuration
+        self.model = needle.model
+        self.lm_head = needle.lm_head
+        self.register_buffer(
+            "k_cache",
+            torch.zeros(
+                (
+                    self.configuration.decoder_layers,
+                    1,
+                    self.configuration.kv_heads,
+                    self.configuration.encoder_max_length,
+                    self.configuration.attention_head_dimensions,
+                )
+            ),
+        )
+        self.register_buffer(
+            "v_cache",
+            torch.zeros(
+                (
+                    self.configuration.decoder_layers,
+                    1,
+                    self.configuration.kv_heads,
+                    self.configuration.encoder_max_length,
+                    self.configuration.attention_head_dimensions,
+                )
+            ),
+        )
+        self.register_buffer("cache_offset", torch.zeros((), dtype=torch.int64))
+
+    def reset(self) -> None:
+        typing.cast(torch.Tensor, self.k_cache).zero_()
+        typing.cast(torch.Tensor, self.v_cache).zero_()
+        typing.cast(torch.Tensor, self.cache_offset).zero_()
+
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        cross_attention_mask: torch.Tensor,
+        encoder_projected_k: torch.Tensor,
+        encoder_projected_v: torch.Tensor,
     ) -> torch.Tensor:
         if input_ids.shape[0] != 1:
             raise ValueError(
-                f"Needle.decode() expects batch size 1, got {input_ids.shape[0]}"
+                f"NeedleDecoder.forward() expects batch size 1, got {input_ids.shape[0]}"
             )
+
         hidden_state = self.model.decode(
             input_ids,
-            cross_mask=encode_state.cross_attention_mask,
-            encoder_projected_k=encode_state.encoder_projected_k,
-            encoder_projected_v=encode_state.encoder_projected_v,
-            cache=self.cache,
+            cross_mask=cross_attention_mask,
+            encoder_projected_k=encoder_projected_k,
+            encoder_projected_v=encoder_projected_v,
+            k_cache=typing.cast(torch.Tensor, self.k_cache),
+            v_cache=typing.cast(torch.Tensor, self.v_cache),
+            cache_offset=int(typing.cast(torch.Tensor, self.cache_offset).item()),
         )
-        return self.project_logits(hidden_state)
-
-    def forward(
-        self, encoder_input_ids: torch.Tensor, decoder_input_ids: torch.Tensor
-    ) -> torch.Tensor:
-        self.reset()
-        return self.decode(decoder_input_ids, self.encode(encoder_input_ids))
-
-    def project_logits(self, hidden_state: torch.Tensor) -> torch.Tensor:
-        if self.lm_head is not None:
-            return self.lm_head(hidden_state)
-        return nn.functional.linear(hidden_state, self.model.embed_tokens.weight)
-
-
-class _NeedleLayerKVCache:
-    def __init__(self, parent: "_NeedleDecoderCache", layer_index: int):
-        self.parent = parent
-        self.layer_index = layer_index
-
-    @property
-    def offset(self) -> int:
-        return self.parent.offset
-
-    def reset(self) -> None:
-        self.parent.offset = 0
-
-    def update(
-        self, keys: torch.Tensor, values: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        offset = self.offset
-        seq_len = keys.shape[2]
-        end = offset + seq_len
-
-        if end > self.parent.max_tokens:
-            raise ValueError(
-                f"Decoder cache capacity exceeded: {end} > {self.parent.max_tokens}"
-            )
-
-        layer_k = self.parent.k[self.layer_index]
-        layer_v = self.parent.v[self.layer_index]
-        layer_k[:, :, offset:end, :] = keys
-        layer_v[:, :, offset:end, :] = values
-        self.parent.offset = end
-        return layer_k[:, :, :end, :], layer_v[:, :, :end, :]
-
-
-class _NeedleDecoderCache:
-    def __init__(
-        self,
-        owner: nn.Module,
-        *,
-        decoder_layers: int,
-        kv_heads: int,
-        head_dimensions: int,
-        max_tokens: int,
-    ):
-        self.owner = owner
-        self.decoder_layers = decoder_layers
-        self.kv_heads = kv_heads
-        self.head_dimensions = head_dimensions
-        self.max_tokens = max_tokens
-        self.offset = 0
-        owner.register_buffer(
-            "k_cache",
-            torch.zeros((decoder_layers, 1, kv_heads, max_tokens, head_dimensions)),
+        typing.cast(torch.Tensor, self.cache_offset).add_(input_ids.shape[1])
+        return _project_logits(
+            hidden_state,
+            self.lm_head,
+            self.model.embed_tokens.weight,
         )
-        owner.register_buffer(
-            "v_cache",
-            torch.zeros((decoder_layers, 1, kv_heads, max_tokens, head_dimensions)),
-        )
-
-    @property
-    def k(self) -> torch.Tensor:
-        return typing.cast(torch.Tensor, self.owner.k_cache)
-
-    @property
-    def v(self) -> torch.Tensor:
-        return typing.cast(torch.Tensor, self.owner.v_cache)
-
-    def reset(self) -> None:
-        self.offset = 0
-        self.k.zero_()
-        self.v.zero_()
-
-    def layer(self, layer_index: int) -> _NeedleLayerKVCache:
-        return _NeedleLayerKVCache(self, layer_index)
 
 
 class _RoPEFrequencies:
@@ -198,7 +175,9 @@ class _NeedleSimpleAttentionNetwork(nn.Module):
         cross_mask: torch.Tensor,
         encoder_projected_k: torch.Tensor,
         encoder_projected_v: torch.Tensor,
-        cache: _NeedleDecoderCache,
+        k_cache: torch.Tensor,
+        v_cache: torch.Tensor,
+        cache_offset: int,
     ) -> torch.Tensor:
         x = self.embed_tokens(x) * self.embed_scale
         return self.decoder(
@@ -207,7 +186,9 @@ class _NeedleSimpleAttentionNetwork(nn.Module):
             cross_mask=cross_mask,
             encoder_projected_k=encoder_projected_k,
             encoder_projected_v=encoder_projected_v,
-            cache=cache,
+            k_cache=k_cache,
+            v_cache=v_cache,
+            cache_offset=cache_offset,
         )
 
     def project_encoder_kv(
@@ -248,11 +229,13 @@ class _NeedleDecoder(nn.Module):
         cross_mask: torch.Tensor,
         encoder_projected_k: torch.Tensor,
         encoder_projected_v: torch.Tensor,
-        cache: _NeedleDecoderCache,
+        k_cache: torch.Tensor,
+        v_cache: torch.Tensor,
+        cache_offset: int,
     ) -> torch.Tensor:
         rope = _RoPEFrequencies(
             inverse=typing.cast(torch.Tensor, self.inverse_rope),
-            seq_len=cache.layer(0).offset + x.shape[1],
+            seq_len=cache_offset + x.shape[1],
             dtype=x.dtype,
         )
         for index, layer in enumerate(self.layers):
@@ -263,7 +246,9 @@ class _NeedleDecoder(nn.Module):
                 encoder_projected_k=encoder_projected_k[index],
                 encoder_projected_v=encoder_projected_v[index],
                 rope=rope,
-                cache=cache.layer(index),
+                layer_k_cache=k_cache[index],
+                layer_v_cache=v_cache[index],
+                cache_offset=cache_offset,
             )
         return self.norm(x)
 
@@ -286,7 +271,9 @@ class _NeedleDecoderBlock(nn.Module):
         encoder_projected_k: torch.Tensor,
         encoder_projected_v: torch.Tensor,
         rope: _RoPEFrequencies,
-        cache: _NeedleLayerKVCache,
+        layer_k_cache: torch.Tensor,
+        layer_v_cache: torch.Tensor,
+        cache_offset: int,
     ) -> torch.Tensor:
         self_normed = self.input_layernorm(x)
         self_attention = self.self_attn(
@@ -294,7 +281,9 @@ class _NeedleDecoderBlock(nn.Module):
             kv=self_normed,
             mask=self_mask,
             rope=rope,
-            cache=cache,
+            layer_k_cache=layer_k_cache,
+            layer_v_cache=layer_v_cache,
+            cache_offset=cache_offset,
         )
         hidden_state = _gated_residual(x, self.self_attn_gate, self_attention)
         cross_normed = self.encoder_attn_layer_norm(hidden_state)
@@ -387,18 +376,22 @@ class _NeedleAttention(nn.Module):
         kv: torch.Tensor,
         mask: torch.Tensor | None,
         rope: _RoPEFrequencies | None = None,
-        cache: _NeedleLayerKVCache | None = None,
+        layer_k_cache: torch.Tensor | None = None,
+        layer_v_cache: torch.Tensor | None = None,
+        cache_offset: int = 0,
     ) -> torch.Tensor:
         projected_k, projected_v = self.project_kv(kv)
         if rope is not None:
-            projected_k = rope.apply(projected_k, offset=cache.offset if cache else 0)
+            projected_k = rope.apply(projected_k, offset=cache_offset)
         return self.forward_with_projected_kv(
             q=q,
             projected_k=projected_k,
             projected_v=projected_v,
             mask=mask,
             rope=rope,
-            cache=cache,
+            layer_k_cache=layer_k_cache,
+            layer_v_cache=layer_v_cache,
+            cache_offset=cache_offset,
         )
 
     def forward_with_projected_kv(
@@ -408,7 +401,9 @@ class _NeedleAttention(nn.Module):
         projected_v: torch.Tensor,
         mask: torch.Tensor | None,
         rope: _RoPEFrequencies | None = None,
-        cache: _NeedleLayerKVCache | None = None,
+        layer_k_cache: torch.Tensor | None = None,
+        layer_v_cache: torch.Tensor | None = None,
+        cache_offset: int = 0,
     ) -> torch.Tensor:
         batch, seq_len, _ = q.shape
         q = self.q_norm(
@@ -418,10 +413,16 @@ class _NeedleAttention(nn.Module):
         )
 
         if rope is not None:
-            q = rope.apply(q, offset=cache.offset if cache else 0)
+            q = rope.apply(q, offset=cache_offset)
 
-        if cache is not None:
-            keys, values = cache.update(projected_k, projected_v)
+        if layer_k_cache is not None and layer_v_cache is not None:
+            keys, values = _update_kv_cache(
+                layer_k_cache,
+                layer_v_cache,
+                projected_k,
+                projected_v,
+                cache_offset,
+            )
         else:
             keys = projected_k
             values = projected_v
@@ -495,3 +496,30 @@ def _gated_residual(
 
 def _padding_mask(ids: torch.Tensor, pad_token_id: int) -> torch.Tensor:
     return (ids != pad_token_id)[..., None, None, :]
+
+
+def _project_logits(
+    hidden_state: torch.Tensor,
+    lm_head: nn.Linear | None,
+    embedding_weight: torch.Tensor,
+) -> torch.Tensor:
+    if lm_head is not None:
+        return lm_head(hidden_state)
+    return nn.functional.linear(hidden_state, embedding_weight)
+
+
+def _update_kv_cache(
+    k_cache: torch.Tensor,
+    v_cache: torch.Tensor,
+    projected_k: torch.Tensor,
+    projected_v: torch.Tensor,
+    cache_offset: int,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    seq_len = projected_k.shape[2]
+    end = cache_offset + seq_len
+    if end > k_cache.shape[2]:
+        raise ValueError(f"Decoder cache capacity exceeded: {end} > {k_cache.shape[2]}")
+
+    k_cache[:, :, cache_offset:end, :] = projected_k
+    v_cache[:, :, cache_offset:end, :] = projected_v
+    return k_cache[:, :, :end, :], v_cache[:, :, :end, :]
