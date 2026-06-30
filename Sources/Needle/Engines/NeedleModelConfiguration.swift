@@ -1,25 +1,26 @@
 // MARK: - NeedleModelConfiguration
 
 public struct NeedleModelConfiguration: Hashable, Sendable {
-  public let vocabularySize: Int
-  public let dimensions: Int
-  public let hiddenDimensions: Int
-  public let attentionHeads: Int
-  public let kvHeads: Int
-  public let encoderLayers: Int
-  public let decoderLayers: Int
-  public let hiddenLayers: Int
-  public let ropeTheta: Float
-  public let rmsNormEps: Float
-  public let padTokenId: NeedleToken.ID
-  public let decoderStartTokenId: NeedleToken.ID
-  public var tieWordEmbeddings: Bool
-  private let maxSeqLen: Int?
-  private let maxPositionEmbeddings: Int?
-  private let _dtype: String?
+  public var vocabularySize: Int = 8192
+  public var dimensions: Int = 512
+  public var hiddenDimensions: Int = 512
+  public var attentionHeads: Int = 8
+  public var kvHeads: Int = 4
+  public var encoderLayers: Int = 12
+  public var decoderLayers: Int = 8
+  public var hiddenLayers: Int = 8
+  public var ropeTheta: Float = 10000.0
+  public var rmsNormEps: Float = 1e-6
+  public var padTokenId: NeedleToken.ID = 0
+  public var decoderStartTokenId: NeedleToken.ID = 1
+  public var tieWordEmbeddings: Bool = true
+  public var maxSeqLen: Int?
+  public var maxPositionEmbeddings: Int?
+  private var _dtype: String?
 
   public var dtype: String {
-    self._dtype ?? "bfloat16"
+    get { self._dtype ?? "bfloat16" }
+    set { self._dtype = newValue }
   }
 
   public var attentionHeadDimensions: Int {
