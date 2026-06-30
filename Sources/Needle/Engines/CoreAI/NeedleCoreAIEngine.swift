@@ -21,7 +21,11 @@
       fatalError()
     }
 
-    public init(model: AIModel, tokenizer: any Tokenizer, grammarEngine: NeedleXGrammarEngine) {
+    public init(
+      model: AIModel,
+      tokenizer: any Tokenizer,
+      grammarEngine: NeedleXGrammarEngine
+    ) throws {
       self.model = model
       self.tokenizer = tokenizer
       self.grammarEngine = grammarEngine
