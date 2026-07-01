@@ -107,30 +107,14 @@ extension NeedleSession {
 // MARK: - Stream
 
 public final class NeedleSessionStream: Sendable, Observable, Identifiable {
-  public enum Status: Sendable {
-    case awaitingExecution
-    case generating
-    case finished(Result<NeedleSessionGeneration, any Error>)
+  public var isGenerating: Bool {
+    self.registrar.access(self, keyPath: \.isGenerating)
+    return self.state.withLock { $0.result == nil }
+  }
 
-    public var isAwaitingExecution: Bool {
-      if case .awaitingExecution = self { return true }
-      return false
-    }
-
-    public var isGenerating: Bool {
-      if case .generating = self { return true }
-      return false
-    }
-
-    public var isFinished: Bool {
-      if case .finished = self { return true }
-      return false
-    }
-
-    public var result: Result<NeedleSessionGeneration, any Error>? {
-      if case .finished(let result) = self { return result }
-      return nil
-    }
+  public var isFinished: Bool {
+    self.registrar.access(self, keyPath: \.isFinished)
+    return self.state.withLock { $0.result != nil }
   }
 
   public var finalGeneration: NeedleSessionGeneration {
@@ -147,14 +131,14 @@ public final class NeedleSessionStream: Sendable, Observable, Identifiable {
     }
   }
 
-  public var status: Status {
-    self.registrar.access(self, keyPath: \.status)
-    return self.state.withLock { $0.status }
-  }
-
   public var toolCalls: NeedleToolCallCollection {
     self.registrar.access(self, keyPath: \.toolCalls)
     return self.state.withLock { $0.toolCalls }
+  }
+
+  public var result: Result<NeedleSessionGeneration, any Error>? {
+    self.registrar.access(self, keyPath: \.result)
+    return self.state.withLock { $0.result }
   }
 
   private let state = Lock(State())
@@ -163,7 +147,7 @@ public final class NeedleSessionStream: Sendable, Observable, Identifiable {
   deinit {
     self.state.withLock { state in
       state.task?.cancel()
-      if !state.status.isFinished {
+      if state.result == nil {
         state.generationTaskStop?()
       }
     }
@@ -204,14 +188,11 @@ public final class NeedleSessionStream: Sendable, Observable, Identifiable {
   ) async throws -> NeedleSessionGeneration {
     let stoppedBeforeGeneration: NeedleSessionGeneration? = self.state.withLock { state in
       guard state.wasStoppedBeforeGeneration else { return nil }
-      self.registrar.withMutation(of: self, keyPath: \.status) {
-        state.beginGenerating()
-      }
       let sessionGeneration = NeedleSessionGeneration(
         engineGeneration: .empty,
         toolCalls: state.toolCalls
       )
-      self.registrar.withMutation(of: self, keyPath: \.status) {
+      self.registrar.withMutation(of: self, keyPath: \.result) {
         state.finish(with: .success(sessionGeneration))
       }
       return sessionGeneration
@@ -249,7 +230,7 @@ public final class NeedleSessionStream: Sendable, Observable, Identifiable {
       }
     } catch {
       self.state.withLock { state in
-        self.registrar.withMutation(of: self, keyPath: \.status) {
+        self.registrar.withMutation(of: self, keyPath: \.result) {
           state.finish(with: .failure(error))
         }
       }
@@ -261,9 +242,6 @@ public final class NeedleSessionStream: Sendable, Observable, Identifiable {
       state.generationTaskStop = { generationTask.stop() }
       if state.wasStoppedBeforeGeneration {
         return true
-      }
-      self.registrar.withMutation(of: self, keyPath: \.status) {
-        state.beginGenerating()
       }
       return false
     }
@@ -277,7 +255,7 @@ public final class NeedleSessionStream: Sendable, Observable, Identifiable {
       try Task.checkCancellation()
     } catch {
       self.state.withLock { state in
-        self.registrar.withMutation(of: self, keyPath: \.status) {
+        self.registrar.withMutation(of: self, keyPath: \.result) {
           state.finish(with: .failure(error))
         }
       }
@@ -289,7 +267,7 @@ public final class NeedleSessionStream: Sendable, Observable, Identifiable {
         engineGeneration: generation,
         toolCalls: state.toolCalls
       )
-      self.registrar.withMutation(of: self, keyPath: \.status) {
+      self.registrar.withMutation(of: self, keyPath: \.result) {
         state.finish(with: .success(sessionGeneration))
       }
       return sessionGeneration
@@ -300,15 +278,12 @@ public final class NeedleSessionStream: Sendable, Observable, Identifiable {
 
   public func stop() {
     let generationTaskStop: (@Sendable () -> Void)? = self.state.withLock { state in
-      switch state.status {
-      case .awaitingExecution:
+      guard state.result == nil else { return nil }
+      guard let generationTaskStop = state.generationTaskStop else {
         state.markStoppedBeforeGeneration()
         return nil
-      case .generating:
-        return state.generationTaskStop
-      case .finished:
-        return nil
       }
+      return generationTaskStop
     }
     generationTaskStop?()
   }
@@ -380,7 +355,7 @@ extension NeedleSessionStream {
 
 extension NeedleSessionStream {
   fileprivate struct State {
-    private(set) var status: NeedleSessionStream.Status = .awaitingExecution
+    private(set) var result: Result<NeedleSessionGeneration, any Error>?
     private(set) var wasStoppedBeforeGeneration = false
     var generationTaskStop: (@Sendable () -> Void)?
     private var tokenContinuations =
@@ -392,18 +367,9 @@ extension NeedleSessionStream {
     private(set) var toolCalls = NeedleToolCallCollection()
     var task: Task<NeedleSessionGeneration, any Error>?
 
-    mutating func beginGenerating() {
-      if case .awaitingExecution = self.status {
-        self.status = .generating
-      }
-    }
-
     mutating func markStoppedBeforeGeneration() {
-      switch self.status {
-      case .awaitingExecution:
+      if self.result == nil {
         self.wasStoppedBeforeGeneration = true
-      case .generating, .finished:
-        break
       }
     }
 
@@ -463,7 +429,7 @@ extension NeedleSessionStream {
 
     mutating func finish(with result: Result<NeedleSessionGeneration, any Error>) {
       self.generationTaskStop = nil
-      self.status = .finished(result)
+      self.result = result
       switch result {
       case .success:
         for continuation in self.tokenContinuations.values {

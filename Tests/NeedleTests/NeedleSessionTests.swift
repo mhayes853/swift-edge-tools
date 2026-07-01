@@ -236,7 +236,7 @@
       let generation = try await stream.finalGeneration
       expectNoDifference(generation.engineGeneration.wasStopped, true)
       expectNoDifference(generation.toolCalls.count, 0)
-      expectNoDifference(stream.status.isFinished, true)
+      expectNoDifference(stream.isFinished, true)
     }
 
     @Test
@@ -248,7 +248,7 @@
 
       let didChange = Lock(false)
       withObservationTracking {
-        _ = stream.status
+        _ = stream.result
       } onChange: {
         didChange.withLock { $0 = true }
       }
@@ -316,7 +316,7 @@
 
       let didChange = Lock(false)
       withObservationTracking {
-        _ = stream.status
+        _ = stream.result
       } onChange: {
         didChange.withLock { $0 = true }
       }
@@ -428,7 +428,7 @@
       let stream = session.stream(tools: [], with: "hi")
 
       try await Task.sleep(for: .milliseconds(50))
-      expectNoDifference(stream.status.isGenerating, true)
+      expectNoDifference(stream.isGenerating, true)
 
       engine.push(.finish)
       engine.push(nil)
@@ -445,14 +445,14 @@
       let stream = session.stream(tools: [], with: "hi")
       let generation = try await stream.finalGeneration
 
-      expectNoDifference(stream.status.isFinished, true)
+      expectNoDifference(stream.isFinished, true)
 
-      let resultGeneration = try #require(try? stream.status.result?.get())
+      let resultGeneration = try #require(try? stream.result?.get())
       expectNoDifference(
         resultGeneration.engineGeneration.tokens,
         generation.engineGeneration.tokens
       )
-      expectNoDifference(stream.status.isGenerating, false)
+      expectNoDifference(stream.isGenerating, false)
     }
 
     @Test
@@ -468,10 +468,10 @@
       await #expect(throws: ToolError.self) {
         _ = try await stream.finalGeneration
       }
-      expectNoDifference(stream.status.isFinished, true)
+      expectNoDifference(stream.isFinished, true)
 
       let resultError = #expect(throws: ToolError.self) {
-        _ = try stream.status.result?.get()
+        _ = try stream.result?.get()
       }
       expectNoDifference(resultError?.message, error.message)
     }
