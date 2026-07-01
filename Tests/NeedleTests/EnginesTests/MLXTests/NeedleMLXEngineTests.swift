@@ -194,7 +194,8 @@
 
     @Test
     func `Tokenize Base`() async throws {
-      assertSnapshot(of: try await self.engine.tokenize(prompt: .sendAdventureEmail), as: .dump)
+      let tokens = try await self.engine.tokenize(prompt: .sendAdventureEmail)
+      assertSnapshot(of: tokens, as: .dump)
     }
   }
 

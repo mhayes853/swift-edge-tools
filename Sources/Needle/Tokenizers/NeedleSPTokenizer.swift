@@ -1,16 +1,15 @@
-#if canImport(Tokenizers) && Sentencepiece
+#if Sentencepiece
   import Foundation
   import CNeedleSentencepiece
-  import Tokenizers
+
+  #if canImport(Tokenizers)
+    import Tokenizers
+  #endif
 
   // MARK: - NeedleSPTokenizer
 
-  public final class NeedleSPTokenizer: Tokenizer {
-    private static let tokenBufferSize = 256
-
+  public final class NeedleSPTokenizer: Sendable {
     private let tokenizer: Lock<needle_sp_tokenizer_t>
-
-    public var hasChatTemplate: Bool { false }
 
     public var bosToken: String? {
       self.bosTokenId.flatMap(self.convertIdToToken)
@@ -133,56 +132,6 @@
       self.tokens(from: ids).map { $0.isEmpty ? nil : $0 }
     }
 
-    public func applyChatTemplate(messages: [Message]) throws -> [Int] {
-      throw TokenizerError.missingChatTemplate
-    }
-
-    public func applyChatTemplate(messages: [Message], tools: [ToolSpec]?) throws -> [Int] {
-      throw TokenizerError.missingChatTemplate
-    }
-
-    public func applyChatTemplate(
-      messages: [Message],
-      tools: [ToolSpec]?,
-      additionalContext: [String: any Sendable]?
-    ) throws -> [Int] {
-      throw TokenizerError.missingChatTemplate
-    }
-
-    public func applyChatTemplate(
-      messages: [Message],
-      chatTemplate: ChatTemplateArgument
-    ) throws -> [Int] {
-      throw TokenizerError.missingChatTemplate
-    }
-
-    public func applyChatTemplate(messages: [Message], chatTemplate: String) throws -> [Int] {
-      throw TokenizerError.missingChatTemplate
-    }
-
-    public func applyChatTemplate(
-      messages: [Message],
-      chatTemplate: ChatTemplateArgument?,
-      addGenerationPrompt: Bool,
-      truncation: Bool,
-      maxLength: Int?,
-      tools: [ToolSpec]?
-    ) throws -> [Int] {
-      throw TokenizerError.missingChatTemplate
-    }
-
-    public func applyChatTemplate(
-      messages: [Message],
-      chatTemplate: ChatTemplateArgument?,
-      addGenerationPrompt: Bool,
-      truncation: Bool,
-      maxLength: Int?,
-      tools: [ToolSpec]?,
-      additionalContext: [String: any Sendable]?
-    ) throws -> [Int] {
-      throw TokenizerError.missingChatTemplate
-    }
-
     private var padTokenId: NeedleToken.ID {
       self.tokenizer.withLock { tokenizer in
         Int(needle_sp_tokenizer_pad_token_id(tokenizer))
@@ -199,10 +148,7 @@
 
     private func tokens(from tokenIds: [Int]) -> [String] {
       self.tokenizer.withLock { tokenizer in
-        withUnsafeTemporaryAllocation(
-          of: CChar.self,
-          capacity: Self.tokenBufferSize
-        ) { buffer in
+        withUnsafeTemporaryAllocation(of: CChar.self, capacity: 256) { buffer in
           tokenIds.map { tokenId in
             let result = needle_sp_tokenizer_id_to_token(
               tokenizer,
@@ -230,6 +176,62 @@
       return tokenIds.filter { !specialTokenIds.contains($0) }
     }
   }
+
+  #if canImport(Tokenizers)
+    extension NeedleSPTokenizer: Tokenizer {
+      public var hasChatTemplate: Bool { false }
+
+      public func applyChatTemplate(messages: [Message]) throws -> [Int] {
+        throw TokenizerError.missingChatTemplate
+      }
+
+      public func applyChatTemplate(messages: [Message], tools: [ToolSpec]?) throws -> [Int] {
+        throw TokenizerError.missingChatTemplate
+      }
+
+      public func applyChatTemplate(
+        messages: [Message],
+        tools: [ToolSpec]?,
+        additionalContext: [String: any Sendable]?
+      ) throws -> [Int] {
+        throw TokenizerError.missingChatTemplate
+      }
+
+      public func applyChatTemplate(
+        messages: [Message],
+        chatTemplate: ChatTemplateArgument
+      ) throws -> [Int] {
+        throw TokenizerError.missingChatTemplate
+      }
+
+      public func applyChatTemplate(messages: [Message], chatTemplate: String) throws -> [Int] {
+        throw TokenizerError.missingChatTemplate
+      }
+
+      public func applyChatTemplate(
+        messages: [Message],
+        chatTemplate: ChatTemplateArgument?,
+        addGenerationPrompt: Bool,
+        truncation: Bool,
+        maxLength: Int?,
+        tools: [ToolSpec]?
+      ) throws -> [Int] {
+        throw TokenizerError.missingChatTemplate
+      }
+
+      public func applyChatTemplate(
+        messages: [Message],
+        chatTemplate: ChatTemplateArgument?,
+        addGenerationPrompt: Bool,
+        truncation: Bool,
+        maxLength: Int?,
+        tools: [ToolSpec]?,
+        additionalContext: [String: any Sendable]?
+      ) throws -> [Int] {
+        throw TokenizerError.missingChatTemplate
+      }
+    }
+  #endif
 
   // MARK: - NeedleSentencepieceTokenizerError
 
