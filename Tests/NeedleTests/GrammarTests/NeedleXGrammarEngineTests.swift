@@ -375,6 +375,16 @@
       }
 
       @Test
+      func `Accepts Multiple Distinct Tool Calls`() throws {
+        let matcher = try self.engine.compile(tools: [.getWeather, .sendEmail])
+
+        let calls =
+          #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"send_email","arguments":{"address":"blob@gmail.com","subject":"Hello","body":"World"}}]"#
+
+        assertAccepts(calls, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
+      }
+
+      @Test
       func `Rejects Missing Required Field`() throws {
         let matcher = try self.engine.compile(tools: [.complexTool])
 

@@ -1,12 +1,10 @@
 #include "bridging.h"
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 #include <optional>
-#include <regex>
+#include <sstream>
 #include <string>
 #include <thread>
-#include <unordered_set>
 #include <vector>
 #include <dlpack/dlpack.h>
 #include <picojson/picojson.h>
@@ -70,209 +68,67 @@ struct ToolDefinition {
 
 constexpr std::string EBNF_LINE_SEPARATOR = " ::= ";
 
-static void replace_all(std::string& text, const std::string& needle, const std::string& replacement) {
-    if (needle.empty()) return;
-    size_t pos = 0;
-    while ((pos = text.find(needle, pos)) != std::string::npos) {
-        text.replace(pos, needle.size(), replacement);
-        pos += replacement.size();
+struct EbnfRuleSet {
+    std::string root_expression = "";
+    std::vector<std::string> remaining_rules;
+};
+
+static std::string escape_string_literal(const std::string& text) {
+    std::string escaped;
+    escaped.reserve(text.size());
+    for (char c : text) {
+        if (c == '\\' || c == '"') escaped.push_back('\\');
+        escaped.push_back(c);
     }
+    return escaped;
 }
 
-struct EbnfSyntax {
-    using RuleExpression = std::string;
+static std::string repeat_expression(const std::string& expression, int lo, int hi) {
+    if (hi == -1) return expression + "{" + std::to_string(lo) + ",}";
+    return expression + "{" + std::to_string(lo) + "," + std::to_string(hi) + "}";
+}
 
-    std::unordered_map<std::string, RuleExpression> rules;
+static EbnfRuleSet ebnf_rule_set(const std::string& ebnf) {
+    EbnfRuleSet rules;
 
-    static std::string escape_string_literal(const std::string& text) {
-        std::string escaped;
-        escaped.reserve(text.size());
-        for (char c : text) {
-            if (c == '\\' || c == '"') escaped.push_back('\\');
-            escaped.push_back(c);
-        }
-        return escaped;
-    }
+    std::istringstream stream(ebnf);
+    std::string line;
+    while (std::getline(stream, line)) {
+        if (line.empty()) continue;
 
-    static std::string escape_multiline_literal(const std::string& text) {
-        std::string escaped = EbnfSyntax::escape_string_literal(text);
-        replace_all(escaped, "\n", "\\n");
-        return escaped;
-    };
-
-    static std::string repeat_expression(const std::string& expression, int lo, int hi) {
-        if (hi == -1) return expression + "{" + std::to_string(lo) + ",}";
-        return expression + "{" + std::to_string(lo) + "," + std::to_string(hi) + "}";
-    }
-
-    static EbnfSyntax from_string(const std::string& ebnf) {
-        EbnfSyntax parsed;
-
-        std::istringstream stream(ebnf);
-        std::string line;
-        while (std::getline(stream, line)) {
-            if (line.empty()) continue;
-
-            const size_t separator_index = line.find(EBNF_LINE_SEPARATOR);
-            if (separator_index == std::string::npos) {
-                throw std::runtime_error("Invalid EBNF rule line: " + line);
-            }
-            const auto rule_name = line.substr(0, separator_index);
-            const auto rule_expression = line.substr(separator_index + EBNF_LINE_SEPARATOR.size());
-            parsed.rules[rule_name] = rule_expression;
-        }
-        return parsed;
-    }
-
-    void merge_with(const std::vector<std::pair<std::string, EbnfSyntax>>& others) {
-        std::unordered_map<std::string, RuleExpression> merged_expr_by_name;
-        UniqueNameGenerator name_generator;
-
-        for (const auto& [identifier, syntax] : others) {
-            EbnfSyntax incoming = syntax;
-            std::unordered_map<std::string, std::string> rename_map;
-
-            for (const auto& [rule_name, rule_expression] : incoming.rules) {
-                auto existing = merged_expr_by_name.find(rule_name);
-                if (existing != merged_expr_by_name.end() && existing->second != rule_expression) {
-                    rename_map.emplace(rule_name, name_generator.next(identifier, rule_name));
-                }
-            }
-
-            incoming.rename_rules(rename_map);
-
-            for (const auto& [rule_name, rule_expression] : incoming.rules) {
-                auto existing = merged_expr_by_name.find(rule_name);
-                if (existing != merged_expr_by_name.end()) continue;
-                merged_expr_by_name.emplace(rule_name, rule_expression);
-                name_generator.names.insert(rule_name);
-                rules[rule_name] = rule_expression;
-            }
+        const size_t separator_index = line.find(EBNF_LINE_SEPARATOR);
+        const auto rule_name = line.substr(0, separator_index);
+        const auto rule_expression = line.substr(separator_index + EBNF_LINE_SEPARATOR.size());
+        if (rules.root_expression.empty()) {
+            rules.root_expression = rule_expression;
+        } else {
+            rules.remaining_rules.push_back(line);
         }
     }
+    return rules;
+}
 
-    void rename_rules(const std::unordered_map<std::string, std::string>& rename_map) {
-        if (rename_map.empty()) return;
+static xgrammar::Grammar make_string_grammar(const std::string& text) {
+    return xgrammar::Grammar::FromEBNF("root ::= \"" + escape_string_literal(text) + "\"");
+}
 
-        std::unordered_map<std::string, RuleExpression> renamed_rules;
-        renamed_rules.reserve(rules.size());
-
-        for (const auto& [rule_name, rule_expression] : rules) {
-            const auto renamed = rename_map.find(rule_name);
-            const std::string& new_name = renamed != rename_map.end() ? renamed->second : rule_name;
-            renamed_rules[new_name] = rewrite_rule_references(rule_expression, rename_map);
-        }
-
-        rules = std::move(renamed_rules);
-    }
-
-    std::string ebnf() {
-        std::string out;
-        for (const auto& [name, expresion] : rules) {
-            out += name + EBNF_LINE_SEPARATOR + expresion + "\n";
-        }
-        return out;
-    }
-
-    void remove_json_whitespaces() {
-        for (auto& [_, rule_expression] : rules) {
-            replace_all(rule_expression, "\"\\n\"", "\"\"");
-            replace_all(rule_expression, "\",\\n\"", "\",\"");
-            replace_all(rule_expression, "\", \"", "\",\"");
-            replace_all(rule_expression, "\": \"", "\":\"");
-        }
-    }
-
-    void remove_unreachable_rules(const std::string& start_rule = "root") {
-        if (!rules.contains(start_rule)) return;
-
-        std::unordered_set<std::string> reachable;
-        collect_reachable_rules(start_rule, reachable);
-
-        std::erase_if(rules, [&](const auto& entry) {
-            return !reachable.contains(entry.first);
-        });
-    }
-
-private:
-    static const std::regex& identifier_token_pattern() {
-        static const std::regex token_pattern(
-            R"((("(?:\\.|[^"\\])*")|(\[(?:\\.|[^\]\\])*\])|([A-Za-z_][A-Za-z0-9_]*)))"
-        );
-        return token_pattern;
-    }
-
-    static std::vector<std::string> referenced_rule_names(const std::string& expr) {
-        std::vector<std::string> identifiers;
-        std::sregex_iterator it(expr.begin(), expr.end(), identifier_token_pattern());
-        const std::sregex_iterator end;
-        for (; it != end; ++it) {
-            if ((*it)[4].matched) {
-                identifiers.push_back((*it)[4].str());
-            }
-        }
-        return identifiers;
-    }
-
-    void collect_reachable_rules(const std::string& rule_name, std::unordered_set<std::string>& reachable) const {
-        if (reachable.contains(rule_name)) return;
-
-        reachable.insert(rule_name);
-        const auto rule_it = rules.find(rule_name);
-        if (rule_it == rules.end()) return;
-
-        for (const auto& identifier : referenced_rule_names(rule_it->second)) {
-            if (rules.contains(identifier)) {
-                collect_reachable_rules(identifier, reachable);
-            }
-        }
-    }
-
-    struct UniqueNameGenerator {
-        std::unordered_set<std::string> names;
-
-        std::string next(const std::string& identifier, const std::string& name) {
-            const auto combined_name = identifier + "__" + name;
-            if (!names.contains(combined_name)) return combined_name;
-
-            size_t suffix = 1;
-            while (true) {
-                const std::string candiate_name = combined_name + "_" + std::to_string(suffix);
-                if (!names.contains(candiate_name)) return candiate_name;
-                suffix++;
-            }
-        }
-    };
-
-    std::string rewrite_rule_references(
-        const std::string& expr,
-        const std::unordered_map<std::string, std::string>& rename_map
-    ) {
-        std::string out;
-        out.reserve(expr.size());
-
-        std::sregex_iterator it(expr.begin(), expr.end(), identifier_token_pattern());
-        const std::sregex_iterator end;
-        size_t last_pos = 0;
-        for (; it != end; ++it) {
-            const auto& match = *it;
-            out += expr.substr(last_pos, static_cast<size_t>(match.position()) - last_pos);
-
-            if (match[4].matched) {
-                const std::string identifier = match[4].str();
-                auto rename = rename_map.find(identifier);
-                out += rename != rename_map.end() ? rename->second : identifier;
-            } else {
-                out += match.str();
-            }
-
-            last_pos = static_cast<size_t>(match.position() + match.length());
-        }
-
-        out += expr.substr(last_pos);
-        return out;
-    }
-};
+static xgrammar::Grammar make_tool_call_grammar(const ToolDefinition& tool) {
+    const auto arguments_grammar = xgrammar::Grammar::FromJSONSchema(
+        tool.arguments_schema,
+        false,
+        std::nullopt,
+        std::pair<std::string, std::string>{",", ":"},
+        true,
+        std::nullopt,
+        false,
+        true
+    );
+    return xgrammar::Grammar::Concat({
+        make_string_grammar("{\"name\":\"" + tool.name + "\",\"arguments\":"),
+        arguments_grammar,
+        make_string_grammar("}")
+    });
+}
 
 static xgrammar::GrammarCompiler make_compiler(XGrammarCompilerHandle* handle) {
     if (handle->compiler) return *handle->compiler;
@@ -285,28 +141,6 @@ static xgrammar::GrammarCompiler make_compiler(XGrammarCompilerHandle* handle) {
         handle->memory_limit
     );
     return *handle->compiler;
-}
-
-static void add_call_body_rule(
-    EbnfSyntax& merged,
-    const std::vector<std::pair<std::string, EbnfSyntax>>& tool_rule_sets,
-    std::function<std::string(const std::string&, const std::string&)>&& build_call_rule
-) {
-    std::vector<std::string> call_rule_names;
-    call_rule_names.reserve(tool_rule_sets.size());
-    for (const auto& [tool_name, _] : tool_rule_sets) {
-        const std::string call_rule_name = tool_name + "_call";
-        const std::string args_rule_name = tool_name + "_args";
-        merged.rules[call_rule_name] = build_call_rule(tool_name, args_rule_name);
-        call_rule_names.push_back(call_rule_name);
-    }
-
-    std::string call_body_expr;
-    for (size_t i = 0; i < call_rule_names.size(); ++i) {
-        if (i != 0) call_body_expr += " | ";
-        call_body_expr += call_rule_names[i];
-    }
-    merged.rules["call_body"] = call_body_expr;
 }
 
 static std::string needle_tool_root_expression(int min_tool_calls, int max_tool_calls) {
@@ -322,14 +156,14 @@ static std::string needle_tool_root_expression(int min_tool_calls, int max_tool_
         call_body_expr = "";
     } else if (min_tool_calls == 0) {
         const int hi = is_unbounded ? -1 : max_repeats;
-        call_body_expr = " (call_body" + EbnfSyntax::repeat_expression(separated_call, 0, hi) + ")?";
+        call_body_expr = " (call_body" + repeat_expression(separated_call, 0, hi) + ")?";
     } else if (is_exact) {
         call_body_expr = min_repeats == 0
             ? " call_body"
-            : " call_body" + EbnfSyntax::repeat_expression(separated_call, min_repeats, min_repeats);
+            : " call_body" + repeat_expression(separated_call, min_repeats, min_repeats);
     } else {
         call_body_expr =
-            " call_body" + EbnfSyntax::repeat_expression(separated_call, min_repeats, max_repeats);
+            " call_body" + repeat_expression(separated_call, min_repeats, max_repeats);
     }
     return "\"<tool_call> [\" " + call_body_expr + " \"]\"";
 }
@@ -341,29 +175,22 @@ static xgrammar::Grammar needle_tool_grammar(
 ) {
     if (tools.empty()) return xgrammar::Grammar::FromEBNF("root ::= \"<tool_call> []\"");
 
-    std::vector<std::pair<std::string, EbnfSyntax>> tool_rule_sets;
-    tool_rule_sets.reserve(tools.size());
-
+    std::vector<xgrammar::Grammar> tool_call_grammars;
+    tool_call_grammars.reserve(tools.size());
     for (const auto& tool : tools) {
-        const auto ebnf = xgrammar::Grammar::FromJSONSchema(tool.arguments_schema, false, 0)
-          .ToString();
-        EbnfSyntax tool_syntax = EbnfSyntax::from_string(ebnf);
-        tool_syntax.remove_json_whitespaces();
-        tool_syntax.rename_rules({{"root", tool.name + "_args"}});
-        tool_rule_sets.push_back({tool.name, std::move(tool_syntax)});
+        tool_call_grammars.push_back(make_tool_call_grammar(tool));
     }
 
-    EbnfSyntax merged;
-    merged.merge_with(tool_rule_sets);
-    add_call_body_rule(merged, tool_rule_sets, [](auto tool_name, auto args_rule_name) {
-        const std::string call_prefix =
-            EbnfSyntax::escape_string_literal("{\"name\":\"" + tool_name + "\",\"arguments\":");
-        return "(\"" + call_prefix + "\" " + args_rule_name + " \"}\")";
-    });
+    const auto call_body_rules = ebnf_rule_set(
+        xgrammar::Grammar::Union(tool_call_grammars).ToString()
+    );
 
-    merged.rules["root"] = needle_tool_root_expression(min_tool_calls, max_tool_calls);
-    merged.remove_unreachable_rules();
-    return xgrammar::Grammar::FromEBNF(merged.ebnf());
+    std::string ebnf = "root ::= " + needle_tool_root_expression(min_tool_calls, max_tool_calls) + "\n";
+    ebnf += "call_body ::= " + call_body_rules.root_expression + "\n";
+    for (const auto& rule : call_body_rules.remaining_rules) {
+        ebnf += rule + "\n";
+    }
+    return xgrammar::Grammar::FromEBNF(ebnf);
 }
 
 }
