@@ -17,11 +17,11 @@
 
     @Test
     func `Generate Basics`() async throws {
-      var tokens = [NeedleToken]()
-      let generation = try self.engine.generate(
+      let tokens = Lock([NeedleToken]())
+      let generation = try await self.engine.generate(
         prompt: .sendAdventureEmail,
         parameters: .default,
-        onToken: { tokens.append($0) }
+        onToken: { token in tokens.withLock { $0.append(token) } }
       )
       expectNoDifference(generation.wasStopped, false)
       withKnownIssue {
@@ -33,47 +33,42 @@
 
     @Test
     func `Generate Streamed Response Matches Final Response`() async throws {
-      var tokens = [NeedleToken]()
-      let generation = try self.engine.generate(
+      let tokens = Lock([NeedleToken]())
+      let generation = try await self.engine.generate(
         prompt: .sendAdventureEmail,
         parameters: .default,
-        onToken: { tokens.append($0) }
+        onToken: { token in tokens.withLock { $0.append(token) } }
       )
 
-      let streamedResponse = tokens.map(\.stringValue).joined()
+      let streamedResponse = tokens.withLock { $0.map(\.stringValue).joined() }
       let finalResponse = generation.tokens.map(\.stringValue).joined()
       expectNoDifference(streamedResponse, finalResponse)
     }
 
     @Test
     func `Generate Stops And Returns Stopped Generation`() async throws {
-      let stopper = self.engine.stopper
-
-      var tokens = [NeedleToken]()
-      let generation = try self.engine.generate(
+      let tokens = Lock([NeedleToken]())
+      let generation = try await self.engine.generate(
         prompt: .sendAdventureEmail,
         parameters: .default,
-        onToken: {
-          tokens.append($0)
-          stopper()
+        onToken: { token in
+          tokens.withLock { $0.append(token) }
+          self.engine.stop()
         }
       )
 
       expectNoDifference(generation.wasStopped, true)
-      expectNoDifference(tokens.count > 0, true)
-      expectNoDifference(generation.decodeMetrics.tokens, tokens.count)
+      let tokenCount = tokens.withLock { $0.count }
+      expectNoDifference(tokenCount > 0, true)
+      expectNoDifference(generation.decodeMetrics.tokens, tokenCount)
       expectNoDifference(generation.tokens.isEmpty, false)
     }
 
     @Test
     func `Generate Cancels And Throws Cancellation Error`() async throws {
       let prompt = NeedlePrompt.sendAdventureEmail
-
-      // NB: We send and never use the engine outside the task, so this is safe.
-      nonisolated(unsafe) let engine = self.engine
-
       let task = Task {
-        _ = try engine.generate(prompt: prompt, parameters: .default) { _ in }
+        _ = try await self.engine.generate(prompt: prompt, parameters: .default) { _ in }
       }
 
       task.cancel()
@@ -84,11 +79,11 @@
 
     @Test
     func `Generate With 4 Bit KV Cache Quantization`() async throws {
-      var tokens = [NeedleToken]()
-      let generation = try self.engine.generate(
+      let tokenStorage = Lock([NeedleToken]())
+      let generation = try await self.engine.generate(
         prompt: .sendAdventureEmail,
         parameters: NeedleMLXEngine.GenerateParameters(kvCacheQuantizationBits: 4),
-        onToken: { tokens.append($0) }
+        onToken: { token in tokenStorage.withLock { $0.append(token) } }
       )
       expectNoDifference(generation.wasStopped, false)
       withKnownIssue {
@@ -107,11 +102,11 @@
         }
       )
 
-      var tokens = [NeedleToken]()
-      let generation = try engine.generate(
+      let tokenStorage = Lock([NeedleToken]())
+      let generation = try await engine.generate(
         prompt: .sendAdventureEmail,
         parameters: .default,
-        onToken: { tokens.append($0) }
+        onToken: { token in tokenStorage.withLock { $0.append(token) } }
       )
       expectNoDifference(generation.wasStopped, false)
       withKnownIssue {
@@ -123,9 +118,7 @@
 
     @Test
     func `Generate Through NeedleSession`() async throws {
-      // NB: We send and never use the engine outside the session, so this is safe.
-      nonisolated(unsafe) let engine = self.engine
-      let session = NeedleSession(engine: engine)
+      let session = NeedleSession(engine: self.engine)
       let generation = try await session.generate(
         tools: [SendEmailTool()],
         with: NeedlePrompt.sendAdventureEmail.user
@@ -150,7 +143,7 @@
     func `Generate Invokes Custom Logit Processor`() async throws {
       let processor = CountingLogitProcessor()
 
-      _ = try self.engine.generate(
+      _ = try await self.engine.generate(
         prompt: .sendAdventureEmail,
         parameters: NeedleMLXEngine.GenerateParameters(processor: processor),
         onToken: { _ in }
@@ -163,7 +156,7 @@
 
     @Test
     func `Generate Records Mean Confidence In Range Zero To One`() async throws {
-      let generation = try self.engine.generate(
+      let generation = try await self.engine.generate(
         prompt: .sendAdventureEmail,
         parameters: .default,
         onToken: { _ in }
@@ -187,8 +180,8 @@
         tools: [.sendEmail]
       )
 
-      let error = #expect(throws: NeedleMLXEngineError.self) {
-        _ = try self.engine.generate(
+      let error = await #expect(throws: NeedleMLXEngineError.self) {
+        _ = try await self.engine.generate(
           prompt: prompt,
           parameters: .default,
           onToken: { _ in }

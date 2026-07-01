@@ -4,18 +4,18 @@
   import Foundation
 
   @available(anyAppleOS 27.0, *)
-  public final class NeedleCoreAIEngine: NeedleEngine {
+  public final class NeedleCoreAIEngine: NeedleEngine, Sendable {
     public struct GenerateParameters: NeedleEngineGenerateParameters {
       public static var `default`: Self { Self() }
     }
 
-    public var stopper: NeedleEngineStopper {
-      NeedleEngineStopper {}
+    private struct State {
+      let grammarEngine: NeedleXGrammarEngine
     }
 
-    public let model: AIModel
-    public let tokenizer: any Tokenizer
-    public let grammarEngine: NeedleXGrammarEngine
+    private let state: Lock<State>
+    private let model: AIModel
+    private let tokenizer: any Tokenizer
 
     public convenience init(modelDirectoryURL: URL) throws {
       fatalError()
@@ -24,31 +24,30 @@
     public init(
       model: AIModel,
       tokenizer: any Tokenizer,
-      grammarEngine: NeedleXGrammarEngine
+      grammarEngine: sending NeedleXGrammarEngine
     ) throws {
+      self.state = Lock(State(grammarEngine: grammarEngine))
       self.model = model
       self.tokenizer = tokenizer
-      self.grammarEngine = grammarEngine
     }
 
     public func tokenize(prompt: NeedlePrompt) -> [NeedleToken] {
       prompt.tokenized(using: self.tokenizer)
     }
 
-    public func generate(
-      prompt: NeedlePrompt,
-      parameters: GenerateParameters,
-      onToken: (NeedleToken) -> Void
-    ) throws -> NeedleEngineGeneration {
-      .empty
-    }
+    public func stop() {}
+    public func reset() {}
 
     public func clearCaches() {
-      self.grammarEngine.clearCache()
+      self.state.withLock { $0.grammarEngine.clearCache() }
     }
 
-    public func reset() {
-      self.clearCaches()
+    public func generate(
+      prompt: NeedlePrompt,
+      parameters: sending GenerateParameters,
+      onToken: @escaping @Sendable (NeedleToken) -> Void
+    ) async throws -> NeedleEngineGeneration {
+      .empty
     }
   }
 #endif

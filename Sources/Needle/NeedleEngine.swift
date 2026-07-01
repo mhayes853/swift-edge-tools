@@ -1,18 +1,17 @@
 // MARK: - NeedleEngine
 
-public protocol NeedleEngine: SendableMetatype {
+public protocol NeedleEngine: Sendable {
   associatedtype GenerateParameters: NeedleEngineGenerateParameters
-
-  var stopper: NeedleEngineStopper { get }
 
   func tokenize(prompt: NeedlePrompt) -> [NeedleToken]
 
   func generate(
     prompt: NeedlePrompt,
-    parameters: GenerateParameters,
-    onToken: (NeedleToken) -> Void
-  ) throws -> NeedleEngineGeneration
+    parameters: sending GenerateParameters,
+    onToken: @escaping @Sendable (NeedleToken) -> Void
+  ) async throws -> NeedleEngineGeneration
 
+  func stop()
   func reset()
 }
 
@@ -20,20 +19,6 @@ public protocol NeedleEngine: SendableMetatype {
 
 public protocol NeedleEngineGenerateParameters {
   static var `default`: Self { get }
-}
-
-// MARK: - NeedleEngineStopper
-
-public struct NeedleEngineStopper: Sendable {
-  private let stop: @Sendable () -> Void
-
-  public init(stop: @escaping @Sendable () -> Void) {
-    self.stop = stop
-  }
-
-  public func callAsFunction() {
-    self.stop()
-  }
 }
 
 // MARK: - NeedleEngineGeneration

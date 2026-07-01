@@ -23,7 +23,7 @@
     }
 
     @Test
-    func `Tokenize Forwards Tool Definitions And Prompt To The Engine`() async throws {
+    func `Tokenize Forwards Tool Definitions And Prompt To The Engine`() throws {
       let expectedTokens = (0..<6).map { NeedleToken(id: $0, stringValue: "t\($0)") }
       let tool = WeatherTool()
       let capturedPrompt = Lock<NeedlePrompt?>(nil)
@@ -33,7 +33,7 @@
       }
       let session = NeedleSession(engine: engine, systemPrompt: "sys")
 
-      let tokens = await session.tokenize(
+      let tokens = session.tokenize(
         tools: [tool],
         with: "hi",
         systemPromptOverride: nil
@@ -419,6 +419,59 @@
     }
 
     @Test
+    func `Concurrent Generates Serialize Through Session Turn Lock`() async throws {
+      let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+      let token = "a a".tokenize(using: tokenizer).first!
+      let engine = MockEngine.live()
+      let activeCount = Lock(0)
+      let maxActive = Lock(0)
+      let startCount = Lock(0)
+      let endCount = Lock(0)
+
+      engine.onGenerateStart = {
+        let now = activeCount.withLock { active -> Int in
+          active += 1
+          return active
+        }
+        maxActive.withLock { max in
+          if now > max { max = now }
+        }
+        startCount.withLock { $0 += 1 }
+      }
+      engine.onGenerateEnd = {
+        _ = activeCount.withLock { active in
+          active -= 1
+          return active
+        }
+        endCount.withLock { $0 += 1 }
+      }
+
+      for _ in 0..<3 {
+        engine.push(.token(token))
+        engine.push(.finish)
+        engine.push(nil)
+      }
+
+      let session = NeedleSession(engine: engine)
+      let stream1 = session.stream(tools: [], with: "hi")
+      let stream2 = session.stream(tools: [], with: "hi")
+      let stream3 = session.stream(tools: [], with: "hi")
+
+      async let g1 = stream1.finalGeneration
+      async let g2 = stream2.finalGeneration
+      async let g3 = stream3.finalGeneration
+
+      _ = try await g1
+      _ = try await g2
+      _ = try await g3
+
+      expectNoDifference(maxActive.withLock { $0 }, 1)
+      expectNoDifference(startCount.withLock { $0 }, 3)
+      expectNoDifference(endCount.withLock { $0 }, 3)
+      expectNoDifference(activeCount.withLock { $0 }, 0)
+    }
+
+    @Test
     func `Status Is Awaiting Execution Before Generation Starts`() async throws {
       let engine = MockEngine.live()
       let session = NeedleSession(engine: engine)
@@ -725,7 +778,18 @@
     private let storage: Storage
     private let _generateCallCount = Lock(0)
     private let tokenizeHandler: (@Sendable (NeedlePrompt) -> [NeedleToken])?
-    let stopper: NeedleEngineStopper
+    private let _onGenerateStart = Lock<(@Sendable () -> Void)?>(nil)
+    private let _onGenerateEnd = Lock<(@Sendable () -> Void)?>(nil)
+
+    var onGenerateStart: (@Sendable () -> Void)? {
+      get { self._onGenerateStart.withLock { $0 } }
+      set { self._onGenerateStart.withLock { $0 = newValue } }
+    }
+
+    var onGenerateEnd: (@Sendable () -> Void)? {
+      get { self._onGenerateEnd.withLock { $0 } }
+      set { self._onGenerateEnd.withLock { $0 = newValue } }
+    }
 
     var generateCallCount: Int {
       self._generateCallCount.withLock { $0 }
@@ -735,14 +799,12 @@
       let storage = Storage()
       self.storage = storage
       self.tokenizeHandler = nil
-      self.stopper = NeedleEngineStopper { storage.stop() }
     }
 
     init(script: [Event]) {
       let storage = Storage()
       self.storage = storage
       self.tokenizeHandler = nil
-      self.stopper = NeedleEngineStopper { storage.stop() }
       for event in script {
         storage.push(event)
       }
@@ -753,7 +815,6 @@
       let storage = Storage()
       self.storage = storage
       self.tokenizeHandler = tokenize
-      self.stopper = NeedleEngineStopper { storage.stop() }
     }
 
     static func live() -> MockEngine {
@@ -768,30 +829,47 @@
       self.storage.push(event)
     }
 
+    func stop() {
+      self.storage.stop()
+    }
+
+    func reset() {
+      self.storage.resetStop()
+    }
+
     func generate(
       prompt: NeedlePrompt,
-      parameters: GenerateParameters,
-      onToken: (NeedleToken) -> Void
-    ) throws -> NeedleEngineGeneration {
+      parameters: sending GenerateParameters,
+      onToken: @escaping @Sendable (NeedleToken) -> Void
+    ) async throws -> NeedleEngineGeneration {
       self._generateCallCount.withLock { $0 += 1 }
       self.storage.resetStop()
+      let onStart = self._onGenerateStart.withLock { $0 }
+      let onEnd = self._onGenerateEnd.withLock { $0 }
+      onStart?()
+      defer { onEnd?() }
       var emittedTokens: [NeedleToken] = []
       var wasStopped = false
       var thrownError: (any Error)?
 
-      while let event = self.storage.nextEvent() {
-        switch event {
-        case .token(let token):
-          onToken(token)
-          emittedTokens.append(token)
-        case .stop:
-          wasStopped = true
-        case .error(let error):
-          thrownError = error
-        case .finish:
-          break
+      try await withTaskCancellationHandler {
+        while let event = self.storage.nextEvent() {
+          try Task.checkCancellation()
+          switch event {
+          case .token(let token):
+            onToken(token)
+            emittedTokens.append(token)
+          case .stop:
+            wasStopped = true
+          case .error(let error):
+            thrownError = error
+          case .finish:
+            break
+          }
+          if wasStopped || thrownError != nil { break }
         }
-        if wasStopped || thrownError != nil { break }
+      } onCancel: {
+        self.storage.stop()
       }
 
       if let error = thrownError { throw error }
@@ -806,8 +884,6 @@
         tokens: emittedTokens
       )
     }
-
-    func reset() {}
   }
 
   // MARK: - GetWeatherTool
