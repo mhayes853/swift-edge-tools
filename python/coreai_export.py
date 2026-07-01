@@ -154,6 +154,7 @@ def export_programs(
                 "encoder_projected_k",
                 "encoder_projected_v",
             ],
+            state_names=["keyCache", "valueCache", "cacheOffset"],
             output_names=["logits"],
         )
         .to_coreai()
