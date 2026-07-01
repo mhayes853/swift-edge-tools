@@ -5,6 +5,14 @@
 
   @available(anyAppleOS 27.0, *)
   public final class NeedleCoreAIEngine: NeedleEngine, Sendable {
+    public final class GenerationTask: NeedleEngineGenerationTask {
+      public var value: NeedleEngineGeneration {
+        get async throws { .empty }
+      }
+
+      public func stop() {}
+    }
+
     public struct GenerateParameters: NeedleEngineGenerateParameters {
       public static var `default`: Self { Self() }
     }
@@ -35,9 +43,6 @@
       prompt.tokenized(using: self.tokenizer)
     }
 
-    public func stop() {}
-    public func reset() {}
-
     public func clearCaches() {
       self.state.withLock { $0.grammarEngine.clearCache() }
     }
@@ -46,8 +51,8 @@
       prompt: NeedlePrompt,
       parameters: sending GenerateParameters,
       onToken: @escaping @Sendable (NeedleToken) -> Void
-    ) async throws -> NeedleEngineGeneration {
-      .empty
+    ) throws -> GenerationTask {
+      GenerationTask()
     }
   }
 #endif

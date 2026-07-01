@@ -4,10 +4,38 @@
   import MLXLMCommon
   import Foundation
   import Tokenizers
+  import Atomics
 
   // MARK: - NeedleMLXEngine
 
-  public final class NeedleMLXEngine: NeedleEngine, Sendable {
+  public final class NeedleMLXEngine: NeedleEngine {
+    public final class GenerationTask: NeedleEngineGenerationTask {
+      private let task: Task<NeedleEngineGeneration, any Error>
+      private let isStopped: ManagedAtomic<Bool>
+
+      fileprivate init(
+        task: sending Task<NeedleEngineGeneration, any Error>,
+        isStopped: ManagedAtomic<Bool>
+      ) {
+        self.task = task
+        self.isStopped = isStopped
+      }
+
+      public var value: NeedleEngineGeneration {
+        get async throws {
+          try await withTaskCancellationHandler {
+            try await self.task.value
+          } onCancel: {
+            self.task.cancel()
+          }
+        }
+      }
+
+      public func stop() {
+        self.isStopped.store(true, ordering: .relaxed)
+      }
+    }
+
     public struct GenerateParameters: NeedleEngineGenerateParameters {
       public static var `default`: Self {
         Self()
@@ -42,9 +70,9 @@
     }
 
     private struct State {
-      var isStopped = false
       let grammarEngine: NeedleXGrammarEngine
       let model: NeedleMLXModel
+      let matcherPool: MatcherPool
     }
 
     private let state: Lock<State>
@@ -88,7 +116,9 @@
       model: sending NeedleMLXModel,
       grammarEngine: sending NeedleXGrammarEngine
     ) {
-      self.state = Lock(State(grammarEngine: grammarEngine, model: model))
+      self.state = Lock(
+        State(grammarEngine: grammarEngine, model: model, matcherPool: MatcherPool())
+      )
       self._tokenizer = tokenizer
     }
 
@@ -96,60 +126,78 @@
       prompt.tokenized(using: self._tokenizer)
     }
 
-    public func stop() {
-      self.state.withLock { $0.isStopped = true }
-    }
-
-    public func reset() {
-      self.state.withLock {
-        $0.model.reset()
-        $0.isStopped = false
-      }
-    }
-
     public func clearCaches() {
-      self.state.withLock { $0.grammarEngine.clearCache() }
+      self.state.withLock { state in
+        state.matcherPool.clear()
+        state.grammarEngine.clearCache()
+      }
     }
 
     public func generate(
       prompt: NeedlePrompt,
       parameters: sending GenerateParameters,
       onToken: @escaping @Sendable (NeedleToken) -> Void
-    ) async throws -> NeedleEngineGeneration {
-      try Task.checkCancellation()
-      guard !self.state.withLock({ $0.isStopped }) else { return .empty }
-      let matcher = try self.state.withLock { state in
-        state.isStopped = false
-        return try state.grammarEngine.compile(
-          tools: prompt.tools,
-          range: parameters.toolCallInvocationRange
-        )
+    ) throws -> GenerationTask {
+      let isStopped = ManagedAtomic(false)
+      let task = Task {
+        // NB: This is safe, Swift must infer the worst when it can't infer isolation. We only
+        // use the params within `generate` and not as a part of the return value.
+        nonisolated(unsafe) let parameters = parameters
+        return try self.state.withLock { state in
+          try self.generate(
+            prompt: prompt,
+            parameters: parameters,
+            onToken: onToken,
+            state: &state,
+            isStopped: isStopped
+          )
+        }
       }
+      return GenerationTask(task: task, isStopped: isStopped)
+    }
+
+    private func generate(
+      prompt: NeedlePrompt,
+      parameters: sending GenerateParameters,
+      onToken: @escaping @Sendable (NeedleToken) -> Void,
+      state: inout sending State,
+      isStopped: ManagedAtomic<Bool>
+    ) throws -> NeedleEngineGeneration {
+      try Task.checkCancellation()
+      guard !isStopped.load(ordering: .relaxed) else { return .empty }
+
+      let matcher = try state.matcherPool.matcher(
+        tools: prompt.tools,
+        range: parameters.toolCallInvocationRange,
+        compilingWith: state.grammarEngine
+      )
+      matcher.reset()
+      state.model.reset()
+      defer { state.model.reset() }
 
       let generationStartSnapshot = Memory.synchronizedSnapshot(
         synchronize: parameters.synchronizeStreamForMemorySnapshots
       )
       let generateStart = self.clock.now
 
-      let model = self.state.withLock { $0.model }
       var processor = parameters.processor
-      var cache = model.newCache(parameters: nil)
+      var cache = state.model.newCache(parameters: nil)
       let (prefillOutput, prefillMetrics, postPrefillSnapshot) = try self.prefill(
         prompt: prompt,
+        model: state.model,
         cache: cache,
         processor: &processor,
         synchronize: parameters.synchronizeStreamForMemorySnapshots
       )
       try Task.checkCancellation()
       guard var output = prefillOutput else { preconditionFailure("Model received empty input.") }
-      matcher.reset()
-      var _durationToFirstToken: Duration?
+      var durationToFirstToken: Duration?
 
       var detokenizer = StreamingDetokenizer(tokenizer: self._tokenizer)
       var generatedTokens = [NeedleToken]()
       var confidence = NeedleMLXConfidenceState()
       while !matcher.isTerminated
-        && !self.state.withLock({ $0.isStopped })
+        && !isStopped.load(ordering: .relaxed)
         && detokenizer.tokenIds.count < (parameters.maxTokens ?? .max)
         && generatedTokens.last?.id != self._tokenizer.eosTokenId
       {
@@ -164,7 +212,7 @@
         let token = parameters.sampler.sample(logits: logits)
         let tokenId = token.item(NeedleToken.ID.self)
 
-        _durationToFirstToken = _durationToFirstToken ?? generateStart.duration(to: self.clock.now)
+        durationToFirstToken = durationToFirstToken ?? generateStart.duration(to: self.clock.now)
         let tokenString = detokenizer.decode(tokenId: tokenId)
         let needleToken = NeedleToken(id: tokenId, stringValue: tokenString)
         generatedTokens.append(needleToken)
@@ -181,10 +229,10 @@
         )
 
         let inputText = LMInput.Text(tokens: token)
-        output = model(inputText[text: .newAxis], cache: cache, state: output.state)
+        output = state.model(inputText[text: .newAxis], cache: cache, state: output.state)
       }
 
-      let durationToFirstToken = _durationToFirstToken ?? .zero
+      let finalDurationToFirstToken = durationToFirstToken ?? .zero
       let postDecodeSnapshot = Memory.synchronizedSnapshot(
         synchronize: parameters.synchronizeStreamForMemorySnapshots
       )
@@ -198,10 +246,10 @@
         prefillMetrics: prefillMetrics,
         decodeMetrics: NeedleDecodeMetrics(
           tokens: generatedTokens.count,
-          duration: generateStart.duration(to: self.clock.now) - durationToFirstToken,
-          durationToFirstToken: durationToFirstToken
+          duration: generateStart.duration(to: self.clock.now) - finalDurationToFirstToken,
+          durationToFirstToken: finalDurationToFirstToken
         ),
-        wasStopped: self.state.withLock { $0.isStopped },
+        wasStopped: isStopped.load(ordering: .relaxed),
         tokens: generatedTokens,
         metadata: metadata
       )
@@ -209,11 +257,11 @@
 
     private func prefill(
       prompt: NeedlePrompt,
+      model: NeedleMLXModel,
       cache: [any KVCache],
       processor: inout (any LogitProcessor)?,
       synchronize: Bool
     ) throws -> (LMOutput?, NeedlePrefillMetrics, Memory.Snapshot) {
-      let model = self.state.withLock(\.model)
       let input = try LMInput.needle(prompt: prompt, using: self._tokenizer)
       guard input.text.tokens.size <= model.configuration.encoderMaxLength else {
         throw NeedleMLXEngineError.contextLengthExceeded(
@@ -231,6 +279,59 @@
       )
       let snapshot = Memory.synchronizedSnapshot(synchronize: synchronize)
       return (output, metrics, snapshot)
+    }
+  }
+
+  // MARK: - MatcherPool
+
+  extension NeedleMLXEngine {
+    private final class MatcherPool {
+      private struct Key: Hashable, Sendable {
+        let tools: [NeedleToolDefinition]
+        let range: NeedleXGrammarEngine.ToolCallInvocationRange
+      }
+
+      private let maxCount: Int
+      private var entries = [Key: NeedleXGrammarEngine.Matcher]()
+      private var order = [Key]()
+
+      init(maxCount: Int = 8) {
+        self.maxCount = maxCount
+      }
+
+      func matcher(
+        tools: some Sequence<NeedleToolDefinition>,
+        range: NeedleXGrammarEngine.ToolCallInvocationRange,
+        compilingWith engine: NeedleXGrammarEngine
+      ) throws -> NeedleXGrammarEngine.Matcher {
+        let key = Key(tools: tools.map { $0.normalized() }, range: range)
+        if let cached = self.entries[key] {
+          self.touch(key)
+          return cached
+        }
+        let matcher = try engine.compile(tools: key.tools, range: key.range)
+        self.insert(key, matcher)
+        return matcher
+      }
+
+      func clear() {
+        self.entries.removeAll()
+        self.order.removeAll()
+      }
+
+      private func touch(_ key: Key) {
+        self.order.removeAll { $0 == key }
+        self.order.append(key)
+      }
+
+      private func insert(_ key: Key, _ matcher: NeedleXGrammarEngine.Matcher) {
+        if self.entries.count >= self.maxCount, let leastRecentlyUsed = self.order.first {
+          self.entries.removeValue(forKey: leastRecentlyUsed)
+          self.order.removeFirst()
+        }
+        self.entries[key] = matcher
+        self.order.append(key)
+      }
     }
   }
 

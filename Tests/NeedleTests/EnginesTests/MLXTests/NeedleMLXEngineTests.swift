@@ -18,11 +18,11 @@
     @Test
     func `Generate Basics`() async throws {
       let tokens = Lock([NeedleToken]())
-      let generation = try await self.engine.generate(
+      let generationTask = try self.engine.generate(
         prompt: .sendAdventureEmail,
-        parameters: .default,
-        onToken: { token in tokens.withLock { $0.append(token) } }
-      )
+        parameters: .default
+      ) { token in tokens.withLock { $0.append(token) } }
+      let generation = try await generationTask.value
       expectNoDifference(generation.wasStopped, false)
       withKnownIssue {
         assertSnapshot(of: generation, as: .dump, record: .all)
@@ -34,11 +34,11 @@
     @Test
     func `Generate Streamed Response Matches Final Response`() async throws {
       let tokens = Lock([NeedleToken]())
-      let generation = try await self.engine.generate(
+      let generationTask = try self.engine.generate(
         prompt: .sendAdventureEmail,
-        parameters: .default,
-        onToken: { token in tokens.withLock { $0.append(token) } }
-      )
+        parameters: .default
+      ) { token in tokens.withLock { $0.append(token) } }
+      let generation = try await generationTask.value
 
       let streamedResponse = tokens.withLock { $0.map(\.stringValue).joined() }
       let finalResponse = generation.tokens.map(\.stringValue).joined()
@@ -48,14 +48,16 @@
     @Test
     func `Generate Stops And Returns Stopped Generation`() async throws {
       let tokens = Lock([NeedleToken]())
-      let generation = try await self.engine.generate(
+      let generationTaskBox = Lock<NeedleMLXEngine.GenerationTask?>(nil)
+      let generationTask = try self.engine.generate(
         prompt: .sendAdventureEmail,
         parameters: .default,
-        onToken: { token in
-          tokens.withLock { $0.append(token) }
-          self.engine.stop()
-        }
-      )
+      ) { token in
+        tokens.withLock { $0.append(token) }
+        generationTaskBox.withLock { $0?.stop() }
+      }
+      generationTaskBox.withLock { $0 = generationTask }
+      let generation = try await generationTask.value
 
       expectNoDifference(generation.wasStopped, true)
       let tokenCount = tokens.withLock { $0.count }
@@ -66,9 +68,12 @@
 
     @Test
     func `Generate Cancels And Throws Cancellation Error`() async throws {
-      let prompt = NeedlePrompt.sendAdventureEmail
       let task = Task {
-        _ = try await self.engine.generate(prompt: prompt, parameters: .default) { _ in }
+        let generationTask = try self.engine.generate(
+          prompt: .sendAdventureEmail,
+          parameters: .default
+        ) { _ in }
+        _ = try await generationTask.value
       }
 
       task.cancel()
@@ -80,11 +85,11 @@
     @Test
     func `Generate With 4 Bit KV Cache Quantization`() async throws {
       let tokenStorage = Lock([NeedleToken]())
-      let generation = try await self.engine.generate(
+      let generationTask = try self.engine.generate(
         prompt: .sendAdventureEmail,
-        parameters: NeedleMLXEngine.GenerateParameters(kvCacheQuantizationBits: 4),
-        onToken: { token in tokenStorage.withLock { $0.append(token) } }
-      )
+        parameters: NeedleMLXEngine.GenerateParameters(kvCacheQuantizationBits: 4)
+      ) { token in tokenStorage.withLock { $0.append(token) } }
+      let generation = try await generationTask.value
       expectNoDifference(generation.wasStopped, false)
       withKnownIssue {
         assertSnapshot(of: generation, as: .dump, record: .all)
@@ -103,11 +108,11 @@
       )
 
       let tokenStorage = Lock([NeedleToken]())
-      let generation = try await engine.generate(
+      let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
-        parameters: .default,
-        onToken: { token in tokenStorage.withLock { $0.append(token) } }
-      )
+        parameters: .default
+      ) { token in tokenStorage.withLock { $0.append(token) } }
+      let generation = try await generationTask.value
       expectNoDifference(generation.wasStopped, false)
       withKnownIssue {
         assertSnapshot(of: generation, as: .dump, record: .all)
@@ -143,11 +148,11 @@
     func `Generate Invokes Custom Logit Processor`() async throws {
       let processor = CountingLogitProcessor()
 
-      _ = try await self.engine.generate(
+      let generationTask = try self.engine.generate(
         prompt: .sendAdventureEmail,
-        parameters: NeedleMLXEngine.GenerateParameters(processor: processor),
-        onToken: { _ in }
-      )
+        parameters: NeedleMLXEngine.GenerateParameters(processor: processor)
+      ) { _ in }
+      _ = try await generationTask.value
 
       expectNoDifference(processor.promptCalls, 1)
       expectNoDifference(processor.processCalls > 0, true)
@@ -156,11 +161,11 @@
 
     @Test
     func `Generate Records Mean Confidence In Range Zero To One`() async throws {
-      let generation = try await self.engine.generate(
+      let generationTask = try self.engine.generate(
         prompt: .sendAdventureEmail,
-        parameters: .default,
-        onToken: { _ in }
-      )
+        parameters: .default
+      ) { _ in }
+      let generation = try await generationTask.value
 
       let confidence = try #require(generation.metadata.mlxEngineGenerationConfidence)
       expectNoDifference((0...1).contains(confidence), true)
@@ -181,11 +186,8 @@
       )
 
       let error = await #expect(throws: NeedleMLXEngineError.self) {
-        _ = try await self.engine.generate(
-          prompt: prompt,
-          parameters: .default,
-          onToken: { _ in }
-        )
+        let generationTask = try self.engine.generate(prompt: prompt, parameters: .default) { _ in }
+        _ = try await generationTask.value
       }
       expectNoDifference(error?.message.contains("context length"), true)
     }

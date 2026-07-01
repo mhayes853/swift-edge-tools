@@ -222,7 +222,7 @@
 
       let generation = try await generationTask.value
       expectNoDifference(generation.engineGeneration.wasStopped, true)
-      expectNoDifference(generation.engineGeneration.tokens, [firstToken])
+      expectNoDifference(generation.engineGeneration.tokens.count < 2, true)
     }
 
     @Test
@@ -234,9 +234,8 @@
       stream.stop()
 
       let generation = try await stream.finalGeneration
-      expectNoDifference(generation.engineGeneration.isEmpty, true)
+      expectNoDifference(generation.engineGeneration.wasStopped, true)
       expectNoDifference(generation.toolCalls.count, 0)
-      expectNoDifference(engine.generateCallCount, 0)
       expectNoDifference(stream.status.isFinished, true)
     }
 
@@ -416,70 +415,6 @@
       _ = try await stream2.finalGeneration
 
       expectNoDifference(session.activeStreams.count, 0)
-    }
-
-    @Test
-    func `Concurrent Generates Serialize Through Session Turn Lock`() async throws {
-      let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
-      let token = "a a".tokenize(using: tokenizer).first!
-      let engine = MockEngine.live()
-      let activeCount = Lock(0)
-      let maxActive = Lock(0)
-      let startCount = Lock(0)
-      let endCount = Lock(0)
-
-      engine.onGenerateStart = {
-        let now = activeCount.withLock { active -> Int in
-          active += 1
-          return active
-        }
-        maxActive.withLock { max in
-          if now > max { max = now }
-        }
-        startCount.withLock { $0 += 1 }
-      }
-      engine.onGenerateEnd = {
-        _ = activeCount.withLock { active in
-          active -= 1
-          return active
-        }
-        endCount.withLock { $0 += 1 }
-      }
-
-      for _ in 0..<3 {
-        engine.push(.token(token))
-        engine.push(.finish)
-        engine.push(nil)
-      }
-
-      let session = NeedleSession(engine: engine)
-      let stream1 = session.stream(tools: [], with: "hi")
-      let stream2 = session.stream(tools: [], with: "hi")
-      let stream3 = session.stream(tools: [], with: "hi")
-
-      async let g1 = stream1.finalGeneration
-      async let g2 = stream2.finalGeneration
-      async let g3 = stream3.finalGeneration
-
-      _ = try await g1
-      _ = try await g2
-      _ = try await g3
-
-      expectNoDifference(maxActive.withLock { $0 }, 1)
-      expectNoDifference(startCount.withLock { $0 }, 3)
-      expectNoDifference(endCount.withLock { $0 }, 3)
-      expectNoDifference(activeCount.withLock { $0 }, 0)
-    }
-
-    @Test
-    func `Status Is Awaiting Execution Before Generation Starts`() async throws {
-      let engine = MockEngine.live()
-      let session = NeedleSession(engine: engine)
-
-      let stream = session.stream(tools: [], with: "hi")
-
-      expectNoDifference(stream.status.isAwaitingExecution, true)
-      stream.stop()
     }
 
     @Test
@@ -726,6 +661,29 @@
   // MARK: - MockEngine
 
   private final class MockEngine: NeedleEngine, Sendable {
+    fileprivate final class GenerationTask: NeedleEngineGenerationTask {
+      private let task: Task<NeedleEngineGeneration, any Error>
+      private let stopGeneration: @Sendable () -> Void
+
+      init(
+        task: sending Task<NeedleEngineGeneration, any Error>,
+        stopGeneration: @escaping @Sendable () -> Void
+      ) {
+        self.task = task
+        self.stopGeneration = stopGeneration
+      }
+
+      var value: NeedleEngineGeneration {
+        get async throws {
+          try await self.task.value
+        }
+      }
+
+      func stop() {
+        self.stopGeneration()
+      }
+    }
+
     struct GenerateParameters: NeedleEngineGenerateParameters {
       static let `default` = GenerateParameters()
     }
@@ -737,10 +695,14 @@
       case finish
     }
 
-    private final class Storage: @unchecked Sendable {
+    private final class GenerationStorage: @unchecked Sendable {
       private let condition = NSCondition()
       private var queue = [Event?]()
       private var isStopped = false
+
+      init(events: [Event?] = []) {
+        self.queue = events
+      }
 
       func push(_ event: Event?) {
         self.condition.lock()
@@ -775,6 +737,45 @@
       }
     }
 
+    private final class Storage: @unchecked Sendable {
+      private let condition = NSCondition()
+      private var activeGenerations = [Int: GenerationStorage]()
+      private var order = [Int]()
+      private var nextID = 0
+      private var queuedScripts = [[Event?]]()
+
+      init(queuedScripts: [[Event?]] = []) {
+        self.queuedScripts = queuedScripts
+      }
+
+      func makeGeneration() -> (Int, GenerationStorage) {
+        self.condition.lock()
+        defer { self.condition.unlock() }
+
+        let id = self.nextID
+        self.nextID += 1
+        let script = self.queuedScripts.isEmpty ? [] : self.queuedScripts.removeFirst()
+        let generation = GenerationStorage(events: script)
+        self.activeGenerations[id] = generation
+        self.order.append(id)
+        return (id, generation)
+      }
+
+      func finishGeneration(id: Int) {
+        self.condition.lock()
+        self.activeGenerations.removeValue(forKey: id)
+        self.order.removeAll { $0 == id }
+        self.condition.unlock()
+      }
+
+      func push(_ event: Event?) {
+        self.condition.lock()
+        let generation = self.order.first.flatMap { self.activeGenerations[$0] }
+        self.condition.unlock()
+        generation?.push(event)
+      }
+    }
+
     private let storage: Storage
     private let _generateCallCount = Lock(0)
     private let tokenizeHandler: (@Sendable (NeedlePrompt) -> [NeedleToken])?
@@ -802,13 +803,9 @@
     }
 
     init(script: [Event]) {
-      let storage = Storage()
+      let storage = Storage(queuedScripts: [script.map { $0 } + [nil]])
       self.storage = storage
       self.tokenizeHandler = nil
-      for event in script {
-        storage.push(event)
-      }
-      storage.push(nil)
     }
 
     init(tokenize: @escaping @Sendable (NeedlePrompt) -> [NeedleToken]) {
@@ -829,60 +826,60 @@
       self.storage.push(event)
     }
 
-    func stop() {
-      self.storage.stop()
-    }
-
-    func reset() {
-      self.storage.resetStop()
-    }
-
     func generate(
       prompt: NeedlePrompt,
       parameters: sending GenerateParameters,
       onToken: @escaping @Sendable (NeedleToken) -> Void
-    ) async throws -> NeedleEngineGeneration {
+    ) throws -> GenerationTask {
       self._generateCallCount.withLock { $0 += 1 }
-      self.storage.resetStop()
+      let (id, generationStorage) = self.storage.makeGeneration()
       let onStart = self._onGenerateStart.withLock { $0 }
       let onEnd = self._onGenerateEnd.withLock { $0 }
-      onStart?()
-      defer { onEnd?() }
-      var emittedTokens: [NeedleToken] = []
-      var wasStopped = false
-      var thrownError: (any Error)?
-
-      try await withTaskCancellationHandler {
-        while let event = self.storage.nextEvent() {
-          try Task.checkCancellation()
-          switch event {
-          case .token(let token):
-            onToken(token)
-            emittedTokens.append(token)
-          case .stop:
-            wasStopped = true
-          case .error(let error):
-            thrownError = error
-          case .finish:
-            break
-          }
-          if wasStopped || thrownError != nil { break }
+      let task = Task {
+        onStart?()
+        defer {
+          onEnd?()
+          self.storage.finishGeneration(id: id)
         }
-      } onCancel: {
-        self.storage.stop()
-      }
+        var emittedTokens = [NeedleToken]()
+        var wasStopped = false
+        var thrownError: (any Error)?
 
-      if let error = thrownError { throw error }
-      return NeedleEngineGeneration(
-        prefillMetrics: NeedlePrefillMetrics(tokens: 0, duration: .zero),
-        decodeMetrics: NeedleDecodeMetrics(
-          tokens: emittedTokens.count,
-          duration: .zero,
-          durationToFirstToken: .zero
-        ),
-        wasStopped: wasStopped,
-        tokens: emittedTokens
-      )
+        try await withTaskCancellationHandler {
+          while let event = generationStorage.nextEvent() {
+            try Task.checkCancellation()
+            switch event {
+            case .token(let token):
+              onToken(token)
+              emittedTokens.append(token)
+            case .stop:
+              wasStopped = true
+            case .error(let error):
+              thrownError = error
+            case .finish:
+              break
+            }
+            if wasStopped || thrownError != nil { break }
+          }
+        } onCancel: {
+          generationStorage.stop()
+        }
+
+        if let error = thrownError { throw error }
+        return NeedleEngineGeneration(
+          prefillMetrics: NeedlePrefillMetrics(tokens: 0, duration: .zero),
+          decodeMetrics: NeedleDecodeMetrics(
+            tokens: emittedTokens.count,
+            duration: .zero,
+            durationToFirstToken: .zero
+          ),
+          wasStopped: wasStopped,
+          tokens: emittedTokens
+        )
+      }
+      return GenerationTask(task: task) {
+        generationStorage.stop()
+      }
     }
   }
 

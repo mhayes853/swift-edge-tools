@@ -7,7 +7,6 @@ public final class NeedleSession<Engine: NeedleEngine>: Sendable, Observable {
   fileprivate let engine: Engine
   private let _systemPrompt: Lock<String>
   private let _activeStreams = Lock([NeedleSessionStream]())
-  private let _activeGeneration = Lock(ActiveGeneration())
   private let observationRegistrar = ObservationRegistrar()
 
   public var systemPrompt: String {
@@ -43,81 +42,6 @@ public final class NeedleSession<Engine: NeedleEngine>: Sendable, Observable {
       }
     }
   }
-
-  fileprivate func acquireGenerationTurn() async throws {
-    let needsWait = self._activeGeneration.withLock { active in
-      if active.isRunning {
-        return true
-      }
-      active.isRunning = true
-      return false
-    }
-    if needsWait {
-      try await withTaskCancellationHandler {
-        try await withCheckedThrowingContinuation {
-          (continuation: CheckedContinuation<Void, any Error>) in
-          let waiter = Waiter(continuation: continuation)
-          let shouldResumeImmediately = self._activeGeneration.withLock { active in
-            active.enqueue(waiter: waiter)
-            return !active.isRunning
-          }
-          if shouldResumeImmediately {
-            self._activeGeneration.withLock { active in
-              if let pending = active.dequeueNext() {
-                active.isRunning = true
-                pending.continuation.resume()
-              }
-            }
-          }
-        }
-      } onCancel: {
-        self.cancelQueuedWaiter()
-      }
-    }
-  }
-
-  fileprivate func endGenerationTurn() {
-    self._activeGeneration.withLock { active in
-      if let next = active.dequeueNext() {
-        active.isRunning = true
-        next.continuation.resume()
-      } else {
-        active.isRunning = false
-      }
-    }
-  }
-
-  private func cancelQueuedWaiter() {
-    self._activeGeneration.withLock { active in
-      guard !active.isRunning else { return }
-      if let waiter = active.removeFirstWaiter() {
-        waiter.continuation.resume(throwing: CancellationError())
-      }
-    }
-  }
-}
-
-// MARK: - Active Generation
-
-private struct ActiveGeneration {
-  var isRunning: Bool = false
-  private var waiters: [Waiter] = []
-
-  mutating func enqueue(waiter: Waiter) {
-    self.waiters.append(waiter)
-  }
-
-  mutating func dequeueNext() -> Waiter? {
-    self.waiters.isEmpty ? nil : self.waiters.removeFirst()
-  }
-
-  mutating func removeFirstWaiter() -> Waiter? {
-    self.waiters.isEmpty ? nil : self.waiters.removeFirst()
-  }
-}
-
-private struct Waiter: Sendable {
-  let continuation: CheckedContinuation<Void, any Error>
 }
 
 // MARK: - Tokenize
@@ -235,13 +159,12 @@ public final class NeedleSessionStream: Sendable, Observable, Identifiable {
 
   private let state = Lock(State())
   private let registrar = ObservationRegistrar()
-  private let engineStop: @Sendable () -> Void
 
   deinit {
     self.state.withLock { state in
       state.task?.cancel()
-      if state.status.isGenerating {
-        self.engineStop()
+      if !state.status.isFinished {
+        state.generationTaskStop?()
       }
     }
   }
@@ -252,11 +175,12 @@ public final class NeedleSessionStream: Sendable, Observable, Identifiable {
     with prompt: String,
     systemPrompt: String,
     parameters: sending Engine.GenerateParameters,
-    shouldInvokeTools: sending @escaping @Sendable (AnyNeedleToolCall) -> Bool
+    shouldInvokeTools: @escaping @Sendable (AnyNeedleToolCall) -> Bool
   ) {
-    let engineStop: @Sendable () -> Void = { [weak session] in session?.engine.stop() }
-    self.engineStop = engineStop
     let task = Task {
+      // NB: This is safe, the compiler must assume the worst when it can't infer isolation
+      // regions fully, but at most the params predicate get sent into the engine and are only
+      // used by it from there on.
       nonisolated(unsafe) let parameters = parameters
       return try await self.runGeneration(
         session: session,
@@ -276,60 +200,38 @@ public final class NeedleSessionStream: Sendable, Observable, Identifiable {
     prompt: String,
     systemPrompt: String,
     parameters: sending Engine.GenerateParameters,
-    shouldInvokeTools: sending @escaping @Sendable (AnyNeedleToolCall) -> Bool
+    shouldInvokeTools: @escaping @Sendable (AnyNeedleToolCall) -> Bool
   ) async throws -> NeedleSessionGeneration {
+    let stoppedBeforeGeneration: NeedleSessionGeneration? = self.state.withLock { state in
+      guard state.wasStoppedBeforeGeneration else { return nil }
+      self.registrar.withMutation(of: self, keyPath: \.status) {
+        state.beginGenerating()
+      }
+      let sessionGeneration = NeedleSessionGeneration(
+        engineGeneration: .empty,
+        toolCalls: state.toolCalls
+      )
+      self.registrar.withMutation(of: self, keyPath: \.status) {
+        state.finish(with: .success(sessionGeneration))
+      }
+      return sessionGeneration
+    }
+    if let stoppedBeforeGeneration {
+      session.removeActiveStream(self)
+      return stoppedBeforeGeneration
+    }
+
     let needlePrompt = NeedlePrompt(
       system: systemPrompt,
       user: prompt,
       tools: tools.map(\.definition)
     )
-    let wasStoppedBeforeGeneration = self.state.withLock { state in
-      if state.wasStoppedBeforeGeneration {
-        self.registrar.withMutation(of: self, keyPath: \.status) {
-          state.beginGenerating()
-        }
-        return true
-      }
-      return false
-    }
-    if wasStoppedBeforeGeneration {
-      let sessionGeneration = self.state.withLock { state in
-        let sessionGeneration = NeedleSessionGeneration(
-          engineGeneration: .empty,
-          toolCalls: state.toolCalls
-        )
-        self.registrar.withMutation(of: self, keyPath: \.status) {
-          state.finish(with: .success(sessionGeneration))
-        }
-        return sessionGeneration
-      }
-      session.removeActiveStream(self)
-      return sessionGeneration
-    }
-
-    do {
-      try await session.acquireGenerationTurn()
-    } catch {
-      self.state.withLock { state in
-        self.registrar.withMutation(of: self, keyPath: \.status) {
-          state.finish(with: .failure(error))
-        }
-      }
-      session.removeActiveStream(self)
-      throw error
-    }
-    self.registrar.withMutation(of: self, keyPath: \.status) {
-      self.state.withLock { $0.beginGenerating() }
-    }
-    session.engine.reset()
-    defer { session.endGenerationTurn() }
-
     let parseState = Lock(ToolCallParseState(tools: tools))
     let shouldInvokeToolsBox = Lock(shouldInvokeTools)
 
-    let generation: NeedleEngineGeneration
+    let generationTask: Engine.GenerationTask
     do {
-      generation = try await session.engine.generate(
+      generationTask = try session.engine.generate(
         prompt: needlePrompt,
         parameters: parameters
       ) { [weak self] token in
@@ -354,6 +256,34 @@ public final class NeedleSessionStream: Sendable, Observable, Identifiable {
       session.removeActiveStream(self)
       throw error
     }
+
+    let shouldStopGeneration = self.state.withLock { state in
+      state.generationTaskStop = { generationTask.stop() }
+      if state.wasStoppedBeforeGeneration {
+        return true
+      }
+      self.registrar.withMutation(of: self, keyPath: \.status) {
+        state.beginGenerating()
+      }
+      return false
+    }
+    if shouldStopGeneration {
+      generationTask.stop()
+    }
+
+    let generation: NeedleEngineGeneration
+    do {
+      generation = try await generationTask.value
+      try Task.checkCancellation()
+    } catch {
+      self.state.withLock { state in
+        self.registrar.withMutation(of: self, keyPath: \.status) {
+          state.finish(with: .failure(error))
+        }
+      }
+      session.removeActiveStream(self)
+      throw error
+    }
     let sessionGeneration = self.state.withLock { state in
       let sessionGeneration = NeedleSessionGeneration(
         engineGeneration: generation,
@@ -369,20 +299,18 @@ public final class NeedleSessionStream: Sendable, Observable, Identifiable {
   }
 
   public func stop() {
-    let shouldStopEngine = self.state.withLock { state in
+    let generationTaskStop: (@Sendable () -> Void)? = self.state.withLock { state in
       switch state.status {
       case .awaitingExecution:
         state.markStoppedBeforeGeneration()
-        return false
+        return nil
       case .generating:
-        return true
+        return state.generationTaskStop
       case .finished:
-        return false
+        return nil
       }
     }
-    if shouldStopEngine {
-      self.engineStop()
-    }
+    generationTaskStop?()
   }
 }
 
@@ -454,6 +382,7 @@ extension NeedleSessionStream {
   fileprivate struct State {
     private(set) var status: NeedleSessionStream.Status = .awaitingExecution
     private(set) var wasStoppedBeforeGeneration = false
+    var generationTaskStop: (@Sendable () -> Void)?
     private var tokenContinuations =
       [Int: AsyncThrowingStream<NeedleToken, any Error>.Continuation]()
     private var toolsContinuations =
@@ -533,6 +462,7 @@ extension NeedleSessionStream {
     }
 
     mutating func finish(with result: Result<NeedleSessionGeneration, any Error>) {
+      self.generationTaskStop = nil
       self.status = .finished(result)
       switch result {
       case .success:

@@ -2,6 +2,7 @@
 
 public protocol NeedleEngine: Sendable {
   associatedtype GenerateParameters: NeedleEngineGenerateParameters
+  associatedtype GenerationTask: NeedleEngineGenerationTask
 
   func tokenize(prompt: NeedlePrompt) -> [NeedleToken]
 
@@ -9,16 +10,21 @@ public protocol NeedleEngine: Sendable {
     prompt: NeedlePrompt,
     parameters: sending GenerateParameters,
     onToken: @escaping @Sendable (NeedleToken) -> Void
-  ) async throws -> NeedleEngineGeneration
-
-  func stop()
-  func reset()
+  ) throws -> GenerationTask
 }
 
 // MARK: - NeedleEngineGenerateParemeters
 
 public protocol NeedleEngineGenerateParameters {
   static var `default`: Self { get }
+}
+
+// MARK: - NeedleEngineGenerationTask
+
+public protocol NeedleEngineGenerationTask: Sendable {
+  var value: NeedleEngineGeneration { get async throws }
+
+  func stop()
 }
 
 // MARK: - NeedleEngineGeneration
