@@ -23,7 +23,7 @@
     }
 
     @Test
-    func `Tokenize Forwards Tool Definitions And Prompt To The Engine`() throws {
+    func `Tokenize Forwards Tool Definitions And Prompt To The Engine`() async throws {
       let expectedTokens = (0..<6).map { NeedleToken(id: $0, stringValue: "t\($0)") }
       let tool = WeatherTool()
       let capturedPrompt = Lock<NeedlePrompt?>(nil)
@@ -33,7 +33,7 @@
       }
       let session = NeedleSession(engine: engine, systemPrompt: "sys")
 
-      let tokens = session.tokenize(
+      let tokens = try await session.tokenize(
         tools: [tool],
         with: "hi",
         systemPromptOverride: nil
@@ -818,7 +818,7 @@
       MockEngine()
     }
 
-    func tokenize(prompt: NeedlePrompt) -> [NeedleToken] {
+    func tokenize(prompt: NeedlePrompt) async throws -> [NeedleToken] {
       self.tokenizeHandler?(prompt) ?? []
     }
 

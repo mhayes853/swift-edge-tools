@@ -39,7 +39,7 @@
       self.tokenizer = tokenizer
     }
 
-    public func tokenize(prompt: NeedlePrompt) -> [NeedleToken] {
+    public func tokenize(prompt: NeedlePrompt) async throws -> [NeedleToken] {
       prompt.tokenized(using: self.tokenizer)
     }
 

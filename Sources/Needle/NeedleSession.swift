@@ -51,8 +51,8 @@ extension NeedleSession {
     tools: [any NeedleTool],
     with prompt: String,
     systemPromptOverride: String?
-  ) -> [NeedleToken] {
-    self.tokenize(
+  ) async throws -> [NeedleToken] {
+    try await self.tokenize(
       tools: tools.map(\.definition),
       with: prompt,
       systemPromptOverride: systemPromptOverride
@@ -63,17 +63,17 @@ extension NeedleSession {
     tools: [NeedleToolDefinition],
     with prompt: String,
     systemPromptOverride: String?
-  ) -> [NeedleToken] {
+  ) async throws -> [NeedleToken] {
     let prompt = NeedlePrompt(
       system: systemPromptOverride ?? self.systemPrompt,
       user: prompt,
       tools: tools
     )
-    return self.tokenize(prompt: prompt)
+    return try await self.tokenize(prompt: prompt)
   }
 
-  public func tokenize(prompt: NeedlePrompt) -> [NeedleToken] {
-    self.engine.tokenize(prompt: prompt)
+  public func tokenize(prompt: NeedlePrompt) async throws -> [NeedleToken] {
+    try await self.engine.tokenize(prompt: prompt)
   }
 }
 

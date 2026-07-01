@@ -4,7 +4,7 @@ public protocol NeedleEngine: Sendable {
   associatedtype GenerateParameters: NeedleEngineGenerateParameters
   associatedtype GenerationTask: NeedleEngineGenerationTask
 
-  func tokenize(prompt: NeedlePrompt) -> [NeedleToken]
+  func tokenize(prompt: NeedlePrompt) async throws -> [NeedleToken]
 
   func generate(
     prompt: NeedlePrompt,
