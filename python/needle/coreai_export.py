@@ -7,6 +7,7 @@ from typing import Any, TypeAlias, Union
 
 import torch
 from coreai.authoring.asset import AIProgram
+from coreai.runtime import AIModelAssetMetadata
 from coreai_opt import ExportBackend
 from coreai_opt.config import CompressionConfig
 from coreai_opt.palettization import KMeansPalettizer, KMeansPalettizerConfig
@@ -26,19 +27,12 @@ _DEFAULT_ENCODER_SAMPLE_LENGTH = 4
 _DEFAULT_DECODER_SAMPLE_LENGTH = 1
 
 
-@dataclass(frozen=True)
-class _ModelSourceFiles:
-    directory: Path
-    configuration_path: Path
-    tokenizer_path: Path
-    weights_path: Path
-
-
 def export_needle_coreai(
     source: str,
     output_directory: Union[str, Path],
     *,
     compression_config: CoreAICompressionConfig | None = None,
+    model_metadata: AIModelAssetMetadata | None = None,
 ) -> Path:
     source_files = _resolve_model_source(source)
     configuration = _load_configuration(source_files.configuration_path)
@@ -52,8 +46,16 @@ def export_needle_coreai(
         configuration,
         compression_config=compression_config,
     )
-    _save_program(encoder_program, output_directory / "encoder.aimodel")
-    _save_program(decoder_program, output_directory / "decoder.aimodel")
+    _save_program(
+        encoder_program,
+        output_directory / "encoder.aimodel",
+        metadata=model_metadata,
+    )
+    _save_program(
+        decoder_program,
+        output_directory / "decoder.aimodel",
+        metadata=model_metadata,
+    )
     _copy_bundle_resources(source_files, output_directory)
     return output_directory
 
@@ -140,6 +142,14 @@ def _prepare_module_for_coreai_export(
     finalized_module = compressor.finalize(backend=ExportBackend.CoreAI)
     finalized_module.eval()
     return finalized_module
+
+
+@dataclass(frozen=True)
+class _ModelSourceFiles:
+    directory: Path
+    configuration_path: Path
+    tokenizer_path: Path
+    weights_path: Path
 
 
 def _resolve_model_source(source: str) -> _ModelSourceFiles:
@@ -281,7 +291,12 @@ def _export_program(
     return torch.export.export(module, args=args).run_decompositions(get_decomp_table())
 
 
-def _save_program(program: AIProgram, path: Path) -> None:
+def _save_program(
+    program: AIProgram,
+    path: Path,
+    *,
+    metadata: AIModelAssetMetadata | None = None,
+) -> None:
     if path.exists():
         shutil.rmtree(path)
-    program.save_asset(path)
+    program.save_asset(path, metadata=metadata)
