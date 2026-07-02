@@ -54,6 +54,49 @@ With a custom source:
 python3 cli.py --source /path/to/needle-bundle --output ./build/coreai-export
 ```
 
+With authoring metadata flags and quantization:
+
+```bash
+python3 cli.py \
+  --source Cactus-Compute/needle-hf \
+  --output ./build/coreai-export \
+  --authoring-author "Needle" \
+  --authoring-description "CoreAI export" \
+  --authoring-license "BSD-3-Clause" \
+  --authoring-custom suite=cli \
+  --quantizer-preset w8 \
+  --quantizer-execution-mode eager
+```
+
+With metadata and palettization config files:
+
+```bash
+python3 cli.py \
+  --source Cactus-Compute/needle-hf \
+  --output ./build/coreai-export \
+  --authoring-metadata ./metadata.yaml \
+  --palettizer-config ./palettizer.yaml
+```
+
+The CLI accepts JSON or YAML for:
+
+- `--authoring-metadata`
+- `--quantizer-config`
+- `--palettizer-config`
+
+Supported compression convenience flags:
+
+- `--quantizer-preset {w4,w4_per_block,w8}`
+- `--quantizer-execution-mode {graph,eager}`
+- `--palettizer-preset {w4,w6,w8}`
+
+Authoring metadata flags:
+
+- `--authoring-author`
+- `--authoring-description`
+- `--authoring-license`
+- `--authoring-custom KEY=VALUE`
+
 ## End-To-End Shell Script
 
 The repository also includes a runnable shell wrapper:

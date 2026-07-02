@@ -8,6 +8,7 @@ dependencies = [
     "coreai-opt>=0.2.1",
     "coreai-torch==0.4.0",
     "huggingface_hub>=1.21.0",
+    "PyYAML>=6.0",
     "safetensors>=0.6.2",
     "sentencepiece>=0.2.1",
     "tokenizers>=0.22.1",
