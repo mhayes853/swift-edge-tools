@@ -45,13 +45,13 @@ The output bundle contains:
 From `python/`:
 
 ```bash
-python3 coreai_export.py --output ./build/coreai-export
+python3 cli.py --output ./build/coreai-export
 ```
 
 With a custom source:
 
 ```bash
-python3 coreai_export.py --source /path/to/needle-bundle --output ./build/coreai-export
+python3 cli.py --source /path/to/needle-bundle --output ./build/coreai-export
 ```
 
 ## End-To-End Shell Script
@@ -78,5 +78,5 @@ Defaults:
 Run the Python tests from `python/`:
 
 ```bash
-python3 -m unittest tests.test_needle_torch tests.test_coreai_export
+python3 -m unittest tests.test_needle_torch tests.test_torch_utils tests.test_coreai_export tests.test_cli
 ```

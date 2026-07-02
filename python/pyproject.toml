@@ -1,5 +1,5 @@
 [project]
-name = "swift_needle"
+name = "needle"
 version = "0.1.0"
 description = ""
 requires-python = ">=3.9"
@@ -17,5 +17,15 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["swift_needle"]
-package-dir = {swift_needle = "swift_needle"}
+packages = ["needle"]
+package-dir = {needle = "needle"}
+py-modules = ["cli"]
+
+[project.scripts]
+needle-coreai-export = "cli:main"
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+explicit_package_bases = true
+mypy_path = "."

@@ -1,16 +1,20 @@
+from __future__ import annotations
+
+import io
 import json
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 
 import torch
 
+from cli import main
 from needle import Needle, NeedleModelConfiguation
-from needle.coreai_export import export_needle_coreai
 
 
-class CoreAIExportTests(unittest.TestCase):
-    def test_export_needle_coreai_runs_end_to_end_on_local_bundle(self) -> None:
+class CLITests(unittest.TestCase):
+    def test_main_runs_end_to_end_on_local_bundle(self) -> None:
         source_ctx = tempfile.TemporaryDirectory()
         output_ctx = tempfile.TemporaryDirectory()
         try:
@@ -45,9 +49,14 @@ class CoreAIExportTests(unittest.TestCase):
                 needle_instance.state_dict(), source_directory / "weights.pkl"
             )
 
-            result = export_needle_coreai(str(source_directory), output_directory)
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    ["--source", str(source_directory), "--output", str(output_directory)]
+                )
 
-            self.assertEqual(result, output_directory.resolve())
+            self.assertEqual(exit_code, 0)
+            result = Path(stdout.getvalue().strip())
             self.assertTrue((result / "encoder.aimodel").exists())
             self.assertTrue((result / "decoder.aimodel").exists())
             self.assertTrue((result / "configuration.json").exists())

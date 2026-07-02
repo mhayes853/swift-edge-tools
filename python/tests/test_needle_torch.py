@@ -3,8 +3,8 @@ import unittest
 
 import torch
 
-from swift_needle.needle_configuration import NeedleModelConfiguation
-from swift_needle.needle_torch import Needle, NeedleDecoder
+from needle import Needle, NeedleDecoder
+from needle.needle_configuration import NeedleModelConfiguation
 
 
 def mock_configuration() -> NeedleModelConfiguation:
@@ -29,7 +29,7 @@ def mock_configuration() -> NeedleModelConfiguation:
 class NeedleTorchTests(unittest.TestCase):
     def test_encode_decode_and_reset(self) -> None:
         model = Needle(mock_configuration())
-        decoder = typing.cast(NeedleDecoder, model.decoder)
+        decoder: NeedleDecoder = model.decoder
         encoder_input_ids = torch.tensor([[1, 2, 3, 0]])
         decoder_input_ids = torch.tensor([[1, 2]])
 
@@ -58,7 +58,7 @@ class NeedleTorchTests(unittest.TestCase):
 
     def test_forward_runs_encode_then_decode(self) -> None:
         model = Needle(mock_configuration())
-        decoder = typing.cast(NeedleDecoder, model.decoder)
+        decoder: NeedleDecoder = model.decoder
         logits = model(
             torch.tensor([[1, 2, 3, 0]]),
             torch.tensor([[1, 2]]),

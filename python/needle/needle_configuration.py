@@ -1,11 +1,8 @@
 from dataclasses import dataclass, field
-import json
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
-JSONScalar = str | int | float | bool | None
-JSONValue = JSONScalar | list["JSONValue"] | dict[str, "JSONValue"]
-JSONObject = dict[str, JSONValue]
+from .json import JSONObject, JSONScalar, JSONValue, load_json_object
 
 
 @dataclass(frozen=True)
@@ -44,8 +41,10 @@ class NeedleModelConfiguation:
         return self.max_seq_len or self.max_position_embeddings or 1024
 
     @classmethod
-    def from_file(cls, configuration_path: str | Path) -> "NeedleModelConfiguation":
-        return cls.from_json_object(_load_json_object(configuration_path))
+    def from_file(
+        cls, configuration_path: Union[str, Path]
+    ) -> "NeedleModelConfiguation":
+        return cls.from_json_object(load_json_object(configuration_path))
 
     @classmethod
     def from_json_object(cls, data: JSONObject) -> "NeedleModelConfiguation":
@@ -121,18 +120,13 @@ class NeedleModelConfiguation:
                 default=defaults.tie_word_embeddings,
             ),
             max_seq_len=_optional_int_value(data, "max_seq_len"),
-            max_position_embeddings=_optional_int_value(data, "max_position_embeddings"),
+            max_position_embeddings=_optional_int_value(
+                data, "max_position_embeddings"
+            ),
             dtype=_optional_str_value(
                 data, "dtype", "torch_dtype", default=defaults.dtype
             ),
         )
-
-
-def _load_json_object(path: str | Path) -> JSONObject:
-    payload = json.loads(Path(path).read_text())
-    if not isinstance(payload, dict):
-        raise ValueError(f"Configuration file must contain a JSON object: {path}")
-    return payload
 
 
 def _config_value(data: JSONObject, *keys: str, default: JSONValue) -> JSONValue:
@@ -142,7 +136,9 @@ def _config_value(data: JSONObject, *keys: str, default: JSONValue) -> JSONValue
     return default
 
 
-def _scalar_value(data: JSONObject, *keys: str, default: JSONScalar) -> JSONScalar:
+def _scalar_value(
+    data: JSONObject, *keys: str, default: JSONValue
+) -> JSONScalar:
     value = _config_value(data, *keys, default=default)
     if isinstance(value, (dict, list)):
         raise ValueError(f"Expected scalar config value for keys {keys}, got {value!r}")
@@ -151,26 +147,36 @@ def _scalar_value(data: JSONObject, *keys: str, default: JSONScalar) -> JSONScal
 
 def _int_value(data: JSONObject, *keys: str, default: int) -> int:
     value = _scalar_value(data, *keys, default=default)
-    return int(value) if value is not None else default
+    if value is None:
+        return default
+    return int(value)
 
 
 def _float_value(data: JSONObject, *keys: str, default: float) -> float:
     value = _scalar_value(data, *keys, default=default)
-    return float(value) if value is not None else default
+    if value is None:
+        return default
+    return float(value)
 
 
 def _bool_value(data: JSONObject, *keys: str, default: bool) -> bool:
     value = _scalar_value(data, *keys, default=default)
-    return bool(value) if value is not None else default
+    if value is None:
+        return default
+    return bool(value)
 
 
-def _optional_int_value(data: JSONObject, key: str) -> int | None:
+def _optional_int_value(data: JSONObject, key: str) -> Optional[int]:
     value = _scalar_value(data, key, default=None)
-    return None if value is None else int(value)
+    if value is None:
+        return None
+    return int(value)
 
 
 def _optional_str_value(
-    data: JSONObject, *keys: str, default: str | None
-) -> str | None:
+    data: JSONObject, *keys: str, default: Optional[str]
+) -> Optional[str]:
     value = _scalar_value(data, *keys, default=default)
-    return None if value is None else str(value)
+    if value is None:
+        return None
+    return str(value)
