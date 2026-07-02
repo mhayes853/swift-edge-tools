@@ -11,6 +11,10 @@ else
   PYTHON="python3"
 fi
 
+if ! "$PYTHON" -c 'import coreai_opt' >/dev/null 2>&1; then
+  "$PYTHON" -m pip install -e "$PYTHON_DIR"
+fi
+
 SOURCE="${1:-Cactus-Compute/needle-hf}"
 OUTPUT="${2:-$PYTHON_DIR/build/coreai-export}"
 

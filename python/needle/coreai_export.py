@@ -3,15 +3,21 @@ from __future__ import annotations
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Union
+from typing import Any, TypeAlias, Union
 
 import torch
 from coreai.authoring.asset import AIProgram
+from coreai_opt import ExportBackend
+from coreai_opt.config import CompressionConfig
+from coreai_opt.palettization import KMeansPalettizer, KMeansPalettizerConfig
+from coreai_opt.quantization import Quantizer, QuantizerConfig
 from coreai_torch import TorchConverter, get_decomp_table
 from huggingface_hub import snapshot_download
 
 from . import Needle, NeedleModelConfiguation
 from .torch_utils import load_state_dict, torch_dtype
+
+CoreAICompressionConfig: TypeAlias = CompressionConfig[Any]
 
 DEFAULT_SOURCE = "Cactus-Compute/needle-hf"
 _CONFIG_FILENAMES = ("configuration.json", "config.json")
@@ -31,6 +37,8 @@ class _ModelSourceFiles:
 def export_needle_coreai(
     source: str,
     output_directory: Union[str, Path],
+    *,
+    compression_config: CoreAICompressionConfig | None = None,
 ) -> Path:
     source_files = _resolve_model_source(source)
     configuration = _load_configuration(source_files.configuration_path)
@@ -40,7 +48,9 @@ def export_needle_coreai(
     output_directory.mkdir(parents=True, exist_ok=True)
 
     encoder_program, decoder_program = convert_needle_coreai_programs(
-        needle, configuration
+        needle,
+        configuration,
+        compression_config=compression_config,
     )
     _save_program(encoder_program, output_directory / "encoder.aimodel")
     _save_program(decoder_program, output_directory / "decoder.aimodel")
@@ -51,16 +61,23 @@ def export_needle_coreai(
 def convert_needle_coreai_programs(
     needle: Needle,
     configuration: NeedleModelConfiguation,
+    *,
+    compression_config: CoreAICompressionConfig | None = None,
 ) -> tuple[AIProgram, AIProgram]:
     encoder_sample = (
         _sample_encoder_input(configuration, _DEFAULT_ENCODER_SAMPLE_LENGTH),
     )
     decoder_sample = _sample_decoder_inputs(needle, configuration)
+    encoder_module = _prepare_module_for_coreai_export(
+        needle.encoder,
+        encoder_sample,
+        compression_config=compression_config,
+    )
 
     encoder_program = (
         TorchConverter()
         .add_pytorch_module(
-            needle.encoder,
+            encoder_module,
             export_fn=lambda module: _export_program(module, encoder_sample),
             input_names=["input_ids"],
             output_names=[
@@ -74,10 +91,15 @@ def convert_needle_coreai_programs(
     encoder_program.optimize()
 
     needle.decoder.reset()
+    decoder_module = _prepare_module_for_coreai_export(
+        needle.decoder,
+        decoder_sample,
+        compression_config=compression_config,
+    )
     decoder_program = (
         TorchConverter()
         .add_pytorch_module(
-            needle.decoder,
+            decoder_module,
             export_fn=lambda module: _export_program(module, decoder_sample),
             input_names=[
                 "input_ids",
@@ -93,6 +115,31 @@ def convert_needle_coreai_programs(
     decoder_program.optimize()
 
     return encoder_program, decoder_program
+
+
+def _prepare_module_for_coreai_export(
+    module: torch.nn.Module,
+    sample_args: tuple[torch.Tensor, ...],
+    *,
+    compression_config: CoreAICompressionConfig | None = None,
+) -> torch.nn.Module:
+    if compression_config is None:
+        return module
+
+    compressor: Any
+    if isinstance(compression_config, QuantizerConfig):
+        compressor = Quantizer(module, compression_config)
+    elif isinstance(compression_config, KMeansPalettizerConfig):
+        compressor = KMeansPalettizer(module, compression_config)
+    else:
+        raise TypeError(
+            "compression_config must be a QuantizerConfig or KMeansPalettizerConfig"
+        )
+
+    compressor.prepare(sample_args)
+    finalized_module = compressor.finalize(backend=ExportBackend.CoreAI)
+    finalized_module.eval()
+    return finalized_module
 
 
 def _resolve_model_source(source: str) -> _ModelSourceFiles:
@@ -230,9 +277,8 @@ def _export_program(
     module: torch.nn.Module,
     args: tuple[torch.Tensor, ...],
 ) -> torch.export.ExportedProgram:
-    return torch.export.export(module.eval(), args=args).run_decompositions(
-        get_decomp_table()
-    )
+    module.eval()
+    return torch.export.export(module, args=args).run_decompositions(get_decomp_table())
 
 
 def _save_program(program: AIProgram, path: Path) -> None:

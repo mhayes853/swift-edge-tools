@@ -3,6 +3,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from coreai_opt.palettization import KMeansPalettizerConfig
+from coreai_opt.quantization import QuantizerConfig
 import torch
 
 from needle import Needle, NeedleModelConfiguation
@@ -11,6 +13,19 @@ from needle.coreai_export import export_needle_coreai
 
 class CoreAIExportTests(unittest.TestCase):
     def test_export_needle_coreai_runs_end_to_end_on_local_bundle(self) -> None:
+        self._assert_export_runs_end_to_end()
+
+    def test_export_needle_coreai_supports_quantization(self) -> None:
+        self._assert_export_runs_end_to_end(
+            compression_config=QuantizerConfig.presets.w8()
+        )
+
+    def test_export_needle_coreai_supports_palettization(self) -> None:
+        self._assert_export_runs_end_to_end(
+            compression_config=KMeansPalettizerConfig.presets.w4()
+        )
+
+    def _assert_export_runs_end_to_end(self, compression_config=None) -> None:
         source_ctx = tempfile.TemporaryDirectory()
         output_ctx = tempfile.TemporaryDirectory()
         try:
@@ -45,7 +60,11 @@ class CoreAIExportTests(unittest.TestCase):
                 needle_instance.state_dict(), source_directory / "weights.pkl"
             )
 
-            result = export_needle_coreai(str(source_directory), output_directory)
+            result = export_needle_coreai(
+                str(source_directory),
+                output_directory,
+                compression_config=compression_config,
+            )
 
             self.assertEqual(result, output_directory.resolve())
             self.assertTrue((result / "encoder.aimodel").exists())
