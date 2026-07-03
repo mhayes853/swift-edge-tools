@@ -12,6 +12,10 @@ from coreai_opt.quantization import QuantizerConfig
 
 from needle import Needle, NeedleModelConfiguation
 from needle.coreai_export import export_needle_coreai
+from needle.needle_compression import (
+    CoreAIKMeansPalettizerCompressor,
+    CoreAIQuantizerCompressor,
+)
 
 
 class CoreAIExportTests(unittest.TestCase):
@@ -20,12 +24,14 @@ class CoreAIExportTests(unittest.TestCase):
 
     def test_export_needle_coreai_supports_quantization(self) -> None:
         self._assert_export_runs_end_to_end(
-            compression_config=QuantizerConfig.presets.w8()
+            compressor=CoreAIQuantizerCompressor(QuantizerConfig.presets.w8())
         )
 
     def test_export_needle_coreai_supports_palettization(self) -> None:
         self._assert_export_runs_end_to_end(
-            compression_config=KMeansPalettizerConfig.presets.w4()
+            compressor=CoreAIKMeansPalettizerCompressor(
+                KMeansPalettizerConfig.presets.w4()
+            )
         )
 
     def test_export_needle_coreai_persists_model_metadata(self) -> None:
@@ -48,7 +54,7 @@ class CoreAIExportTests(unittest.TestCase):
 
     def _assert_export_runs_end_to_end(
         self,
-        compression_config=None,
+        compressor=None,
         model_metadata: AIModelAssetMetadata | None = None,
         post_export_assertions: Callable[[Path], None] | None = None,
     ) -> None:
@@ -87,7 +93,7 @@ class CoreAIExportTests(unittest.TestCase):
             result = export_needle_coreai(
                 str(source_directory),
                 output_directory,
-                compression_config=compression_config,
+                compressor=compressor,
                 model_metadata=model_metadata,
             )
 

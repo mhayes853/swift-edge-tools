@@ -3,22 +3,17 @@ from __future__ import annotations
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, TypeAlias, Union
+from typing import Union
 
 import torch
 from coreai.authoring.asset import AIProgram
 from coreai.runtime import AIModelAssetMetadata
-from coreai_opt import ExportBackend
-from coreai_opt.config import CompressionConfig
-from coreai_opt.palettization import KMeansPalettizer, KMeansPalettizerConfig
-from coreai_opt.quantization import Quantizer, QuantizerConfig
 from coreai_torch import TorchConverter, get_decomp_table
 from huggingface_hub import snapshot_download
 
 from . import Needle, NeedleModelConfiguation
+from .needle_compression import NeedleCompressor
 from .torch_utils import load_state_dict, torch_dtype
-
-CoreAICompressionConfig: TypeAlias = CompressionConfig[Any]
 
 DEFAULT_SOURCE = "Cactus-Compute/needle-hf"
 _CONFIG_FILENAMES = ("configuration.json", "config.json")
@@ -31,7 +26,7 @@ def export_needle_coreai(
     source: str,
     output_directory: Union[str, Path],
     *,
-    compression_config: CoreAICompressionConfig | None = None,
+    compressor: NeedleCompressor | None = None,
     model_metadata: AIModelAssetMetadata | None = None,
 ) -> Path:
     source_files = _resolve_model_source(source)
@@ -44,7 +39,7 @@ def export_needle_coreai(
     encoder_program, decoder_program = convert_needle_coreai_programs(
         needle,
         configuration,
-        compression_config=compression_config,
+        compressor=compressor,
     )
     _save_program(
         encoder_program,
@@ -64,7 +59,7 @@ def convert_needle_coreai_programs(
     needle: Needle,
     configuration: NeedleModelConfiguation,
     *,
-    compression_config: CoreAICompressionConfig | None = None,
+    compressor: NeedleCompressor | None = None,
 ) -> tuple[AIProgram, AIProgram]:
     encoder_sample = (
         _sample_encoder_input(configuration, _DEFAULT_ENCODER_SAMPLE_LENGTH),
@@ -73,7 +68,7 @@ def convert_needle_coreai_programs(
     encoder_module = _prepare_module_for_coreai_export(
         needle.encoder,
         encoder_sample,
-        compression_config=compression_config,
+        compressor=compressor,
     )
 
     encoder_program = (
@@ -96,7 +91,7 @@ def convert_needle_coreai_programs(
     decoder_module = _prepare_module_for_coreai_export(
         needle.decoder,
         decoder_sample,
-        compression_config=compression_config,
+        compressor=compressor,
     )
     decoder_program = (
         TorchConverter()
@@ -123,25 +118,11 @@ def _prepare_module_for_coreai_export(
     module: torch.nn.Module,
     sample_args: tuple[torch.Tensor, ...],
     *,
-    compression_config: CoreAICompressionConfig | None = None,
+    compressor: NeedleCompressor | None = None,
 ) -> torch.nn.Module:
-    if compression_config is None:
+    if compressor is None:
         return module
-
-    compressor: Any
-    if isinstance(compression_config, QuantizerConfig):
-        compressor = Quantizer(module, compression_config)
-    elif isinstance(compression_config, KMeansPalettizerConfig):
-        compressor = KMeansPalettizer(module, compression_config)
-    else:
-        raise TypeError(
-            "compression_config must be a QuantizerConfig or KMeansPalettizerConfig"
-        )
-
-    compressor.prepare(sample_args)
-    finalized_module = compressor.finalize(backend=ExportBackend.CoreAI)
-    finalized_module.eval()
-    return finalized_module
+    return compressor.compress(module, sample_args)
 
 
 @dataclass(frozen=True)

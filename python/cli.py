@@ -13,6 +13,11 @@ from coreai.runtime import AIModelAssetMetadata
 from coreai_opt.palettization import KMeansPalettizerConfig
 from coreai_opt.quantization import QuantizerConfig
 
+from needle.coreai_compression import (
+    CoreAIKMeansPalettizerCompressor,
+    CoreAIQuantizerCompressor,
+    NeedleCompressor,
+)
 from needle.coreai_export import DEFAULT_SOURCE, export_needle_coreai
 
 _QUANTIZER_PRESETS = ("w4", "w4_per_block", "w8")
@@ -176,6 +181,17 @@ def _build_compression_config(parsed: argparse.Namespace):
     return None
 
 
+def _build_compressor(parsed: argparse.Namespace) -> NeedleCompressor | None:
+    compression_config = _build_compression_config(parsed)
+    if compression_config is None:
+        return None
+    if isinstance(compression_config, QuantizerConfig):
+        return CoreAIQuantizerCompressor(compression_config)
+    if isinstance(compression_config, KMeansPalettizerConfig):
+        return CoreAIKMeansPalettizerCompressor(compression_config)
+    raise TypeError("Unsupported compression config type")
+
+
 def _build_quantizer_config(parsed: argparse.Namespace) -> QuantizerConfig:
     if parsed.quantizer_config:
         config = _load_compression_config(parsed.quantizer_config, QuantizerConfig)
@@ -218,7 +234,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
     parser = build_parser()
     parsed = parser.parse_args(arguments)
     try:
-        compression_config = _build_compression_config(parsed)
+        compressor = _build_compressor(parsed)
         model_metadata = _build_authoring_metadata(parsed)
     except ValueError as error:
         parser.error(str(error))
@@ -227,7 +243,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
         output_directory = export_needle_coreai(
             parsed.source,
             parsed.output,
-            compression_config=compression_config,
+            compressor=compressor,
             model_metadata=model_metadata,
         )
     sys.stdout.write(f"{output_directory}\n")
