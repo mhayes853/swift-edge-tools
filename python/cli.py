@@ -13,7 +13,7 @@ from coreai.runtime import AIModelAssetMetadata
 from coreai_opt.palettization import KMeansPalettizerConfig
 from coreai_opt.quantization import QuantizerConfig
 
-from needle.coreai_compression import (
+from needle.needle_compression import (
     CoreAIKMeansPalettizerCompressor,
     CoreAIQuantizerCompressor,
     NeedleCompressor,

@@ -11,28 +11,26 @@ from coreai_opt.palettization import KMeansPalettizerConfig
 from coreai_opt.quantization import QuantizerConfig
 
 from needle import Needle, NeedleModelConfiguation
-from needle.coreai_export import export_needle_coreai
 from needle.needle_compression import (
     CoreAIKMeansPalettizerCompressor,
     CoreAIQuantizerCompressor,
 )
+from needle.coreai_export import export_needle_coreai
 
 
 class CoreAIExportTests(unittest.TestCase):
     def test_export_needle_coreai_runs_end_to_end_on_local_bundle(self) -> None:
         self._assert_export_runs_end_to_end()
 
-    def test_export_needle_coreai_supports_quantization(self) -> None:
-        self._assert_export_runs_end_to_end(
-            compressor=CoreAIQuantizerCompressor(QuantizerConfig.presets.w8())
-        )
+    def test_export_needle_coreai_supports_builtin_compressors(self) -> None:
+        compressors = [
+            CoreAIQuantizerCompressor(QuantizerConfig.presets.w8()),
+            CoreAIKMeansPalettizerCompressor(KMeansPalettizerConfig.presets.w4()),
+        ]
 
-    def test_export_needle_coreai_supports_palettization(self) -> None:
-        self._assert_export_runs_end_to_end(
-            compressor=CoreAIKMeansPalettizerCompressor(
-                KMeansPalettizerConfig.presets.w4()
-            )
-        )
+        for compressor in compressors:
+            with self.subTest(compressor=type(compressor).__name__):
+                self._assert_export_runs_end_to_end(compressor=compressor)
 
     def test_export_needle_coreai_persists_model_metadata(self) -> None:
         metadata = AIModelAssetMetadata()
