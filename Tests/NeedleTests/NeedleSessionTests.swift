@@ -911,16 +911,19 @@
 
   @Suite
   struct `Duplicate Tool Name Precondition tests` {
-    @Test
-    func `Stream With Duplicate Tool Names Causes Precondition Failure`() async {
-      await #expect(processExitsWith: .failure) {
-        let session = NeedleSession(engine: MockEngine())
-        _ = session.stream(
-          tools: [CamelCaseWeatherTool(), GetWeatherTool()],
-          with: "hi"
-        )
+    
+    #if os(macOS) || os(linux) || os(windows)
+      @Test
+      func `Stream With Duplicate Tool Names Causes Precondition Failure`() async {
+        await #expect(processExitsWith: .failure) {
+          let session = NeedleSession(engine: MockEngine())
+          _ = session.stream(
+            tools: [CamelCaseWeatherTool(), GetWeatherTool()],
+            with: "hi"
+          )
+        }
       }
-    }
+    #endif
 
     @Test
     func `Duplicate Tool Name Error`() throws {
