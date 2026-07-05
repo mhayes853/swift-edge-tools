@@ -20,7 +20,11 @@ let package = Package(
     .trait(name: "XGrammar", description: "XGrammar-powered structured generation."),
     .trait(name: "Sentencepiece", description: "Pretrained Sentencepiece tokenizer support."),
     .trait(name: "MLX", description: "MLX Engine Support.", enabledTraits: ["XGrammar"]),
-    .trait(name: "CoreAI", description: "CoreAI Engine Support.", enabledTraits: ["XGrammar"]),
+    .trait(
+      name: "CoreAI",
+      description: "CoreAI Engine Support (experimental).",
+      enabledTraits: ["XGrammar"]
+    ),
     .default(enabledTraits: ["XGrammar", "MLX", "Sentencepiece", "CoreAI"])
   ],
   dependencies: [

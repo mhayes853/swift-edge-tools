@@ -1,17 +1,17 @@
 ▿ NeedleSessionGeneration
   ▿ engineGeneration: NeedleEngineGeneration
     ▿ decodeMetrics: NeedleDecodeMetrics
-      ▿ duration: 0.683686292 seconds
-        - _low: 683686292000000000
+      ▿ duration: 0.816714959 seconds
+        - _low: 816714959000000000
         - _high: 0
-      ▿ durationToFirstToken: 0.977725417 seconds
-        - _low: 977725417000000000
+      ▿ durationToFirstToken: 1.037543791 seconds
+        - _low: 1037543791000000000
         - _high: 0
       - tokens: 42
     - metadata: 0 key/value pairs
     ▿ prefillMetrics: NeedlePrefillMetrics
-      ▿ duration: 0.291494792 seconds
-        - _low: 291494792000000000
+      ▿ duration: 0.307120708 seconds
+        - _low: 307120708000000000
         - _high: 0
       - tokens: 136
     ▿ tokens: 42 elements
@@ -147,7 +147,7 @@
       ▿ AnyNeedleToolCall
         ▿ base: NeedleToolCall<SendEmailTool>
           ▿ id: NeedleToolCallID
-            - rawValue: "07EA9339-4D16-42A1-AA9D-4511764CF2FF"
+            - rawValue: "B534AC51-76DC-4A89-BE1A-6E906CF1BB50"
           ▿ registrar: ObservationRegistrar
             ▿ extent: Extent
               ▿ context: Context

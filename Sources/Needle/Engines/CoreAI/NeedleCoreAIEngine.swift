@@ -198,6 +198,9 @@
     public convenience init(
       modelDirectoryURL: URL,
       editConfiguration: (inout NeedleModelConfiguration) -> Void = { _ in },
+      specializationOptions: SpecializationOptions = SpecializationOptions(
+        preferredComputeUnitKind: .neuralEngine
+      ),
       grammarEngine: (any Tokenizer) -> NeedleXGrammarEngine? = {
         NeedleXGrammarEngine(tokenizer: $0)
       }
@@ -213,14 +216,16 @@
       editConfiguration(&configuration)
 
       async let encoderModel = AIModel(
-        contentsOf: modelDirectoryURL.appending(path: "encoder.aimodel")
+        contentsOf: modelDirectoryURL.appending(path: "encoder.aimodel"),
+        options: specializationOptions
       )
       async let decoderModel = AIModel(
-        contentsOf: modelDirectoryURL.appending(path: "decoder.aimodel")
+        contentsOf: modelDirectoryURL.appending(path: "decoder.aimodel"),
+        options: specializationOptions
       )
-      try self.init(
-        encoderModel: try await encoderModel,
-        decoderModel: try await decoderModel,
+      try await self.init(
+        encoderModel: encoderModel,
+        decoderModel: decoderModel,
         tokenizer: tokenizer,
         configuration: configuration,
         grammarEngine: grammarEngine
