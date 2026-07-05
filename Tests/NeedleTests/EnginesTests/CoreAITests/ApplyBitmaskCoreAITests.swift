@@ -19,8 +19,8 @@
         mask[index] = false
       }
 
-      let initialLogits = NDArray(scalars: (0..<64).map(Float.init), shape: [1, 64])
-      let logits = applyBitmaskCoreAI(logits: initialLogits, mask: mask)
+      var initialLogits = NDArray(scalars: (0..<64).map(Float.init), shape: [1, 64])
+      let logits = applyBitmaskCoreAI(logits: &initialLogits, mask: mask)
       let view = logits.view(as: Float.self)
       let filtered = (0..<64)
         .compactMap { index in
