@@ -5,6 +5,7 @@
   import SnapshotTesting
   import Testing
 
+  @Suite(.serialized)
   struct `NeedleCoreAIEngine tests` {
     @Test
     @available(anyAppleOS 27.0, *)
@@ -82,7 +83,7 @@
       }
     }
 
-    @Test(.enabledIfXcode())
+    @Test
     @available(anyAppleOS 27.0, *)
     func `Generate Through NeedleSession`() async throws {
       let engine = try await makeNeedleCoreAIEngine()

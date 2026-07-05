@@ -121,7 +121,7 @@ static xgrammar::Grammar make_tool_call_grammar(const ToolDefinition& tool) {
         true,
         std::nullopt,
         false,
-        true
+        false
     );
     return xgrammar::Grammar::Concat({
         make_string_grammar("{\"name\":\"" + tool.name + "\",\"arguments\":"),

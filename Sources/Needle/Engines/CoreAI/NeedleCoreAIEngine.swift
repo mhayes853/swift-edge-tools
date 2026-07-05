@@ -138,7 +138,7 @@
             TensorName.inputIds: inputIds,
             TensorName.crossAttentionMask: encoderOutputs.crossAttentionMask,
             TensorName.encoderProjectedK: encoderOutputs.encoderProjectedK,
-            TensorName.encoderProjectedV: encoderOutputs.encoderProjectedV,
+            TensorName.encoderProjectedV: encoderOutputs.encoderProjectedV
           ],
           states: stateViews
         )
@@ -152,7 +152,7 @@
       }
 
       private static func array(from descriptor: InferenceValue.Descriptor) throws -> NDArray {
-        guard case let .ndArray(descriptor) = descriptor else {
+        guard case .ndArray(let descriptor) = descriptor else {
           throw NeedleCoreAIEngineError.missingModelStateDescriptors
         }
         return NDArray(descriptor: descriptor)
@@ -169,7 +169,7 @@
       private static func zero(_ array: inout NDArray) throws {
         let scalarCount = array.shape.reduce(1, *)
         switch array.scalarType {
-        case .bfloat16:
+        case .bfloat16, .float16:
           var rawView = array.mutableRawView()
           var view = MutableSpan<UInt16>(mutableBytes: rawView.mutableBytes)
           for index in 0..<scalarCount {
@@ -202,7 +202,9 @@
         NeedleXGrammarEngine(tokenizer: $0)
       }
     ) async throws {
-      let tokenizer = try NeedleSPTokenizer(modelURL: modelDirectoryURL.appending(path: "tokenizer.model"))
+      let tokenizer = try NeedleSPTokenizer(
+        modelURL: modelDirectoryURL.appending(path: "tokenizer.model")
+      )
       guard let grammarEngine = grammarEngine(tokenizer) else {
         throw NeedleCoreAIEngineError.failedToLoadGrammarEngine
       }
@@ -210,8 +212,12 @@
       var configuration = try Self.decodeConfiguration(from: modelDirectoryURL)
       editConfiguration(&configuration)
 
-      async let encoderModel = AIModel(contentsOf: modelDirectoryURL.appending(path: "encoder.aimodel"))
-      async let decoderModel = AIModel(contentsOf: modelDirectoryURL.appending(path: "decoder.aimodel"))
+      async let encoderModel = AIModel(
+        contentsOf: modelDirectoryURL.appending(path: "encoder.aimodel")
+      )
+      async let decoderModel = AIModel(
+        contentsOf: modelDirectoryURL.appending(path: "decoder.aimodel")
+      )
       try self.init(
         encoderModel: try await encoderModel,
         decoderModel: try await decoderModel,
@@ -454,9 +460,10 @@
         let vocabularySize = shape[2]
         let offset = stepIndex * vocabularySize
         let view = Span<UInt16>(viewing: logits.rawView().bytes)
-        let scalars = (0..<vocabularySize).map { index in
-          Self.float32(fromBFloat16Bits: view[offset + index])
-        }
+        let scalars = (0..<vocabularySize)
+          .map { index in
+            Self.float32(fromBFloat16Bits: view[offset + index])
+          }
         return NDArray(scalars: scalars, shape: [1, scalars.count])
       default:
         throw NeedleCoreAIEngineError.unsupportedLogitsScalarType(logits.scalarType)
@@ -467,7 +474,9 @@
       NDArray(scalars: tokenIds.map(Int32.init), shape: shape)
     }
 
-    private static func decodeConfiguration(from directory: URL) throws -> NeedleModelConfiguration {
+    private static func decodeConfiguration(
+      from directory: URL
+    ) throws -> NeedleModelConfiguration {
       let decoder = JSONDecoder()
       let configurationURLs = [
         directory.appending(path: "configuration.json"),
@@ -506,9 +515,10 @@
 
       public func sample(logits: NDArray) -> NeedleToken.ID {
         let view = logits.view(as: Float.self)
-        let best = (0..<logits.shape[1]).max { lhs, rhs in
-          view[scalarAt: [0, lhs]] < view[scalarAt: [0, rhs]]
-        }
+        let best = (0..<logits.shape[1])
+          .max { lhs, rhs in
+            view[scalarAt: [0, lhs]] < view[scalarAt: [0, rhs]]
+          }
         return best ?? 0
       }
     }
@@ -556,7 +566,9 @@
       Self(message: "Prompt token count (\(tokens)) exceeds the model context length (\(maximum)).")
     }
 
-    public static let missingModelOutputs = Self(message: "CoreAI model did not return expected outputs.")
+    public static let missingModelOutputs = Self(
+      message: "CoreAI model did not return expected outputs."
+    )
 
     public static let missingModelStateDescriptors = Self(
       message: "CoreAI model did not return expected state descriptors."

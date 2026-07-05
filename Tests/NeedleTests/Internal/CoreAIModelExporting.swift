@@ -9,6 +9,7 @@
       return outputDirectory
     }
 
+    print("=== Exporting Test CoreAI Model ===")
     try FileManager.default.createDirectory(
       at: outputDirectory.deletingLastPathComponent(),
       withIntermediateDirectories: true
@@ -42,6 +43,7 @@
     guard SelfCoreAIExport.filesExist(in: outputDirectory) else {
       throw CoreAIModelExportError(message: "CoreAI export did not produce the expected files.")
     }
+    print("=== Exported Test CoreAI Model Successfully ===")
     return outputDirectory
   }
 
@@ -55,10 +57,10 @@
     static func pythonDirectory() -> URL {
       let packageDirectory =
         URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent()  // Internal/
-        .deletingLastPathComponent()  // NeedleTests/
-        .deletingLastPathComponent()  // Tests/
-        .deletingLastPathComponent()  // <package>/
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
       return packageDirectory.appending(path: "python")
     }
 

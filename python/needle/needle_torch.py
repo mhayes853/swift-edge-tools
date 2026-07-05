@@ -97,7 +97,7 @@ class NeedleDecoder(nn.Module):
                 )
             ),
         )
-        self.register_buffer("cache_offset", torch.zeros((), dtype=torch.int64))
+        self.register_buffer("cache_offset", torch.zeros((), dtype=torch.int32))
 
     def reset(self) -> None:
         typing.cast(torch.Tensor, self.k_cache).zero_()
@@ -262,9 +262,12 @@ class _NeedleDecoder(nn.Module):
             max_tokens=k_cache.shape[3],
             cache_offset=next_cache_offset,
             device=x.device,
+            dtype=x.dtype,
         )
+        updated_keys: list[torch.Tensor] = []
+        updated_values: list[torch.Tensor] = []
         for index, layer in enumerate(self.layers):
-            x = layer(
+            x, updated_k, updated_v = layer(
                 x,
                 self_mask=self_mask,
                 cross_mask=cross_mask,
@@ -275,6 +278,10 @@ class _NeedleDecoder(nn.Module):
                 layer_v_cache=v_cache[index],
                 cache_offset=cache_offset,
             )
+            updated_keys.append(updated_k)
+            updated_values.append(updated_v)
+        k_cache.copy_(torch.stack(updated_keys, dim=0))
+        v_cache.copy_(torch.stack(updated_values, dim=0))
         return self.norm(x)
 
 
@@ -296,12 +303,14 @@ class _NeedleDecoderBlock(nn.Module):
         encoder_projected_k: torch.Tensor,
         encoder_projected_v: torch.Tensor,
         rope: _RoPEFrequencies,
-        layer_k_cache: torch.Tensor,
-        layer_v_cache: torch.Tensor,
-        cache_offset: torch.Tensor,
-    ) -> torch.Tensor:
+        layer_k_cache: torch.Tensor | None,
+        layer_v_cache: torch.Tensor | None,
+        cache_offset: torch.Tensor | None,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        if layer_k_cache is None or layer_v_cache is None or cache_offset is None:
+            raise ValueError("Decoder self-attention requires KV cache state.")
         self_normed = self.input_layernorm(x)
-        self_attention = self.self_attn(
+        self_attention, updated_k, updated_v = self.self_attn.forward_with_kv_cache(
             q=self_normed,
             kv=self_normed,
             mask=self_mask,
@@ -318,7 +327,11 @@ class _NeedleDecoderBlock(nn.Module):
             projected_v=encoder_projected_v,
             mask=cross_mask,
         )
-        return _gated_residual(hidden_state, self.cross_attn_gate, cross_attention)
+        return (
+            _gated_residual(hidden_state, self.cross_attn_gate, cross_attention),
+            updated_k,
+            updated_v,
+        )
 
 
 class _NeedleEncoder(nn.Module):
@@ -402,9 +415,6 @@ class _NeedleAttention(nn.Module):
         kv: torch.Tensor,
         mask: torch.Tensor | None,
         rope: _RoPEFrequencies | None = None,
-        layer_k_cache: torch.Tensor | None = None,
-        layer_v_cache: torch.Tensor | None = None,
-        cache_offset: torch.Tensor | None = None,
     ) -> torch.Tensor:
         projected_k, projected_v = self.project_kv(kv)
         if rope is not None:
@@ -415,10 +425,39 @@ class _NeedleAttention(nn.Module):
             projected_v=projected_v,
             mask=mask,
             rope=rope,
-            layer_k_cache=layer_k_cache,
-            layer_v_cache=layer_v_cache,
-            cache_offset=cache_offset,
         )
+
+    def forward_with_kv_cache(
+        self,
+        q: torch.Tensor,
+        kv: torch.Tensor,
+        mask: torch.Tensor | None,
+        rope: _RoPEFrequencies,
+        layer_k_cache: torch.Tensor,
+        layer_v_cache: torch.Tensor,
+        cache_offset: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        projected_k, projected_v = self.project_kv(kv)
+        projected_k = rope.apply(projected_k)
+        seq_len = projected_k.shape[2]
+        indices = (
+            cache_offset.to(device=projected_k.device)
+            + torch.arange(
+                seq_len,
+                device=projected_k.device,
+                dtype=cache_offset.dtype,
+            )
+        ).to(torch.long)
+        updated_k = torch.index_copy(layer_k_cache, 2, indices, projected_k)
+        updated_v = torch.index_copy(layer_v_cache, 2, indices, projected_v)
+        output = self.forward_with_projected_kv(
+            q=q,
+            projected_k=updated_k,
+            projected_v=updated_v,
+            mask=mask,
+            rope=rope,
+        )
+        return output, updated_k, updated_v
 
     def forward_with_projected_kv(
         self,
@@ -427,9 +466,6 @@ class _NeedleAttention(nn.Module):
         projected_v: torch.Tensor,
         mask: torch.Tensor | None,
         rope: _RoPEFrequencies | None = None,
-        layer_k_cache: torch.Tensor | None = None,
-        layer_v_cache: torch.Tensor | None = None,
-        cache_offset: torch.Tensor | None = None,
     ) -> torch.Tensor:
         batch, seq_len, _ = q.shape
         q = self.q_norm(
@@ -441,20 +477,8 @@ class _NeedleAttention(nn.Module):
         if rope is not None:
             q = rope.apply(q)
 
-        if (
-            layer_k_cache is not None
-            and layer_v_cache is not None
-            and cache_offset is not None
-        ):
-            keys, values = _update_kv_cache(
-                layer_k_cache,
-                layer_v_cache,
-                projected_k,
-                projected_v,
-            )
-        else:
-            keys = projected_k
-            values = projected_v
+        keys = projected_k
+        values = projected_v
 
         if self.heads != self.kv_heads:
             repeat = self.heads // self.kv_heads
@@ -531,26 +555,6 @@ def _project_logits(
     return nn.functional.linear(hidden_state, embedding_weight)
 
 
-def _update_kv_cache(
-    k_cache: torch.Tensor,
-    v_cache: torch.Tensor,
-    projected_k: torch.Tensor,
-    projected_v: torch.Tensor,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    seq_len = projected_k.shape[2]
-    start = k_cache.shape[2] - seq_len
-    updated_k = torch.roll(k_cache, shifts=-seq_len, dims=2)
-    updated_v = torch.roll(v_cache, shifts=-seq_len, dims=2)
-    updated_k = torch.ops.aten.slice_scatter.default(
-        updated_k, projected_k, 2, start, k_cache.shape[2], 1
-    )
-    updated_v = torch.ops.aten.slice_scatter.default(
-        updated_v, projected_v, 2, start, v_cache.shape[2], 1
-    )
-    k_cache.copy_(updated_k)
-    v_cache.copy_(updated_v)
-    return updated_k, updated_v
-
 
 def _next_cache_offset(
     cache_offset: torch.Tensor, query_length: int, max_tokens: int
@@ -566,15 +570,22 @@ def _decoder_self_mask(
     max_tokens: int,
     cache_offset: torch.Tensor,
     device: torch.device,
+    dtype: torch.dtype,
 ) -> torch.Tensor:
     query_positions = (
         torch.arange(query_length, device=device, dtype=cache_offset.dtype)
         + cache_offset
-        - query_length
     )
     key_positions = torch.arange(max_tokens, device=device, dtype=cache_offset.dtype)
-    valid_key_positions = key_positions >= (max_tokens - cache_offset)
-    causal_positions = query_positions[:, None] >= (
-        key_positions[None, :] - (max_tokens - cache_offset)
+    next_cache_offset = torch.minimum(
+        cache_offset
+        + torch.tensor(query_length, device=device, dtype=cache_offset.dtype),
+        torch.tensor(max_tokens, device=device, dtype=cache_offset.dtype),
     )
-    return (causal_positions & valid_key_positions[None, :])[None, None, :, :]
+    valid_key_positions = key_positions < next_cache_offset
+    causal_positions = query_positions[:, None] >= key_positions[None, :]
+    return torch.where(
+        causal_positions & valid_key_positions[None, :],
+        torch.tensor(0, device=device, dtype=dtype),
+        torch.tensor(-10000, device=device, dtype=dtype),
+    )[None, None, :, :]
