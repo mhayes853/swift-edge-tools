@@ -5,12 +5,11 @@
   import SnapshotTesting
   import Testing
 
-  @Suite(.serialized)
   struct `NeedleCoreAIEngine tests` {
     @Test
     @available(anyAppleOS 27.0, *)
     func `Generate Basics`() async throws {
-      let engine = try await sharedNeedleCoreAIEngine()
+      let engine = try await makeNeedleCoreAIEngine()
       let tokens = Lock([NeedleToken]())
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
@@ -29,7 +28,7 @@
     @Test
     @available(anyAppleOS 27.0, *)
     func `Generate Streamed Response Matches Final Response`() async throws {
-      let engine = try await sharedNeedleCoreAIEngine()
+      let engine = try await makeNeedleCoreAIEngine()
       let tokens = Lock([NeedleToken]())
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
@@ -45,7 +44,7 @@
     @Test
     @available(anyAppleOS 27.0, *)
     func `Generate Stops And Returns Stopped Generation`() async throws {
-      let engine = try await sharedNeedleCoreAIEngine()
+      let engine = try await makeNeedleCoreAIEngine()
       let tokens = Lock([NeedleToken]())
       let generationTaskBox = Lock<NeedleCoreAIEngine.GenerationTask?>(nil)
       let generationTask = try engine.generate(
@@ -68,7 +67,7 @@
     @Test
     @available(anyAppleOS 27.0, *)
     func `Generate Cancels And Throws Cancellation Error`() async throws {
-      let engine = try await sharedNeedleCoreAIEngine()
+      let engine = try await makeNeedleCoreAIEngine()
       let task = Task {
         let generationTask = try engine.generate(
           prompt: .sendAdventureEmail,
@@ -86,7 +85,7 @@
     @Test(.enabledIfXcode())
     @available(anyAppleOS 27.0, *)
     func `Generate Through NeedleSession`() async throws {
-      let engine = try await sharedNeedleCoreAIEngine()
+      let engine = try await makeNeedleCoreAIEngine()
       let session = NeedleSession(engine: engine)
       let generation = try await session.generate(
         tools: [SendEmailTool()],
@@ -108,7 +107,7 @@
     @Test
     @available(anyAppleOS 27.0, *)
     func `Generate Invokes Custom Logit Processor`() async throws {
-      let engine = try await sharedNeedleCoreAIEngine()
+      let engine = try await makeNeedleCoreAIEngine()
       let processor = CountingLogitsProcessor()
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
@@ -124,7 +123,7 @@
     @Test
     @available(anyAppleOS 27.0, *)
     func `Generate Throws When Prompt Exceeds Context Length`() async throws {
-      let engine = try await sharedNeedleCoreAIEngine()
+      let engine = try await makeNeedleCoreAIEngine()
       let prompt = NeedlePrompt(
         system: "",
         user: String(repeating: "token ", count: 2_000),
@@ -137,29 +136,6 @@
       }
       expectNoDifference(error?.message.contains("context length"), true)
     }
-  }
-
-  @available(anyAppleOS 27.0, *)
-  private actor SharedCoreAIEngine {
-    private var engine: NeedleCoreAIEngine?
-
-    func engineValue() async throws -> NeedleCoreAIEngine {
-      if let engine = self.engine {
-        engine.clearCaches()
-        return engine
-      }
-      let engine = try await makeNeedleCoreAIEngine()
-      self.engine = engine
-      return engine
-    }
-  }
-
-  @available(anyAppleOS 27.0, *)
-  private let sharedCoreAIEngine = SharedCoreAIEngine()
-
-  @available(anyAppleOS 27.0, *)
-  private func sharedNeedleCoreAIEngine() async throws -> NeedleCoreAIEngine {
-    try await sharedCoreAIEngine.engineValue()
   }
 
   @available(anyAppleOS 27.0, *)

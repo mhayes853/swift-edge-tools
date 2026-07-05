@@ -14,8 +14,7 @@
       withIntermediateDirectories: true
     )
 
-    let pythonDirectory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-      .appending(path: "python")
+    let pythonDirectory = SelfCoreAIExport.pythonDirectory()
     let pythonExecutable = SelfCoreAIExport.pythonExecutable(in: pythonDirectory)
 
     let process = Process()
@@ -53,6 +52,16 @@
   }
 
   private enum SelfCoreAIExport {
+    static func pythonDirectory() -> URL {
+      let packageDirectory =
+        URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()  // Internal/
+        .deletingLastPathComponent()  // NeedleTests/
+        .deletingLastPathComponent()  // Tests/
+        .deletingLastPathComponent()  // <package>/
+      return packageDirectory.appending(path: "python")
+    }
+
     static func filesExist(in directory: URL) -> Bool {
       let fileManager = FileManager.default
       return [
