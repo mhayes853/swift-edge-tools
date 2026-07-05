@@ -83,103 +83,6 @@
       let encoderProjectedV: NDArray
     }
 
-    private actor DecoderState {
-      private var keyCache: NDArray?
-      private var valueCache: NDArray?
-      private var cacheOffset: NDArray?
-
-      init(descriptor: InferenceFunctionDescriptor) throws {
-        guard let keyCacheDescriptor = descriptor.stateDescriptor(of: TensorName.keyCache),
-          let valueCacheDescriptor = descriptor.stateDescriptor(of: TensorName.valueCache),
-          let cacheOffsetDescriptor = descriptor.stateDescriptor(of: TensorName.cacheOffset)
-        else {
-          throw NeedleCoreAIEngineError.missingModelStateDescriptors
-        }
-        self.keyCache = try Self.array(from: keyCacheDescriptor)
-        self.valueCache = try Self.array(from: valueCacheDescriptor)
-        self.cacheOffset = try Self.array(from: cacheOffsetDescriptor)
-      }
-
-      func reset() throws {
-        guard var keyCache = self.keyCache,
-          var valueCache = self.valueCache,
-          var cacheOffset = self.cacheOffset
-        else {
-          throw NeedleCoreAIEngineError.missingModelStateDescriptors
-        }
-        try Self.zero(&keyCache)
-        try Self.zero(&valueCache)
-        try Self.zeroCacheOffset(&cacheOffset)
-        self.keyCache = keyCache
-        self.valueCache = valueCache
-        self.cacheOffset = cacheOffset
-      }
-
-      func logits(
-        function: InferenceFunction,
-        inputIds: NDArray,
-        encoderOutputs: EncoderOutputs
-      ) async throws -> NDArray {
-        guard var keyCache, var valueCache, var cacheOffset else {
-          throw NeedleCoreAIEngineError.missingModelStateDescriptors
-        }
-
-        var stateViews = InferenceFunction.MutableViews()
-        stateViews.insert(&keyCache, for: TensorName.keyCache)
-        stateViews.insert(&valueCache, for: TensorName.valueCache)
-        stateViews.insert(&cacheOffset, for: TensorName.cacheOffset)
-
-        var outputs = try await function.run(
-          inputs: [
-            TensorName.inputIds: inputIds,
-            TensorName.crossAttentionMask: encoderOutputs.crossAttentionMask,
-            TensorName.encoderProjectedK: encoderOutputs.encoderProjectedK,
-            TensorName.encoderProjectedV: encoderOutputs.encoderProjectedV
-          ],
-          states: stateViews
-        )
-        self.keyCache = keyCache
-        self.valueCache = valueCache
-        self.cacheOffset = cacheOffset
-        guard let logits = outputs.remove(TensorName.logits)?.ndArray else {
-          throw NeedleCoreAIEngineError.missingModelOutputs
-        }
-        return logits
-      }
-
-      private static func array(from descriptor: InferenceValue.Descriptor) throws -> NDArray {
-        guard case .ndArray(let descriptor) = descriptor else {
-          throw NeedleCoreAIEngineError.missingModelStateDescriptors
-        }
-        return NDArray(descriptor: descriptor)
-      }
-
-      private static func zeroCacheOffset(_ array: inout NDArray) throws {
-        guard array.scalarType == .int32 else {
-          throw NeedleCoreAIEngineError.unsupportedStateScalarType(array.scalarType)
-        }
-        var view = array.mutableView(as: Int32.self)
-        view.copyElements(fromContentsOf: [0])
-      }
-
-      private static func zero(_ array: inout NDArray) throws {
-        let scalarCount = array.shape.reduce(1, *)
-        switch array.scalarType {
-        case .bfloat16, .float16:
-          var rawView = array.mutableRawView()
-          var view = MutableSpan<UInt16>(mutableBytes: rawView.mutableBytes)
-          for index in 0..<scalarCount {
-            view[index] = 0
-          }
-        case .int32:
-          var view = array.mutableView(as: Int32.self)
-          view.copyElements(fromContentsOf: repeatElement(0, count: scalarCount))
-        default:
-          throw NeedleCoreAIEngineError.unsupportedStateScalarType(array.scalarType)
-        }
-      }
-    }
-
     private let state: Lock<State>
     private let configuration: NeedleModelConfiguration
     private let encoderFunction: InferenceFunction
@@ -319,7 +222,7 @@
 
       var processor = parameters.processor
       let generateStart = self.clock.now
-      let (encoderOutputs, promptArray, prefillMetrics) = try await self.prefill(
+      let (encoderOutputs, prefillMetrics) = try await self.prefill(
         prompt: prompt,
         configuration: configuration,
         processor: &processor
@@ -366,7 +269,6 @@
       }
 
       let finalDurationToFirstToken = durationToFirstToken ?? .zero
-      _ = promptArray
       var metadata = NeedleMetadata()
       metadata.generationConfidence = confidence.mean
       metadata.perTokenConfidences = confidence.perTokenConfidences
@@ -387,7 +289,7 @@
       prompt: NeedlePrompt,
       configuration: NeedleModelConfiguration,
       processor: inout (any LogitsProcessor)?
-    ) async throws -> (EncoderOutputs, NDArray, NeedlePrefillMetrics) {
+    ) async throws -> (EncoderOutputs, NeedlePrefillMetrics) {
       let promptTokens = self._tokenizer.encode(text: prompt.formatted())
       guard promptTokens.count <= configuration.encoderMaxLength else {
         throw NeedleCoreAIEngineError.contextLengthExceeded(
@@ -404,7 +306,7 @@
         tokens: promptTokens.count,
         duration: prefillStart.duration(to: self.clock.now)
       )
-      return (encoderOutputs, promptArray, metrics)
+      return (encoderOutputs, metrics)
     }
 
     private func encode(promptTokens: [NeedleToken.ID]) async throws -> EncoderOutputs {
@@ -467,10 +369,7 @@
         let vocabularySize = shape[2]
         let offset = stepIndex * vocabularySize
         let view = Span<UInt16>(viewing: logits.rawView().bytes)
-        let scalars = (0..<vocabularySize)
-          .map { index in
-            Self.float32(fromBFloat16Bits: view[offset + index])
-          }
+        let scalars = (0..<vocabularySize).map { Float(bfloat16Bits: view[offset + $0]) }
         return NDArray(scalars: scalars, shape: [1, scalars.count])
       default:
         throw NeedleCoreAIEngineError.unsupportedLogitsScalarType(logits.scalarType)
@@ -484,15 +383,10 @@
     private static func decodeConfiguration(
       from directory: URL
     ) throws -> NeedleModelConfiguration {
-      let decoder = JSONDecoder()
-      let configurationURLs = [
-        directory.appending(path: "configuration.json"),
-        directory.appending(path: "config.json")
-      ]
-      for url in configurationURLs where FileManager.default.fileExists(atPath: url.path()) {
-        return try decoder.decode(NeedleModelConfiguration.self, from: Data(contentsOf: url))
+      guard let config = try NeedleModelConfiguration.decode(in: directory) else {
+        throw NeedleCoreAIEngineError.failedToLoadConfiguration
       }
-      throw NeedleCoreAIEngineError.failedToLoadConfiguration
+      return config
     }
 
     private static func loadFunction(
@@ -504,9 +398,82 @@
       }
       return function
     }
+  }
 
-    private static func float32(fromBFloat16Bits bits: UInt16) -> Float {
-      Float(bitPattern: UInt32(bits) << 16)
+  // MARK: - DecoderState
+
+  @available(anyAppleOS 27.0, *)
+  extension NeedleCoreAIEngine {
+    private actor DecoderState {
+      private var keyCache: NDArray
+      private var valueCache: NDArray
+      private var cacheOffset: NDArray
+
+      init(descriptor: InferenceFunctionDescriptor) throws {
+        guard
+          let keyCacheDescriptor = descriptor.stateDescriptor(of: TensorName.keyCache),
+          let valueCacheDescriptor = descriptor.stateDescriptor(of: TensorName.valueCache),
+          let cacheOffsetDescriptor = descriptor.stateDescriptor(of: TensorName.cacheOffset)
+        else {
+          throw NeedleCoreAIEngineError.missingModelStateDescriptors
+        }
+        self.keyCache = try Self.array(from: keyCacheDescriptor)
+        self.valueCache = try Self.array(from: valueCacheDescriptor)
+        self.cacheOffset = try Self.array(from: cacheOffsetDescriptor)
+      }
+
+      func reset() throws {
+        try Self.zero(&self.keyCache)
+        try Self.zero(&self.valueCache)
+        var cacheOffset = self.cacheOffset.mutableView(as: Int32.self)
+        cacheOffset.copyElements(fromContentsOf: [0])
+      }
+
+      func logits(
+        function: InferenceFunction,
+        inputIds: NDArray,
+        encoderOutputs: EncoderOutputs
+      ) async throws -> NDArray {
+        var stateViews = InferenceFunction.MutableViews()
+        stateViews.insert(&self.keyCache, for: TensorName.keyCache)
+        stateViews.insert(&self.valueCache, for: TensorName.valueCache)
+        stateViews.insert(&self.cacheOffset, for: TensorName.cacheOffset)
+
+        var outputs = try await function.run(
+          inputs: [
+            TensorName.inputIds: inputIds,
+            TensorName.crossAttentionMask: encoderOutputs.crossAttentionMask,
+            TensorName.encoderProjectedK: encoderOutputs.encoderProjectedK,
+            TensorName.encoderProjectedV: encoderOutputs.encoderProjectedV
+          ],
+          states: stateViews
+        )
+        guard let logits = outputs.remove(TensorName.logits)?.ndArray else {
+          throw NeedleCoreAIEngineError.missingModelOutputs
+        }
+        return logits
+      }
+
+      private static func array(from descriptor: InferenceValue.Descriptor) throws -> NDArray {
+        guard case .ndArray(let descriptor) = descriptor else {
+          throw NeedleCoreAIEngineError.missingModelStateDescriptors
+        }
+        return NDArray(descriptor: descriptor)
+      }
+
+      private static func zero(_ array: inout NDArray) throws {
+        let scalarCount = array.shape.reduce(1, *)
+        switch array.scalarType {
+        case .bfloat16:
+          var rawView = array.mutableRawView()
+          var view = MutableSpan<UInt16>(mutableBytes: rawView.mutableBytes)
+          for index in 0..<scalarCount {
+            view[index] = 0
+          }
+        default:
+          throw NeedleCoreAIEngineError.unsupportedStateScalarType(array.scalarType)
+        }
+      }
     }
   }
 

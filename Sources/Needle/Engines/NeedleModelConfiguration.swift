@@ -1,3 +1,5 @@
+import Foundation
+
 // MARK: - NeedleModelConfiguration
 
 public struct NeedleModelConfiguration: Hashable, Sendable {
@@ -56,5 +58,20 @@ extension NeedleModelConfiguration: Codable {
     case maxSeqLen = "max_seq_len"
     case maxPositionEmbeddings = "max_position_embeddings"
     case _dtype = "dtype"
+  }
+}
+
+// MARK: - Loading
+
+extension NeedleModelConfiguration {
+  static func decode(in directory: URL, decoder: JSONDecoder = JSONDecoder()) throws -> Self? {
+    let configurationURLs = [
+      directory.appending(path: "configuration.json"),
+      directory.appending(path: "config.json")
+    ]
+    for url in configurationURLs where FileManager.default.fileExists(atPath: url.path()) {
+      return try decoder.decode(Self.self, from: Data(contentsOf: url))
+    }
+    return nil
   }
 }

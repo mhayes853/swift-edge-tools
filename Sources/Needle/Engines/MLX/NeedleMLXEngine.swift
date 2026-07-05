@@ -99,11 +99,9 @@
       let grammarEngine = grammarEngine(tokenizer)
       guard let grammarEngine else { throw NeedleMLXEngineError.failedToLoadGrammarEngine }
 
-      var configuration = try JSONDecoder()
-        .decode(
-          NeedleModelConfiguration.self,
-          from: Data(contentsOf: url.appending(path: "config.json"))
-        )
+      guard var configuration = try NeedleModelConfiguration.decode(in: url) else {
+        throw NeedleMLXEngineError.failedToLoadConfiguration
+      }
       editConfiguration(&configuration)
       let model = NeedleMLXModel(configuration: configuration)
       try model.loadWeights(from: url.appending(path: "model.safetensors"))
@@ -282,7 +280,6 @@
     }
   }
 
-
   // MARK: - Synchronized Memory Snapshot
 
   extension Memory {
@@ -300,6 +297,10 @@
     public let message: String
 
     public static let failedToLoadGrammarEngine = Self(message: "Could not load grammar engine.")
+
+    public static let failedToLoadConfiguration = Self(
+      message: "Could not load model configuration."
+    )
 
     public static func grammarRejectedToken(token: NeedleToken) -> Self {
       Self(
