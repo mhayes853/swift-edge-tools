@@ -1,0 +1,26 @@
+▿ NeedleEngineGeneration
+  ▿ decodeMetrics: NeedleDecodeMetrics
+    ▿ duration: 0.037929042 seconds
+      - _low: 37929042000000000
+      - _high: 0
+    ▿ durationToFirstToken: 1.126621833 seconds
+      - _low: 1126621833000000000
+      - _high: 0
+    - tokens: 3
+  - metadata: 0 key/value pairs
+  ▿ prefillMetrics: NeedlePrefillMetrics
+    ▿ duration: 0.362221125 seconds
+      - _low: 362221125000000000
+      - _high: 0
+    - tokens: 132
+  ▿ tokens: 3 elements
+    ▿ NeedleToken
+      - id: 4
+      - stringValue: "<tool_call>"
+    ▿ NeedleToken
+      - id: 809
+      - stringValue: " []"
+    ▿ NeedleToken
+      - id: 1
+      - stringValue: ""
+  - wasStopped: false

@@ -3,7 +3,7 @@ from __future__ import annotations
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Union
+from typing import Any, Union
 
 import torch
 from coreai.authoring.asset import AIProgram
@@ -65,17 +65,23 @@ def convert_needle_coreai_programs(
         _sample_encoder_input(configuration, _DEFAULT_ENCODER_SAMPLE_LENGTH),
     )
     decoder_sample = _sample_decoder_inputs(needle, configuration)
+    encoder_dynamic_shapes = _encoder_dynamic_shapes(configuration)
     encoder_module = _prepare_module_for_coreai_export(
         needle.encoder,
         encoder_sample,
         compressor=compressor,
+        dynamic_shapes=encoder_dynamic_shapes,
     )
 
     encoder_program = (
         TorchConverter()
         .add_pytorch_module(
             encoder_module,
-            export_fn=lambda module: _export_program(module, encoder_sample),
+            export_fn=lambda module: _export_program(
+                module,
+                encoder_sample,
+                dynamic_shapes=encoder_dynamic_shapes,
+            ),
             input_names=["input_ids"],
             output_names=[
                 "cross_attention_mask",
@@ -88,16 +94,22 @@ def convert_needle_coreai_programs(
     encoder_program.optimize()
 
     needle.decoder.reset()
+    decoder_dynamic_shapes = _decoder_dynamic_shapes()
     decoder_module = _prepare_module_for_coreai_export(
         needle.decoder,
         decoder_sample,
         compressor=compressor,
+        dynamic_shapes=decoder_dynamic_shapes,
     )
     decoder_program = (
         TorchConverter()
         .add_pytorch_module(
             decoder_module,
-            export_fn=lambda module: _export_program(module, decoder_sample),
+            export_fn=lambda module: _export_program(
+                module,
+                decoder_sample,
+                dynamic_shapes=decoder_dynamic_shapes,
+            ),
             input_names=[
                 "input_ids",
                 "cross_attention_mask",
@@ -119,10 +131,15 @@ def _prepare_module_for_coreai_export(
     sample_args: tuple[torch.Tensor, ...],
     *,
     compressor: NeedleCompressor | None = None,
+    dynamic_shapes: dict[str, Any] | tuple[Any, ...] | list[Any] | None = None,
 ) -> torch.nn.Module:
     if compressor is None:
         return module
-    return compressor.compress(module, sample_args)
+    return compressor.compress(
+        module,
+        sample_args,
+        dynamic_shapes=dynamic_shapes,
+    )
 
 
 @dataclass(frozen=True)
@@ -264,12 +281,52 @@ def _sample_decoder_inputs(
     )
 
 
+def _encoder_dynamic_shapes(
+    configuration: NeedleModelConfiguation,
+) -> tuple[dict[int, Any], ...]:
+    _ = configuration
+    return ({0: torch.export.Dim.STATIC, 1: torch.export.Dim.AUTO},)
+
+
+def _decoder_dynamic_shapes() -> tuple[dict[int, Any], ...]:
+    return (
+        {0: torch.export.Dim.STATIC, 1: torch.export.Dim.STATIC},
+        {
+            0: torch.export.Dim.STATIC,
+            1: torch.export.Dim.STATIC,
+            2: torch.export.Dim.STATIC,
+            3: torch.export.Dim.AUTO,
+        },
+        {
+            0: torch.export.Dim.STATIC,
+            1: torch.export.Dim.STATIC,
+            2: torch.export.Dim.STATIC,
+            3: torch.export.Dim.AUTO,
+            4: torch.export.Dim.STATIC,
+        },
+        {
+            0: torch.export.Dim.STATIC,
+            1: torch.export.Dim.STATIC,
+            2: torch.export.Dim.STATIC,
+            3: torch.export.Dim.AUTO,
+            4: torch.export.Dim.STATIC,
+        },
+    )
+
+
 def _export_program(
     module: torch.nn.Module,
     args: tuple[torch.Tensor, ...],
+    *,
+    dynamic_shapes: dict[str, Any] | tuple[Any, ...] | list[Any] | None = None,
 ) -> torch.export.ExportedProgram:
     module.eval()
-    return torch.export.export(module, args=args).run_decompositions(get_decomp_table())
+    return torch.export.export(
+        module,
+        args=args,
+        dynamic_shapes=dynamic_shapes,
+        strict=False,
+    ).run_decompositions(get_decomp_table())
 
 
 def _save_program(

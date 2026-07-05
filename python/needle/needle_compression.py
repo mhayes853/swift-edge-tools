@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol, cast
+from typing import Any, Protocol, cast
 
 import torch
 from coreai_opt import ExportBackend
@@ -14,6 +14,8 @@ class NeedleCompressor(Protocol):
         self,
         module: torch.nn.Module,
         sample_args: tuple[torch.Tensor, ...],
+        *,
+        dynamic_shapes: dict[str, Any] | tuple[Any, ...] | list[Any] | None = None,
     ) -> torch.nn.Module: ...
 
 
@@ -25,9 +27,11 @@ class CoreAIQuantizerCompressor:
         self,
         module: torch.nn.Module,
         sample_args: tuple[torch.Tensor, ...],
+        *,
+        dynamic_shapes: dict[str, Any] | tuple[Any, ...] | list[Any] | None = None,
     ) -> torch.nn.Module:
         quantizer = Quantizer(module, self.config)
-        quantizer.prepare(sample_args)
+        quantizer.prepare(sample_args, dynamic_shapes=dynamic_shapes)
         finalized_module = quantizer.finalize(backend=ExportBackend.CoreAI)
         finalized_module.eval()
         return finalized_module
@@ -41,6 +45,8 @@ class CoreAIKMeansPalettizerCompressor:
         self,
         module: torch.nn.Module,
         sample_args: tuple[torch.Tensor, ...],
+        *,
+        dynamic_shapes: dict[str, Any] | tuple[Any, ...] | list[Any] | None = None,
     ) -> torch.nn.Module:
         palettizer = KMeansPalettizer(module, self.config)
         palettizer.prepare(cast(tuple[torch.Tensor], sample_args))

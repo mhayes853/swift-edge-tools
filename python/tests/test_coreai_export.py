@@ -15,12 +15,67 @@ from needle.needle_compression import (
     CoreAIKMeansPalettizerCompressor,
     CoreAIQuantizerCompressor,
 )
-from needle.coreai_export import export_needle_coreai
+from needle.coreai_export import (
+    _encoder_dynamic_shapes,
+    _export_program,
+    _load_needle_model,
+    _sample_encoder_input,
+    export_needle_coreai,
+)
 
 
 class CoreAIExportTests(unittest.TestCase):
     def test_export_needle_coreai_runs_end_to_end_on_local_bundle(self) -> None:
         self._assert_export_runs_end_to_end()
+
+    def test_export_program_supports_dynamic_encoder_sequence_length(self) -> None:
+        configuration = NeedleModelConfiguation(
+            vocabulary_size=16,
+            dimensions=8,
+            hidden_dimensions=8,
+            attention_heads=2,
+            kv_heads=1,
+            encoder_layers=1,
+            decoder_layers=1,
+            hidden_layers=1,
+            max_seq_len=32,
+            dtype="float32",
+        )
+        needle = Needle(configuration)
+        sample = (_sample_encoder_input(configuration, 4),)
+
+        exported_program = _export_program(
+            needle.encoder,
+            sample,
+            dynamic_shapes=_encoder_dynamic_shapes(configuration),
+        )
+
+        self.assertEqual(len(exported_program.range_constraints), 1)
+
+    def test_load_needle_model_uses_configuration_dtype(self) -> None:
+        source_ctx = tempfile.TemporaryDirectory()
+        try:
+            source_directory = Path(source_ctx.name)
+            configuration = NeedleModelConfiguation(
+                vocabulary_size=16,
+                dimensions=8,
+                hidden_dimensions=8,
+                attention_heads=2,
+                kv_heads=1,
+                encoder_layers=1,
+                decoder_layers=1,
+                hidden_layers=1,
+                max_seq_len=32,
+                dtype="bfloat16",
+            )
+            needle = Needle(configuration)
+            torch.save(needle.state_dict(), source_directory / "weights.pkl")
+
+            loaded = _load_needle_model(configuration, source_directory / "weights.pkl")
+
+            self.assertEqual(next(loaded.parameters()).dtype, torch.bfloat16)
+        finally:
+            source_ctx.cleanup()
 
     def test_export_needle_coreai_supports_builtin_compressors(self) -> None:
         compressors = [

@@ -45,7 +45,7 @@ let package = Package(
         .product(
           name: "Tokenizers",
           package: "swift-transformers",
-          condition: .when(traits: ["MLX"])
+          condition: .when(traits: ["MLX", "CoreAI"])
         ),
         .product(
           name: "Hub",
