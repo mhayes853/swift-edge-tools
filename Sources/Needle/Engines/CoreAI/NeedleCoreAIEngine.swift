@@ -44,9 +44,8 @@
       public init(
         sampler: any Sampler = ArgmaxSampler(),
         processor: (any LogitsProcessor)? = nil,
-        toolCallInvocationRange: NeedleXGrammarEngine.ToolCallInvocationRange = .unbounded(
-          minimum: 0
-        ),
+        toolCallInvocationRange: NeedleXGrammarEngine.ToolCallInvocationRange =
+          .unbounded(minimum: 0),
         maxTokens: Int? = 1024
       ) {
         self.sampler = sampler
@@ -121,10 +120,7 @@
         inputIds: NDArray,
         encoderOutputs: EncoderOutputs
       ) async throws -> NDArray {
-        guard var keyCache = self.keyCache,
-          var valueCache = self.valueCache,
-          var cacheOffset = self.cacheOffset
-        else {
+        guard var keyCache, var valueCache, var cacheOffset else {
           throw NeedleCoreAIEngineError.missingModelStateDescriptors
         }
 
@@ -335,6 +331,7 @@
       var nextDecoderTokenId = configuration.decoderStartTokenId
       var detokenizer = StreamingDetokenizer(tokenizer: self._tokenizer)
       var generatedTokens = [NeedleToken]()
+      var confidence = NeedleConfidenceState()
       var durationToFirstToken: Duration?
 
       while !matcher.isTerminated
@@ -351,7 +348,8 @@
         var logits = try self.stepLogits(from: decoderLogits)
         let processedLogits = processor?.process(logits: &logits) ?? logits
         var maskedLogits = processedLogits
-        _ = applyBitmaskCoreAI(logits: &maskedLogits, mask: matcher.bitmask())
+        applyBitmaskCoreAI(logits: &maskedLogits, mask: matcher.bitmask())
+        try confidence.add(logits: maskedLogits)
 
         let tokenId = parameters.sampler.sample(logits: maskedLogits)
         durationToFirstToken = durationToFirstToken ?? generateStart.duration(to: self.clock.now)
@@ -369,6 +367,9 @@
 
       let finalDurationToFirstToken = durationToFirstToken ?? .zero
       _ = promptArray
+      var metadata = NeedleMetadata()
+      metadata.generationConfidence = confidence.mean
+      metadata.perTokenConfidences = confidence.perTokenConfidences
       return NeedleEngineGeneration(
         prefillMetrics: prefillMetrics,
         decodeMetrics: NeedleDecodeMetrics(
@@ -377,7 +378,8 @@
           durationToFirstToken: finalDurationToFirstToken
         ),
         wasStopped: isStopped.load(ordering: .relaxed),
-        tokens: generatedTokens
+        tokens: generatedTokens,
+        metadata: metadata
       )
     }
 
@@ -493,9 +495,10 @@
       throw NeedleCoreAIEngineError.failedToLoadConfiguration
     }
 
-    private static func loadFunction(named name: String, from model: AIModel) throws
-      -> InferenceFunction
-    {
+    private static func loadFunction(
+      named name: String,
+      from model: AIModel
+    ) throws -> InferenceFunction {
       guard let function = try model.loadFunction(named: name) else {
         throw NeedleCoreAIEngineError.failedToLoadFunction(name: name)
       }

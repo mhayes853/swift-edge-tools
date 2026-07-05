@@ -1,20 +1,38 @@
 ▿ 5 key/value pairs
   ▿ (2 elements)
     ▿ key: NeedleMetadataKey
-      - rawValue: "MLXEngineGenerationConfidence"
+      - rawValue: "GenerationConfidence"
     - value: 0.9101301
   ▿ (2 elements)
     ▿ key: NeedleMetadataKey
       - rawValue: "MLXEngineGenerationStartMemorySnapshot"
-    ▿ value: Peak:   99M          (104297920)
+    ▿ value: Peak:   104M         (109816138)
 Active: 0K           (568)
-Cache:  126M         (132346044)
+Cache:  134M         (140916108)
       - activeMemory: 568
-      - cacheMemory: 132346044
-      - peakMemory: 104297920
+      - cacheMemory: 140916108
+      - peakMemory: 109816138
   ▿ (2 elements)
     ▿ key: NeedleMetadataKey
-      - rawValue: "MLXEnginePerTokenConfidences"
+      - rawValue: "MLXEnginePostDecodeMemorySnapshot"
+    ▿ value: Peak:   104M         (109816138)
+Active: 64M          (67787016)
+Cache:  77M          (81518268)
+      - activeMemory: 67787016
+      - cacheMemory: 81518268
+      - peakMemory: 109816138
+  ▿ (2 elements)
+    ▿ key: NeedleMetadataKey
+      - rawValue: "MLXEnginePostPrefillMemorySnapshot"
+    ▿ value: Peak:   104M         (109816138)
+Active: 53M          (56418444)
+Cache:  80M          (84498232)
+      - activeMemory: 56418444
+      - cacheMemory: 84498232
+      - peakMemory: 109816138
+  ▿ (2 elements)
+    ▿ key: NeedleMetadataKey
+      - rawValue: "PerTokenConfidences"
     ▿ value: 57 elements
       - 1.0
       - 0.9499494
@@ -73,21 +91,3 @@ Cache:  126M         (132346044)
       - 0.99851304
       - 0.9994234
       - 1.0
-  ▿ (2 elements)
-    ▿ key: NeedleMetadataKey
-      - rawValue: "MLXEnginePostDecodeMemorySnapshot"
-    ▿ value: Peak:   115M         (121610052)
-Active: 64M          (67754248)
-Cache:  73M          (77183478)
-      - activeMemory: 67754248
-      - cacheMemory: 77183478
-      - peakMemory: 121610052
-  ▿ (2 elements)
-    ▿ key: NeedleMetadataKey
-      - rawValue: "MLXEnginePostPrefillMemorySnapshot"
-    ▿ value: Peak:   99M          (104297920)
-Active: 53M          (56385676)
-Cache:  72M          (75960946)
-      - activeMemory: 56385676
-      - cacheMemory: 75960946
-      - peakMemory: 104297920

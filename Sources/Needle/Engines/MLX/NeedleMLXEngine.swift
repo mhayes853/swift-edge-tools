@@ -195,7 +195,7 @@
 
       var detokenizer = StreamingDetokenizer(tokenizer: self._tokenizer)
       var generatedTokens = [NeedleToken]()
-      var confidence = NeedleMLXConfidenceState()
+      var confidence = NeedleConfidenceState()
       while !matcher.isTerminated
         && !isStopped.load(ordering: .relaxed)
         && detokenizer.tokenIds.count < (parameters.maxTokens ?? .max)
@@ -240,8 +240,8 @@
       metadata.mlxEngineGenerationStartMemorySnapshot = generationStartSnapshot
       metadata.mlxEnginePostPrefillMemorySnapshot = postPrefillSnapshot
       metadata.mlxEnginePostDecodeMemorySnapshot = postDecodeSnapshot
-      metadata.mlxEngineGenerationConfidence = confidence.mean
-      metadata.mlxEnginePerTokenConfidences = confidence.perTokenConfidences
+      metadata.generationConfidence = confidence.mean
+      metadata.perTokenConfidences = confidence.perTokenConfidences
       return NeedleEngineGeneration(
         prefillMetrics: prefillMetrics,
         decodeMetrics: NeedleDecodeMetrics(

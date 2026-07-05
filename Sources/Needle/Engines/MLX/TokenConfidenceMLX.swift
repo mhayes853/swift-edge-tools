@@ -2,22 +2,11 @@
   import Foundation
   import MLX
 
-  // MARK: - ConfidenceState
+  // MARK: - NeedleConfidenceState (MLX)
 
-  struct NeedleMLXConfidenceState {
-    private(set) var perTokenConfidences = [Float]()
-    private var totalSum: Float = 0
-
-    var mean: Float? {
-      !self.perTokenConfidences.isEmpty
-        ? self.totalSum / Float(self.perTokenConfidences.count)
-        : nil
-    }
-
+  extension NeedleConfidenceState {
     mutating func add(logits: MLXArray) {
-      let confidence = tokenConfidenceMLX(logits: logits)
-      self.perTokenConfidences.append(confidence)
-      self.totalSum += confidence
+      self.add(confidence: tokenConfidenceMLX(logits: logits))
     }
   }
 
