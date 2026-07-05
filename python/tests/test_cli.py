@@ -12,7 +12,6 @@ import torch
 import yaml
 from coreai.authoring.asset import AIModelAsset
 from coreai.runtime import AIModelAssetMetadata
-from coreai_opt.palettization import KMeansPalettizerConfig
 from coreai_opt.quantization import QuantizerConfig
 
 from cli import (
@@ -150,37 +149,6 @@ class CLITests(unittest.TestCase):
         finally:
             directory_ctx.cleanup()
 
-    def test_build_compression_config_supports_palettizer_input(self) -> None:
-        directory_ctx = tempfile.TemporaryDirectory()
-        try:
-            directory = Path(directory_ctx.name)
-            config_path = directory / "palettizer.json"
-            config_path.write_text(
-                json.dumps(
-                    {
-                        "kmeans_palettization_config": {
-                            "global_config": {
-                                "rounding_precision": 6,
-                            }
-                        }
-                    }
-                )
-            )
-
-            parsed = parse_arguments(
-                [
-                    "--output",
-                    str(directory / "out"),
-                    "--palettizer-config",
-                    str(config_path),
-                ]
-            )
-            config = self._unwrap_palettizer_config(_build_compression_config(parsed))
-            global_config = self._unwrap_value(config.global_config)
-            self.assertEqual(global_config.rounding_precision, 6)
-        finally:
-            directory_ctx.cleanup()
-
     def test_main_persists_authoring_metadata(self) -> None:
         source_ctx = tempfile.TemporaryDirectory()
         output_ctx = tempfile.TemporaryDirectory()
@@ -250,19 +218,6 @@ class CLITests(unittest.TestCase):
             output_ctx.cleanup()
             source_ctx.cleanup()
 
-    def test_main_rejects_quantizer_and_palettizer_options_together(self) -> None:
-        with self.assertRaises(SystemExit):
-            main(
-                [
-                    "--output",
-                    "/tmp/out",
-                    "--quantizer-preset",
-                    "w8",
-                    "--palettizer-preset",
-                    "w4",
-                ]
-            )
-
     def _custom_metadata(self, metadata: AIModelAssetMetadata) -> dict[str, str]:
         return cast(dict[str, str], getattr(metadata, "creator_defined_metadata"))
 
@@ -275,10 +230,6 @@ class CLITests(unittest.TestCase):
     def _unwrap_quantizer_config(self, config: object) -> QuantizerConfig:
         self.assertIsInstance(config, QuantizerConfig)
         return cast(QuantizerConfig, config)
-
-    def _unwrap_palettizer_config(self, config: object) -> KMeansPalettizerConfig:
-        self.assertIsInstance(config, KMeansPalettizerConfig)
-        return cast(KMeansPalettizerConfig, config)
 
     def _unwrap_value(self, value: _T | None) -> _T:
         self.assertIsNotNone(value)

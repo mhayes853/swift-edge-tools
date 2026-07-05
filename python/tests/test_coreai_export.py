@@ -7,14 +7,10 @@ from typing import Callable, cast
 import torch
 from coreai.authoring.asset import AIModelAsset
 from coreai.runtime import AIModelAssetMetadata
-from coreai_opt.palettization import KMeansPalettizerConfig
 from coreai_opt.quantization import QuantizerConfig
 
 from needle import Needle, NeedleModelConfiguation
-from needle.needle_compression import (
-    CoreAIKMeansPalettizerCompressor,
-    CoreAIQuantizerCompressor,
-)
+from needle.needle_compression import CoreAIQuantizerCompressor
 from needle.coreai_export import (
     _encoder_dynamic_shapes,
     _export_program,
@@ -77,15 +73,9 @@ class CoreAIExportTests(unittest.TestCase):
         finally:
             source_ctx.cleanup()
 
-    def test_export_needle_coreai_supports_builtin_compressors(self) -> None:
-        compressors = [
-            CoreAIQuantizerCompressor(QuantizerConfig.presets.w8()),
-            CoreAIKMeansPalettizerCompressor(KMeansPalettizerConfig.presets.w4()),
-        ]
-
-        for compressor in compressors:
-            with self.subTest(compressor=type(compressor).__name__):
-                self._assert_export_runs_end_to_end(compressor=compressor)
+    def test_export_needle_coreai_supports_quantizer_compressor(self) -> None:
+        compressor = CoreAIQuantizerCompressor(QuantizerConfig.presets.w8())
+        self._assert_export_runs_end_to_end(compressor=compressor)
 
     def test_export_needle_coreai_persists_model_metadata(self) -> None:
         metadata = AIModelAssetMetadata()

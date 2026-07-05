@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Protocol, cast
+from typing import Any, Protocol
 
 import torch
 from coreai_opt import ExportBackend
-from coreai_opt.palettization import KMeansPalettizer, KMeansPalettizerConfig
 from coreai_opt.quantization import Quantizer, QuantizerConfig
 
 
@@ -33,23 +32,5 @@ class CoreAIQuantizerCompressor:
         quantizer = Quantizer(module, self.config)
         quantizer.prepare(sample_args, dynamic_shapes=dynamic_shapes)
         finalized_module = quantizer.finalize(backend=ExportBackend.CoreAI)
-        finalized_module.eval()
-        return finalized_module
-
-
-@dataclass(frozen=True)
-class CoreAIKMeansPalettizerCompressor:
-    config: KMeansPalettizerConfig
-
-    def compress(
-        self,
-        module: torch.nn.Module,
-        sample_args: tuple[torch.Tensor, ...],
-        *,
-        dynamic_shapes: dict[str, Any] | tuple[Any, ...] | list[Any] | None = None,
-    ) -> torch.nn.Module:
-        palettizer = KMeansPalettizer(module, self.config)
-        palettizer.prepare(cast(tuple[torch.Tensor], sample_args))
-        finalized_module = palettizer.finalize(backend=ExportBackend.CoreAI)
         finalized_module.eval()
         return finalized_module

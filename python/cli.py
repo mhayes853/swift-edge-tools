@@ -10,18 +10,15 @@ from typing import Any, Sequence
 
 import yaml
 from coreai.runtime import AIModelAssetMetadata
-from coreai_opt.palettization import KMeansPalettizerConfig
 from coreai_opt.quantization import QuantizerConfig
 
 from needle.needle_compression import (
-    CoreAIKMeansPalettizerCompressor,
     CoreAIQuantizerCompressor,
     NeedleCompressor,
 )
 from needle.coreai_export import DEFAULT_SOURCE, export_needle_coreai
 
 _QUANTIZER_PRESETS = ("w4", "w4_per_block", "w8")
-_PALETTIZER_PRESETS = ("w4", "w6", "w8")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -43,9 +40,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--quantizer-config")
     parser.add_argument("--quantizer-preset", choices=_QUANTIZER_PRESETS)
     parser.add_argument("--quantizer-execution-mode", choices=("graph", "eager"))
-
-    parser.add_argument("--palettizer-config")
-    parser.add_argument("--palettizer-preset", choices=_PALETTIZER_PRESETS)
     return parser
 
 
@@ -143,7 +137,7 @@ def _apply_metadata_mapping(
             )
 
 
-def _build_compression_config(parsed: argparse.Namespace):
+def _build_compression_config(parsed: argparse.Namespace) -> QuantizerConfig | None:
     has_quantizer_inputs = any(
         [
             parsed.quantizer_config,
@@ -151,34 +145,16 @@ def _build_compression_config(parsed: argparse.Namespace):
             parsed.quantizer_execution_mode,
         ]
     )
-    has_palettizer_inputs = any(
-        [
-            parsed.palettizer_config,
-            parsed.palettizer_preset,
-        ]
-    )
 
-    if has_quantizer_inputs and has_palettizer_inputs:
-        raise ValueError(
-            "Quantization and palettization CLI options are mutually exclusive"
-        )
+    if not has_quantizer_inputs:
+        return None
 
     if parsed.quantizer_config and parsed.quantizer_preset:
         raise ValueError(
             "--quantizer-config and --quantizer-preset are mutually exclusive"
         )
-    if parsed.palettizer_config and parsed.palettizer_preset:
-        raise ValueError(
-            "--palettizer-config and --palettizer-preset are mutually exclusive"
-        )
 
-    if has_quantizer_inputs:
-        quantizer_config = _build_quantizer_config(parsed)
-        return quantizer_config
-    if has_palettizer_inputs:
-        palettizer_config = _build_palettizer_config(parsed)
-        return palettizer_config
-    return None
+    return _build_quantizer_config(parsed)
 
 
 def _build_compressor(parsed: argparse.Namespace) -> NeedleCompressor | None:
@@ -187,8 +163,6 @@ def _build_compressor(parsed: argparse.Namespace) -> NeedleCompressor | None:
         return None
     if isinstance(compression_config, QuantizerConfig):
         return CoreAIQuantizerCompressor(compression_config)
-    if isinstance(compression_config, KMeansPalettizerConfig):
-        return CoreAIKMeansPalettizerCompressor(compression_config)
     raise TypeError("Unsupported compression config type")
 
 
@@ -203,17 +177,6 @@ def _build_quantizer_config(parsed: argparse.Namespace) -> QuantizerConfig:
     if parsed.quantizer_execution_mode is not None:
         config.set_execution_mode(parsed.quantizer_execution_mode)
     return config
-
-
-def _build_palettizer_config(parsed: argparse.Namespace) -> KMeansPalettizerConfig:
-    if parsed.palettizer_config:
-        return _load_compression_config(
-            parsed.palettizer_config,
-            KMeansPalettizerConfig,
-        )
-    if parsed.palettizer_preset:
-        return getattr(KMeansPalettizerConfig.presets, parsed.palettizer_preset)()
-    return KMeansPalettizerConfig()
 
 
 def _load_compression_config(path: str | Path, config_type: type[Any]):

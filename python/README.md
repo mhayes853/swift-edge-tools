@@ -68,27 +68,25 @@ python3 cli.py \
   --quantizer-execution-mode eager
 ```
 
-With metadata and palettization config files:
+With metadata and quantizer config files:
 
 ```bash
 python3 cli.py \
   --source Cactus-Compute/needle-hf \
   --output ./build/coreai-export \
   --authoring-metadata ./metadata.yaml \
-  --palettizer-config ./palettizer.yaml
+  --quantizer-config ./quantizer.yaml
 ```
 
 The CLI accepts JSON or YAML for:
 
 - `--authoring-metadata`
 - `--quantizer-config`
-- `--palettizer-config`
 
 Supported compression convenience flags:
 
 - `--quantizer-preset {w4,w4_per_block,w8}`
 - `--quantizer-execution-mode {graph,eager}`
-- `--palettizer-preset {w4,w6,w8}`
 
 Authoring metadata flags:
 
