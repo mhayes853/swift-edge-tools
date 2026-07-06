@@ -2,7 +2,7 @@
   final class NeedleGrammarMatcherPool {
     private struct Key: Hashable, Sendable {
       let tools: [NeedleToolDefinition]
-      let range: NeedleXGrammarEngine.ToolCallInvocationRange
+      let range: NeedleGrammarToolCallRange
     }
 
     private let maxCount: Int
@@ -15,7 +15,7 @@
 
     func matcher(
       tools: some Sequence<NeedleToolDefinition>,
-      range: NeedleXGrammarEngine.ToolCallInvocationRange,
+      range: NeedleGrammarToolCallRange,
       compilingWith engine: NeedleXGrammarEngine
     ) throws -> NeedleXGrammarEngine.Matcher {
       let key = Key(tools: tools.map { $0.normalized() }, range: range)

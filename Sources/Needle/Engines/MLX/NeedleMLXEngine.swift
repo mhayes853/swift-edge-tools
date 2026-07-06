@@ -46,7 +46,7 @@
         self._processor()
       }
 
-      public var toolCallInvocationRange: NeedleXGrammarEngine.ToolCallInvocationRange
+      public var toolCallRange: NeedleGrammarToolCallRange
       public var maxTokens: Int?
       public var kvCacheQuantizationBits: Int?
       public var kvCacheQuantizationGroupSize: Int
@@ -55,8 +55,7 @@
       public init(
         sampler: @autoclosure @escaping @Sendable () -> any LogitSampler = ArgMaxSampler(),
         processor: @autoclosure @escaping @Sendable () -> (any LogitProcessor)? = nil,
-        toolCallInvocationRange: NeedleXGrammarEngine.ToolCallInvocationRange =
-          .unbounded(minimum: 0),
+        toolCallRange: NeedleGrammarToolCallRange = .unbounded(minimum: 0),
         maxTokens: Int? = 1024,
         kvCacheQuantizationBits: Int? = nil,
         kvCacheQuantizationGroupSize: Int = 64,
@@ -64,7 +63,7 @@
       ) {
         self._sampler = sampler
         self._processor = processor
-        self.toolCallInvocationRange = toolCallInvocationRange
+        self.toolCallRange = toolCallRange
         self.maxTokens = maxTokens
         self.kvCacheQuantizationBits = kvCacheQuantizationBits
         self.kvCacheQuantizationGroupSize = kvCacheQuantizationGroupSize
@@ -166,7 +165,7 @@
 
       let matcher = try state.matcherPool.matcher(
         tools: prompt.tools,
-        range: parameters.toolCallInvocationRange,
+        range: parameters.toolCallRange,
         compilingWith: state.grammarEngine
       )
       matcher.reset()

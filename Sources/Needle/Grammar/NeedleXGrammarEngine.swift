@@ -57,7 +57,7 @@
 
     public func compile(
       tools: some Sequence<NeedleToolDefinition>,
-      range: ToolCallInvocationRange = .unbounded(minimum: 0)
+      range: NeedleGrammarToolCallRange = .unbounded(minimum: 0)
     ) throws -> Matcher {
       let toolsJSON = String(
         decoding: tools.lazy.map { $0.normalized() }.needlePromptEncoded(),
@@ -125,37 +125,15 @@
 
   // MARK: - ToolCallInvocationRange
 
-  extension NeedleXGrammarEngine {
-    public enum ToolCallInvocationRange: Hashable, Sendable {
-      case unbounded(minimum: Int)
-      case bounded(ClosedRange<Int>)
-      case exact(Int)
-
-      public static func unbounded(_ range: PartialRangeFrom<Int>) -> Self {
-        .unbounded(minimum: range.lowerBound)
-      }
-
-      public static func bounded(_ range: PartialRangeThrough<Int>) -> Self {
-        .bounded(0...range.upperBound)
-      }
-
-      public static func bounded(_ range: PartialRangeUpTo<Int>) -> Self {
-        .bounded(0..<range.upperBound)
-      }
-
-      public static func bounded(_ range: Range<Int>) -> Self {
-        .bounded(range.lowerBound...(range.upperBound - 1))
-      }
-
-      fileprivate var cRange: (Int32, Int32) {
-        switch self {
-        case .bounded(let range):
-          (Int32(range.lowerBound), Int32(range.upperBound))
-        case .unbounded(let minimum):
-          (Int32(minimum), kNeedleXGrammarToolCallsUnbounded)
-        case .exact(let count):
-          (Int32(count), kNeedleXGrammarToolCallsOnlyLowerBound)
-        }
+  extension NeedleGrammarToolCallRange {
+    fileprivate var cRange: (Int32, Int32) {
+      switch self {
+      case .bounded(let range):
+        (Int32(range.lowerBound), Int32(range.upperBound))
+      case .unbounded(let minimum):
+        (Int32(minimum), kNeedleXGrammarToolCallsUnbounded)
+      case .exact(let count):
+        (Int32(count), kNeedleXGrammarToolCallsOnlyLowerBound)
       }
     }
   }

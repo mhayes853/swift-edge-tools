@@ -41,19 +41,18 @@
         self._processor()
       }
 
-      public var toolCallInvocationRange: NeedleXGrammarEngine.ToolCallInvocationRange
+      public var toolCallRange: NeedleGrammarToolCallRange
       public var maxTokens: Int?
 
       public init(
         sampler: @autoclosure @escaping @Sendable () -> any Sampler = ArgmaxSampler(),
         processor: @autoclosure @escaping @Sendable () -> (any LogitsProcessor)? = nil,
-        toolCallInvocationRange: NeedleXGrammarEngine.ToolCallInvocationRange =
-          .unbounded(minimum: 0),
+        toolCallRange: NeedleGrammarToolCallRange = .unbounded(minimum: 0),
         maxTokens: Int? = 1024
       ) {
         self._sampler = sampler
         self._processor = processor
-        self.toolCallInvocationRange = toolCallInvocationRange
+        self.toolCallRange = toolCallRange
         self.maxTokens = maxTokens
       }
     }
@@ -167,7 +166,7 @@
     ) throws -> GenerationTask {
       let isStopped = ManagedAtomic(false)
       let task = Task {
-        let range = parameters.toolCallInvocationRange
+        let range = parameters.toolCallRange
         let matcher = try self.state.withLock { state in
           let matcher = try state.matcherPool.matcher(
             tools: prompt.tools,
