@@ -10,25 +10,16 @@
     public typealias Output = Base.Output
 
     public let base: Base
+    public let arguments: NeedleGenerationSchema
+
+    public var name: String { self.base.name }
+    public var description: String { self.base.description }
 
     public init(_ base: Base) {
       self.base = base
-    }
 
-    public var name: String {
-      self.base.name
-    }
-
-    public var description: String {
-      self.base.description
-    }
-
-    public var arguments: NeedleGenerationSchema {
-      try! JSONDecoder()
-        .decode(
-          NeedleGenerationSchema.self,
-          from: Data(self.base.parameters.debugDescription.utf8)
-        )
+      let data = Data(self.base.parameters.debugDescription.utf8)
+      self.arguments = try! JSONDecoder().decode(NeedleGenerationSchema.self, from: data)
     }
 
     public func invoke(input: Input) async throws -> Base.Output {
