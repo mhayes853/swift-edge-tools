@@ -495,16 +495,8 @@
       message: "CoreAI model did not return expected state descriptors."
     )
 
-    public static let decoderStateAlreadyInUse = Self(
-      message: "CoreAI decoder state is already in use by another generation."
-    )
-
     public static func unsupportedLogitsScalarType(_ scalarType: NDArray.ScalarType) -> Self {
       Self(message: "Unsupported logits scalar type: \(scalarType).")
-    }
-
-    public static func unsupportedStateScalarType(_ scalarType: NDArray.ScalarType) -> Self {
-      Self(message: "Unsupported state scalar type: \(scalarType).")
     }
   }
 
