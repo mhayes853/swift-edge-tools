@@ -41,6 +41,7 @@
       public var sampler: any LogitSampler {
         self._sampler()
       }
+
       public var processor: (any LogitProcessor)? {
         self._processor()
       }

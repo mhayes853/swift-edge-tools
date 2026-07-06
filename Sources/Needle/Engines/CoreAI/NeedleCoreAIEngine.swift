@@ -36,6 +36,7 @@
       public var sampler: any Sampler {
         self._sampler()
       }
+
       public var processor: (any LogitsProcessor)? {
         self._processor()
       }
@@ -60,21 +61,6 @@
     private struct State {
       let grammarEngine: NeedleXGrammarEngine
       let matcherPool: NeedleGrammarMatcherPool
-    }
-
-    private enum FunctionName {
-      static let main = "main"
-    }
-
-    private enum TensorName {
-      static let inputIds = "input_ids"
-      static let crossAttentionMask = "cross_attention_mask"
-      static let encoderProjectedK = "encoder_projected_k"
-      static let encoderProjectedV = "encoder_projected_v"
-      static let keyCache = "keyCache"
-      static let valueCache = "valueCache"
-      static let cacheOffset = "cacheOffset"
-      static let logits = "logits"
     }
 
     private struct EncoderOutputs {
@@ -546,5 +532,20 @@
         span[i] = 0
       }
     }
+  }
+
+  private enum FunctionName {
+    static let main = "main"
+  }
+
+  private enum TensorName {
+    static let inputIds = "input_ids"
+    static let crossAttentionMask = "cross_attention_mask"
+    static let encoderProjectedK = "encoder_projected_k"
+    static let encoderProjectedV = "encoder_projected_v"
+    static let keyCache = "keyCache"
+    static let valueCache = "valueCache"
+    static let cacheOffset = "cacheOffset"
+    static let logits = "logits"
   }
 #endif
