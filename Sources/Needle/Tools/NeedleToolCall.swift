@@ -99,12 +99,7 @@ public final class NeedleToolCall<Tool: NeedleTool>: Sendable, Observable, Ident
 
       switch action {
       case .awaitTask(let task):
-        let output = try await withTaskCancellationHandler {
-          try await task.value
-        } onCancel: {
-          task.cancel()
-        }
-        guard let output else { throw CancellationError() }
+        guard let output = try await task.cancellableValue else { throw CancellationError() }
         return output
       case .returnResult(let result):
         return try result.get()

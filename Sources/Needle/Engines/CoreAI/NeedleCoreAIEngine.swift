@@ -19,13 +19,7 @@
       }
 
       public var value: NeedleEngineGeneration {
-        get async throws {
-          try await withTaskCancellationHandler {
-            try await self.task.value
-          } onCancel: {
-            self.task.cancel()
-          }
-        }
+        get async throws { try await self.task.cancellableValue }
       }
 
       public func stop() {
