@@ -25,7 +25,7 @@
         assertSnapshot(of: generation.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
       }
     }
-    
+
     @Test
     @available(anyAppleOS 27.0, *)
     func `Concurrent Generations`() async throws {
@@ -40,7 +40,7 @@
         assertSnapshot(of: g2.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
       }
     }
-    
+
     @Test
     @available(anyAppleOS 27.0, *)
     func `Sequential Generations`() async throws {
@@ -72,6 +72,21 @@
       let streamedResponse = tokens.withLock { $0.map(\.stringValue).joined() }
       let finalResponse = generation.tokens.map(\.stringValue).joined()
       expectNoDifference(streamedResponse, finalResponse)
+    }
+
+    @Test
+    @available(anyAppleOS 27.0, *)
+    func `Generate With Compute Stream`() async throws {
+      let engine = try await makeNeedleCoreAIEngine()
+
+      let params = NeedleCoreAIEngine.GenerateParameters(computeStream: ComputeStream())
+      let task = try engine.generate(prompt: .sendAdventureEmail, parameters: params) { _ in }
+      let generation = try await task.value
+
+      expectNoDifference(generation.wasStopped, false)
+      withKnownIssue {
+        assertSnapshot(of: generation.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
+      }
     }
 
     @Test

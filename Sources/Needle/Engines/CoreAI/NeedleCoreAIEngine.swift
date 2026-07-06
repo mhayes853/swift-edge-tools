@@ -32,6 +32,7 @@
 
       private var _sampler: @Sendable () -> any Sampler
       private var _processor: @Sendable () -> (any LogitsProcessor)?
+      private var _computeStream: @Sendable () -> ComputeStream?
 
       public var sampler: any Sampler {
         self._sampler()
@@ -41,17 +42,23 @@
         self._processor()
       }
 
+      public var computeStream: ComputeStream? {
+        self._computeStream()
+      }
+
       public var toolCallRange: NeedleGrammarToolCallRange
       public var maxTokens: Int?
 
       public init(
         sampler: @autoclosure @escaping @Sendable () -> any Sampler = ArgmaxSampler(),
         processor: @autoclosure @escaping @Sendable () -> (any LogitsProcessor)? = nil,
+        computeStream: @autoclosure @escaping @Sendable () -> ComputeStream? = nil,
         toolCallRange: NeedleGrammarToolCallRange = .unbounded(minimum: 0),
         maxTokens: Int? = 1024
       ) {
         self._sampler = sampler
         self._processor = processor
+        self._computeStream = computeStream
         self.toolCallRange = toolCallRange
         self.maxTokens = maxTokens
       }
@@ -201,11 +208,13 @@
 
       let sampler = parameters.sampler
       var processor = parameters.processor
+      let stream = parameters.computeStream
       let generateStart = self.clock.now
       let (encoderOutputs, prefillMetrics) = try await self.prefill(
         prompt: prompt,
         configuration: configuration,
-        processor: &processor
+        processor: &processor,
+        stream: stream
       )
 
       var decodeStates = try self.beginDecodeWithStates()
@@ -226,7 +235,8 @@
         let decoderLogits = try await self.decode(
           inputIds: inputIds,
           encoderOutputs: encoderOutputs,
-          states: &decodeStates
+          states: &decodeStates,
+          stream: stream
         )
         var logits = try self.stepLogits(from: decoderLogits)
         let processedLogits = processor?.process(logits: &logits) ?? logits
@@ -268,7 +278,8 @@
     private func prefill(
       prompt: NeedlePrompt,
       configuration: NeedleModelConfiguration,
-      processor: inout (any LogitsProcessor)?
+      processor: inout (any LogitsProcessor)?,
+      stream: ComputeStream?
     ) async throws -> (EncoderOutputs, NeedlePrefillMetrics) {
       let promptTokens = self.tokenizer.encode(text: prompt.formatted())
       guard promptTokens.count <= configuration.encoderMaxLength else {
@@ -281,7 +292,7 @@
       let promptArray = NDArray(tokenIds: promptTokens)
       let prefillStart = self.clock.now
       processor?.prompt(promptArray)
-      let encoderOutputs = try await self.encode(promptTokens: promptTokens)
+      let encoderOutputs = try await self.runEncoder(promptTokens: promptTokens, stream: stream)
       let metrics = NeedlePrefillMetrics(
         tokens: promptTokens.count,
         duration: prefillStart.duration(to: self.clock.now)
@@ -289,8 +300,14 @@
       return (encoderOutputs, metrics)
     }
 
-    private func encode(promptTokens: [NeedleToken.ID]) async throws -> EncoderOutputs {
+    private func runEncoder(
+      promptTokens: [NeedleToken.ID],
+      stream: ComputeStream?
+    ) async throws -> EncoderOutputs {
       let inputIds = NDArray(tokenIds: promptTokens)
+      if let stream {
+        return try await self.runEncoderOnStream(inputIds: inputIds, stream: stream)
+      }
       var outputs = try await self.encoderFunction.run(inputs: [TensorName.inputIds: inputIds])
       guard
         let crossAttentionMask = outputs.remove(TensorName.crossAttentionMask)?.ndArray,
@@ -306,13 +323,55 @@
       )
     }
 
+    private func runEncoderOnStream(
+      inputIds: NDArray,
+      stream: ComputeStream
+    ) async throws -> EncoderOutputs {
+      let descriptor = self.encoderFunction.descriptor
+      guard
+        let crossMaskDescriptor = descriptor.arrayDescriptor(for: TensorName.crossAttentionMask),
+        let projectedKDescriptor = descriptor.arrayDescriptor(for: TensorName.encoderProjectedK),
+        let projectedVDescriptor = descriptor.arrayDescriptor(for: TensorName.encoderProjectedV)
+      else {
+        throw NeedleCoreAIEngineError.missingModelOutputs
+      }
+
+      var crossAttentionMask = InferenceFunction.AsyncMutableValue(
+        NDArray(descriptor: crossMaskDescriptor)
+      )
+      var encoderProjectedK = InferenceFunction.AsyncMutableValue(
+        NDArray(descriptor: projectedKDescriptor)
+      )
+      var encoderProjectedV = InferenceFunction.AsyncMutableValue(
+        NDArray(descriptor: projectedVDescriptor)
+      )
+
+      var outputViews = InferenceFunction.AsyncMutableViews()
+      outputViews.insert(&crossAttentionMask, for: TensorName.crossAttentionMask)
+      outputViews.insert(&encoderProjectedK, for: TensorName.encoderProjectedK)
+      outputViews.insert(&encoderProjectedV, for: TensorName.encoderProjectedV)
+
+      let inputValues = [TensorName.inputIds: InferenceFunction.AsyncValue(inputIds)]
+      _ = try self.encoderFunction.encode(inputs: inputValues, outputViews: outputViews, to: stream)
+      await stream.currentWorkCompleted()
+
+      guard
+        let crossAttentionMaskNDArray = try await crossAttentionMask.ndArray,
+        let encoderProjectedKNDArray = try await encoderProjectedK.ndArray,
+        let encoderProjectedVNDArray = try await encoderProjectedV.ndArray
+      else {
+        throw NeedleCoreAIEngineError.missingModelOutputs
+      }
+      return EncoderOutputs(
+        crossAttentionMask: crossAttentionMaskNDArray,
+        encoderProjectedK: encoderProjectedKNDArray,
+        encoderProjectedV: encoderProjectedVNDArray
+      )
+    }
+
     private func stepLogits(from logits: NDArray) throws -> NDArray {
       let stepIndex = logits.shape[1] - 1
       switch logits.scalarType {
-      case .float32:
-        let view = logits.view(as: Float.self)
-        let scalars = (0..<logits.shape[2]).map { view[scalarAt: [0, stepIndex, $0]] }
-        return NDArray(scalars: scalars, shape: [1, scalars.count])
       case .bfloat16:
         let shape = logits.shape
         let vocabularySize = shape[2]
@@ -399,8 +458,17 @@
     private func decode(
       inputIds: NDArray,
       encoderOutputs: EncoderOutputs,
-      states: inout DecoderStates
+      states: inout DecoderStates,
+      stream: ComputeStream?
     ) async throws -> NDArray {
+      if let stream {
+        return try await self.decodeOnStream(
+          inputIds: inputIds,
+          encoderOutputs: encoderOutputs,
+          states: &states,
+          stream: stream
+        )
+      }
       var stateViews = InferenceFunction.MutableViews()
       stateViews.insert(&states.keyCache, for: TensorName.keyCache)
       stateViews.insert(&states.valueCache, for: TensorName.valueCache)
@@ -419,6 +487,57 @@
         throw NeedleCoreAIEngineError.missingModelOutputs
       }
       return logits
+    }
+
+    private func decodeOnStream(
+      inputIds: NDArray,
+      encoderOutputs: EncoderOutputs,
+      states: inout DecoderStates,
+      stream: ComputeStream
+    ) async throws -> NDArray {
+      let descriptor = self.decoderFunction.descriptor
+      guard let logitsArrayDescriptor = descriptor.arrayDescriptor(for: TensorName.logits) else {
+        throw NeedleCoreAIEngineError.missingModelOutputs
+      }
+
+      var keyCache = InferenceFunction.AsyncMutableValue(states.keyCache)
+      var valueCache = InferenceFunction.AsyncMutableValue(states.valueCache)
+      var cacheOffset = InferenceFunction.AsyncMutableValue(states.cacheOffset)
+
+      var stateViews = InferenceFunction.AsyncMutableViews()
+      stateViews.insert(&keyCache, for: TensorName.keyCache)
+      stateViews.insert(&valueCache, for: TensorName.valueCache)
+      stateViews.insert(&cacheOffset, for: TensorName.cacheOffset)
+
+      var logits = InferenceFunction.AsyncMutableValue(NDArray(descriptor: logitsArrayDescriptor))
+      var outputViews = InferenceFunction.AsyncMutableViews()
+      outputViews.insert(&logits, for: TensorName.logits)
+
+      let inputValues = [
+        TensorName.inputIds: InferenceFunction.AsyncValue(inputIds),
+        TensorName.crossAttentionMask: InferenceFunction.AsyncValue(
+          encoderOutputs.crossAttentionMask
+        ),
+        TensorName.encoderProjectedK: InferenceFunction.AsyncValue(
+          encoderOutputs.encoderProjectedK
+        ),
+        TensorName.encoderProjectedV: InferenceFunction.AsyncValue(encoderOutputs.encoderProjectedV)
+      ]
+      _ = try self.decoderFunction.encode(
+        inputs: inputValues,
+        states: stateViews,
+        outputViews: outputViews,
+        to: stream
+      )
+      await stream.currentWorkCompleted()
+
+      guard let logitsNDArray = try await logits.ndArray else {
+        throw NeedleCoreAIEngineError.missingModelOutputs
+      }
+      states.keyCache = try await keyCache.ndArray ?? states.keyCache
+      states.valueCache = try await valueCache.ndArray ?? states.valueCache
+      states.cacheOffset = try await cacheOffset.ndArray ?? states.cacheOffset
+      return logitsNDArray
     }
   }
 
@@ -522,6 +641,14 @@
       for i in 0..<count {
         span[i] = 0
       }
+    }
+  }
+
+  @available(anyAppleOS 27.0, *)
+  extension InferenceFunctionDescriptor {
+    fileprivate func arrayDescriptor(for name: String) -> NDArrayDescriptor? {
+      guard case .ndArray(let arrayDescriptor) = self.outputDescriptor(of: name) else { return nil }
+      return arrayDescriptor
     }
   }
 
