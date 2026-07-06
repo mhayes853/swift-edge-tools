@@ -10,6 +10,9 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  EXPERIMENTAL_TESTS: "1"
+
 jobs:
   macos:
     name: macOS

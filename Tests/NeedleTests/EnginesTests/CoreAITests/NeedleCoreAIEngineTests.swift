@@ -5,7 +5,7 @@
   import SnapshotTesting
   import Testing
 
-  @Suite(.serialized)
+  @Suite(.serialized, .experimental())
   struct `NeedleCoreAIEngine tests` {
     @Test
     @available(anyAppleOS 27.0, *)
