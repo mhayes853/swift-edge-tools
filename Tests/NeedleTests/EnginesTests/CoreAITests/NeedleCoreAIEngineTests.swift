@@ -25,6 +25,38 @@
         assertSnapshot(of: generation.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
       }
     }
+    
+    @Test
+    @available(anyAppleOS 27.0, *)
+    func `Concurrent Generations`() async throws {
+      let engine = try await makeNeedleCoreAIEngine()
+
+      let t1 = try engine.generate(prompt: .sendAdventureEmail, parameters: .default) { _ in }
+      let t2 = try engine.generate(prompt: .sendAdventureEmail, parameters: .default) { _ in }
+
+      let (g1, g2) = try await (t1.value, t2.value)
+      withKnownIssue {
+        assertSnapshot(of: g1.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
+        assertSnapshot(of: g2.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
+      }
+    }
+    
+    @Test
+    @available(anyAppleOS 27.0, *)
+    func `Sequential Generations`() async throws {
+      let engine = try await makeNeedleCoreAIEngine()
+
+      let t1 = try engine.generate(prompt: .sendAdventureEmail, parameters: .default) { _ in }
+      let g1 = try await t1.value
+
+      let t2 = try engine.generate(prompt: .sendAdventureEmail, parameters: .default) { _ in }
+      let g2 = try await t2.value
+
+      withKnownIssue {
+        assertSnapshot(of: g1.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
+        assertSnapshot(of: g2.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
+      }
+    }
 
     @Test
     @available(anyAppleOS 27.0, *)

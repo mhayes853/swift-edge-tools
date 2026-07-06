@@ -21,11 +21,12 @@
       let key = Key(tools: tools.map { $0.normalized() }, range: range)
       if let cached = self.entries[key] {
         self.touch(key)
-        return cached
+        cached.reset()
+        return cached.fork()
       }
       let matcher = try engine.compile(tools: key.tools, range: key.range)
       self.insert(key, matcher)
-      return matcher
+      return matcher.fork()
     }
 
     func clear() {

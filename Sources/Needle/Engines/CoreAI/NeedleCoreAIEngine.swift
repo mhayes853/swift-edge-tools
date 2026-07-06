@@ -52,8 +52,6 @@
     private struct State {
       let grammarEngine: NeedleXGrammarEngine
       let matcherPool: NeedleGrammarMatcherPool
-      var decoderState: DecoderState?
-      var isDecoderStateInUse = false
     }
 
     private enum FunctionName {
@@ -81,12 +79,9 @@
     private let configuration: NeedleModelConfiguration
     private let encoderFunction: InferenceFunction
     private let decoderFunction: InferenceFunction
-    private let _tokenizer: any Tokenizer
+    private let tokenizer: any Tokenizer
     private let clock = ContinuousClock()
-
-    public var tokenizer: any Tokenizer {
-      self._tokenizer
-    }
+    private let decoderStates: Lock<DecoderStates?>
 
     public convenience init(
       modelDirectoryURL: URL,
@@ -148,29 +143,26 @@
       grammarEngine: sending NeedleXGrammarEngine
     ) throws {
       self.state = Lock(
-        State(
-          grammarEngine: grammarEngine,
-          matcherPool: NeedleGrammarMatcherPool(),
-          decoderState: nil,
-          isDecoderStateInUse: false
-        )
+        State(grammarEngine: grammarEngine, matcherPool: NeedleGrammarMatcherPool())
       )
       self.configuration = configuration
       self.encoderFunction = try Self.loadFunction(named: FunctionName.main, from: encoderModel)
-      self.decoderFunction = try Self.loadFunction(named: FunctionName.main, from: decoderModel)
-      self._tokenizer = tokenizer
+      let decoderFunction = try Self.loadFunction(named: FunctionName.main, from: decoderModel)
+      self.decoderFunction = decoderFunction
+      self.tokenizer = tokenizer
+      self.decoderStates = Lock(
+        try DecoderStates(descriptor: decoderFunction.descriptor, isPersistent: true)
+      )
     }
 
     public func tokenize(prompt: NeedlePrompt) async throws -> [NeedleToken] {
-      prompt.tokenized(using: self._tokenizer)
+      prompt.tokenized(using: self.tokenizer)
     }
 
     public func clearCaches() {
-      self.state.withLock { state in
-        state.matcherPool.clear()
-        state.grammarEngine.clearCache()
-        state.decoderState = nil
-        state.isDecoderStateInUse = false
+      self.state.withLock {
+        $0.matcherPool.clear()
+        $0.grammarEngine.clearCache()
       }
     }
 
@@ -182,10 +174,11 @@
       let isStopped = ManagedAtomic(false)
       let task = Task {
         nonisolated(unsafe) let parameters = parameters
+        let range = parameters.toolCallInvocationRange
         let matcher = try self.state.withLock { state in
           let matcher = try state.matcherPool.matcher(
             tools: prompt.tools,
-            range: parameters.toolCallInvocationRange,
+            range: range,
             compilingWith: state.grammarEngine
           )
           matcher.reset()
@@ -221,12 +214,11 @@
         configuration: configuration,
         processor: &processor
       )
-      let decoderState = try self.acquireDecoderState()
-      defer { self.releaseDecoderState() }
-      try await decoderState.reset()
 
+      var decodeStates = try self.beginDecodeWithStates()
+      defer { self.endDecodeWithStates(decodeStates) }
       var nextDecoderTokenId = configuration.decoderStartTokenId
-      var detokenizer = StreamingDetokenizer(tokenizer: self._tokenizer)
+      var detokenizer = StreamingDetokenizer(tokenizer: self.tokenizer)
       var generatedTokens = [NeedleToken]()
       var confidence = NeedleConfidenceState()
       var durationToFirstToken: Duration?
@@ -234,13 +226,14 @@
       while !matcher.isTerminated
         && !isStopped.load(ordering: .relaxed)
         && detokenizer.tokenIds.count < (parameters.maxTokens ?? .max)
-        && generatedTokens.last?.id != self._tokenizer.eosTokenId
+        && generatedTokens.last?.id != self.tokenizer.eosTokenId
       {
         try Task.checkCancellation()
+        let inputIds = NDArray(tokenIds: [nextDecoderTokenId])
         let decoderLogits = try await self.decode(
-          tokenId: nextDecoderTokenId,
+          inputIds: inputIds,
           encoderOutputs: encoderOutputs,
-          decoderState: decoderState
+          states: &decodeStates
         )
         var logits = try self.stepLogits(from: decoderLogits)
         let processedLogits = processor?.process(logits: &logits) ?? logits
@@ -284,7 +277,7 @@
       configuration: NeedleModelConfiguration,
       processor: inout (any LogitsProcessor)?
     ) async throws -> (EncoderOutputs, NeedlePrefillMetrics) {
-      let promptTokens = self._tokenizer.encode(text: prompt.formatted())
+      let promptTokens = self.tokenizer.encode(text: prompt.formatted())
       guard promptTokens.count <= configuration.encoderMaxLength else {
         throw NeedleCoreAIEngineError.contextLengthExceeded(
           tokens: promptTokens.count,
@@ -292,7 +285,7 @@
         )
       }
 
-      let promptArray = Self.array(tokenIds: promptTokens, shape: [1, promptTokens.count])
+      let promptArray = NDArray(tokenIds: promptTokens)
       let prefillStart = self.clock.now
       processor?.prompt(promptArray)
       let encoderOutputs = try await self.encode(promptTokens: promptTokens)
@@ -304,9 +297,10 @@
     }
 
     private func encode(promptTokens: [NeedleToken.ID]) async throws -> EncoderOutputs {
-      let inputIds = Self.array(tokenIds: promptTokens, shape: [1, promptTokens.count])
+      let inputIds = NDArray(tokenIds: promptTokens)
       var outputs = try await self.encoderFunction.run(inputs: [TensorName.inputIds: inputIds])
-      guard let crossAttentionMask = outputs.remove(TensorName.crossAttentionMask)?.ndArray,
+      guard
+        let crossAttentionMask = outputs.remove(TensorName.crossAttentionMask)?.ndArray,
         let encoderProjectedK = outputs.remove(TensorName.encoderProjectedK)?.ndArray,
         let encoderProjectedV = outputs.remove(TensorName.encoderProjectedV)?.ndArray
       else {
@@ -317,38 +311,6 @@
         encoderProjectedK: encoderProjectedK,
         encoderProjectedV: encoderProjectedV
       )
-    }
-
-    private func decode(
-      tokenId: NeedleToken.ID,
-      encoderOutputs: EncoderOutputs,
-      decoderState: DecoderState
-    ) async throws -> NDArray {
-      let inputIds = Self.array(tokenIds: [tokenId], shape: [1, 1])
-      return try await decoderState.logits(
-        function: self.decoderFunction,
-        inputIds: inputIds,
-        encoderOutputs: encoderOutputs
-      )
-    }
-
-    private func acquireDecoderState() throws -> DecoderState {
-      try self.state.withLock { state in
-        guard !state.isDecoderStateInUse else {
-          throw NeedleCoreAIEngineError.decoderStateAlreadyInUse
-        }
-        if state.decoderState == nil {
-          state.decoderState = try DecoderState(descriptor: self.decoderFunction.descriptor)
-        }
-        state.isDecoderStateInUse = true
-        return state.decoderState!
-      }
-    }
-
-    private func releaseDecoderState() {
-      self.state.withLock { state in
-        state.isDecoderStateInUse = false
-      }
     }
 
     private func stepLogits(from logits: NDArray) throws -> NDArray {
@@ -368,10 +330,6 @@
       default:
         throw NeedleCoreAIEngineError.unsupportedLogitsScalarType(logits.scalarType)
       }
-    }
-
-    private static func array(tokenIds: [NeedleToken.ID], shape: [Int]) -> NDArray {
-      NDArray(scalars: tokenIds.map(Int32.init), shape: shape)
     }
 
     private static func decodeConfiguration(
@@ -394,16 +352,17 @@
     }
   }
 
-  // MARK: - DecoderState
+  // MARK: - Decoder State
 
   @available(anyAppleOS 27.0, *)
   extension NeedleCoreAIEngine {
-    private actor DecoderState {
-      private var keyCache: NDArray
-      private var valueCache: NDArray
-      private var cacheOffset: NDArray
+    private struct DecoderStates {
+      var keyCache: NDArray
+      var valueCache: NDArray
+      var cacheOffset: NDArray
+      let isPersistent: Bool
 
-      init(descriptor: InferenceFunctionDescriptor) throws {
+      init(descriptor: InferenceFunctionDescriptor, isPersistent: Bool) throws {
         guard
           let keyCacheDescriptor = descriptor.stateDescriptor(of: TensorName.keyCache),
           let valueCacheDescriptor = descriptor.stateDescriptor(of: TensorName.valueCache),
@@ -411,63 +370,62 @@
         else {
           throw NeedleCoreAIEngineError.missingModelStateDescriptors
         }
-        self.keyCache = try Self.array(from: keyCacheDescriptor)
-        self.valueCache = try Self.array(from: valueCacheDescriptor)
-        self.cacheOffset = try Self.array(from: cacheOffsetDescriptor)
+        self.keyCache = try NDArray(descriptor: keyCacheDescriptor)
+        self.valueCache = try NDArray(descriptor: valueCacheDescriptor)
+        self.cacheOffset = try NDArray(descriptor: cacheOffsetDescriptor)
+        self.isPersistent = isPersistent
       }
 
-      func reset() throws {
-        try Self.zero(&self.keyCache)
-        try Self.zero(&self.valueCache)
-        var cacheOffset = self.cacheOffset.mutableView(as: Int32.self)
-        cacheOffset.copyElements(fromContentsOf: [0])
+      mutating func reset() {
+        self.keyCache.zero()
+        self.valueCache.zero()
+        self.cacheOffset.zero()
       }
+    }
 
-      func logits(
-        function: InferenceFunction,
-        inputIds: NDArray,
-        encoderOutputs: EncoderOutputs
-      ) async throws -> NDArray {
-        var stateViews = InferenceFunction.MutableViews()
-        stateViews.insert(&self.keyCache, for: TensorName.keyCache)
-        stateViews.insert(&self.valueCache, for: TensorName.valueCache)
-        stateViews.insert(&self.cacheOffset, for: TensorName.cacheOffset)
-
-        var outputs = try await function.run(
-          inputs: [
-            TensorName.inputIds: inputIds,
-            TensorName.crossAttentionMask: encoderOutputs.crossAttentionMask,
-            TensorName.encoderProjectedK: encoderOutputs.encoderProjectedK,
-            TensorName.encoderProjectedV: encoderOutputs.encoderProjectedV
-          ],
-          states: stateViews
-        )
-        guard let logits = outputs.remove(TensorName.logits)?.ndArray else {
-          throw NeedleCoreAIEngineError.missingModelOutputs
-        }
-        return logits
-      }
-
-      private static func array(from descriptor: InferenceValue.Descriptor) throws -> NDArray {
-        guard case .ndArray(let descriptor) = descriptor else {
-          throw NeedleCoreAIEngineError.missingModelStateDescriptors
-        }
-        return NDArray(descriptor: descriptor)
-      }
-
-      private static func zero(_ array: inout NDArray) throws {
-        let scalarCount = array.shape.reduce(1, *)
-        switch array.scalarType {
-        case .bfloat16:
-          var rawView = array.mutableRawView()
-          var view = MutableSpan<UInt16>(mutableBytes: rawView.mutableBytes)
-          for index in 0..<scalarCount {
-            view[index] = 0
-          }
-        default:
-          throw NeedleCoreAIEngineError.unsupportedStateScalarType(array.scalarType)
+    private func beginDecodeWithStates() throws -> sending DecoderStates {
+      try self.decoderStates.withLock { states in
+        if var persistentStates = states {
+          persistentStates.reset()
+          states = nil
+          return persistentStates
+        } else {
+          return try DecoderStates(
+            descriptor: self.decoderFunction.descriptor,
+            isPersistent: false
+          )
         }
       }
+    }
+
+    private func endDecodeWithStates(_ states: sending DecoderStates) {
+      guard states.isPersistent else { return }
+      self.decoderStates.withLock { $0 = states }
+    }
+
+    private func decode(
+      inputIds: NDArray,
+      encoderOutputs: EncoderOutputs,
+      states: inout DecoderStates
+    ) async throws -> NDArray {
+      var stateViews = InferenceFunction.MutableViews()
+      stateViews.insert(&states.keyCache, for: TensorName.keyCache)
+      stateViews.insert(&states.valueCache, for: TensorName.valueCache)
+      stateViews.insert(&states.cacheOffset, for: TensorName.cacheOffset)
+
+      var outputs = try await self.decoderFunction.run(
+        inputs: [
+          TensorName.inputIds: inputIds,
+          TensorName.crossAttentionMask: encoderOutputs.crossAttentionMask,
+          TensorName.encoderProjectedK: encoderOutputs.encoderProjectedK,
+          TensorName.encoderProjectedV: encoderOutputs.encoderProjectedV
+        ],
+        states: stateViews
+      )
+      guard let logits = outputs.remove(TensorName.logits)?.ndArray else {
+        throw NeedleCoreAIEngineError.missingModelOutputs
+      }
+      return logits
     }
   }
 
@@ -553,6 +511,32 @@
 
     public static func unsupportedStateScalarType(_ scalarType: NDArray.ScalarType) -> Self {
       Self(message: "Unsupported state scalar type: \(scalarType).")
+    }
+  }
+
+  // MARK: - Helpers
+
+  @available(anyAppleOS 27.0, *)
+  extension NDArray {
+    fileprivate init(descriptor: InferenceValue.Descriptor) throws {
+      guard case .ndArray(let descriptor) = descriptor else {
+        throw NeedleCoreAIEngineError.missingModelStateDescriptors
+      }
+      self.init(descriptor: descriptor)
+    }
+
+    fileprivate init(tokenIds: some Sequence<NeedleToken.ID>) {
+      let ids = tokenIds.map(Int32.init)
+      self.init(scalars: ids, shape: [1, ids.count])
+    }
+
+    fileprivate mutating func zero() {
+      var view = self.mutableRawView()
+      let count = view.mutableBytes.byteCount
+      var span = MutableSpan<UInt8>(mutableBytes: view.mutableBytes)
+      for i in 0..<count {
+        span[i] = 0
+      }
     }
   }
 #endif
