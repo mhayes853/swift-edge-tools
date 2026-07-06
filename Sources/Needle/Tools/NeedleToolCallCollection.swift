@@ -75,32 +75,3 @@ extension NeedleToolCallCollection {
     self[index].as(type)
   }
 }
-
-// MARK: - Invoke
-
-extension NeedleToolCallCollection {
-  public struct InvokeOutcome: Sendable {
-    public let tool: any NeedleTool
-    public let result: Result<any Sendable, any Error>
-  }
-
-  public func invokeAllIfNecessary() async -> [InvokeOutcome] {
-    await self.invokeAllIfNecessary(where: { _ in true })
-  }
-
-  public func invokeAllIfNecessary(where predicate: (Element) -> Bool) async -> [InvokeOutcome] {
-    await withTaskGroup(of: InvokeOutcome.self) { group in
-      for call in self.filter(predicate) {
-        group.addTask {
-          do {
-            let output = try await call.output
-            return InvokeOutcome(tool: call.tool, result: .success(output))
-          } catch {
-            return InvokeOutcome(tool: call.tool, result: .failure(error))
-          }
-        }
-      }
-      return await group.reduce(into: [InvokeOutcome]()) { $0.append($1) }
-    }
-  }
-}
