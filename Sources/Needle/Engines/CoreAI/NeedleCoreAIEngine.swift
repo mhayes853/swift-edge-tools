@@ -328,6 +328,7 @@
       stream: ComputeStream
     ) async throws -> EncoderOutputs {
       let descriptor = self.encoderFunction.descriptor
+      let promptTokenCount = inputIds.shape[1]
       guard
         let crossMaskDescriptor = descriptor.arrayDescriptor(for: TensorName.crossAttentionMask),
         let projectedKDescriptor = descriptor.arrayDescriptor(for: TensorName.encoderProjectedK),
@@ -336,14 +337,23 @@
         throw NeedleCoreAIEngineError.missingModelOutputs
       }
 
+      let crossShape = [1, 1, 1, promptTokenCount]
       var crossAttentionMask = InferenceFunction.AsyncMutableValue(
-        NDArray(descriptor: crossMaskDescriptor)
+        NDArray(descriptor: crossMaskDescriptor.resolvingDynamicDimensions(crossShape))
       )
+
+      let kvShape = [
+        self.configuration.decoderLayers,
+        1,
+        self.configuration.kvHeads,
+        promptTokenCount,
+        self.configuration.attentionHeadDimensions
+      ]
       var encoderProjectedK = InferenceFunction.AsyncMutableValue(
-        NDArray(descriptor: projectedKDescriptor)
+        NDArray(descriptor: projectedKDescriptor.resolvingDynamicDimensions(kvShape))
       )
       var encoderProjectedV = InferenceFunction.AsyncMutableValue(
-        NDArray(descriptor: projectedVDescriptor)
+        NDArray(descriptor: projectedVDescriptor.resolvingDynamicDimensions(kvShape))
       )
 
       var outputViews = InferenceFunction.AsyncMutableViews()
@@ -509,7 +519,10 @@
       stateViews.insert(&valueCache, for: TensorName.valueCache)
       stateViews.insert(&cacheOffset, for: TensorName.cacheOffset)
 
-      var logits = InferenceFunction.AsyncMutableValue(NDArray(descriptor: logitsArrayDescriptor))
+      let logitsShape = [1, inputIds.shape[1], self.configuration.vocabularySize]
+      var logits = InferenceFunction.AsyncMutableValue(
+        NDArray(descriptor: logitsArrayDescriptor.resolvingDynamicDimensions(logitsShape))
+      )
       var outputViews = InferenceFunction.AsyncMutableViews()
       outputViews.insert(&logits, for: TensorName.logits)
 

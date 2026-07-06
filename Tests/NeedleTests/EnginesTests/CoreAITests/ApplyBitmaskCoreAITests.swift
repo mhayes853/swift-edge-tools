@@ -9,7 +9,6 @@
     @Test
     @available(anyAppleOS 27.0, *)
     func `Filters Masked Tokens`() {
-
       var mask = NeedleGrammarBitmask(storage: [0, 0, 0])
       for i in 0..<mask.count {
         mask[i] = true
