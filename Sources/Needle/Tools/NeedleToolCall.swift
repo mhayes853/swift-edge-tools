@@ -80,6 +80,38 @@ public final class NeedleToolCall<Tool: NeedleTool>: Sendable, Observable, Ident
     }
   }
 
+  public var output: Tool.Output {
+    get async throws {
+      let action: InvokeAction = self.state.withLock { state in
+        switch state.status {
+        case .idle:
+          let task = Task { [weak self] in try await self?.run() }
+          self.registrar.withMutation(of: self, keyPath: \.status) {
+            state.status = .running(task)
+          }
+          return .awaitTask(task)
+        case .running(let task):
+          return .awaitTask(task)
+        case .finished(let result):
+          return .returnResult(result)
+        }
+      }
+
+      switch action {
+      case .awaitTask(let task):
+        let output = try await withTaskCancellationHandler {
+          try await task.value
+        } onCancel: {
+          task.cancel()
+        }
+        guard let output else { throw CancellationError() }
+        return output
+      case .returnResult(let result):
+        return try result.get()
+      }
+    }
+  }
+
   public init(id: NeedleToolCallID, tool: Tool, input: Tool.Input) {
     self.id = id
     self.tool = tool
@@ -92,36 +124,6 @@ public final class NeedleToolCall<Tool: NeedleTool>: Sendable, Observable, Ident
       case .running(let task): task.cancel()
       default: break
       }
-    }
-  }
-
-  public func invokeIfNecessary() async throws -> Tool.Output {
-    let action: InvokeAction = self.state.withLock { state in
-      switch state.status {
-      case .idle:
-        let task = Task { [weak self] in try await self?.run() }
-        self.registrar.withMutation(of: self, keyPath: \.status) {
-          state.status = .running(task)
-        }
-        return .awaitTask(task)
-      case .running(let task):
-        return .awaitTask(task)
-      case .finished(let result):
-        return .returnResult(result)
-      }
-    }
-
-    switch action {
-    case .awaitTask(let task):
-      let output = try await withTaskCancellationHandler {
-        try await task.value
-      } onCancel: {
-        task.cancel()
-      }
-      guard let output else { throw CancellationError() }
-      return output
-    case .returnResult(let result):
-      return try result.get()
     }
   }
 
@@ -161,6 +163,10 @@ public final class AnyNeedleToolCall: Sendable, Observable, Identifiable {
     self.base._id
   }
 
+  public var output: any Sendable {
+    get async throws { try await self.base._output }
+  }
+
   private let base: _AnyNeedleToolCall
 
   public init(_ toolCall: NeedleToolCall<some NeedleTool>) {
@@ -170,10 +176,6 @@ public final class AnyNeedleToolCall: Sendable, Observable, Identifiable {
   public func `as`<Tool: NeedleTool>(_: Tool.Type) -> NeedleToolCall<Tool>? {
     self.base as? NeedleToolCall<Tool>
   }
-
-  public func invokeIfNecessary() async throws -> any Sendable {
-    try await self.base._invokeIfNecessary()
-  }
 }
 
 private protocol _AnyNeedleToolCall: Sendable {
@@ -181,7 +183,7 @@ private protocol _AnyNeedleToolCall: Sendable {
   var _tool: any NeedleTool { get }
   var _input: any ConvertibleFromNeedleValue & Sendable { get nonmutating set }
   var _status: NeedleToolCallStatus<any Sendable> { get }
-  func _invokeIfNecessary() async throws -> any Sendable
+  var _output: any Sendable { get async throws }
 }
 
 extension NeedleToolCall: _AnyNeedleToolCall {
@@ -202,8 +204,8 @@ extension NeedleToolCall: _AnyNeedleToolCall {
     self.status.map { $0 }
   }
 
-  func _invokeIfNecessary() async throws -> any Sendable {
-    try await self.invokeIfNecessary()
+  var _output: any Sendable {
+    get async throws { try await self.output }
   }
 }
 

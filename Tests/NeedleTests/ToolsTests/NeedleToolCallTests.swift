@@ -15,7 +15,7 @@ struct `NeedleToolCall tests` {
   @Test
   func `Invoke Returns Output And Status Becomes Finished`() async throws {
     let call = NeedleToolCall(id: NeedleToolCallID(), tool: EchoTool(), input: "hello")
-    let output = try await call.invokeIfNecessary()
+    let output = try await call.output
 
     let expectedOutput = "echo: hello"
     expectNoDifference(output, expectedOutput)
@@ -30,7 +30,7 @@ struct `NeedleToolCall tests` {
       input: ""
     )
 
-    _ = Task { try await call.invokeIfNecessary() }
+    _ = Task { try await call.output }
 
     try await Task.sleep(for: .milliseconds(100))
     expectNoDifference(call.status.isRunning, true)
@@ -41,9 +41,9 @@ struct `NeedleToolCall tests` {
     let tool = DelayedCountingTool(duration: .milliseconds(200), output: "result")
     let call = NeedleToolCall(id: NeedleToolCallID(), tool: tool, input: "")
 
-    async let a = try await call.invokeIfNecessary()
-    async let b = try await call.invokeIfNecessary()
-    async let c = try await call.invokeIfNecessary()
+    async let a = try await call.output
+    async let b = try await call.output
+    async let c = try await call.output
 
     let results = try await [a, b, c]
 
@@ -56,8 +56,8 @@ struct `NeedleToolCall tests` {
     let tool = DelayedCountingTool(duration: .milliseconds(0), output: "cached")
     let call = NeedleToolCall(id: NeedleToolCallID(), tool: tool, input: "")
 
-    let first = try await call.invokeIfNecessary()
-    let second = try await call.invokeIfNecessary()
+    let first = try await call.output
+    let second = try await call.output
 
     expectNoDifference(first, "cached")
     expectNoDifference(second, "cached")
@@ -73,7 +73,7 @@ struct `NeedleToolCall tests` {
     )
 
     await #expect(throws: ToolError.self) {
-      _ = try await call.invokeIfNecessary()
+      _ = try await call.output
     }
     #expect(throws: ToolError.self) {
       _ = try call.status.result?.get()
@@ -89,10 +89,10 @@ struct `NeedleToolCall tests` {
     let call = NeedleToolCall(id: NeedleToolCallID(), tool: tool, input: "")
 
     await #expect(throws: ToolError.self) {
-      _ = try await call.invokeIfNecessary()
+      _ = try await call.output
     }
     await #expect(throws: ToolError.self) {
-      _ = try await call.invokeIfNecessary()
+      _ = try await call.output
     }
 
     expectNoDifference(tool.invokeCount, 1)
@@ -106,7 +106,7 @@ struct `NeedleToolCall tests` {
       input: ""
     )
 
-    let task = Task { try await call.invokeIfNecessary() }
+    let task = Task { try await call.output }
 
     try await Task.sleep(for: .milliseconds(50))
     task.cancel()
@@ -130,7 +130,7 @@ struct `NeedleToolCall tests` {
       didChange.withLock { $0 = true }
     }
 
-    _ = try await call.invokeIfNecessary()
+    _ = try await call.output
     didChange.withLock { expectNoDifference($0, true) }
   }
 

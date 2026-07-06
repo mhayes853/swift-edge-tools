@@ -93,7 +93,7 @@ extension NeedleToolCallCollection {
       for call in self.filter(predicate) {
         group.addTask {
           do {
-            let output = try await call.invokeIfNecessary()
+            let output = try await call.output
             return InvokeOutcome(tool: call.tool, result: .success(output))
           } catch {
             return InvokeOutcome(tool: call.tool, result: .failure(error))
