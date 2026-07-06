@@ -371,17 +371,17 @@
 
     private func stepLogits(from logits: NDArray) throws -> NDArray {
       let stepIndex = logits.shape[1] - 1
+      let vocabularySize = logits.shape[2]
+      let offset = stepIndex * vocabularySize
+      let scalars: [Float]
       switch logits.scalarType {
       case .bfloat16:
-        let shape = logits.shape
-        let vocabularySize = shape[2]
-        let offset = stepIndex * vocabularySize
         let view = Span<UInt16>(viewing: logits.rawView().bytes)
-        let scalars = (0..<vocabularySize).map { Float(bfloat16Bits: view[offset + $0]) }
-        return NDArray(scalars: scalars, shape: [1, scalars.count])
+        scalars = (0..<vocabularySize).map { Float(bfloat16Bits: view[offset + $0]) }
       default:
         throw NeedleCoreAIEngineError.unsupportedLogitsScalarType(logits.scalarType)
       }
+      return NDArray(scalars: scalars, shape: [1, scalars.count])
     }
 
     private static func decodeConfiguration(

@@ -3,8 +3,11 @@
   import Needle
 
   @available(anyAppleOS 27.0, *)
-  func exportNeedleCoreAI() async throws -> URL {
-    let outputDirectory = URL.swiftNeedleTestsDirectory.appending(path: "coreai-export")
+  func exportNeedleCoreAI(
+    outputDirectoryName: String = "coreai-export",
+    arguments: [String] = []
+  ) async throws -> URL {
+    let outputDirectory = URL.swiftNeedleTestsDirectory.appending(path: outputDirectoryName)
     if SelfCoreAIExport.filesExist(in: outputDirectory) {
       return outputDirectory
     }
@@ -25,7 +28,7 @@
       "cli.py",
       "--output",
       outputDirectory.path()
-    ]
+    ] + arguments
 
     let outputPipe = Pipe()
     process.standardOutput = outputPipe
@@ -48,8 +51,11 @@
   }
 
   @available(anyAppleOS 27.0, *)
-  func makeNeedleCoreAIEngine() async throws -> NeedleCoreAIEngine {
-    let directory = try await exportNeedleCoreAI()
+  func makeNeedleCoreAIEngine(quantizerPreset: String? = nil) async throws -> NeedleCoreAIEngine {
+    let directory = try await exportNeedleCoreAI(
+      outputDirectoryName: SelfCoreAIExport.outputDirectoryName(quantizerPreset: quantizerPreset),
+      arguments: quantizerPreset.map { ["--quantizer-preset", $0] } ?? []
+    )
     return try await NeedleCoreAIEngine(modelDirectoryURL: directory)
   }
 
@@ -66,13 +72,18 @@
 
     static func filesExist(in directory: URL) -> Bool {
       let fileManager = FileManager.default
-      return [
+      let hasTokenizer = ["tokenizer.model", "tokenizer.json"]
+        .contains { fileManager.fileExists(atPath: directory.appending(path: $0).path()) }
+      return hasTokenizer && [
         "encoder.aimodel",
         "decoder.aimodel",
-        "configuration.json",
-        "tokenizer.model"
+        "configuration.json"
       ]
       .allSatisfy { fileManager.fileExists(atPath: directory.appending(path: $0).path()) }
+    }
+
+    static func outputDirectoryName(quantizerPreset: String?) -> String {
+      quantizerPreset.map { "coreai-export-\($0)" } ?? "coreai-export"
     }
 
     static func pythonExecutable(in pythonDirectory: URL) -> URL {

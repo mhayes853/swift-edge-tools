@@ -132,6 +132,25 @@
 
     @Test
     @available(anyAppleOS 27.0, *)
+    func `Generate Basics With W8 Quantized Export`() async throws {
+      let engine = try await makeNeedleCoreAIEngine(quantizerPreset: "w8")
+      let tokens = Lock([NeedleToken]())
+      let generationTask = try engine.generate(
+        prompt: .sendAdventureEmail,
+        parameters: .default
+      ) { token in tokens.withLock { $0.append(token) } }
+      let generation = try await generationTask.value
+
+      expectNoDifference(generation.wasStopped, false)
+      withKnownIssue {
+        assertSnapshot(of: generation, as: .dump, record: .all)
+        assertSnapshot(of: generation.metadata, as: .dump, record: .all)
+        assertSnapshot(of: generation.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
+      }
+    }
+
+    @Test
+    @available(anyAppleOS 27.0, *)
     func `Generate Through NeedleSession`() async throws {
       let engine = try await makeNeedleCoreAIEngine()
       let session = NeedleSession(engine: engine)

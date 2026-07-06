@@ -6,7 +6,7 @@ requires-python = ">=3.9"
 dependencies = [
     "torch==2.10.0",
     "coreai-opt>=0.2.1",
-    "coreai-torch==0.4.0",
+    "coreai-torch==0.4.1",
     "huggingface_hub>=1.21.0",
     "PyYAML>=6.0",
     "safetensors>=0.6.2",
