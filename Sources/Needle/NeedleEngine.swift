@@ -8,14 +8,14 @@ public protocol NeedleEngine: Sendable {
 
   func generate(
     prompt: NeedlePrompt,
-    parameters: sending GenerateParameters,
+    parameters: GenerateParameters,
     onToken: @escaping @Sendable (NeedleToken) -> Void
   ) throws -> GenerationTask
 }
 
 // MARK: - NeedleEngineGenerateParemeters
 
-public protocol NeedleEngineGenerateParameters {
+public protocol NeedleEngineGenerateParameters: Sendable {
   static var `default`: Self { get }
 }
 

@@ -5,7 +5,7 @@
   import Atomics
 
   @available(anyAppleOS 27.0, *)
-  public final class NeedleCoreAIEngine: NeedleEngine, Sendable {
+  public final class NeedleCoreAIEngine: NeedleEngine {
     public final class GenerationTask: NeedleEngineGenerationTask {
       private let task: Task<NeedleEngineGeneration, any Error>
       private let isStopped: ManagedAtomic<Bool>
@@ -30,20 +30,28 @@
     public struct GenerateParameters: NeedleEngineGenerateParameters {
       public static var `default`: Self { Self() }
 
-      public var sampler: any Sampler
-      public var processor: (any LogitsProcessor)?
+      private var _sampler: @Sendable () -> any Sampler
+      private var _processor: @Sendable () -> (any LogitsProcessor)?
+
+      public var sampler: any Sampler {
+        self._sampler()
+      }
+      public var processor: (any LogitsProcessor)? {
+        self._processor()
+      }
+
       public var toolCallInvocationRange: NeedleXGrammarEngine.ToolCallInvocationRange
       public var maxTokens: Int?
 
       public init(
-        sampler: any Sampler = ArgmaxSampler(),
-        processor: (any LogitsProcessor)? = nil,
+        sampler: @autoclosure @escaping @Sendable () -> any Sampler = ArgmaxSampler(),
+        processor: @autoclosure @escaping @Sendable () -> (any LogitsProcessor)? = nil,
         toolCallInvocationRange: NeedleXGrammarEngine.ToolCallInvocationRange =
           .unbounded(minimum: 0),
         maxTokens: Int? = 1024
       ) {
-        self.sampler = sampler
-        self.processor = processor
+        self._sampler = sampler
+        self._processor = processor
         self.toolCallInvocationRange = toolCallInvocationRange
         self.maxTokens = maxTokens
       }
@@ -168,12 +176,11 @@
 
     public func generate(
       prompt: NeedlePrompt,
-      parameters: sending GenerateParameters,
+      parameters: GenerateParameters,
       onToken: @escaping @Sendable (NeedleToken) -> Void
     ) throws -> GenerationTask {
       let isStopped = ManagedAtomic(false)
       let task = Task {
-        nonisolated(unsafe) let parameters = parameters
         let range = parameters.toolCallInvocationRange
         let matcher = try self.state.withLock { state in
           let matcher = try state.matcherPool.matcher(
@@ -198,7 +205,7 @@
 
     private func generate(
       prompt: NeedlePrompt,
-      parameters: sending GenerateParameters,
+      parameters: GenerateParameters,
       onToken: @escaping @Sendable (NeedleToken) -> Void,
       matcher: NeedleXGrammarEngine.Matcher,
       configuration: NeedleModelConfiguration,
@@ -207,6 +214,7 @@
       try Task.checkCancellation()
       guard !isStopped.load(ordering: .relaxed) else { return .empty }
 
+      let sampler = parameters.sampler
       var processor = parameters.processor
       let generateStart = self.clock.now
       let (encoderOutputs, prefillMetrics) = try await self.prefill(
@@ -241,7 +249,7 @@
         applyBitmaskCoreAI(logits: &maskedLogits, mask: matcher.bitmask())
         try confidence.add(logits: maskedLogits)
 
-        let tokenId = parameters.sampler.sample(logits: maskedLogits)
+        let tokenId = sampler.sample(logits: maskedLogits)
         durationToFirstToken = durationToFirstToken ?? generateStart.duration(to: self.clock.now)
 
         let tokenString = detokenizer.decode(tokenId: tokenId)

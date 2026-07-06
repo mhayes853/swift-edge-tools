@@ -90,7 +90,7 @@ extension NeedleSession {
     tools: [any NeedleTool],
     with prompt: String,
     systemPromptOverride: String? = nil,
-    parameters: sending Engine.GenerateParameters = .default,
+    parameters: Engine.GenerateParameters = .default,
     shouldInvokeTools: @escaping @Sendable (AnyNeedleToolCall) -> Bool = { _ in true }
   ) async throws -> NeedleSessionGeneration {
     let stream = self.stream(
@@ -158,14 +158,10 @@ public final class NeedleSessionStream: Sendable, Observable, Identifiable {
     tools: [any NeedleTool],
     with prompt: String,
     systemPrompt: String,
-    parameters: sending Engine.GenerateParameters,
+    parameters: Engine.GenerateParameters,
     shouldInvokeTools: @escaping @Sendable (AnyNeedleToolCall) -> Bool
   ) {
     let task = Task {
-      // NB: This is safe, the compiler must assume the worst when it can't infer isolation
-      // regions fully, but at most the params predicate get sent into the engine and are only
-      // used by it from there on.
-      nonisolated(unsafe) let parameters = parameters
       return try await self.runGeneration(
         session: session,
         tools: tools,
@@ -183,7 +179,7 @@ public final class NeedleSessionStream: Sendable, Observable, Identifiable {
     tools: [any NeedleTool],
     prompt: String,
     systemPrompt: String,
-    parameters: sending Engine.GenerateParameters,
+    parameters: Engine.GenerateParameters,
     shouldInvokeTools: @escaping @Sendable (AnyNeedleToolCall) -> Bool
   ) async throws -> NeedleSessionGeneration {
     let stoppedBeforeGeneration: NeedleSessionGeneration? = self.state.withLock { state in
@@ -457,7 +453,7 @@ extension NeedleSession {
     tools: [any NeedleTool],
     with prompt: String,
     systemPromptOverride: String? = nil,
-    parameters: sending Engine.GenerateParameters = .default,
+    parameters: Engine.GenerateParameters = .default,
     shouldInvokeTools: @escaping @Sendable (AnyNeedleToolCall) -> Bool = { _ in true }
   ) -> NeedleSessionStream {
     if let message = duplicateToolNameError(tools.map(\.name)) {

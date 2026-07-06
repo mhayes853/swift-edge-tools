@@ -35,8 +35,16 @@
         Self()
       }
 
-      public var sampler: LogitSampler
-      public var processor: LogitProcessor?
+      private var _sampler: @Sendable () -> any LogitSampler
+      private var _processor: @Sendable () -> (any LogitProcessor)?
+
+      public var sampler: any LogitSampler {
+        self._sampler()
+      }
+      public var processor: (any LogitProcessor)? {
+        self._processor()
+      }
+
       public var toolCallInvocationRange: NeedleXGrammarEngine.ToolCallInvocationRange
       public var maxTokens: Int?
       public var kvCacheQuantizationBits: Int?
@@ -44,8 +52,8 @@
       public var synchronizeStreamForMemorySnapshots: Bool
 
       public init(
-        sampler: any LogitSampler = ArgMaxSampler(),
-        processor: (any LogitProcessor)? = nil,
+        sampler: @autoclosure @escaping @Sendable () -> any LogitSampler = ArgMaxSampler(),
+        processor: @autoclosure @escaping @Sendable () -> (any LogitProcessor)? = nil,
         toolCallInvocationRange: NeedleXGrammarEngine.ToolCallInvocationRange =
           .unbounded(minimum: 0),
         maxTokens: Int? = 1024,
@@ -53,8 +61,8 @@
         kvCacheQuantizationGroupSize: Int = 64,
         synchronizeStreamForMemorySnapshots: Bool = true
       ) {
-        self.sampler = sampler
-        self.processor = processor
+        self._sampler = sampler
+        self._processor = processor
         self.toolCallInvocationRange = toolCallInvocationRange
         self.maxTokens = maxTokens
         self.kvCacheQuantizationBits = kvCacheQuantizationBits
@@ -127,14 +135,11 @@
 
     public func generate(
       prompt: NeedlePrompt,
-      parameters: sending GenerateParameters,
+      parameters: GenerateParameters,
       onToken: @escaping @Sendable (NeedleToken) -> Void
     ) throws -> GenerationTask {
       let isStopped = ManagedAtomic(false)
       let task = Task {
-        // NB: This is safe, Swift must infer the worst when it can't infer isolation. We only
-        // use the params within `generate` and not as a part of the return value.
-        nonisolated(unsafe) let parameters = parameters
         return try self.state.withLock { state in
           try self.generate(
             prompt: prompt,
@@ -150,7 +155,7 @@
 
     private func generate(
       prompt: NeedlePrompt,
-      parameters: sending GenerateParameters,
+      parameters: GenerateParameters,
       onToken: @escaping @Sendable (NeedleToken) -> Void,
       state: inout sending State,
       isStopped: ManagedAtomic<Bool>
@@ -172,6 +177,7 @@
       )
       let generateStart = self.clock.now
 
+      let sampler = parameters.sampler
       var processor = parameters.processor
       var cache = state.model.newCache(parameters: nil)
       let (prefillOutput, prefillMetrics, postPrefillSnapshot) = try self.prefill(
@@ -201,7 +207,7 @@
         )
         confidence.add(logits: logits)
 
-        let token = parameters.sampler.sample(logits: logits)
+        let token = sampler.sample(logits: logits)
         let tokenId = token.item(NeedleToken.ID.self)
 
         durationToFirstToken = durationToFirstToken ?? generateStart.duration(to: self.clock.now)

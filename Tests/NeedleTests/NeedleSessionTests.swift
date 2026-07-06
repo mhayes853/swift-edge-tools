@@ -828,7 +828,7 @@
 
     func generate(
       prompt: NeedlePrompt,
-      parameters: sending GenerateParameters,
+      parameters: GenerateParameters,
       onToken: @escaping @Sendable (NeedleToken) -> Void
     ) throws -> GenerationTask {
       self._generateCallCount.withLock { $0 += 1 }
