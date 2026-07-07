@@ -350,7 +350,7 @@
         let matcher = try self.engine.compile(tools: [.complexTool])
 
         let call =
-          #"<tool_call> [{"name":"complex_tool","arguments":{"config":{"flags":[true,false],"threshold":0.75},"count":3.5,"enabled":true,"labels":{"ALPHA":1,"BETA_LABEL":2},"mode":"execute","optional_note":null,"priority":4,"routing":{"region":"us-west"},"tags":["a","b"],"ticket_id":"ABC-12","title":"alpha","tuple_args":["alpha",2,true],"window":3}}]"#
+          #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1,"BETA_LABEL":2},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}}]"#
 
         assertAccepts(call, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
       }
