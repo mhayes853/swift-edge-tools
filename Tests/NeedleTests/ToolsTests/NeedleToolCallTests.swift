@@ -133,19 +133,4 @@ struct `NeedleToolCall tests` {
     _ = try await call.output
     didChange.withLock { expectNoDifference($0, true) }
   }
-
-  @Test
-  func `Input Is Observable`() {
-    let call = NeedleToolCall(id: NeedleToolCallID(), tool: EchoTool(), input: "blob")
-
-    let didChange = Lock(false)
-    withObservationTracking {
-      _ = call.input
-    } onChange: {
-      didChange.withLock { $0 = true }
-    }
-
-    call.input = "new"
-    didChange.withLock { expectNoDifference($0, true) }
-  }
 }

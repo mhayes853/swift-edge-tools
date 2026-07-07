@@ -47,25 +47,13 @@ public final class NeedleToolCall<Tool: NeedleTool>: Sendable, Observable, Ident
 
   private struct State {
     var status = Status.idle
-    var input: Tool.Input
     var task: Task<Void, any Error>?
   }
 
   private let state: Lock<State>
   private let registrar = ObservationRegistrar()
 
-  public var input: Tool.Input {
-    get {
-      self.registrar.access(self, keyPath: \.input)
-      return self.state.withLock { $0.input }
-    }
-    set {
-      self.registrar.withMutation(of: self, keyPath: \.input) {
-        self.state.withLock { $0.input = newValue }
-      }
-    }
-  }
-
+  public let input: Tool.Input
   public let id: NeedleToolCallID
   public let tool: Tool
 
@@ -110,7 +98,8 @@ public final class NeedleToolCall<Tool: NeedleTool>: Sendable, Observable, Ident
   public init(id: NeedleToolCallID, tool: Tool, input: Tool.Input) {
     self.id = id
     self.tool = tool
-    self.state = Lock(State(input: input))
+    self.input = input
+    self.state = Lock(State())
   }
 
   deinit {
@@ -146,8 +135,7 @@ public final class AnyNeedleToolCall: Sendable, Observable, Identifiable {
   }
 
   public var input: any ConvertibleFromNeedleValue & Sendable {
-    get { self.base._input }
-    set { self.base._input = newValue }
+    self.base._input
   }
 
   public var status: NeedleToolCallStatus<any Sendable> {
@@ -176,7 +164,7 @@ public final class AnyNeedleToolCall: Sendable, Observable, Identifiable {
 private protocol _AnyNeedleToolCall: Sendable {
   var _id: NeedleToolCallID { get }
   var _tool: any NeedleTool { get }
-  var _input: any ConvertibleFromNeedleValue & Sendable { get nonmutating set }
+  var _input: any ConvertibleFromNeedleValue & Sendable { get }
   var _status: NeedleToolCallStatus<any Sendable> { get }
   var _output: any Sendable { get async throws }
 }
@@ -186,13 +174,7 @@ extension NeedleToolCall: _AnyNeedleToolCall {
   var _tool: any NeedleTool { self.tool }
 
   var _input: any ConvertibleFromNeedleValue & Sendable {
-    get { self.input }
-    set {
-      guard let input = newValue as? Tool.Input else {
-        fatalError("New input value must have the same type as the existing input value.")
-      }
-      self.input = input
-    }
+    self.input
   }
 
   var _status: NeedleToolCallStatus<any Sendable> {
