@@ -425,10 +425,6 @@ extension NeedleGenerationSchema {
     Self([.pattern: .string(value)])
   }
 
-  public static func pattern<Output>(_ value: Regex<Output>) -> Self {
-    Self.pattern(String(describing: value))
-  }
-
   public static func lengthRange(_ range: ClosedRange<Int>) -> Self {
     Self(.minLength(range.lowerBound), .maxLength(range.upperBound))
   }
