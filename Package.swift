@@ -19,13 +19,14 @@ let package = Package(
   traits: [
     .trait(name: "XGrammar", description: "XGrammar-powered structured generation."),
     .trait(name: "Sentencepiece", description: "Pretrained Sentencepiece tokenizer support."),
-    .trait(name: "MLX", description: "MLX Engine Support.", enabledTraits: ["XGrammar"]),
+    .trait(name: "MLX", description: "MLX engine support.", enabledTraits: ["XGrammar"]),
     .trait(
       name: "CoreAI",
-      description: "CoreAI Engine Support (experimental).",
+      description: "CoreAI engine support (experimental).",
       enabledTraits: ["XGrammar"]
     ),
-    .default(enabledTraits: ["XGrammar", "MLX", "Sentencepiece", "CoreAI"])
+    .trait(name: "CoreML", description: "CoreML engine support.", enabledTraits: ["XGrammar"]),
+    .default(enabledTraits: ["XGrammar", "MLX", "Sentencepiece", "CoreAI", "CoreML"])
   ],
   dependencies: [
     .package(url: "https://github.com/ml-explore/mlx-swift-lm", from: "3.31.3"),
