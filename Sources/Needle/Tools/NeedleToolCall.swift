@@ -193,6 +193,7 @@ public enum NeedleToolCallStatus<Output> {
   case running
   case finished(Result<Output, any Error>)
 
+  @inlinable
   public func map<T, E: Error>(
     _ body: (Output) throws(E) -> T
   ) throws(E) -> NeedleToolCallStatus<T> {
@@ -200,6 +201,18 @@ public enum NeedleToolCallStatus<Output> {
     case .idle: .idle
     case .running: .running
     case .finished(.success(let output)): .finished(.success(try body(output)))
+    case .finished(.failure(let error)): .finished(.failure(error))
+    }
+  }
+
+  @inlinable
+  public func flatMap<T, E: Error>(
+    _ body: (Output) throws(E) -> NeedleToolCallStatus<T>
+  ) throws(E) -> NeedleToolCallStatus<T> {
+    switch self {
+    case .idle: .idle
+    case .running: .running
+    case .finished(.success(let output)): try body(output)
     case .finished(.failure(let error)): .finished(.failure(error))
     }
   }
