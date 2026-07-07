@@ -120,16 +120,22 @@ The repository also includes a runnable shell wrapper:
 ./scripts/export_needle_coreai_e2e.sh
 ```
 
+```bash
+./scripts/export_needle_coreml_e2e.sh
+```
+
 With an explicit source and output:
 
 ```bash
 ./scripts/export_needle_coreai_e2e.sh /path/to/needle-bundle ./build/coreai-export
+./scripts/export_needle_coreml_e2e.sh /path/to/needle-bundle ./build/coreml-export
 ```
 
 Defaults:
 
 - source: `Cactus-Compute/needle-hf`
-- output: `python/build/coreai-export`
+- CoreAI output: `python/build/coreai-export`
+- CoreML output: `python/build/coreml-export`
 
 ## Tests
 

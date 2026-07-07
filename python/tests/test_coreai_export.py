@@ -11,14 +11,14 @@ from coreai.runtime import AIModelAssetMetadata
 from coreai_opt.quantization import QuantizerConfig
 
 from needle import Needle, NeedleModelConfiguation
-from needle.needle_compression import CoreAIQuantizerCompressor
-from needle.coreai_export import (
-    _encoder_dynamic_shapes,
-    _export_program,
-    _load_needle_model,
-    _sample_encoder_input,
-    export_needle_coreai,
+from needle.coreai_export import export_needle_coreai
+from needle.export_helpers import (
+    encoder_dynamic_shapes,
+    export_program,
+    load_needle_model,
+    sample_encoder_input,
 )
+from needle.needle_compression import CoreAIQuantizerCompressor
 
 
 class CoreAIExportTests(unittest.TestCase):
@@ -39,12 +39,12 @@ class CoreAIExportTests(unittest.TestCase):
             dtype="float32",
         )
         needle = Needle(configuration)
-        sample = (_sample_encoder_input(configuration, 4),)
+        sample = (sample_encoder_input(configuration, 4),)
 
-        exported_program = _export_program(
+        exported_program = export_program(
             needle.encoder,
             sample,
-            dynamic_shapes=_encoder_dynamic_shapes(configuration),
+            dynamic_shapes=encoder_dynamic_shapes(configuration),
         )
 
         self.assertEqual(len(exported_program.range_constraints), 1)
@@ -68,7 +68,7 @@ class CoreAIExportTests(unittest.TestCase):
             needle = Needle(configuration)
             torch.save(needle.state_dict(), source_directory / "weights.pkl")
 
-            loaded = _load_needle_model(configuration, source_directory / "weights.pkl")
+            loaded = load_needle_model(configuration, source_directory / "weights.pkl")
 
             self.assertEqual(next(loaded.parameters()).dtype, torch.bfloat16)
         finally:

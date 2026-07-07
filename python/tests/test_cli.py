@@ -4,10 +4,10 @@ import io
 import json
 import tempfile
 import unittest
-from unittest.mock import patch
 from contextlib import redirect_stdout
 from pathlib import Path
 from typing import TypeVar, cast
+from unittest.mock import patch
 
 import torch
 import yaml
@@ -18,6 +18,7 @@ from coreai_opt.quantization import QuantizerConfig
 from cli import (
     _build_authoring_metadata,
     _build_compression_config,
+    _parse_backend,
     main,
     parse_arguments,
 )
@@ -174,6 +175,32 @@ class CLITests(unittest.TestCase):
             ["macOS", "iOS"],
         )
 
+    def test_parse_backend_supports_case_insensitive_engine_names(self) -> None:
+        self.assertEqual(_parse_backend("CoreAI").value, "coreai")
+        self.assertEqual(_parse_backend("coreml").value, "coreml")
+
+    def test_main_dispatches_coreml_backend_case_insensitively(self) -> None:
+        with (
+            patch("cli.export_needle_coreai") as export_needle_coreai_mock,
+            patch("cli._export_needle_coreml") as export_needle_coreml_mock,
+        ):
+            export_needle_coreml_mock.return_value = Path("/tmp/coreml-export")
+
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "--output",
+                        "./build/coreml-export",
+                        "--backend",
+                        "coreml",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        export_needle_coreai_mock.assert_not_called()
+        export_needle_coreml_mock.assert_called_once()
+
     def test_main_persists_authoring_metadata(self) -> None:
         source_ctx = tempfile.TemporaryDirectory()
         output_ctx = tempfile.TemporaryDirectory()
@@ -244,7 +271,10 @@ class CLITests(unittest.TestCase):
             source_ctx.cleanup()
 
     def _custom_metadata(self, metadata: AIModelAssetMetadata) -> dict[str, str]:
-        return cast(dict[str, str], getattr(metadata, "creator_defined_metadata"))
+        return cast(
+            dict[str, str],
+            object.__getattribute__(metadata, "creator_defined_metadata"),
+        )
 
     def _unwrap_metadata(
         self, metadata: AIModelAssetMetadata | None
