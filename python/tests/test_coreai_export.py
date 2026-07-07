@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from typing import Callable, cast
+from unittest.mock import patch
 
 import torch
 from coreai.authoring.asset import AIModelAsset
@@ -77,6 +78,36 @@ class CoreAIExportTests(unittest.TestCase):
         compressor = CoreAIQuantizerCompressor(QuantizerConfig.presets.w8())
         self._assert_export_runs_end_to_end(compressor=compressor)
 
+    def test_export_needle_coreai_supports_ahead_of_time_compilation(self) -> None:
+        def compile_model_asset(
+            source_asset_path: Path,
+            *,
+            output_directory: Path,
+            platforms: tuple[str, ...] | list[str],
+        ) -> None:
+            self.assertEqual(list(platforms), ["macOS"])
+            compiled_path = output_directory / f"{source_asset_path.stem}.h16c.aimodelc"
+            compiled_path.mkdir(parents=True)
+            (compiled_path / "metadata.json").write_text("{}")
+
+        with patch(
+            "needle.coreai_export._compile_model_asset",
+            side_effect=compile_model_asset,
+        ) as compile_model_asset_mock:
+            self._assert_export_runs_end_to_end(
+                compile_platforms=["macOS"],
+                expected_model_paths=[
+                    "encoder.h16c.aimodelc",
+                    "decoder.h16c.aimodelc",
+                ],
+                unexpected_model_paths=[
+                    "encoder.aimodel",
+                    "decoder.aimodel",
+                ],
+            )
+
+        self.assertEqual(compile_model_asset_mock.call_count, 2)
+
     def test_export_needle_coreai_persists_model_metadata(self) -> None:
         metadata = AIModelAssetMetadata()
         metadata.author = "Needle Tests"
@@ -99,7 +130,10 @@ class CoreAIExportTests(unittest.TestCase):
         self,
         compressor=None,
         model_metadata: AIModelAssetMetadata | None = None,
+        compile_platforms: list[str] | None = None,
         post_export_assertions: Callable[[Path], None] | None = None,
+        expected_model_paths: list[str] | None = None,
+        unexpected_model_paths: list[str] | None = None,
     ) -> None:
         source_ctx = tempfile.TemporaryDirectory()
         output_ctx = tempfile.TemporaryDirectory()
@@ -138,11 +172,20 @@ class CoreAIExportTests(unittest.TestCase):
                 output_directory,
                 compressor=compressor,
                 model_metadata=model_metadata,
+                compile_platforms=compile_platforms or [],
             )
 
+            expected_model_paths = expected_model_paths or [
+                "encoder.aimodel",
+                "decoder.aimodel",
+            ]
+            unexpected_model_paths = unexpected_model_paths or []
+
             self.assertEqual(result, output_directory.resolve())
-            self.assertTrue((result / "encoder.aimodel").exists())
-            self.assertTrue((result / "decoder.aimodel").exists())
+            for model_path in expected_model_paths:
+                self.assertTrue((result / model_path).exists())
+            for model_path in unexpected_model_paths:
+                self.assertFalse((result / model_path).exists())
             self.assertTrue((result / "configuration.json").exists())
             self.assertTrue((result / "tokenizer.json").exists())
             if post_export_assertions is not None:

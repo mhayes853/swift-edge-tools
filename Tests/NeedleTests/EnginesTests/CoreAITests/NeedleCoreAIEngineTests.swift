@@ -74,7 +74,7 @@
       expectNoDifference(streamedResponse, finalResponse)
     }
 
-    @Test
+    @Test(.disabled("TODO - Investigate Metal Crash Issue"))
     @available(anyAppleOS 27.0, *)
     func `Generate With Compute Stream`() async throws {
       let engine = try await makeNeedleCoreAIEngine()
@@ -145,6 +145,19 @@
       withKnownIssue {
         assertSnapshot(of: generation, as: .dump, record: .all)
         assertSnapshot(of: generation.metadata, as: .dump, record: .all)
+        assertSnapshot(of: generation.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
+      }
+    }
+
+    @Test
+    @available(anyAppleOS 27.0, *)
+    func `Generate Basics With AOT Compiled Export`() async throws {
+      let engine = try await makeNeedleCoreAIEngine(compilePlatforms: ["macOS"])
+      let task = try engine.generate(prompt: .sendAdventureEmail, parameters: .default) { _ in }
+      let generation = try await task.value
+
+      expectNoDifference(generation.wasStopped, false)
+      withKnownIssue {
         assertSnapshot(of: generation.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
       }
     }

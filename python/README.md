@@ -40,6 +40,10 @@ The output bundle contains:
 - `configuration.json`
 - `tokenizer.model` or `tokenizer.json`
 
+If ahead-of-time compilation is enabled, the output contains compiled
+`encoder.*.aimodelc` and `decoder.*.aimodelc` assets instead of the source
+`.aimodel` directories.
+
 ## CLI Usage
 
 From `python/`:
@@ -68,6 +72,15 @@ python3 cli.py \
   --quantizer-execution-mode eager
 ```
 
+With ahead-of-time compilation:
+
+```bash
+python3 cli.py \
+  --source Cactus-Compute/needle-hf \
+  --output ./build/coreai-export \
+  --compile-platform macOS
+```
+
 With metadata and quantizer config files:
 
 ```bash
@@ -82,6 +95,10 @@ The CLI accepts JSON or YAML for:
 
 - `--authoring-metadata`
 - `--quantizer-config`
+
+Ahead-of-time compilation flags:
+
+- `--compile-platform PLATFORM`
 
 Supported compression convenience flags:
 

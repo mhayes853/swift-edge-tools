@@ -25,6 +25,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Export Needle CoreAI models")
     parser.add_argument("--source", default=DEFAULT_SOURCE)
     parser.add_argument("--output", required=True)
+    parser.add_argument(
+        "--compile-platform",
+        action="append",
+        default=[],
+        dest="compile_platforms",
+        metavar="PLATFORM",
+    )
 
     parser.add_argument("--authoring-metadata")
     parser.add_argument("--authoring-author")
@@ -208,6 +215,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
             parsed.output,
             compressor=compressor,
             model_metadata=model_metadata,
+            compile_platforms=parsed.compile_platforms,
         )
     sys.stdout.write(f"{output_directory}\n")
     sys.stdout.flush()

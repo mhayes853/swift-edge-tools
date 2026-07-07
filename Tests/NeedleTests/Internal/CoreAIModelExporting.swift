@@ -51,10 +51,18 @@
   }
 
   @available(anyAppleOS 27.0, *)
-  func makeNeedleCoreAIEngine(quantizerPreset: String? = nil) async throws -> NeedleCoreAIEngine {
+  func makeNeedleCoreAIEngine(
+    quantizerPreset: String? = nil,
+    compilePlatforms: [String] = []
+  ) async throws -> NeedleCoreAIEngine {
+    var arguments = quantizerPreset.map { ["--quantizer-preset", $0] } ?? []
+    arguments += compilePlatforms.flatMap { ["--compile-platform", $0] }
     let directory = try await exportNeedleCoreAI(
-      outputDirectoryName: SelfCoreAIExport.outputDirectoryName(quantizerPreset: quantizerPreset),
-      arguments: quantizerPreset.map { ["--quantizer-preset", $0] } ?? []
+      outputDirectoryName: SelfCoreAIExport.outputDirectoryName(
+        quantizerPreset: quantizerPreset,
+        compilePlatforms: compilePlatforms
+      ),
+      arguments: arguments
     )
     return try await NeedleCoreAIEngine(modelDirectoryURL: directory)
   }
@@ -74,16 +82,29 @@
       let fileManager = FileManager.default
       let hasTokenizer = ["tokenizer.model", "tokenizer.json"]
         .contains { fileManager.fileExists(atPath: directory.appending(path: $0).path()) }
-      return hasTokenizer && [
-        "encoder.aimodel",
-        "decoder.aimodel",
-        "configuration.json"
-      ]
-      .allSatisfy { fileManager.fileExists(atPath: directory.appending(path: $0).path()) }
+      guard hasTokenizer else { return false }
+
+      let contents = (try? fileManager.contentsOfDirectory(atPath: directory.path())) ?? []
+      let hasEncoderModel = contents.contains("encoder.aimodel")
+        || contents.contains { $0.hasPrefix("encoder.") && $0.hasSuffix(".aimodelc") }
+      let hasDecoderModel = contents.contains("decoder.aimodel")
+        || contents.contains { $0.hasPrefix("decoder.") && $0.hasSuffix(".aimodelc") }
+      return hasEncoderModel
+        && hasDecoderModel
+        && fileManager.fileExists(atPath: directory.appending(path: "configuration.json").path())
     }
 
-    static func outputDirectoryName(quantizerPreset: String?) -> String {
-      quantizerPreset.map { "coreai-export-\($0)" } ?? "coreai-export"
+    static func outputDirectoryName(
+      quantizerPreset: String?,
+      compilePlatforms: [String]
+    ) -> String {
+      let compileSuffix = compilePlatforms.isEmpty
+        ? ""
+        : "-aot-" + compilePlatforms.joined(separator: "-")
+      if let quantizerPreset {
+        return "coreai-export-\(quantizerPreset)\(compileSuffix)"
+      }
+      return "coreai-export\(compileSuffix)"
     }
 
     static func pythonExecutable(in pythonDirectory: URL) -> URL {

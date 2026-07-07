@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import shutil
+import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Union
+from typing import Any, Sequence, Union
 
 import torch
 from coreai.authoring.asset import AIProgram
@@ -28,6 +30,7 @@ def export_needle_coreai(
     *,
     compressor: NeedleCompressor | None = None,
     model_metadata: AIModelAssetMetadata | None = None,
+    compile_platforms: Sequence[str] = (),
 ) -> Path:
     source_files = _resolve_model_source(source)
     configuration = _load_configuration(source_files.configuration_path)
@@ -41,15 +44,19 @@ def export_needle_coreai(
         configuration,
         compressor=compressor,
     )
-    _save_program(
+    _persist_program(
         encoder_program,
-        output_directory / "encoder.aimodel",
+        output_directory=output_directory,
+        name="encoder",
         metadata=model_metadata,
+        compile_platforms=compile_platforms,
     )
-    _save_program(
+    _persist_program(
         decoder_program,
-        output_directory / "decoder.aimodel",
+        output_directory=output_directory,
+        name="decoder",
         metadata=model_metadata,
+        compile_platforms=compile_platforms,
     )
     _copy_bundle_resources(source_files, output_directory)
     return output_directory
@@ -329,6 +336,28 @@ def _export_program(
     ).run_decompositions(get_decomp_table())
 
 
+def _persist_program(
+    program: AIProgram,
+    *,
+    output_directory: Path,
+    name: str,
+    metadata: AIModelAssetMetadata | None = None,
+    compile_platforms: Sequence[str] = (),
+) -> None:
+    if compile_platforms:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            source_asset_path = Path(temporary_directory) / f"{name}.aimodel"
+            _save_program(program, source_asset_path, metadata=metadata)
+            _compile_model_asset(
+                source_asset_path,
+                output_directory=output_directory,
+                platforms=compile_platforms,
+            )
+        return
+
+    _save_program(program, output_directory / f"{name}.aimodel", metadata=metadata)
+
+
 def _save_program(
     program: AIProgram,
     path: Path,
@@ -338,3 +367,31 @@ def _save_program(
     if path.exists():
         shutil.rmtree(path)
     program.save_asset(path, metadata=metadata)
+
+
+def _compile_model_asset(
+    source_asset_path: Path,
+    *,
+    output_directory: Path,
+    platforms: Sequence[str],
+) -> None:
+    command = [
+        "xcrun",
+        "coreai-build",
+        "compile",
+        str(source_asset_path),
+        "--output",
+        str(output_directory),
+    ]
+    for platform in platforms:
+        command.extend(["--platform", platform])
+
+    try:
+        subprocess.run(command, check=True, capture_output=True, text=True)
+    except subprocess.CalledProcessError as error:
+        output = "\n".join(
+            value for value in [error.stdout.strip(), error.stderr.strip()] if value
+        )
+        raise RuntimeError(
+            f"Failed to compile CoreAI model asset {source_asset_path.name}: {output}"
+        ) from error

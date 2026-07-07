@@ -4,6 +4,7 @@ import io
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from contextlib import redirect_stdout
 from pathlib import Path
 from typing import TypeVar, cast
@@ -148,6 +149,30 @@ class CLITests(unittest.TestCase):
                     self.assertEqual(config.execution_mode.value, "eager")
         finally:
             directory_ctx.cleanup()
+
+    def test_main_passes_compile_platforms_to_export(self) -> None:
+        with patch("cli.export_needle_coreai") as export_needle_coreai_mock:
+            export_needle_coreai_mock.return_value = Path("/tmp/coreai-export")
+
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "--output",
+                        "./build/coreai-export",
+                        "--compile-platform",
+                        "macOS",
+                        "--compile-platform",
+                        "iOS",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        export_needle_coreai_mock.assert_called_once()
+        self.assertEqual(
+            export_needle_coreai_mock.call_args.kwargs["compile_platforms"],
+            ["macOS", "iOS"],
+        )
 
     def test_main_persists_authoring_metadata(self) -> None:
         source_ctx = tempfile.TemporaryDirectory()

@@ -103,12 +103,14 @@
       var configuration = try Self.decodeConfiguration(from: modelDirectoryURL)
       editConfiguration(&configuration)
 
-      async let encoderModel = AIModel(
-        contentsOf: modelDirectoryURL.appending(path: "encoder.aimodel"),
+      async let encoderModel = Self.loadModel(
+        named: "encoder",
+        from: modelDirectoryURL,
         options: specializationOptions
       )
-      async let decoderModel = AIModel(
-        contentsOf: modelDirectoryURL.appending(path: "decoder.aimodel"),
+      async let decoderModel = Self.loadModel(
+        named: "decoder",
+        from: modelDirectoryURL,
         options: specializationOptions
       )
       try await self.init(
@@ -411,6 +413,22 @@
         throw NeedleCoreAIEngineError.failedToLoadFunction(name: name)
       }
       return function
+    }
+
+    private static func loadModel(
+      named name: String,
+      from directory: URL,
+      options: SpecializationOptions
+    ) async throws -> AIModel {
+      do {
+        let compiledModelURL = directory.appending(
+          path: "\(name).\(AIModel.deviceArchitectureName).aimodelc"
+        )
+        return try await AIModel(contentsOf: compiledModelURL, options: options)
+      } catch {
+        let modelURL = directory.appending(path: "\(name).aimodel")
+        return try await AIModel(contentsOf: modelURL, options: options)
+      }
     }
   }
 
