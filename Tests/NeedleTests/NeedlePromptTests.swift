@@ -1,3 +1,4 @@
+import CustomDump
 import Needle
 import Testing
 
@@ -11,13 +12,13 @@ struct `NeedlePrompt tests` {
       tools: [.sendEmail]
     )
 
-    #expect(
-      prompt.formatted()
-        == """
-        You are a helpful assistant who can send emails.
+    expectNoDifference(
+      prompt.formatted(),
+      """
+      You are a helpful assistant who can send emails.
 
-        Send an email to Henry.<tools>[{"name":"send_email","description":"Sends an email to a recipient with an email address.","arguments":{"type":"object","properties":{"address":{"type":"string","description":"The recipient's email address.","pattern":"[a-z][a-z0-9]{1,10}@gmail\\\\.com","examples":["blob@gmail.com"]},"subject":{"type":"string"},"body":{"type":"string"}},"required":["address","subject","body"]}}]
-        """
+      Send an email to Henry.<tools>[{"name":"send_email","description":"Sends an email to a recipient with an email address.","arguments":{"type":"object","properties":{"address":{"type":"string","description":"The recipient's email address.","pattern":"[a-z][a-z0-9]{1,10}@gmail\\\\.com","examples":["blob@gmail.com"]},"subject":{"type":"string"},"body":{"type":"string"}},"required":["address","subject","body"]}}]
+      """
     )
   }
 
@@ -35,6 +36,6 @@ struct `NeedlePrompt tests` {
 
     let expected =
       #"[{"name":"get_weather","description":"Gets the current weather for a location.","arguments":{"type":"object","properties":{"location":{"type":"string"}},"required":["location"],"additionalProperties":false}}]"#
-    #expect(String(jsonSlice) == expected)
+    expectNoDifference(String(jsonSlice), expected)
   }
 }
