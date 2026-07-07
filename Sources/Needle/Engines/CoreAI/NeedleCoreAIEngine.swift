@@ -86,9 +86,9 @@
     public convenience init(
       modelDirectoryURL: URL,
       editConfiguration: (inout NeedleModelConfiguration) -> Void = { _ in },
-      specializationOptions: SpecializationOptions = SpecializationOptions(
-        preferredComputeUnitKind: .neuralEngine
-      ),
+      specializationOptions: SpecializationOptions = .default,
+      modelCache: AIModelCache = .default,
+      cachePolicy: AIModelCache.Policy = .default,
       grammarEngine: (any Tokenizer) -> NeedleXGrammarEngine? = {
         NeedleXGrammarEngine(tokenizer: $0)
       }
@@ -106,33 +106,22 @@
       async let encoderModel = Self.loadModel(
         named: "encoder",
         from: modelDirectoryURL,
-        options: specializationOptions
+        options: specializationOptions,
+        cache: modelCache,
+        cachePolicy: cachePolicy
       )
       async let decoderModel = Self.loadModel(
         named: "decoder",
         from: modelDirectoryURL,
-        options: specializationOptions
+        options: specializationOptions,
+        cache: modelCache,
+        cachePolicy: cachePolicy
       )
       try await self.init(
         encoderModel: encoderModel,
         decoderModel: decoderModel,
         tokenizer: tokenizer,
         configuration: configuration,
-        grammarEngine: grammarEngine
-      )
-    }
-
-    public convenience init(
-      encoderModel: AIModel,
-      decoderModel: AIModel,
-      tokenizer: any Tokenizer,
-      grammarEngine: sending NeedleXGrammarEngine
-    ) throws {
-      try self.init(
-        encoderModel: encoderModel,
-        decoderModel: decoderModel,
-        tokenizer: tokenizer,
-        configuration: NeedleModelConfiguration(),
         grammarEngine: grammarEngine
       )
     }
@@ -418,17 +407,46 @@
     private static func loadModel(
       named name: String,
       from directory: URL,
-      options: SpecializationOptions
+      options: SpecializationOptions,
+      cache: AIModelCache,
+      cachePolicy: AIModelCache.Policy
     ) async throws -> AIModel {
       do {
         let compiledModelURL = directory.appending(
           path: "\(name).\(AIModel.deviceArchitectureName).aimodelc"
         )
-        return try await AIModel(contentsOf: compiledModelURL, options: options)
+        return try await Self.loadCachedModel(
+          contentsOf: compiledModelURL,
+          options: options,
+          cache: cache,
+          cachePolicy: cachePolicy
+        )
       } catch {
         let modelURL = directory.appending(path: "\(name).aimodel")
-        return try await AIModel(contentsOf: modelURL, options: options)
+        return try await Self.loadCachedModel(
+          contentsOf: modelURL,
+          options: options,
+          cache: cache,
+          cachePolicy: cachePolicy
+        )
       }
+    }
+
+    private static func loadCachedModel(
+      contentsOf modelURL: URL,
+      options: SpecializationOptions,
+      cache: AIModelCache,
+      cachePolicy: AIModelCache.Policy
+    ) async throws -> AIModel {
+      if let model = try cache.model(for: modelURL, options: options) {
+        return model
+      }
+      return try await AIModel.specialize(
+        contentsOf: modelURL,
+        options: options,
+        cache: cache,
+        cachePolicy: cachePolicy
+      )
     }
   }
 
