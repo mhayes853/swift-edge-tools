@@ -78,15 +78,7 @@
     }
 
     private let state: Lock<State>
-    private let _tokenizer: any Tokenizers.Tokenizer
-
-    public var tokenizer: any Tokenizers.Tokenizer {
-      self._tokenizer
-    }
-
-    public var model: NeedleMLXModel {
-      self.state.withLock(\.model)
-    }
+    private let tokenizer: any Tokenizers.Tokenizer
 
     private let clock = ContinuousClock()
 
@@ -97,17 +89,12 @@
         NeedleXGrammarEngine(tokenizer: $0)
       }
     ) throws {
-      let tokenizer = try NeedleSPTokenizer(modelURL: url.appending(path: "tokenizer.model"))
+      let (tokenizer, model) = try loadNeedleMLXModel(
+        from: url,
+        editConfiguration: editConfiguration
+      )
       let grammarEngine = grammarEngine(tokenizer)
       guard let grammarEngine else { throw NeedleMLXEngineError.failedToLoadGrammarEngine }
-
-      guard var configuration = try NeedleModelConfiguration.decode(in: url) else {
-        throw NeedleMLXEngineError.failedToLoadConfiguration
-      }
-      editConfiguration(&configuration)
-      let model = NeedleMLXModel(configuration: configuration)
-      try model.loadWeights(from: url.appending(path: "model.safetensors"))
-
       self.init(tokenizer: tokenizer, model: model, grammarEngine: grammarEngine)
     }
 
@@ -119,17 +106,17 @@
       self.state = Lock(
         State(grammarEngine: grammarEngine, model: model, matcherPool: NeedleGrammarMatcherPool())
       )
-      self._tokenizer = tokenizer
+      self.tokenizer = tokenizer
     }
 
     public func tokenize(prompt: NeedlePrompt) async throws -> [NeedleToken] {
-      prompt.tokenized(using: self._tokenizer)
+      prompt.tokenized(using: self.tokenizer)
     }
 
     public func clearCaches() {
-      self.state.withLock { state in
-        state.matcherPool.clear()
-        state.grammarEngine.clearCache()
+      self.state.withLock {
+        $0.matcherPool.clear()
+        $0.grammarEngine.clearCache()
       }
     }
 
@@ -140,7 +127,7 @@
     ) throws -> GenerationTask {
       let isStopped = ManagedAtomic(false)
       let task = Task {
-        return try self.state.withLock { state in
+        try self.state.withLock { state in
           try self.generate(
             prompt: prompt,
             parameters: parameters,
@@ -191,13 +178,13 @@
       guard var output = prefillOutput else { preconditionFailure("Model received empty input.") }
       var durationToFirstToken: Duration?
 
-      var detokenizer = StreamingDetokenizer(tokenizer: self._tokenizer)
+      var detokenizer = StreamingDetokenizer(tokenizer: self.tokenizer)
       var generatedTokens = [NeedleToken]()
       var confidence = NeedleConfidenceState()
       while !matcher.isTerminated
         && !isStopped.load(ordering: .relaxed)
         && detokenizer.tokenIds.count < (parameters.maxTokens ?? .max)
-        && generatedTokens.last?.id != self._tokenizer.eosTokenId
+        && generatedTokens.last?.id != self.tokenizer.eosTokenId
       {
         try Task.checkCancellation()
         let processedLogits = processor?.process(logits: output.logits) ?? output.logits
@@ -260,7 +247,7 @@
       processor: inout (any LogitProcessor)?,
       synchronize: Bool
     ) throws -> (LMOutput?, NeedlePrefillMetrics, Memory.Snapshot) {
-      let input = try LMInput.needle(prompt: prompt, using: self._tokenizer)
+      let input = try LMInput.needle(prompt: prompt, using: self.tokenizer)
       guard input.text.tokens.size <= model.configuration.encoderMaxLength else {
         throw NeedleMLXEngineError.contextLengthExceeded(
           tokens: input.text.tokens.size,
@@ -312,5 +299,21 @@
     public static func contextLengthExceeded(tokens: Int, maximum: Int) -> Self {
       Self(message: "Prompt token count (\(tokens)) exceeds the model context length (\(maximum)).")
     }
+  }
+
+  // MARK: - Helpers
+
+  package func loadNeedleMLXModel(
+    from url: URL,
+    editConfiguration: (inout NeedleModelConfiguration) -> Void = { _ in }
+  ) throws -> sending (tokenizer: any Tokenizers.Tokenizer, model: NeedleMLXModel) {
+    let tokenizer = try NeedleSPTokenizer(modelURL: url.appending(path: "tokenizer.model"))
+    guard var configuration = try NeedleModelConfiguration.decode(in: url) else {
+      throw NeedleMLXEngineError.failedToLoadConfiguration
+    }
+    editConfiguration(&configuration)
+    let model = NeedleMLXModel(configuration: configuration)
+    try model.loadWeights(from: url.appending(path: "model.safetensors"))
+    return (tokenizer, model)
   }
 #endif

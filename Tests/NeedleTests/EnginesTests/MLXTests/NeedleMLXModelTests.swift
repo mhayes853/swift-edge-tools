@@ -16,9 +16,9 @@
 
     init() async throws {
       let url = try await downloadNeedleHF()
-      let engine = try NeedleMLXEngine(from: url)
-      self.model = engine.model
-      self.tokenizer = engine.tokenizer
+      let (tokenizer, model) = try loadNeedleMLXModel(from: url)
+      self.tokenizer = tokenizer
+      self.model = model
     }
 
     @Test
