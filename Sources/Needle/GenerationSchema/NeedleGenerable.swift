@@ -28,7 +28,7 @@ extension NeedleValue: ConvertibleFromNeedleValue {
 // MARK: - Scalar Types
 
 extension String: NeedleGenerable {
-  public static var needleGenerationSchema: NeedleGenerationSchema { .string() }
+  public static var needleGenerationSchema: NeedleGenerationSchema { .string }
 
   public init(needleValue: NeedleValue) throws {
     guard case .string(let string) = needleValue else {
@@ -39,7 +39,7 @@ extension String: NeedleGenerable {
 }
 
 extension Bool: NeedleGenerable {
-  public static var needleGenerationSchema: NeedleGenerationSchema { .bool() }
+  public static var needleGenerationSchema: NeedleGenerationSchema { .boolean }
 
   public init(needleValue: NeedleValue) throws {
     guard case .boolean(let boolean) = needleValue else {
@@ -50,7 +50,7 @@ extension Bool: NeedleGenerable {
 }
 
 extension Double: NeedleGenerable {
-  public static var needleGenerationSchema: NeedleGenerationSchema { .number() }
+  public static var needleGenerationSchema: NeedleGenerationSchema { .number }
 
   public init(needleValue: NeedleValue) throws {
     switch needleValue {
@@ -65,7 +65,7 @@ extension Double: NeedleGenerable {
 }
 
 extension Float: NeedleGenerable {
-  public static var needleGenerationSchema: NeedleGenerationSchema { .number() }
+  public static var needleGenerationSchema: NeedleGenerationSchema { .number }
 
   public init(needleValue: NeedleValue) throws {
     switch needleValue {
@@ -80,7 +80,7 @@ extension Float: NeedleGenerable {
 }
 
 extension Int8: NeedleGenerable {
-  public static var needleGenerationSchema: NeedleGenerationSchema { .integer() }
+  public static var needleGenerationSchema: NeedleGenerationSchema { .integer }
 
   public init(needleValue: NeedleValue) throws {
     self = try Self.integer(from: needleValue)
@@ -88,7 +88,7 @@ extension Int8: NeedleGenerable {
 }
 
 extension Int16: NeedleGenerable {
-  public static var needleGenerationSchema: NeedleGenerationSchema { .integer() }
+  public static var needleGenerationSchema: NeedleGenerationSchema { .integer }
 
   public init(needleValue: NeedleValue) throws {
     self = try Self.integer(from: needleValue)
@@ -96,7 +96,7 @@ extension Int16: NeedleGenerable {
 }
 
 extension Int32: NeedleGenerable {
-  public static var needleGenerationSchema: NeedleGenerationSchema { .integer() }
+  public static var needleGenerationSchema: NeedleGenerationSchema { .integer }
 
   public init(needleValue: NeedleValue) throws {
     self = try Self.integer(from: needleValue)
@@ -104,7 +104,7 @@ extension Int32: NeedleGenerable {
 }
 
 extension Int64: NeedleGenerable {
-  public static var needleGenerationSchema: NeedleGenerationSchema { .integer() }
+  public static var needleGenerationSchema: NeedleGenerationSchema { .integer }
 
   public init(needleValue: NeedleValue) throws {
     self = try Self.integer(from: needleValue)
@@ -112,7 +112,7 @@ extension Int64: NeedleGenerable {
 }
 
 extension Int: NeedleGenerable {
-  public static var needleGenerationSchema: NeedleGenerationSchema { .integer() }
+  public static var needleGenerationSchema: NeedleGenerationSchema { .integer }
 
   public init(needleValue: NeedleValue) throws {
     self = try Self.integer(from: needleValue)
@@ -120,7 +120,9 @@ extension Int: NeedleGenerable {
 }
 
 extension UInt8: NeedleGenerable {
-  public static var needleGenerationSchema: NeedleGenerationSchema { .integer(minimum: 0) }
+  public static var needleGenerationSchema: NeedleGenerationSchema {
+    NeedleGenerationSchema(.integer, .minimum(0))
+  }
 
   public init(needleValue: NeedleValue) throws {
     self = try Self.integer(from: needleValue)
@@ -128,7 +130,9 @@ extension UInt8: NeedleGenerable {
 }
 
 extension UInt16: NeedleGenerable {
-  public static var needleGenerationSchema: NeedleGenerationSchema { .integer(minimum: 0) }
+  public static var needleGenerationSchema: NeedleGenerationSchema {
+    NeedleGenerationSchema(.integer, .minimum(0))
+  }
 
   public init(needleValue: NeedleValue) throws {
     self = try Self.integer(from: needleValue)
@@ -136,7 +140,9 @@ extension UInt16: NeedleGenerable {
 }
 
 extension UInt32: NeedleGenerable {
-  public static var needleGenerationSchema: NeedleGenerationSchema { .integer(minimum: 0) }
+  public static var needleGenerationSchema: NeedleGenerationSchema {
+    NeedleGenerationSchema(.integer, .minimum(0))
+  }
 
   public init(needleValue: NeedleValue) throws {
     self = try Self.integer(from: needleValue)
@@ -144,7 +150,9 @@ extension UInt32: NeedleGenerable {
 }
 
 extension UInt64: NeedleGenerable {
-  public static var needleGenerationSchema: NeedleGenerationSchema { .integer(minimum: 0) }
+  public static var needleGenerationSchema: NeedleGenerationSchema {
+    NeedleGenerationSchema(.integer, .minimum(0))
+  }
 
   public init(needleValue: NeedleValue) throws {
     self = try Self.integer(from: needleValue)
@@ -152,7 +160,9 @@ extension UInt64: NeedleGenerable {
 }
 
 extension UInt: NeedleGenerable {
-  public static var needleGenerationSchema: NeedleGenerationSchema { .integer(minimum: 0) }
+  public static var needleGenerationSchema: NeedleGenerationSchema {
+    NeedleGenerationSchema(.integer, .minimum(0))
+  }
 
   public init(needleValue: NeedleValue) throws {
     self = try Self.integer(from: needleValue)
@@ -161,7 +171,7 @@ extension UInt: NeedleGenerable {
 
 @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
 extension Int128: NeedleGenerable {
-  public static var needleGenerationSchema: NeedleGenerationSchema { .integer() }
+  public static var needleGenerationSchema: NeedleGenerationSchema { .integer }
 
   public init(needleValue: NeedleValue) throws {
     self = try Self.integer(from: needleValue)
@@ -170,7 +180,9 @@ extension Int128: NeedleGenerable {
 
 @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
 extension UInt128: NeedleGenerable {
-  public static var needleGenerationSchema: NeedleGenerationSchema { .integer(minimum: 0) }
+  public static var needleGenerationSchema: NeedleGenerationSchema {
+    NeedleGenerationSchema(.integer, .minimum(0))
+  }
 
   public init(needleValue: NeedleValue) throws {
     self = try Self.integer(from: needleValue)
@@ -181,7 +193,7 @@ extension UInt128: NeedleGenerable {
 
 #if canImport(Foundation)
   extension Data: NeedleGenerable {
-    public static var needleGenerationSchema: NeedleGenerationSchema { .string() }
+    public static var needleGenerationSchema: NeedleGenerationSchema { .string }
 
     public init(needleValue: NeedleValue) throws {
       guard case .string(let string) = needleValue else {
@@ -192,7 +204,7 @@ extension UInt128: NeedleGenerable {
   }
 
   extension Decimal: NeedleGenerable {
-    public static var needleGenerationSchema: NeedleGenerationSchema { .number() }
+    public static var needleGenerationSchema: NeedleGenerationSchema { .number }
 
     public init(needleValue: NeedleValue) throws {
       switch needleValue {
@@ -211,7 +223,7 @@ extension UInt128: NeedleGenerable {
 
 extension Array: NeedleGenerable where Element: NeedleGenerable {
   public static var needleGenerationSchema: NeedleGenerationSchema {
-    .array(items: Element.needleGenerationSchema)
+    NeedleGenerationSchema(.type(.array), .items(Element.needleGenerationSchema))
   }
 }
 
@@ -227,7 +239,7 @@ extension Array: ConvertibleFromNeedleValue where Element: ConvertibleFromNeedle
 extension Dictionary: NeedleGenerable
 where Key == String, Value: NeedleGenerable {
   public static var needleGenerationSchema: NeedleGenerationSchema {
-    .object(additionalProperties: Value.needleGenerationSchema)
+    NeedleGenerationSchema(.type(.object), .additionalProperties(Value.needleGenerationSchema))
   }
 }
 
@@ -237,13 +249,17 @@ where Key == String, Value: ConvertibleFromNeedleValue {
     guard case .object(let object) = needleValue else {
       throw NeedleValueTypeError(expected: .object, received: needleValue.type)
     }
-    self = try object.mapValues { try Value(needleValue: $0) }
+    self = try Dictionary(
+      uniqueKeysWithValues: object.map { key, value in
+        (key, try Value(needleValue: value))
+      }
+    )
   }
 }
 
 extension Optional: NeedleGenerable where Wrapped: NeedleGenerable {
   public static var needleGenerationSchema: NeedleGenerationSchema {
-    .object(anyOf: [Wrapped.needleGenerationSchema, .null()])
+    Wrapped.needleGenerationSchema.nullable()
   }
 }
 
@@ -262,7 +278,7 @@ extension Optional: ConvertibleFromNeedleValue where Wrapped: ConvertibleFromNee
   import CoreGraphics
 
   extension CGFloat: NeedleGenerable {
-    public static var needleGenerationSchema: NeedleGenerationSchema { .number() }
+    public static var needleGenerationSchema: NeedleGenerationSchema { .number }
 
     public init(needleValue: NeedleValue) throws {
       switch needleValue {

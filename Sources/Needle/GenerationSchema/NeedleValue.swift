@@ -1,3 +1,5 @@
+import OrderedCollections
+
 // MARK: - NeedleValue
 
 /// A JSON value used for Needle generation schemas.
@@ -12,7 +14,7 @@ public enum NeedleValue: Hashable, Sendable {
   case array([Self])
 
   /// An object value.
-  case object([String: Self])
+  case object(OrderedDictionary<String, Self>)
 
   /// A numerical value.
   case number(Double)
@@ -40,16 +42,33 @@ public enum NeedleValue: Hashable, Sendable {
 // MARK: - Encodable
 
 extension NeedleValue: Encodable {
-  public func encode(to encoder: any Swift.Encoder) throws {
-    var container = encoder.singleValueContainer()
+  public func encode(to encoder: any Encoder) throws {
     switch self {
-    case .array(let array): try container.encode(array)
-    case .boolean(let value): try container.encode(value)
-    case .null: try container.encodeNil()
-    case .number(let number): try container.encode(number)
-    case .integer(let integer): try container.encode(integer)
-    case .object(let object): try container.encode(object)
-    case .string(let string): try container.encode(string)
+    case .array(let array):
+      var container = encoder.unkeyedContainer()
+      for value in array {
+        try container.encode(value)
+      }
+    case .boolean(let value):
+      var container = encoder.singleValueContainer()
+      try container.encode(value)
+    case .integer(let integer):
+      var container = encoder.singleValueContainer()
+      try container.encode(integer)
+    case .null:
+      var container = encoder.singleValueContainer()
+      try container.encodeNil()
+    case .number(let number):
+      var container = encoder.singleValueContainer()
+      try container.encode(number)
+    case .object(let object):
+      var container = encoder.container(keyedBy: DynamicCodingKey.self)
+      for (key, value) in object {
+        try container.encode(value, forKey: DynamicCodingKey(key))
+      }
+    case .string(let string):
+      var container = encoder.singleValueContainer()
+      try container.encode(string)
     }
   }
 }
@@ -57,7 +76,26 @@ extension NeedleValue: Encodable {
 // MARK: - Decodable
 
 extension NeedleValue: Decodable {
-  public init(from decoder: any Swift.Decoder) throws {
+  public init(from decoder: any Decoder) throws {
+    if let keyedContainer = try? decoder.container(keyedBy: DynamicCodingKey.self) {
+      var object = OrderedDictionary<String, Self>()
+      for key in keyedContainer.allKeys {
+        object[key.stringValue] = try keyedContainer.decode(Self.self, forKey: key)
+      }
+      self = .object(object)
+      return
+    }
+
+    let unkeyedContainer = try? decoder.unkeyedContainer()
+    if var unkeyedContainer {
+      var values = [Self]()
+      while !unkeyedContainer.isAtEnd {
+        values.append(try unkeyedContainer.decode(Self.self))
+      }
+      self = .array(values)
+      return
+    }
+
     let container = try decoder.singleValueContainer()
     if let bool = try? container.decode(Bool.self) {
       self = .boolean(bool)
@@ -67,10 +105,6 @@ extension NeedleValue: Decodable {
       self = .number(number)
     } else if let string = try? container.decode(String.self) {
       self = .string(string)
-    } else if let array = try? container.decode([Self].self) {
-      self = .array(array)
-    } else if let object = try? container.decode([String: Self].self) {
-      self = .object(object)
     } else if container.decodeNil() {
       self = .null
     } else {
@@ -123,6 +157,33 @@ extension NeedleValue: ExpressibleByArrayLiteral {
 
 extension NeedleValue: ExpressibleByDictionaryLiteral {
   public init(dictionaryLiteral elements: (String, Self)...) {
-    self = .object(Dictionary(uniqueKeysWithValues: elements))
+    self = .object(OrderedDictionary(uniqueKeysWithValues: elements))
+  }
+}
+
+// MARK: - ExpressibleByNilLiteral
+
+extension NeedleValue: ExpressibleByNilLiteral {
+  public init(nilLiteral: ()) {
+    self = .null
+  }
+}
+
+struct DynamicCodingKey: CodingKey, Hashable, Sendable {
+  let stringValue: String
+  let intValue: Int?
+
+  init(_ stringValue: String) {
+    self.stringValue = stringValue
+    self.intValue = nil
+  }
+
+  init?(stringValue: String) {
+    self.init(stringValue)
+  }
+
+  init?(intValue: Int) {
+    self.stringValue = String(intValue)
+    self.intValue = intValue
   }
 }

@@ -29,14 +29,15 @@
         Issue.record("Expected object schema, got \(schema)")
         return
       }
-      expectNoDifference(root.description, "Weather query arguments")
-      expectNoDifference(root.title, "WeatherArgs")
+      expectNoDifference(root[.description], .string("Weather query arguments"))
+      expectNoDifference(root[.title], .string("WeatherArgs"))
 
-      let valueSchema = try #require(root.valueSchema)
-      let objectValue = try #require(valueSchema.object)
-      let properties = try #require(objectValue.properties)
-      expectNoDifference(properties.keys.sorted(), ["city", "units"])
-      expectNoDifference(objectValue.required, ["city"])
+      guard case .object(let properties)? = root[.properties] else {
+        Issue.record("Expected properties object.")
+        return
+      }
+      expectNoDifference(Array(properties.keys), ["city", "units"])
+      expectNoDifference(root[.required], .array([.string("city")]))
     }
 
     @Test

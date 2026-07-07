@@ -16,15 +16,15 @@ struct SendEmailTool: NeedleTool {
   @NeedleGenerable
   struct Input: Sendable {
     @NeedleGuide(
-      .string(pattern: /[a-z][a-z0-9]{1,10}@gmail\.com/),
-      description: "The recipient's email address."
+      .pattern("[a-z][a-z0-9]{1,10}@gmail\\.com"),
+      .description("The recipient's email address.")
     )
     var address: String
 
-    @NeedleGuide(description: "The subject of an email.")
+    @NeedleGuide(.description("The subject of an email."))
     var subject: String
 
-    @NeedleGuide(description: "The content of an email.")
+    @NeedleGuide(.description("The content of an email."))
     var body: String
   }
 

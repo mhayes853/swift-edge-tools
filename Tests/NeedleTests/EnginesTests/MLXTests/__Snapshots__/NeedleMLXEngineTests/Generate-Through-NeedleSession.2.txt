@@ -2,77 +2,81 @@
   ▿ (2 elements)
     ▿ key: NeedleMetadataKey
       - rawValue: "GenerationConfidence"
-    - value: 0.9355868
+    - value: 0.9125555
   ▿ (2 elements)
     ▿ key: NeedleMetadataKey
       - rawValue: "MLXEngineGenerationStartMemorySnapshot"
-    ▿ value: Peak:   104M         (109816138)
+    ▿ value: Peak:   95M          (100272792)
 Active: 0K           (288)
-Cache:  142M         (149304996)
+Cache:  127M         (133348520)
       - activeMemory: 288
-      - cacheMemory: 149304996
-      - peakMemory: 109816138
+      - cacheMemory: 133348520
+      - peakMemory: 100272792
   ▿ (2 elements)
     ▿ key: NeedleMetadataKey
       - rawValue: "MLXEnginePostDecodeMemorySnapshot"
-    ▿ value: Peak:   104M         (109816138)
-Active: 56M          (59381868)
-Cache:  95M          (99950424)
-      - activeMemory: 59381868
-      - cacheMemory: 99950424
-      - peakMemory: 109816138
+    ▿ value: Peak:   95M          (100272792)
+Active: 56M          (59512940)
+Cache:  81M          (85124444)
+      - activeMemory: 59512940
+      - cacheMemory: 85124444
+      - peakMemory: 100272792
   ▿ (2 elements)
     ▿ key: NeedleMetadataKey
       - rawValue: "MLXEnginePostPrefillMemorySnapshot"
-    ▿ value: Peak:   104M         (109816138)
-Active: 53M          (56402400)
-Cache:  98M          (102929892)
-      - activeMemory: 56402400
-      - cacheMemory: 102929892
-      - peakMemory: 109816138
+    ▿ value: Peak:   95M          (100272792)
+Active: 53M          (56533472)
+Cache:  84M          (88103912)
+      - activeMemory: 56533472
+      - cacheMemory: 88103912
+      - peakMemory: 100272792
   ▿ (2 elements)
     ▿ key: NeedleMetadataKey
       - rawValue: "PerTokenConfidences"
-    ▿ value: 42 elements
+    ▿ value: 46 elements
       - 1.0
-      - 0.9641226
+      - 0.96743697
       - 0.99999917
       - 1.0
-      - 0.99999964
-      - 1.0
       - 0.99999976
-      - 0.99998057
-      - 0.9999809
       - 1.0
-      - 0.97904235
-      - 0.99998987
-      - 0.77799696
-      - 0.9038238
-      - 0.7506973
-      - 0.9456967
+      - 0.9999999
+      - 0.9999677
+      - 0.9999827
       - 1.0
-      - 0.9999678
+      - 0.9114573
+      - 0.9999771
+      - 0.60908985
+      - 0.8558046
+      - 0.6780941
+      - 0.9583911
       - 1.0
-      - 0.9991265
-      - 0.99999785
-      - 0.98128027
-      - 0.999577
-      - 0.5977004
-      - 0.7053698
-      - 0.99606603
-      - 0.9939028
-      - 0.8916145
-      - 0.971836
-      - 0.92227167
-      - 0.9973878
-      - 0.99988806
-      - 0.9998957
-      - 0.6077428
-      - 0.60213435
-      - 0.99997544
-      - 0.99601775
-      - 0.896727
-      - 0.99965703
-      - 0.99820495
-      - 0.8169809
+      - 0.9999752
+      - 1.0
+      - 0.9996673
+      - 0.99999774
+      - 0.99999976
+      - 0.9982327
+      - 0.51706034
+      - 0.57228184
+      - 0.9861202
+      - 0.95547414
+      - 0.9999862
+      - 0.99964905
+      - 0.63867706
+      - 0.72863257
+      - 0.9954945
+      - 0.9941016
+      - 0.8231042
+      - 0.96718216
+      - 0.9003227
+      - 0.99466056
+      - 0.9998864
+      - 0.9999274
+      - 0.9228633
+      - 0.54820096
+      - 0.5128435
+      - 0.9622817
+      - 0.9869741
+      - 0.9937535
       - 1.0

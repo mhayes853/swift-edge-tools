@@ -21,7 +21,10 @@ struct `NeedleToolDefinition tests` {
     let tool = NeedleToolDefinition(
       name: name,
       description: "Blob",
-      arguments: .object(properties: ["name": .string()])
+      arguments: NeedleGenerationSchema(
+        .type(.object),
+        .properties(["name": .string])
+      )
     )
 
     var expectedTool = tool
@@ -34,9 +37,15 @@ struct `NeedleToolDefinition tests` {
     let tool = NeedleToolDefinition(
       name: "say_\"hello\"",
       description: "Uses a \"quoted\" phrase",
-      arguments: .object(
-        description: "Schema with \"quotes\"",
-        properties: ["message": .string(pattern: #"say \"hi\""#)]
+      arguments: NeedleGenerationSchema(
+        .type(.object),
+        .description("Schema with \"quotes\""),
+        .properties([
+          "message": NeedleGenerationSchema(
+            .string,
+            .pattern(#"say \"hi\""#)
+          )
+        ])
       )
     )
 

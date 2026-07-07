@@ -1,740 +1,120 @@
+import OrderedCollections
+
 // MARK: - NeedleGenerationSchema
 
 /// An enum defining a Needle generation schema.
 ///
 /// A valid generation schema is either an object or a boolean.
-public indirect enum NeedleGenerationSchema: Hashable, Sendable {
+public enum NeedleGenerationSchema: Hashable, Sendable {
+  /// A schema key.
+  public struct Key: RawRepresentable, ExpressibleByStringLiteral, Hashable, Sendable, Codable {
+    public let rawValue: String
+
+    public init(rawValue: String) {
+      self.rawValue = rawValue
+    }
+
+    public init(stringLiteral value: StringLiteralType) {
+      self.init(rawValue: value)
+    }
+  }
+
   /// A boolean schema.
   case boolean(Bool)
 
   /// An object schema.
-  case object(Object)
-}
+  case object(OrderedDictionary<Key, NeedleValue>)
 
-// MARK: - Object
+  public init(_ object: OrderedDictionary<Key, NeedleValue>) {
+    self = .object(object)
+  }
 
-extension NeedleGenerationSchema {
-  /// An object schema.
-  public struct Object: Hashable, Sendable, Codable {
-    /// The title of the schema.
-    ///
-    /// [title](https://json-schema.org/draft/2020-12/json-schema-validation#name-title-and-description)
-    public var title: String?
+  public init(_ schemas: Self...) {
+    self.init(schemas)
+  }
 
-    /// The description of the schema.
-    ///
-    /// [description](https://json-schema.org/draft/2020-12/json-schema-validation#name-title-and-description)
-    public var description: String?
-
-    /// The ``NeedleGenerationSchema/ValueSchema`` of this schema.
-    public var valueSchema: ValueSchema?
-
-    /// The ``NeedleGenerationSchema/ValueType`` of this schema.
-    ///
-    /// [type](https://json-schema.org/draft/2020-12/json-schema-validation#name-type)
-    public var type: ValueType? {
-      self.valueSchema?.type
-    }
-
-    /// The default value of the schema.
-    ///
-    /// [default](https://json-schema.org/draft/2020-12/json-schema-validation#name-default)
-    public var `default`: NeedleValue?
-
-    /// A list of example values.
-    ///
-    /// [examples](https://json-schema.org/draft/2020-12/json-schema-validation#name-examples)
-    public var examples: [NeedleValue]?
-
-    /// A list of allowed values.
-    ///
-    /// [enum](https://json-schema.org/draft/2020-12/json-schema-validation#name-enum)
-    public var `enum`: [NeedleValue]?
-
-    /// The only allowed value.
-    ///
-    /// [const](https://json-schema.org/draft/2020-12/json-schema-validation#name-const)
-    public var const: NeedleValue?
-
-    /// A list of schemas in which the value must match all of them.
-    ///
-    /// [allOf](https://json-schema.org/draft/2020-12/json-schema-validation#name-a-vocabulary-for-structural-validation)
-    public var allOf: [NeedleGenerationSchema]?
-
-    /// A list of schemas in which the value must match at least one of them.
-    ///
-    /// [anyOf](https://json-schema.org/draft/2020-12/json-schema-validation#name-a-vocabulary-for-structural-validation)
-    public var anyOf: [NeedleGenerationSchema]?
-
-    /// A list of schemas in which the value must match exactly one of them.
-    ///
-    /// [oneOf](https://json-schema.org/draft/2020-12/json-schema-validation#name-a-vocabulary-for-structural-validation)
-    public var oneOf: [NeedleGenerationSchema]?
-
-    /// A schema that the value must not match.
-    ///
-    /// [not](https://json-schema.org/draft/2020-12/json-schema-validation#name-a-vocabulary-for-structural-validation)
-    public var not: NeedleGenerationSchema?
-
-    /// A schema to use for control flow.
-    ///
-    /// If the value matches the `if` schema, then it must also match the ``then`` schema. If the
-    /// value fails to match the `if` schema, then it must match the ``else`` schema.
-    ///
-    /// [if](https://json-schema.org/draft/2020-12/json-schema-validation#name-a-vocabulary-for-structural-validation)
-    public var `if`: NeedleGenerationSchema?
-
-    /// A schema to match against if a value successfully matches against ``if``.
-    ///
-    /// [then](https://json-schema.org/draft/2020-12/json-schema-validation#name-a-vocabulary-for-structural-validation)
-    public var then: NeedleGenerationSchema?
-
-    /// A schema to match against if a value fails to match against ``if``.
-    ///
-    /// [else](https://json-schema.org/draft/2020-12/json-schema-validation#name-a-vocabulary-for-structural-validation)
-    public var `else`: NeedleGenerationSchema?
-
-    /// Creates an object schema.
-    ///
-    /// - Parameters:
-    ///   - title: The title of the schema.
-    ///   - description: The description of the schema.
-    ///   - valueSchema: The ``NeedleGenerationSchema/ValueSchema`` of this schema.
-    ///   - default: The default value of the schema.
-    ///   - examples: A list of example values.
-    ///   - enum: A list of allowed values.
-    ///   - const: The only allowed value.
-    ///   - allOf: A list of schemas in which the value must match all of them.
-    ///   - anyOf: A list of schemas in which the value must match at least one of them.
-    ///   - oneOf: A list of schemas in which the value must match exactly one of them.
-    ///   - not: A schema that the value must not match.
-    ///   - if: A schema to use for control flow.
-    ///   - then: A schema to match against if a value successfully matches against ``if``.
-    ///   - else: A schema to match against if a value fails to match against ``if``.
-    public init(
-      title: String? = nil,
-      description: String? = nil,
-      valueSchema: ValueSchema?,
-      `default`: NeedleValue? = nil,
-      examples: [NeedleValue]? = nil,
-      `enum`: [NeedleValue]? = nil,
-      const: NeedleValue? = nil,
-      allOf: [NeedleGenerationSchema]? = nil,
-      anyOf: [NeedleGenerationSchema]? = nil,
-      oneOf: [NeedleGenerationSchema]? = nil,
-      not: NeedleGenerationSchema? = nil,
-      `if`: NeedleGenerationSchema? = nil,
-      then: NeedleGenerationSchema? = nil,
-      `else`: NeedleGenerationSchema? = nil
-    ) {
-      self.title = title
-      self.description = description
-      self.`default` = `default`
-      self.examples = examples
-      self.valueSchema = valueSchema
-      self.`enum` = `enum`
-      self.const = const
-      self.allOf = allOf
-      self.anyOf = anyOf
-      self.oneOf = oneOf
-      self.not = not
-      self.`if` = `if`
-      self.then = then
-      self.`else` = `else`
+  public init(_ schemas: some Sequence<Self>) {
+    self = schemas.reduce(Self.object(OrderedDictionary<Key, NeedleValue>())) {
+      partialResult,
+      schema in
+      partialResult.merging(schema)
     }
   }
 
-  /// Creates an object schema.
-  ///
-  /// - Parameters:
-  ///   - title: The title of the schema.
-  ///   - description: The description of the schema.
-  ///   - valueSchema: The ``NeedleGenerationSchema/ValueSchema`` of this schema.
-  ///   - default: The default value of the schema.
-  ///   - examples: A list of example values.
-  ///   - enum: A list of allowed values.
-  ///   - const: The only allowed value.
-  ///   - allOf: A list of schemas in which the value must match all of them.
-  ///   - anyOf: A list of schemas in which the value must match at least one of them.
-  ///   - oneOf: A list of schemas in which the value must match exactly one of them.
-  ///   - not: A schema that the value must not match.
-  ///   - if: A schema to use for control flow.
-  ///   - then: A schema to match against if a value successfully matches against ``Object/if``.
-  ///   - else: A schema to match against if a value fails to match against ``Object/if``.
-  public static func object(
-    title: String? = nil,
-    description: String? = nil,
-    valueSchema: ValueSchema?,
-    `default`: NeedleValue? = nil,
-    examples: [NeedleValue]? = nil,
-    `enum`: [NeedleValue]? = nil,
-    const: NeedleValue? = nil,
-    allOf: [NeedleGenerationSchema]? = nil,
-    anyOf: [NeedleGenerationSchema]? = nil,
-    oneOf: [NeedleGenerationSchema]? = nil,
-    not: NeedleGenerationSchema? = nil,
-    `if`: NeedleGenerationSchema? = nil,
-    then: NeedleGenerationSchema? = nil,
-    `else`: NeedleGenerationSchema? = nil
-  ) -> Self {
-    .object(
-      Object(
-        title: title,
-        description: description,
-        valueSchema: valueSchema,
-        default: `default`,
-        examples: examples,
-        enum: `enum`,
-        const: const,
-        allOf: allOf,
-        anyOf: anyOf,
-        oneOf: oneOf,
-        not: not,
-        if: `if`,
-        then: then,
-        else: `else`
+  public var objectValue: OrderedDictionary<Key, NeedleValue>? {
+    switch self {
+    case .boolean: nil
+    case .object(let object): object
+    }
+  }
+
+  public func merging(_ other: Self) -> Self {
+    switch (self, other) {
+    case (.object(let lhs), .object(let rhs)):
+      var merged = lhs
+      for (key, value) in rhs {
+        merged[key] = value
+      }
+      return .object(merged)
+    case (_, _):
+      return other
+    }
+  }
+
+  public mutating func merge(_ other: Self) {
+    self = self.merging(other)
+  }
+
+  public func nullable() -> Self {
+    guard case .object(var object) = self else {
+      return Self(.anyOf([self, .null]))
+    }
+    guard let typeValue = object[.type], let valueType = Self.valueType(from: typeValue) else {
+      return Self(.anyOf([self, .null]))
+    }
+    object[.type] = valueType.union(.null).needleValue
+    return .object(object)
+  }
+}
+
+// MARK: - Codable
+
+extension NeedleGenerationSchema: Encodable {
+  public func encode(to encoder: any Encoder) throws {
+    switch self {
+    case .boolean(let value):
+      var container = encoder.singleValueContainer()
+      try container.encode(value)
+    case .object(let object):
+      var container = encoder.container(keyedBy: DynamicCodingKey.self)
+      for (key, value) in object {
+        try container.encode(value, forKey: DynamicCodingKey(key.rawValue))
+      }
+    }
+  }
+}
+
+extension NeedleGenerationSchema: Decodable {
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    if let bool = try? container.decode(Bool.self) {
+      self = .boolean(bool)
+      return
+    }
+
+    let keyedContainer = try decoder.container(keyedBy: DynamicCodingKey.self)
+    var object = OrderedDictionary<Key, NeedleValue>()
+    for key in keyedContainer.allKeys {
+      object[Key(rawValue: key.stringValue)] = try keyedContainer.decode(
+        NeedleValue.self,
+        forKey: key
       )
-    )
-  }
-
-  private static func typed(
-    title: String? = nil,
-    description: String? = nil,
-    valueSchema: ValueSchema,
-    `default`: NeedleValue? = nil,
-    examples: [NeedleValue]? = nil,
-    `enum`: [NeedleValue]? = nil,
-    const: NeedleValue? = nil,
-    allOf: [NeedleGenerationSchema]? = nil,
-    anyOf: [NeedleGenerationSchema]? = nil,
-    oneOf: [NeedleGenerationSchema]? = nil,
-    not: NeedleGenerationSchema? = nil,
-    `if`: NeedleGenerationSchema? = nil,
-    then: NeedleGenerationSchema? = nil,
-    `else`: NeedleGenerationSchema? = nil
-  ) -> Self {
-    .object(
-      title: title,
-      description: description,
-      valueSchema: valueSchema,
-      default: `default`,
-      examples: examples,
-      enum: `enum`,
-      const: const,
-      allOf: allOf,
-      anyOf: anyOf,
-      oneOf: oneOf,
-      not: not,
-      if: `if`,
-      then: then,
-      else: `else`
-    )
-  }
-
-  /// Creates a string-specific object schema.
-  ///
-  /// - Parameters:
-  ///   - title: The title of the schema.
-  ///   - description: The description of the schema.
-  ///   - minLength: The minimum length of the string.
-  ///   - maxLength: The maximum length of the string.
-  ///   - pattern: A regular expression that the string must match.
-  ///   - default: The default value of the schema.
-  ///   - examples: A list of example values.
-  ///   - enum: A list of allowed values.
-  ///   - const: The only allowed value.
-  ///   - allOf: A list of schemas in which the value must match all of them.
-  ///   - anyOf: A list of schemas in which the value must match at least one of them.
-  ///   - oneOf: A list of schemas in which the value must match exactly one of them.
-  ///   - not: A schema that the value must not match.
-  ///   - if: A schema to use for control flow.
-  ///   - then: A schema to match against if a value successfully matches against ``Object/if``.
-  ///   - else: A schema to match against if a value fails to match against ``Object/if``.
-  public static func string(
-    title: String? = nil,
-    description: String? = nil,
-    minLength: Int? = nil,
-    maxLength: Int? = nil,
-    pattern: String? = nil,
-    `default`: NeedleValue? = nil,
-    examples: [NeedleValue]? = nil,
-    `enum`: [NeedleValue]? = nil,
-    const: NeedleValue? = nil,
-    allOf: [NeedleGenerationSchema]? = nil,
-    anyOf: [NeedleGenerationSchema]? = nil,
-    oneOf: [NeedleGenerationSchema]? = nil,
-    not: NeedleGenerationSchema? = nil,
-    `if`: NeedleGenerationSchema? = nil,
-    then: NeedleGenerationSchema? = nil,
-    `else`: NeedleGenerationSchema? = nil
-  ) -> Self {
-    .typed(
-      title: title,
-      description: description,
-      valueSchema: .string(minLength: minLength, maxLength: maxLength, pattern: pattern),
-      default: `default`,
-      examples: examples,
-      enum: `enum`,
-      const: const,
-      allOf: allOf,
-      anyOf: anyOf,
-      oneOf: oneOf,
-      not: not,
-      if: `if`,
-      then: then,
-      else: `else`
-    )
-  }
-
-  /// Creates a number-specific object schema.
-  ///
-  /// - Parameters:
-  ///   - title: The title of the schema.
-  ///   - description: The description of the schema.
-  ///   - multipleOf: The value that the number must be a multiple of.
-  ///   - minimum: The minimum value (inclusive) of the number.
-  ///   - exclusiveMinimum: The minimum value (exclusive) of the number.
-  ///   - maximum: The maximum value (inclusive) of the number.
-  ///   - exclusiveMaximum: The maximum value (exclusive) of the number.
-  ///   - default: The default value of the schema.
-  ///   - examples: A list of example values.
-  ///   - enum: A list of allowed values.
-  ///   - const: The only allowed value.
-  ///   - allOf: A list of schemas in which the value must match all of them.
-  ///   - anyOf: A list of schemas in which the value must match at least one of them.
-  ///   - oneOf: A list of schemas in which the value must match exactly one of them.
-  ///   - not: A schema that the value must not match.
-  ///   - if: A schema to use for control flow.
-  ///   - then: A schema to match against if a value successfully matches against ``Object/if``.
-  ///   - else: A schema to match against if a value fails to match against ``Object/if``.
-  public static func number(
-    title: String? = nil,
-    description: String? = nil,
-    multipleOf: Double? = nil,
-    minimum: Double? = nil,
-    exclusiveMinimum: Double? = nil,
-    maximum: Double? = nil,
-    exclusiveMaximum: Double? = nil,
-    `default`: NeedleValue? = nil,
-    examples: [NeedleValue]? = nil,
-    `enum`: [NeedleValue]? = nil,
-    const: NeedleValue? = nil,
-    allOf: [NeedleGenerationSchema]? = nil,
-    anyOf: [NeedleGenerationSchema]? = nil,
-    oneOf: [NeedleGenerationSchema]? = nil,
-    not: NeedleGenerationSchema? = nil,
-    `if`: NeedleGenerationSchema? = nil,
-    then: NeedleGenerationSchema? = nil,
-    `else`: NeedleGenerationSchema? = nil
-  ) -> Self {
-    .typed(
-      title: title,
-      description: description,
-      valueSchema: .number(
-        multipleOf: multipleOf,
-        minimum: minimum,
-        exclusiveMinimum: exclusiveMinimum,
-        maximum: maximum,
-        exclusiveMaximum: exclusiveMaximum
-      ),
-      default: `default`,
-      examples: examples,
-      enum: `enum`,
-      const: const,
-      allOf: allOf,
-      anyOf: anyOf,
-      oneOf: oneOf,
-      not: not,
-      if: `if`,
-      then: then,
-      else: `else`
-    )
-  }
-
-  /// Creates an integer-specific object schema.
-  ///
-  /// - Parameters:
-  ///   - title: The title of the schema.
-  ///   - description: The description of the schema.
-  ///   - multipleOf: The value that the integer must be a multiple of.
-  ///   - minimum: The minimum value (inclusive) of the integer.
-  ///   - exclusiveMinimum: The minimum value (exclusive) of the integer.
-  ///   - maximum: The maximum value (inclusive) of the integer.
-  ///   - exclusiveMaximum: The maximum value (exclusive) of the integer.
-  ///   - default: The default value of the schema.
-  ///   - examples: A list of example values.
-  ///   - enum: A list of allowed values.
-  ///   - const: The only allowed value.
-  ///   - allOf: A list of schemas in which the value must match all of them.
-  ///   - anyOf: A list of schemas in which the value must match at least one of them.
-  ///   - oneOf: A list of schemas in which the value must match exactly one of them.
-  ///   - not: A schema that the value must not match.
-  ///   - if: A schema to use for control flow.
-  ///   - then: A schema to match against if a value successfully matches against ``Object/if``.
-  ///   - else: A schema to match against if a value fails to match against ``Object/if``.
-  public static func integer(
-    title: String? = nil,
-    description: String? = nil,
-    multipleOf: Int? = nil,
-    minimum: Int? = nil,
-    exclusiveMinimum: Int? = nil,
-    maximum: Int? = nil,
-    exclusiveMaximum: Int? = nil,
-    `default`: NeedleValue? = nil,
-    examples: [NeedleValue]? = nil,
-    `enum`: [NeedleValue]? = nil,
-    const: NeedleValue? = nil,
-    allOf: [NeedleGenerationSchema]? = nil,
-    anyOf: [NeedleGenerationSchema]? = nil,
-    oneOf: [NeedleGenerationSchema]? = nil,
-    not: NeedleGenerationSchema? = nil,
-    `if`: NeedleGenerationSchema? = nil,
-    then: NeedleGenerationSchema? = nil,
-    `else`: NeedleGenerationSchema? = nil
-  ) -> Self {
-    .typed(
-      title: title,
-      description: description,
-      valueSchema: .integer(
-        multipleOf: multipleOf,
-        minimum: minimum,
-        exclusiveMinimum: exclusiveMinimum,
-        maximum: maximum,
-        exclusiveMaximum: exclusiveMaximum
-      ),
-      default: `default`,
-      examples: examples,
-      enum: `enum`,
-      const: const,
-      allOf: allOf,
-      anyOf: anyOf,
-      oneOf: oneOf,
-      not: not,
-      if: `if`,
-      then: then,
-      else: `else`
-    )
-  }
-
-  /// Creates an array-specific object schema.
-  ///
-  /// - Parameters:
-  ///   - title: The title of the schema.
-  ///   - description: The description of the schema.
-  ///   - items: The schema applied to every element in the array.
-  ///   - prefixItems: An array of schemas applied to the element at the matching index.
-  ///   - minItems: The minimum number of items allowed in the array.
-  ///   - maxItems: The maximum number of items allowed in the array.
-  ///   - uniqueItems: A boolean that indicates whether all items in the array must be unique.
-  ///   - contains: A schema that must be contained within the array.
-  ///   - minContains: The minimum number of array elements that must match `contains`.
-  ///   - maxContains: The maximum number of array elements that may match `contains`.
-  ///   - default: The default value of the schema.
-  ///   - examples: A list of example values.
-  ///   - enum: A list of allowed values.
-  ///   - const: The only allowed value.
-  ///   - allOf: A list of schemas in which the value must match all of them.
-  ///   - anyOf: A list of schemas in which the value must match at least one of them.
-  ///   - oneOf: A list of schemas in which the value must match exactly one of them.
-  ///   - not: A schema that the value must not match.
-  ///   - if: A schema to use for control flow.
-  ///   - then: A schema to match against if a value successfully matches against ``Object/if``.
-  ///   - else: A schema to match against if a value fails to match against ``Object/if``.
-  public static func array(
-    title: String? = nil,
-    description: String? = nil,
-    items: NeedleGenerationSchema? = nil,
-    prefixItems: [NeedleGenerationSchema]? = nil,
-    minItems: Int? = nil,
-    maxItems: Int? = nil,
-    uniqueItems: Bool? = nil,
-    contains: NeedleGenerationSchema? = nil,
-    minContains: Int? = nil,
-    maxContains: Int? = nil,
-    `default`: NeedleValue? = nil,
-    examples: [NeedleValue]? = nil,
-    `enum`: [NeedleValue]? = nil,
-    const: NeedleValue? = nil,
-    allOf: [NeedleGenerationSchema]? = nil,
-    anyOf: [NeedleGenerationSchema]? = nil,
-    oneOf: [NeedleGenerationSchema]? = nil,
-    not: NeedleGenerationSchema? = nil,
-    `if`: NeedleGenerationSchema? = nil,
-    then: NeedleGenerationSchema? = nil,
-    `else`: NeedleGenerationSchema? = nil
-  ) -> Self {
-    .typed(
-      title: title,
-      description: description,
-      valueSchema: .array(
-        items: items,
-        prefixItems: prefixItems,
-        minItems: minItems,
-        maxItems: maxItems,
-        uniqueItems: uniqueItems,
-        contains: contains,
-        minContains: minContains,
-        maxContains: maxContains
-      ),
-      default: `default`,
-      examples: examples,
-      enum: `enum`,
-      const: const,
-      allOf: allOf,
-      anyOf: anyOf,
-      oneOf: oneOf,
-      not: not,
-      if: `if`,
-      then: then,
-      else: `else`
-    )
-  }
-
-  /// Creates an object-specific object schema.
-  ///
-  /// - Parameters:
-  ///   - title: The title of the schema.
-  ///   - description: The description of the schema.
-  ///   - properties: A dictionary of property names and their corresponding schemas.
-  ///   - required: An array of required property names.
-  ///   - minProperties: The minimum number of properties the object must have.
-  ///   - maxProperties: The maximum number of properties the object can have.
-  ///   - additionalProperties: A schema that defines constraints for additional properties not defined on the object.
-  ///   - patternProperties: A dictionary of regex patterns and corresponding schemas for matching property names.
-  ///   - propertyNames: A schema that defines constraints for property names.
-  ///   - dependentRequired: A dictionary mapping property names to additional property names that are required when the key property is present.
-  ///   - default: The default value of the schema.
-  ///   - examples: A list of example values.
-  ///   - enum: A list of allowed values.
-  ///   - const: The only allowed value.
-  ///   - allOf: A list of schemas in which the value must match all of them.
-  ///   - anyOf: A list of schemas in which the value must match at least one of them.
-  ///   - oneOf: A list of schemas in which the value must match exactly one of them.
-  ///   - not: A schema that the value must not match.
-  ///   - if: A schema to use for control flow.
-  ///   - then: A schema to match against if a value successfully matches against ``Object/if``.
-  ///   - else: A schema to match against if a value fails to match against ``Object/if``.
-  public static func object(
-    title: String? = nil,
-    description: String? = nil,
-    properties: [String: NeedleGenerationSchema]? = nil,
-    required: [String]? = nil,
-    minProperties: Int? = nil,
-    maxProperties: Int? = nil,
-    additionalProperties: NeedleGenerationSchema? = nil,
-    patternProperties: [String: NeedleGenerationSchema]? = nil,
-    propertyNames: NeedleGenerationSchema? = nil,
-    dependentRequired: [String: [String]]? = nil,
-    `default`: NeedleValue? = nil,
-    examples: [NeedleValue]? = nil,
-    `enum`: [NeedleValue]? = nil,
-    const: NeedleValue? = nil,
-    allOf: [NeedleGenerationSchema]? = nil,
-    anyOf: [NeedleGenerationSchema]? = nil,
-    oneOf: [NeedleGenerationSchema]? = nil,
-    not: NeedleGenerationSchema? = nil,
-    `if`: NeedleGenerationSchema? = nil,
-    then: NeedleGenerationSchema? = nil,
-    `else`: NeedleGenerationSchema? = nil
-  ) -> Self {
-    .typed(
-      title: title,
-      description: description,
-      valueSchema: .object(
-        properties: properties,
-        required: required,
-        minProperties: minProperties,
-        maxProperties: maxProperties,
-        additionalProperties: additionalProperties,
-        patternProperties: patternProperties,
-        propertyNames: propertyNames,
-        dependentRequired: dependentRequired
-      ),
-      default: `default`,
-      examples: examples,
-      enum: `enum`,
-      const: const,
-      allOf: allOf,
-      anyOf: anyOf,
-      oneOf: oneOf,
-      not: not,
-      if: `if`,
-      then: then,
-      else: `else`
-    )
-  }
-
-  /// Creates a null-specific object schema.
-  ///
-  /// - Parameters:
-  ///   - title: The title of the schema.
-  ///   - description: The description of the schema.
-  ///   - default: The default value of the schema.
-  ///   - examples: A list of example values.
-  ///   - enum: A list of allowed values.
-  ///   - const: The only allowed value.
-  ///   - allOf: A list of schemas in which the value must match all of them.
-  ///   - anyOf: A list of schemas in which the value must match at least one of them.
-  ///   - oneOf: A list of schemas in which the value must match exactly one of them.
-  ///   - not: A schema that the value must not match.
-  ///   - if: A schema to use for control flow.
-  ///   - then: A schema to match against if a value successfully matches against ``Object/if``.
-  ///   - else: A schema to match against if a value fails to match against ``Object/if``.
-  public static func null(
-    title: String? = nil,
-    description: String? = nil,
-    `default`: NeedleValue? = nil,
-    examples: [NeedleValue]? = nil,
-    `enum`: [NeedleValue]? = nil,
-    const: NeedleValue? = nil,
-    allOf: [NeedleGenerationSchema]? = nil,
-    anyOf: [NeedleGenerationSchema]? = nil,
-    oneOf: [NeedleGenerationSchema]? = nil,
-    not: NeedleGenerationSchema? = nil,
-    `if`: NeedleGenerationSchema? = nil,
-    then: NeedleGenerationSchema? = nil,
-    `else`: NeedleGenerationSchema? = nil
-  ) -> Self {
-    .typed(
-      title: title,
-      description: description,
-      valueSchema: .null,
-      default: `default`,
-      examples: examples,
-      enum: `enum`,
-      const: const,
-      allOf: allOf,
-      anyOf: anyOf,
-      oneOf: oneOf,
-      not: not,
-      if: `if`,
-      then: then,
-      else: `else`
-    )
-  }
-
-  /// Creates a boolean-specific object schema.
-  ///
-  /// - Parameters:
-  ///   - title: The title of the schema.
-  ///   - description: The description of the schema.
-  ///   - default: The default value of the schema.
-  ///   - examples: A list of example values.
-  ///   - enum: A list of allowed values.
-  ///   - const: The only allowed value.
-  ///   - allOf: A list of schemas in which the value must match all of them.
-  ///   - anyOf: A list of schemas in which the value must match at least one of them.
-  ///   - oneOf: A list of schemas in which the value must match exactly one of them.
-  ///   - not: A schema that the value must not match.
-  ///   - if: A schema to use for control flow.
-  ///   - then: A schema to match against if a value successfully matches against ``Object/if``.
-  ///   - else: A schema to match against if a value fails to match against ``Object/if``.
-  public static func bool(
-    title: String? = nil,
-    description: String? = nil,
-    `default`: NeedleValue? = nil,
-    examples: [NeedleValue]? = nil,
-    `enum`: [NeedleValue]? = nil,
-    const: NeedleValue? = nil,
-    allOf: [NeedleGenerationSchema]? = nil,
-    anyOf: [NeedleGenerationSchema]? = nil,
-    oneOf: [NeedleGenerationSchema]? = nil,
-    not: NeedleGenerationSchema? = nil,
-    `if`: NeedleGenerationSchema? = nil,
-    then: NeedleGenerationSchema? = nil,
-    `else`: NeedleGenerationSchema? = nil
-  ) -> Self {
-    .typed(
-      title: title,
-      description: description,
-      valueSchema: .boolean,
-      default: `default`,
-      examples: examples,
-      enum: `enum`,
-      const: const,
-      allOf: allOf,
-      anyOf: anyOf,
-      oneOf: oneOf,
-      not: not,
-      if: `if`,
-      then: then,
-      else: `else`
-    )
-  }
-
-  /// Creates a union-specific object schema.
-  ///
-  /// - Parameters:
-  ///   - title: The title of the schema.
-  ///   - description: The description of the schema.
-  ///   - string: String-specific constraints included in the union.
-  ///   - bool: Whether the union includes the boolean type.
-  ///   - number: Number-specific constraints included in the union.
-  ///   - integer: Integer-specific constraints included in the union.
-  ///   - array: Array-specific constraints included in the union.
-  ///   - object: Object-specific constraints included in the union.
-  ///   - null: Whether the union includes the null type.
-  ///   - default: The default value of the schema.
-  ///   - examples: A list of example values.
-  ///   - enum: A list of allowed values.
-  ///   - const: The only allowed value.
-  ///   - allOf: A list of schemas in which the value must match all of them.
-  ///   - anyOf: A list of schemas in which the value must match at least one of them.
-  ///   - oneOf: A list of schemas in which the value must match exactly one of them.
-  ///   - not: A schema that the value must not match.
-  ///   - if: A schema to use for control flow.
-  ///   - then: A schema to match against if a value successfully matches against ``Object/if``.
-  ///   - else: A schema to match against if a value fails to match against ``Object/if``.
-  public static func union(
-    title: String? = nil,
-    description: String? = nil,
-    string: ValueSchema.String? = nil,
-    bool: Bool = false,
-    number: ValueSchema.Number? = nil,
-    integer: ValueSchema.Integer? = nil,
-    array: ValueSchema.Array? = nil,
-    object: ValueSchema.Object? = nil,
-    null: Bool = false,
-    `default`: NeedleValue? = nil,
-    examples: [NeedleValue]? = nil,
-    `enum`: [NeedleValue]? = nil,
-    const: NeedleValue? = nil,
-    allOf: [NeedleGenerationSchema]? = nil,
-    anyOf: [NeedleGenerationSchema]? = nil,
-    oneOf: [NeedleGenerationSchema]? = nil,
-    not: NeedleGenerationSchema? = nil,
-    `if`: NeedleGenerationSchema? = nil,
-    then: NeedleGenerationSchema? = nil,
-    `else`: NeedleGenerationSchema? = nil
-  ) -> Self {
-    .typed(
-      title: title,
-      description: description,
-      valueSchema: .union(
-        string: string,
-        isBoolean: bool,
-        array: array,
-        object: object,
-        number: number,
-        integer: integer,
-        isNullable: null
-      ),
-      default: `default`,
-      examples: examples,
-      enum: `enum`,
-      const: const,
-      allOf: allOf,
-      anyOf: anyOf,
-      oneOf: oneOf,
-      not: not,
-      if: `if`,
-      then: then,
-      else: `else`
-    )
+    }
+    self = .object(object)
   }
 }
 
-// MARK: - ExpressibleByBooleanLiteral
+// MARK: - Literals
 
 extension NeedleGenerationSchema: ExpressibleByBooleanLiteral {
   public init(booleanLiteral value: Bool) {
@@ -742,273 +122,398 @@ extension NeedleGenerationSchema: ExpressibleByBooleanLiteral {
   }
 }
 
-// MARK: - Encodable
+extension NeedleGenerationSchema: ExpressibleByArrayLiteral {
+  public init(arrayLiteral elements: Self...) {
+    self.init(elements)
+  }
+}
 
-extension NeedleGenerationSchema: Encodable {
-  public func encode(to encoder: any Encoder) throws {
-    var container = encoder.singleValueContainer()
+extension NeedleGenerationSchema: ExpressibleByDictionaryLiteral {
+  public init(dictionaryLiteral elements: (Key, NeedleValue)...) {
+    self = .object(OrderedDictionary(uniqueKeysWithValues: elements))
+  }
+}
+
+// MARK: - Raw helpers
+
+extension NeedleGenerationSchema {
+  public static func raw(_ key: Key, _ value: NeedleValue) -> Self {
+    Self([key: value])
+  }
+
+  public var needleValue: NeedleValue {
     switch self {
-    case .boolean(let bool):
-      try container.encode(bool)
+    case .boolean(let value):
+      .boolean(value)
     case .object(let object):
-      try container.encode(SerializeableObject(object: object))
+      .object(OrderedDictionary(uniqueKeysWithValues: object.map { ($0.key.rawValue, $0.value) }))
     }
   }
-}
 
-// MARK: - Decodable
-
-extension NeedleGenerationSchema: Decodable {
-  public init(from decoder: any Decoder) throws {
-    let container = try decoder.singleValueContainer()
-    if let bool = try? container.decode(Bool.self) {
-      self = .boolean(bool)
-    } else if let object = try? container.decode(SerializeableObject.self) {
-      self = .object(Object(serializeable: object))
-    } else {
-      throw DecodingError.dataCorruptedError(
-        in: container,
-        debugDescription: "NeedleGenerationSchema must either be a boolean or object."
-      )
-    }
+  private static func schemaArrayValue(_ schemas: [Self]) -> NeedleValue {
+    .array(schemas.map(\.needleValue))
   }
-}
 
-// MARK: - SerializeableObject
-
-private struct SerializeableObject: Codable {
-  var type: NeedleGenerationSchema.ValueType?
-  var title: String?
-  var description: String?
-  var `default`: NeedleValue?
-  var examples: [NeedleValue]?
-
-  var `enum`: [NeedleValue]?
-  var const: NeedleValue?
-
-  var allOf: [NeedleGenerationSchema]?
-  var anyOf: [NeedleGenerationSchema]?
-  var oneOf: [NeedleGenerationSchema]?
-  var not: NeedleGenerationSchema?
-
-  var `if`: NeedleGenerationSchema?
-  var then: NeedleGenerationSchema?
-  var `else`: NeedleGenerationSchema?
-
-  var properties: [Swift.String: NeedleGenerationSchema]?
-  var required: [Swift.String]?
-  var minProperties: Int?
-  var maxProperties: Int?
-  var additionalProperties: NeedleGenerationSchema?
-  var patternProperties: [Swift.String: NeedleGenerationSchema]?
-  var propertyNames: NeedleGenerationSchema?
-  var dependentRequired: [Swift.String: [Swift.String]]?
-
-  var items: NeedleGenerationSchema?
-  var prefixItems: [NeedleGenerationSchema]?
-  var minItems: Int?
-  var maxItems: Int?
-  var uniqueItems: Bool?
-  var contains: NeedleGenerationSchema?
-  var minContains: Int?
-  var maxContains: Int?
-
-  var multipleOf: Numeric?
-  var minimum: Numeric?
-  var exclusiveMinimum: Numeric?
-  var maximum: Numeric?
-  var exclusiveMaximum: Numeric?
-
-  var minLength: Int?
-  var maxLength: Int?
-  var pattern: Swift.String?
-
-  init(object: NeedleGenerationSchema.Object) {
-    self.title = object.title
-    self.description = object.description
-    self.default = object.default
-    self.examples = object.examples
-    self.allOf = object.allOf
-    self.anyOf = object.anyOf
-    self.oneOf = object.oneOf
-    self.not = object.not
-    self.if = object.if
-    self.then = object.then
-    self.else = object.else
-    self.enum = object.enum
-    self.const = object.const
-
-    if let array = object.valueSchema?.array {
-      self.items = array.items
-      self.prefixItems = array.prefixItems
-      self.minItems = array.minItems
-      self.maxItems = array.maxItems
-      self.uniqueItems = array.uniqueItems
-      self.contains = array.contains
-      self.minContains = array.minContains
-      self.maxContains = array.maxContains
-    }
-
-    if let integer = object.valueSchema?.integer {
-      self.multipleOf = integer.multipleOf.map(Numeric.integer)
-      self.minimum = integer.minimum.map(Numeric.integer)
-      self.exclusiveMinimum = integer.exclusiveMinimum.map(Numeric.integer)
-      self.maximum = integer.maximum.map(Numeric.integer)
-      self.exclusiveMaximum = integer.exclusiveMaximum.map(Numeric.integer)
-    }
-
-    if let number = object.valueSchema?.number {
-      self.multipleOf = number.multipleOf.map(Numeric.double)
-      self.minimum = number.minimum.map(Numeric.double)
-      self.exclusiveMinimum = number.exclusiveMinimum.map(Numeric.double)
-      self.maximum = number.maximum.map(Numeric.double)
-      self.exclusiveMaximum = number.exclusiveMaximum.map(Numeric.double)
-    }
-
-    if let string = object.valueSchema?.string {
-      self.minLength = string.minLength
-      self.maxLength = string.maxLength
-      self.pattern = string.pattern
-    }
-
-    if let object = object.valueSchema?.object {
-      self.properties = object.properties
-      self.patternProperties = object.patternProperties
-      self.additionalProperties = object.additionalProperties
-      self.minProperties = object.minProperties
-      self.maxProperties = object.maxProperties
-      self.required = object.required
-      self.propertyNames = object.propertyNames
-      self.dependentRequired = object.dependentRequired
-    }
-
-    self.type = object.type
-  }
-}
-
-extension SerializeableObject {
-  enum Numeric: Codable {
-    case integer(Int)
-    case double(Double)
-
-    var doubleValue: Double {
-      switch self {
-      case .integer(let integer): Double(integer)
-      case .double(let decimal): decimal
-      }
-    }
-
-    var integerValue: Int {
-      switch self {
-      case .integer(let integer): integer
-      case .double(let decimal): Int(decimal)
-      }
-    }
-
-    func encode(to encoder: any Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .integer(let integer): try container.encode(integer)
-      case .double(let decimal): try container.encode(decimal)
-      }
-    }
-
-    init(from decoder: any Decoder) throws {
-      let container = try decoder.singleValueContainer()
-      if let integer = try? container.decode(Int.self) {
-        self = .integer(integer)
-      } else if let double = try? container.decode(Double.self) {
-        self = .double(double)
-      } else {
-        throw DecodingError.typeMismatch(
-          Numeric.self,
-          .init(codingPath: decoder.codingPath, debugDescription: "Expected Numeric")
-        )
-      }
-    }
-  }
-}
-
-extension NeedleGenerationSchema.Object {
-  fileprivate init(serializeable: SerializeableObject) {
-    self.init(
-      title: serializeable.title,
-      description: serializeable.description,
-      valueSchema: NeedleGenerationSchema.ValueSchema(serializeable: serializeable),
-      default: serializeable.default,
-      examples: serializeable.examples,
-      enum: serializeable.enum,
-      const: serializeable.const,
-      allOf: serializeable.allOf,
-      anyOf: serializeable.anyOf,
-      oneOf: serializeable.oneOf,
-      not: serializeable.not,
-      if: serializeable.if,
-      then: serializeable.then,
-      else: serializeable.else
+  private static func schemaObjectValue(
+    _ properties: OrderedDictionary<String, Self>
+  ) -> NeedleValue {
+    .object(
+      OrderedDictionary(uniqueKeysWithValues: properties.map { ($0.key, $0.value.needleValue) })
     )
   }
+
+  private static func schemaObjectValue(
+    _ properties: KeyValuePairs<String, Self>
+  ) -> NeedleValue {
+    .object(
+      OrderedDictionary(uniqueKeysWithValues: properties.map { ($0.0, $0.1.needleValue) })
+    )
+  }
+
+  private static func rawStringArray(_ strings: [String]) -> NeedleValue {
+    .array(strings.map(NeedleValue.string))
+  }
+
+  private static func rawStringObject(_ object: OrderedDictionary<String, [String]>) -> NeedleValue
+  {
+    .object(
+      OrderedDictionary(
+        uniqueKeysWithValues: object.map { key, values in
+          (key, Self.rawStringArray(values))
+        }
+      )
+    )
+  }
+
+  static func valueType(from value: NeedleValue) -> ValueType? {
+    switch value {
+    case .string(let string):
+      switch string {
+      case "string": .string
+      case "number": .number
+      case "integer": .integer
+      case "boolean": .boolean
+      case "object": .object
+      case "array": .array
+      case "null": .null
+      default: nil
+      }
+    case .array(let values):
+      values.reduce(into: ValueType()) { partialResult, value in
+        guard let type = Self.valueType(from: value) else { return }
+        partialResult.formUnion(type)
+      }
+    default:
+      nil
+    }
+  }
 }
 
-extension NeedleGenerationSchema.ValueSchema {
-  fileprivate init?(serializeable: SerializeableObject) {
-    guard let type = serializeable.type else { return nil }
+// MARK: - Standard keys
 
-    self = .union()
-    if type.contains(.array) {
-      self.array = .array(
-        items: serializeable.items,
-        prefixItems: serializeable.prefixItems,
-        minItems: serializeable.minItems,
-        maxItems: serializeable.maxItems,
-        uniqueItems: serializeable.uniqueItems,
-        contains: serializeable.contains,
-        minContains: serializeable.minContains,
-        maxContains: serializeable.maxContains
-      )
-    }
-    if type.contains(.integer) {
-      self.integer = .integer(
-        multipleOf: serializeable.multipleOf?.integerValue,
-        minimum: serializeable.minimum?.integerValue,
-        exclusiveMinimum: serializeable.exclusiveMinimum?.integerValue,
-        maximum: serializeable.maximum?.integerValue,
-        exclusiveMaximum: serializeable.exclusiveMaximum?.integerValue
-      )
-    }
-    if type.contains(.number) {
-      self.number = .number(
-        multipleOf: serializeable.multipleOf?.doubleValue,
-        minimum: serializeable.minimum?.doubleValue,
-        exclusiveMinimum: serializeable.exclusiveMinimum?.doubleValue,
-        maximum: serializeable.maximum?.doubleValue,
-        exclusiveMaximum: serializeable.exclusiveMaximum?.doubleValue
-      )
-    }
-    if type.contains(.string) {
-      self.string = .string(
-        minLength: serializeable.minLength,
-        maxLength: serializeable.maxLength,
-        pattern: serializeable.pattern
-      )
-    }
-    if type.contains(.object) {
-      self.object = .object(
-        properties: serializeable.properties,
-        required: serializeable.required,
-        minProperties: serializeable.minProperties,
-        maxProperties: serializeable.maxProperties,
-        additionalProperties: serializeable.additionalProperties,
-        patternProperties: serializeable.patternProperties,
-        propertyNames: serializeable.propertyNames,
-        dependentRequired: serializeable.dependentRequired
-      )
-    }
-    if type.contains(.null) {
-      self.isNullable = true
-    }
-    if type.contains(.boolean) {
-      self.isBoolean = true
-    }
+extension NeedleGenerationSchema.Key {
+  public static let type: Self = "type"
+  public static let title: Self = "title"
+  public static let description: Self = "description"
+  public static let `default`: Self = "default"
+  public static let examples: Self = "examples"
+  public static let `enum`: Self = "enum"
+  public static let const: Self = "const"
+  public static let allOf: Self = "allOf"
+  public static let anyOf: Self = "anyOf"
+  public static let oneOf: Self = "oneOf"
+  public static let not: Self = "not"
+  public static let `if`: Self = "if"
+  public static let then: Self = "then"
+  public static let `else`: Self = "else"
+  public static let properties: Self = "properties"
+  public static let required: Self = "required"
+  public static let additionalProperties: Self = "additionalProperties"
+  public static let patternProperties: Self = "patternProperties"
+  public static let propertyNames: Self = "propertyNames"
+  public static let minProperties: Self = "minProperties"
+  public static let maxProperties: Self = "maxProperties"
+  public static let dependentRequired: Self = "dependentRequired"
+  public static let items: Self = "items"
+  public static let prefixItems: Self = "prefixItems"
+  public static let minItems: Self = "minItems"
+  public static let maxItems: Self = "maxItems"
+  public static let uniqueItems: Self = "uniqueItems"
+  public static let contains: Self = "contains"
+  public static let minContains: Self = "minContains"
+  public static let maxContains: Self = "maxContains"
+  public static let minLength: Self = "minLength"
+  public static let maxLength: Self = "maxLength"
+  public static let pattern: Self = "pattern"
+  public static let multipleOf: Self = "multipleOf"
+  public static let minimum: Self = "minimum"
+  public static let exclusiveMinimum: Self = "exclusiveMinimum"
+  public static let maximum: Self = "maximum"
+  public static let exclusiveMaximum: Self = "exclusiveMaximum"
+}
+
+// MARK: - Fragment helpers
+
+extension NeedleGenerationSchema {
+  public static var string: Self { .type(.string) }
+  public static var number: Self { .type(.number) }
+  public static var integer: Self { .type(.integer) }
+  public static var null: Self { .type(.null) }
+  public static var boolean: Self { .type(.boolean) }
+
+  public static func type(_ type: ValueType) -> Self {
+    Self([.type: type.needleValue])
+  }
+
+  public static func title(_ value: String) -> Self {
+    Self([.title: .string(value)])
+  }
+
+  public static func description(_ value: String) -> Self {
+    Self([.description: .string(value)])
+  }
+
+  public static func `default`(_ value: NeedleValue) -> Self {
+    Self([.default: value])
+  }
+
+  public static func examples(_ value: [NeedleValue]) -> Self {
+    Self([.examples: .array(value)])
+  }
+
+  public static func `enum`(_ value: [NeedleValue]) -> Self {
+    Self([.enum: .array(value)])
+  }
+
+  public static func const(_ value: NeedleValue) -> Self {
+    Self([.const: value])
+  }
+
+  public static func allOf(_ schemas: [Self]) -> Self {
+    Self([.allOf: Self.schemaArrayValue(schemas)])
+  }
+
+  public static func anyOf(_ schemas: [Self]) -> Self {
+    Self([.anyOf: Self.schemaArrayValue(schemas)])
+  }
+
+  public static func oneOf(_ schemas: [Self]) -> Self {
+    Self([.oneOf: Self.schemaArrayValue(schemas)])
+  }
+
+  public static func not(_ schema: Self) -> Self {
+    Self([.not: schema.needleValue])
+  }
+
+  public static func `if`(_ schema: Self) -> Self {
+    Self([.if: schema.needleValue])
+  }
+
+  public static func then(_ schema: Self) -> Self {
+    Self([.then: schema.needleValue])
+  }
+
+  public static func `else`(_ schema: Self) -> Self {
+    Self([.else: schema.needleValue])
+  }
+
+  public static func properties(_ properties: KeyValuePairs<String, Self>) -> Self {
+    Self([.properties: Self.schemaObjectValue(properties)])
+  }
+
+  public static func properties(_ properties: KeyValuePairs<String, [Self]>) -> Self {
+    Self(
+      [
+        .properties: .object(
+          OrderedDictionary(
+            uniqueKeysWithValues: properties.map { entry in
+              (entry.0, NeedleGenerationSchema(entry.1).needleValue)
+            }
+          )
+        )
+      ]
+    )
+  }
+
+  public static func property(_ key: String, _ schema: Self) -> Self {
+    Self.properties(KeyValuePairs(dictionaryLiteral: (key, schema)))
+  }
+
+  public static func property(_ key: String, _ schemas: Self...) -> Self {
+    Self.properties(KeyValuePairs(dictionaryLiteral: (key, Self(schemas))))
+  }
+
+  public static func required(_ keys: [String]) -> Self {
+    Self([.required: Self.rawStringArray(keys)])
+  }
+
+  public static func additionalProperties(_ schema: Self) -> Self {
+    Self([.additionalProperties: schema.needleValue])
+  }
+
+  public static func additionalProperties(_ allowed: Bool) -> Self {
+    Self([.additionalProperties: .boolean(allowed)])
+  }
+
+  public static func patternProperties(_ properties: KeyValuePairs<String, Self>) -> Self {
+    Self([.patternProperties: Self.schemaObjectValue(properties)])
+  }
+
+  public static func propertyNames(_ schema: Self) -> Self {
+    Self([.propertyNames: schema.needleValue])
+  }
+
+  public static func minProperties(_ value: Int) -> Self {
+    Self([.minProperties: .integer(value)])
+  }
+
+  public static func maxProperties(_ value: Int) -> Self {
+    Self([.maxProperties: .integer(value)])
+  }
+
+  public static func dependentRequired(_ value: KeyValuePairs<String, [String]>) -> Self {
+    Self(
+      [
+        .dependentRequired: Self.rawStringObject(
+          OrderedDictionary(uniqueKeysWithValues: value.map { ($0.0, $0.1) })
+        )
+      ]
+    )
+  }
+
+  public static func items(_ schema: Self) -> Self {
+    Self([.items: schema.needleValue])
+  }
+
+  public static func prefixItems(_ schemas: [Self]) -> Self {
+    Self([.prefixItems: Self.schemaArrayValue(schemas)])
+  }
+
+  public static func minItems(_ value: Int) -> Self {
+    Self([.minItems: .integer(value)])
+  }
+
+  public static func maxItems(_ value: Int) -> Self {
+    Self([.maxItems: .integer(value)])
+  }
+
+  public static func uniqueItems(_ value: Bool = true) -> Self {
+    Self([.uniqueItems: .boolean(value)])
+  }
+
+  public static func contains(_ schema: Self) -> Self {
+    Self([.contains: schema.needleValue])
+  }
+
+  public static func minContains(_ value: Int) -> Self {
+    Self([.minContains: .integer(value)])
+  }
+
+  public static func maxContains(_ value: Int) -> Self {
+    Self([.maxContains: .integer(value)])
+  }
+
+  public static func minLength(_ value: Int) -> Self {
+    Self([.minLength: .integer(value)])
+  }
+
+  public static func maxLength(_ value: Int) -> Self {
+    Self([.maxLength: .integer(value)])
+  }
+
+  public static func pattern(_ value: String) -> Self {
+    Self([.pattern: .string(value)])
+  }
+
+  public static func pattern<Output>(_ value: Regex<Output>) -> Self {
+    Self.pattern(String(describing: value))
+  }
+
+  public static func lengthRange(_ range: ClosedRange<Int>) -> Self {
+    Self(.minLength(range.lowerBound), .maxLength(range.upperBound))
+  }
+
+  public static func lengthRange(_ range: PartialRangeFrom<Int>) -> Self {
+    Self(.minLength(range.lowerBound))
+  }
+
+  public static func lengthRange(_ range: PartialRangeThrough<Int>) -> Self {
+    Self(.maxLength(range.upperBound))
+  }
+
+  public static func lengthRange(_ range: Range<Int>) -> Self {
+    Self(.minLength(range.lowerBound), .maxLength(range.upperBound - 1))
+  }
+
+  public static func multipleOf(_ value: Int) -> Self {
+    Self([.multipleOf: .integer(value)])
+  }
+
+  public static func multipleOf(_ value: Double) -> Self {
+    Self([.multipleOf: .number(value)])
+  }
+
+  public static func minimum(_ value: Int) -> Self {
+    Self([.minimum: .integer(value)])
+  }
+
+  public static func minimum(_ value: Double) -> Self {
+    Self([.minimum: .number(value)])
+  }
+
+  public static func exclusiveMinimum(_ value: Int) -> Self {
+    Self([.exclusiveMinimum: .integer(value)])
+  }
+
+  public static func exclusiveMinimum(_ value: Double) -> Self {
+    Self([.exclusiveMinimum: .number(value)])
+  }
+
+  public static func maximum(_ value: Int) -> Self {
+    Self([.maximum: .integer(value)])
+  }
+
+  public static func maximum(_ value: Double) -> Self {
+    Self([.maximum: .number(value)])
+  }
+
+  public static func exclusiveMaximum(_ value: Int) -> Self {
+    Self([.exclusiveMaximum: .integer(value)])
+  }
+
+  public static func exclusiveMaximum(_ value: Double) -> Self {
+    Self([.exclusiveMaximum: .number(value)])
+  }
+
+  public static func range(_ range: ClosedRange<Int>) -> Self {
+    Self(.minimum(range.lowerBound), .maximum(range.upperBound))
+  }
+
+  public static func range(_ range: ClosedRange<Double>) -> Self {
+    Self(.minimum(range.lowerBound), .maximum(range.upperBound))
+  }
+
+  public static func range(_ range: PartialRangeFrom<Int>) -> Self {
+    Self(.minimum(range.lowerBound))
+  }
+
+  public static func range(_ range: PartialRangeFrom<Double>) -> Self {
+    Self(.minimum(range.lowerBound))
+  }
+
+  public static func range(_ range: PartialRangeThrough<Int>) -> Self {
+    Self(.maximum(range.upperBound))
+  }
+
+  public static func range(_ range: PartialRangeThrough<Double>) -> Self {
+    Self(.maximum(range.upperBound))
+  }
+
+  public static func range(_ range: Range<Int>) -> Self {
+    Self(.minimum(range.lowerBound), .exclusiveMaximum(range.upperBound))
+  }
+
+  public static func range(_ range: Range<Double>) -> Self {
+    Self(.minimum(range.lowerBound), .exclusiveMaximum(range.upperBound))
   }
 }

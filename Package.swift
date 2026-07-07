@@ -34,13 +34,15 @@ let package = Package(
     .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.31.3"),
     .package(url: "https://github.com/pointfreeco/swift-macro-testing", from: "0.6.5"),
     .package(url: "https://github.com/swiftlang/swift-syntax", "600.0.0"..<"603.0.0"),
-    .package(url: "https://github.com/huggingface/swift-transformers", from: "1.3.0")
+    .package(url: "https://github.com/huggingface/swift-transformers", from: "1.3.0"),
+    .package(url: "https://github.com/apple/swift-collections", from: "1.2.1")
   ],
   targets: [
     .target(
       name: "Needle",
       dependencies: [
         "NeedleMacros",
+        .product(name: "OrderedCollections", package: "swift-collections"),
         .product(name: "MLX", package: "mlx-swift", condition: .when(traits: ["MLX"])),
         .product(name: "MLXNN", package: "mlx-swift", condition: .when(traits: ["MLX"])),
         .product(name: "MLXLLM", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),

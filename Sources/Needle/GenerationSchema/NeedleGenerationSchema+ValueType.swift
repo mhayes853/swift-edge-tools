@@ -30,18 +30,20 @@ extension NeedleGenerationSchema {
     /// A null type.
     public static let null = Self(rawValue: 1 << 6)
 
-    /// Returns true if this type of compatible with type of the specified `value`.
-    ///
-    /// If the type of value is ``integer``, it is compatible with ``number``.
-    ///
-    /// - Parameter value: The value to check compatibility with.
+    /// Returns true if this type is compatible with the type of the specified `value`.
     public func isCompatible(with value: NeedleValue) -> Bool {
       self.contains(value.type) || (value.type == .integer && self.contains(.number))
     }
+
+    public var needleValue: NeedleValue {
+      let containedTypes = self.containedTypes
+      if containedTypes.count == 1, let type = containedTypes.first {
+        return .string(type.canonicalName)
+      }
+      return .array(containedTypes.map { .string($0.canonicalName) })
+    }
   }
 }
-
-// MARK: - ExpressibleByArrayLiteral
 
 extension NeedleGenerationSchema.ValueType: ExpressibleByArrayLiteral {
   public init(arrayLiteral elements: Self...) {
@@ -49,53 +51,39 @@ extension NeedleGenerationSchema.ValueType: ExpressibleByArrayLiteral {
   }
 }
 
-// MARK: - Encodable
-
 extension NeedleGenerationSchema.ValueType: Encodable {
   public func encode(to encoder: any Encoder) throws {
-    var container = encoder.singleValueContainer()
-    switch self {
-    case .integer: try container.encode("integer")
-    case .string: try container.encode("string")
-    case .boolean: try container.encode("boolean")
-    case .array: try container.encode("array")
-    case .object: try container.encode("object")
-    case .number: try container.encode("number")
-    case .null: try container.encode("null")
-    default:
-      let allTypes = [Self.integer, .string, .boolean, .array, .object, .number, .null]
-      try container.encode(allTypes.filter { self.contains($0) })
-    }
+    try self.needleValue.encode(to: encoder)
   }
 }
 
-// MARK: - Decodable
-
 extension NeedleGenerationSchema.ValueType: Decodable {
   public init(from decoder: any Decoder) throws {
-    let container = try decoder.singleValueContainer()
-    if let string = try? container.decode(String.self) {
-      switch string {
-      case "integer": self = .integer
-      case "string": self = .string
-      case "boolean": self = .boolean
-      case "array": self = .array
-      case "object": self = .object
-      case "number": self = .number
-      case "null": self = .null
-      default:
-        throw DecodingError.dataCorruptedError(
-          in: container,
-          debugDescription: "Invalid schema type"
-        )
-      }
-    } else if let array = try? container.decode([Self].self) {
-      self.init(array)
-    } else {
-      throw DecodingError.dataCorruptedError(
-        in: container,
-        debugDescription: "Invalid schema type"
-      )
+    let value = try NeedleValue(from: decoder)
+    guard let type = NeedleGenerationSchema.valueType(from: value) else {
+      let container = try decoder.singleValueContainer()
+      throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid schema type")
     }
+    self = type
+  }
+}
+
+extension NeedleGenerationSchema.ValueType {
+  var canonicalName: String {
+    switch self {
+    case .integer: "integer"
+    case .string: "string"
+    case .boolean: "boolean"
+    case .array: "array"
+    case .object: "object"
+    case .number: "number"
+    case .null: "null"
+    default: "unknown"
+    }
+  }
+
+  var containedTypes: [Self] {
+    let allTypes = [Self.integer, .string, .boolean, .array, .object, .number, .null]
+    return allTypes.filter { self.contains($0) }
   }
 }
