@@ -152,7 +152,20 @@
     @Test
     @available(anyAppleOS 27.0, *)
     func `Generate Basics With AOT Compiled Export`() async throws {
-      let engine = try await makeNeedleCoreAIEngine(compilePlatforms: ["macOS"])
+      let compilePlatform: String = {
+        #if os(macOS)
+          "macOS"
+        #elseif os(iOS)
+          "iOS"
+        #elseif os(tvOS)
+          "tvOS"
+        #elseif os(visionOS)
+          "visionOS"
+        #else
+          "watchOS"
+        #endif
+      }()
+      let engine = try await makeNeedleCoreAIEngine(compilePlatforms: [compilePlatform])
       let task = try engine.generate(prompt: .sendAdventureEmail, parameters: .default) { _ in }
       let generation = try await task.value
 
