@@ -1,5 +1,29 @@
 #if MLX && canImport(MLX)
   import MLX
+  import MLXLMCommon
+
+  // MARK: - Logit Processor
+
+  public final class NeedleApplyBitmaskProcessorMLX: LogitProcessor {
+    public private(set) var matcher: NeedleXGrammarEngine.Matcher
+    
+    public init(matcher: NeedleXGrammarEngine.Matcher) {
+      self.matcher = matcher
+    }
+    
+    public func prompt(_ prompt: MLXArray) {
+    }
+    
+    public func didSample(token: MLXArray) {
+      self.matcher.accept(tokenId: token.item(NeedleToken.ID.self))
+    }
+    
+    public func process(logits: MLXArray) -> MLXArray {
+      applyBitmaskMLX(logits: logits, mask: self.matcher.bitmask())
+    }
+  }
+
+  // MARK: - Apply Bitmask
 
   public func applyBitmaskMLX(logits: MLXArray, mask: NeedleGrammarBitmask) -> MLXArray {
     let vocabSize = logits.dim(1)

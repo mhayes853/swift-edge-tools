@@ -23,16 +23,20 @@
 
     @Test
     func `TokenIterator Usage`() async throws {
+      let grammarEngine = try #require(NeedleXGrammarEngine(tokenizer: self.tokenizer))
+      let matcher = try grammarEngine.compile(tools: NeedlePrompt.sendAdventureEmail.tools)
+      
       var iterator = try TokenIterator(
         input: try LMInput.needle(prompt: .sendAdventureEmail, using: self.tokenizer),
         model: self.model,
-        parameters: Self.parameters
+        processor: NeedleApplyBitmaskProcessorMLX(matcher: matcher),
+        sampler: ArgMaxSampler()
       )
 
       var tokens = [Int]()
       while let token = iterator.next() {
         tokens.append(token)
-        if token == self.tokenizer.eosTokenId {
+        if token == self.tokenizer.eosTokenId || matcher.isTerminated {
           break
         }
       }
