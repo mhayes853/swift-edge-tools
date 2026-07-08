@@ -268,12 +268,12 @@
           inputIds: MLTensor(tokenIds: [nextDecoderTokenId]),
           encoderOutputs: encoderOutputs
         )
-        var logits = try await self.stepLogits(from: decoderLogits)
-        let processedLogits = processor?.process(logits: &logits) ?? logits
-        let maskedLogits = Self.applyBitmask(processedLogits, mask: matcher.bitmask())
-        confidence.add(confidence: Self.tokenConfidence(maskedLogits))
+        let stepLogits = decoderLogits.squeezingShape(at: 1)
+        let processedLogits = try await processor?.process(stepLogits) ?? stepLogits
+        let maskedLogits = applyBitmaskCoreML(logits: processedLogits, mask: matcher.bitmask())
+        await confidence.add(logits: maskedLogits)
 
-        let tokenId = sampler.sample(logits: maskedLogits)
+        let tokenId = try await sampler.sample(maskedLogits)
         durationToFirstToken = durationToFirstToken ?? generateStart.duration(to: self.clock.now)
 
         let tokenString = detokenizer.decode(tokenId: tokenId)
@@ -362,12 +362,6 @@
       return logits
     }
 
-    private func stepLogits(from logits: MLTensor) async throws -> [Float] {
-      let scalars = await logits.cast(to: Float.self).shapedArray(of: Float.self)
-      let stepIndex = logits.shape[1] - 1
-      return (0..<logits.shape[2]).map { scalars[scalarAt: [0, stepIndex, $0]] }
-    }
-
     private static func decodeConfiguration(
       from directory: URL
     ) throws -> NeedleModelConfiguration {
@@ -400,14 +394,15 @@
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
   extension NeedleCoreMLEngine {
     public protocol Sampler {
-      func sample(logits: [Float]) -> NeedleToken.ID
+      func sample(_ logits: MLTensor) async throws -> NeedleToken.ID
     }
 
     public struct ArgmaxSampler: Sampler {
       public init() {}
 
-      public func sample(logits: [Float]) -> NeedleToken.ID {
-        logits.indices.max { logits[$0] < logits[$1] } ?? 0
+      public func sample(_ logits: MLTensor) async throws -> NeedleToken.ID {
+        let indices = await logits.argmax(alongAxis: 1).shapedArray(of: Int32.self).scalars
+        return NeedleToken.ID(indices.first ?? 0)
       }
     }
   }
@@ -417,7 +412,7 @@
     public protocol LogitsProcessor {
       mutating func prompt(_ prompt: MLTensor)
 
-      func process(logits: inout [Float]) -> [Float]
+      func process(_ logits: MLTensor) async throws -> MLTensor
 
       mutating func didSample(token: NeedleToken)
     }
@@ -468,29 +463,6 @@
           memset(baseAddress, 0, bytes.count)
         }
       }
-    }
-  }
-
-  @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-  extension NeedleCoreMLEngine {
-    private static func applyBitmask(
-      _ logits: [Float],
-      mask: NeedleGrammarBitmask
-    ) -> [Float] {
-      let maskValues = mask.storage.withUnsafeBytes { bytes in
-        bytes.bindMemory(to: UInt8.self)
-          .flatMap { Needle.bitmaskTable[(Int($0) * 8)..<(Int($0) * 8 + 8)] }
-      }
-      return zip(logits, maskValues).map(+)
-    }
-
-    private static func tokenConfidence(_ logits: [Float]) -> Float {
-      let topTwo = logits.sorted(by: >).prefix(2)
-      let values = Array(topTwo)
-      let top1 = values.first ?? -.infinity
-      let top2 = values.dropFirst().first ?? -.infinity
-      let margin = Swift.min(Swift.max(top1 - top2, -60.0), 60.0)
-      return 1.0 / (1.0 + Foundation.exp(-margin))
     }
   }
 

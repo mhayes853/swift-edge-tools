@@ -185,7 +185,7 @@
       self.promptCalls += 1
     }
 
-    func process(logits: inout [Float]) -> [Float] {
+    func process(_ logits: MLTensor) async throws -> MLTensor {
       self.processCalls += 1
       return logits
     }
