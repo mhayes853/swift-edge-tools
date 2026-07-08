@@ -6,27 +6,6 @@
 
   @available(anyAppleOS 27.0, *)
   public final class NeedleCoreAIEngine: NeedleEngine {
-    public final class GenerationTask: NeedleEngineGenerationTask {
-      private let task: Task<NeedleEngineGeneration, any Error>
-      private let isStopped: ManagedAtomic<Bool>
-
-      fileprivate init(
-        task: sending Task<NeedleEngineGeneration, any Error>,
-        isStopped: ManagedAtomic<Bool>
-      ) {
-        self.task = task
-        self.isStopped = isStopped
-      }
-
-      public var value: NeedleEngineGeneration {
-        get async throws { try await self.task.cancellableValue }
-      }
-
-      public func stop() {
-        self.isStopped.store(true, ordering: .relaxed)
-      }
-    }
-
     public struct GenerateParameters: NeedleEngineGenerateParameters {
       public static var `default`: Self { Self() }
 
@@ -86,7 +65,9 @@
     public convenience init(
       modelDirectoryURL: URL,
       editConfiguration: (inout NeedleModelConfiguration) -> Void = { _ in },
-      specializationOptions: SpecializationOptions = SpecializationOptions(preferredComputeUnitKind: .neuralEngine),
+      specializationOptions: SpecializationOptions = SpecializationOptions(
+        preferredComputeUnitKind: .neuralEngine
+      ),
       modelCache: AIModelCache = .default,
       cachePolicy: AIModelCache.Policy = .default,
       grammarEngine: (any Tokenizer) -> NeedleXGrammarEngine? = {
@@ -161,7 +142,7 @@
       prompt: NeedlePrompt,
       parameters: GenerateParameters,
       onToken: @escaping @Sendable (NeedleToken) -> Void
-    ) throws -> GenerationTask {
+    ) throws -> some NeedleEngineGenerationTask {
       let isStopped = ManagedAtomic(false)
       let task = Task {
         let range = parameters.toolCallRange
@@ -183,7 +164,7 @@
           isStopped: isStopped
         )
       }
-      return GenerationTask(task: task, isStopped: isStopped)
+      return AtomicGenerationTask(task: task, isStopped: isStopped)
     }
 
     private func generate(

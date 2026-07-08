@@ -9,27 +9,6 @@
   // MARK: - NeedleMLXEngine
 
   public final class NeedleMLXEngine: NeedleEngine {
-    public final class GenerationTask: NeedleEngineGenerationTask {
-      private let task: Task<NeedleEngineGeneration, any Error>
-      private let isStopped: ManagedAtomic<Bool>
-
-      fileprivate init(
-        task: sending Task<NeedleEngineGeneration, any Error>,
-        isStopped: ManagedAtomic<Bool>
-      ) {
-        self.task = task
-        self.isStopped = isStopped
-      }
-
-      public var value: NeedleEngineGeneration {
-        get async throws { try await self.task.cancellableValue }
-      }
-
-      public func stop() {
-        self.isStopped.store(true, ordering: .relaxed)
-      }
-    }
-
     public struct GenerateParameters: NeedleEngineGenerateParameters {
       public static var `default`: Self {
         Self()
@@ -124,7 +103,7 @@
       prompt: NeedlePrompt,
       parameters: GenerateParameters,
       onToken: @escaping @Sendable (NeedleToken) -> Void
-    ) throws -> GenerationTask {
+    ) throws -> some NeedleEngineGenerationTask {
       let isStopped = ManagedAtomic(false)
       let task = Task {
         try self.state.withLock { state in
@@ -137,7 +116,7 @@
           )
         }
       }
-      return GenerationTask(task: task, isStopped: isStopped)
+      return AtomicGenerationTask(task: task, isStopped: isStopped)
     }
 
     private func generate(
