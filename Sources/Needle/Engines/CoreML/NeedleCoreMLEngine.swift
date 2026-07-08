@@ -56,6 +56,8 @@
 
     public convenience init(
       modelDirectoryURL: URL,
+      modelConfiguration: MLModelConfiguration,
+      editModelConfiguration: (inout MLModelConfiguration) -> Void = { _ in },
       editConfiguration: (inout NeedleModelConfiguration) -> Void = { _ in },
       grammarEngine: (any Tokenizer) -> NeedleXGrammarEngine? = {
         NeedleXGrammarEngine(tokenizer: $0)
@@ -71,8 +73,16 @@
       var configuration = try Self.decodeConfiguration(from: modelDirectoryURL)
       editConfiguration(&configuration)
 
-      async let encoderModel = Self.loadModel(named: ModelName.encoder, from: modelDirectoryURL)
-      async let decoderModel = Self.loadModel(named: ModelName.decoder, from: modelDirectoryURL)
+      async let encoderModel = Self.loadModel(
+        named: ModelName.encoder,
+        from: modelDirectoryURL,
+        configuration: modelConfiguration
+      )
+      async let decoderModel = Self.loadModel(
+        named: ModelName.decoder,
+        from: modelDirectoryURL,
+        configuration: modelConfiguration
+      )
       try await self.init(
         encoderModel: encoderModel,
         decoderModel: decoderModel,
@@ -289,10 +299,12 @@
       return config
     }
 
-    private static func loadModel(named name: String, from directory: URL) async throws -> MLModel {
+    private static func loadModel(
+      named name: String,
+      from directory: URL,
+      configuration: MLModelConfiguration
+    ) async throws -> MLModel {
       let packageURL = directory.appending(path: "\(name).mlpackage")
-      let configuration = MLModelConfiguration()
-      configuration.computeUnits = .cpuAndGPU
       #if os(watchOS)
         return try await MLModel.load(contentsOf: packageURL, configuration: configuration)
       #else

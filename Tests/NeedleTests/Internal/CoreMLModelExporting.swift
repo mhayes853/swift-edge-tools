@@ -25,13 +25,14 @@
     let process = Process()
     process.executableURL = pythonExecutable
     process.currentDirectoryURL = pythonDirectory
-    process.arguments = [
-      "cli.py",
-      "--backend",
-      "CoreML",
-      "--output",
-      outputDirectory.path()
-    ] + arguments
+    process.arguments =
+      [
+        "cli.py",
+        "--backend",
+        "CoreML",
+        "--output",
+        outputDirectory.path()
+      ] + arguments
 
     let outputPipe = Pipe()
     process.standardOutput = outputPipe
@@ -62,7 +63,12 @@
       outputDirectoryName: SelfCoreMLExport.outputDirectoryName(quantizerPreset: quantizerPreset),
       arguments: arguments
     )
-    return try await NeedleCoreMLEngine(modelDirectoryURL: directory)
+    let configuration = MLModelConfiguration()
+    configuration.computeUnits = .cpuAndGPU
+    return try await NeedleCoreMLEngine(
+      modelDirectoryURL: directory,
+      modelConfiguration: configuration
+    )
   }
 
   private enum SelfCoreMLExport {
