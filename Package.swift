@@ -52,12 +52,12 @@ let package = Package(
         .product(
           name: "Tokenizers",
           package: "swift-transformers",
-          condition: .when(traits: ["MLX", "CoreAI"])
+          condition: .when(traits: ["MLX", "CoreAI", "CoreML"])
         ),
         .product(
           name: "Hub",
           package: "swift-transformers",
-          condition: .when(traits: ["MLX", "CoreAI"])
+          condition: .when(traits: ["MLX", "CoreAI", "CoreML"])
         ),
         .target(name: "CNeedleSentencepiece", condition: .when(traits: ["Sentencepiece"]))
       ],

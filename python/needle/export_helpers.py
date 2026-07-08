@@ -196,11 +196,15 @@ def export_program(
     args: tuple[torch.Tensor, ...],
     *,
     dynamic_shapes: dict[str, Any] | tuple[Any, ...] | list[Any] | None = None,
+    decomposition_table: dict[Any, Any] | None = None,
 ) -> torch.export.ExportedProgram:
     module.eval()
-    return torch.export.export(
+    exported_program = torch.export.export(
         module,
         args=args,
         dynamic_shapes=dynamic_shapes,
         strict=False,
-    ).run_decompositions(get_decomp_table())
+    )
+    if decomposition_table is None:
+        decomposition_table = get_decomp_table()
+    return exported_program.run_decompositions(decomposition_table)

@@ -86,7 +86,7 @@
     public convenience init(
       modelDirectoryURL: URL,
       editConfiguration: (inout NeedleModelConfiguration) -> Void = { _ in },
-      specializationOptions: SpecializationOptions = .default,
+      specializationOptions: SpecializationOptions = SpecializationOptions(preferredComputeUnitKind: .neuralEngine),
       modelCache: AIModelCache = .default,
       cachePolicy: AIModelCache.Policy = .default,
       grammarEngine: (any Tokenizer) -> NeedleXGrammarEngine? = {

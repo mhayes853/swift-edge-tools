@@ -1,70 +1,74 @@
 ▿ NeedleSessionGeneration
   ▿ engineGeneration: NeedleEngineGeneration
     ▿ decodeMetrics: NeedleDecodeMetrics
-      ▿ duration: 0.698211666 seconds
-        - _low: 698211666000000000
+      ▿ duration: 1.447290916 seconds
+        - _low: 1447290916000000000
         - _high: 0
-      ▿ durationToFirstToken: 1.547991167 seconds
-        - _low: 1547991167000000000
+      ▿ durationToFirstToken: 0.113905375 seconds
+        - _low: 113905375000000000
         - _high: 0
-      - tokens: 42
+      - tokens: 46
     ▿ metadata: 2 key/value pairs
       ▿ (2 elements)
         ▿ key: NeedleMetadataKey
           - rawValue: "GenerationConfidence"
-        - value: 0.9137308
+        - value: 0.91392004
       ▿ (2 elements)
         ▿ key: NeedleMetadataKey
           - rawValue: "PerTokenConfidences"
-        ▿ value: 42 elements
+        ▿ value: 46 elements
           - 1.0
-          - 0.9730365
+          - 0.97221756
           - 0.99999905
           - 1.0
           - 0.99999976
           - 1.0
           - 0.9999999
-          - 0.99997926
-          - 0.9999833
+          - 0.9999794
+          - 0.9999831
           - 1.0
-          - 0.9073123
-          - 0.9999778
-          - 0.61508787
-          - 0.8645393
-          - 0.71383077
-          - 0.96378
+          - 0.91086304
+          - 0.9999777
+          - 0.6220002
+          - 0.8666695
+          - 0.6907416
+          - 0.96323055
           - 0.9999999
-          - 0.9999788
+          - 0.9999783
           - 1.0
-          - 0.99970406
+          - 0.99970144
           - 0.999998
           - 0.99999976
-          - 0.99818975
+          - 0.9982091
           - 0.5312094
-          - 0.5774954
-          - 0.9863631
-          - 0.69966495
-          - 0.9999893
-          - 0.99968684
-          - 0.6513549
-          - 0.7310586
-          - 0.99509466
-          - 0.9937588
-          - 0.8080672
-          - 0.97272736
-          - 0.8992984
-          - 0.99469805
-          - 0.9998876
-          - 0.99992573
-          - 0.9273361
           - 0.57367843
+          - 0.985663
+          - 0.9620519
+          - 0.9999864
+          - 0.999634
+          - 0.6513549
+          - 0.741674
+          - 0.9955142
+          - 0.9940486
+          - 0.82866174
+          - 0.96842605
+          - 0.90252376
+          - 0.9946203
+          - 0.99987805
+          - 0.9999256
+          - 0.93084824
+          - 0.5117166
+          - 0.5029296
+          - 0.9629179
+          - 0.9859364
+          - 0.9935806
           - 1.0
     ▿ prefillMetrics: NeedlePrefillMetrics
-      ▿ duration: 0.3793045 seconds
-        - _low: 379304500000000000
+      ▿ duration: 0.072885416 seconds
+        - _low: 72885416000000000
         - _high: 0
       - tokens: 137
-    ▿ tokens: 42 elements
+    ▿ tokens: 46 elements
       ▿ NeedleToken
         - id: 4
         - stringValue: "<tool_call>"
@@ -186,8 +190,20 @@
         - id: 8105
         - stringValue: "?"
       ▿ NeedleToken
-        - id: 503
-        - stringValue: "\"}}]"
+        - id: 8071
+        - stringValue: "["
+      ▿ NeedleToken
+        - id: 8039
+        - stringValue: "\""
+      ▿ NeedleToken
+        - id: 8059
+        - stringValue: "}"
+      ▿ NeedleToken
+        - id: 8059
+        - stringValue: "}"
+      ▿ NeedleToken
+        - id: 8072
+        - stringValue: "]"
       ▿ NeedleToken
         - id: 1
         - stringValue: ""
@@ -197,10 +213,10 @@
       ▿ AnyNeedleToolCall
         ▿ base: NeedleToolCall<SendEmailTool>
           ▿ id: NeedleToolCallID
-            - rawValue: "C29D5653-9544-4D59-906F-CE6F517CFF30"
+            - rawValue: "22086B00-400B-404C-B290-83B89C55848F"
           ▿ input: Input
             - address: "henderry@gmail.com"
-            - body: "Could you please go on an adventure?"
+            - body: "Could you please go on an adventure?["
             - subject: "Hello"
           ▿ registrar: ObservationRegistrar
             ▿ extent: Extent
