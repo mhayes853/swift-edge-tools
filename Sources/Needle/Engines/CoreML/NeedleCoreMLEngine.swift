@@ -1,4 +1,4 @@
-#if swift(>=6.4) && CoreML && Sentencepiece && canImport(CoreML)
+#if CoreML && Sentencepiece && canImport(CoreML)
   import Atomics
   @preconcurrency import CoreML
   import Foundation
@@ -68,83 +68,12 @@
       let encoderProjectedV: MLTensor
     }
 
-    private struct SendableModel: @unchecked Sendable {
-      // NB: @unchecked Sendable is safe here because all MLModel access is serialized through
-      // actor isolation, and decode state is reused behind the decoder actor.
-      let value: MLModel
-    }
-
-    private actor EncoderModelActor {
-      private let model: SendableModel
-
-      init(model: SendableModel) {
-        self.model = model
-      }
-
-      func prediction(from inputs: [String: MLTensor]) async throws -> [String: MLTensor] {
-        try await self.model.value.prediction(from: inputs)
-      }
-    }
-
-    private actor DecoderModelActor {
-      private let model: SendableModel
-      private let state: MLState
-
-      init(model: SendableModel) {
-        self.model = model
-        self.state = model.value.makeState()
-      }
-
-      func reset() {
-        self.state.zero(named: TensorName.keyCache)
-        self.state.zero(named: TensorName.valueCache)
-        self.state.zero(named: TensorName.cacheOffset)
-      }
-
-      func prediction(from inputs: [String: MLTensor]) async throws -> [String: MLTensor] {
-        try await self.model.value.prediction(from: inputs, using: self.state)
-      }
-    }
-
-    private actor GenerationGate {
-      private var isGenerating = false
-      private var waiters = [CheckedContinuation<Void, Never>]()
-
-      func withExclusiveAccess<T: Sendable>(
-        _ operation: @Sendable () async throws -> T
-      ) async rethrows -> T {
-        await self.acquire()
-        defer { self.release() }
-        return try await operation()
-      }
-
-      private func acquire() async {
-        guard self.isGenerating else {
-          self.isGenerating = true
-          return
-        }
-        await withCheckedContinuation { continuation in
-          self.waiters.append(continuation)
-        }
-      }
-
-      private func release() {
-        guard let waiter = self.waiters.first else {
-          self.isGenerating = false
-          return
-        }
-        self.waiters.removeFirst()
-        waiter.resume()
-      }
-    }
-
     private let state: Lock<State>
     private let configuration: NeedleModelConfiguration
     private let encoderModel: EncoderModelActor
     private let decoderModel: DecoderModelActor
     private let tokenizer: any Tokenizer
     private let clock = ContinuousClock()
-    private let generationGate = GenerationGate()
 
     public convenience init(
       modelDirectoryURL: URL,
@@ -175,8 +104,8 @@
     }
 
     public init(
-      encoderModel: MLModel,
-      decoderModel: MLModel,
+      encoderModel: sending MLModel,
+      decoderModel: sending MLModel,
       tokenizer: any Tokenizer,
       configuration: NeedleModelConfiguration,
       grammarEngine: sending NeedleXGrammarEngine
@@ -185,8 +114,8 @@
         State(grammarEngine: grammarEngine, matcherPool: NeedleGrammarMatcherPool())
       )
       self.configuration = configuration
-      self.encoderModel = EncoderModelActor(model: SendableModel(value: encoderModel))
-      self.decoderModel = DecoderModelActor(model: SendableModel(value: decoderModel))
+      self.encoderModel = EncoderModelActor(model: encoderModel)
+      self.decoderModel = DecoderModelActor(model: decoderModel)
       self.tokenizer = tokenizer
     }
 
@@ -208,24 +137,31 @@
     ) throws -> GenerationTask {
       let isStopped = ManagedAtomic(false)
       let task = Task {
-        try await self.generationGate.withExclusiveAccess {
-          let matcher = try self.state.withLock { state in
-            let matcher = try state.matcherPool.matcher(
-              tools: prompt.tools,
-              range: parameters.toolCallRange,
-              compilingWith: state.grammarEngine
-            )
-            matcher.reset()
-            return matcher
-          }
-          return try await self.generate(
+        let matcher = try self.state.withLock { state in
+          let matcher = try state.matcherPool.matcher(
+            tools: prompt.tools,
+            range: parameters.toolCallRange,
+            compilingWith: state.grammarEngine
+          )
+          matcher.reset()
+          return matcher
+        }
+        let decoderState = await self.decoderModel.beginDecodeWithState()
+        do {
+          let result = try await self.generate(
             prompt: prompt,
             parameters: parameters,
             onToken: onToken,
             matcher: matcher,
+            decoderState: decoderState.mlState,
             configuration: self.configuration,
             isStopped: isStopped
           )
+          await self.decoderModel.endDecodeWithState(decoderState)
+          return result
+        } catch {
+          await self.decoderModel.endDecodeWithState(decoderState)
+          throw error
         }
       }
       return GenerationTask(task: task, isStopped: isStopped)
@@ -236,6 +172,7 @@
       parameters: GenerateParameters,
       onToken: @escaping @Sendable (NeedleToken) -> Void,
       matcher: NeedleXGrammarEngine.Matcher,
+      decoderState: MLState,
       configuration: NeedleModelConfiguration,
       isStopped: ManagedAtomic<Bool>
     ) async throws -> NeedleEngineGeneration {
@@ -251,7 +188,6 @@
         processor: &processor
       )
 
-      await self.decoderModel.reset()
       var nextDecoderTokenId = configuration.decoderStartTokenId
       var detokenizer = StreamingDetokenizer(tokenizer: self.tokenizer)
       var generatedTokens = [NeedleToken]()
@@ -266,7 +202,8 @@
         try Task.checkCancellation()
         let decoderLogits = try await self.decode(
           inputIds: MLTensor(tokenIds: [nextDecoderTokenId]),
-          encoderOutputs: encoderOutputs
+          encoderOutputs: encoderOutputs,
+          decoderState: decoderState
         )
         let stepLogits = decoderLogits.squeezingShape(at: 1)
         let processedLogits = try await processor?.process(stepLogits) ?? stepLogits
@@ -346,7 +283,8 @@
 
     private func decode(
       inputIds: MLTensor,
-      encoderOutputs: EncoderOutputs
+      encoderOutputs: EncoderOutputs,
+      decoderState: MLState
     ) async throws -> MLTensor {
       var outputs = try await self.decoderModel.prediction(
         from: [
@@ -354,7 +292,8 @@
           TensorName.crossAttentionMask: encoderOutputs.crossAttentionMask,
           TensorName.encoderProjectedK: encoderOutputs.encoderProjectedK,
           TensorName.encoderProjectedV: encoderOutputs.encoderProjectedV
-        ]
+        ],
+        using: decoderState
       )
       guard let logits = outputs.removeValue(forKey: TensorName.logits) else {
         throw NeedleCoreMLEngineError.missingModelOutputs
@@ -391,6 +330,68 @@
     }
   }
 
+  // MARK: - Encoder + Decoder Actors
+
+  @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
+  extension NeedleCoreMLEngine {
+    private actor EncoderModelActor {
+      private let model: MLModel
+
+      init(model: sending MLModel) {
+        self.model = model
+      }
+
+      func prediction(from inputs: [String: MLTensor]) async throws -> [String: MLTensor] {
+        try await self.model.prediction(from: inputs)
+      }
+    }
+
+    private actor DecoderModelActor {
+      private nonisolated let model: MLModel
+      private var bufferedState: State?
+
+      struct State {
+        let mlState: MLState
+        let isPersistent: Bool
+
+        func reset() {
+          self.mlState.zero(named: TensorName.keyCache)
+          self.mlState.zero(named: TensorName.valueCache)
+          self.mlState.zero(named: TensorName.cacheOffset)
+        }
+      }
+
+      init(model: sending MLModel) {
+        self.model = model
+        self.bufferedState = State(mlState: model.makeState(), isPersistent: true)
+      }
+
+      func beginDecodeWithState() -> sending State {
+        if let persistent = self.bufferedState {
+          self.bufferedState = nil
+          persistent.reset()
+          return persistent
+        } else {
+          return State(mlState: model.makeState(), isPersistent: false)
+        }
+      }
+
+      func endDecodeWithState(_ state: sending State) {
+        guard state.isPersistent else { return }
+        self.bufferedState = state
+      }
+
+      func prediction(
+        from inputs: [String: MLTensor],
+        using state: MLState
+      ) async throws -> [String: MLTensor] {
+        try await self.model.prediction(from: inputs, using: state)
+      }
+    }
+  }
+
+  // MARK: - Sampler
+
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
   extension NeedleCoreMLEngine {
     public protocol Sampler {
@@ -407,6 +408,8 @@
     }
   }
 
+  // MARK: - LogitsProcessor
+
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
   extension NeedleCoreMLEngine {
     public protocol LogitsProcessor {
@@ -417,6 +420,8 @@
       mutating func didSample(token: NeedleToken)
     }
   }
+
+  // MARK: - Error
 
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
   public struct NeedleCoreMLEngineError: Hashable, Error {
@@ -445,6 +450,8 @@
       message: "CoreML model did not return expected outputs."
     )
   }
+
+  // MARK: - Helpers
 
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
   extension MLTensor {

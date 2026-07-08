@@ -1,11 +1,11 @@
 ▿ NeedleSessionGeneration
   ▿ engineGeneration: NeedleEngineGeneration
     ▿ decodeMetrics: NeedleDecodeMetrics
-      ▿ duration: 0.613423708 seconds
-        - _low: 613423708000000000
+      ▿ duration: 0.6474405 seconds
+        - _low: 647440500000000000
         - _high: 0
-      ▿ durationToFirstToken: 0.095772417 seconds
-        - _low: 95772417000000000
+      ▿ durationToFirstToken: 0.097626333 seconds
+        - _low: 97626333000000000
         - _high: 0
       - tokens: 46
     ▿ metadata: 2 key/value pairs
@@ -64,8 +64,8 @@
           - 0.9935806
           - 1.0
     ▿ prefillMetrics: NeedlePrefillMetrics
-      ▿ duration: 0.071619959 seconds
-        - _low: 71619959000000000
+      ▿ duration: 0.073916708 seconds
+        - _low: 73916708000000000
         - _high: 0
       - tokens: 137
     ▿ tokens: 46 elements
@@ -213,7 +213,7 @@
       ▿ AnyNeedleToolCall
         ▿ base: NeedleToolCall<SendEmailTool>
           ▿ id: NeedleToolCallID
-            - rawValue: "D3BA26E6-6B63-4724-B8D4-9029E477B32C"
+            - rawValue: "06C07249-012D-4324-9B0A-E9D1ECCDCE84"
           ▿ input: Input
             - address: "henderry@gmail.com"
             - body: "Could you please go on an adventure?["
