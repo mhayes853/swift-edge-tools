@@ -138,20 +138,46 @@ def sample_encoder_input(
 def sample_decoder_inputs(
     needle: Needle,
     configuration: NeedleModelConfiguation,
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-    encoder_input = sample_encoder_input(configuration, DEFAULT_ENCODER_SAMPLE_LENGTH)
+) -> tuple[
+    torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor
+]:
+    encoder_input = sample_encoder_input(
+        configuration, configuration.encoder_max_length
+    )
     with torch.no_grad():
-        cross_attention_mask, encoder_projected_k, encoder_projected_v = needle.encoder(
-            encoder_input
-        )
+        encoder_outputs = needle.encoder(encoder_input)
 
+    return sample_decoder_inputs_from_encoder_outputs(configuration, encoder_outputs)
+
+
+def sample_decoder_inputs_from_encoder_outputs(
+    configuration: NeedleModelConfiguation,
+    encoder_outputs: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+) -> tuple[
+    torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor
+]:
     decoder_input = torch.full(
         (1, DEFAULT_DECODER_SAMPLE_LENGTH),
         fill_value=configuration.decoder_start_token_id,
         dtype=torch.long,
     )
+    cache_position = torch.zeros((1,), dtype=torch.int32)
+    cross_attention_mask, encoder_projected_k, encoder_projected_v = encoder_outputs
+    self_attention_mask = torch.full(
+        (
+            1,
+            1,
+            DEFAULT_DECODER_SAMPLE_LENGTH,
+            configuration.encoder_max_length,
+        ),
+        fill_value=-65500.0,
+        dtype=cross_attention_mask.dtype,
+    )
+    self_attention_mask[..., 0] = 0
     return (
         decoder_input,
+        cache_position,
+        self_attention_mask,
         cross_attention_mask,
         encoder_projected_k,
         encoder_projected_v,
@@ -162,30 +188,40 @@ def encoder_dynamic_shapes(
     configuration: NeedleModelConfiguation,
 ) -> tuple[dict[int, Any], ...]:
     _ = configuration
-    return ({0: torch.export.Dim.STATIC, 1: torch.export.Dim.AUTO},)
+    return ({0: torch.export.Dim.STATIC, 1: torch.export.Dim.STATIC},)
 
 
-def decoder_dynamic_shapes() -> tuple[dict[int, Any], ...]:
+def decoder_dynamic_shapes(
+    configuration: NeedleModelConfiguation,
+) -> tuple[dict[int, Any], ...]:
+    _ = configuration
     return (
         {0: torch.export.Dim.STATIC, 1: torch.export.Dim.STATIC},
+        {0: torch.export.Dim.STATIC},
         {
             0: torch.export.Dim.STATIC,
             1: torch.export.Dim.STATIC,
             2: torch.export.Dim.STATIC,
-            3: torch.export.Dim.AUTO,
+            3: torch.export.Dim.STATIC,
         },
         {
             0: torch.export.Dim.STATIC,
             1: torch.export.Dim.STATIC,
             2: torch.export.Dim.STATIC,
-            3: torch.export.Dim.AUTO,
+            3: torch.export.Dim.STATIC,
+        },
+        {
+            0: torch.export.Dim.STATIC,
+            1: torch.export.Dim.STATIC,
+            2: torch.export.Dim.STATIC,
+            3: torch.export.Dim.STATIC,
             4: torch.export.Dim.STATIC,
         },
         {
             0: torch.export.Dim.STATIC,
             1: torch.export.Dim.STATIC,
             2: torch.export.Dim.STATIC,
-            3: torch.export.Dim.AUTO,
+            3: torch.export.Dim.STATIC,
             4: torch.export.Dim.STATIC,
         },
     )

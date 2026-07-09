@@ -6,10 +6,10 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import cast
 
-import coremltools as ct
-import torch
 from coreai.runtime import AIModelAssetMetadata
 from coreai_opt.quantization import QuantizerConfig
+import coremltools as ct
+import torch
 
 from needle import Needle, NeedleModelConfiguation
 from needle.needle_compression import CoreMLQuantizerCompressor
@@ -132,6 +132,8 @@ class CoreMLExportTests(unittest.TestCase):
                 [field.name for field in decoder_model.get_spec().description.input],
                 [
                     "input_ids",
+                    "cache_position",
+                    "self_attention_mask",
                     "cross_attention_mask",
                     "encoder_projected_k",
                     "encoder_projected_v",
@@ -139,7 +141,7 @@ class CoreMLExportTests(unittest.TestCase):
             )
             self.assertEqual(
                 [field.name for field in decoder_model.get_spec().description.state],
-                ["keyCache", "valueCache", "cacheOffset"],
+                ["key_cache", "value_cache"],
             )
             self.assertEqual(
                 [field.name for field in decoder_model.get_spec().description.output],

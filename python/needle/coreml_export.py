@@ -6,18 +6,16 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+from coreai.runtime import AIModelAssetMetadata
 import coremltools as ct
+from coremltools.models import MLModel
 import numpy as np
 import torch
-from coreai.runtime import AIModelAssetMetadata
-from coremltools.models import MLModel
 
 import needle.export_helpers as export_helpers
 
 from . import Needle, NeedleModelConfiguation
 from .needle_compression import NeedleCompressor
-from .needle_torch import NeedleDecoder, _RoPEFrequencies, _project_logits
-from .needle_torch_helpers import forward_attention_with_kv_cache, forward_decoder
 
 _ENCODER_INPUT_NAMES = ["input_ids"]
 _ENCODER_OUTPUT_NAMES = [
@@ -27,201 +25,14 @@ _ENCODER_OUTPUT_NAMES = [
 ]
 _DECODER_INPUT_NAMES = [
     "input_ids",
+    "cache_position",
+    "self_attention_mask",
     "cross_attention_mask",
     "encoder_projected_k",
     "encoder_projected_v",
 ]
 _DECODER_OUTPUT_NAMES = ["logits"]
-_DECODER_STATE_NAMES = ["keyCache", "valueCache", "cacheOffset"]
-
-
-class _CoreMLEncoderWrapper(torch.nn.Module):
-    def __init__(self, needle: Needle):
-        super().__init__()
-        self.configuration = needle.configuration
-        self.model: Any = needle.model
-        self.model_dtype = typing.cast(
-            torch.Tensor, needle.model.embed_tokens.weight
-        ).dtype
-
-    def forward(
-        self,
-        input_ids: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        encoder_output = self.model.encode(input_ids, mask=None)
-        encoder_projected_k, encoder_projected_v = self.model.project_encoder_kv(
-            encoder_output
-        )
-        cross_attention_mask = torch.zeros(
-            (1, 1, 1, input_ids.shape[1]),
-            device=encoder_output.device,
-            dtype=self.model_dtype,
-        )
-        return (
-            cross_attention_mask.to(dtype=torch.float16),
-            encoder_projected_k.to(dtype=torch.float16),
-            encoder_projected_v.to(dtype=torch.float16),
-        )
-
-
-class _CoreMLDecoderWrapper(torch.nn.Module):
-    def __init__(self, decoder: NeedleDecoder):
-        super().__init__()
-        self.configuration = decoder.configuration
-        self.model: Any = decoder.model
-        self.lm_head: Any = decoder.lm_head
-        self.embedding_weight = typing.cast(
-            torch.Tensor, decoder.model.embed_tokens.weight
-        )
-        self.register_buffer(
-            "keyCache",
-            torch.zeros(
-                typing.cast(torch.Tensor, decoder.k_cache).shape,
-                dtype=torch.float16,
-            ),
-        )
-        self.register_buffer(
-            "valueCache",
-            torch.zeros(
-                typing.cast(torch.Tensor, decoder.v_cache).shape,
-                dtype=torch.float16,
-            ),
-        )
-        self.register_buffer("cacheOffset", torch.zeros((1,), dtype=torch.float16))
-
-    def reset(self) -> None:
-        typing.cast(torch.Tensor, self.keyCache).zero_()
-        typing.cast(torch.Tensor, self.valueCache).zero_()
-        typing.cast(torch.Tensor, self.cacheOffset).zero_()
-
-    def forward(
-        self,
-        input_ids: torch.Tensor,
-        cross_attention_mask: torch.Tensor,
-        encoder_projected_k: torch.Tensor,
-        encoder_projected_v: torch.Tensor,
-    ) -> torch.Tensor:
-        model_dtype = self.embedding_weight.dtype
-        key_cache = typing.cast(torch.Tensor, self.keyCache).to(dtype=model_dtype)
-        value_cache = typing.cast(torch.Tensor, self.valueCache).to(dtype=model_dtype)
-        cache_offset = typing.cast(torch.Tensor, self.cacheOffset).to(dtype=torch.int32)
-
-        hidden_state = self._decode_with_coreml_cache(
-            input_ids=input_ids,
-            cross_attention_mask=cross_attention_mask.to(dtype=model_dtype),
-            encoder_projected_k=encoder_projected_k.to(dtype=model_dtype),
-            encoder_projected_v=encoder_projected_v.to(dtype=model_dtype),
-            key_cache=key_cache,
-            value_cache=value_cache,
-            cache_offset=cache_offset,
-        )
-        typing.cast(torch.Tensor, self.keyCache).copy_(
-            key_cache.to(dtype=typing.cast(torch.Tensor, self.keyCache).dtype)
-        )
-        typing.cast(torch.Tensor, self.valueCache).copy_(
-            value_cache.to(dtype=typing.cast(torch.Tensor, self.valueCache).dtype)
-        )
-        typing.cast(torch.Tensor, self.cacheOffset).copy_(
-            (cache_offset + torch.full_like(cache_offset, input_ids.shape[1])).to(
-                dtype=typing.cast(torch.Tensor, self.cacheOffset).dtype
-            )
-        )
-        return _project_logits(
-            hidden_state,
-            self.lm_head,
-            self.embedding_weight,
-        ).to(dtype=torch.float16)
-
-    def _decode_with_coreml_cache(
-        self,
-        *,
-        input_ids: torch.Tensor,
-        cross_attention_mask: torch.Tensor,
-        encoder_projected_k: torch.Tensor,
-        encoder_projected_v: torch.Tensor,
-        key_cache: torch.Tensor,
-        value_cache: torch.Tensor,
-        cache_offset: torch.Tensor,
-    ) -> torch.Tensor:
-        hidden_state = self.model.embed_tokens(input_ids) * self.model.embed_scale
-        decoder = self.model.decoder
-        return forward_decoder(
-            decoder=decoder,
-            x=hidden_state,
-            cross_mask=cross_attention_mask,
-            encoder_projected_k=encoder_projected_k,
-            encoder_projected_v=encoder_projected_v,
-            k_cache=key_cache,
-            v_cache=value_cache,
-            cache_offset=cache_offset,
-            rope_frequencies=_RoPEFrequencies,
-            self_attention_adapter=self._forward_layer_self_attention,
-        )
-
-    def _forward_layer_self_attention(
-        self,
-        layer: typing.Any,
-        q: torch.Tensor,
-        mask: torch.Tensor,
-        rope: _RoPEFrequencies,
-        layer_k_cache: torch.Tensor,
-        layer_v_cache: torch.Tensor,
-        cache_offset: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        return forward_attention_with_kv_cache(
-            attention=layer.self_attn,
-            q=q,
-            kv=q,
-            mask=mask,
-            rope=rope,
-            layer_k_cache=layer_k_cache,
-            layer_v_cache=layer_v_cache,
-            cache_offset=cache_offset,
-            update_kv_cache=lambda layer_k_cache, layer_v_cache, projected_k, projected_v, cache_offset: (
-                self._update_kv_cache(
-                    layer_k_cache=layer_k_cache,
-                    layer_v_cache=layer_v_cache,
-                    projected_k=projected_k,
-                    projected_v=projected_v,
-                    cache_offset=cache_offset,
-                )
-            ),
-        )
-
-    def _update_kv_cache(
-        self,
-        *,
-        layer_k_cache: torch.Tensor,
-        layer_v_cache: torch.Tensor,
-        projected_k: torch.Tensor,
-        projected_v: torch.Tensor,
-        cache_offset: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        cache_k = layer_k_cache.squeeze(0)
-        cache_v = layer_v_cache.squeeze(0)
-        update_k = projected_k.squeeze(0)
-        update_v = projected_v.squeeze(0)
-
-        seq_len = update_k.shape[1]
-        positions = torch.arange(
-            cache_k.shape[1],
-            device=update_k.device,
-            dtype=cache_offset.dtype,
-        )
-        token_positions = cache_offset.to(device=update_k.device) + torch.arange(
-            seq_len,
-            device=update_k.device,
-            dtype=cache_offset.dtype,
-        )
-        scatter = positions[None, :] == token_positions[:, None]
-        scatter_values = scatter.to(dtype=update_k.dtype)
-        write_mask = scatter.any(dim=0)[None, :, None]
-
-        expanded_k = torch.einsum("hsd,st->htd", update_k, scatter_values)
-        expanded_v = torch.einsum("hsd,st->htd", update_v, scatter_values)
-        updated_k = torch.where(write_mask, expanded_k, cache_k).unsqueeze(0)
-        updated_v = torch.where(write_mask, expanded_v, cache_v).unsqueeze(0)
-        return updated_k, updated_v
+_DECODER_STATE_NAMES = ["key_cache", "value_cache"]
 
 
 def export_needle_coreml(
@@ -270,6 +81,12 @@ def _load_needle_coreml_model(
     needle = needle.to(dtype=torch.float32)
     needle.encoder.to(dtype=torch.float32)
     needle.decoder.to(dtype=torch.float32)
+    needle.decoder.key_cache = typing.cast(torch.Tensor, needle.decoder.key_cache).to(
+        dtype=torch.float16
+    )
+    needle.decoder.value_cache = typing.cast(
+        torch.Tensor, needle.decoder.value_cache
+    ).to(dtype=torch.float16)
     return needle
 
 
@@ -282,12 +99,12 @@ def convert_needle_coreml_models(
     encoder_sample = (
         export_helpers.sample_encoder_input(
             configuration,
-            export_helpers.DEFAULT_ENCODER_SAMPLE_LENGTH,
+            configuration.encoder_max_length,
         ),
     )
     encoder_shapes = export_helpers.encoder_dynamic_shapes(configuration)
     encoder_module = _prepare_module_for_coreml_export(
-        _CoreMLEncoderWrapper(needle),
+        needle.encoder,
         encoder_sample,
         compressor=compressor,
         dynamic_shapes=encoder_shapes,
@@ -320,17 +137,13 @@ def convert_needle_coreml_models(
 
     needle.decoder.reset()
     encoder_outputs = encoder_module(*encoder_sample)
-    decoder_sample = (
-        torch.full(
-            (1, export_helpers.DEFAULT_DECODER_SAMPLE_LENGTH),
-            fill_value=configuration.decoder_start_token_id,
-            dtype=torch.long,
-        ),
-        *encoder_outputs,
+    decoder_sample = export_helpers.sample_decoder_inputs_from_encoder_outputs(
+        configuration,
+        encoder_outputs,
     )
-    decoder_shapes = export_helpers.decoder_dynamic_shapes()
+    decoder_shapes = export_helpers.decoder_dynamic_shapes(configuration)
     decoder_module = _prepare_module_for_coreml_export(
-        _CoreMLDecoderWrapper(needle.decoder),
+        needle.decoder,
         decoder_sample,
         compressor=compressor,
         dynamic_shapes=decoder_shapes,
@@ -353,9 +166,7 @@ def convert_needle_coreml_models(
                 _DECODER_OUTPUT_NAMES,
                 (decoder_module(*decoder_sample),),
             ),
-            states=_coreml_state_types(
-                typing.cast(_CoreMLDecoderWrapper, decoder_module)
-            ),
+            states=_coreml_state_types(needle.decoder),
         ),
     )
     decoder_model = _rename_model_features(
@@ -425,13 +236,12 @@ def _coreml_output_tensor_types(
     ]
 
 
-def _coreml_state_types(module: _CoreMLDecoderWrapper) -> list[ct.StateType]:
-    key_cache = typing.cast(torch.Tensor, module.keyCache)
-    value_cache = typing.cast(torch.Tensor, module.valueCache)
-    cache_offset = typing.cast(torch.Tensor, module.cacheOffset)
+def _coreml_state_types(module: torch.nn.Module) -> list[ct.StateType]:
+    key_cache = typing.cast(torch.Tensor, module.key_cache)
+    value_cache = typing.cast(torch.Tensor, module.value_cache)
     return [
         ct.StateType(
-            name="keyCache",
+            name="key_cache",
             wrapped_type=typing.cast(
                 Any,
                 ct.TensorType(
@@ -441,22 +251,12 @@ def _coreml_state_types(module: _CoreMLDecoderWrapper) -> list[ct.StateType]:
             ),
         ),
         ct.StateType(
-            name="valueCache",
+            name="value_cache",
             wrapped_type=typing.cast(
                 Any,
                 ct.TensorType(
                     shape=tuple(value_cache.shape),
                     dtype=_numpy_dtype(value_cache.dtype),
-                ),
-            ),
-        ),
-        ct.StateType(
-            name="cacheOffset",
-            wrapped_type=typing.cast(
-                Any,
-                ct.TensorType(
-                    shape=tuple(cache_offset.shape),
-                    dtype=_numpy_dtype(cache_offset.dtype),
                 ),
             ),
         ),

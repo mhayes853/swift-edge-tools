@@ -36,8 +36,11 @@ class NeedleTorchTests(unittest.TestCase):
         cross_attention_mask, encoder_projected_k, encoder_projected_v = model.encoder(
             encoder_input_ids
         )
+        self_attention_mask = torch.zeros((1, 1, 2, 16))
         logits = decoder(
             decoder_input_ids,
+            torch.zeros((1,), dtype=torch.int32),
+            self_attention_mask,
             cross_attention_mask,
             encoder_projected_k,
             encoder_projected_v,
@@ -48,13 +51,20 @@ class NeedleTorchTests(unittest.TestCase):
         self.assertEqual(tuple(encoder_projected_v.shape), (1, 1, 1, 4, 4))
         self.assertEqual(tuple(logits.shape), (1, 2, 32))
         self.assertEqual(
-            tuple(typing.cast(torch.Tensor, decoder.k_cache).shape), (1, 1, 1, 16, 4)
+            tuple(typing.cast(torch.Tensor, decoder.key_cache).shape), (1, 16, 1, 4)
         )
-        self.assertEqual(int(typing.cast(torch.Tensor, decoder.cache_offset).item()), 2)
+        self.assertEqual(
+            tuple(typing.cast(torch.Tensor, decoder.value_cache).shape),
+            (1, 16, 1, 4),
+        )
+        self.assertFalse(hasattr(decoder, "cache_offset"))
 
         model.reset()
 
-        self.assertEqual(int(typing.cast(torch.Tensor, decoder.cache_offset).item()), 0)
+        key_cache = typing.cast(torch.Tensor, decoder.key_cache)
+        value_cache = typing.cast(torch.Tensor, decoder.value_cache)
+        self.assertTrue(torch.equal(key_cache, torch.zeros_like(key_cache)))
+        self.assertTrue(torch.equal(value_cache, torch.zeros_like(value_cache)))
 
     def test_forward_runs_encode_then_decode(self) -> None:
         model = Needle(mock_configuration())
@@ -65,7 +75,7 @@ class NeedleTorchTests(unittest.TestCase):
         )
 
         self.assertEqual(tuple(logits.shape), (1, 2, 32))
-        self.assertEqual(int(typing.cast(torch.Tensor, decoder.cache_offset).item()), 2)
+        self.assertFalse(hasattr(decoder, "cache_offset"))
 
     def test_decode_rejects_non_unit_batch(self) -> None:
         model = Needle(mock_configuration())
@@ -76,6 +86,8 @@ class NeedleTorchTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "batch size 1"):
             model.decoder(
                 torch.tensor([[1], [2]]),
+                torch.zeros((1,), dtype=torch.int32),
+                torch.zeros((1, 1, 1, 16)),
                 cross_attention_mask,
                 encoder_projected_k,
                 encoder_projected_v,

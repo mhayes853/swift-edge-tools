@@ -191,6 +191,7 @@
         try Task.checkCancellation()
         let decoderLogits = try await self.decode(
           inputIds: MLTensor(tokenIds: [nextDecoderTokenId]),
+          cachePosition: generatedTokens.count,
           encoderOutputs: encoderOutputs,
           decoderState: decoderState
         )
@@ -244,9 +245,14 @@
       }
 
       let promptTensor = MLTensor(tokenIds: promptTokens)
+      let paddedPromptTensor = MLTensor(
+        tokenIds: promptTokens,
+        paddingTo: configuration.encoderMaxLength,
+        padTokenId: configuration.padTokenId
+      )
       let prefillStart = self.clock.now
       processor?.prompt(promptTensor)
-      let encoderOutputs = try await self.runEncoder(inputIds: promptTensor)
+      let encoderOutputs = try await self.runEncoder(inputIds: paddedPromptTensor)
       let metrics = NeedlePrefillMetrics(
         tokens: promptTokens.count,
         duration: prefillStart.duration(to: self.clock.now)
@@ -264,20 +270,26 @@
         throw NeedleCoreMLEngineError.missingModelOutputs
       }
       return EncoderOutputs(
-        crossAttentionMask: crossAttentionMask.cast(to: Float16.self),
-        encoderProjectedK: encoderProjectedK.cast(to: Float16.self),
-        encoderProjectedV: encoderProjectedV.cast(to: Float16.self)
+        crossAttentionMask: crossAttentionMask,
+        encoderProjectedK: encoderProjectedK,
+        encoderProjectedV: encoderProjectedV
       )
     }
 
     private func decode(
       inputIds: MLTensor,
+      cachePosition: Int,
       encoderOutputs: EncoderOutputs,
       decoderState: MLState
     ) async throws -> MLTensor {
       var outputs = try await self.decoderModel.prediction(
         from: [
           TensorName.inputIds: inputIds,
+          TensorName.cachePosition: MLTensor(shape: [1], scalars: [Int32(cachePosition)]),
+          TensorName.selfAttentionMask: Self.selfAttentionMask(
+            step: cachePosition,
+            maxLength: self.configuration.encoderMaxLength
+          ),
           TensorName.crossAttentionMask: encoderOutputs.crossAttentionMask,
           TensorName.encoderProjectedK: encoderOutputs.encoderProjectedK,
           TensorName.encoderProjectedV: encoderOutputs.encoderProjectedV
@@ -348,7 +360,6 @@
         func reset() {
           self.mlState.zero(named: TensorName.keyCache)
           self.mlState.zero(named: TensorName.valueCache)
-          self.mlState.zero(named: TensorName.cacheOffset)
         }
       }
 
@@ -450,6 +461,27 @@
       let ids = tokenIds.map(Int32.init)
       self.init(shape: [1, ids.count], scalars: ids, scalarType: Int32.self)
     }
+
+    fileprivate init(
+      tokenIds: some Sequence<NeedleToken.ID>,
+      paddingTo length: Int,
+      padTokenId: NeedleToken.ID
+    ) {
+      var ids = tokenIds.map(Int32.init)
+      ids.append(contentsOf: repeatElement(Int32(padTokenId), count: length - ids.count))
+      self.init(shape: [1, length], scalars: ids, scalarType: Int32.self)
+    }
+  }
+
+  @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
+  extension NeedleCoreMLEngine {
+    private static func selfAttentionMask(step: Int, maxLength: Int) -> MLTensor {
+      var scalars = Array(repeating: Float16(-65500), count: maxLength)
+      for index in 0...min(step, maxLength - 1) {
+        scalars[index] = 0
+      }
+      return MLTensor(shape: [1, 1, 1, maxLength], scalars: scalars)
+    }
   }
 
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
@@ -471,12 +503,13 @@
 
   private enum TensorName {
     static let inputIds = "input_ids"
+    static let cachePosition = "cache_position"
+    static let selfAttentionMask = "self_attention_mask"
     static let crossAttentionMask = "cross_attention_mask"
     static let encoderProjectedK = "encoder_projected_k"
     static let encoderProjectedV = "encoder_projected_v"
-    static let keyCache = "keyCache"
-    static let valueCache = "valueCache"
-    static let cacheOffset = "cacheOffset"
+    static let keyCache = "key_cache"
+    static let valueCache = "value_cache"
     static let logits = "logits"
   }
 #endif

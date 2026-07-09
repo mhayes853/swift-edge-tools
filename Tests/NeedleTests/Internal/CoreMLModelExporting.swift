@@ -94,9 +94,9 @@
 
     static func outputDirectoryName(quantizerPreset: String?) -> String {
       if let quantizerPreset {
-        return "coreml-export-v3-\(quantizerPreset)"
+        return "coreml-export-v9-\(quantizerPreset)"
       }
-      return "coreml-export-v3"
+      return "coreml-export-v9"
     }
 
     static func pythonExecutable(in pythonDirectory: URL) -> URL {

@@ -1,14 +1,15 @@
 import json
 import tempfile
 import unittest
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, cast
+from typing import cast
 from unittest.mock import patch
 
-import torch
 from coreai.authoring.asset import AIModelAsset
 from coreai.runtime import AIModelAssetMetadata
 from coreai_opt.quantization import QuantizerConfig
+import torch
 
 from needle import Needle, NeedleModelConfiguation
 from needle.coreai_export import export_needle_coreai
@@ -25,7 +26,7 @@ class CoreAIExportTests(unittest.TestCase):
     def test_export_needle_coreai_runs_end_to_end_on_local_bundle(self) -> None:
         self._assert_export_runs_end_to_end()
 
-    def test_export_program_supports_dynamic_encoder_sequence_length(self) -> None:
+    def test_export_program_uses_static_encoder_sequence_length(self) -> None:
         configuration = NeedleModelConfiguation(
             vocabulary_size=16,
             dimensions=8,
@@ -47,7 +48,7 @@ class CoreAIExportTests(unittest.TestCase):
             dynamic_shapes=encoder_dynamic_shapes(configuration),
         )
 
-        self.assertEqual(len(exported_program.range_constraints), 1)
+        self.assertEqual(len(exported_program.range_constraints), 0)
 
     def test_load_needle_model_uses_configuration_dtype(self) -> None:
         source_ctx = tempfile.TemporaryDirectory()
@@ -208,7 +209,10 @@ class CoreAIExportTests(unittest.TestCase):
         )
 
     def _custom_metadata(self, metadata: AIModelAssetMetadata) -> dict[str, str]:
-        return cast(dict[str, str], getattr(metadata, "creator_defined_metadata"))
+        return cast(
+            dict[str, str],
+            object.__getattribute__(metadata, "creator_defined_metadata"),
+        )
 
 
 if __name__ == "__main__":

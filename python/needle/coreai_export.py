@@ -6,10 +6,10 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-import torch
 from coreai.authoring.asset import AIProgram
 from coreai.runtime import AIModelAssetMetadata
 from coreai_torch import TorchConverter
+import torch
 
 import needle.export_helpers as export_helpers
 
@@ -67,7 +67,7 @@ def convert_needle_coreai_programs(
     encoder_sample = (
         export_helpers.sample_encoder_input(
             configuration,
-            export_helpers.DEFAULT_ENCODER_SAMPLE_LENGTH,
+            configuration.encoder_max_length,
         ),
     )
     decoder_sample = export_helpers.sample_decoder_inputs(needle, configuration)
@@ -100,7 +100,7 @@ def convert_needle_coreai_programs(
     encoder_program.optimize()
 
     needle.decoder.reset()
-    decoder_shapes = export_helpers.decoder_dynamic_shapes()
+    decoder_shapes = export_helpers.decoder_dynamic_shapes(configuration)
     decoder_module = _prepare_module_for_coreai_export(
         needle.decoder,
         decoder_sample,
@@ -118,11 +118,13 @@ def convert_needle_coreai_programs(
             ),
             input_names=[
                 "input_ids",
+                "cache_position",
+                "self_attention_mask",
                 "cross_attention_mask",
                 "encoder_projected_k",
                 "encoder_projected_v",
             ],
-            state_names=["keyCache", "valueCache", "cacheOffset"],
+            state_names=["key_cache", "value_cache"],
             output_names=["logits"],
         )
         .to_coreai()
