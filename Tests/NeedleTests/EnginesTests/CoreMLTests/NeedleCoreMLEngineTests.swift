@@ -28,6 +28,21 @@
 
     @Test
     @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
+    func `Concurrent Generations`() async throws {
+      let engine = try await makeNeedleCoreMLEngine()
+
+      let firstTask = try engine.generate(prompt: .sendAdventureEmail, parameters: .default) { _ in }
+      let secondTask = try engine.generate(prompt: .sendAdventureEmail, parameters: .default) { _ in }
+
+      let (firstGeneration, secondGeneration) = try await (firstTask.value, secondTask.value)
+      withKnownIssue {
+        assertSnapshot(of: firstGeneration.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
+        assertSnapshot(of: secondGeneration.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
+      }
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
     func `Sequential Generations`() async throws {
       let engine = try await makeNeedleCoreMLEngine()
 
