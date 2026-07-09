@@ -491,6 +491,7 @@ class _NeedleAttention(nn.Module):
             attn_mask=mask,
             dropout_p=0.0,
             scale=self.scale,
+            enable_gqa=self.heads != self.kv_heads,
         )
 
         output = (
