@@ -6,12 +6,11 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+import needle.export_helpers as export_helpers
+import torch
 from coreai.authoring.asset import AIProgram
 from coreai.runtime import AIModelAssetMetadata
 from coreai_torch import TorchConverter
-import torch
-
-import needle.export_helpers as export_helpers
 
 from . import Needle, NeedleModelConfiguation
 from .needle_compression import NeedleCompressor
@@ -70,7 +69,10 @@ def convert_needle_coreai_programs(
             configuration.encoder_max_length,
         ),
     )
-    decoder_sample = export_helpers.sample_decoder_inputs(needle, configuration)
+    decoder_sample = (
+        *export_helpers.sample_decoder_inputs(needle, configuration),
+        *export_helpers.empty_decoder_caches(configuration, dtype=torch.float32),
+    )
     encoder_shapes = export_helpers.encoder_dynamic_shapes(configuration)
     encoder_module = _prepare_module_for_coreai_export(
         needle.encoder,
@@ -99,8 +101,21 @@ def convert_needle_coreai_programs(
     )
     encoder_program.optimize()
 
-    needle.decoder.reset()
-    decoder_shapes = export_helpers.decoder_dynamic_shapes(configuration)
+    decoder_shapes = (
+        *export_helpers.decoder_dynamic_shapes(configuration),
+        {
+            0: torch.export.Dim.STATIC,
+            1: torch.export.Dim.STATIC,
+            2: torch.export.Dim.STATIC,
+            3: torch.export.Dim.STATIC,
+        },
+        {
+            0: torch.export.Dim.STATIC,
+            1: torch.export.Dim.STATIC,
+            2: torch.export.Dim.STATIC,
+            3: torch.export.Dim.STATIC,
+        },
+    )
     decoder_module = _prepare_module_for_coreai_export(
         needle.decoder,
         decoder_sample,
@@ -123,9 +138,10 @@ def convert_needle_coreai_programs(
                 "cross_attention_mask",
                 "encoder_projected_k",
                 "encoder_projected_v",
+                "key_cache",
+                "value_cache",
             ],
-            state_names=["key_cache", "value_cache"],
-            output_names=["logits"],
+            output_names=["logits", "updated_key_cache", "updated_value_cache"],
         )
         .to_coreai()
     )

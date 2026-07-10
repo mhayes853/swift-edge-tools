@@ -131,9 +131,11 @@ private enum NeedleTestModelExport {
 
       let fileManager = FileManager.default
       let contents = (try? fileManager.contentsOfDirectory(atPath: directory.path())) ?? []
-      let hasEncoderModel = contents.contains("encoder.aimodel")
+      let hasEncoderModel =
+        contents.contains("encoder.aimodel")
         || contents.contains { $0.hasPrefix("encoder.") && $0.hasSuffix(".aimodelc") }
-      let hasDecoderModel = contents.contains("decoder.aimodel")
+      let hasDecoderModel =
+        contents.contains("decoder.aimodel")
         || contents.contains { $0.hasPrefix("decoder.") && $0.hasSuffix(".aimodelc") }
       return hasEncoderModel
         && hasDecoderModel
@@ -144,13 +146,14 @@ private enum NeedleTestModelExport {
       quantizerPreset: String?,
       compilePlatforms: [String]
     ) -> String {
-      let compileSuffix = compilePlatforms.isEmpty
+      let compileSuffix =
+        compilePlatforms.isEmpty
         ? ""
         : "-aot-" + compilePlatforms.joined(separator: "-")
       if let quantizerPreset {
-        return "coreai-export-\(quantizerPreset)\(compileSuffix)"
+        return "coreai-export-v3-\(quantizerPreset)\(compileSuffix)"
       }
-      return "coreai-export\(compileSuffix)"
+      return "coreai-export-v3\(compileSuffix)"
     }
   }
 
@@ -186,7 +189,7 @@ private enum NeedleTestModelExport {
       arguments: arguments
     )
     let configuration = MLModelConfiguration()
-    configuration.computeUnits = .cpuAndGPU
+    configuration.computeUnits = .cpuAndNeuralEngine
     return try await NeedleCoreMLEngine(
       modelDirectoryURL: directory,
       modelConfiguration: configuration
@@ -204,9 +207,9 @@ private enum NeedleTestModelExport {
 
     static func outputDirectoryName(quantizerPreset: String?) -> String {
       if let quantizerPreset {
-        return "coreml-export-v9-\(quantizerPreset)"
+        return "coreml-export-v16-\(quantizerPreset)"
       }
-      return "coreml-export-v9"
+      return "coreml-export-v16"
     }
   }
 

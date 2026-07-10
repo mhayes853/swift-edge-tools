@@ -47,6 +47,27 @@
       let encoderProjectedV: MLTensor
     }
 
+    private struct DecoderCache: Sendable {
+      var key: MLTensor
+      var value: MLTensor
+
+      init(key: MLTensor, value: MLTensor) {
+        self.key = key
+        self.value = value
+      }
+
+      init(configuration: NeedleModelConfiguration) {
+        let shape = [
+          configuration.decoderLayers,
+          configuration.encoderMaxLength,
+          configuration.attentionHeads,
+          configuration.attentionHeadDimensions
+        ]
+        self.key = MLTensor(repeating: Float16.zero, shape: shape, scalarType: Float16.self)
+        self.value = MLTensor(repeating: Float16.zero, shape: shape, scalarType: Float16.self)
+      }
+    }
+
     private let state: Lock<State>
     private let configuration: NeedleModelConfiguration
     private let encoderModel: EncoderModelActor
@@ -135,23 +156,14 @@
           matcher.reset()
           return matcher
         }
-        let decoderState = await self.decoderModel.beginDecodeWithState()
-        do {
-          let result = try await self.generate(
-            prompt: prompt,
-            parameters: parameters,
-            onToken: onToken,
-            matcher: matcher,
-            decoderState: decoderState.mlState,
-            configuration: self.configuration,
-            isStopped: isStopped
-          )
-          await self.decoderModel.endDecodeWithState(decoderState)
-          return result
-        } catch {
-          await self.decoderModel.endDecodeWithState(decoderState)
-          throw error
-        }
+        return try await self.generate(
+          prompt: prompt,
+          parameters: parameters,
+          onToken: onToken,
+          matcher: matcher,
+          configuration: self.configuration,
+          isStopped: isStopped
+        )
       }
       return AtomicGenerationTask(task: task, isStopped: isStopped)
     }
@@ -161,7 +173,6 @@
       parameters: GenerateParameters,
       onToken: @escaping @Sendable (NeedleToken) -> Void,
       matcher: NeedleXGrammarEngine.Matcher,
-      decoderState: MLState,
       configuration: NeedleModelConfiguration,
       isStopped: ManagedAtomic<Bool>
     ) async throws -> NeedleEngineGeneration {
@@ -177,6 +188,7 @@
         processor: &processor
       )
 
+      var cache = DecoderCache(configuration: configuration)
       var nextDecoderTokenId = configuration.decoderStartTokenId
       var detokenizer = StreamingDetokenizer(tokenizer: self.tokenizer)
       var generatedTokens = [NeedleToken]()
@@ -193,7 +205,7 @@
           inputIds: MLTensor(tokenIds: [nextDecoderTokenId]),
           cachePosition: generatedTokens.count,
           encoderOutputs: encoderOutputs,
-          decoderState: decoderState
+          cache: &cache
         )
         let stepLogits = decoderLogits.squeezingShape(at: 1)
         let processedLogits = try await processor?.process(stepLogits) ?? stepLogits
@@ -280,10 +292,9 @@
       inputIds: MLTensor,
       cachePosition: Int,
       encoderOutputs: EncoderOutputs,
-      decoderState: MLState
+      cache: inout DecoderCache
     ) async throws -> MLTensor {
-      var outputs = try await self.decoderModel.prediction(
-        from: [
+      let inputs = [
           TensorName.inputIds: inputIds,
           TensorName.cachePosition: MLTensor(shape: [1], scalars: [Int32(cachePosition)]),
           TensorName.selfAttentionMask: Self.selfAttentionMask(
@@ -292,13 +303,19 @@
           ),
           TensorName.crossAttentionMask: encoderOutputs.crossAttentionMask,
           TensorName.encoderProjectedK: encoderOutputs.encoderProjectedK,
-          TensorName.encoderProjectedV: encoderOutputs.encoderProjectedV
-        ],
-        using: decoderState
-      )
-      guard let logits = outputs.removeValue(forKey: TensorName.logits) else {
+          TensorName.encoderProjectedV: encoderOutputs.encoderProjectedV,
+          TensorName.keyCache: cache.key,
+          TensorName.valueCache: cache.value
+      ]
+      let outputs = try await self.decoderModel.prediction(from: inputs)
+      guard
+        let logits = outputs[TensorName.logits],
+        let updatedKey = outputs[TensorName.updatedKeyCache],
+        let updatedValue = outputs[TensorName.updatedValueCache]
+      else {
         throw NeedleCoreMLEngineError.missingModelOutputs
       }
+      cache = DecoderCache(key: updatedKey, value: updatedValue)
       return logits
     }
 
@@ -351,43 +368,13 @@
 
     private actor DecoderModelActor {
       private nonisolated let model: MLModel
-      private var bufferedState: State?
-
-      struct State {
-        let mlState: MLState
-        let isPersistent: Bool
-
-        func reset() {
-          self.mlState.zero(named: TensorName.keyCache)
-          self.mlState.zero(named: TensorName.valueCache)
-        }
-      }
 
       init(model: sending MLModel) {
         self.model = model
-        self.bufferedState = State(mlState: model.makeState(), isPersistent: true)
       }
 
-      func beginDecodeWithState() -> sending State {
-        if let persistent = self.bufferedState {
-          self.bufferedState = nil
-          persistent.reset()
-          return persistent
-        } else {
-          return State(mlState: model.makeState(), isPersistent: false)
-        }
-      }
-
-      func endDecodeWithState(_ state: sending State) {
-        guard state.isPersistent else { return }
-        self.bufferedState = state
-      }
-
-      func prediction(
-        from inputs: [String: MLTensor],
-        using state: MLState
-      ) async throws -> [String: MLTensor] {
-        try await self.model.prediction(from: inputs, using: state)
+      func prediction(from inputs: [String: MLTensor]) async throws -> [String: MLTensor] {
+        try await self.model.prediction(from: inputs)
       }
     }
   }
@@ -477,22 +464,11 @@
   extension NeedleCoreMLEngine {
     private static func selfAttentionMask(step: Int, maxLength: Int) -> MLTensor {
       var scalars = Array(repeating: Float16(-65500), count: maxLength)
-      for index in 0...min(step, maxLength - 1) {
+      let allowedStart = max(0, maxLength - step - 1)
+      for index in allowedStart..<maxLength {
         scalars[index] = 0
       }
       return MLTensor(shape: [1, 1, 1, maxLength], scalars: scalars)
-    }
-  }
-
-  @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-  extension MLState {
-    fileprivate func zero(named name: String) {
-      self.withMultiArray(for: name) { array in
-        array.withUnsafeMutableBytes { bytes, _ in
-          guard let baseAddress = bytes.baseAddress else { return }
-          memset(baseAddress, 0, bytes.count)
-        }
-      }
     }
   }
 
@@ -510,6 +486,8 @@
     static let encoderProjectedV = "encoder_projected_v"
     static let keyCache = "key_cache"
     static let valueCache = "value_cache"
+    static let updatedKeyCache = "updated_key_cache"
+    static let updatedValueCache = "updated_value_cache"
     static let logits = "logits"
   }
 #endif

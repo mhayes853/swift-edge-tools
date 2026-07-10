@@ -54,13 +54,28 @@
       let encoderProjectedV: NDArray
     }
 
+    private struct DecoderCache {
+      var key: NDArray
+      var value: NDArray
+
+      init(descriptor: InferenceFunctionDescriptor) throws {
+        guard
+          let keyDescriptor = descriptor.arrayDescriptor(for: TensorName.updatedKeyCache),
+          let valueDescriptor = descriptor.arrayDescriptor(for: TensorName.updatedValueCache)
+        else {
+          throw NeedleCoreAIEngineError.missingModelOutputs
+        }
+        self.key = NDArray(descriptor: keyDescriptor)
+        self.value = NDArray(descriptor: valueDescriptor)
+      }
+    }
+
     private let state: Lock<State>
     private let configuration: NeedleModelConfiguration
     private let encoderFunction: InferenceFunction
     private let decoderFunction: InferenceFunction
     private let tokenizer: any Tokenizer
     private let clock = ContinuousClock()
-    private let decoderStates: Lock<DecoderStates?>
 
     public convenience init(
       modelDirectoryURL: URL,
@@ -122,11 +137,11 @@
       let decoderFunction = try Self.loadFunction(named: FunctionName.main, from: decoderModel)
       self.decoderFunction = decoderFunction
       self.tokenizer = tokenizer
-      self.decoderStates = Lock(
-        try DecoderStates(descriptor: decoderFunction.descriptor, isPersistent: true)
-      )
     }
+  }
 
+  @available(anyAppleOS 27.0, *)
+  extension NeedleCoreAIEngine {
     public func tokenize(prompt: NeedlePrompt) async throws -> [NeedleToken] {
       prompt.tokenized(using: self.tokenizer)
     }
@@ -189,8 +204,7 @@
         stream: stream
       )
 
-      var decodeStates = try self.beginDecodeWithStates()
-      defer { self.endDecodeWithStates(decodeStates) }
+      var cache = try DecoderCache(descriptor: self.decoderFunction.descriptor)
       var nextDecoderTokenId = configuration.decoderStartTokenId
       var detokenizer = StreamingDetokenizer(tokenizer: self.tokenizer)
       var generatedTokens = [NeedleToken]()
@@ -208,7 +222,7 @@
           inputIds: inputIds,
           cachePosition: generatedTokens.count,
           encoderOutputs: encoderOutputs,
-          states: &decodeStates,
+          cache: &cache,
           stream: stream
         )
         var logits = try self.stepLogits(from: decoderLogits)
@@ -435,58 +449,15 @@
     }
   }
 
-  // MARK: - Decoder State
+  // MARK: - Decoder
 
   @available(anyAppleOS 27.0, *)
   extension NeedleCoreAIEngine {
-    private struct DecoderStates {
-      var keyCache: NDArray
-      var valueCache: NDArray
-      let isPersistent: Bool
-
-      init(descriptor: InferenceFunctionDescriptor, isPersistent: Bool) throws {
-        guard
-          let keyCacheDescriptor = descriptor.stateDescriptor(of: TensorName.keyCache),
-          let valueCacheDescriptor = descriptor.stateDescriptor(of: TensorName.valueCache)
-        else {
-          throw NeedleCoreAIEngineError.missingModelStateDescriptors
-        }
-        self.keyCache = try NDArray(descriptor: keyCacheDescriptor)
-        self.valueCache = try NDArray(descriptor: valueCacheDescriptor)
-        self.isPersistent = isPersistent
-      }
-
-      mutating func reset() {
-        self.keyCache.zero()
-        self.valueCache.zero()
-      }
-    }
-
-    private func beginDecodeWithStates() throws -> sending DecoderStates {
-      try self.decoderStates.withLock { states in
-        if var persistentStates = states {
-          persistentStates.reset()
-          states = nil
-          return persistentStates
-        } else {
-          return try DecoderStates(
-            descriptor: self.decoderFunction.descriptor,
-            isPersistent: false
-          )
-        }
-      }
-    }
-
-    private func endDecodeWithStates(_ states: sending DecoderStates) {
-      guard states.isPersistent else { return }
-      self.decoderStates.withLock { $0 = states }
-    }
-
     private func decode(
       inputIds: NDArray,
       cachePosition: Int,
       encoderOutputs: EncoderOutputs,
-      states: inout DecoderStates,
+      cache: inout DecoderCache,
       stream: ComputeStream?
     ) async throws -> NDArray {
       if let stream {
@@ -494,14 +465,10 @@
           inputIds: inputIds,
           cachePosition: cachePosition,
           encoderOutputs: encoderOutputs,
-          states: &states,
+          cache: &cache,
           stream: stream
         )
       }
-      var stateViews = InferenceFunction.MutableViews()
-      stateViews.insert(&states.keyCache, for: TensorName.keyCache)
-      stateViews.insert(&states.valueCache, for: TensorName.valueCache)
-
       var outputs = try await self.decoderFunction.run(
         inputs: [
           TensorName.inputIds: inputIds,
@@ -512,13 +479,20 @@
           ),
           TensorName.crossAttentionMask: encoderOutputs.crossAttentionMask,
           TensorName.encoderProjectedK: encoderOutputs.encoderProjectedK,
-          TensorName.encoderProjectedV: encoderOutputs.encoderProjectedV
-        ],
-        states: stateViews
+          TensorName.encoderProjectedV: encoderOutputs.encoderProjectedV,
+          TensorName.keyCache: cache.key,
+          TensorName.valueCache: cache.value
+        ]
       )
-      guard let logits = outputs.remove(TensorName.logits)?.ndArray else {
+      guard
+        let logits = outputs.remove(TensorName.logits)?.ndArray,
+        let updatedKey = outputs.remove(TensorName.updatedKeyCache)?.ndArray,
+        let updatedValue = outputs.remove(TensorName.updatedValueCache)?.ndArray
+      else {
         throw NeedleCoreAIEngineError.missingModelOutputs
       }
+      cache.key = updatedKey
+      cache.value = updatedValue
       return logits
     }
 
@@ -526,61 +500,47 @@
       inputIds: NDArray,
       cachePosition: Int,
       encoderOutputs: EncoderOutputs,
-      states: inout DecoderStates,
+      cache: inout DecoderCache,
       stream: ComputeStream
     ) async throws -> NDArray {
-      let descriptor = self.decoderFunction.descriptor
-      guard let logitsArrayDescriptor = descriptor.arrayDescriptor(for: TensorName.logits) else {
-        throw NeedleCoreAIEngineError.missingModelOutputs
-      }
-
-      var keyCache = InferenceFunction.AsyncMutableValue(states.keyCache)
-      var valueCache = InferenceFunction.AsyncMutableValue(states.valueCache)
-
-      var stateViews = InferenceFunction.AsyncMutableViews()
-      stateViews.insert(&keyCache, for: TensorName.keyCache)
-      stateViews.insert(&valueCache, for: TensorName.valueCache)
-
-      let logitsShape = [1, inputIds.shape[1], self.configuration.vocabularySize]
-      var logits = InferenceFunction.AsyncMutableValue(
-        NDArray(descriptor: logitsArrayDescriptor.resolvingDynamicDimensions(logitsShape))
-      )
-      var outputViews = InferenceFunction.AsyncMutableViews()
-      outputViews.insert(&logits, for: TensorName.logits)
-
-      let inputValues = [
-        TensorName.inputIds: InferenceFunction.AsyncValue(inputIds),
-        TensorName.cachePosition: InferenceFunction.AsyncValue(
-          NDArray(scalars: [Int32(cachePosition)], shape: [1])
-        ),
-        TensorName.selfAttentionMask: InferenceFunction.AsyncValue(
-          Self.selfAttentionMask(
-            step: cachePosition,
-            maxLength: self.configuration.encoderMaxLength
-          )
-        ),
-        TensorName.crossAttentionMask: InferenceFunction.AsyncValue(
-          encoderOutputs.crossAttentionMask
-        ),
-        TensorName.encoderProjectedK: InferenceFunction.AsyncValue(
-          encoderOutputs.encoderProjectedK
-        ),
-        TensorName.encoderProjectedV: InferenceFunction.AsyncValue(encoderOutputs.encoderProjectedV)
-      ]
-      _ = try self.decoderFunction.encode(
-        inputs: inputValues,
-        states: stateViews,
-        outputViews: outputViews,
+      let outputs = try self.decoderFunction.encode(
+        inputs: [
+          TensorName.inputIds: InferenceFunction.AsyncValue(inputIds),
+          TensorName.cachePosition: InferenceFunction.AsyncValue(
+            NDArray(scalars: [Int32(cachePosition)], shape: [1])
+          ),
+          TensorName.selfAttentionMask: InferenceFunction.AsyncValue(
+            Self.selfAttentionMask(
+              step: cachePosition,
+              maxLength: self.configuration.encoderMaxLength
+            )
+          ),
+          TensorName.crossAttentionMask: InferenceFunction.AsyncValue(
+            encoderOutputs.crossAttentionMask
+          ),
+          TensorName.encoderProjectedK: InferenceFunction.AsyncValue(
+            encoderOutputs.encoderProjectedK
+          ),
+          TensorName.encoderProjectedV: InferenceFunction.AsyncValue(
+            encoderOutputs.encoderProjectedV
+          ),
+          TensorName.keyCache: InferenceFunction.AsyncValue(cache.key),
+          TensorName.valueCache: InferenceFunction.AsyncValue(cache.value)
+        ],
         to: stream
       )
       await stream.currentWorkCompleted()
 
-      guard let logitsNDArray = try await logits.ndArray else {
+      guard
+        let logits = try await outputs[TensorName.logits]?.ndArray,
+        let key = try await outputs[TensorName.updatedKeyCache]?.ndArray,
+        let value = try await outputs[TensorName.updatedValueCache]?.ndArray
+      else {
         throw NeedleCoreAIEngineError.missingModelOutputs
       }
-      states.keyCache = try await keyCache.ndArray ?? states.keyCache
-      states.valueCache = try await valueCache.ndArray ?? states.valueCache
-      return logitsNDArray
+      cache.key = key
+      cache.value = value
+      return logits
     }
   }
 
@@ -701,11 +661,11 @@
   extension NeedleCoreAIEngine {
     private static func selfAttentionMask(step: Int, maxLength: Int) -> NDArray {
       var mask = NDArray(shape: [1, 1, 1, maxLength], scalarType: .bfloat16)
-      let allowedEnd = min(step, maxLength - 1)
+      let allowedStart = max(0, maxLength - step - 1)
       var rawView = mask.mutableRawView()
       var values = MutableSpan<UInt16>(mutableBytes: rawView.mutableBytes)
       for index in 0..<maxLength {
-        values[index] = index <= allowedEnd ? 0 : 0xC77F
+        values[index] = index >= allowedStart ? 0 : 0xC77F
       }
       return mask
     }
@@ -732,6 +692,8 @@
     static let encoderProjectedV = "encoder_projected_v"
     static let keyCache = "key_cache"
     static let valueCache = "value_cache"
+    static let updatedKeyCache = "updated_key_cache"
+    static let updatedValueCache = "updated_value_cache"
     static let logits = "logits"
   }
 #endif

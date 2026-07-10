@@ -19,6 +19,23 @@ DEFAULT_ENCODER_SAMPLE_LENGTH = 4
 DEFAULT_DECODER_SAMPLE_LENGTH = 1
 
 
+def empty_decoder_caches(
+    configuration: NeedleModelConfiguation,
+    *,
+    dtype: torch.dtype,
+    device: torch.device | None = None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    shape = (
+        configuration.decoder_layers,
+        configuration.encoder_max_length,
+        configuration.attention_heads,
+        configuration.attention_head_dimensions,
+    )
+    return torch.zeros(shape, dtype=dtype, device=device), torch.zeros(
+        shape, dtype=dtype, device=device
+    )
+
+
 @dataclass(frozen=True)
 class ModelSourceFiles:
     directory: Path
@@ -173,7 +190,7 @@ def sample_decoder_inputs_from_encoder_outputs(
         fill_value=-65500.0,
         dtype=cross_attention_mask.dtype,
     )
-    self_attention_mask[..., 0] = 0
+    self_attention_mask[..., -1] = 0
     return (
         decoder_input,
         cache_position,

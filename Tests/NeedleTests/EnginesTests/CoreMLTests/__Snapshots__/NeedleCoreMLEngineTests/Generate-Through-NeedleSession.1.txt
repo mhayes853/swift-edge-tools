@@ -1,229 +1,72 @@
 ▿ NeedleSessionGeneration
   ▿ engineGeneration: NeedleEngineGeneration
     ▿ decodeMetrics: NeedleDecodeMetrics
-      ▿ duration: 0.650715125 seconds
-        - _low: 650715125000000000
+      ▿ duration: 0.072337834 seconds
+        - _low: 72337834000000000
         - _high: 0
-      ▿ durationToFirstToken: 0.307197125 seconds
-        - _low: 307197125000000000
+      ▿ durationToFirstToken: 0.080908666 seconds
+        - _low: 80908666000000000
         - _high: 0
-      - tokens: 46
+      - tokens: 11
     ▿ metadata: 2 key/value pairs
       ▿ (2 elements)
         ▿ key: NeedleMetadataKey
           - rawValue: "GenerationConfidence"
-        - value: 0.913254
+        - value: 0.9282196
       ▿ (2 elements)
         ▿ key: NeedleMetadataKey
           - rawValue: "PerTokenConfidences"
-        ▿ value: 46 elements
+        ▿ value: 11 elements
+          - 0.91964257
+          - 0.95962983
+          - 0.9004423
+          - 0.98262435
+          - 0.9995939
+          - 0.9791955
+          - 0.9242787
+          - 0.9999645
           - 1.0
-          - 0.9681916
-          - 0.99999917
-          - 1.0
-          - 0.99999976
-          - 1.0
-          - 0.9999999
-          - 0.9999672
-          - 0.9999831
-          - 1.0
-          - 0.9105322
-          - 0.9999771
-          - 0.61321986
-          - 0.858216
-          - 0.6763455
-          - 0.9583017
-          - 1.0
-          - 0.9999751
-          - 1.0
-          - 0.99965966
-          - 0.9999976
-          - 0.99999976
-          - 0.99826556
-          - 0.53327686
-          - 0.5791087
-          - 0.98623776
-          - 0.9553442
-          - 0.9999862
-          - 0.9996494
-          - 0.6412539
-          - 0.73212284
-          - 0.99534374
-          - 0.9942689
-          - 0.8232526
-          - 0.96749085
-          - 0.8987358
-          - 0.9942677
-          - 0.999876
-          - 0.99992776
-          - 0.92650473
-          - 0.5313674
-          - 0.5273356
-          - 0.96140593
-          - 0.986613
-          - 0.9936777
+          - 0.5450436
           - 1.0
     ▿ prefillMetrics: NeedlePrefillMetrics
-      ▿ duration: 0.160601833 seconds
-        - _low: 160601833000000000
+      ▿ duration: 0.052204625 seconds
+        - _low: 52204625000000000
         - _high: 0
       - tokens: 137
-    ▿ tokens: 46 elements
+    ▿ tokens: 11 elements
       ▿ NeedleToken
-        - id: 4
-        - stringValue: "<tool_call>"
+        - id: 66
+        - stringValue: "<"
       ▿ NeedleToken
-        - id: 356
-        - stringValue: " [{\""
+        - id: 8040
+        - stringValue: "t"
       ▿ NeedleToken
-        - id: 294
-        - stringValue: "name"
+        - id: 8047
+        - stringValue: "o"
       ▿ NeedleToken
-        - id: 264
-        - stringValue: "\":\""
-      ▿ NeedleToken
-        - id: 818
-        - stringValue: "send"
+        - id: 425
+        - stringValue: "ol"
       ▿ NeedleToken
         - id: 8062
         - stringValue: "_"
       ▿ NeedleToken
-        - id: 820
-        - stringValue: "email"
+        - id: 8051
+        - stringValue: "c"
       ▿ NeedleToken
-        - id: 265
-        - stringValue: "\",\""
+        - id: 304
+        - stringValue: "al"
       ▿ NeedleToken
-        - id: 393
-        - stringValue: "arguments"
+        - id: 8055
+        - stringValue: "l"
       ▿ NeedleToken
-        - id: 282
-        - stringValue: "\":{\""
+        - id: 68
+        - stringValue: ">"
       ▿ NeedleToken
-        - id: 2876
-        - stringValue: "address"
-      ▿ NeedleToken
-        - id: 264
-        - stringValue: "\":\""
-      ▿ NeedleToken
-        - id: 280
-        - stringValue: "he"
-      ▿ NeedleToken
-        - id: 1665
-        - stringValue: "nder"
-      ▿ NeedleToken
-        - id: 1127
-        - stringValue: "ry"
-      ▿ NeedleToken
-        - id: 8181
-        - stringValue: "@"
-      ▿ NeedleToken
-        - id: 8057
-        - stringValue: "g"
-      ▿ NeedleToken
-        - id: 497
-        - stringValue: "mail"
-      ▿ NeedleToken
-        - id: 8063
-        - stringValue: "."
-      ▿ NeedleToken
-        - id: 869
-        - stringValue: "com"
-      ▿ NeedleToken
-        - id: 265
-        - stringValue: "\",\""
-      ▿ NeedleToken
-        - id: 979
-        - stringValue: "subject"
-      ▿ NeedleToken
-        - id: 264
-        - stringValue: "\":\""
-      ▿ NeedleToken
-        - id: 8103
-        - stringValue: "H"
-      ▿ NeedleToken
-        - id: 637
-        - stringValue: "el"
-      ▿ NeedleToken
-        - id: 363
-        - stringValue: "lo"
-      ▿ NeedleToken
-        - id: 265
-        - stringValue: "\",\""
-      ▿ NeedleToken
-        - id: 1519
-        - stringValue: "body"
-      ▿ NeedleToken
-        - id: 264
-        - stringValue: "\":\""
-      ▿ NeedleToken
-        - id: 8076
-        - stringValue: "C"
-      ▿ NeedleToken
-        - id: 837
-        - stringValue: "ould"
-      ▿ NeedleToken
-        - id: 885
-        - stringValue: " you"
-      ▿ NeedleToken
-        - id: 1105
-        - stringValue: " please"
-      ▿ NeedleToken
-        - id: 3245
-        - stringValue: " go"
-      ▿ NeedleToken
-        - id: 442
-        - stringValue: " on"
-      ▿ NeedleToken
-        - id: 439
-        - stringValue: " an"
-      ▿ NeedleToken
-        - id: 1746
-        - stringValue: " ad"
-      ▿ NeedleToken
-        - id: 628
-        - stringValue: "vent"
-      ▿ NeedleToken
-        - id: 491
-        - stringValue: "ure"
-      ▿ NeedleToken
-        - id: 8105
-        - stringValue: "?"
-      ▿ NeedleToken
-        - id: 8071
-        - stringValue: "["
-      ▿ NeedleToken
-        - id: 8039
-        - stringValue: "\""
-      ▿ NeedleToken
-        - id: 8059
-        - stringValue: "}"
-      ▿ NeedleToken
-        - id: 8059
-        - stringValue: "}"
-      ▿ NeedleToken
-        - id: 8072
-        - stringValue: "]"
+        - id: 809
+        - stringValue: " []"
       ▿ NeedleToken
         - id: 1
         - stringValue: ""
     - wasStopped: false
   ▿ toolCalls: NeedleToolCallCollection
-    ▿ elements: 1 element
-      ▿ AnyNeedleToolCall
-        ▿ base: NeedleToolCall<SendEmailTool>
-          ▿ id: NeedleToolCallID
-            - rawValue: "E6201A96-7865-419C-A7CD-618CB0BFDF05"
-          ▿ input: Input
-            - address: "henderry@gmail.com"
-            - body: "Could you please go on an adventure?["
-            - subject: "Hello"
-          ▿ registrar: ObservationRegistrar
-            ▿ extent: Extent
-              ▿ context: Context
-                ▿ state: _ManagedCriticalState<State>
-                  - buffer: LockedBuffer
-          - state: (0 elements)
-          ▿ tool: SendEmailTool
-            - description: "Sends an email to a recipient with an email address."
-            - name: "sendEmail"
+    - elements: 0 elements

@@ -1,4 +1,3 @@
-import importlib
 import json
 import tempfile
 import unittest
@@ -6,20 +5,45 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import cast
 
-from coreai.runtime import AIModelAssetMetadata
-from coreai_opt.quantization import QuantizerConfig
 import coremltools as ct
 import torch
+from coreai.runtime import AIModelAssetMetadata
+from coreai_opt.quantization import QuantizerConfig
 
 from needle import Needle, NeedleModelConfiguation
+from needle.coreml_export import (
+    convert_needle_coreml_models,
+    coreml_operation_histogram,
+    export_needle_coreml,
+)
 from needle.needle_compression import CoreMLQuantizerCompressor
-
-export_needle_coreml = importlib.import_module(
-    "needle.coreml_export"
-).export_needle_coreml
 
 
 class CoreMLExportTests(unittest.TestCase):
+    def test_convert_needle_coreml_uses_sdpa_mil(self) -> None:
+        configuration = NeedleModelConfiguation(
+            vocabulary_size=16,
+            dimensions=8,
+            hidden_dimensions=8,
+            attention_heads=2,
+            kv_heads=1,
+            encoder_layers=1,
+            decoder_layers=1,
+            hidden_layers=1,
+            max_seq_len=16,
+            dtype="float32",
+        )
+        needle = Needle(configuration)
+        encoder, decoder = convert_needle_coreml_models(
+            needle,
+            configuration,
+        )
+
+        encoder_operations = coreml_operation_histogram(encoder)
+        decoder_operations = coreml_operation_histogram(decoder)
+        self.assertGreater(encoder_operations["scaled_dot_product_attention"], 0)
+        self.assertGreater(decoder_operations["scaled_dot_product_attention"], 0)
+
     def test_export_needle_coreml_runs_end_to_end_on_local_bundle(self) -> None:
         self._assert_export_runs_end_to_end()
 
@@ -137,15 +161,17 @@ class CoreMLExportTests(unittest.TestCase):
                     "cross_attention_mask",
                     "encoder_projected_k",
                     "encoder_projected_v",
+                    "key_cache",
+                    "value_cache",
                 ],
             )
             self.assertEqual(
                 [field.name for field in decoder_model.get_spec().description.state],
-                ["key_cache", "value_cache"],
+                [],
             )
             self.assertEqual(
                 [field.name for field in decoder_model.get_spec().description.output],
-                ["logits"],
+                ["logits", "updated_key_cache", "updated_value_cache"],
             )
             if post_export_assertions is not None:
                 post_export_assertions(result)

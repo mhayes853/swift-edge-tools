@@ -2,19 +2,19 @@ from __future__ import annotations
 
 import subprocess
 import typing
-from collections.abc import Sequence
+from collections import Counter
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from coreai.runtime import AIModelAssetMetadata
 import coremltools as ct
-from coremltools.models import MLModel
+import needle.export_helpers as export_helpers
 import numpy as np
 import torch
+from coreai.runtime import AIModelAssetMetadata
+from coremltools.models import MLModel
 
-import needle.export_helpers as export_helpers
-
-from . import Needle, NeedleModelConfiguation
+from . import Needle, NeedleDecoder, NeedleModelConfiguation
 from .needle_compression import NeedleCompressor
 
 _ENCODER_INPUT_NAMES = ["input_ids"]
@@ -30,9 +30,56 @@ _DECODER_INPUT_NAMES = [
     "cross_attention_mask",
     "encoder_projected_k",
     "encoder_projected_v",
+    "key_cache",
+    "value_cache",
 ]
-_DECODER_OUTPUT_NAMES = ["logits"]
-_DECODER_STATE_NAMES = ["key_cache", "value_cache"]
+_DECODER_OUTPUT_NAMES = ["logits", "updated_key_cache", "updated_value_cache"]
+
+
+class _CoreMLDecoder(torch.nn.Module):
+    def __init__(self, decoder: NeedleDecoder):
+        super().__init__()
+        self.decoder = decoder
+
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        cache_position: torch.Tensor,
+        self_attention_mask: torch.Tensor,
+        cross_attention_mask: torch.Tensor,
+        encoder_projected_k: torch.Tensor,
+        encoder_projected_v: torch.Tensor,
+        key_cache: torch.Tensor,
+        value_cache: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        return self.decoder.forward_with_cache(
+            input_ids,
+            cache_position,
+            self_attention_mask,
+            cross_attention_mask,
+            encoder_projected_k,
+            encoder_projected_v,
+            key_cache,
+            value_cache,
+        )
+
+
+def coreml_operation_histogram(model: MLModel) -> Counter[str]:
+    """Counts operations in a converted model, including operations in nested blocks."""
+    histogram = Counter[str]()
+
+    def count_operations(operations: Sequence[Any]) -> None:
+        for operation in operations:
+            histogram[operation.op_type] += 1
+            for block in operation.blocks:
+                count_operations(block.operations)
+
+    program = model._mil_program
+    if program is None:
+        raise ValueError("CoreML model does not retain its MIL program")
+    for function in program.functions.values():
+        count_operations(function.operations)
+    return histogram
 
 
 def export_needle_coreml(
@@ -81,12 +128,6 @@ def _load_needle_coreml_model(
     needle = needle.to(dtype=torch.float32)
     needle.encoder.to(dtype=torch.float32)
     needle.decoder.to(dtype=torch.float32)
-    needle.decoder.key_cache = typing.cast(torch.Tensor, needle.decoder.key_cache).to(
-        dtype=torch.float16
-    )
-    needle.decoder.value_cache = typing.cast(
-        torch.Tensor, needle.decoder.value_cache
-    ).to(dtype=torch.float16)
     return needle
 
 
@@ -126,6 +167,7 @@ def convert_needle_coreml_models(
             outputs=_coreml_output_tensor_types(
                 _ENCODER_OUTPUT_NAMES,
                 encoder_module(*encoder_sample),
+                dtype_overrides=dict.fromkeys(_ENCODER_OUTPUT_NAMES, np.float16),
             ),
         ),
     )
@@ -135,15 +177,31 @@ def convert_needle_coreml_models(
         output_names=_ENCODER_OUTPUT_NAMES,
     )
 
-    needle.decoder.reset()
     encoder_outputs = encoder_module(*encoder_sample)
-    decoder_sample = export_helpers.sample_decoder_inputs_from_encoder_outputs(
-        configuration,
-        encoder_outputs,
+    decoder_sample = (
+        *export_helpers.sample_decoder_inputs_from_encoder_outputs(
+            configuration,
+            encoder_outputs,
+        ),
+        *export_helpers.empty_decoder_caches(configuration, dtype=torch.float32),
     )
-    decoder_shapes = export_helpers.decoder_dynamic_shapes(configuration)
+    decoder_shapes = (
+        *export_helpers.decoder_dynamic_shapes(configuration),
+        {
+            0: torch.export.Dim.STATIC,
+            1: torch.export.Dim.STATIC,
+            2: torch.export.Dim.STATIC,
+            3: torch.export.Dim.STATIC,
+        },
+        {
+            0: torch.export.Dim.STATIC,
+            1: torch.export.Dim.STATIC,
+            2: torch.export.Dim.STATIC,
+            3: torch.export.Dim.STATIC,
+        },
+    )
     decoder_module = _prepare_module_for_coreml_export(
-        needle.decoder,
+        _CoreMLDecoder(needle.decoder),
         decoder_sample,
         compressor=compressor,
         dynamic_shapes=decoder_shapes,
@@ -161,19 +219,35 @@ def convert_needle_coreml_models(
             minimum_deployment_target=ct.target.macOS15,
             compute_precision=ct.precision.FLOAT16,
             skip_model_load=True,
-            inputs=_coreml_input_tensor_types(_DECODER_INPUT_NAMES, decoder_sample),
+            inputs=_coreml_input_tensor_types(
+                _DECODER_INPUT_NAMES,
+                decoder_sample,
+                dtype_overrides=dict.fromkeys(
+                    (
+                        "self_attention_mask",
+                        "cross_attention_mask",
+                        "encoder_projected_k",
+                        "encoder_projected_v",
+                        "key_cache",
+                        "value_cache",
+                    ),
+                    np.float16,
+                ),
+            ),
             outputs=_coreml_output_tensor_types(
                 _DECODER_OUTPUT_NAMES,
-                (decoder_module(*decoder_sample),),
+                decoder_module(*decoder_sample),
+                dtype_overrides={
+                    "updated_key_cache": np.float16,
+                    "updated_value_cache": np.float16,
+                },
             ),
-            states=_coreml_state_types(needle.decoder),
         ),
     )
     decoder_model = _rename_model_features(
         decoder_model,
         input_names=_DECODER_INPUT_NAMES,
         output_names=_DECODER_OUTPUT_NAMES,
-        state_names=_DECODER_STATE_NAMES,
     )
     return encoder_model, decoder_model
 
@@ -209,13 +283,16 @@ def _numpy_dtype(dtype: torch.dtype) -> Any:
 def _coreml_input_tensor_types(
     names: Sequence[str],
     tensors: Sequence[torch.Tensor],
+    *,
+    dtype_overrides: Mapping[str, Any] | None = None,
 ) -> list[ct.TensorType]:
     if len(names) != len(tensors):
         raise ValueError(f"Expected {len(names)} tensors, got {len(tensors)}")
+    dtype_overrides = dtype_overrides or {}
     return [
         ct.TensorType(
             name=name,
-            dtype=_numpy_dtype(tensor.dtype),
+            dtype=dtype_overrides.get(name, _numpy_dtype(tensor.dtype)),
         )
         for name, tensor in zip(names, tensors, strict=True)
     ]
@@ -224,42 +301,18 @@ def _coreml_input_tensor_types(
 def _coreml_output_tensor_types(
     names: Sequence[str],
     tensors: Sequence[torch.Tensor],
+    *,
+    dtype_overrides: Mapping[str, Any] | None = None,
 ) -> list[ct.TensorType]:
     if len(names) != len(tensors):
         raise ValueError(f"Expected {len(names)} tensors, got {len(tensors)}")
+    dtype_overrides = dtype_overrides or {}
     return [
         ct.TensorType(
             name=name,
-            dtype=_numpy_dtype(tensor.dtype),
+            dtype=dtype_overrides.get(name, _numpy_dtype(tensor.dtype)),
         )
         for name, tensor in zip(names, tensors, strict=True)
-    ]
-
-
-def _coreml_state_types(module: torch.nn.Module) -> list[ct.StateType]:
-    key_cache = typing.cast(torch.Tensor, module.key_cache)
-    value_cache = typing.cast(torch.Tensor, module.value_cache)
-    return [
-        ct.StateType(
-            name="key_cache",
-            wrapped_type=typing.cast(
-                Any,
-                ct.TensorType(
-                    shape=tuple(key_cache.shape),
-                    dtype=_numpy_dtype(key_cache.dtype),
-                ),
-            ),
-        ),
-        ct.StateType(
-            name="value_cache",
-            wrapped_type=typing.cast(
-                Any,
-                ct.TensorType(
-                    shape=tuple(value_cache.shape),
-                    dtype=_numpy_dtype(value_cache.dtype),
-                ),
-            ),
-        ),
     ]
 
 
@@ -274,7 +327,9 @@ def _rename_model_features(
     _rename_feature_collection(spec.description.input, input_names)
     _rename_feature_collection(spec.description.output, output_names)
     _rename_feature_collection(spec.description.state, state_names)
-    return MLModel(spec, weights_dir=model.weights_dir, skip_model_load=True)
+    renamed_model = MLModel(spec, weights_dir=model.weights_dir, skip_model_load=True)
+    renamed_model._mil_program = model._mil_program
+    return renamed_model
 
 
 def _rename_feature_collection(features: Sequence[Any], names: Sequence[str]) -> None:

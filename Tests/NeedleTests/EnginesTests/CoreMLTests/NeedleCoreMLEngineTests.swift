@@ -1,4 +1,4 @@
-#if swift(>=6.4) && CoreML && Sentencepiece && canImport(CoreML)
+#if CoreML && Sentencepiece && canImport(CoreML)
   import CoreML
   import CustomDump
   import Needle
@@ -31,13 +31,13 @@
     func `Concurrent Generations`() async throws {
       let engine = try await makeNeedleCoreMLEngine()
 
-      let firstTask = try engine.generate(prompt: .sendAdventureEmail, parameters: .default) { _ in }
-      let secondTask = try engine.generate(prompt: .sendAdventureEmail, parameters: .default) { _ in }
+      let t1 = try engine.generate(prompt: .sendAdventureEmail, parameters: .default) { _ in }
+      let t2 = try engine.generate(prompt: .sendAdventureEmail, parameters: .default) { _ in }
 
-      let (firstGeneration, secondGeneration) = try await (firstTask.value, secondTask.value)
+      let (g1, g2) = try await (t1.value, t2.value)
       withKnownIssue {
-        assertSnapshot(of: firstGeneration.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
-        assertSnapshot(of: secondGeneration.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
+        assertSnapshot(of: g1.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
+        assertSnapshot(of: g2.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
       }
     }
 
