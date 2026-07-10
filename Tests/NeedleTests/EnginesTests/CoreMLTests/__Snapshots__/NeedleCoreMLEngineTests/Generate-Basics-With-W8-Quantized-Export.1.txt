@@ -1,10 +1,10 @@
 ▿ NeedleEngineGeneration
   ▿ decodeMetrics: NeedleDecodeMetrics
-    ▿ duration: 0.069805625 seconds
-      - _low: 69805625000000000
+    ▿ duration: 0.068631917 seconds
+      - _low: 68631917000000000
       - _high: 0
-    ▿ durationToFirstToken: 0.087530333 seconds
-      - _low: 87530333000000000
+    ▿ durationToFirstToken: 0.077979291 seconds
+      - _low: 77979291000000000
       - _high: 0
     - tokens: 11
   ▿ metadata: 2 key/value pairs
@@ -28,8 +28,8 @@
         - 0.53607005
         - 1.0
   ▿ prefillMetrics: NeedlePrefillMetrics
-    ▿ duration: 0.059455042 seconds
-      - _low: 59455042000000000
+    ▿ duration: 0.050708834 seconds
+      - _low: 50708834000000000
       - _high: 0
     - tokens: 132
   ▿ tokens: 11 elements

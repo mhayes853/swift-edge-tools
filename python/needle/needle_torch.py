@@ -89,38 +89,6 @@ class NeedleDecoder(nn.Module):
         key_cache: torch.Tensor,
         value_cache: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        if input_ids.shape[0] != 1:
-            raise ValueError(
-                f"NeedleDecoder.forward() expects batch size 1, got {input_ids.shape[0]}"
-            )
-        if input_ids.shape[1] != 1:
-            raise ValueError(
-                "NeedleDecoder.forward() expects exactly one token, "
-                f"got {input_ids.shape[1]}"
-            )
-
-        return self.forward_with_cache(
-            input_ids,
-            cache_position,
-            self_attention_mask,
-            cross_attention_mask,
-            encoder_projected_k,
-            encoder_projected_v,
-            key_cache,
-            value_cache,
-        )
-
-    def forward_with_cache(
-        self,
-        input_ids: torch.Tensor,
-        cache_position: torch.Tensor,
-        self_attention_mask: torch.Tensor,
-        cross_attention_mask: torch.Tensor,
-        encoder_projected_k: torch.Tensor,
-        encoder_projected_v: torch.Tensor,
-        key_cache: torch.Tensor,
-        value_cache: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         hidden_state, updated_key_cache, updated_value_cache = self.model.decode(
             input_ids,
             cache_position=cache_position,
@@ -155,7 +123,10 @@ class _RoPEFrequencies:
 
     def __init__(self, inverse: torch.Tensor, seq_len: int, dtype: torch.dtype):
         positions = torch.arange(0, seq_len, dtype=torch.float32, device=inverse.device)
-        self._initialize(inverse, positions, dtype)
+        frequencies = positions[:, None] * inverse[None, :]
+        embeddings = torch.cat([frequencies, frequencies], dim=-1)
+        self.sin = torch.sin(embeddings)[None, :].to(device=inverse.device, dtype=dtype)
+        self.cos = torch.cos(embeddings)[None, :].to(device=inverse.device, dtype=dtype)
 
     @classmethod
     def from_table(
@@ -166,14 +137,6 @@ class _RoPEFrequencies:
         rope.sin = selected[0].unsqueeze(0).to(dtype=dtype)
         rope.cos = selected[1].unsqueeze(0).to(dtype=dtype)
         return rope
-
-    def _initialize(
-        self, inverse: torch.Tensor, positions: torch.Tensor, dtype: torch.dtype
-    ) -> None:
-        frequencies = positions[:, None] * inverse[None, :]
-        embeddings = torch.cat([frequencies, frequencies], dim=-1)
-        self.sin = torch.sin(embeddings)[None, :].to(device=inverse.device, dtype=dtype)
-        self.cos = torch.cos(embeddings)[None, :].to(device=inverse.device, dtype=dtype)
 
     def apply(self, x: torch.Tensor) -> torch.Tensor:
         sin = self.sin.unsqueeze(1)

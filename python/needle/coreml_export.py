@@ -8,11 +8,12 @@ from pathlib import Path
 from typing import Any
 
 import coremltools as ct
-import needle.export_helpers as export_helpers
 import numpy as np
 import torch
 from coreai.runtime import AIModelAssetMetadata
 from coremltools.models import MLModel
+
+import needle.export_helpers as export_helpers
 
 from . import Needle, NeedleDecoder, NeedleModelConfiguation
 from .needle_compression import NeedleCompressor
@@ -52,7 +53,7 @@ class _CoreMLDecoder(torch.nn.Module):
         key_cache: torch.Tensor,
         value_cache: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        return self.decoder.forward_with_cache(
+        return self.decoder.forward(
             input_ids,
             cache_position,
             self_attention_mask,
