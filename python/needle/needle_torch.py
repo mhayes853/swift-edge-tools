@@ -8,9 +8,17 @@ from .needle_configuration import NeedleModelConfiguation
 
 
 class NeedleModel(nn.Module):
-    def __init__(self, configuration: NeedleModelConfiguation):
+    def __init__(
+        self,
+        configuration: NeedleModelConfiguation,
+        *,
+        use_native_sdpa: bool,
+    ):
         super().__init__()
-        self.model = _NeedleSimpleAttentionNetwork(configuration)
+        self.model = _NeedleSimpleAttentionNetwork(
+            configuration,
+            use_native_sdpa=use_native_sdpa,
+        )
         self.lm_head = (
             None
             if configuration.tie_word_embeddings
@@ -24,9 +32,17 @@ class NeedleModel(nn.Module):
 
 
 class Needle:
-    def __init__(self, configuration: NeedleModelConfiguation):
+    def __init__(
+        self,
+        configuration: NeedleModelConfiguation,
+        *,
+        use_native_sdpa: bool = True,
+    ):
         self.configuration = configuration
-        self._weights = NeedleModel(configuration)
+        self._weights = NeedleModel(
+            configuration,
+            use_native_sdpa=use_native_sdpa,
+        )
         self.encoder = NeedleEncoder(self._weights)
         self.decoder = NeedleDecoder(self._weights)
 
@@ -147,14 +163,25 @@ class _RoPEFrequencies:
 
 
 class _NeedleSimpleAttentionNetwork(nn.Module):
-    def __init__(self, configuration: NeedleModelConfiguation):
+    def __init__(
+        self,
+        configuration: NeedleModelConfiguation,
+        *,
+        use_native_sdpa: bool,
+    ):
         super().__init__()
         self.embed_tokens = nn.Embedding(
             num_embeddings=configuration.vocabulary_size,
             embedding_dim=configuration.dimensions,
         )
-        self.encoder = _NeedleEncoder(configuration)
-        self.decoder = _NeedleDecoder(configuration)
+        self.encoder = _NeedleEncoder(
+            configuration,
+            use_native_sdpa=use_native_sdpa,
+        )
+        self.decoder = _NeedleDecoder(
+            configuration,
+            use_native_sdpa=use_native_sdpa,
+        )
         self.embed_scale = math.sqrt(configuration.dimensions)
 
     def encode(self, x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
@@ -201,11 +228,19 @@ class _NeedleSimpleAttentionNetwork(nn.Module):
 
 
 class _NeedleDecoder(nn.Module):
-    def __init__(self, configuration: NeedleModelConfiguation):
+    def __init__(
+        self,
+        configuration: NeedleModelConfiguation,
+        *,
+        use_native_sdpa: bool,
+    ):
         super().__init__()
         self.layers = nn.ModuleList(
             [
-                _NeedleDecoderBlock(configuration)
+                _NeedleDecoderBlock(
+                    configuration,
+                    use_native_sdpa=use_native_sdpa,
+                )
                 for _ in range(configuration.decoder_layers)
             ]
         )
@@ -262,13 +297,24 @@ class _NeedleDecoder(nn.Module):
 
 
 class _NeedleDecoderBlock(nn.Module):
-    def __init__(self, configuration: NeedleModelConfiguation):
+    def __init__(
+        self,
+        configuration: NeedleModelConfiguation,
+        *,
+        use_native_sdpa: bool,
+    ):
         super().__init__()
         self.input_layernorm = _ZCRMSNorm.from_configuration(configuration)
-        self.self_attn = _NeedleAttention(configuration)
+        self.self_attn = _NeedleAttention(
+            configuration,
+            use_native_sdpa=use_native_sdpa,
+        )
         self.self_attn_gate = nn.Parameter(torch.zeros(1))
         self.encoder_attn_layer_norm = _ZCRMSNorm.from_configuration(configuration)
-        self.encoder_attn = _NeedleAttention(configuration)
+        self.encoder_attn = _NeedleAttention(
+            configuration,
+            use_native_sdpa=use_native_sdpa,
+        )
         self.cross_attn_gate = nn.Parameter(torch.zeros(1))
 
     def forward(
@@ -308,11 +354,19 @@ class _NeedleDecoderBlock(nn.Module):
 
 
 class _NeedleEncoder(nn.Module):
-    def __init__(self, configuration: NeedleModelConfiguation):
+    def __init__(
+        self,
+        configuration: NeedleModelConfiguation,
+        *,
+        use_native_sdpa: bool,
+    ):
         super().__init__()
         self.layers = nn.ModuleList(
             [
-                _NeedleEncoderBlock(configuration)
+                _NeedleEncoderBlock(
+                    configuration,
+                    use_native_sdpa=use_native_sdpa,
+                )
                 for _ in range(configuration.encoder_layers)
             ]
         )
@@ -338,10 +392,18 @@ class _NeedleEncoder(nn.Module):
 
 
 class _NeedleEncoderBlock(nn.Module):
-    def __init__(self, configuration: NeedleModelConfiguation):
+    def __init__(
+        self,
+        configuration: NeedleModelConfiguation,
+        *,
+        use_native_sdpa: bool,
+    ):
         super().__init__()
         self.input_layernorm = _ZCRMSNorm.from_configuration(configuration)
-        self.self_attn = _NeedleAttention(configuration)
+        self.self_attn = _NeedleAttention(
+            configuration,
+            use_native_sdpa=use_native_sdpa,
+        )
         self.attn_gate = nn.Parameter(torch.zeros(1))
 
     def forward(
@@ -353,9 +415,15 @@ class _NeedleEncoderBlock(nn.Module):
 
 
 class _NeedleAttention(nn.Module):
-    def __init__(self, configuration: NeedleModelConfiguation):
+    def __init__(
+        self,
+        configuration: NeedleModelConfiguation,
+        *,
+        use_native_sdpa: bool,
+    ):
         super().__init__()
         self.heads = configuration.attention_heads
+        self.use_native_sdpa = use_native_sdpa
         self.kv_heads = configuration.kv_heads
         self.head_dimensions = configuration.attention_head_dimensions
 
@@ -443,12 +511,21 @@ class _NeedleAttention(nn.Module):
         if rope is not None:
             q = rope.apply(q)
 
-        attention_scores = torch.matmul(q, projected_k.transpose(-2, -1))
-        attention_scores = attention_scores / math.sqrt(q.shape[-1])
-        if mask is not None:
-            attention_scores = attention_scores + mask
-        attention_probabilities = torch.softmax(attention_scores, dim=-1)
-        output = torch.matmul(attention_probabilities, projected_v)
+        if self.use_native_sdpa:
+            output = nn.functional.scaled_dot_product_attention(
+                q,
+                projected_k,
+                projected_v,
+                attn_mask=mask,
+                dropout_p=0.0,
+            )
+        else:
+            attention_scores = torch.matmul(q, projected_k.transpose(-2, -1))
+            attention_scores = attention_scores / math.sqrt(q.shape[-1])
+            if mask is not None:
+                attention_scores = attention_scores + mask
+            attention_probabilities = torch.softmax(attention_scores, dim=-1)
+            output = torch.matmul(attention_probabilities, projected_v)
 
         output = (
             output.transpose(1, 2)

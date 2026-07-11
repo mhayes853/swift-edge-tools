@@ -6,13 +6,13 @@ from pathlib import Path
 from typing import cast
 from unittest.mock import patch
 
+import torch
 from coreai.authoring.asset import AIModelAsset
 from coreai.runtime import AIModelAssetMetadata
 from coreai_opt.quantization import QuantizerConfig
-import torch
 
 from needle import Needle, NeedleModelConfiguation
-from needle.coreai_export import export_needle_coreai
+from needle.coreai_export import convert_needle_coreai_programs, export_needle_coreai
 from needle.export_helpers import (
     encoder_dynamic_shapes,
     export_program,
@@ -25,6 +25,40 @@ from needle.needle_compression import CoreAIQuantizerCompressor
 class CoreAIExportTests(unittest.TestCase):
     def test_export_needle_coreai_runs_end_to_end_on_local_bundle(self) -> None:
         self._assert_export_runs_end_to_end()
+
+    def test_convert_needle_coreai_uses_native_sdpa(self) -> None:
+        configuration = NeedleModelConfiguation(
+            vocabulary_size=16,
+            dimensions=8,
+            hidden_dimensions=8,
+            attention_heads=2,
+            kv_heads=1,
+            encoder_layers=1,
+            decoder_layers=1,
+            hidden_layers=1,
+            max_seq_len=16,
+            dtype="float32",
+        )
+        needle = Needle(configuration, use_native_sdpa=True)
+        exported_programs = []
+
+        def capture_exported_program(*args, **kwargs):
+            program = export_program(*args, **kwargs)
+            exported_programs.append(program)
+            return program
+
+        with patch(
+            "needle.coreai_export.export_helpers.export_program",
+            side_effect=capture_exported_program,
+        ):
+            convert_needle_coreai_programs(needle, configuration)
+
+        self.assertEqual(len(exported_programs), 2)
+        for program in exported_programs:
+            self.assertIn(
+                "scaled_dot_product_attention",
+                program.graph_module.code,
+            )
 
     def test_export_program_uses_static_encoder_sequence_length(self) -> None:
         configuration = NeedleModelConfiguation(

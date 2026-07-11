@@ -29,6 +29,7 @@ def export_needle_coreai(
     needle = export_helpers.load_needle_model(
         configuration,
         source_files.weights_path,
+        use_native_sdpa=True,
     )
 
     output_directory = Path(output_directory).expanduser().resolve()

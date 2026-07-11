@@ -79,8 +79,13 @@ def load_configuration(configuration_path: str | Path) -> NeedleModelConfiguatio
 def load_needle_model(
     configuration: NeedleModelConfiguation,
     weights_path: str | Path,
+    *,
+    use_native_sdpa: bool = True,
 ) -> Needle:
-    model = Needle(configuration)
+    model = Needle(
+        configuration,
+        use_native_sdpa=use_native_sdpa,
+    )
     dtype = torch_dtype(configuration.resolved_dtype)
     model = model.to(dtype=dtype)
     model.encoder.to(dtype=dtype)

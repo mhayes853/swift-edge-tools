@@ -56,6 +56,25 @@ class NeedleTorchTests(unittest.TestCase):
         self.assertEqual(tuple(updated_key_cache.shape), (1, 16, 2, 4))
         self.assertEqual(tuple(updated_value_cache.shape), (1, 16, 2, 4))
 
+    def test_attention_strategy_is_selectable(self) -> None:
+        encoder_input_ids = torch.tensor([[1, 2, 3, 0]])
+
+        native = torch.export.export(
+            Needle(mock_configuration(), use_native_sdpa=True).encoder,
+            (encoder_input_ids,),
+            strict=False,
+        )
+        canonical = torch.export.export(
+            Needle(mock_configuration(), use_native_sdpa=False).encoder,
+            (encoder_input_ids,),
+            strict=False,
+        )
+
+        self.assertIn("scaled_dot_product_attention", native.graph_module.code)
+        self.assertNotIn("scaled_dot_product_attention", canonical.graph_module.code)
+        self.assertIn("torch.ops.aten.matmul", canonical.graph_module.code)
+        self.assertIn("torch.ops.aten.softmax", canonical.graph_module.code)
+
     def test_needle_wraps_export_modules(self) -> None:
         model = Needle(mock_configuration())
 

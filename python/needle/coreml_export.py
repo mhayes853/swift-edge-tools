@@ -8,12 +8,11 @@ from pathlib import Path
 from typing import Any
 
 import coremltools as ct
+import needle.export_helpers as export_helpers
 import numpy as np
 import torch
 from coreai.runtime import AIModelAssetMetadata
 from coremltools.models import MLModel
-
-import needle.export_helpers as export_helpers
 
 from . import Needle, NeedleDecoder, NeedleModelConfiguation
 from .needle_compression import NeedleCompressor
@@ -125,7 +124,11 @@ def _load_needle_coreml_model(
     configuration: NeedleModelConfiguation,
     weights_path: str | Path,
 ) -> Needle:
-    needle = export_helpers.load_needle_model(configuration, weights_path)
+    needle = export_helpers.load_needle_model(
+        configuration,
+        weights_path,
+        use_native_sdpa=False,
+    )
     needle = needle.to(dtype=torch.float32)
     needle.encoder.to(dtype=torch.float32)
     needle.decoder.to(dtype=torch.float32)

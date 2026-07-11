@@ -151,9 +151,9 @@ private enum NeedleTestModelExport {
         ? ""
         : "-aot-" + compilePlatforms.joined(separator: "-")
       if let quantizerPreset {
-        return "coreai-export-v4-\(quantizerPreset)\(compileSuffix)"
+        return "coreai-export-v5-\(quantizerPreset)\(compileSuffix)"
       }
-      return "coreai-export-v4\(compileSuffix)"
+      return "coreai-export-v5\(compileSuffix)"
     }
   }
 
