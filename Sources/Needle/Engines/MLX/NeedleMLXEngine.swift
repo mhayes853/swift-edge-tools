@@ -25,7 +25,7 @@
         self._processor()
       }
 
-      public var toolCallRange: NeedleGrammarToolCallRange
+      public var toolCallRange: GrammarToolCallRange
       public var maxTokens: Int?
       public var kvCacheQuantizationBits: Int?
       public var kvCacheQuantizationGroupSize: Int
@@ -34,7 +34,7 @@
       public init(
         sampler: @autoclosure @escaping @Sendable () -> any LogitSampler = ArgMaxSampler(),
         processor: @autoclosure @escaping @Sendable () -> (any LogitProcessor)? = nil,
-        toolCallRange: NeedleGrammarToolCallRange = .unbounded(minimum: 0),
+        toolCallRange: GrammarToolCallRange = .unbounded(minimum: 0),
         maxTokens: Int? = 1024,
         kvCacheQuantizationBits: Int? = nil,
         kvCacheQuantizationGroupSize: Int = 64,
@@ -51,7 +51,7 @@
     }
 
     private struct State {
-      let grammarEngine: NeedleXGrammarEngine
+      let grammarEngine: XGrammarCompiler
       let model: NeedleMLXModel
       let matcherPool: NeedleGrammarMatcherPool
     }
@@ -64,23 +64,25 @@
     public convenience init(
       from url: URL,
       editConfiguration: (inout NeedleModelConfiguration) -> Void = { _ in },
-      grammarEngine: (any Tokenizers.Tokenizer) -> NeedleXGrammarEngine? = {
-        NeedleXGrammarEngine(tokenizer: $0)
+      grammarCompiler: (any Tokenizers.Tokenizer) throws -> XGrammarCompiler = {
+        guard let compiler = XGrammarCompiler.needle(tokenizer: $0) else {
+          throw XGrammarError(message: "Needle requires a tokenizer with an EOS token.")
+        }
+        return compiler
       }
     ) throws {
       let (tokenizer, model) = try loadNeedleMLXModel(
         from: url,
         editConfiguration: editConfiguration
       )
-      let grammarEngine = grammarEngine(tokenizer)
-      guard let grammarEngine else { throw NeedleMLXEngineError.failedToLoadGrammarEngine }
+      let grammarEngine = try grammarCompiler(tokenizer)
       self.init(tokenizer: tokenizer, model: model, grammarEngine: grammarEngine)
     }
 
     public init(
       tokenizer: any Tokenizers.Tokenizer,
       model: sending NeedleMLXModel,
-      grammarEngine: sending NeedleXGrammarEngine
+      grammarEngine: sending XGrammarCompiler
     ) {
       self.state = Lock(
         State(grammarEngine: grammarEngine, model: model, matcherPool: NeedleGrammarMatcherPool())
@@ -261,8 +263,6 @@
 
   public struct NeedleMLXEngineError: Hashable, Error {
     public let message: String
-
-    public static let failedToLoadGrammarEngine = Self(message: "Could not load grammar engine.")
 
     public static let failedToLoadConfiguration = Self(
       message: "Could not load model configuration."

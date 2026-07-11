@@ -3,7 +3,7 @@
 
   @discardableResult
   @available(anyAppleOS 27.0, *)
-  public func applyBitmaskCoreAI(logits: inout NDArray, mask: NeedleGrammarBitmask) -> NDArray {
+  public func applyBitmaskCoreAI(logits: inout NDArray, mask: GrammarBitmask) -> NDArray {
     var logitsView = logits.mutableView(as: Float.self)
     mask.storage.withUnsafeBytes { ptr in
       let buffer = ptr.bindMemory(to: UInt8.self)

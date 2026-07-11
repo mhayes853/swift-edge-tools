@@ -7,41 +7,41 @@
   // MARK: - Suite
 
   @Suite
-  struct `NeedleXGrammarEngine tests` {
-    private let engine: NeedleXGrammarEngine
+  struct `NeedleXGrammarCompiler tests` {
+    private let engine: XGrammarCompiler
     private let tokenizer: NeedleSPTokenizer
 
     init() throws {
       let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
       self.tokenizer = tokenizer
-      self.engine = try #require(NeedleXGrammarEngine(tokenizer: tokenizer))
+      self.engine = try #require(XGrammarCompiler.needle(tokenizer: tokenizer))
     }
 
     @Test
     func `Compile Tools With Empty Tools Array`() {
       #expect(throws: Never.self) {
-        _ = try self.engine.compile(tools: [])
+        _ = try self.engine.compile(try XGrammarGrammar.needle(tools: []))
       }
     }
 
     @Test
     func `Compile Tools With Single Tool`() {
       #expect(throws: Never.self) {
-        _ = try self.engine.compile(tools: [.sendEmail])
+        _ = try self.engine.compile(try XGrammarGrammar.needle(tools: [.sendEmail]))
       }
     }
 
     @Test
     func `Compile Tools With Multiple Tools`() {
       #expect(throws: Never.self) {
-        _ = try self.engine.compile(tools: [.sendEmail, .getWeather])
+        _ = try self.engine.compile(try XGrammarGrammar.needle(tools: [.sendEmail, .getWeather]))
       }
     }
 
     @Test
     func `Compile Tools With Complex Tool`() {
       #expect(throws: Never.self) {
-        _ = try self.engine.compile(tools: [.complexTool])
+        _ = try self.engine.compile(try XGrammarGrammar.needle(tools: [.complexTool]))
       }
     }
 
@@ -56,14 +56,14 @@
         self.eosToken = try #require(tokenizer.eosTokenId)
       }
 
-      private func makeEngine() throws -> NeedleXGrammarEngine {
-        try #require(NeedleXGrammarEngine(tokenizer: self.tokenizer))
+      private func makeEngine() throws -> XGrammarCompiler {
+        try #require(XGrammarCompiler.needle(tokenizer: self.tokenizer))
       }
 
       @Test
       func `Default Unbounded Range Accepts Empty Tool Call List`() throws {
         let engine = try self.makeEngine()
-        let matcher = try engine.compile(tools: [.getWeather])
+        let matcher = try engine.compile(try XGrammarGrammar.needle(tools: [.getWeather]))
         assertAccepts(
           #"<tool_call> []"#,
           matcher: matcher,
@@ -75,7 +75,7 @@
       @Test
       func `Default Unbounded Range Accepts Multiple Tool Calls`() throws {
         let engine = try self.makeEngine()
-        let matcher = try engine.compile(tools: [.getWeather])
+        let matcher = try engine.compile(try XGrammarGrammar.needle(tools: [.getWeather]))
         let calls =
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#
         assertAccepts(calls, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
@@ -84,7 +84,9 @@
       @Test
       func `Unbounded With Min One Rejects Empty Tool Call List`() throws {
         let engine = try self.makeEngine()
-        let matcher = try engine.compile(tools: [.getWeather], range: .unbounded(minimum: 1))
+        let matcher = try engine.compile(
+          try XGrammarGrammar.needle(tools: [.getWeather], range: .unbounded(minimum: 1))
+        )
         assertRejects(
           #"<tool_call> []"#,
           matcher: matcher,
@@ -96,7 +98,9 @@
       @Test
       func `Unbounded With Min One Accepts Single Tool Call`() throws {
         let engine = try self.makeEngine()
-        let matcher = try engine.compile(tools: [.getWeather], range: .unbounded(minimum: 1))
+        let matcher = try engine.compile(
+          try XGrammarGrammar.needle(tools: [.getWeather], range: .unbounded(minimum: 1))
+        )
         assertAccepts(
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
           matcher: matcher,
@@ -108,7 +112,9 @@
       @Test
       func `Bounded Max One Rejects Two Tool Calls`() throws {
         let engine = try self.makeEngine()
-        let matcher = try engine.compile(tools: [.getWeather], range: .bounded(0...1))
+        let matcher = try engine.compile(
+          try XGrammarGrammar.needle(tools: [.getWeather], range: .bounded(0...1))
+        )
         let calls =
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#
         assertRejects(calls, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
@@ -117,14 +123,18 @@
       @Test
       func `Bounded Max One Accepts Empty And Single Tool Call`() throws {
         let engine = try self.makeEngine()
-        let emptyMatcher = try engine.compile(tools: [.getWeather], range: .bounded(0...1))
+        let emptyMatcher = try engine.compile(
+          try XGrammarGrammar.needle(tools: [.getWeather], range: .bounded(0...1))
+        )
         assertAccepts(
           #"<tool_call> []"#,
           matcher: emptyMatcher,
           tokenizer: self.tokenizer,
           eosToken: self.eosToken
         )
-        let singleMatcher = try engine.compile(tools: [.getWeather], range: .bounded(0...1))
+        let singleMatcher = try engine.compile(
+          try XGrammarGrammar.needle(tools: [.getWeather], range: .bounded(0...1))
+        )
         assertAccepts(
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
           matcher: singleMatcher,
@@ -136,7 +146,9 @@
       @Test
       func `Bounded Range Rejects Out Of Range Counts`() throws {
         let engine = try self.makeEngine()
-        let singleMatcher = try engine.compile(tools: [.getWeather], range: .bounded(2...3))
+        let singleMatcher = try engine.compile(
+          try XGrammarGrammar.needle(tools: [.getWeather], range: .bounded(2...3))
+        )
         assertRejects(
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
           matcher: singleMatcher,
@@ -144,7 +156,9 @@
           eosToken: self.eosToken
         )
 
-        let pairMatcher = try engine.compile(tools: [.getWeather], range: .bounded(2...3))
+        let pairMatcher = try engine.compile(
+          try XGrammarGrammar.needle(tools: [.getWeather], range: .bounded(2...3))
+        )
         assertAccepts(
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#,
           matcher: pairMatcher,
@@ -156,7 +170,9 @@
       @Test
       func `Empty Tools Ignores Invocation Range`() throws {
         let engine = try self.makeEngine()
-        let matcher = try engine.compile(tools: [], range: .bounded(1...1))
+        let matcher = try engine.compile(
+          try XGrammarGrammar.needle(tools: [], range: .bounded(1...1))
+        )
         assertAccepts(
           #"<tool_call> []"#,
           matcher: matcher,
@@ -168,7 +184,9 @@
       @Test
       func `Compile Accepts Explicit Tool Call Invocation Range`() throws {
         let engine = try self.makeEngine()
-        let matcher = try engine.compile(tools: [.getWeather], range: .exact(0))
+        let matcher = try engine.compile(
+          try XGrammarGrammar.needle(tools: [.getWeather], range: .exact(0))
+        )
         assertAccepts(
           #"<tool_call> []"#,
           matcher: matcher,
@@ -180,7 +198,9 @@
       @Test
       func `Exact Three Accepts Three Tool Calls`() throws {
         let engine = try self.makeEngine()
-        let matcher = try engine.compile(tools: [.getWeather], range: .exact(3))
+        let matcher = try engine.compile(
+          try XGrammarGrammar.needle(tools: [.getWeather], range: .exact(3))
+        )
         let calls =
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}},{"name":"get_weather","arguments":{"location":"Tokyo"}}]"#
         assertAccepts(calls, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
@@ -189,7 +209,9 @@
       @Test
       func `Exact Zero Accepts Only Empty Tool Call List`() throws {
         let engine = try self.makeEngine()
-        let matcher = try engine.compile(tools: [.getWeather], range: .exact(0))
+        let matcher = try engine.compile(
+          try XGrammarGrammar.needle(tools: [.getWeather], range: .exact(0))
+        )
         assertAccepts(
           #"<tool_call> []"#,
           matcher: matcher,
@@ -207,15 +229,17 @@
       @Test
       func `Negative Minimum Tool Calls Throws Error`() throws {
         let engine = try self.makeEngine()
-        #expect(throws: NeedleXGrammarEngineError.invalidToolInvocationRange) {
-          _ = try engine.compile(tools: [.getWeather], range: .unbounded(minimum: -1))
+        #expect(throws: NeedleXGrammarError.invalidToolInvocationRange) {
+          _ = try engine.compile(
+            try XGrammarGrammar.needle(tools: [.getWeather], range: .unbounded(minimum: -1))
+          )
         }
       }
     }
 
     @Suite
     struct `Matcher tests` {
-      private let engine: NeedleXGrammarEngine
+      private let engine: XGrammarCompiler
       private let tokenizer: NeedleSPTokenizer
       private let eosToken: NeedleToken.ID
 
@@ -223,12 +247,12 @@
         let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
         self.tokenizer = tokenizer
         self.eosToken = try #require(tokenizer.eosTokenId)
-        self.engine = try #require(NeedleXGrammarEngine(tokenizer: tokenizer))
+        self.engine = try #require(XGrammarCompiler.needle(tokenizer: tokenizer))
       }
 
       @Test
       func `Reset Restores Initial State`() throws {
-        let matcher = try self.engine.compile(tools: [.getWeather])
+        let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.getWeather]))
         let call = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
 
         for tokenId in encodedGrammarText(call, tokenizer: self.tokenizer) {
@@ -245,7 +269,9 @@
 
       @Test
       func `Rollback Allows Accepting Alternative Branch`() throws {
-        let matcher = try self.engine.compile(tools: [.sendEmail, .getWeather])
+        let matcher = try self.engine.compile(
+          try XGrammarGrammar.needle(tools: [.sendEmail, .getWeather])
+        )
 
         let firstBitmask = matcher.bitmask()
         let firstAllowedIndex = firstBitmask.storage
@@ -267,7 +293,7 @@
 
       @Test
       func `Completion State Transitions`() throws {
-        let matcher = try self.engine.compile(tools: [.getWeather])
+        let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.getWeather]))
         let call = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
 
         expectNoDifference(matcher.isCompleted, false)
@@ -286,7 +312,7 @@
 
       @Test
       func `Fork Preserves Accept State`() throws {
-        let matcher = try self.engine.compile(tools: [.getWeather])
+        let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.getWeather]))
 
         let tokens = encodedGrammarText(
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
@@ -318,7 +344,7 @@
 
       @Test
       func `Bitmask Disallows Eos Before Completion`() throws {
-        let matcher = try self.engine.compile(tools: [.sendEmail])
+        let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.sendEmail]))
 
         let bitmask = matcher.bitmask()
         expectNoDifference(bitmask[self.eosToken], false)
@@ -326,7 +352,7 @@
 
       @Test
       func `Bitmask Allows Eos After Completion`() throws {
-        let matcher = try self.engine.compile(tools: [.getWeather])
+        let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.getWeather]))
         let call = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
 
         for tokenId in encodedGrammarText(call, tokenizer: self.tokenizer) {
@@ -340,14 +366,14 @@
 
       @Test
       func `Bitmask Has Expected Size`() throws {
-        let matcher = try self.engine.compile(tools: [.sendEmail])
+        let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.sendEmail]))
         let bitmask = matcher.bitmask()
         expectNoDifference(bitmask.count, 8192)
       }
 
       @Test
       func `Accepts Valid Complex Tool Call`() throws {
-        let matcher = try self.engine.compile(tools: [.complexTool])
+        let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.complexTool]))
 
         let call =
           #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1,"BETA_LABEL":2},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}}]"#
@@ -357,7 +383,7 @@
 
       @Test
       func `Accepts Valid Simple Tool Call`() throws {
-        let matcher = try self.engine.compile(tools: [.getWeather])
+        let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.getWeather]))
 
         let call = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
 
@@ -366,7 +392,7 @@
 
       @Test
       func `Accepts Multiple Consecutive Tool Calls`() throws {
-        let matcher = try self.engine.compile(tools: [.getWeather])
+        let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.getWeather]))
 
         let calls =
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Henry's Altar"}}]"#
@@ -376,7 +402,9 @@
 
       @Test
       func `Accepts Multiple Distinct Tool Calls`() throws {
-        let matcher = try self.engine.compile(tools: [.getWeather, .sendEmail])
+        let matcher = try self.engine.compile(
+          try XGrammarGrammar.needle(tools: [.getWeather, .sendEmail])
+        )
 
         let calls =
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"send_email","arguments":{"address":"blob@gmail.com","subject":"Hello","body":"World"}}]"#
@@ -386,7 +414,7 @@
 
       @Test
       func `Rejects Missing Required Field`() throws {
-        let matcher = try self.engine.compile(tools: [.complexTool])
+        let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.complexTool]))
 
         let call =
           #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"]}}]"#
@@ -396,7 +424,7 @@
 
       @Test
       func `Rejects Wrong Type`() throws {
-        let matcher = try self.engine.compile(tools: [.complexTool])
+        let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.complexTool]))
 
         let call =
           #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":"3.5","enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}}]"#
@@ -406,7 +434,7 @@
 
       @Test
       func `Rejects Invalid Pattern Properties`() throws {
-        let matcher = try self.engine.compile(tools: [.complexTool])
+        let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.complexTool]))
 
         let call =
           #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"alpha":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}}]"#
@@ -416,7 +444,7 @@
 
       @Test
       func `Rejects Extra Property`() throws {
-        let matcher = try self.engine.compile(tools: [.complexTool])
+        let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.complexTool]))
 
         let call =
           #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]},"extra":1}}]"#
@@ -426,7 +454,7 @@
 
       @Test
       func `Rejects Malformed JSON`() throws {
-        let matcher = try self.engine.compile(tools: [.complexTool])
+        let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.complexTool]))
 
         let call =
           #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}]"#
@@ -436,7 +464,7 @@
 
       @Test
       func `Rejects Invalid Tool Name`() throws {
-        let matcher = try self.engine.compile(tools: [.getWeather])
+        let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.getWeather]))
 
         let call = #"toolcall [{"name":"not_a_real_tool","arguments":{"location":"Seoul"}}]"#
 
@@ -446,13 +474,13 @@
 
     @Suite
     struct `Memory usage tests` {
-      private let engine: NeedleXGrammarEngine
+      private let engine: XGrammarCompiler
       private let tokenizer: NeedleSPTokenizer
 
       init() throws {
         let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
         self.tokenizer = tokenizer
-        self.engine = try #require(NeedleXGrammarEngine(tokenizer: tokenizer))
+        self.engine = try #require(XGrammarCompiler.needle(tokenizer: tokenizer))
       }
 
       @Test
@@ -463,13 +491,13 @@
 
       @Test
       func `Cache Size Becomes Non-Negative After Compile`() throws {
-        _ = try self.engine.compile(tools: [.getWeather])
+        _ = try self.engine.compile(try XGrammarGrammar.needle(tools: [.getWeather]))
         expectNoDifference(self.engine.cacheSizeBytes >= 0, true)
       }
 
       @Test
       func `Cache Limit Becomes Reportable After Compile`() throws {
-        _ = try self.engine.compile(tools: [.getWeather])
+        _ = try self.engine.compile(try XGrammarGrammar.needle(tools: [.getWeather]))
         expectNoDifference(
           self.engine.cacheLimitBytes == -1 || self.engine.cacheLimitBytes >= 0,
           true
@@ -478,21 +506,23 @@
 
       @Test
       func `Matcher Reports Non-Zero Memory Size`() throws {
-        let matcher = try self.engine.compile(tools: [.getWeather])
+        let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.getWeather]))
         expectNoDifference(matcher.memorySizeBytes > 0, true)
       }
 
       @Test
       func `Forked Matcher Reports Equal Memory Size`() throws {
-        let matcher = try self.engine.compile(tools: [.getWeather])
+        let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.getWeather]))
         let forked = matcher.fork()
         expectNoDifference(forked.memorySizeBytes, matcher.memorySizeBytes)
       }
 
       @Test
       func `More Tools Yield Larger Compiled Grammar`() throws {
-        let single = try self.engine.compile(tools: [.getWeather])
-        let many = try self.engine.compile(tools: [.getWeather, .sendEmail, .complexTool])
+        let single = try self.engine.compile(try XGrammarGrammar.needle(tools: [.getWeather]))
+        let many = try self.engine.compile(
+          try XGrammarGrammar.needle(tools: [.getWeather, .sendEmail, .complexTool])
+        )
         expectNoDifference(many.memorySizeBytes > single.memorySizeBytes, true)
       }
     }
@@ -502,7 +532,7 @@
 
   private func firstRejectedToken(
     in text: String,
-    matcher: NeedleXGrammarEngine.Matcher,
+    matcher: XGrammarMatcher,
     tokenizer: NeedleSPTokenizer
   ) -> (index: Int, tokenId: NeedleToken.ID, token: String, prefix: String)? {
     let tokenIds = encodedGrammarText(text, tokenizer: tokenizer)
@@ -530,7 +560,7 @@
 
   private func assertAccepts(
     _ text: String,
-    matcher: NeedleXGrammarEngine.Matcher,
+    matcher: XGrammarMatcher,
     tokenizer: NeedleSPTokenizer,
     eosToken: NeedleToken.ID
   ) {
@@ -545,7 +575,7 @@
 
   private func assertRejects(
     _ text: String,
-    matcher: NeedleXGrammarEngine.Matcher,
+    matcher: XGrammarMatcher,
     tokenizer: NeedleSPTokenizer,
     eosToken: NeedleToken.ID
   ) {

@@ -23,8 +23,8 @@
 
     @Test
     func `TokenIterator Usage`() async throws {
-      let grammarEngine = try #require(NeedleXGrammarEngine(tokenizer: self.tokenizer))
-      let matcher = try grammarEngine.compile(tools: NeedlePrompt.sendAdventureEmail.tools)
+      let grammarEngine = try #require(XGrammarCompiler.needle(tokenizer: self.tokenizer))
+      let matcher = try grammarEngine.compile(try XGrammarGrammar.needle(tools: NeedlePrompt.sendAdventureEmail.tools))
       
       var iterator = try TokenIterator(
         input: try LMInput.needle(prompt: .sendAdventureEmail, using: self.tokenizer),

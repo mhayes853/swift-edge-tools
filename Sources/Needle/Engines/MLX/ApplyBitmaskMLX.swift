@@ -5,9 +5,9 @@
   // MARK: - Logit Processor
 
   public final class NeedleApplyBitmaskProcessorMLX: LogitProcessor {
-    public private(set) var matcher: NeedleXGrammarEngine.Matcher
+    public private(set) var matcher: XGrammarMatcher
     
-    public init(matcher: NeedleXGrammarEngine.Matcher) {
+    public init(matcher: XGrammarMatcher) {
       self.matcher = matcher
     }
     
@@ -25,7 +25,7 @@
 
   // MARK: - Apply Bitmask
 
-  public func applyBitmaskMLX(logits: MLXArray, mask: NeedleGrammarBitmask) -> MLXArray {
+  public func applyBitmaskMLX(logits: MLXArray, mask: GrammarBitmask) -> MLXArray {
     let vocabSize = logits.dim(1)
     let table = MLXArray(Needle.bitmaskTable, [256, 8]).asType(logits.dtype)
     let mask = mask.storage.withUnsafeBytes { MLXArray($0)[.newAxis, 0...] }

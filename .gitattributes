@@ -1,2 +1,2 @@
-Sources/CNeedleXGrammar/include/dlpack/** linguist-vendored
-Sources/CNeedleXGrammar/include/picojson/** linguist-vendored
+Sources/CXGrammar/include/dlpack/** linguist-vendored
+Sources/CXGrammar/include/picojson/** linguist-vendored

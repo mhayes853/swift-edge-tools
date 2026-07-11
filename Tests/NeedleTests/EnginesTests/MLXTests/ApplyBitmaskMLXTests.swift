@@ -8,7 +8,7 @@
   struct `ApplyBitmaskMLX tests` {
     @Test
     func `Filters Masked Tokens`() {
-      var mask = NeedleGrammarBitmask(storage: [0, 0, 0])
+      var mask = GrammarBitmask(storage: [0, 0, 0])
       for i in 0..<mask.count {
         mask[i] = true
       }

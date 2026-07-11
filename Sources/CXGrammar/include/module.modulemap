@@ -1,4 +1,4 @@
-module CNeedleXGrammar {
+module CXGrammar {
     header "bridging.h"
 
     export *

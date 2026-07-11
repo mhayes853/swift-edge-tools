@@ -3,10 +3,10 @@ import Needle
 import Testing
 
 @Suite
-struct `NeedleBitmask tests` {
+struct `GrammarBitmask tests` {
   @Test
   func `Empty Bitmask Is Zeroed At Proper Size`() {
-    let mask = NeedleGrammarBitmask()
+    let mask = GrammarBitmask()
     expectNoDifference(mask.storage.count, 256)
     for i in 0..<8192 {
       expectNoDifference(mask[i], false)
@@ -15,13 +15,13 @@ struct `NeedleBitmask tests` {
 
   @Test
   func `Count`() {
-    let mask = NeedleGrammarBitmask()
+    let mask = GrammarBitmask()
     expectNoDifference(mask.count, 8192)
   }
 
   @Test
   func `Set Bool Basics`() {
-    var mask = NeedleGrammarBitmask()
+    var mask = GrammarBitmask()
 
     mask[0] = true
     expectNoDifference(mask[0], true)
@@ -38,7 +38,7 @@ struct `NeedleBitmask tests` {
 
   @Test
   func `Mutate Through Storage`() {
-    var mask = NeedleGrammarBitmask()
+    var mask = GrammarBitmask()
     mask.storage[0] = 0x0000_0001
     expectNoDifference(mask[0], true)
 

@@ -20,13 +20,13 @@
         self._processor()
       }
 
-      public var toolCallRange: NeedleGrammarToolCallRange
+      public var toolCallRange: GrammarToolCallRange
       public var maxTokens: Int?
 
       public init(
         sampler: @autoclosure @escaping @Sendable () -> any Sampler = ArgmaxSampler(),
         processor: @autoclosure @escaping @Sendable () -> (any LogitsProcessor)? = nil,
-        toolCallRange: NeedleGrammarToolCallRange = .unbounded(minimum: 0),
+        toolCallRange: GrammarToolCallRange = .unbounded(minimum: 0),
         maxTokens: Int? = 1024
       ) {
         self._sampler = sampler
@@ -37,7 +37,7 @@
     }
 
     private struct State {
-      let grammarEngine: NeedleXGrammarEngine
+      let grammarEngine: XGrammarCompiler
       let matcherPool: NeedleGrammarMatcherPool
     }
 
@@ -80,16 +80,17 @@
       modelConfiguration: MLModelConfiguration,
       editModelConfiguration: (inout MLModelConfiguration) -> Void = { _ in },
       editConfiguration: (inout NeedleModelConfiguration) -> Void = { _ in },
-      grammarEngine: (any Tokenizer) -> NeedleXGrammarEngine? = {
-        NeedleXGrammarEngine(tokenizer: $0)
+      grammarCompiler: (any Tokenizer) throws -> XGrammarCompiler = {
+        guard let compiler = XGrammarCompiler.needle(tokenizer: $0) else {
+          throw XGrammarError(message: "Needle requires a tokenizer with an EOS token.")
+        }
+        return compiler
       }
     ) async throws {
       let tokenizer = try NeedleSPTokenizer(
         modelURL: modelDirectoryURL.appending(path: "tokenizer.model")
       )
-      guard let grammarEngine = grammarEngine(tokenizer) else {
-        throw NeedleCoreMLEngineError.failedToLoadGrammarEngine
-      }
+      let grammarEngine = try grammarCompiler(tokenizer)
 
       var configuration = try Self.decodeConfiguration(from: modelDirectoryURL)
       editConfiguration(&configuration)
@@ -118,7 +119,7 @@
       decoderModel: sending MLModel,
       tokenizer: any Tokenizer,
       configuration: NeedleModelConfiguration,
-      grammarEngine: sending NeedleXGrammarEngine
+      grammarEngine: sending XGrammarCompiler
     ) {
       self.state = Lock(
         State(grammarEngine: grammarEngine, matcherPool: NeedleGrammarMatcherPool())
@@ -172,7 +173,7 @@
       prompt: NeedlePrompt,
       parameters: GenerateParameters,
       onToken: @escaping @Sendable (NeedleToken) -> Void,
-      matcher: NeedleXGrammarEngine.Matcher,
+      matcher: XGrammarMatcher,
       configuration: NeedleModelConfiguration,
       isStopped: ManagedAtomic<Bool>
     ) async throws -> NeedleEngineGeneration {
@@ -295,17 +296,17 @@
       cache: inout DecoderCache
     ) async throws -> MLTensor {
       let inputs = [
-          TensorName.inputIds: inputIds,
-          TensorName.cachePosition: MLTensor(shape: [1], scalars: [Int32(cachePosition)]),
-          TensorName.selfAttentionMask: Self.selfAttentionMask(
-            step: cachePosition,
-            maxLength: self.configuration.encoderMaxLength
-          ),
-          TensorName.crossAttentionMask: encoderOutputs.crossAttentionMask,
-          TensorName.encoderProjectedK: encoderOutputs.encoderProjectedK,
-          TensorName.encoderProjectedV: encoderOutputs.encoderProjectedV,
-          TensorName.keyCache: cache.key,
-          TensorName.valueCache: cache.value
+        TensorName.inputIds: inputIds,
+        TensorName.cachePosition: MLTensor(shape: [1], scalars: [Int32(cachePosition)]),
+        TensorName.selfAttentionMask: Self.selfAttentionMask(
+          step: cachePosition,
+          maxLength: self.configuration.encoderMaxLength
+        ),
+        TensorName.crossAttentionMask: encoderOutputs.crossAttentionMask,
+        TensorName.encoderProjectedK: encoderOutputs.encoderProjectedK,
+        TensorName.encoderProjectedV: encoderOutputs.encoderProjectedV,
+        TensorName.keyCache: cache.key,
+        TensorName.valueCache: cache.value
       ]
       let outputs = try await self.decoderModel.prediction(from: inputs)
       guard
@@ -418,10 +419,6 @@
 
     public static let failedToLoadConfiguration = Self(
       message: "Could not load model configuration."
-    )
-
-    public static let failedToLoadGrammarEngine = Self(
-      message: "Could not load grammar engine."
     )
 
     public static func grammarRejectedToken(token: NeedleToken) -> Self {

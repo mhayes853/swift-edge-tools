@@ -1,6 +1,6 @@
-// MARK: - NeedleGrammarBitmask
+// MARK: - GrammarBitmask
 
-public struct NeedleGrammarBitmask: Hashable, Sendable {
+public struct GrammarBitmask: Hashable, Sendable {
   public var storage: [Int32]
 
   @inlinable
@@ -11,18 +11,24 @@ public struct NeedleGrammarBitmask: Hashable, Sendable {
 
   @inlinable
   @inline(__always)
+  public init(wordCount: Int) {
+    self.storage = [Int32](repeating: 0, count: wordCount)
+  }
+
+  @inlinable
+  @inline(__always)
   public init() {
-    self.storage = [Int32](repeating: 0, count: 256)
+    self.init(wordCount: 256)
   }
 }
 
 // MARK: - Collection
 
-extension NeedleGrammarBitmask: MutableCollection {
+extension GrammarBitmask: MutableCollection {
   public typealias Index = Int
   public typealias Element = Bool
 
-  public func index(after i: Int) -> Int { i + 1 }
+  public func index(after index: Int) -> Int { index + 1 }
   public var startIndex: Int { self.storage.startIndex }
   public var endIndex: Int { self.storage.endIndex * 32 }
 
@@ -38,4 +44,4 @@ extension NeedleGrammarBitmask: MutableCollection {
   }
 }
 
-extension NeedleGrammarBitmask: RandomAccessCollection {}
+extension GrammarBitmask: RandomAccessCollection {}

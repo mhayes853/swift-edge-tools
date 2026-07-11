@@ -3,5 +3,5 @@
 #endif
 
 #if XGrammar
-  @_exported import CNeedleXGrammar
+  @_exported import CXGrammar
 #endif

@@ -48,7 +48,7 @@ let package = Package(
         .product(name: "MLXNN", package: "mlx-swift", condition: .when(traits: ["MLX"])),
         .product(name: "MLXLLM", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),
         .product(name: "MLXLMCommon", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),
-        .target(name: "CNeedleXGrammar", condition: .when(traits: ["XGrammar"])),
+        .target(name: "CXGrammar", condition: .when(traits: ["XGrammar"])),
         .product(
           name: "Tokenizers",
           package: "swift-transformers",
@@ -63,8 +63,8 @@ let package = Package(
       ],
     ),
     .target(
-      name: "CNeedleXGrammar",
-      path: "Sources/CNeedleXGrammar",
+      name: "CXGrammar",
+      path: "Sources/CXGrammar",
       sources: [
         "bridging.cc",
         "xgrammar/cpp/compiled_grammar.cc",

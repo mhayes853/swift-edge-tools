@@ -79,6 +79,14 @@ extension NeedleToolDefinition {
   }
 }
 
+extension NeedleGenerationSchema {
+  func needleGrammarEncoded() -> Data {
+    var writer = JSONWriter()
+    writer.writeSchema(self)
+    return Data(writer.buffer)
+  }
+}
+
 extension Sequence where Element == NeedleToolDefinition {
   /// Encodes a list of tool definitions as a JSON array using the canonical
   /// Cactus Needle field order. See ``encodedAsCanonicalJSON()`` for details.
