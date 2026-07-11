@@ -1,68 +1,360 @@
 ▿ NeedleEngineGeneration
   ▿ decodeMetrics: NeedleDecodeMetrics
-    ▿ duration: 0.068631917 seconds
-      - _low: 68631917000000000
+    ▿ duration: 0.76773525 seconds
+      - _low: 767735250000000000
       - _high: 0
-    ▿ durationToFirstToken: 0.077979291 seconds
-      - _low: 77979291000000000
+    ▿ durationToFirstToken: 0.081288959 seconds
+      - _low: 81288959000000000
       - _high: 0
-    - tokens: 11
+    - tokens: 84
   ▿ metadata: 2 key/value pairs
     ▿ (2 elements)
       ▿ key: NeedleMetadataKey
         - rawValue: "GenerationConfidence"
-      - value: 0.9203817
+      - value: 0.9104302
     ▿ (2 elements)
       ▿ key: NeedleMetadataKey
         - rawValue: "PerTokenConfidences"
-      ▿ value: 11 elements
-        - 0.9791955
-        - 0.9615969
-        - 0.9498325
-        - 0.8584518
-        - 0.9996178
-        - 0.9809125
-        - 0.8585408
-        - 0.99998105
+      ▿ value: 84 elements
         - 1.0
-        - 0.53607005
+        - 0.95506835
+        - 0.9999987
+        - 0.9999999
+        - 0.9999995
+        - 1.0
+        - 0.99999964
+        - 0.99976677
+        - 0.9999726
+        - 0.9999999
+        - 0.99240065
+        - 0.99998534
+        - 0.8025555
+        - 0.846308
+        - 0.7050748
+        - 0.917746
+        - 1.0
+        - 0.99999845
+        - 1.0
+        - 0.9999713
+        - 0.99999046
+        - 0.99999964
+        - 0.99407744
+        - 0.64957863
+        - 0.7779754
+        - 0.9890131
+        - 0.6617043
+        - 0.99985147
+        - 0.99881846
+        - 0.50781184
+        - 0.6531269
+        - 0.99444515
+        - 0.995488
+        - 0.79182106
+        - 0.9565328
+        - 0.89358836
+        - 0.99369794
+        - 0.99983525
+        - 0.9998393
+        - 0.95367575
+        - 0.72594017
+        - 0.62016165
+        - 0.5554352
+        - 0.9985335
+        - 0.99999917
+        - 0.999995
+        - 1.0
+        - 0.999998
+        - 0.98912126
+        - 0.9996886
+        - 0.99999917
+        - 0.99080795
+        - 0.99998736
+        - 0.70089483
+        - 0.77321637
+        - 0.61878043
+        - 0.991891
+        - 1.0
+        - 0.99999857
+        - 1.0
+        - 0.9999875
+        - 0.9999453
+        - 0.99999976
+        - 0.9946568
+        - 0.61693585
+        - 0.9216402
+        - 0.9797453
+        - 0.9309228
+        - 0.99982446
+        - 0.99655366
+        - 0.61138195
+        - 0.57630354
+        - 0.7474317
+        - 0.9882222
+        - 0.9954261
+        - 0.9978822
+        - 0.7298087
+        - 0.8017807
+        - 0.86036915
+        - 0.9875503
+        - 0.99985516
+        - 0.9998074
+        - 0.745954
         - 1.0
   ▿ prefillMetrics: NeedlePrefillMetrics
-    ▿ duration: 0.050708834 seconds
-      - _low: 50708834000000000
+    ▿ duration: 0.055704292 seconds
+      - _low: 55704292000000000
       - _high: 0
     - tokens: 132
-  ▿ tokens: 11 elements
+  ▿ tokens: 84 elements
     ▿ NeedleToken
-      - id: 66
-      - stringValue: "<"
+      - id: 4
+      - stringValue: "<tool_call>"
     ▿ NeedleToken
-      - id: 8040
-      - stringValue: "t"
+      - id: 356
+      - stringValue: " [{\""
     ▿ NeedleToken
-      - id: 8047
-      - stringValue: "o"
+      - id: 294
+      - stringValue: "name"
     ▿ NeedleToken
-      - id: 425
-      - stringValue: "ol"
+      - id: 264
+      - stringValue: "\":\""
+    ▿ NeedleToken
+      - id: 818
+      - stringValue: "send"
     ▿ NeedleToken
       - id: 8062
       - stringValue: "_"
     ▿ NeedleToken
-      - id: 8051
-      - stringValue: "c"
+      - id: 820
+      - stringValue: "email"
     ▿ NeedleToken
-      - id: 304
-      - stringValue: "al"
+      - id: 265
+      - stringValue: "\",\""
     ▿ NeedleToken
-      - id: 8055
-      - stringValue: "l"
+      - id: 393
+      - stringValue: "arguments"
     ▿ NeedleToken
-      - id: 68
-      - stringValue: ">"
+      - id: 282
+      - stringValue: "\":{\""
     ▿ NeedleToken
-      - id: 809
-      - stringValue: " []"
+      - id: 2876
+      - stringValue: "address"
+    ▿ NeedleToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ NeedleToken
+      - id: 280
+      - stringValue: "he"
+    ▿ NeedleToken
+      - id: 1665
+      - stringValue: "nder"
+    ▿ NeedleToken
+      - id: 1127
+      - stringValue: "ry"
+    ▿ NeedleToken
+      - id: 8181
+      - stringValue: "@"
+    ▿ NeedleToken
+      - id: 8057
+      - stringValue: "g"
+    ▿ NeedleToken
+      - id: 497
+      - stringValue: "mail"
+    ▿ NeedleToken
+      - id: 8063
+      - stringValue: "."
+    ▿ NeedleToken
+      - id: 869
+      - stringValue: "com"
+    ▿ NeedleToken
+      - id: 265
+      - stringValue: "\",\""
+    ▿ NeedleToken
+      - id: 979
+      - stringValue: "subject"
+    ▿ NeedleToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ NeedleToken
+      - id: 8103
+      - stringValue: "H"
+    ▿ NeedleToken
+      - id: 637
+      - stringValue: "el"
+    ▿ NeedleToken
+      - id: 363
+      - stringValue: "lo"
+    ▿ NeedleToken
+      - id: 265
+      - stringValue: "\",\""
+    ▿ NeedleToken
+      - id: 1519
+      - stringValue: "body"
+    ▿ NeedleToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ NeedleToken
+      - id: 8076
+      - stringValue: "C"
+    ▿ NeedleToken
+      - id: 837
+      - stringValue: "ould"
+    ▿ NeedleToken
+      - id: 885
+      - stringValue: " you"
+    ▿ NeedleToken
+      - id: 1105
+      - stringValue: " please"
+    ▿ NeedleToken
+      - id: 3245
+      - stringValue: " go"
+    ▿ NeedleToken
+      - id: 442
+      - stringValue: " on"
+    ▿ NeedleToken
+      - id: 439
+      - stringValue: " an"
+    ▿ NeedleToken
+      - id: 1746
+      - stringValue: " ad"
+    ▿ NeedleToken
+      - id: 628
+      - stringValue: "vent"
+    ▿ NeedleToken
+      - id: 491
+      - stringValue: "ure"
+    ▿ NeedleToken
+      - id: 8105
+      - stringValue: "?"
+    ▿ NeedleToken
+      - id: 8071
+      - stringValue: "["
+    ▿ NeedleToken
+      - id: 271
+      - stringValue: "{\""
+    ▿ NeedleToken
+      - id: 431
+      - stringValue: "}},{\""
+    ▿ NeedleToken
+      - id: 294
+      - stringValue: "name"
+    ▿ NeedleToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ NeedleToken
+      - id: 818
+      - stringValue: "send"
+    ▿ NeedleToken
+      - id: 8062
+      - stringValue: "_"
+    ▿ NeedleToken
+      - id: 820
+      - stringValue: "email"
+    ▿ NeedleToken
+      - id: 265
+      - stringValue: "\",\""
+    ▿ NeedleToken
+      - id: 393
+      - stringValue: "arguments"
+    ▿ NeedleToken
+      - id: 282
+      - stringValue: "\":{\""
+    ▿ NeedleToken
+      - id: 2876
+      - stringValue: "address"
+    ▿ NeedleToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ NeedleToken
+      - id: 280
+      - stringValue: "he"
+    ▿ NeedleToken
+      - id: 1665
+      - stringValue: "nder"
+    ▿ NeedleToken
+      - id: 1127
+      - stringValue: "ry"
+    ▿ NeedleToken
+      - id: 8181
+      - stringValue: "@"
+    ▿ NeedleToken
+      - id: 8057
+      - stringValue: "g"
+    ▿ NeedleToken
+      - id: 497
+      - stringValue: "mail"
+    ▿ NeedleToken
+      - id: 8063
+      - stringValue: "."
+    ▿ NeedleToken
+      - id: 869
+      - stringValue: "com"
+    ▿ NeedleToken
+      - id: 265
+      - stringValue: "\",\""
+    ▿ NeedleToken
+      - id: 979
+      - stringValue: "subject"
+    ▿ NeedleToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ NeedleToken
+      - id: 8103
+      - stringValue: "H"
+    ▿ NeedleToken
+      - id: 637
+      - stringValue: "el"
+    ▿ NeedleToken
+      - id: 363
+      - stringValue: "lo"
+    ▿ NeedleToken
+      - id: 265
+      - stringValue: "\",\""
+    ▿ NeedleToken
+      - id: 1519
+      - stringValue: "body"
+    ▿ NeedleToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ NeedleToken
+      - id: 8084
+      - stringValue: "I"
+    ▿ NeedleToken
+      - id: 647
+      - stringValue: " am"
+    ▿ NeedleToken
+      - id: 365
+      - stringValue: " w"
+    ▿ NeedleToken
+      - id: 269
+      - stringValue: "ri"
+    ▿ NeedleToken
+      - id: 490
+      - stringValue: "ting"
+    ▿ NeedleToken
+      - id: 314
+      - stringValue: " to"
+    ▿ NeedleToken
+      - id: 3245
+      - stringValue: " go"
+    ▿ NeedleToken
+      - id: 442
+      - stringValue: " on"
+    ▿ NeedleToken
+      - id: 439
+      - stringValue: " an"
+    ▿ NeedleToken
+      - id: 1746
+      - stringValue: " ad"
+    ▿ NeedleToken
+      - id: 628
+      - stringValue: "vent"
+    ▿ NeedleToken
+      - id: 491
+      - stringValue: "ure"
+    ▿ NeedleToken
+      - id: 4369
+      - stringValue: ".\"}}]"
     ▿ NeedleToken
       - id: 1
       - stringValue: ""

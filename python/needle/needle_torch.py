@@ -443,13 +443,12 @@ class _NeedleAttention(nn.Module):
         if rope is not None:
             q = rope.apply(q)
 
-        output = nn.functional.scaled_dot_product_attention(
-            q,
-            projected_k,
-            projected_v,
-            attn_mask=mask,
-            dropout_p=0.0,
-        )
+        attention_scores = torch.matmul(q, projected_k.transpose(-2, -1))
+        attention_scores = attention_scores / math.sqrt(q.shape[-1])
+        if mask is not None:
+            attention_scores = attention_scores + mask
+        attention_probabilities = torch.softmax(attention_scores, dim=-1)
+        output = torch.matmul(attention_probabilities, projected_v)
 
         output = (
             output.transpose(1, 2)

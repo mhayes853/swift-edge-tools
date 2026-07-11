@@ -151,9 +151,9 @@ private enum NeedleTestModelExport {
         ? ""
         : "-aot-" + compilePlatforms.joined(separator: "-")
       if let quantizerPreset {
-        return "coreai-export-v3-\(quantizerPreset)\(compileSuffix)"
+        return "coreai-export-v4-\(quantizerPreset)\(compileSuffix)"
       }
-      return "coreai-export-v3\(compileSuffix)"
+      return "coreai-export-v4\(compileSuffix)"
     }
   }
 
@@ -207,9 +207,9 @@ private enum NeedleTestModelExport {
 
     static func outputDirectoryName(quantizerPreset: String?) -> String {
       if let quantizerPreset {
-        return "coreml-export-v16-\(quantizerPreset)"
+        return "coreml-export-v17-\(quantizerPreset)"
       }
-      return "coreml-export-v16"
+      return "coreml-export-v17"
     }
   }
 
