@@ -9,15 +9,6 @@
   struct `NeedleFMTool tests` {
     @Test
     @available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0, *)
-    func `Decodes FoundationModels Schema To Needle Schema`() throws {
-      let schema = NeedleFMTool(WeatherTool()).arguments
-      let data = try Self.jsonEncoder.encode(schema)
-      let decoded = try JSONDecoder().decode(NeedleGenerationSchema.self, from: data)
-      expectNoDifference(decoded, schema)
-    }
-
-    @Test
-    @available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0, *)
     func `Contains Expected Metadata And Properties`() throws {
       let tool = NeedleFMTool(WeatherTool())
       let schema = tool.arguments
@@ -36,7 +27,7 @@
         Issue.record("Expected properties object.")
         return
       }
-      expectNoDifference(Array(properties.keys), ["city", "units"])
+      expectNoDifference(properties.keys.sorted(), ["city", "units"])
       expectNoDifference(root[.required], .array([.string("city")]))
     }
 

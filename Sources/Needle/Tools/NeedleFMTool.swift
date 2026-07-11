@@ -18,7 +18,7 @@
     public init(_ base: Base) {
       self.base = base
 
-      let data = Data(self.base.parameters.debugDescription.utf8)
+      let data = try! JSONEncoder().encode(self.base.parameters)
       self.arguments = try! JSONDecoder().decode(NeedleGenerationSchema.self, from: data)
     }
 
