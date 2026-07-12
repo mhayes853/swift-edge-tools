@@ -9,7 +9,6 @@ public protocol EdgeToolsTokenizer: ~Copyable {
   var unknownTokenId: EdgeToolsToken.ID? { borrowing get }
   var bosTokenId: EdgeToolsToken.ID? { borrowing get }
   var eosTokenId: EdgeToolsToken.ID? { borrowing get }
-  var padTokenId: EdgeToolsToken.ID? { borrowing get }
 
   borrowing func encode(text: String) -> [EdgeToolsToken.ID]
   borrowing func decode(tokens: [EdgeToolsToken.ID]) -> String

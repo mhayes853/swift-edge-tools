@@ -20,7 +20,6 @@ extension EdgeToolsTokenizer where Self: ~Copyable {
       self.unknownTokenId,
       self.bosTokenId,
       self.eosTokenId,
-      self.padTokenId,
       self.toolsTokenId,
       self.toolCallTokenId
     ]

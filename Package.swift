@@ -19,6 +19,7 @@ let package = Package(
   traits: [
     .trait(name: "XGrammar", description: "XGrammar-powered structured generation."),
     .trait(name: "Sentencepiece", description: "Pretrained Sentencepiece tokenizer support."),
+    .trait(name: "Transformers", description: "swift-transformers tokenizer support."),
     .trait(name: "MLX", description: "MLX engine support.", enabledTraits: ["XGrammar"]),
     .trait(
       name: "CoreAI",
@@ -51,7 +52,12 @@ let package = Package(
         .product(name: "MLXLLM", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),
         .product(name: "MLXLMCommon", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),
         .target(name: "CXGrammar", condition: .when(traits: ["XGrammar"])),
-        .target(name: "CSentencepiece", condition: .when(traits: ["Sentencepiece"]))
+        .target(name: "CSentencepiece", condition: .when(traits: ["Sentencepiece"])),
+        .product(
+          name: "Tokenizers",
+          package: "swift-transformers",
+          condition: .when(traits: ["Transformers"])
+        )
       ],
     ),
     .target(
