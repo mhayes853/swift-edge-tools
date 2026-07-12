@@ -7,8 +7,8 @@
   public final class EdgeToolsApplyBitmaskProcessorMLX: LogitProcessor {
     public private(set) var matcher: XGrammarMatcher
 
-    public init(matcher: XGrammarMatcher) {
-      self.matcher = matcher
+    public init(matcher: consuming XGrammarMatcher) {
+      self.matcher = consume matcher
     }
 
     public func prompt(_ prompt: MLXArray) {}

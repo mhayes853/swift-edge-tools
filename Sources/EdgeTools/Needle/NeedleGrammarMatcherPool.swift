@@ -1,12 +1,24 @@
 #if XGrammar
   final class NeedleGrammarMatcherPool {
+    private final class CachedMatcher {
+      private let matcher: XGrammarMatcher
+
+      init(_ matcher: consuming XGrammarMatcher) {
+        self.matcher = consume matcher
+      }
+
+      func fork() throws -> XGrammarMatcher {
+        try self.matcher.fork()
+      }
+    }
+
     private struct Key: Hashable, Sendable {
       let tools: [EdgeToolDefinition]
       let range: GrammarToolCallRange
     }
 
     private let maxCount: Int
-    private var entries = [Key: XGrammarMatcher]()
+    private var entries = [Key: CachedMatcher]()
     private var order = [Key]()
 
     init(maxCount: Int = 8) {
@@ -16,18 +28,16 @@
     func matcher(
       tools: some Sequence<EdgeToolDefinition>,
       range: GrammarToolCallRange,
-      compilingWith compiler: XGrammarCompiler
+      compilingWith compiler: borrowing XGrammarCompiler
     ) throws -> XGrammarMatcher {
       let key = Key(tools: tools.map { $0.needleNormalized() }, range: range)
       if let cached = self.entries[key] {
         self.touch(key)
-        cached.reset()
-        return cached.fork()
+        return try cached.fork()
       }
       let grammar = try XGrammarGrammar.needle(tools: key.tools, range: key.range)
       let matcher = try compiler.compile(grammar)
-      self.insert(key, matcher)
-      return matcher.fork()
+      return try self.insert(key, matcher: consume matcher)
     }
 
     func clear() {
@@ -40,13 +50,18 @@
       self.order.append(key)
     }
 
-    private func insert(_ key: Key, _ matcher: XGrammarMatcher) {
+    private func insert(
+      _ key: Key,
+      matcher: consuming XGrammarMatcher
+    ) throws -> XGrammarMatcher {
+      let cached = CachedMatcher(consume matcher)
       if self.entries.count >= self.maxCount, let leastRecentlyUsed = self.order.first {
         self.entries.removeValue(forKey: leastRecentlyUsed)
         self.order.removeFirst()
       }
-      self.entries[key] = matcher
+      self.entries[key] = cached
       self.order.append(key)
+      return try cached.fork()
     }
   }
 #endif

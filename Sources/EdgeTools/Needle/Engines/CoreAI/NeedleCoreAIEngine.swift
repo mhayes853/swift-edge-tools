@@ -42,7 +42,7 @@
       }
     }
 
-    private struct State {
+    private struct State: ~Copyable {
       let grammarEngine: XGrammarCompiler
       let matcherPool: NeedleGrammarMatcherPool
     }
@@ -114,7 +114,7 @@
         decoderModel: decoderModel,
         tokenizer: consume lockedTokenizer,
         configuration: configuration,
-        grammarEngine: grammarEngine
+        grammarEngine: consume grammarEngine
       )
     }
 
@@ -123,14 +123,14 @@
       decoderModel: AIModel,
       tokenizer: consuming sending Tokenizer,
       configuration: NeedleModelConfiguration,
-      grammarEngine: sending XGrammarCompiler
+      grammarEngine: consuming sending XGrammarCompiler
     ) throws {
       try self.init(
         encoderModel: encoderModel,
         decoderModel: decoderModel,
         tokenizer: Lock(consume tokenizer),
         configuration: configuration,
-        grammarEngine: grammarEngine
+        grammarEngine: consume grammarEngine
       )
     }
 
@@ -139,10 +139,10 @@
       decoderModel: AIModel,
       tokenizer: consuming sending Lock<any EdgeToolsTokenizer & ~Copyable>,
       configuration: NeedleModelConfiguration,
-      grammarEngine: sending XGrammarCompiler
+      grammarEngine: consuming sending XGrammarCompiler
     ) throws {
       self.state = Lock(
-        State(grammarEngine: grammarEngine, matcherPool: NeedleGrammarMatcherPool())
+        State(grammarEngine: consume grammarEngine, matcherPool: NeedleGrammarMatcherPool())
       )
       self.configuration = configuration
       self.encoderFunction = try Self.loadFunction(named: FunctionName.main, from: encoderModel)
@@ -204,13 +204,14 @@
       prompt: EdgeToolsPrompt,
       parameters: GenerateParameters,
       onToken: @escaping @Sendable (EdgeToolsToken, EdgeRawToolCall?) -> Void,
-      matcher: XGrammarMatcher,
+      matcher: consuming XGrammarMatcher,
       configuration: NeedleModelConfiguration,
       isStopped: ManagedAtomic<Bool>
     ) async throws -> EdgeToolEngineGeneration {
       try Task.checkCancellation()
       guard !isStopped.load(ordering: .relaxed) else { return .empty }
 
+      let matcher = consume matcher
       let sampler = parameters.sampler
       var processor = parameters.processor
       let stream = parameters.computeStream

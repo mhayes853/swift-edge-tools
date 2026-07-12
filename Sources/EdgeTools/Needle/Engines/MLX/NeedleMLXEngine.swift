@@ -49,7 +49,7 @@
       }
     }
 
-    private struct State {
+    private struct State: ~Copyable {
       let grammarEngine: XGrammarCompiler
       let model: NeedleMLXModel
       let matcherPool: NeedleGrammarMatcherPool
@@ -73,16 +73,20 @@
       guard let grammarEngine else {
         throw XGrammarError(message: "Needle requires a tokenizer with an EOS token.")
       }
-      self.init(tokenizer: tokenizer, model: model, grammarEngine: grammarEngine)
+      self.init(tokenizer: tokenizer, model: model, grammarEngine: consume grammarEngine)
     }
 
     public init<Tokenizer: EdgeToolsTokenizer & ~Copyable>(
       tokenizer: consuming sending Tokenizer,
       model: sending NeedleMLXModel,
-      grammarEngine: sending XGrammarCompiler
+      grammarEngine: consuming sending XGrammarCompiler
     ) {
       self.state = Lock(
-        State(grammarEngine: grammarEngine, model: model, matcherPool: NeedleGrammarMatcherPool())
+        State(
+          grammarEngine: consume grammarEngine,
+          model: model,
+          matcherPool: NeedleGrammarMatcherPool()
+        )
       )
       self.tokenizer = Lock(consume tokenizer)
     }
@@ -90,10 +94,14 @@
     private init(
       tokenizer: consuming sending Lock<any EdgeToolsTokenizer & ~Copyable>,
       model: sending NeedleMLXModel,
-      grammarEngine: sending XGrammarCompiler
+      grammarEngine: consuming sending XGrammarCompiler
     ) {
       self.state = Lock(
-        State(grammarEngine: grammarEngine, model: model, matcherPool: NeedleGrammarMatcherPool())
+        State(
+          grammarEngine: consume grammarEngine,
+          model: model,
+          matcherPool: NeedleGrammarMatcherPool()
+        )
       )
       self.tokenizer = consume tokenizer
     }

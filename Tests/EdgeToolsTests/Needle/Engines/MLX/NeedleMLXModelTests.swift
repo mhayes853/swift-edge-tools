@@ -32,7 +32,7 @@
       var tokens = [Int]()
       while let token = iterator.next() {
         tokens.append(token)
-        if token == tokenizer.eosTokenId || matcher.isTerminated {
+        if token == tokenizer.eosTokenId {
           break
         }
       }

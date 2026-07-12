@@ -35,7 +35,7 @@
       }
     }
 
-    private struct State {
+    private struct State: ~Copyable {
       let grammarEngine: XGrammarCompiler
       let matcherPool: NeedleGrammarMatcherPool
     }
@@ -115,10 +115,10 @@
       decoderModel: sending MLModel,
       tokenizer: consuming sending Tokenizer,
       configuration: NeedleModelConfiguration,
-      grammarEngine: sending XGrammarCompiler
+      grammarEngine: consuming sending XGrammarCompiler
     ) {
       self.state = Lock(
-        State(grammarEngine: grammarEngine, matcherPool: NeedleGrammarMatcherPool())
+        State(grammarEngine: consume grammarEngine, matcherPool: NeedleGrammarMatcherPool())
       )
       self.configuration = configuration
       self.encoderModel = EncoderModelActor(model: encoderModel)
@@ -131,10 +131,10 @@
       decoderModel: sending MLModel,
       tokenizer: consuming sending Lock<any EdgeToolsTokenizer & ~Copyable>,
       configuration: NeedleModelConfiguration,
-      grammarEngine: sending XGrammarCompiler
+      grammarEngine: consuming sending XGrammarCompiler
     ) {
       self.state = Lock(
-        State(grammarEngine: grammarEngine, matcherPool: NeedleGrammarMatcherPool())
+        State(grammarEngine: consume grammarEngine, matcherPool: NeedleGrammarMatcherPool())
       )
       self.configuration = configuration
       self.encoderModel = EncoderModelActor(model: encoderModel)
@@ -192,13 +192,14 @@
       prompt: EdgeToolsPrompt,
       parameters: GenerateParameters,
       onToken: @escaping @Sendable (EdgeToolsToken, EdgeRawToolCall?) -> Void,
-      matcher: XGrammarMatcher,
+      matcher: consuming XGrammarMatcher,
       configuration: NeedleModelConfiguration,
       isStopped: ManagedAtomic<Bool>
     ) async throws -> EdgeToolEngineGeneration {
       try Task.checkCancellation()
       guard !isStopped.load(ordering: .relaxed) else { return .empty }
 
+      let matcher = consume matcher
       let sampler = parameters.sampler
       var processor = parameters.processor
       let generateStart = self.clock.now

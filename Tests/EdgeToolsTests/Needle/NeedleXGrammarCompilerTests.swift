@@ -335,7 +335,7 @@
         for i in 0..<forkPoint {
           expectNoDifference(matcher.accept(tokenId: tokens[i]), true)
         }
-        let forked = matcher.fork()
+        let forked = try matcher.fork()
 
         for i in forkPoint..<tokens.count {
           expectNoDifference(matcher.accept(tokenId: tokens[i]), true)
@@ -522,7 +522,7 @@
       @Test
       func `Forked Matcher Reports Equal Memory Size`() throws {
         let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.getWeather]))
-        let forked = matcher.fork()
+        let forked = try matcher.fork()
         expectNoDifference(forked.memorySizeBytes, matcher.memorySizeBytes)
       }
 
@@ -566,7 +566,7 @@
 
   private func firstRejectedToken(
     in text: String,
-    matcher: XGrammarMatcher,
+    matcher: borrowing XGrammarMatcher,
     tokenizer: borrowing some EdgeToolsTokenizer & ~Copyable
   ) -> RejectedToken? {
     let tokenIds = encodedGrammarText(text, tokenizer: tokenizer)
@@ -594,7 +594,7 @@
 
   private func assertAccepts(
     _ text: String,
-    matcher: XGrammarMatcher,
+    matcher: borrowing XGrammarMatcher,
     tokenizer: borrowing some EdgeToolsTokenizer & ~Copyable,
     eosToken: EdgeToolsToken.ID
   ) {
@@ -609,7 +609,7 @@
 
   private func assertRejects(
     _ text: String,
-    matcher: XGrammarMatcher,
+    matcher: borrowing XGrammarMatcher,
     tokenizer: borrowing some EdgeToolsTokenizer & ~Copyable,
     eosToken: EdgeToolsToken.ID
   ) {

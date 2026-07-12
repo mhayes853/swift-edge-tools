@@ -2,17 +2,10 @@
   import CXGrammar
 
   public func concatenate(
-    _ grammars: XGrammarGrammar...
+    _ lhs: borrowing XGrammarGrammar,
+    _ rhs: borrowing XGrammarGrammar
   ) throws -> XGrammarGrammar {
-    try concatenate(contentsOf: grammars)
-  }
-
-  public func concatenate(
-    contentsOf grammars: some Sequence<XGrammarGrammar>
-  ) throws -> XGrammarGrammar {
-    let grammars = Array(grammars)
-    guard !grammars.isEmpty else { throw XGrammarError.emptyGrammarCollection }
-    let handles: [xgrammar_grammar_t?] = grammars.map { $0.handle }
+    let handles: [xgrammar_grammar_t?] = [lhs.handle, rhs.handle]
     let handle = try handles.withUnsafeBufferPointer {
       try XGrammarCompiler.requiredHandle(
         xgrammar_grammar_concatenate($0.baseAddress, $0.count)
@@ -22,17 +15,10 @@
   }
 
   public func union(
-    _ grammars: XGrammarGrammar...
+    _ lhs: borrowing XGrammarGrammar,
+    _ rhs: borrowing XGrammarGrammar
   ) throws -> XGrammarGrammar {
-    try union(contentsOf: grammars)
-  }
-
-  public func union(
-    contentsOf grammars: some Sequence<XGrammarGrammar>
-  ) throws -> XGrammarGrammar {
-    let grammars = Array(grammars)
-    guard !grammars.isEmpty else { throw XGrammarError.emptyGrammarCollection }
-    let handles: [xgrammar_grammar_t?] = grammars.map { $0.handle }
+    let handles: [xgrammar_grammar_t?] = [lhs.handle, rhs.handle]
     let handle = try handles.withUnsafeBufferPointer {
       try XGrammarCompiler.requiredHandle(
         xgrammar_grammar_union($0.baseAddress, $0.count)
@@ -42,14 +28,14 @@
   }
 
   public func `repeat`(
-    _ grammar: XGrammarGrammar,
+    _ grammar: borrowing XGrammarGrammar,
     exactly count: Int
   ) throws -> XGrammarGrammar {
     try `repeat`(grammar, count...count)
   }
 
   public func `repeat`(
-    _ grammar: XGrammarGrammar,
+    _ grammar: borrowing XGrammarGrammar,
     _ range: ClosedRange<Int>
   ) throws -> XGrammarGrammar {
     guard range.lowerBound >= 0,
@@ -69,7 +55,7 @@
   }
 
   public func `repeat`(
-    _ grammar: XGrammarGrammar,
+    _ grammar: borrowing XGrammarGrammar,
     _ range: PartialRangeFrom<Int>
   ) throws -> XGrammarGrammar {
     guard range.lowerBound >= 0, Int32(exactly: range.lowerBound) != nil else {

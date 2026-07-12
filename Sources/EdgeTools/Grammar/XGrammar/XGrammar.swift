@@ -2,6 +2,8 @@
   import CXGrammar
   import Foundation
 
+  // MARK: - XGrammarVocabularyType
+
   public enum XGrammarVocabularyType: Hashable, Sendable {
     case raw
     case byteFallback
@@ -15,6 +17,8 @@
       }
     }
   }
+
+  // MARK: - XGrammarError
 
   public struct XGrammarError: Error, Hashable, Sendable {
     public let message: String
@@ -30,7 +34,9 @@
     public static let emptyGrammarCollection = Self(message: "Expected at least one grammar.")
   }
 
-  public final class XGrammarCompiler {
+  // MARK: - XGrammarCompiler
+
+  public struct XGrammarCompiler: ~Copyable {
     public struct Configuration: Hashable, Sendable {
       public var memoryLimitBytes: Int64?
       public var maximumThreads: Int?
@@ -89,9 +95,9 @@
             return try Self.requiredHandle(compiler)
           }
       }
+      Self.apply(configuration, to: handle)
       self.handle = handle
       self.bitmaskWordCount = (resolvedVocabularySize + 31) / 32
-      try self.apply(configuration: configuration)
     }
 
     deinit {
@@ -100,13 +106,17 @@
 
     public func apply(configuration: Configuration) throws {
       try Self.validate(configuration: configuration)
-      xgrammar_compiler_set_memory_limit(self.handle, configuration.memoryLimitBytes ?? -1)
-      xgrammar_compiler_set_max_threads(
-        self.handle,
-        Int64(configuration.maximumThreads ?? -1)
-      )
+      Self.apply(configuration, to: self.handle)
+    }
+
+    private static func apply(
+      _ configuration: Configuration,
+      to handle: xgrammar_compiler_t
+    ) {
+      xgrammar_compiler_set_memory_limit(handle, configuration.memoryLimitBytes ?? -1)
+      xgrammar_compiler_set_max_threads(handle, Int64(configuration.maximumThreads ?? -1))
       xgrammar_compiler_set_cache_enabled(
-        self.handle,
+        handle,
         configuration.isCacheEnabled.intValue(as: Int32.self)
       )
     }
@@ -115,7 +125,9 @@
       xgrammar_compiler_clear_cache(self.handle)
     }
 
-    public func compile(_ grammar: XGrammarGrammar) throws -> XGrammarMatcher {
+    public borrowing func compile(
+      _ grammar: borrowing XGrammarGrammar
+    ) throws -> XGrammarMatcher {
       try XGrammarMatcher(
         handle: Self.requiredHandle(xgrammar_compile_matcher(self.handle, grammar.handle)),
         bitmaskWordCount: self.bitmaskWordCount
@@ -138,7 +150,9 @@
     }
   }
 
-  public final class XGrammarGrammar {
+  // MARK: - XGrammarGrammar
+
+  public struct XGrammarGrammar: ~Copyable {
     public struct JSONSchemaConfiguration: Hashable, Sendable {
       public struct Separators: Hashable, Sendable {
         public var comma: String
@@ -190,7 +204,7 @@
       }
     }
 
-    public convenience init(literal: String) throws {
+    public init(literal: String) throws {
       try self.init(ebnf: "root ::= \"\(Self.escapeEBNFLiteral(literal))\"")
     }
 
@@ -279,45 +293,40 @@
       }
     }
 
-    public func concatenate(_ grammar: XGrammarGrammar) throws -> XGrammarGrammar {
+    public borrowing func concatenate(
+      _ grammar: borrowing XGrammarGrammar
+    ) throws -> XGrammarGrammar {
       try EdgeTools.concatenate(self, grammar)
     }
 
-    public func concatenate(contentsOf grammars: some Sequence<XGrammarGrammar>) throws
-      -> XGrammarGrammar
-    {
-      try EdgeTools.concatenate(contentsOf: [self] + Array(grammars))
-    }
-
-    public func union(_ grammar: XGrammarGrammar) throws -> XGrammarGrammar {
+    public borrowing func union(
+      _ grammar: borrowing XGrammarGrammar
+    ) throws -> XGrammarGrammar {
       try EdgeTools.union(self, grammar)
     }
 
-    public func union(contentsOf grammars: some Sequence<XGrammarGrammar>) throws -> XGrammarGrammar
-    {
-      try EdgeTools.union(contentsOf: [self] + Array(grammars))
-    }
-
-    public func optional() throws -> XGrammarGrammar {
+    public borrowing func optional() throws -> XGrammarGrammar {
       try XGrammarGrammar(
         handle: XGrammarCompiler.requiredHandle(xgrammar_grammar_optional(self.handle))
       )
     }
 
-    public func repeated(exactly count: Int) throws -> XGrammarGrammar {
+    public borrowing func repeated(exactly count: Int) throws -> XGrammarGrammar {
       try `repeat`(self, exactly: count)
     }
 
-    public func repeated(_ range: ClosedRange<Int>) throws -> XGrammarGrammar {
+    public borrowing func repeated(_ range: ClosedRange<Int>) throws -> XGrammarGrammar {
       try `repeat`(self, range)
     }
 
-    public func repeated(_ range: PartialRangeFrom<Int>) throws -> XGrammarGrammar {
+    public borrowing func repeated(_ range: PartialRangeFrom<Int>) throws -> XGrammarGrammar {
       try `repeat`(self, range)
     }
   }
 
-  public final class XGrammarMatcher {
+  // MARK: - XGrammarMatcher
+
+  public struct XGrammarMatcher: ~Copyable {
     private let handle: xgrammar_matcher_t
     private let bitmaskWordCount: Int
 
@@ -364,9 +373,9 @@
       xgrammar_matcher_reset(self.handle)
     }
 
-    public func fork() -> XGrammarMatcher {
-      XGrammarMatcher(
-        handle: xgrammar_matcher_fork(self.handle)!,
+    public borrowing func fork() throws -> XGrammarMatcher {
+      try XGrammarMatcher(
+        handle: XGrammarCompiler.requiredHandle(xgrammar_matcher_fork(self.handle)),
         bitmaskWordCount: self.bitmaskWordCount
       )
     }

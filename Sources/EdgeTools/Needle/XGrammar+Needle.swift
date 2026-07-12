@@ -48,13 +48,13 @@
       tools: some Sequence<EdgeToolDefinition>,
       range: GrammarToolCallRange = .unbounded(minimum: 0)
     ) throws -> XGrammarGrammar {
-      let tools = tools.map { $0.needleNormalized() }
-      let calls = try XGrammarGrammar.needleCalls(tools: tools, range: range)
-      return try EdgeTools.concatenate(contentsOf: [
-        XGrammarGrammar(literal: "<tool_call> ["),
-        calls,
-        XGrammarGrammar(literal: "]")
-      ])
+      let calls = try XGrammarGrammar.needleCalls(
+        tools: tools.map { $0.needleNormalized() },
+        range: range
+      )
+      let prefix = try XGrammarGrammar(literal: "<tool_call> [")
+      let prefixedCalls = try prefix.concatenate(calls)
+      return try prefixedCalls.concatenate(XGrammarGrammar(literal: "]"))
     }
 
     private static func needleCalls(
@@ -62,11 +62,13 @@
       range: GrammarToolCallRange
     ) throws -> XGrammarGrammar {
       guard range.lowerBound >= 0 else { throw NeedleXGrammarError.invalidToolInvocationRange }
-      guard !tools.isEmpty else { return try XGrammarGrammar(literal: "") }
+      guard let firstTool = tools.first else { return try XGrammarGrammar(literal: "") }
 
-      let calls = try tools.map(XGrammarGrammar.needleCall)
-      let call = try EdgeTools.union(contentsOf: calls)
-      let separatedCall = try EdgeTools.concatenate(contentsOf: [XGrammarGrammar(literal: ","), call])
+      var call = try XGrammarGrammar.needleCall(firstTool)
+      for tool in tools.dropFirst() {
+        call = try call.union(XGrammarGrammar.needleCall(tool))
+      }
+      let separatedCall = try XGrammarGrammar(literal: ",").concatenate(call)
 
       switch range {
       case .exact(let count):
@@ -102,18 +104,16 @@
           isStrict: true
         )
       )
-      return try EdgeTools.concatenate(contentsOf: [
-        XGrammarGrammar(literal: "{\"name\":\""),
-        XGrammarGrammar(literal: tool.name),
-        XGrammarGrammar(literal: "\",\"arguments\":"),
-        arguments,
-        XGrammarGrammar(literal: "}")
-      ])
+      let namePrefix = try XGrammarGrammar(literal: "{\"name\":\"")
+      let named = try namePrefix.concatenate(XGrammarGrammar(literal: tool.name))
+      let argumentsPrefix = try named.concatenate(XGrammarGrammar(literal: "\",\"arguments\":"))
+      let withArguments = try argumentsPrefix.concatenate(arguments)
+      return try withArguments.concatenate(XGrammarGrammar(literal: "}"))
     }
 
     private static func needleCallList(
-      call: XGrammarGrammar,
-      separatedCall: XGrammarGrammar,
+      call: borrowing XGrammarGrammar,
+      separatedCall: borrowing XGrammarGrammar,
       minimum: Int,
       maximum: Int
     ) throws -> XGrammarGrammar {
@@ -122,18 +122,18 @@
       }
       guard maximum > 0 else { return try XGrammarGrammar(literal: "") }
       let repeatedCalls = try separatedCall.repeated((Swift.max(0, minimum - 1))...(maximum - 1))
-      let nonempty = try EdgeTools.concatenate(contentsOf: [call, repeatedCalls])
+      let nonempty = try call.concatenate(repeatedCalls)
       return minimum == 0 ? try nonempty.optional() : nonempty
     }
 
     private static func needleUnboundedCallList(
-      call: XGrammarGrammar,
-      separatedCall: XGrammarGrammar,
+      call: borrowing XGrammarGrammar,
+      separatedCall: borrowing XGrammarGrammar,
       minimum: Int
     ) throws -> XGrammarGrammar {
       guard minimum >= 0 else { throw NeedleXGrammarError.invalidToolInvocationRange }
       let repeatedCalls = try separatedCall.repeated(Swift.max(0, minimum - 1)...)
-      let nonempty = try EdgeTools.concatenate(contentsOf: [call, repeatedCalls])
+      let nonempty = try call.concatenate(repeatedCalls)
       return minimum == 0 ? try nonempty.optional() : nonempty
     }
   }
