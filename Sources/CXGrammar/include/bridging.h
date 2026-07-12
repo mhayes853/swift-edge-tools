@@ -80,6 +80,7 @@ xgrammar_matcher_t xgrammar_compile_matcher(
     xgrammar_grammar_t grammar
 );
 xgrammar_matcher_t xgrammar_matcher_fork(xgrammar_matcher_t matcher);
+size_t xgrammar_matcher_bit_count(xgrammar_matcher_t matcher);
 int xgrammar_matcher_bitmask(xgrammar_matcher_t matcher, int* bitmask);
 int xgrammar_matcher_accept_token(xgrammar_matcher_t matcher, int token);
 int xgrammar_matcher_is_completed(xgrammar_matcher_t matcher);

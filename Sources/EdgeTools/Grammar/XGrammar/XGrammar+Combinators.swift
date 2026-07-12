@@ -7,9 +7,7 @@
   ) throws -> XGrammarGrammar {
     let handles: [xgrammar_grammar_t?] = [lhs.handle, rhs.handle]
     let handle = try handles.withUnsafeBufferPointer {
-      try XGrammarCompiler.requiredHandle(
-        xgrammar_grammar_concatenate($0.baseAddress, $0.count)
-      )
+      try xgrammarRequiredHandle(xgrammar_grammar_concatenate($0.baseAddress, $0.count))
     }
     return XGrammarGrammar(handle: handle)
   }
@@ -20,9 +18,7 @@
   ) throws -> XGrammarGrammar {
     let handles: [xgrammar_grammar_t?] = [lhs.handle, rhs.handle]
     let handle = try handles.withUnsafeBufferPointer {
-      try XGrammarCompiler.requiredHandle(
-        xgrammar_grammar_union($0.baseAddress, $0.count)
-      )
+      try xgrammarRequiredHandle(xgrammar_grammar_union($0.baseAddress, $0.count))
     }
     return XGrammarGrammar(handle: handle)
   }
@@ -44,13 +40,11 @@
     else {
       throw XGrammarError.invalidRepetitionRange
     }
-    let handle = try XGrammarCompiler.requiredHandle(
-      xgrammar_grammar_repeat(
-        grammar.handle,
-        Int32(range.lowerBound),
-        Int32(range.upperBound)
-      )
-    )
+    let handle = try xgrammarRequiredHandle(xgrammar_grammar_repeat(
+      grammar.handle,
+      Int32(range.lowerBound),
+      Int32(range.upperBound)
+    ))
     return XGrammarGrammar(handle: handle)
   }
 
@@ -61,9 +55,7 @@
     guard range.lowerBound >= 0, Int32(exactly: range.lowerBound) != nil else {
       throw XGrammarError.invalidRepetitionRange
     }
-    let handle = try XGrammarCompiler.requiredHandle(
-      xgrammar_grammar_repeat(grammar.handle, Int32(range.lowerBound), -1)
-    )
+    let handle = try xgrammarRequiredHandle(xgrammar_grammar_repeat(grammar.handle, Int32(range.lowerBound), -1))
     return XGrammarGrammar(handle: handle)
   }
 #endif

@@ -34,6 +34,13 @@
     public static let emptyGrammarCollection = Self(message: "Expected at least one grammar.")
   }
 
+  func xgrammarRequiredHandle<Handle>(_ handle: Handle?) throws -> Handle {
+    guard let handle else {
+      throw XGrammarError(message: String(cString: xgrammar_last_error_message()))
+    }
+    return handle
+  }
+
   // MARK: - XGrammarCompiler
 
   public struct XGrammarCompiler: ~Copyable {
@@ -53,8 +60,7 @@
       }
     }
 
-    private let handle: xgrammar_compiler_t
-    private let bitmaskWordCount: Int
+    public let handle: xgrammar_compiler_t
 
     public var cacheSizeBytes: Int64 {
       xgrammar_compiler_cache_size_bytes(self.handle)
@@ -72,14 +78,12 @@
       addPrefixSpace: Bool = false,
       configuration: Configuration = Configuration()
     ) throws {
-      try Self.validate(configuration: configuration)
       guard vocabularySize.map({ $0 >= 0 }) ?? true,
         stopTokenIDs.allSatisfy({ Int32(exactly: $0) != nil })
       else {
         throw XGrammarError.invalidCompilerConfiguration
       }
 
-      let resolvedVocabularySize = vocabularySize ?? encodedVocabulary.count
       let handle = try withCopiedCStringPointerBuffer(encodedVocabulary) { vocabulary in
         try stopTokenIDs.map(Int32.init)
           .withUnsafeBufferPointer { stopTokenIDs in
@@ -92,31 +96,26 @@
               stopTokenIDs.count,
               addPrefixSpace.intValue(as: Int32.self)
             )
-            return try Self.requiredHandle(compiler)
+            return try xgrammarRequiredHandle(compiler)
           }
       }
-      Self.apply(configuration, to: handle)
       self.handle = handle
-      self.bitmaskWordCount = (resolvedVocabularySize + 31) / 32
+      self.apply(configuration: configuration)
+    }
+
+    public init(handle: consuming xgrammar_compiler_t) {
+      self.handle = consume handle
     }
 
     deinit {
       xgrammar_compiler_destroy(self.handle)
     }
 
-    public func apply(configuration: Configuration) throws {
-      try Self.validate(configuration: configuration)
-      Self.apply(configuration, to: self.handle)
-    }
-
-    private static func apply(
-      _ configuration: Configuration,
-      to handle: xgrammar_compiler_t
-    ) {
-      xgrammar_compiler_set_memory_limit(handle, configuration.memoryLimitBytes ?? -1)
-      xgrammar_compiler_set_max_threads(handle, Int64(configuration.maximumThreads ?? -1))
+    public func apply(configuration: Configuration) {
+      xgrammar_compiler_set_memory_limit(self.handle, configuration.memoryLimitBytes ?? -1)
+      xgrammar_compiler_set_max_threads(self.handle, Int64(configuration.maximumThreads ?? -1))
       xgrammar_compiler_set_cache_enabled(
-        handle,
+        self.handle,
         configuration.isCacheEnabled.intValue(as: Int32.self)
       )
     }
@@ -129,24 +128,8 @@
       _ grammar: borrowing XGrammarGrammar
     ) throws -> XGrammarMatcher {
       try XGrammarMatcher(
-        handle: Self.requiredHandle(xgrammar_compile_matcher(self.handle, grammar.handle)),
-        bitmaskWordCount: self.bitmaskWordCount
+        handle: xgrammarRequiredHandle(xgrammar_compile_matcher(self.handle, grammar.handle))
       )
-    }
-
-    private static func validate(configuration: Configuration) throws {
-      guard configuration.memoryLimitBytes.map({ $0 >= 0 }) ?? true,
-        configuration.maximumThreads.map({ $0 > 0 }) ?? true
-      else {
-        throw XGrammarError.invalidCompilerConfiguration
-      }
-    }
-
-    static func requiredHandle<Handle>(_ handle: Handle?) throws -> Handle {
-      guard let handle else {
-        throw XGrammarError(message: String(cString: xgrammar_last_error_message()))
-      }
-      return handle
     }
   }
 
@@ -188,19 +171,19 @@
       }
     }
 
-    let handle: xgrammar_grammar_t
+    public let handle: xgrammar_grammar_t
 
     public init(ebnf: String, rootRuleName: String = "root") throws {
       self.handle = try ebnf.withCString { ebnf in
         try rootRuleName.withCString { rootRuleName in
-          try XGrammarCompiler.requiredHandle(xgrammar_grammar_init_ebnf(ebnf, rootRuleName))
+          try xgrammarRequiredHandle(xgrammar_grammar_init_ebnf(ebnf, rootRuleName))
         }
       }
     }
 
     public init(regex: String) throws {
       self.handle = try regex.withCString {
-        try XGrammarCompiler.requiredHandle(xgrammar_grammar_init_regex($0))
+        try xgrammarRequiredHandle(xgrammar_grammar_init_regex($0))
       }
     }
 
@@ -221,38 +204,34 @@
         if let separators = configuration.separators {
           return try separators.comma.withCString { comma in
             try separators.colon.withCString { colon in
-              try XGrammarCompiler.requiredHandle(
-                xgrammar_grammar_init_json_schema(
-                  jsonSchema,
-                  configuration.anyWhitespace.intValue(as: Int32.self),
-                  Int32(configuration.indent ?? -1),
-                  comma,
-                  colon,
-                  configuration.isStrict.intValue(as: Int32.self),
-                  Int32(configuration.maximumWhitespaceCount ?? -1),
-                  configuration.anyOrder.intValue(as: Int32.self)
-                )
-              )
+              try xgrammarRequiredHandle(xgrammar_grammar_init_json_schema(
+                jsonSchema,
+                configuration.anyWhitespace.intValue(as: Int32.self),
+                Int32(configuration.indent ?? -1),
+                comma,
+                colon,
+                configuration.isStrict.intValue(as: Int32.self),
+                Int32(configuration.maximumWhitespaceCount ?? -1),
+                configuration.anyOrder.intValue(as: Int32.self)
+              ))
             }
           }
         }
-        return try XGrammarCompiler.requiredHandle(
-          xgrammar_grammar_init_json_schema(
-            jsonSchema,
-            configuration.anyWhitespace.intValue(as: Int32.self),
-            Int32(configuration.indent ?? -1),
-            nil,
-            nil,
-            configuration.isStrict.intValue(as: Int32.self),
-            Int32(configuration.maximumWhitespaceCount ?? -1),
-            configuration.anyOrder.intValue(as: Int32.self)
-          )
-        )
+        return try xgrammarRequiredHandle(xgrammar_grammar_init_json_schema(
+          jsonSchema,
+          configuration.anyWhitespace.intValue(as: Int32.self),
+          Int32(configuration.indent ?? -1),
+          nil,
+          nil,
+          configuration.isStrict.intValue(as: Int32.self),
+          Int32(configuration.maximumWhitespaceCount ?? -1),
+          configuration.anyOrder.intValue(as: Int32.self)
+        ))
       }
     }
 
-    init(handle: xgrammar_grammar_t) {
-      self.handle = handle
+    public init(handle: consuming xgrammar_grammar_t) {
+      self.handle = consume handle
     }
 
     deinit {
@@ -307,7 +286,7 @@
 
     public borrowing func optional() throws -> XGrammarGrammar {
       try XGrammarGrammar(
-        handle: XGrammarCompiler.requiredHandle(xgrammar_grammar_optional(self.handle))
+        handle: xgrammarRequiredHandle(xgrammar_grammar_optional(self.handle))
       )
     }
 
@@ -327,8 +306,7 @@
   // MARK: - XGrammarMatcher
 
   public struct XGrammarMatcher: ~Copyable {
-    private let handle: xgrammar_matcher_t
-    private let bitmaskWordCount: Int
+    public let handle: xgrammar_matcher_t
 
     public var isCompleted: Bool {
       xgrammar_matcher_is_completed(self.handle).boolValue
@@ -342,9 +320,8 @@
       xgrammar_matcher_memory_size_bytes(self.handle)
     }
 
-    fileprivate init(handle: xgrammar_matcher_t, bitmaskWordCount: Int) {
-      self.handle = handle
-      self.bitmaskWordCount = bitmaskWordCount
+    public init(handle: consuming xgrammar_matcher_t) {
+      self.handle = consume handle
     }
 
     deinit {
@@ -352,7 +329,7 @@
     }
 
     public func bitmask() -> GrammarBitmask {
-      var bitmask = GrammarBitmask(bitCount: self.bitmaskWordCount * 32)
+      var bitmask = GrammarBitmask(bitCount: Int(xgrammar_matcher_bit_count(self.handle)))
       _ = bitmask.storage.withUnsafeMutableBytes { bytes in
         let words = bytes.bindMemory(to: Int32.self)
         return xgrammar_matcher_bitmask(self.handle, words.baseAddress)
@@ -375,8 +352,7 @@
 
     public borrowing func fork() throws -> XGrammarMatcher {
       try XGrammarMatcher(
-        handle: XGrammarCompiler.requiredHandle(xgrammar_matcher_fork(self.handle)),
-        bitmaskWordCount: self.bitmaskWordCount
+        handle: xgrammarRequiredHandle(xgrammar_matcher_fork(self.handle))
       )
     }
   }

@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <cstring>
 #include <exception>
-#include <memory>
+#include <limits>
 #include <optional>
 #include <string>
 #include <thread>
@@ -53,6 +53,16 @@ struct XGrammarMatcherHandle {
 struct XGrammarGrammarHandle {
     xgrammar::Grammar grammar;
 };
+
+int64_t normalized_memory_limit(int64_t limit) {
+    return limit < 0 ? kXGrammarUnlimited : limit;
+}
+
+int64_t normalized_max_threads(int64_t threads) {
+    return threads > 0 && threads <= std::numeric_limits<int>::max()
+        ? threads
+        : kXGrammarUnlimited;
+}
 
 xgrammar::VocabType vocab_type(xgrammar_vocab_type_t type) {
     switch (type) {
@@ -195,14 +205,14 @@ void xgrammar_compiler_set_memory_limit(xgrammar_compiler_t compiler, int64_t li
     if (!compiler) return;
     auto handle = static_cast<XGrammarCompilerHandle*>(compiler);
     handle->compiler = std::nullopt;
-    handle->memory_limit = limit;
+    handle->memory_limit = normalized_memory_limit(limit);
 }
 
 void xgrammar_compiler_set_max_threads(xgrammar_compiler_t compiler, int64_t threads) {
     if (!compiler) return;
     auto handle = static_cast<XGrammarCompilerHandle*>(compiler);
     handle->compiler = std::nullopt;
-    handle->max_threads = threads;
+    handle->max_threads = normalized_max_threads(threads);
 }
 
 void xgrammar_compiler_set_cache_enabled(xgrammar_compiler_t compiler, int is_enabled) {
@@ -369,6 +379,12 @@ xgrammar_matcher_t xgrammar_matcher_fork(xgrammar_matcher_t matcher) {
     if (!matcher) return nullptr;
     const auto handle = static_cast<XGrammarMatcherHandle*>(matcher);
     return new XGrammarMatcherHandle{handle->matcher.Fork(), handle->compiled_grammar, handle->bitmask_word_count};
+}
+
+size_t xgrammar_matcher_bit_count(xgrammar_matcher_t matcher) {
+    if (!matcher) return 0;
+    const auto handle = static_cast<const XGrammarMatcherHandle*>(matcher);
+    return static_cast<size_t>(handle->bitmask_word_count) * 32;
 }
 
 int xgrammar_matcher_bitmask(xgrammar_matcher_t matcher, int* bitmask) {
