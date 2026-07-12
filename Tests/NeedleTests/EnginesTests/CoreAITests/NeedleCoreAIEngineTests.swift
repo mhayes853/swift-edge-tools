@@ -15,7 +15,7 @@
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
         parameters: .default
-      ) { token in tokens.withLock { $0.append(token) } }
+      ) { token, _ in tokens.withLock { $0.append(token) } }
       let generation = try await generationTask.value
 
       expectNoDifference(generation.wasStopped, false)
@@ -31,8 +31,8 @@
     func `Concurrent Generations`() async throws {
       let engine = try await makeNeedleCoreAIEngine()
 
-      let t1 = try engine.generate(prompt: .sendAdventureEmail, parameters: .default) { _ in }
-      let t2 = try engine.generate(prompt: .sendAdventureEmail, parameters: .default) { _ in }
+      let t1 = try engine.generate(prompt: .sendAdventureEmail, parameters: .default) { _, _ in }
+      let t2 = try engine.generate(prompt: .sendAdventureEmail, parameters: .default) { _, _ in }
 
       let (g1, g2) = try await (t1.value, t2.value)
       withKnownIssue {
@@ -46,10 +46,10 @@
     func `Sequential Generations`() async throws {
       let engine = try await makeNeedleCoreAIEngine()
 
-      let t1 = try engine.generate(prompt: .sendAdventureEmail, parameters: .default) { _ in }
+      let t1 = try engine.generate(prompt: .sendAdventureEmail, parameters: .default) { _, _ in }
       let g1 = try await t1.value
 
-      let t2 = try engine.generate(prompt: .sendAdventureEmail, parameters: .default) { _ in }
+      let t2 = try engine.generate(prompt: .sendAdventureEmail, parameters: .default) { _, _ in }
       let g2 = try await t2.value
 
       withKnownIssue {
@@ -66,7 +66,7 @@
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
         parameters: .default
-      ) { token in tokens.withLock { $0.append(token) } }
+      ) { token, _ in tokens.withLock { $0.append(token) } }
       let generation = try await generationTask.value
 
       let streamedResponse = tokens.withLock { $0.map(\.stringValue).joined() }
@@ -80,7 +80,7 @@
       let engine = try await makeNeedleCoreAIEngine()
 
       let params = NeedleCoreAIEngine.GenerateParameters(computeStream: ComputeStream())
-      let task = try engine.generate(prompt: .sendAdventureEmail, parameters: params) { _ in }
+      let task = try engine.generate(prompt: .sendAdventureEmail, parameters: params) { _, _ in }
       let generation = try await task.value
 
       expectNoDifference(generation.wasStopped, false)
@@ -98,7 +98,7 @@
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
         parameters: .default
-      ) { token in
+      ) { token, _ in
         tokens.withLock { $0.append(token) }
         generationTaskBox.withLock { $0?.stop() }
       }
@@ -120,7 +120,7 @@
         let generationTask = try engine.generate(
           prompt: .sendAdventureEmail,
           parameters: .default
-        ) { _ in }
+        ) { _, _ in }
         _ = try await generationTask.value
       }
 
@@ -138,7 +138,7 @@
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
         parameters: .default
-      ) { token in tokens.withLock { $0.append(token) } }
+      ) { token, _ in tokens.withLock { $0.append(token) } }
       let generation = try await generationTask.value
 
       expectNoDifference(generation.wasStopped, false)
@@ -166,7 +166,7 @@
         #endif
       }()
       let engine = try await makeNeedleCoreAIEngine(compilePlatforms: [compilePlatform])
-      let task = try engine.generate(prompt: .sendAdventureEmail, parameters: .default) { _ in }
+      let task = try engine.generate(prompt: .sendAdventureEmail, parameters: .default) { _, _ in }
       let generation = try await task.value
 
       expectNoDifference(generation.wasStopped, false)
@@ -205,7 +205,7 @@
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
         parameters: NeedleCoreAIEngine.GenerateParameters(processor: processor)
-      ) { _ in }
+      ) { _, _ in }
       _ = try await generationTask.value
 
       expectNoDifference(processor.promptCalls, 1)
@@ -224,7 +224,7 @@
       )
 
       let error = await #expect(throws: NeedleCoreAIEngineError.self) {
-        let generationTask = try engine.generate(prompt: prompt, parameters: .default) { _ in }
+        let generationTask = try engine.generate(prompt: prompt, parameters: .default) { _, _ in }
         _ = try await generationTask.value
       }
       expectNoDifference(error?.message.contains("context length"), true)

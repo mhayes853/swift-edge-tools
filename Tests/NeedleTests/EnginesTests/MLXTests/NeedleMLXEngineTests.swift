@@ -21,7 +21,7 @@
       let generationTask = try self.engine.generate(
         prompt: .sendAdventureEmail,
         parameters: .default
-      ) { token in tokens.withLock { $0.append(token) } }
+      ) { token, _ in tokens.withLock { $0.append(token) } }
       let generation = try await generationTask.value
       expectNoDifference(generation.wasStopped, false)
       withKnownIssue {
@@ -37,7 +37,7 @@
       let generationTask = try self.engine.generate(
         prompt: .sendAdventureEmail,
         parameters: .default
-      ) { token in tokens.withLock { $0.append(token) } }
+      ) { token, _ in tokens.withLock { $0.append(token) } }
       let generation = try await generationTask.value
 
       let streamedResponse = tokens.withLock { $0.map(\.stringValue).joined() }
@@ -52,7 +52,7 @@
       let generationTask = try self.engine.generate(
         prompt: .sendAdventureEmail,
         parameters: .default,
-      ) { token in
+      ) { token, _ in
         tokens.withLock { $0.append(token) }
         generationTaskBox.withLock { $0?.stop() }
       }
@@ -72,7 +72,7 @@
         let generationTask = try self.engine.generate(
           prompt: .sendAdventureEmail,
           parameters: .default
-        ) { _ in }
+        ) { _, _ in }
         _ = try await generationTask.value
       }
 
@@ -88,7 +88,7 @@
       let generationTask = try self.engine.generate(
         prompt: .sendAdventureEmail,
         parameters: NeedleMLXEngine.GenerateParameters(kvCacheQuantizationBits: 4)
-      ) { token in tokenStorage.withLock { $0.append(token) } }
+      ) { token, _ in tokenStorage.withLock { $0.append(token) } }
       let generation = try await generationTask.value
       expectNoDifference(generation.wasStopped, false)
       withKnownIssue {
@@ -111,7 +111,7 @@
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
         parameters: .default
-      ) { token in tokenStorage.withLock { $0.append(token) } }
+      ) { token, _ in tokenStorage.withLock { $0.append(token) } }
       let generation = try await generationTask.value
       expectNoDifference(generation.wasStopped, false)
       withKnownIssue {
@@ -151,7 +151,7 @@
       let generationTask = try self.engine.generate(
         prompt: .sendAdventureEmail,
         parameters: NeedleMLXEngine.GenerateParameters(processor: processor)
-      ) { _ in }
+      ) { _, _ in }
       _ = try await generationTask.value
 
       expectNoDifference(processor.promptCalls, 1)
@@ -164,7 +164,7 @@
       let generationTask = try self.engine.generate(
         prompt: .sendAdventureEmail,
         parameters: .default
-      ) { _ in }
+      ) { _, _ in }
       let generation = try await generationTask.value
 
       let confidence = try #require(generation.metadata.generationConfidence)
@@ -186,7 +186,7 @@
       )
 
       let error = await #expect(throws: NeedleMLXEngineError.self) {
-        let generationTask = try self.engine.generate(prompt: prompt, parameters: .default) { _ in }
+        let generationTask = try self.engine.generate(prompt: prompt, parameters: .default) { _, _ in }
         _ = try await generationTask.value
       }
       expectNoDifference(error?.message.contains("context length"), true)

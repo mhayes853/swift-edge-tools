@@ -9,7 +9,7 @@ public protocol NeedleEngine: Sendable {
   func generate(
     prompt: NeedlePrompt,
     parameters: GenerateParameters,
-    onToken: @escaping @Sendable (NeedleToken) -> Void
+    onToken: @escaping @Sendable (NeedleToken, NeedleRawToolCall?) -> Void
   ) throws -> GenerationTask
 }
 

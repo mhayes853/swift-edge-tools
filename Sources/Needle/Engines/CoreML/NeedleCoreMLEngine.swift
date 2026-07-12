@@ -144,7 +144,7 @@
     public func generate(
       prompt: NeedlePrompt,
       parameters: GenerateParameters,
-      onToken: @escaping @Sendable (NeedleToken) -> Void
+      onToken: @escaping @Sendable (NeedleToken, NeedleRawToolCall?) -> Void
     ) throws -> some NeedleEngineGenerationTask {
       let isStopped = ManagedAtomic(false)
       let task = Task {
@@ -172,7 +172,7 @@
     private func generate(
       prompt: NeedlePrompt,
       parameters: GenerateParameters,
-      onToken: @escaping @Sendable (NeedleToken) -> Void,
+      onToken: @escaping @Sendable (NeedleToken, NeedleRawToolCall?) -> Void,
       matcher: XGrammarMatcher,
       configuration: NeedleModelConfiguration,
       isStopped: ManagedAtomic<Bool>
@@ -192,6 +192,7 @@
       var cache = DecoderCache(configuration: configuration)
       var nextDecoderTokenId = configuration.decoderStartTokenId
       var detokenizer = StreamingDetokenizer(tokenizer: self.tokenizer)
+      var parser = NeedleToolCallParser()
       var generatedTokens = [NeedleToken]()
       var confidence = NeedleConfidenceState()
       var durationToFirstToken: Duration?
@@ -223,7 +224,7 @@
         guard matcher.accept(tokenId: token.id) else {
           throw NeedleCoreMLEngineError.grammarRejectedToken(token: token)
         }
-        onToken(token)
+        onToken(token, parser.accept(token: token))
         processor?.didSample(token: token)
       }
 

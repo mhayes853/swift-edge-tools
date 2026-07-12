@@ -203,7 +203,9 @@ public final class NeedleSessionStream: Sendable, Observable, Identifiable {
       user: prompt,
       tools: tools.map(\.definition)
     )
-    let parseState = Lock(ToolCallParseState(tools: tools))
+    let toolsByName = Dictionary(
+      uniqueKeysWithValues: tools.map { ($0.name.snakeCased(), $0) }
+    )
     let shouldInvokeToolsBox = Lock(shouldInvokeTools)
 
     let generationTask: Engine.GenerationTask
@@ -211,9 +213,9 @@ public final class NeedleSessionStream: Sendable, Observable, Identifiable {
       generationTask = try session.engine.generate(
         prompt: needlePrompt,
         parameters: parameters
-      ) { [weak self] token in
+      ) { [weak self] token, rawToolCall in
         guard let self else { return }
-        let call = parseState.withLock { $0.accept(token: token) }
+        let call = rawToolCall.flatMap { self.resolve($0, toolsByName: toolsByName) }
         let shouldInvoke = shouldInvokeToolsBox.withLock { $0 }
         self.state.withLock { state in
           state.emitToken(token: token)
@@ -282,6 +284,19 @@ public final class NeedleSessionStream: Sendable, Observable, Identifiable {
       return generationTaskStop
     }
     generationTaskStop?()
+  }
+
+  private func resolve(
+    _ rawToolCall: NeedleRawToolCall,
+    toolsByName: [String: any NeedleTool]
+  ) -> AnyNeedleToolCall? {
+    guard let tool = toolsByName[rawToolCall.name.snakeCased()] else { return nil }
+
+    func open<Tool: NeedleTool>(_ concrete: Tool) -> AnyNeedleToolCall? {
+      guard let input = try? Tool.Input(needleValue: rawToolCall.arguments) else { return nil }
+      return AnyNeedleToolCall(NeedleToolCall(id: NeedleToolCallID(), tool: concrete, input: input))
+    }
+    return open(tool)
   }
 }
 
@@ -490,169 +505,4 @@ package func duplicateToolNameError(_ names: some Sequence<String>) -> String? {
       "The names \(originals.sorted().map { "'\($0)'" }.joined(separator: " and ")) all normalize to '\(normalized)'."
     }
     .joined(separator: "\n")
-}
-
-// MARK: - Parse State
-
-private struct ToolCallParseState: Sendable {
-  private enum Phase {
-    case outsideBlock
-    case insideArray
-  }
-
-  private enum JSONStringState {
-    case outsideString
-    case insideString(isEscaping: Bool)
-  }
-
-  private static let opener = "tool_call"
-
-  private let toolsByName: [String: any NeedleTool]
-  private var phase = Phase.outsideBlock
-  private var buffer = ""
-  private var hasSeenArrayOpen = false
-  private var braceDepth = 0
-  private var currentObjectStart: String.Index?
-  private var scanIndex: String.Index?
-  private var jsonStringState = JSONStringState.outsideString
-
-  init(tools: [any NeedleTool]) {
-    var byName = [String: any NeedleTool]()
-    for tool in tools {
-      byName[tool.name.snakeCased()] = tool
-    }
-    self.toolsByName = byName
-  }
-
-  mutating func accept(token: NeedleToken) -> AnyNeedleToolCall? {
-    self.buffer.append(token.stringValue)
-    switch self.phase {
-    case .outsideBlock: return self.handleOutsideBlock()
-    case .insideArray: return self.handleInsideArray()
-    }
-  }
-
-  private mutating func handleOutsideBlock() -> AnyNeedleToolCall? {
-    guard let range = self.buffer.range(of: Self.opener) else { return nil }
-    self.buffer.removeSubrange(..<range.upperBound)
-    self.phase = .insideArray
-    return self.handleInsideArray()
-  }
-
-  private mutating func handleInsideArray() -> AnyNeedleToolCall? {
-    guard self.consumeArrayOpenBracketIfNeeded() else { return nil }
-
-    var scanIndex = self.scanIndex ?? self.buffer.startIndex
-    while scanIndex < self.buffer.endIndex {
-      let character = self.buffer[scanIndex]
-      let nextIndex = self.buffer.index(after: scanIndex)
-
-      self.updateJSONStringState(for: character)
-
-      guard self.shouldTreatAsBoundary(character) else {
-        scanIndex = nextIndex
-        continue
-      }
-
-      switch character {
-      case "{":
-        self.openBrace(at: scanIndex)
-        scanIndex = nextIndex
-
-      case "}":
-        if let call = self.closeBrace(at: nextIndex) {
-          return call
-        }
-        scanIndex = nextIndex
-
-      case "]":
-        if self.braceDepth == 0 {
-          self.buffer.removeSubrange(..<nextIndex)
-          return nil
-        }
-        scanIndex = nextIndex
-
-      default:
-        break
-      }
-    }
-
-    self.scanIndex = scanIndex
-    return nil
-  }
-
-  private mutating func updateJSONStringState(for character: Character) {
-    switch (self.jsonStringState, character) {
-    case (.outsideString, "\""):
-      self.jsonStringState = .insideString(isEscaping: false)
-    case (.insideString(let isEscaping), "\\"):
-      self.jsonStringState = .insideString(isEscaping: !isEscaping)
-    case (.insideString(let isEscaping), "\""):
-      self.jsonStringState = isEscaping ? .insideString(isEscaping: false) : .outsideString
-    case (.insideString, _):
-      self.jsonStringState = .insideString(isEscaping: false)
-    case (.outsideString, _):
-      break
-    }
-  }
-
-  private func shouldTreatAsBoundary(_ character: Character) -> Bool {
-    if case .insideString = self.jsonStringState {
-      return false
-    }
-    return character.isNeedleBoundary
-  }
-
-  private mutating func consumeArrayOpenBracketIfNeeded() -> Bool {
-    guard !self.hasSeenArrayOpen else { return true }
-    guard let bracketIndex = self.buffer.firstIndex(of: "[") else { return false }
-    self.buffer.removeSubrange(..<bracketIndex)
-    self.hasSeenArrayOpen = true
-    self.scanIndex = self.buffer.startIndex
-    return true
-  }
-
-  private mutating func openBrace(at index: String.Index) {
-    if self.braceDepth == 0 {
-      self.currentObjectStart = index
-    }
-    self.braceDepth += 1
-  }
-
-  private mutating func closeBrace(at nextIndex: String.Index) -> AnyNeedleToolCall? {
-    guard self.braceDepth > 0 else { return nil }
-    self.braceDepth -= 1
-    guard self.braceDepth == 0, let start = self.currentObjectStart else { return nil }
-
-    let objectString = String(self.buffer[start..<nextIndex])
-    self.buffer.removeSubrange(..<nextIndex)
-    self.currentObjectStart = nil
-    self.scanIndex = self.buffer.startIndex
-    return self.parseAndBuild(objectString: objectString)
-  }
-
-  private func parseAndBuild(objectString: String) -> AnyNeedleToolCall? {
-    guard let data = objectString.data(using: .utf8) else { return nil }
-    guard let value = try? JSONDecoder().decode(ParsedToolCall.self, from: data) else {
-      return nil
-    }
-    guard let tool = self.toolsByName[value.name] else { return nil }
-
-    func open<Tool: NeedleTool>(_ concrete: Tool) -> AnyNeedleToolCall? {
-      guard let typed = try? Tool.Input(needleValue: value.arguments) else { return nil }
-      return AnyNeedleToolCall(NeedleToolCall(id: NeedleToolCallID(), tool: concrete, input: typed))
-    }
-    return open(tool)
-  }
-}
-
-extension Character {
-  fileprivate var isNeedleBoundary: Bool {
-    ["{", "}", "]"].contains(self)
-  }
-}
-
-private struct ParsedToolCall: Codable {
-  let name: String
-  let arguments: NeedleValue
 }
