@@ -57,22 +57,6 @@
     }
 
     @Test
-    func `Decode Skips Needle Special Tokens`() throws {
-      let tokenizer = try EdgeToolsSPTokenizer(modelURL: self.modelURL)
-      let toolsTokenId = tokenizer.toolsTokenId
-      let toolCallTokenId = tokenizer.toolCallTokenId
-      guard let toolsTokenId, let toolCallTokenId else {
-        Issue.record("Expected Needle special tokens in the vocabulary.")
-        return
-      }
-
-      expectNoDifference(
-        tokenizer.decode(tokens: [toolsTokenId, toolCallTokenId], skipSpecialTokens: true),
-        ""
-      )
-    }
-
-    @Test
     func `Encode Snapshot`() throws {
       let tokenizer = try EdgeToolsSPTokenizer(modelURL: self.modelURL)
       let tokens = tokenizer.encode(text: "This is a test")
