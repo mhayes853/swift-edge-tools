@@ -1,0 +1,361 @@
+▿ EdgeToolEngineGeneration
+  ▿ decodeMetrics: EdgeToolsDecodeMetrics
+    ▿ duration: 1.42877625 seconds
+      - _low: 1428776250000000000
+      - _high: 0
+    ▿ durationToFirstToken: 0.093987667 seconds
+      - _low: 93987667000000000
+      - _high: 0
+    - tokens: 84
+  ▿ metadata: 2 key/value pairs
+    ▿ (2 elements)
+      ▿ key: EdgeToolsMetadataKey
+        - rawValue: "GenerationConfidence"
+      - value: 0.91095936
+    ▿ (2 elements)
+      ▿ key: EdgeToolsMetadataKey
+        - rawValue: "PerTokenConfidences"
+      ▿ value: 84 elements
+        - 1.0
+        - 0.9561454
+        - 0.9999988
+        - 1.0
+        - 0.99999964
+        - 1.0
+        - 0.99999964
+        - 0.9997695
+        - 0.9999764
+        - 1.0
+        - 0.99248135
+        - 0.999987
+        - 0.80069196
+        - 0.8418256
+        - 0.7348813
+        - 0.92523
+        - 1.0
+        - 0.99999857
+        - 1.0
+        - 0.9999726
+        - 0.99999094
+        - 0.99999964
+        - 0.9943581
+        - 0.6513549
+        - 0.76629364
+        - 0.98934746
+        - 0.66366893
+        - 0.99986124
+        - 0.998862
+        - 0.5
+        - 0.6654106
+        - 0.994615
+        - 0.9955662
+        - 0.78199726
+        - 0.9571178
+        - 0.89478946
+        - 0.9939964
+        - 0.99986017
+        - 0.99983907
+        - 0.9535353
+        - 0.7248703
+        - 0.6548947
+        - 0.5544705
+        - 0.9989183
+        - 0.9999993
+        - 0.9999951
+        - 1.0
+        - 0.999998
+        - 0.9878996
+        - 0.99973875
+        - 0.9999993
+        - 0.99101454
+        - 0.9999877
+        - 0.7122322
+        - 0.7799929
+        - 0.6104535
+        - 0.99242276
+        - 1.0
+        - 0.9999987
+        - 1.0
+        - 0.99998844
+        - 0.99994695
+        - 0.99999976
+        - 0.9950177
+        - 0.6076632
+        - 0.93045825
+        - 0.97966766
+        - 0.93089926
+        - 0.9998306
+        - 0.996597
+        - 0.62245935
+        - 0.5794004
+        - 0.7439129
+        - 0.9890131
+        - 0.99509466
+        - 0.9978677
+        - 0.7090191
+        - 0.80069196
+        - 0.858244
+        - 0.98662347
+        - 0.9998766
+        - 0.99981767
+        - 0.7401744
+        - 1.0
+  ▿ prefillMetrics: EdgeToolsPrefillMetrics
+    ▿ duration: 0.05681025 seconds
+      - _low: 56810250000000000
+      - _high: 0
+    - tokens: 132
+  ▿ tokens: 84 elements
+    ▿ EdgeToolsToken
+      - id: 4
+      - stringValue: "<tool_call>"
+    ▿ EdgeToolsToken
+      - id: 356
+      - stringValue: " [{\""
+    ▿ EdgeToolsToken
+      - id: 294
+      - stringValue: "name"
+    ▿ EdgeToolsToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ EdgeToolsToken
+      - id: 818
+      - stringValue: "send"
+    ▿ EdgeToolsToken
+      - id: 8062
+      - stringValue: "_"
+    ▿ EdgeToolsToken
+      - id: 820
+      - stringValue: "email"
+    ▿ EdgeToolsToken
+      - id: 265
+      - stringValue: "\",\""
+    ▿ EdgeToolsToken
+      - id: 393
+      - stringValue: "arguments"
+    ▿ EdgeToolsToken
+      - id: 282
+      - stringValue: "\":{\""
+    ▿ EdgeToolsToken
+      - id: 2876
+      - stringValue: "address"
+    ▿ EdgeToolsToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ EdgeToolsToken
+      - id: 280
+      - stringValue: "he"
+    ▿ EdgeToolsToken
+      - id: 1665
+      - stringValue: "nder"
+    ▿ EdgeToolsToken
+      - id: 1127
+      - stringValue: "ry"
+    ▿ EdgeToolsToken
+      - id: 8181
+      - stringValue: "@"
+    ▿ EdgeToolsToken
+      - id: 8057
+      - stringValue: "g"
+    ▿ EdgeToolsToken
+      - id: 497
+      - stringValue: "mail"
+    ▿ EdgeToolsToken
+      - id: 8063
+      - stringValue: "."
+    ▿ EdgeToolsToken
+      - id: 869
+      - stringValue: "com"
+    ▿ EdgeToolsToken
+      - id: 265
+      - stringValue: "\",\""
+    ▿ EdgeToolsToken
+      - id: 979
+      - stringValue: "subject"
+    ▿ EdgeToolsToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ EdgeToolsToken
+      - id: 8103
+      - stringValue: "H"
+    ▿ EdgeToolsToken
+      - id: 637
+      - stringValue: "el"
+    ▿ EdgeToolsToken
+      - id: 363
+      - stringValue: "lo"
+    ▿ EdgeToolsToken
+      - id: 265
+      - stringValue: "\",\""
+    ▿ EdgeToolsToken
+      - id: 1519
+      - stringValue: "body"
+    ▿ EdgeToolsToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ EdgeToolsToken
+      - id: 8076
+      - stringValue: "C"
+    ▿ EdgeToolsToken
+      - id: 837
+      - stringValue: "ould"
+    ▿ EdgeToolsToken
+      - id: 885
+      - stringValue: " you"
+    ▿ EdgeToolsToken
+      - id: 1105
+      - stringValue: " please"
+    ▿ EdgeToolsToken
+      - id: 3245
+      - stringValue: " go"
+    ▿ EdgeToolsToken
+      - id: 442
+      - stringValue: " on"
+    ▿ EdgeToolsToken
+      - id: 439
+      - stringValue: " an"
+    ▿ EdgeToolsToken
+      - id: 1746
+      - stringValue: " ad"
+    ▿ EdgeToolsToken
+      - id: 628
+      - stringValue: "vent"
+    ▿ EdgeToolsToken
+      - id: 491
+      - stringValue: "ure"
+    ▿ EdgeToolsToken
+      - id: 8105
+      - stringValue: "?"
+    ▿ EdgeToolsToken
+      - id: 8071
+      - stringValue: "["
+    ▿ EdgeToolsToken
+      - id: 271
+      - stringValue: "{\""
+    ▿ EdgeToolsToken
+      - id: 431
+      - stringValue: "}},{\""
+    ▿ EdgeToolsToken
+      - id: 294
+      - stringValue: "name"
+    ▿ EdgeToolsToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ EdgeToolsToken
+      - id: 818
+      - stringValue: "send"
+    ▿ EdgeToolsToken
+      - id: 8062
+      - stringValue: "_"
+    ▿ EdgeToolsToken
+      - id: 820
+      - stringValue: "email"
+    ▿ EdgeToolsToken
+      - id: 265
+      - stringValue: "\",\""
+    ▿ EdgeToolsToken
+      - id: 393
+      - stringValue: "arguments"
+    ▿ EdgeToolsToken
+      - id: 282
+      - stringValue: "\":{\""
+    ▿ EdgeToolsToken
+      - id: 2876
+      - stringValue: "address"
+    ▿ EdgeToolsToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ EdgeToolsToken
+      - id: 280
+      - stringValue: "he"
+    ▿ EdgeToolsToken
+      - id: 1665
+      - stringValue: "nder"
+    ▿ EdgeToolsToken
+      - id: 1127
+      - stringValue: "ry"
+    ▿ EdgeToolsToken
+      - id: 8181
+      - stringValue: "@"
+    ▿ EdgeToolsToken
+      - id: 8057
+      - stringValue: "g"
+    ▿ EdgeToolsToken
+      - id: 497
+      - stringValue: "mail"
+    ▿ EdgeToolsToken
+      - id: 8063
+      - stringValue: "."
+    ▿ EdgeToolsToken
+      - id: 869
+      - stringValue: "com"
+    ▿ EdgeToolsToken
+      - id: 265
+      - stringValue: "\",\""
+    ▿ EdgeToolsToken
+      - id: 979
+      - stringValue: "subject"
+    ▿ EdgeToolsToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ EdgeToolsToken
+      - id: 8103
+      - stringValue: "H"
+    ▿ EdgeToolsToken
+      - id: 637
+      - stringValue: "el"
+    ▿ EdgeToolsToken
+      - id: 363
+      - stringValue: "lo"
+    ▿ EdgeToolsToken
+      - id: 265
+      - stringValue: "\",\""
+    ▿ EdgeToolsToken
+      - id: 1519
+      - stringValue: "body"
+    ▿ EdgeToolsToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ EdgeToolsToken
+      - id: 8084
+      - stringValue: "I"
+    ▿ EdgeToolsToken
+      - id: 647
+      - stringValue: " am"
+    ▿ EdgeToolsToken
+      - id: 365
+      - stringValue: " w"
+    ▿ EdgeToolsToken
+      - id: 269
+      - stringValue: "ri"
+    ▿ EdgeToolsToken
+      - id: 490
+      - stringValue: "ting"
+    ▿ EdgeToolsToken
+      - id: 314
+      - stringValue: " to"
+    ▿ EdgeToolsToken
+      - id: 3245
+      - stringValue: " go"
+    ▿ EdgeToolsToken
+      - id: 442
+      - stringValue: " on"
+    ▿ EdgeToolsToken
+      - id: 439
+      - stringValue: " an"
+    ▿ EdgeToolsToken
+      - id: 1746
+      - stringValue: " ad"
+    ▿ EdgeToolsToken
+      - id: 628
+      - stringValue: "vent"
+    ▿ EdgeToolsToken
+      - id: 491
+      - stringValue: "ure"
+    ▿ EdgeToolsToken
+      - id: 4369
+      - stringValue: ".\"}}]"
+    ▿ EdgeToolsToken
+      - id: 1
+      - stringValue: ""
+  - wasStopped: false

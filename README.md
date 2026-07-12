@@ -1,11 +1,12 @@
-# Swift Needle
+# Swift Edge Tools
 
-A runtime for [Cactus Needle](https://github.com/cactus-compute/needle) in pure Swift.
+A Swift runtime for local model tool calling, with built-in support for
+[Cactus Needle](https://github.com/cactus-compute/needle).
 
 ## Usage
 
 ```swift
-import Needle
+import EdgeTools
 
 let modelURL = try await NeedleMLX.download(from: .cactusNeedleMLXHuggingFace) { progress in
   print("Progress", progress)
@@ -18,7 +19,7 @@ let model = try NeedleCactus(from: modelURL)
 let model = try NeedleCoreML(from: modelURL)
 let model = try NeedleCoreAI(from: modelURL) // WWDC Rumors
 
-let toolDefinition = NeedleToolDefinition(
+let toolDefinition = EdgeToolDefinition(
   name: "get_weather",
   arguments: toolSchema
 )
@@ -26,8 +27,8 @@ let toolDefinition = NeedleToolDefinition(
 let response = try model.invoke(messages: [], tools: [toolDefinition])
 print(response.messages, response.toolCalls)
 
-struct GetWeather: NeedleTool {
-  @NeeldeGenerable
+struct GetWeather: EdgeTool {
+  @EdgeToolsGenerable
   struct Input {
     let city: String
   }
@@ -38,7 +39,7 @@ struct GetWeather: NeedleTool {
 }
 
 // Can also construct with NeedleCactus, NeedleONNX, etc.
-let session = try NeedleSession<NeedleMLX>(from: modelURL)
+let session = try EdgeToolsSession<NeedleMLX>(from: modelURL)
 
 try await session.prefill(prompt: "What is the weather in ", tools: [GetWeather()])
 
@@ -53,8 +54,8 @@ for try await token in stream {
   print(token.stringValue, token.id)
 }
 
-struct GetPopulation: NeedleTool {
-  @NeedleGenerable
+struct GetPopulation: EdgeTool {
+  @EdgeToolsGenerable
   struct Input {
     let city: String
   }
@@ -65,15 +66,15 @@ struct GetPopulation: NeedleTool {
 }
 
 // Dynamic
-let session = try NeedleSession<NeedleMLX>(from: modelURL)
+let session = try EdgeToolsSession<NeedleMLX>(from: modelURL)
 let response = try await session.invoke(
   prompt: "What is the weather in San Francisco?", 
   tools: [GetWeather(), GetPopulation()]
 )
-print(response) // NeedleSession.DynamicToolInvocations
+print(response) // EdgeToolsSession.DynamicToolInvocations
 
-let weatherResult = response[0].result(of: GetWeather.self) // Result<NeedleToolInvocation<GetWeather>, any Error>?
-let populationResult = response[0].output(of: GetPopulation.self) // Result<NeedleToolInvocation<GetPopulation>, any Error>?
+let weatherResult = response[0].result(of: GetWeather.self) // Result<EdgeToolInvocation<GetWeather>, any Error>?
+let populationResult = response[0].output(of: GetPopulation.self) // Result<EdgeToolInvocation<GetPopulation>, any Error>?
 
 // Static
 
@@ -86,7 +87,7 @@ enum SessionTools {
 // Macro Generates
 // @NeedleStaticToolCollectionCase(GetWeather(/* Custom args */)) on case if one wants custom configuration
 extension SessionTools {
-  static let tools: [any NeedleTool] = [GetWeather(), GetPopulation()]
+  static let tools: [any EdgeTool] = [GetWeather(), GetPopulation()]
 
   enum Output: NeedleStaticToolsCollectionOutput {
     case getWeather(GetWeather.Output)
@@ -96,57 +97,58 @@ extension SessionTools {
   }
 }
 
-let session = try NeedleSession<NeedleMLX>(from: modelURL)
+let session = try EdgeToolsSession<NeedleMLX>(from: modelURL)
 let response = try await session.invoke(
   prompt: "What is the weather in San Francisco?", 
   tools: SessionTools.self
 )
-print(response) // NeedleSession.StaticToolInvocations<SessionTools.Output>
+print(response) // EdgeToolsSession.StaticToolInvocations<SessionTools.Output>
 ```
 
 New JSON Schema API
+
 ```swift
-let schema = NeedleGenerationSchema(
+let schema = EdgeToolsGenerationSchema(
   .type(.string),
   .minLength(1)
 )
 
-// Raw init (each value is a NeedleValue)
-let schema = NeedleGenerationSchema([
+// Raw init (each value is a EdgeToolsValue)
+let schema = EdgeToolsGenerationSchema([
   "type": "string",
   "minLength": 1
 ])
 
 // Composite Keys
-let schema = NeedleGenerationSchema(
+let schema = EdgeToolsGenerationSchema(
   .type(.string),
   .lengthRange(1...10),
   .pattern("[0-9a-zA-Z]+")
 )
 
-let schema = NeedleGenerationSchema(
+let schema = EdgeToolsGenerationSchema(
   .type(.number),
   .range(1.2...10.1)
 )
 
 // Arrays
-let schema = NeedleGenerationSchema(
+let schema = EdgeToolsGenerationSchema(
   .array, // OR .type(.array)
   .properties(.type(.string), .minLength(1))
 )
 
 // Objects
-let schema = NeedleGenerationSchema(
+let schema = EdgeToolsGenerationSchema(
   .type(.object), // OR .type(.object)
   .properties([
-    "name": NeedleGenerationSchema(
+    "name": EdgeToolsGenerationSchema(
       .string, // OR .type(.string)
       .minLength(1)
     )
   ])
 )
 
-let schema = NeedleGenerationSchema(
+let schema = EdgeToolsGenerationSchema(
   .type(.object), // OR .type(.object)
   .properties([
     "name": [
@@ -157,43 +159,43 @@ let schema = NeedleGenerationSchema(
 )
 
 // Unions
-let schema = NeedleGenerationSchema(
+let schema = EdgeToolsGenerationSchema(
   .type([.string, .number]),
   .minLength(1), // string constraint
   .minimum(1) // number constraint
 )
 
 // Metakeys
-let schema = NeedleGenerationSchema(
+let schema = EdgeToolsGenerationSchema(
   .type(.number),
   .range(1.2...10.1),
   .oneOf([otherSchema, ...]),
   .allOf([otherSchema, ...])
 )
 
-public enum NeedleGenerationSchema: Hashable, Sendable, Codable {
+public enum EdgeToolsGenerationSchema: Hashable, Sendable, Codable {
   public struct Key: RawRepresentable, ExpressibleByStringLiteral, Codable {
     // Have extensions for all common keys in JSON Schema standard ("type", "minLength", etc.)
   }
 
   // Ordered dictionary would guarantee ordering for Needle Prompts
-  case object(OrderedDictionary<Key: NeedleValue>)
+  case object(OrderedDictionary<Key: EdgeToolsValue>)
   case boolean(Bool)
 
-  public init(_ properties: OrderedDictionary<Key: NeedleValue>)
+  public init(_ properties: OrderedDictionary<Key: EdgeToolsValue>)
 
   // Allows inits that you see above with strongly typed properties. Implementation would merge underlying property dicts
   public init(_ schemas: some Sequence<Self>)
   public init(_ schemas: Self...)
 }
 
-extension NeedleGenerationSchema: ExpressibleByArrayLiteral {}
-extension NeedleGenerationSchema: ExpressibleByDictionaryLiteral {}
-extension NeedleGenerationSchema: ExpressibleByBooleanLiteral {}
+extension EdgeToolsGenerationSchema: ExpressibleByArrayLiteral {}
+extension EdgeToolsGenerationSchema: ExpressibleByDictionaryLiteral {}
+extension EdgeToolsGenerationSchema: ExpressibleByBooleanLiteral {}
 
-extension NeedleGenerationSchema {
+extension EdgeToolsGenerationSchema {
   public static func type(_ type: ValueType) -> Self {
-    Self(["type": /* Convert type to a NeedleValue of a string array of types, or just a single string if only 1 type in the ValueType set. */])
+    Self(["type": /* Convert type to a EdgeToolsValue of a string array of types, or just a single string if only 1 type in the ValueType set. */])
   }
 
   public static func minLength(_ value: Int) -> Self {
@@ -209,7 +211,7 @@ extension NeedleGenerationSchema {
   // Have these kinds of helpers for all existing JSON schema properties...
 }
 
-public enum NeedleValue {
+public enum EdgeToolsValue {
   // Existing cases...
 
   // New object case is ordered
@@ -218,13 +220,13 @@ public enum NeedleValue {
 
 // Updated Macro Usage (uses the schema merging, type inferred on a per-property basis)
 // Macro type validation would be looser, but more flexible.
-@NeedleGenerable(
+@EdgeToolsGenerable(
   .title("Input"),
   .description("Sends an email."),
   // Other meta properties (oneOf, anyOf, etc.) can also be placed here.
 )
 struct Input: Sendable {
-  @NeedleGuide(
+  @EdgeToolsGuide(
     key: "addr", // Key override still uses the macro argument.
     .pattern("[a-z][a-z0-9]{1,10}@gmail\\.com"),
     .description("The recipient's email address."),
@@ -232,10 +234,10 @@ struct Input: Sendable {
   )
   var address: String
 
-  @NeedleGuide(.description("The subject of an email."))
+  @EdgeToolsGuide(.description("The subject of an email."))
   var subject: String
 
-  @NeedleGuide(.description("The content of an email."))
+  @EdgeToolsGuide(.description("The content of an email."))
   var body: String
 }
 ```

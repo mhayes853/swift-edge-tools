@@ -1,0 +1,42 @@
+// MARK: - EdgeTool
+
+public protocol EdgeTool<Input, Output>: Sendable {
+  associatedtype Input: ConvertibleFromEdgeToolsValue & Sendable
+  associatedtype Output: Sendable
+
+  var name: String { get }
+  var description: String { get }
+  var arguments: EdgeToolsGenerationSchema { get }
+
+  func invoke(input: Input) async throws -> Output
+}
+
+extension EdgeTool where Input: EdgeToolsGenerable {
+  public var arguments: EdgeToolsGenerationSchema {
+    Input.edgeToolsGenerationSchema
+  }
+}
+
+extension EdgeTool {
+  public var definition: EdgeToolDefinition {
+    EdgeToolDefinition(
+      name: self.name,
+      description: self.description,
+      arguments: self.arguments
+    )
+  }
+}
+
+// MARK: - EdgeToolDefinition
+
+public struct EdgeToolDefinition: Hashable, Sendable, Codable {
+  public var name: String
+  public var description: String
+  public var arguments: EdgeToolsGenerationSchema
+
+  public init(name: String, description: String, arguments: EdgeToolsGenerationSchema) {
+    self.name = name
+    self.description = description
+    self.arguments = arguments
+  }
+}

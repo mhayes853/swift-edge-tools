@@ -1,0 +1,397 @@
+▿ 132 elements
+  ▿ EdgeToolsToken
+    - id: 5099
+    - stringValue: "▁Send"
+  ▿ EdgeToolsToken
+    - id: 439
+    - stringValue: "▁an"
+  ▿ EdgeToolsToken
+    - id: 635
+    - stringValue: "▁email"
+  ▿ EdgeToolsToken
+    - id: 314
+    - stringValue: "▁to"
+  ▿ EdgeToolsToken
+    - id: 893
+    - stringValue: "▁H"
+  ▿ EdgeToolsToken
+    - id: 381
+    - stringValue: "en"
+  ▿ EdgeToolsToken
+    - id: 1127
+    - stringValue: "ry"
+  ▿ EdgeToolsToken
+    - id: 7893
+    - stringValue: "▁asking"
+  ▿ EdgeToolsToken
+    - id: 5956
+    - stringValue: "▁him"
+  ▿ EdgeToolsToken
+    - id: 314
+    - stringValue: "▁to"
+  ▿ EdgeToolsToken
+    - id: 3245
+    - stringValue: "▁go"
+  ▿ EdgeToolsToken
+    - id: 442
+    - stringValue: "▁on"
+  ▿ EdgeToolsToken
+    - id: 439
+    - stringValue: "▁an"
+  ▿ EdgeToolsToken
+    - id: 1746
+    - stringValue: "▁ad"
+  ▿ EdgeToolsToken
+    - id: 628
+    - stringValue: "vent"
+  ▿ EdgeToolsToken
+    - id: 491
+    - stringValue: "ure"
+  ▿ EdgeToolsToken
+    - id: 8063
+    - stringValue: "."
+  ▿ EdgeToolsToken
+    - id: 5
+    - stringValue: "<tools>"
+  ▿ EdgeToolsToken
+    - id: 8071
+    - stringValue: "["
+  ▿ EdgeToolsToken
+    - id: 271
+    - stringValue: "{\""
+  ▿ EdgeToolsToken
+    - id: 294
+    - stringValue: "name"
+  ▿ EdgeToolsToken
+    - id: 264
+    - stringValue: "\":\""
+  ▿ EdgeToolsToken
+    - id: 818
+    - stringValue: "send"
+  ▿ EdgeToolsToken
+    - id: 8062
+    - stringValue: "_"
+  ▿ EdgeToolsToken
+    - id: 820
+    - stringValue: "email"
+  ▿ EdgeToolsToken
+    - id: 265
+    - stringValue: "\",\""
+  ▿ EdgeToolsToken
+    - id: 283
+    - stringValue: "description"
+  ▿ EdgeToolsToken
+    - id: 264
+    - stringValue: "\":\""
+  ▿ EdgeToolsToken
+    - id: 3406
+    - stringValue: "Sends"
+  ▿ EdgeToolsToken
+    - id: 439
+    - stringValue: "▁an"
+  ▿ EdgeToolsToken
+    - id: 635
+    - stringValue: "▁email"
+  ▿ EdgeToolsToken
+    - id: 314
+    - stringValue: "▁to"
+  ▿ EdgeToolsToken
+    - id: 289
+    - stringValue: "▁a"
+  ▿ EdgeToolsToken
+    - id: 964
+    - stringValue: "▁recipient"
+  ▿ EdgeToolsToken
+    - id: 516
+    - stringValue: "▁with"
+  ▿ EdgeToolsToken
+    - id: 439
+    - stringValue: "▁an"
+  ▿ EdgeToolsToken
+    - id: 635
+    - stringValue: "▁email"
+  ▿ EdgeToolsToken
+    - id: 919
+    - stringValue: "▁address"
+  ▿ EdgeToolsToken
+    - id: 284
+    - stringValue: ".\",\""
+  ▿ EdgeToolsToken
+    - id: 393
+    - stringValue: "arguments"
+  ▿ EdgeToolsToken
+    - id: 282
+    - stringValue: "\":{\""
+  ▿ EdgeToolsToken
+    - id: 298
+    - stringValue: "type"
+  ▿ EdgeToolsToken
+    - id: 264
+    - stringValue: "\":\""
+  ▿ EdgeToolsToken
+    - id: 1872
+    - stringValue: "ob"
+  ▿ EdgeToolsToken
+    - id: 557
+    - stringValue: "ject"
+  ▿ EdgeToolsToken
+    - id: 265
+    - stringValue: "\",\""
+  ▿ EdgeToolsToken
+    - id: 4860
+    - stringValue: "properties"
+  ▿ EdgeToolsToken
+    - id: 282
+    - stringValue: "\":{\""
+  ▿ EdgeToolsToken
+    - id: 2876
+    - stringValue: "address"
+  ▿ EdgeToolsToken
+    - id: 282
+    - stringValue: "\":{\""
+  ▿ EdgeToolsToken
+    - id: 298
+    - stringValue: "type"
+  ▿ EdgeToolsToken
+    - id: 264
+    - stringValue: "\":\""
+  ▿ EdgeToolsToken
+    - id: 315
+    - stringValue: "string"
+  ▿ EdgeToolsToken
+    - id: 265
+    - stringValue: "\",\""
+  ▿ EdgeToolsToken
+    - id: 283
+    - stringValue: "description"
+  ▿ EdgeToolsToken
+    - id: 264
+    - stringValue: "\":\""
+  ▿ EdgeToolsToken
+    - id: 329
+    - stringValue: "The"
+  ▿ EdgeToolsToken
+    - id: 964
+    - stringValue: "▁recipient"
+  ▿ EdgeToolsToken
+    - id: 8066
+    - stringValue: "\'"
+  ▿ EdgeToolsToken
+    - id: 8046
+    - stringValue: "s"
+  ▿ EdgeToolsToken
+    - id: 635
+    - stringValue: "▁email"
+  ▿ EdgeToolsToken
+    - id: 919
+    - stringValue: "▁address"
+  ▿ EdgeToolsToken
+    - id: 284
+    - stringValue: ".\",\""
+  ▿ EdgeToolsToken
+    - id: 8050
+    - stringValue: "p"
+  ▿ EdgeToolsToken
+    - id: 940
+    - stringValue: "atter"
+  ▿ EdgeToolsToken
+    - id: 8045
+    - stringValue: "n"
+  ▿ EdgeToolsToken
+    - id: 264
+    - stringValue: "\":\""
+  ▿ EdgeToolsToken
+    - id: 8071
+    - stringValue: "["
+  ▿ EdgeToolsToken
+    - id: 8044
+    - stringValue: "a"
+  ▿ EdgeToolsToken
+    - id: 8080
+    - stringValue: "-"
+  ▿ EdgeToolsToken
+    - id: 8078
+    - stringValue: "z"
+  ▿ EdgeToolsToken
+    - id: 8072
+    - stringValue: "]"
+  ▿ EdgeToolsToken
+    - id: 8071
+    - stringValue: "["
+  ▿ EdgeToolsToken
+    - id: 8044
+    - stringValue: "a"
+  ▿ EdgeToolsToken
+    - id: 8080
+    - stringValue: "-"
+  ▿ EdgeToolsToken
+    - id: 8078
+    - stringValue: "z"
+  ▿ EdgeToolsToken
+    - id: 8075
+    - stringValue: "0"
+  ▿ EdgeToolsToken
+    - id: 8080
+    - stringValue: "-"
+  ▿ EdgeToolsToken
+    - id: 8113
+    - stringValue: "9"
+  ▿ EdgeToolsToken
+    - id: 8072
+    - stringValue: "]"
+  ▿ EdgeToolsToken
+    - id: 8058
+    - stringValue: "{"
+  ▿ EdgeToolsToken
+    - id: 5377
+    - stringValue: "1,"
+  ▿ EdgeToolsToken
+    - id: 5744
+    - stringValue: "10"
+  ▿ EdgeToolsToken
+    - id: 8059
+    - stringValue: "}"
+  ▿ EdgeToolsToken
+    - id: 8181
+    - stringValue: "@"
+  ▿ EdgeToolsToken
+    - id: 8057
+    - stringValue: "g"
+  ▿ EdgeToolsToken
+    - id: 497
+    - stringValue: "mail"
+  ▿ EdgeToolsToken
+    - id: 8190
+    - stringValue: "\\"
+  ▿ EdgeToolsToken
+    - id: 8190
+    - stringValue: "\\"
+  ▿ EdgeToolsToken
+    - id: 8063
+    - stringValue: "."
+  ▿ EdgeToolsToken
+    - id: 869
+    - stringValue: "com"
+  ▿ EdgeToolsToken
+    - id: 265
+    - stringValue: "\",\""
+  ▿ EdgeToolsToken
+    - id: 5319
+    - stringValue: "example"
+  ▿ EdgeToolsToken
+    - id: 8046
+    - stringValue: "s"
+  ▿ EdgeToolsToken
+    - id: 262
+    - stringValue: "\":"
+  ▿ EdgeToolsToken
+    - id: 8071
+    - stringValue: "["
+  ▿ EdgeToolsToken
+    - id: 8039
+    - stringValue: "\""
+  ▿ EdgeToolsToken
+    - id: 5241
+    - stringValue: "blob"
+  ▿ EdgeToolsToken
+    - id: 8181
+    - stringValue: "@"
+  ▿ EdgeToolsToken
+    - id: 8057
+    - stringValue: "g"
+  ▿ EdgeToolsToken
+    - id: 497
+    - stringValue: "mail"
+  ▿ EdgeToolsToken
+    - id: 8063
+    - stringValue: "."
+  ▿ EdgeToolsToken
+    - id: 869
+    - stringValue: "com"
+  ▿ EdgeToolsToken
+    - id: 8039
+    - stringValue: "\""
+  ▿ EdgeToolsToken
+    - id: 8072
+    - stringValue: "]"
+  ▿ EdgeToolsToken
+    - id: 336
+    - stringValue: "},\""
+  ▿ EdgeToolsToken
+    - id: 979
+    - stringValue: "subject"
+  ▿ EdgeToolsToken
+    - id: 282
+    - stringValue: "\":{\""
+  ▿ EdgeToolsToken
+    - id: 298
+    - stringValue: "type"
+  ▿ EdgeToolsToken
+    - id: 264
+    - stringValue: "\":\""
+  ▿ EdgeToolsToken
+    - id: 315
+    - stringValue: "string"
+  ▿ EdgeToolsToken
+    - id: 6490
+    - stringValue: "\"},\""
+  ▿ EdgeToolsToken
+    - id: 1519
+    - stringValue: "body"
+  ▿ EdgeToolsToken
+    - id: 282
+    - stringValue: "\":{\""
+  ▿ EdgeToolsToken
+    - id: 298
+    - stringValue: "type"
+  ▿ EdgeToolsToken
+    - id: 264
+    - stringValue: "\":\""
+  ▿ EdgeToolsToken
+    - id: 315
+    - stringValue: "string"
+  ▿ EdgeToolsToken
+    - id: 8039
+    - stringValue: "\""
+  ▿ EdgeToolsToken
+    - id: 288
+    - stringValue: "}}"
+  ▿ EdgeToolsToken
+    - id: 263
+    - stringValue: ",\""
+  ▿ EdgeToolsToken
+    - id: 301
+    - stringValue: "required"
+  ▿ EdgeToolsToken
+    - id: 262
+    - stringValue: "\":"
+  ▿ EdgeToolsToken
+    - id: 8071
+    - stringValue: "["
+  ▿ EdgeToolsToken
+    - id: 8039
+    - stringValue: "\""
+  ▿ EdgeToolsToken
+    - id: 2876
+    - stringValue: "address"
+  ▿ EdgeToolsToken
+    - id: 265
+    - stringValue: "\",\""
+  ▿ EdgeToolsToken
+    - id: 979
+    - stringValue: "subject"
+  ▿ EdgeToolsToken
+    - id: 265
+    - stringValue: "\",\""
+  ▿ EdgeToolsToken
+    - id: 1519
+    - stringValue: "body"
+  ▿ EdgeToolsToken
+    - id: 8039
+    - stringValue: "\""
+  ▿ EdgeToolsToken
+    - id: 8072
+    - stringValue: "]"
+  ▿ EdgeToolsToken
+    - id: 403
+    - stringValue: "}}]"

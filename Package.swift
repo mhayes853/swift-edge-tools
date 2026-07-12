@@ -5,7 +5,7 @@ import CompilerPluginSupport
 import PackageDescription
 
 let package = Package(
-  name: "swift-needle",
+  name: "swift-edge-tools",
   platforms: [
     .macOS(.v14),
     .iOS(.v17),
@@ -14,7 +14,7 @@ let package = Package(
     .visionOS(.v1)
   ],
   products: [
-    .library(name: "Needle", targets: ["Needle"])
+    .library(name: "EdgeTools", targets: ["EdgeTools"])
   ],
   traits: [
     .trait(name: "XGrammar", description: "XGrammar-powered structured generation."),
@@ -40,9 +40,9 @@ let package = Package(
   ],
   targets: [
     .target(
-      name: "Needle",
+      name: "EdgeTools",
       dependencies: [
-        "NeedleMacros",
+        "EdgeToolsMacros",
         .product(name: "OrderedCollections", package: "swift-collections"),
         .product(name: "MLX", package: "mlx-swift", condition: .when(traits: ["MLX"])),
         .product(name: "MLXNN", package: "mlx-swift", condition: .when(traits: ["MLX"])),
@@ -158,7 +158,7 @@ let package = Package(
       ]
     ),
     .macro(
-      name: "NeedleMacros",
+      name: "EdgeToolsMacros",
       dependencies: [
         .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
         .product(name: "SwiftSyntax", package: "swift-syntax"),
@@ -168,13 +168,13 @@ let package = Package(
       ]
     ),
     .testTarget(
-      name: "NeedleMacrosTests",
-      dependencies: ["NeedleMacros", .product(name: "MacroTesting", package: "swift-macro-testing")]
+      name: "EdgeToolsMacrosTests",
+      dependencies: ["EdgeToolsMacros", .product(name: "MacroTesting", package: "swift-macro-testing")]
     ),
     .testTarget(
-      name: "NeedleTests",
+      name: "EdgeToolsTests",
       dependencies: [
-        "Needle",
+        "EdgeTools",
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
         .product(name: "CustomDump", package: "swift-custom-dump"),
         .product(
@@ -183,7 +183,13 @@ let package = Package(
           condition: .when(traits: ["MLX"])
         )
       ],
-      exclude: ["NeedleGenerationSchemaTests/__Snapshots__"],
+      exclude: [
+        "GenerationSchemaTests/__Snapshots__",
+        "Needle/Engines/CoreAI/__Snapshots__",
+        "Needle/Engines/CoreML/__Snapshots__",
+        "Needle/Engines/MLX/__Snapshots__",
+        "Needle/__Snapshots__"
+      ],
       resources: [.process("Resources")]
     )
   ],
