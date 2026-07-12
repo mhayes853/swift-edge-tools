@@ -41,6 +41,18 @@ package struct Lock<Value: ~Copyable>: ~Copyable {
       try self.lock.withLock(body)
     #endif
   }
+
+  package borrowing func withBorrowedLock<Result: ~Copyable, E: Error>(
+    _ body: (borrowing Value) throws(E) -> sending Result
+  ) throws(E) -> sending Result {
+    #if canImport(Darwin) && canImport(Foundation)
+      self.lock.lock()
+      defer { self.lock.unlock() }
+      return try body(self.value.pointee)
+    #else
+      try self.lock.withLock { try body($0) }
+    #endif
+  }
 }
 
 extension Lock: @unchecked Sendable where Value: ~Copyable {}

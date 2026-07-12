@@ -1,4 +1,4 @@
-module CNeedleSentencepiece {
+module CSentencepiece {
     header "bridging.h"
     export *
 }

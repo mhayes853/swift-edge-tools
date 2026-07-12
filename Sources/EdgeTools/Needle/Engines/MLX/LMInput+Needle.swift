@@ -2,14 +2,13 @@
   import Foundation
   import MLX
   import MLXLMCommon
-  import Tokenizers
 
   extension LMInput {
     public static func needle(
       prompt: EdgeToolsPrompt,
-      using tokenizer: some Tokenizers.Tokenizer
+      using tokenizer: borrowing some EdgeToolsTokenizer & ~Copyable
     ) throws -> Self {
-      let tokens = tokenizer.encode(text: prompt.needleFormatted(), addSpecialTokens: false)
+      let tokens = tokenizer.encode(text: prompt.needleFormatted())
       return LMInput(text: LMInput.Text(tokens: MLXArray(tokens)))
     }
   }

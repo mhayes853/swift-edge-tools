@@ -2,7 +2,6 @@
   import Atomics
   @preconcurrency import CoreML
   import Foundation
-  import Tokenizers
 
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
   public final class NeedleCoreMLEngine: EdgeToolEngine {
@@ -72,25 +71,22 @@
     private let configuration: NeedleModelConfiguration
     private let encoderModel: EncoderModelActor
     private let decoderModel: DecoderModelActor
-    private let tokenizer: any Tokenizer
+    private let tokenizer: Lock<any EdgeToolsTokenizer & ~Copyable>
     private let clock = ContinuousClock()
 
     public convenience init(
       modelDirectoryURL: URL,
       modelConfiguration: MLModelConfiguration,
       editModelConfiguration: (inout MLModelConfiguration) -> Void = { _ in },
-      editConfiguration: (inout NeedleModelConfiguration) -> Void = { _ in },
-      grammarCompiler: (any Tokenizer) throws -> XGrammarCompiler = {
-        guard let compiler = XGrammarCompiler.needle(tokenizer: $0) else {
-          throw XGrammarError(message: "Needle requires a tokenizer with an EOS token.")
-        }
-        return compiler
-      }
+      editConfiguration: (inout NeedleModelConfiguration) -> Void = { _ in }
     ) async throws {
-      let tokenizer = try NeedleSPTokenizer(
-        modelURL: modelDirectoryURL.appending(path: "tokenizer.model")
+      let tokenizer = try Self.loadTokenizer(
+        from: modelDirectoryURL.appending(path: "tokenizer.model")
       )
-      let grammarEngine = try grammarCompiler(tokenizer)
+      let grammarEngine = tokenizer.withLock { XGrammarCompiler.needle(erasedTokenizer: $0) }
+      guard let grammarEngine else {
+        throw XGrammarError(message: "Needle requires a tokenizer with an EOS token.")
+      }
 
       var configuration = try Self.decodeConfiguration(from: modelDirectoryURL)
       editConfiguration(&configuration)
@@ -108,16 +104,16 @@
       try await self.init(
         encoderModel: encoderModel,
         decoderModel: decoderModel,
-        tokenizer: tokenizer,
+        tokenizer: consume tokenizer,
         configuration: configuration,
         grammarEngine: grammarEngine
       )
     }
 
-    public init(
+    public init<Tokenizer: EdgeToolsTokenizer & ~Copyable>(
       encoderModel: sending MLModel,
       decoderModel: sending MLModel,
-      tokenizer: any Tokenizer,
+      tokenizer: consuming sending Tokenizer,
       configuration: NeedleModelConfiguration,
       grammarEngine: sending XGrammarCompiler
     ) {
@@ -127,11 +123,34 @@
       self.configuration = configuration
       self.encoderModel = EncoderModelActor(model: encoderModel)
       self.decoderModel = DecoderModelActor(model: decoderModel)
-      self.tokenizer = tokenizer
+      self.tokenizer = Lock(consume tokenizer)
+    }
+
+    private init(
+      encoderModel: sending MLModel,
+      decoderModel: sending MLModel,
+      tokenizer: consuming sending Lock<any EdgeToolsTokenizer & ~Copyable>,
+      configuration: NeedleModelConfiguration,
+      grammarEngine: sending XGrammarCompiler
+    ) {
+      self.state = Lock(
+        State(grammarEngine: grammarEngine, matcherPool: NeedleGrammarMatcherPool())
+      )
+      self.configuration = configuration
+      self.encoderModel = EncoderModelActor(model: encoderModel)
+      self.decoderModel = DecoderModelActor(model: decoderModel)
+      self.tokenizer = consume tokenizer
+    }
+
+    private static func loadTokenizer(
+      from modelURL: URL
+    ) throws -> Lock<any EdgeToolsTokenizer & ~Copyable> {
+      let tokenizer = try EdgeToolsSPTokenizer(modelURL: modelURL)
+      return Lock(consume tokenizer)
     }
 
     public func tokenize(prompt: EdgeToolsPrompt) async throws -> [EdgeToolsToken] {
-      prompt.needleTokenized(using: self.tokenizer)
+      self.tokenizer.withBorrowedLock { prompt.needleTokenized(using: $0) }
     }
 
     public func clearCaches() {
@@ -191,7 +210,7 @@
 
       var cache = DecoderCache(configuration: configuration)
       var nextDecoderTokenId = configuration.decoderStartTokenId
-      var detokenizer = StreamingDetokenizer(tokenizer: self.tokenizer)
+      var detokenizer = StreamingDetokenizer()
       var parser = NeedleToolCallParser()
       var generatedTokens = [EdgeToolsToken]()
       var confidence = EdgeToolsConfidenceState()
@@ -200,7 +219,7 @@
       while !matcher.isTerminated
         && !isStopped.load(ordering: .relaxed)
         && detokenizer.tokenIds.count < (parameters.maxTokens ?? .max)
-        && generatedTokens.last?.id != self.tokenizer.eosTokenId
+        && generatedTokens.last?.id != self.tokenizer.withBorrowedLock({ $0.eosTokenId })
       {
         try Task.checkCancellation()
         let decoderLogits = try await self.decode(
@@ -217,7 +236,8 @@
         let tokenId = try await sampler.sample(maskedLogits)
         durationToFirstToken = durationToFirstToken ?? generateStart.duration(to: self.clock.now)
 
-        let tokenString = detokenizer.decode(tokenId: tokenId)
+        let tokenString = self.tokenizer.withBorrowedLock { detokenizer.decode(tokenId: tokenId, using: $0)
+                 }
         let token = EdgeToolsToken(id: tokenId, stringValue: tokenString)
         generatedTokens.append(token)
         nextDecoderTokenId = tokenId
@@ -250,7 +270,8 @@
       configuration: NeedleModelConfiguration,
       processor: inout (any LogitsProcessor)?
     ) async throws -> (EncoderOutputs, EdgeToolsPrefillMetrics) {
-      let promptTokens = self.tokenizer.encode(text: prompt.needleFormatted())
+      let promptTokens = self.tokenizer.withBorrowedLock { edgeToolsEncode(text: prompt.needleFormatted(), using: $0)
+             }
       guard promptTokens.count <= configuration.encoderMaxLength else {
         throw NeedleCoreMLEngineError.contextLengthExceeded(
           tokens: promptTokens.count,

@@ -5,43 +5,43 @@
   import MLX
   import MLXLMCommon
   import EdgeTools
-  import Tokenizers
   import SnapshotTesting
   import Testing
 
   @Suite(.serialized, .enabledIfXcode())
   struct `NeedleMLXModel tests` {
-    private let model: NeedleMLXModel
-    private let tokenizer: any Tokenizers.Tokenizer
-
-    init() async throws {
-      let url = try await downloadNeedleHF()
-      let (tokenizer, model) = try loadNeedleMLXModel(from: url)
-      self.tokenizer = tokenizer
-      self.model = model
-    }
-
     @Test
     func `TokenIterator Usage`() async throws {
-      let grammarEngine = try #require(XGrammarCompiler.needle(tokenizer: self.tokenizer))
-      let matcher = try grammarEngine.compile(try XGrammarGrammar.needle(tools: EdgeToolsPrompt.sendAdventureEmail.tools))
+      let url = try await downloadNeedleHF()
+      var tokenizer = try self.tokenizer(url: url)
+      let model = try loadNeedleMLXModel(from: url)
+      let grammarEngine = XGrammarCompiler.needle(tokenizer: consume tokenizer)!
+      let grammar = try XGrammarGrammar.needle(tools: EdgeToolsPrompt.sendAdventureEmail.tools)
+      let matcher = try grammarEngine.compile(grammar)
       
+      tokenizer = try self.tokenizer(url: url)
+
       var iterator = try TokenIterator(
-        input: try LMInput.needle(prompt: .sendAdventureEmail, using: self.tokenizer),
-        model: self.model,
+        input: try LMInput.needle(prompt: .sendAdventureEmail, using: consume tokenizer),
+        model: model,
         processor: EdgeToolsApplyBitmaskProcessorMLX(matcher: matcher),
         sampler: ArgMaxSampler()
       )
-
+      
+      tokenizer = try self.tokenizer(url: url)
       var tokens = [Int]()
       while let token = iterator.next() {
         tokens.append(token)
-        if token == self.tokenizer.eosTokenId || matcher.isTerminated {
+        if token == tokenizer.eosTokenId || matcher.isTerminated {
           break
         }
       }
       assertSnapshot(of: tokens, as: .dump)
-      assertSnapshot(of: self.tokenizer.decode(tokens: tokens), as: .lines)
+      assertSnapshot(of: tokenizer.decode(tokens: tokens), as: .lines)
+    }
+    
+    private func tokenizer(url: URL) throws -> EdgeToolsSPTokenizer {
+      try EdgeToolsSPTokenizer(modelURL: url.appending(path: "tokenizer.model"))
     }
   }
 

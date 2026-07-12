@@ -3,7 +3,6 @@
   import MLXNN
   import MLXLMCommon
   import Foundation
-  import Tokenizers
   import Atomics
 
   // MARK: - NeedleMLXEngine
@@ -57,41 +56,57 @@
     }
 
     private let state: Lock<State>
-    private let tokenizer: any Tokenizers.Tokenizer
+    private let tokenizer: Lock<any EdgeToolsTokenizer & ~Copyable>
 
     private let clock = ContinuousClock()
 
     public convenience init(
       from url: URL,
-      editConfiguration: (inout NeedleModelConfiguration) -> Void = { _ in },
-      grammarCompiler: (any Tokenizers.Tokenizer) throws -> XGrammarCompiler = {
-        guard let compiler = XGrammarCompiler.needle(tokenizer: $0) else {
-          throw XGrammarError(message: "Needle requires a tokenizer with an EOS token.")
-        }
-        return compiler
-      }
+      editConfiguration: (inout NeedleModelConfiguration) -> Void = { _ in }
     ) throws {
-      let (tokenizer, model) = try loadNeedleMLXModel(
+      let tokenizer = try Self.loadTokenizer(from: url.appending(path: "tokenizer.model"))
+      let model = try loadNeedleMLXModel(
         from: url,
         editConfiguration: editConfiguration
       )
-      let grammarEngine = try grammarCompiler(tokenizer)
+      let grammarEngine = tokenizer.withLock { XGrammarCompiler.needle(erasedTokenizer: $0) }
+      guard let grammarEngine else {
+        throw XGrammarError(message: "Needle requires a tokenizer with an EOS token.")
+      }
       self.init(tokenizer: tokenizer, model: model, grammarEngine: grammarEngine)
     }
 
-    public init(
-      tokenizer: any Tokenizers.Tokenizer,
+    public init<Tokenizer: EdgeToolsTokenizer & ~Copyable>(
+      tokenizer: consuming sending Tokenizer,
       model: sending NeedleMLXModel,
       grammarEngine: sending XGrammarCompiler
     ) {
       self.state = Lock(
         State(grammarEngine: grammarEngine, model: model, matcherPool: NeedleGrammarMatcherPool())
       )
-      self.tokenizer = tokenizer
+      self.tokenizer = Lock(consume tokenizer)
+    }
+
+    private init(
+      tokenizer: consuming sending Lock<any EdgeToolsTokenizer & ~Copyable>,
+      model: sending NeedleMLXModel,
+      grammarEngine: sending XGrammarCompiler
+    ) {
+      self.state = Lock(
+        State(grammarEngine: grammarEngine, model: model, matcherPool: NeedleGrammarMatcherPool())
+      )
+      self.tokenizer = consume tokenizer
+    }
+
+    private static func loadTokenizer(
+      from modelURL: URL
+    ) throws -> Lock<any EdgeToolsTokenizer & ~Copyable> {
+      let tokenizer = try EdgeToolsSPTokenizer(modelURL: modelURL)
+      return Lock(consume tokenizer)
     }
 
     public func tokenize(prompt: EdgeToolsPrompt) async throws -> [EdgeToolsToken] {
-      prompt.needleTokenized(using: self.tokenizer)
+      self.tokenizer.withBorrowedLock { prompt.needleTokenized(using: $0) }
     }
 
     public func clearCaches() {
@@ -159,14 +174,14 @@
       guard var output = prefillOutput else { preconditionFailure("Model received empty input.") }
       var durationToFirstToken: Duration?
 
-      var detokenizer = StreamingDetokenizer(tokenizer: self.tokenizer)
+      var detokenizer = StreamingDetokenizer()
       var parser = NeedleToolCallParser()
       var generatedTokens = [EdgeToolsToken]()
       var confidence = EdgeToolsConfidenceState()
       while !matcher.isTerminated
         && !isStopped.load(ordering: .relaxed)
         && detokenizer.tokenIds.count < (parameters.maxTokens ?? .max)
-        && generatedTokens.last?.id != self.tokenizer.eosTokenId
+        && generatedTokens.last?.id != self.tokenizer.withBorrowedLock({ $0.eosTokenId })
       {
         try Task.checkCancellation()
         let processedLogits = processor?.process(logits: output.logits) ?? output.logits
@@ -180,7 +195,8 @@
         let tokenId = token.item(EdgeToolsToken.ID.self)
 
         durationToFirstToken = durationToFirstToken ?? generateStart.duration(to: self.clock.now)
-        let tokenString = detokenizer.decode(tokenId: tokenId)
+        let tokenString = self.tokenizer.withBorrowedLock { detokenizer.decode(tokenId: tokenId, using: $0)
+                 }
         let needleToken = EdgeToolsToken(id: tokenId, stringValue: tokenString)
         generatedTokens.append(needleToken)
         guard matcher.accept(tokenId: needleToken.id) else {
@@ -229,7 +245,10 @@
       processor: inout (any LogitProcessor)?,
       synchronize: Bool
     ) throws -> (LMOutput?, EdgeToolsPrefillMetrics, Memory.Snapshot) {
-      let input = try LMInput.needle(prompt: prompt, using: self.tokenizer)
+      let tokens = self.tokenizer.withBorrowedLock {
+        $0.encode(text: prompt.needleFormatted())
+      }
+      let input = LMInput(text: LMInput.Text(tokens: MLXArray(tokens)))
       guard input.text.tokens.size <= model.configuration.encoderMaxLength else {
         throw NeedleMLXEngineError.contextLengthExceeded(
           tokens: input.text.tokens.size,
@@ -286,14 +305,13 @@
   package func loadNeedleMLXModel(
     from url: URL,
     editConfiguration: (inout NeedleModelConfiguration) -> Void = { _ in }
-  ) throws -> sending (tokenizer: any Tokenizers.Tokenizer, model: NeedleMLXModel) {
-    let tokenizer = try NeedleSPTokenizer(modelURL: url.appending(path: "tokenizer.model"))
+  ) throws -> sending NeedleMLXModel {
     guard var configuration = try NeedleModelConfiguration.decode(in: url) else {
       throw NeedleMLXEngineError.failedToLoadConfiguration
     }
     editConfiguration(&configuration)
     let model = NeedleMLXModel(configuration: configuration)
     try model.loadWeights(from: url.appending(path: "model.safetensors"))
-    return (tokenizer, model)
+    return model
   }
 #endif

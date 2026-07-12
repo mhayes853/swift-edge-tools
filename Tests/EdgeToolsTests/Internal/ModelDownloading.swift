@@ -1,6 +1,7 @@
-#if canImport(Tokenizers) && canImport(Hub)
+import Foundation
+
+#if canImport(Hub)
   import Hub
-  import Foundation
 
   func downloadNeedleHF() async throws -> URL {
     let hub = HubApi(downloadBase: URL.swiftEdgeToolsTestsDirectory)
@@ -17,16 +18,16 @@
     print("=== Finished Downloading Needle HF Model To \(url.path) ===")
     return url
   }
-
-  extension URL {
-    static let swiftEdgeToolsTestsDirectory = {
-      #if os(macOS)
-        URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-          .appendingPathComponent(".swift-needle-tests")
-      #else
-        URL.documentsDirectory
-          .appendingPathComponent(".swift-needle-tests")
-      #endif
-    }()
-  }
 #endif
+
+extension URL {
+  static let swiftEdgeToolsTestsDirectory = {
+    #if os(macOS)
+      URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        .appendingPathComponent(".swift-needle-tests")
+    #else
+      URL.documentsDirectory
+        .appendingPathComponent(".swift-needle-tests")
+    #endif
+  }()
+}

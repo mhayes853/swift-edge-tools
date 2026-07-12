@@ -36,7 +36,8 @@ let package = Package(
     .package(url: "https://github.com/pointfreeco/swift-macro-testing", from: "0.6.5"),
     .package(url: "https://github.com/swiftlang/swift-syntax", "600.0.0"..<"603.0.0"),
     .package(url: "https://github.com/huggingface/swift-transformers", from: "1.3.0"),
-    .package(url: "https://github.com/apple/swift-collections", from: "1.2.1")
+    .package(url: "https://github.com/apple/swift-collections", from: "1.2.1"),
+    .package(url: "https://github.com/apple/swift-atomics", from: "1.3.0")
   ],
   targets: [
     .target(
@@ -44,22 +45,13 @@ let package = Package(
       dependencies: [
         "EdgeToolsMacros",
         .product(name: "OrderedCollections", package: "swift-collections"),
+        .product(name: "Atomics", package: "swift-atomics"),
         .product(name: "MLX", package: "mlx-swift", condition: .when(traits: ["MLX"])),
         .product(name: "MLXNN", package: "mlx-swift", condition: .when(traits: ["MLX"])),
         .product(name: "MLXLLM", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),
         .product(name: "MLXLMCommon", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),
         .target(name: "CXGrammar", condition: .when(traits: ["XGrammar"])),
-        .product(
-          name: "Tokenizers",
-          package: "swift-transformers",
-          condition: .when(traits: ["MLX", "CoreAI", "CoreML"])
-        ),
-        .product(
-          name: "Hub",
-          package: "swift-transformers",
-          condition: .when(traits: ["MLX", "CoreAI", "CoreML"])
-        ),
-        .target(name: "CNeedleSentencepiece", condition: .when(traits: ["Sentencepiece"]))
+        .target(name: "CSentencepiece", condition: .when(traits: ["Sentencepiece"]))
       ],
     ),
     .target(
@@ -100,8 +92,8 @@ let package = Package(
       ]
     ),
     .target(
-      name: "CNeedleSentencepiece",
-      path: "Sources/CNeedleSentencepiece",
+      name: "CSentencepiece",
+      path: "Sources/CSentencepiece",
       sources: [
         "bridging.cc",
         "sentencepiece/src/bpe_model.cc",

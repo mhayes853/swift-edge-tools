@@ -7,14 +7,15 @@
   // MARK: - Suite
 
   @Suite
-  struct `NeedleXGrammarCompiler tests` {
+  struct `NeedleXGrammarCompiler tests`: ~Copyable {
     private let engine: XGrammarCompiler
-    private let tokenizer: NeedleSPTokenizer
+    private let tokenizer: EdgeToolsSPTokenizer
 
     init() throws {
-      let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+      let tokenizer = try EdgeToolsSPTokenizer(modelURL: .testTokenizerModel)
+      let engine = try requiredNeedleCompiler(tokenizer: tokenizer)
       self.tokenizer = tokenizer
-      self.engine = try #require(XGrammarCompiler.needle(tokenizer: tokenizer))
+      self.engine = engine
     }
 
     @Test
@@ -46,18 +47,21 @@
     }
 
     @Suite
-    struct `Range tests` {
-      private let tokenizer: NeedleSPTokenizer
+    struct `Range tests`: ~Copyable {
+      private let tokenizer: EdgeToolsSPTokenizer
       private let eosToken: EdgeToolsToken.ID
 
       init() throws {
-        let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+        let tokenizer = try EdgeToolsSPTokenizer(modelURL: .testTokenizerModel)
+        guard let eosToken = tokenizer.eosTokenId else {
+          throw XGrammarError(message: "Needle requires a tokenizer with an EOS token.")
+        }
         self.tokenizer = tokenizer
-        self.eosToken = try #require(tokenizer.eosTokenId)
+        self.eosToken = eosToken
       }
 
       private func makeEngine() throws -> XGrammarCompiler {
-        try #require(XGrammarCompiler.needle(tokenizer: self.tokenizer))
+        try requiredNeedleCompiler(tokenizer: self.tokenizer)
       }
 
       @Test
@@ -238,16 +242,20 @@
     }
 
     @Suite
-    struct `Matcher tests` {
+    struct `Matcher tests`: ~Copyable {
       private let engine: XGrammarCompiler
-      private let tokenizer: NeedleSPTokenizer
+      private let tokenizer: EdgeToolsSPTokenizer
       private let eosToken: EdgeToolsToken.ID
 
       init() throws {
-        let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+        let tokenizer = try EdgeToolsSPTokenizer(modelURL: .testTokenizerModel)
+        guard let eosToken = tokenizer.eosTokenId else {
+          throw XGrammarError(message: "Needle requires a tokenizer with an EOS token.")
+        }
+        let engine = try requiredNeedleCompiler(tokenizer: tokenizer)
         self.tokenizer = tokenizer
-        self.eosToken = try #require(tokenizer.eosTokenId)
-        self.engine = try #require(XGrammarCompiler.needle(tokenizer: tokenizer))
+        self.eosToken = eosToken
+        self.engine = engine
       }
 
       @Test
@@ -473,14 +481,15 @@
     }
 
     @Suite
-    struct `Memory usage tests` {
+    struct `Memory usage tests`: ~Copyable {
       private let engine: XGrammarCompiler
-      private let tokenizer: NeedleSPTokenizer
+      private let tokenizer: EdgeToolsSPTokenizer
 
       init() throws {
-        let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+        let tokenizer = try EdgeToolsSPTokenizer(modelURL: .testTokenizerModel)
+        let engine = try requiredNeedleCompiler(tokenizer: tokenizer)
         self.tokenizer = tokenizer
-        self.engine = try #require(XGrammarCompiler.needle(tokenizer: tokenizer))
+        self.engine = engine
       }
 
       @Test
@@ -530,24 +539,49 @@
 
   // MARK: - Helpers
 
+  private struct RejectedToken: Hashable, Sendable {
+    let index: Int
+    let tokenId: EdgeToolsToken.ID
+    let token: String
+    let prefix: String
+  }
+
+  private func requiredNeedleCompiler(
+    tokenizer: borrowing some EdgeToolsTokenizer & ~Copyable
+  ) throws -> XGrammarCompiler {
+    guard let compiler = XGrammarCompiler.needle(tokenizer: tokenizer) else {
+      throw XGrammarError(message: "Needle requires a tokenizer with an EOS token.")
+    }
+    return compiler
+  }
+
+  private func requiredNeedleCompiler(
+    erasedTokenizer tokenizer: borrowing any EdgeToolsTokenizer & ~Copyable
+  ) throws -> XGrammarCompiler {
+    guard let compiler = XGrammarCompiler.needle(tokenizer: tokenizer) else {
+      throw XGrammarError(message: "Needle requires a tokenizer with an EOS token.")
+    }
+    return compiler
+  }
+
   private func firstRejectedToken(
     in text: String,
     matcher: XGrammarMatcher,
-    tokenizer: NeedleSPTokenizer
-  ) -> (index: Int, tokenId: EdgeToolsToken.ID, token: String, prefix: String)? {
+    tokenizer: borrowing some EdgeToolsTokenizer & ~Copyable
+  ) -> RejectedToken? {
     let tokenIds = encodedGrammarText(text, tokenizer: tokenizer)
     for (index, tokenId) in tokenIds.enumerated() {
       guard !matcher.accept(tokenId: tokenId) else { continue }
       let token = tokenizer.convertIdToToken(tokenId) ?? ""
       let prefix = tokenizer.decode(tokens: Array(tokenIds.prefix(index + 1)))
-      return (index, tokenId, token, prefix)
+      return RejectedToken(index: index, tokenId: tokenId, token: token, prefix: prefix)
     }
     return nil
   }
 
   private func encodedGrammarText(
     _ text: String,
-    tokenizer: NeedleSPTokenizer
+    tokenizer: borrowing some EdgeToolsTokenizer & ~Copyable
   ) -> [EdgeToolsToken.ID] {
     let tokenIds = tokenizer.encode(text: text)
     guard let firstTokenId = tokenIds.first else { return tokenIds }
@@ -561,7 +595,7 @@
   private func assertAccepts(
     _ text: String,
     matcher: XGrammarMatcher,
-    tokenizer: NeedleSPTokenizer,
+    tokenizer: borrowing some EdgeToolsTokenizer & ~Copyable,
     eosToken: EdgeToolsToken.ID
   ) {
     if let rejected = firstRejectedToken(in: text, matcher: matcher, tokenizer: tokenizer) {
@@ -576,7 +610,7 @@
   private func assertRejects(
     _ text: String,
     matcher: XGrammarMatcher,
-    tokenizer: NeedleSPTokenizer,
+    tokenizer: borrowing some EdgeToolsTokenizer & ~Copyable,
     eosToken: EdgeToolsToken.ID
   ) {
     guard firstRejectedToken(in: text, matcher: matcher, tokenizer: tokenizer) == nil else {

@@ -1,32 +1,47 @@
 #if XGrammar
   import Foundation
 
-  #if canImport(Tokenizers)
-    import Tokenizers
+  extension XGrammarCompiler {
+    public typealias Matcher = XGrammarMatcher
 
-    extension XGrammarCompiler {
-      public typealias Matcher = XGrammarMatcher
-
-      public static func needle(
-        tokenizer: any Tokenizer,
-        configuration: Configuration = Configuration()
-      ) -> XGrammarCompiler? {
-        guard let eosTokenID = tokenizer.eosTokenId else { return nil }
-        do {
-          return try XGrammarCompiler(
-            encodedVocabulary: tokenizer.convertIdsToTokens(Array(0..<8192)).compactMap { $0 },
-            vocabularyType: .byteFallback,
-            vocabularySize: 8192,
-            stopTokenIDs: [eosTokenID],
-            addPrefixSpace: true,
-            configuration: configuration
-          )
-        } catch {
-          return nil
-        }
-      }
+    public static func needle(
+      tokenizer: borrowing some EdgeToolsTokenizer & ~Copyable,
+      configuration: Configuration = Configuration()
+    ) -> XGrammarCompiler? {
+      Self.makeNeedleCompiler(
+        vocabulary: tokenizer.convertIdsToTokens(Array(0..<8192)),
+        eosTokenID: tokenizer.eosTokenId,
+        configuration: configuration
+      )
     }
-  #endif
+
+    static func needle(
+      erasedTokenizer tokenizer: borrowing any EdgeToolsTokenizer & ~Copyable,
+      configuration: Configuration = Configuration()
+    ) -> XGrammarCompiler? {
+      Self.makeNeedleCompiler(
+        vocabulary: tokenizer.convertIdsToTokens(Array(0..<8192)),
+        eosTokenID: tokenizer.eosTokenId,
+        configuration: configuration
+      )
+    }
+
+    private static func makeNeedleCompiler(
+      vocabulary: [String?],
+      eosTokenID: EdgeToolsToken.ID?,
+      configuration: Configuration
+    ) -> XGrammarCompiler? {
+      guard let eosTokenID, vocabulary.allSatisfy({ $0 != nil }) else { return nil }
+      return try? XGrammarCompiler(
+        encodedVocabulary: vocabulary.map { $0! },
+        vocabularyType: .byteFallback,
+        vocabularySize: vocabulary.count,
+        stopTokenIDs: [eosTokenID],
+        addPrefixSpace: true,
+        configuration: configuration
+      )
+    }
+  }
 
   extension XGrammarGrammar {
     public static func needle(

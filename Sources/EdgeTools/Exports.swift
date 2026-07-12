@@ -1,7 +1,7 @@
-#if Sentencepiece
-  @_exported import CNeedleSentencepiece
-#endif
-
 #if XGrammar
   @_exported import CXGrammar
+#endif
+
+#if SentencePiece
+  @_exported import CSentencepiece
 #endif

@@ -1,5 +1,5 @@
 [submodule "Sources/CNeedleSentencepiece/sentencepiece"]
-	path = Sources/CNeedleSentencepiece/sentencepiece
+	path = Sources/CSentencepiece/sentencepiece
 	url = https://github.com/google/sentencepiece
 	branch = master
 [submodule "Sources/CXGrammar/xgrammar"]

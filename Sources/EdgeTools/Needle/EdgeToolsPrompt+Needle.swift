@@ -1,7 +1,3 @@
-#if canImport(Tokenizers)
-  import Tokenizers
-#endif
-
 extension EdgeToolsPrompt {
   public func needleFormatted() -> String {
     let separator = self.system.isEmpty || self.user.isEmpty ? "" : "\n\n"
@@ -11,17 +7,15 @@ extension EdgeToolsPrompt {
     )
     return "\(self.system)\(separator)\(self.user)<tools>\(toolsSchema)"
   }
-}
 
-#if canImport(Tokenizers)
-  extension EdgeToolsPrompt {
-    public func needleTokenized(using tokenizer: some Tokenizer) -> [EdgeToolsToken] {
-      let tokenIds = tokenizer.encode(text: self.needleFormatted())
-      let tokens = tokenizer.convertIdsToTokens(tokenIds)
-      return zip(tokenIds, tokens)
-        .compactMap { (tokenId, token) in
-          token.map { EdgeToolsToken(id: tokenId, stringValue: $0) }
-        }
-    }
+  public func needleTokenized(
+    using tokenizer: borrowing some EdgeToolsTokenizer & ~Copyable
+  ) -> [EdgeToolsToken] {
+    let tokenIds = tokenizer.encode(text: self.needleFormatted())
+    let tokens = tokenizer.convertIdsToTokens(tokenIds)
+    return zip(tokenIds, tokens)
+      .compactMap { (tokenId, token) in
+        token.map { EdgeToolsToken(id: tokenId, stringValue: $0) }
+      }
   }
-#endif
+}
