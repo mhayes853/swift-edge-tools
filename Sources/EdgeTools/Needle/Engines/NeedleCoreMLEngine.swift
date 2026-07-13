@@ -163,7 +163,7 @@
     public func generate(
       prompt: EdgeToolsPrompt,
       parameters: GenerateParameters,
-      onToken: @escaping @Sendable (EdgeToolsToken, EdgeRawToolCall?) -> Void
+      channel: EdgeToolsGenerationChannel
     ) throws -> some EdgeToolEngineGenerationTask {
       let isStopped = ManagedAtomic(false)
       let task = Task {
@@ -179,7 +179,7 @@
         return try await self.generate(
           prompt: prompt,
           parameters: parameters,
-          onToken: onToken,
+          channel: channel,
           matcher: matcher,
           configuration: self.configuration,
           isStopped: isStopped
@@ -191,7 +191,7 @@
     private func generate(
       prompt: EdgeToolsPrompt,
       parameters: GenerateParameters,
-      onToken: @escaping @Sendable (EdgeToolsToken, EdgeRawToolCall?) -> Void,
+      channel: EdgeToolsGenerationChannel,
       matcher: consuming XGrammarMatcher,
       configuration: NeedleModelConfiguration,
       isStopped: ManagedAtomic<Bool>
@@ -237,15 +237,20 @@
         let tokenId = try await sampler.sample(maskedLogits)
         durationToFirstToken = durationToFirstToken ?? generateStart.duration(to: self.clock.now)
 
-        let tokenString = self.tokenizer.withBorrowedLock { detokenizer.decode(tokenId: tokenId, using: $0)
-                 }
+        let tokenString = self.tokenizer.withBorrowedLock {
+          detokenizer.decode(tokenId: tokenId, using: $0)
+        }
         let token = EdgeToolsToken(id: tokenId, stringValue: tokenString)
         generatedTokens.append(token)
         nextDecoderTokenId = tokenId
         guard matcher.accept(tokenId: token.id) else {
           throw NeedleCoreMLEngineError.grammarRejectedToken(token: token)
         }
-        onToken(token, parser.accept(token: token))
+        let rawToolCall = parser.accept(token: token)
+        channel.emit(token: token)
+        if let rawToolCall {
+          channel.emit(toolCall: rawToolCall)
+        }
         processor?.didSample(token: token)
       }
 
@@ -271,8 +276,9 @@
       configuration: NeedleModelConfiguration,
       processor: inout (any LogitsProcessor)?
     ) async throws -> (EncoderOutputs, EdgeToolsPrefillMetrics) {
-      let promptTokens = self.tokenizer.withBorrowedLock { edgeToolsEncode(text: prompt.needleFormatted(), using: $0)
-             }
+      let promptTokens = self.tokenizer.withBorrowedLock {
+        edgeToolsEncode(text: prompt.needleFormatted(), using: $0)
+      }
       guard promptTokens.count <= configuration.encoderMaxLength else {
         throw NeedleCoreMLEngineError.contextLengthExceeded(
           tokens: promptTokens.count,

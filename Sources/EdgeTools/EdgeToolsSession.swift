@@ -210,22 +210,27 @@ public final class EdgeToolsSessionStream: Sendable, Observable, Identifiable {
 
     let generationTask: Engine.GenerationTask
     do {
-      generationTask = try session.engine.generate(
-        prompt: edgeToolsPrompt,
-        parameters: parameters
-      ) { [weak self] token, rawToolCall in
-        guard let self else { return }
-        let call = rawToolCall.flatMap { self.resolve($0, toolsByName: toolsByName) }
-        let shouldInvoke = shouldInvokeToolsBox.withLock { $0 }
-        self.state.withLock { state in
-          state.emitToken(token: token)
-          if let call {
+      let channel = EdgeToolsGenerationChannel(
+        onToken: { [weak self] token in
+          guard let self else { return }
+          self.state.withLock { $0.emitToken(token: token) }
+        },
+        onToolCall: { [weak self] rawToolCall in
+          guard let self else { return }
+          guard let call = self.resolve(rawToolCall, toolsByName: toolsByName) else { return }
+          let shouldInvoke = shouldInvokeToolsBox.withLock { $0 }
+          self.state.withLock { state in
             self.registrar.withMutation(of: self, keyPath: \.toolCalls) {
               state.emitToolCall(call, shouldInvoke: shouldInvoke)
             }
           }
         }
-      }
+      )
+      generationTask = try session.engine.generate(
+        prompt: edgeToolsPrompt,
+        parameters: parameters,
+        channel: channel
+      )
     } catch {
       self.state.withLock { state in
         self.registrar.withMutation(of: self, keyPath: \.result) {

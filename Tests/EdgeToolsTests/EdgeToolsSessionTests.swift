@@ -360,6 +360,10 @@
       expectNoDifference(args.location, "Seoul")
     }
 
+  }
+
+  @Suite
+  struct `EdgeToolsSession status tests` {
     @Test
     func `Active Streams Track Concurrent Streams And Remove On Finish`() async throws {
       let engine = MockEngine.live()
@@ -590,7 +594,6 @@
 
   @Suite
   struct `Duplicate Tool Name Precondition tests` {
-    
     #if os(macOS) || os(linux) || os(windows)
       @Test
       func `Stream With Duplicate Tool Names Causes Precondition Failure`() async {

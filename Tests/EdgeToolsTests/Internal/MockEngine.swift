@@ -1,5 +1,5 @@
-import Foundation
 import EdgeTools
+import Foundation
 
 private typealias MockGenerationError = any Error
 private typealias MockGenerationTaskValue = Task<EdgeToolEngineGeneration, MockGenerationError>
@@ -169,7 +169,7 @@ final class MockEngine: EdgeToolEngine, Sendable {
   func generate(
     prompt: EdgeToolsPrompt,
     parameters: GenerateParameters,
-    onToken: @escaping @Sendable (EdgeToolsToken, EdgeRawToolCall?) -> Void
+    channel: EdgeToolsGenerationChannel
   ) throws -> GenerationTask {
     self._generateCallCount.withLock { $0 += 1 }
     let (id, generationStorage) = self.storage.makeGeneration()
@@ -191,7 +191,11 @@ final class MockEngine: EdgeToolEngine, Sendable {
           try Task.checkCancellation()
           switch event {
           case .token(let token):
-            onToken(token, parser.accept(token: token))
+            let rawToolCall = parser.accept(token: token)
+            channel.emit(token: token)
+            if let rawToolCall {
+              channel.emit(toolCall: rawToolCall)
+            }
             emittedTokens.append(token)
           case .stop:
             wasStopped = true

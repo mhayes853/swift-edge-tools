@@ -20,8 +20,11 @@
       let tokens = Lock([EdgeToolsToken]())
       let generationTask = try self.engine.generate(
         prompt: .sendAdventureEmail,
-        parameters: .default
-      ) { token, _ in tokens.withLock { $0.append(token) } }
+        parameters: .default,
+        channel: EdgeToolsGenerationChannel(
+          onToken: { token in tokens.withLock { $0.append(token) } }
+        )
+      )
       let generation = try await generationTask.value
       expectNoDifference(generation.wasStopped, false)
       withKnownIssue {
@@ -36,8 +39,11 @@
       let tokens = Lock([EdgeToolsToken]())
       let generationTask = try self.engine.generate(
         prompt: .sendAdventureEmail,
-        parameters: .default
-      ) { token, _ in tokens.withLock { $0.append(token) } }
+        parameters: .default,
+        channel: EdgeToolsGenerationChannel(
+          onToken: { token in tokens.withLock { $0.append(token) } }
+        )
+      )
       let generation = try await generationTask.value
 
       let streamedResponse = tokens.withLock { $0.map(\.stringValue).joined() }
@@ -52,10 +58,13 @@
       let generationTask = try self.engine.generate(
         prompt: .sendAdventureEmail,
         parameters: .default,
-      ) { token, _ in
-        tokens.withLock { $0.append(token) }
-        generationTaskBox.withLock { $0?.stop() }
-      }
+        channel: EdgeToolsGenerationChannel(
+          onToken: { token in
+            tokens.withLock { $0.append(token) }
+            generationTaskBox.withLock { $0?.stop() }
+          }
+        )
+      )
       generationTaskBox.withLock { $0 = generationTask }
       let generation = try await generationTask.value
 
@@ -71,8 +80,9 @@
       let task = Task {
         let generationTask = try self.engine.generate(
           prompt: .sendAdventureEmail,
-          parameters: .default
-        ) { _, _ in }
+          parameters: .default,
+          channel: EdgeToolsGenerationChannel()
+        )
         _ = try await generationTask.value
       }
 
@@ -87,8 +97,11 @@
       let tokenStorage = Lock([EdgeToolsToken]())
       let generationTask = try self.engine.generate(
         prompt: .sendAdventureEmail,
-        parameters: NeedleMLXEngine.GenerateParameters(kvCacheQuantizationBits: 4)
-      ) { token, _ in tokenStorage.withLock { $0.append(token) } }
+        parameters: NeedleMLXEngine.GenerateParameters(kvCacheQuantizationBits: 4),
+        channel: EdgeToolsGenerationChannel(
+          onToken: { token in tokenStorage.withLock { $0.append(token) } }
+        )
+      )
       let generation = try await generationTask.value
       expectNoDifference(generation.wasStopped, false)
       withKnownIssue {
@@ -110,8 +123,11 @@
       let tokenStorage = Lock([EdgeToolsToken]())
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
-        parameters: .default
-      ) { token, _ in tokenStorage.withLock { $0.append(token) } }
+        parameters: .default,
+        channel: EdgeToolsGenerationChannel(
+          onToken: { token in tokenStorage.withLock { $0.append(token) } }
+        )
+      )
       let generation = try await generationTask.value
       expectNoDifference(generation.wasStopped, false)
       withKnownIssue {
@@ -150,8 +166,9 @@
 
       let generationTask = try self.engine.generate(
         prompt: .sendAdventureEmail,
-        parameters: NeedleMLXEngine.GenerateParameters(processor: processor)
-      ) { _, _ in }
+        parameters: NeedleMLXEngine.GenerateParameters(processor: processor),
+        channel: EdgeToolsGenerationChannel()
+      )
       _ = try await generationTask.value
 
       expectNoDifference(processor.promptCalls, 1)
@@ -163,8 +180,9 @@
     func `Generate Records Mean Confidence In Range Zero To One`() async throws {
       let generationTask = try self.engine.generate(
         prompt: .sendAdventureEmail,
-        parameters: .default
-      ) { _, _ in }
+        parameters: .default,
+        channel: EdgeToolsGenerationChannel()
+      )
       let generation = try await generationTask.value
 
       let confidence = try #require(generation.metadata.generationConfidence)
@@ -186,7 +204,11 @@
       )
 
       let error = await #expect(throws: NeedleMLXEngineError.self) {
-        let generationTask = try self.engine.generate(prompt: prompt, parameters: .default) { _, _ in }
+        let generationTask = try self.engine.generate(
+          prompt: prompt,
+          parameters: .default,
+          channel: EdgeToolsGenerationChannel()
+        )
         _ = try await generationTask.value
       }
       expectNoDifference(error?.message.contains("context length"), true)

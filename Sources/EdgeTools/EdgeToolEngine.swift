@@ -9,7 +9,7 @@ public protocol EdgeToolEngine: Sendable {
   func generate(
     prompt: EdgeToolsPrompt,
     parameters: GenerateParameters,
-    onToken: @escaping @Sendable (EdgeToolsToken, EdgeRawToolCall?) -> Void
+    channel: EdgeToolsGenerationChannel
   ) throws -> GenerationTask
 }
 

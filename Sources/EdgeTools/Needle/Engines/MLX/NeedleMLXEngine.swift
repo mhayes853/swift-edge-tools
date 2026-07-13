@@ -127,7 +127,7 @@
     public func generate(
       prompt: EdgeToolsPrompt,
       parameters: GenerateParameters,
-      onToken: @escaping @Sendable (EdgeToolsToken, EdgeRawToolCall?) -> Void
+      channel: EdgeToolsGenerationChannel
     ) throws -> some EdgeToolEngineGenerationTask {
       let isStopped = ManagedAtomic(false)
       let task = Task {
@@ -135,7 +135,7 @@
           try self.generate(
             prompt: prompt,
             parameters: parameters,
-            onToken: onToken,
+            channel: channel,
             state: &state,
             isStopped: isStopped
           )
@@ -147,7 +147,7 @@
     private func generate(
       prompt: EdgeToolsPrompt,
       parameters: GenerateParameters,
-      onToken: @escaping @Sendable (EdgeToolsToken, EdgeRawToolCall?) -> Void,
+      channel: EdgeToolsGenerationChannel,
       state: inout sending State,
       isStopped: ManagedAtomic<Bool>
     ) throws -> EdgeToolEngineGeneration {
@@ -203,14 +203,19 @@
         let tokenId = token.item(EdgeToolsToken.ID.self)
 
         durationToFirstToken = durationToFirstToken ?? generateStart.duration(to: self.clock.now)
-        let tokenString = self.tokenizer.withBorrowedLock { detokenizer.decode(tokenId: tokenId, using: $0)
-                 }
+        let tokenString = self.tokenizer.withBorrowedLock {
+          detokenizer.decode(tokenId: tokenId, using: $0)
+        }
         let needleToken = EdgeToolsToken(id: tokenId, stringValue: tokenString)
         generatedTokens.append(needleToken)
         guard matcher.accept(tokenId: needleToken.id) else {
           throw NeedleMLXEngineError.grammarRejectedToken(token: needleToken)
         }
-        onToken(needleToken, parser.accept(token: needleToken))
+        let rawToolCall = parser.accept(token: needleToken)
+        channel.emit(token: needleToken)
+        if let rawToolCall {
+          channel.emit(toolCall: rawToolCall)
+        }
         processor?.didSample(token: token)
 
         maybeQuantizeKVCache(

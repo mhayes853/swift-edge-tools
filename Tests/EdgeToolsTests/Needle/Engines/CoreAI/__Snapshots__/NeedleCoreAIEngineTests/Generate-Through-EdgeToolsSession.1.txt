@@ -1,11 +1,11 @@
 ▿ EdgeToolsSessionGeneration
   ▿ engineGeneration: EdgeToolEngineGeneration
     ▿ decodeMetrics: EdgeToolsDecodeMetrics
-      ▿ duration: 0.764423084 seconds
-        - _low: 764423084000000000
+      ▿ duration: 0.71772625 seconds
+        - _low: 717726250000000000
         - _high: 0
-      ▿ durationToFirstToken: 0.074567541 seconds
-        - _low: 74567541000000000
+      ▿ durationToFirstToken: 0.083535792 seconds
+        - _low: 83535792000000000
         - _high: 0
       - tokens: 46
     ▿ metadata: 2 key/value pairs
@@ -64,8 +64,8 @@
           - 0.9940428
           - 1.0
     ▿ prefillMetrics: EdgeToolsPrefillMetrics
-      ▿ duration: 0.047732292 seconds
-        - _low: 47732292000000000
+      ▿ duration: 0.058181292 seconds
+        - _low: 58181292000000000
         - _high: 0
       - tokens: 137
     ▿ tokens: 46 elements
@@ -213,7 +213,7 @@
       ▿ AnyEdgeToolCall
         ▿ base: EdgeToolCall<SendEmailTool>
           ▿ id: EdgeToolCallID
-            - rawValue: "0DB51B20-821F-4C62-924F-23C5A50AD345"
+            - rawValue: "07DF9029-6FD3-4A75-9EDA-43FE4DFFE174"
           ▿ input: Input
             - address: "henderry@gmail.com"
             - body: "Could you please go on an adventure?["

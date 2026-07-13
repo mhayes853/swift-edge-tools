@@ -14,8 +14,11 @@
       let tokens = Lock([EdgeToolsToken]())
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
-        parameters: .default
-      ) { token, _ in tokens.withLock { $0.append(token) } }
+        parameters: .default,
+        channel: EdgeToolsGenerationChannel(
+          onToken: { token in tokens.withLock { $0.append(token) } }
+        )
+      )
       let generation = try await generationTask.value
 
       expectNoDifference(generation.wasStopped, false)
@@ -31,8 +34,16 @@
     func `Concurrent Generations`() async throws {
       let engine = try await makeNeedleCoreAIEngine()
 
-      let t1 = try engine.generate(prompt: .sendAdventureEmail, parameters: .default) { _, _ in }
-      let t2 = try engine.generate(prompt: .sendAdventureEmail, parameters: .default) { _, _ in }
+      let t1 = try engine.generate(
+        prompt: .sendAdventureEmail,
+        parameters: .default,
+        channel: EdgeToolsGenerationChannel()
+      )
+      let t2 = try engine.generate(
+        prompt: .sendAdventureEmail,
+        parameters: .default,
+        channel: EdgeToolsGenerationChannel()
+      )
 
       let (g1, g2) = try await (t1.value, t2.value)
       withKnownIssue {
@@ -46,10 +57,18 @@
     func `Sequential Generations`() async throws {
       let engine = try await makeNeedleCoreAIEngine()
 
-      let t1 = try engine.generate(prompt: .sendAdventureEmail, parameters: .default) { _, _ in }
+      let t1 = try engine.generate(
+        prompt: .sendAdventureEmail,
+        parameters: .default,
+        channel: EdgeToolsGenerationChannel()
+      )
       let g1 = try await t1.value
 
-      let t2 = try engine.generate(prompt: .sendAdventureEmail, parameters: .default) { _, _ in }
+      let t2 = try engine.generate(
+        prompt: .sendAdventureEmail,
+        parameters: .default,
+        channel: EdgeToolsGenerationChannel()
+      )
       let g2 = try await t2.value
 
       withKnownIssue {
@@ -65,8 +84,11 @@
       let tokens = Lock([EdgeToolsToken]())
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
-        parameters: .default
-      ) { token, _ in tokens.withLock { $0.append(token) } }
+        parameters: .default,
+        channel: EdgeToolsGenerationChannel(
+          onToken: { token in tokens.withLock { $0.append(token) } }
+        )
+      )
       let generation = try await generationTask.value
 
       let streamedResponse = tokens.withLock { $0.map(\.stringValue).joined() }
@@ -80,7 +102,11 @@
       let engine = try await makeNeedleCoreAIEngine()
 
       let params = NeedleCoreAIEngine.GenerateParameters(computeStream: ComputeStream())
-      let task = try engine.generate(prompt: .sendAdventureEmail, parameters: params) { _, _ in }
+      let task = try engine.generate(
+        prompt: .sendAdventureEmail,
+        parameters: params,
+        channel: EdgeToolsGenerationChannel()
+      )
       let generation = try await task.value
 
       expectNoDifference(generation.wasStopped, false)
@@ -97,11 +123,14 @@
       let generationTaskBox = Lock<NeedleCoreAIEngine.GenerationTask?>(nil)
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
-        parameters: .default
-      ) { token, _ in
-        tokens.withLock { $0.append(token) }
-        generationTaskBox.withLock { $0?.stop() }
-      }
+        parameters: .default,
+        channel: EdgeToolsGenerationChannel(
+          onToken: { token in
+            tokens.withLock { $0.append(token) }
+            generationTaskBox.withLock { $0?.stop() }
+          }
+        )
+      )
       generationTaskBox.withLock { $0 = generationTask }
       let generation = try await generationTask.value
 
@@ -119,8 +148,9 @@
       let task = Task {
         let generationTask = try engine.generate(
           prompt: .sendAdventureEmail,
-          parameters: .default
-        ) { _, _ in }
+          parameters: .default,
+          channel: EdgeToolsGenerationChannel()
+        )
         _ = try await generationTask.value
       }
 
@@ -137,8 +167,11 @@
       let tokens = Lock([EdgeToolsToken]())
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
-        parameters: .default
-      ) { token, _ in tokens.withLock { $0.append(token) } }
+        parameters: .default,
+        channel: EdgeToolsGenerationChannel(
+          onToken: { token in tokens.withLock { $0.append(token) } }
+        )
+      )
       let generation = try await generationTask.value
 
       expectNoDifference(generation.wasStopped, false)
@@ -166,7 +199,11 @@
         #endif
       }()
       let engine = try await makeNeedleCoreAIEngine(compilePlatforms: [compilePlatform])
-      let task = try engine.generate(prompt: .sendAdventureEmail, parameters: .default) { _, _ in }
+      let task = try engine.generate(
+        prompt: .sendAdventureEmail,
+        parameters: .default,
+        channel: EdgeToolsGenerationChannel()
+      )
       let generation = try await task.value
 
       expectNoDifference(generation.wasStopped, false)
@@ -204,8 +241,9 @@
       let processor = CountingLogitsProcessor()
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
-        parameters: NeedleCoreAIEngine.GenerateParameters(processor: processor)
-      ) { _, _ in }
+        parameters: NeedleCoreAIEngine.GenerateParameters(processor: processor),
+        channel: EdgeToolsGenerationChannel()
+      )
       _ = try await generationTask.value
 
       expectNoDifference(processor.promptCalls, 1)
@@ -224,7 +262,11 @@
       )
 
       let error = await #expect(throws: NeedleCoreAIEngineError.self) {
-        let generationTask = try engine.generate(prompt: prompt, parameters: .default) { _, _ in }
+        let generationTask = try engine.generate(
+          prompt: prompt,
+          parameters: .default,
+          channel: EdgeToolsGenerationChannel()
+        )
         _ = try await generationTask.value
       }
       expectNoDifference(error?.message.contains("context length"), true)
