@@ -91,6 +91,22 @@ python3 cli.py \
   --compute-units cpu-and-gpu
 ```
 
+With ahead-of-time CoreML compilation for watchOS:
+
+```bash
+python3 cli.py \
+  --backend coreml \
+  --source Cactus-Compute/needle \
+  --output ./build/coreml-watchos-export \
+  --compile-platform watchOS
+```
+
+This produces `compiled/watchOS/encoder.mlmodelc` and
+`compiled/watchOS/decoder.mlmodelc`. Multiple `--compile-platform` flags produce
+one compiled model pair per platform. CoreML Needle requires the watchOS compiled
+artifacts at runtime; source `.mlpackage` files are only emitted when no compile
+platform is requested.
+
 With metadata and quantizer config files:
 
 ```bash

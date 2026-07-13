@@ -9,10 +9,10 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-import yaml
 from coreai.runtime import AIModelAssetMetadata
 from coreai_opt import ExportBackend
 from coreai_opt.quantization import QuantizerConfig
+import yaml
 
 from needle.coreai_export import export_needle_coreai
 from needle.coreml_export import (
@@ -269,16 +269,13 @@ def _export_for_backend(
             compile_platforms=compile_platforms,
         )
     if backend == ExportBackend.CoreML:
-        if compile_platforms:
-            raise ValueError(
-                "--compile-platform is only supported for the CoreAI backend"
-            )
         return _export_needle_coreml(
             source,
             output,
             compressor=compressor,
             model_metadata=model_metadata,
             compute_units=compute_units,
+            compile_platforms=compile_platforms,
         )
     raise ValueError(f"Unsupported backend: {backend.value}")
 
@@ -290,6 +287,7 @@ def _export_needle_coreml(
     compressor: NeedleCompressor | None = None,
     model_metadata: AIModelAssetMetadata | None = None,
     compute_units: CoreMLComputeUnits = CoreMLComputeUnits.ALL,
+    compile_platforms: Sequence[str] = (),
 ) -> Path:
     return export_needle_coreml(
         source,
@@ -297,6 +295,7 @@ def _export_needle_coreml(
         compressor=compressor,
         model_metadata=model_metadata,
         compute_units=compute_units,
+        compile_platforms=compile_platforms,
     )
 
 

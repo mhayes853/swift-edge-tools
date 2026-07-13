@@ -7,13 +7,13 @@ from pathlib import Path
 from typing import Any, cast
 from unittest.mock import patch
 
-import coremltools as ct
-import torch
 from coreai.runtime import AIModelAssetMetadata
 from coreai_opt.quantization import QuantizerConfig
+import coremltools as ct
+import torch
 
-import needle.coreml_export as coreml_export
 from needle import Needle, NeedleModelConfiguation
+import needle.coreml_export as coreml_export
 from needle.coreml_export import (
     CoreMLComputeUnits,
     coreml_operation_histogram,
@@ -23,6 +23,47 @@ from needle.needle_compression import CoreMLQuantizerCompressor
 
 
 class CoreMLExportTests(unittest.TestCase):
+    def test_coreml_compiler_writes_platform_specific_artifacts(self) -> None:
+        output_ctx = tempfile.TemporaryDirectory()
+        try:
+            output_directory = Path(output_ctx.name)
+            source_path = Path("/tmp/encoder.mlpackage")
+            with patch.object(coreml_export.subprocess, "run") as run_mock:
+                coreml_export._compile_model(
+                    source_path,
+                    output_directory=output_directory,
+                    platforms=("watchOS",),
+                )
+
+            platform_directory = output_directory / "compiled" / "watchOS"
+            self.assertTrue(platform_directory.is_dir())
+            run_mock.assert_called_once_with(
+                [
+                    "xcrun",
+                    "coremlcompiler",
+                    "compile",
+                    str(source_path),
+                    str(platform_directory),
+                    "--platform",
+                    "watchOS",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        finally:
+            output_ctx.cleanup()
+
+    def test_coreml_compile_platforms_are_normalized_and_validated(self) -> None:
+        self.assertEqual(
+            coreml_export._validated_compile_platforms(["watchos", "iOS"]),
+            ("watchOS", "iOS"),
+        )
+        with self.assertRaisesRegex(ValueError, "Unsupported CoreML compile platform"):
+            coreml_export._validated_compile_platforms(["Linux"])
+        with self.assertRaisesRegex(ValueError, "must not contain duplicates"):
+            coreml_export._validated_compile_platforms(["watchOS", "watchos"])
+
     def test_export_needle_coreml_runs_end_to_end_on_local_bundle(self) -> None:
         self._assert_export_runs_end_to_end()
 

@@ -168,25 +168,32 @@ private enum NeedleTestModelExport {
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
   func exportNeedleCoreML(
     outputDirectoryName: String = "coreml-export",
-    arguments: [String] = []
+    arguments: [String] = [],
+    compilePlatforms: [String] = []
   ) async throws -> URL {
-    try await NeedleTestModelExport.export(
+    let compileArguments = compilePlatforms.flatMap { ["--compile-platform", $0] }
+    return try await NeedleTestModelExport.export(
       backend: "CoreML",
       outputDirectoryName: outputDirectoryName,
-      arguments: arguments,
-      expectedFilesExist: SelfCoreMLExport.filesExist(in:),
+      arguments: arguments + compileArguments,
+      expectedFilesExist: { SelfCoreMLExport.filesExist(in: $0, compilePlatforms: compilePlatforms) },
       errorMessage: { CoreMLModelExportError(message: $0) }
     )
   }
 
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
   func makeNeedleCoreMLEngine(
-    quantizerPreset: String? = nil
+    quantizerPreset: String? = nil,
+    compilePlatforms: [String] = []
   ) async throws -> NeedleCoreMLEngine {
     let arguments = quantizerPreset.map { ["--quantizer-preset", $0] } ?? []
     let directory = try await exportNeedleCoreML(
-      outputDirectoryName: SelfCoreMLExport.outputDirectoryName(quantizerPreset: quantizerPreset),
-      arguments: arguments
+      outputDirectoryName: SelfCoreMLExport.outputDirectoryName(
+        quantizerPreset: quantizerPreset,
+        compilePlatforms: compilePlatforms
+      ),
+      arguments: arguments,
+      compilePlatforms: compilePlatforms
     )
     let configuration = MLModelConfiguration()
     configuration.computeUnits = .cpuAndNeuralEngine
@@ -197,19 +204,40 @@ private enum NeedleTestModelExport {
   }
 
   private enum SelfCoreMLExport {
-    static func filesExist(in directory: URL) -> Bool {
+    static func filesExist(in directory: URL, compilePlatforms: [String]) -> Bool {
       let fileManager = FileManager.default
+      let hasModels: Bool
+      if compilePlatforms.isEmpty {
+        hasModels =
+          fileManager.fileExists(atPath: directory.appending(path: "encoder.mlpackage").path())
+          && fileManager.fileExists(atPath: directory.appending(path: "decoder.mlpackage").path())
+      } else {
+        hasModels = compilePlatforms.allSatisfy { platform in
+          let compiledDirectory = directory.appending(path: "compiled").appending(path: platform)
+          return fileManager.fileExists(
+            atPath: compiledDirectory.appending(path: "encoder.mlmodelc").path()
+          ) && fileManager.fileExists(
+            atPath: compiledDirectory.appending(path: "decoder.mlmodelc").path()
+          )
+        }
+      }
       return NeedleTestModelExport.hasTokenizer(in: directory)
-        && fileManager.fileExists(atPath: directory.appending(path: "encoder.mlpackage").path())
-        && fileManager.fileExists(atPath: directory.appending(path: "decoder.mlpackage").path())
+        && hasModels
         && fileManager.fileExists(atPath: directory.appending(path: "configuration.json").path())
     }
 
-    static func outputDirectoryName(quantizerPreset: String?) -> String {
+    static func outputDirectoryName(
+      quantizerPreset: String?,
+      compilePlatforms: [String]
+    ) -> String {
+      let compileSuffix =
+        compilePlatforms.isEmpty
+        ? ""
+        : "-aot-" + compilePlatforms.joined(separator: "-")
       if let quantizerPreset {
-        return "coreml-export-v17-\(quantizerPreset)"
+        return "coreml-export-v17-\(quantizerPreset)\(compileSuffix)"
       }
-      return "coreml-export-v17"
+      return "coreml-export-v17\(compileSuffix)"
     }
   }
 

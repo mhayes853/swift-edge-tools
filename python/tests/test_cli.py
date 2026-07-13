@@ -9,11 +9,11 @@ from pathlib import Path
 from typing import TypeVar, cast
 from unittest.mock import patch
 
-import torch
-import yaml
 from coreai.authoring.asset import AIModelAsset
 from coreai.runtime import AIModelAssetMetadata
 from coreai_opt.quantization import QuantizerConfig
+import torch
+import yaml
 
 from cli import (
     _build_authoring_metadata,
@@ -182,6 +182,29 @@ class CLITests(unittest.TestCase):
     def test_parse_backend_supports_case_insensitive_engine_names(self) -> None:
         self.assertEqual(_parse_backend("CoreAI").value, "coreai")
         self.assertEqual(_parse_backend("coreml").value, "coreml")
+
+    def test_main_passes_compile_platforms_to_coreml_export(self) -> None:
+        with patch("cli._export_needle_coreml") as export_needle_coreml_mock:
+            export_needle_coreml_mock.return_value = Path("/tmp/coreml-export")
+
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "--output",
+                        "./build/coreml-export",
+                        "--backend",
+                        "coreml",
+                        "--compile-platform",
+                        "watchOS",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(
+            export_needle_coreml_mock.call_args.kwargs["compile_platforms"],
+            ["watchOS"],
+        )
 
     def test_main_passes_compute_units_to_coreml_export(self) -> None:
         with patch("cli._export_needle_coreml") as export_needle_coreml_mock:

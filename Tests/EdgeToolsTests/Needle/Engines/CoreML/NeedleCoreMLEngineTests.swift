@@ -165,6 +165,38 @@
 
     @Test
     @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
+    func `Generate Basics With AOT Compiled Export`() async throws {
+      let compilePlatform: String = {
+        #if targetEnvironment(macCatalyst)
+          "macCatalyst"
+        #elseif os(macOS)
+          "macOS"
+        #elseif os(iOS)
+          "iOS"
+        #elseif os(watchOS)
+          "watchOS"
+        #elseif os(tvOS)
+          "tvOS"
+        #else
+          "visionOS"
+        #endif
+      }()
+      let engine = try await makeNeedleCoreMLEngine(compilePlatforms: [compilePlatform])
+      let task = try engine.generate(
+        prompt: .sendAdventureEmail,
+        parameters: .default,
+        channel: EdgeToolsGenerationChannel()
+      )
+      let generation = try await task.value
+
+      expectNoDifference(generation.wasStopped, false)
+      withKnownIssue {
+        assertSnapshot(of: generation.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
+      }
+    }
+
+    @Test
+    @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
     func `Generate Through EdgeToolsSession`() async throws {
       let engine = try await makeNeedleCoreMLEngine()
       let session = EdgeToolsSession(engine: engine)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+import tempfile
 import typing
 from collections import Counter
 from collections.abc import Mapping, Sequence
@@ -36,6 +37,14 @@ _DECODER_INPUT_NAMES = [
     "value_cache",
 ]
 _DECODER_OUTPUT_NAMES = ["logits", "updated_key_cache", "updated_value_cache"]
+_COREML_COMPILE_PLATFORMS = {
+    "macos": "macOS",
+    "ios": "iOS",
+    "watchos": "watchOS",
+    "tvos": "tvOS",
+    "maccatalyst": "macCatalyst",
+    "visionos": "visionOS",
+}
 
 
 class CoreMLComputeUnits(str, Enum):
@@ -74,7 +83,9 @@ def export_needle_coreml(
     compressor: NeedleCompressor | None = None,
     model_metadata: AIModelAssetMetadata | None = None,
     compute_units: CoreMLComputeUnits = CoreMLComputeUnits.ALL,
+    compile_platforms: Sequence[str] = (),
 ) -> Path:
+    compile_platforms = _validated_compile_platforms(compile_platforms)
     source_files = export_helpers.resolve_model_source(source)
     configuration = export_helpers.load_configuration(source_files.configuration_path)
     needle = _load_needle_coreml_model(
@@ -96,12 +107,14 @@ def export_needle_coreml(
         output_directory=output_directory,
         name="encoder",
         metadata=model_metadata,
+        compile_platforms=compile_platforms,
     )
     _persist_model(
         decoder_model,
         output_directory=output_directory,
         name="decoder",
         metadata=model_metadata,
+        compile_platforms=compile_platforms,
     )
     export_helpers.copy_bundle_resources(source_files, output_directory)
     return output_directory
@@ -338,12 +351,80 @@ def _persist_model(
     output_directory: Path,
     name: str,
     metadata: AIModelAssetMetadata | None = None,
+    compile_platforms: Sequence[str] = (),
 ) -> None:
-    path = output_directory / f"{name}.mlpackage"
+    if compile_platforms:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            source_path = Path(temporary_directory) / f"{name}.mlpackage"
+            _save_model(model, source_path, metadata=metadata)
+            _compile_model(
+                source_path,
+                output_directory=output_directory,
+                platforms=compile_platforms,
+            )
+        return
+
+    _save_model(model, output_directory / f"{name}.mlpackage", metadata=metadata)
+
+
+def _save_model(
+    model: MLModel,
+    path: Path,
+    *,
+    metadata: AIModelAssetMetadata | None = None,
+) -> None:
     if path.exists():
         subprocess.run(["rm", "-rf", str(path)], check=True)
     model = _apply_model_metadata(model, metadata)
     model.save(str(path))
+
+
+def _compile_model(
+    source_path: Path,
+    *,
+    output_directory: Path,
+    platforms: Sequence[str],
+) -> None:
+    for platform in platforms:
+        platform_output_directory = output_directory / "compiled" / platform
+        platform_output_directory.mkdir(parents=True, exist_ok=True)
+        command = [
+            "xcrun",
+            "coremlcompiler",
+            "compile",
+            str(source_path),
+            str(platform_output_directory),
+            "--platform",
+            platform,
+        ]
+        try:
+            subprocess.run(command, check=True, capture_output=True, text=True)
+        except subprocess.CalledProcessError as error:
+            output = "\n".join(
+                value for value in [error.stdout.strip(), error.stderr.strip()] if value
+            )
+            raise RuntimeError(
+                f"Failed to compile CoreML model {source_path.name} for {platform}: {output}"
+            ) from error
+
+
+def _validated_compile_platforms(platforms: Sequence[str]) -> tuple[str, ...]:
+    normalized_platforms = tuple(
+        _COREML_COMPILE_PLATFORMS.get(platform.casefold(), "") for platform in platforms
+    )
+    if invalid_platforms := [
+        platform
+        for platform, normalized in zip(platforms, normalized_platforms, strict=True)
+        if not normalized
+    ]:
+        supported = ", ".join(_COREML_COMPILE_PLATFORMS.values())
+        invalid = ", ".join(invalid_platforms)
+        raise ValueError(
+            f"Unsupported CoreML compile platform(s): {invalid}. Expected: {supported}"
+        )
+    if len(set(normalized_platforms)) != len(normalized_platforms):
+        raise ValueError("CoreML compile platforms must not contain duplicates")
+    return normalized_platforms
 
 
 def _apply_model_metadata(

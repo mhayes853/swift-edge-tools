@@ -344,6 +344,12 @@
       return logits
     }
 
+  }
+
+  // MARK: - Model Loading
+
+  @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
+  extension NeedleCoreMLEngine {
     private static func decodeConfiguration(
       from directory: URL
     ) throws -> NeedleModelConfiguration {
@@ -358,10 +364,18 @@
       from directory: URL,
       configuration: MLModelConfiguration
     ) async throws -> MLModel {
-      let packageURL = directory.appending(path: "\(name).mlpackage")
+      let aotCompiledURL = directory
+        .appending(path: "compiled")
+        .appending(path: Self.coreMLPlatform)
+        .appending(path: "\(name).mlmodelc")
+      if FileManager.default.fileExists(atPath: aotCompiledURL.path()) {
+        return try await MLModel.load(contentsOf: aotCompiledURL, configuration: configuration)
+      }
+
       #if os(watchOS)
-        return try await MLModel.load(contentsOf: packageURL, configuration: configuration)
+        throw NeedleCoreMLEngineError.missingAOTModel(name: name, platform: Self.coreMLPlatform)
       #else
+        let packageURL = directory.appending(path: "\(name).mlpackage")
         let compiledURL = directory.appending(path: "\(name).mlmodelc")
         if !FileManager.default.fileExists(atPath: compiledURL.path()) {
           let temporaryCompiledURL = try await MLModel.compileModel(at: packageURL)
@@ -371,6 +385,22 @@
           try FileManager.default.copyItem(at: temporaryCompiledURL, to: compiledURL)
         }
         return try await MLModel.load(contentsOf: compiledURL, configuration: configuration)
+      #endif
+    }
+
+    private static var coreMLPlatform: String {
+      #if targetEnvironment(macCatalyst)
+        "macCatalyst"
+      #elseif os(macOS)
+        "macOS"
+      #elseif os(iOS)
+        "iOS"
+      #elseif os(watchOS)
+        "watchOS"
+      #elseif os(tvOS)
+        "tvOS"
+      #else
+        "visionOS"
       #endif
     }
   }
@@ -428,6 +458,14 @@
     public static let missingModelOutputs = Self(
       message: "CoreML model did not return expected outputs."
     )
+
+    public static func missingAOTModel(name: String, platform: String) -> Self {
+      Self(
+        message:
+          "Could not find a precompiled CoreML model at compiled/\(platform)/\(name).mlmodelc. "
+          + "watchOS requires models exported with --compile-platform \(platform)."
+      )
+    }
   }
 
   // MARK: - Helpers
