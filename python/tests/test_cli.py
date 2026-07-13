@@ -22,7 +22,11 @@ from cli import (
     main,
     parse_arguments,
 )
-from needle import Needle, NeedleModelConfiguation
+from needle import (
+    Needle,
+    NeedleModelConfiguation,
+)
+from needle.coreml_export import CoreMLComputeUnits
 
 
 class CLITests(unittest.TestCase):
@@ -178,6 +182,29 @@ class CLITests(unittest.TestCase):
     def test_parse_backend_supports_case_insensitive_engine_names(self) -> None:
         self.assertEqual(_parse_backend("CoreAI").value, "coreai")
         self.assertEqual(_parse_backend("coreml").value, "coreml")
+
+    def test_main_passes_compute_units_to_coreml_export(self) -> None:
+        with patch("cli._export_needle_coreml") as export_needle_coreml_mock:
+            export_needle_coreml_mock.return_value = Path("/tmp/coreml-export")
+
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "--output",
+                        "./build/coreml-export",
+                        "--backend",
+                        "coreml",
+                        "--compute-units",
+                        "cpu-and-gpu",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(
+            export_needle_coreml_mock.call_args.kwargs["compute_units"],
+            CoreMLComputeUnits.CPU_AND_GPU,
+        )
 
     def test_main_dispatches_coreml_backend_case_insensitively(self) -> None:
         with (

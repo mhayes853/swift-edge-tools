@@ -4,17 +4,19 @@ import subprocess
 import typing
 from collections import Counter
 from collections.abc import Mapping, Sequence
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
 import coremltools as ct
-import needle.export_helpers as export_helpers
 import numpy as np
 import torch
 from coreai.runtime import AIModelAssetMetadata
 from coremltools.models import MLModel
 
-from . import Needle, NeedleDecoder, NeedleModelConfiguation
+import needle.export_helpers as export_helpers
+
+from . import Needle, NeedleModelConfiguation
 from .needle_compression import NeedleCompressor
 
 _ENCODER_INPUT_NAMES = ["input_ids"]
@@ -36,32 +38,15 @@ _DECODER_INPUT_NAMES = [
 _DECODER_OUTPUT_NAMES = ["logits", "updated_key_cache", "updated_value_cache"]
 
 
-class _CoreMLDecoder(torch.nn.Module):
-    def __init__(self, decoder: NeedleDecoder):
-        super().__init__()
-        self.decoder = decoder
+class CoreMLComputeUnits(str, Enum):
+    ALL = "all"
+    CPU_ONLY = "cpu-only"
+    CPU_AND_GPU = "cpu-and-gpu"
+    CPU_AND_NE = "cpu-and-ne"
 
-    def forward(
-        self,
-        input_ids: torch.Tensor,
-        cache_position: torch.Tensor,
-        self_attention_mask: torch.Tensor,
-        cross_attention_mask: torch.Tensor,
-        encoder_projected_k: torch.Tensor,
-        encoder_projected_v: torch.Tensor,
-        key_cache: torch.Tensor,
-        value_cache: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        return self.decoder.forward(
-            input_ids,
-            cache_position,
-            self_attention_mask,
-            cross_attention_mask,
-            encoder_projected_k,
-            encoder_projected_v,
-            key_cache,
-            value_cache,
-        )
+    @property
+    def uses_native_sdpa(self) -> bool:
+        return self in {self.CPU_ONLY, self.CPU_AND_GPU}
 
 
 def coreml_operation_histogram(model: MLModel) -> Counter[str]:
@@ -88,12 +73,14 @@ def export_needle_coreml(
     *,
     compressor: NeedleCompressor | None = None,
     model_metadata: AIModelAssetMetadata | None = None,
+    compute_units: CoreMLComputeUnits = CoreMLComputeUnits.ALL,
 ) -> Path:
     source_files = export_helpers.resolve_model_source(source)
     configuration = export_helpers.load_configuration(source_files.configuration_path)
     needle = _load_needle_coreml_model(
         configuration,
         source_files.weights_path,
+        use_native_sdpa=compute_units.uses_native_sdpa,
     )
 
     output_directory = Path(output_directory).expanduser().resolve()
@@ -123,11 +110,13 @@ def export_needle_coreml(
 def _load_needle_coreml_model(
     configuration: NeedleModelConfiguation,
     weights_path: str | Path,
+    *,
+    use_native_sdpa: bool,
 ) -> Needle:
     needle = export_helpers.load_needle_model(
         configuration,
         weights_path,
-        use_native_sdpa=False,
+        use_native_sdpa=use_native_sdpa,
     )
     needle = needle.to(dtype=torch.float32)
     needle.encoder.to(dtype=torch.float32)
@@ -205,7 +194,7 @@ def convert_needle_coreml_models(
         },
     )
     decoder_module = _prepare_module_for_coreml_export(
-        _CoreMLDecoder(needle.decoder),
+        needle.decoder,
         decoder_sample,
         compressor=compressor,
         dynamic_shapes=decoder_shapes,

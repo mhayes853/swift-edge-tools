@@ -1,17 +1,24 @@
 import json
 import tempfile
 import unittest
+from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
+from unittest.mock import patch
 
 import coremltools as ct
 import torch
 from coreai.runtime import AIModelAssetMetadata
 from coreai_opt.quantization import QuantizerConfig
 
+import needle.coreml_export as coreml_export
 from needle import Needle, NeedleModelConfiguation
-from needle.coreml_export import export_needle_coreml
+from needle.coreml_export import (
+    CoreMLComputeUnits,
+    coreml_operation_histogram,
+    export_needle_coreml,
+)
 from needle.needle_compression import CoreMLQuantizerCompressor
 
 
@@ -22,6 +29,22 @@ class CoreMLExportTests(unittest.TestCase):
     def test_export_needle_coreml_supports_quantizer_compressor(self) -> None:
         compressor = CoreMLQuantizerCompressor(QuantizerConfig.presets.w8())
         self._assert_export_runs_end_to_end(compressor=compressor)
+
+    def test_coreml_export_uses_native_sdpa_without_ane(self) -> None:
+        histograms = self._export_operation_histograms(
+            compute_units=CoreMLComputeUnits.CPU_AND_GPU,
+        )
+
+        for histogram in histograms:
+            self.assertGreater(histogram["scaled_dot_product_attention"], 0)
+
+    def test_coreml_export_avoids_native_sdpa_with_ane(self) -> None:
+        histograms = self._export_operation_histograms(
+            compute_units=CoreMLComputeUnits.ALL,
+        )
+
+        for histogram in histograms:
+            self.assertEqual(histogram["scaled_dot_product_attention"], 0)
 
     def test_export_needle_coreml_supports_bfloat16_source_weights(self) -> None:
         self._assert_export_runs_end_to_end(source_dtype="bfloat16")
@@ -50,12 +73,37 @@ class CoreMLExportTests(unittest.TestCase):
             post_export_assertions=assert_metadata,
         )
 
+    def _export_operation_histograms(
+        self,
+        *,
+        compute_units: CoreMLComputeUnits,
+    ) -> list[Counter[str]]:
+        histograms: list[Counter[str]] = []
+        persist_model = coreml_export._persist_model
+
+        def persist_model_with_histogram(
+            model: ct.models.MLModel,
+            **kwargs: Any,
+        ) -> None:
+            histograms.append(coreml_operation_histogram(model))
+            persist_model(model, **kwargs)
+
+        with patch.object(
+            coreml_export,
+            "_persist_model",
+            side_effect=persist_model_with_histogram,
+        ):
+            self._assert_export_runs_end_to_end(compute_units=compute_units)
+
+        return histograms
+
     def _assert_export_runs_end_to_end(
         self,
         compressor=None,
         model_metadata: AIModelAssetMetadata | None = None,
         post_export_assertions: Callable[[Path], None] | None = None,
         source_dtype: str = "float32",
+        compute_units: CoreMLComputeUnits = CoreMLComputeUnits.ALL,
     ) -> None:
         source_ctx = tempfile.TemporaryDirectory()
         output_ctx = tempfile.TemporaryDirectory()
@@ -94,6 +142,7 @@ class CoreMLExportTests(unittest.TestCase):
                 output_directory,
                 compressor=compressor,
                 model_metadata=model_metadata,
+                compute_units=compute_units,
             )
 
             self.assertEqual(result, output_directory.resolve())

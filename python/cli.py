@@ -15,7 +15,10 @@ from coreai_opt import ExportBackend
 from coreai_opt.quantization import QuantizerConfig
 
 from needle.coreai_export import export_needle_coreai
-from needle.coreml_export import export_needle_coreml
+from needle.coreml_export import (
+    CoreMLComputeUnits,
+    export_needle_coreml,
+)
 from needle.export_helpers import DEFAULT_SOURCE
 from needle.needle_compression import (
     CoreAIQuantizerCompressor,
@@ -24,6 +27,7 @@ from needle.needle_compression import (
 )
 
 _QUANTIZER_PRESETS = ("w4", "w4_per_block", "w8")
+_COMPUTE_UNITS = tuple(compute_units.value for compute_units in CoreMLComputeUnits)
 _BACKENDS = {
     "coreai": ExportBackend.CoreAI,
     "coreml": ExportBackend.CoreML,
@@ -35,6 +39,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--source", default=DEFAULT_SOURCE)
     parser.add_argument("--output", required=True)
     parser.add_argument("--backend", default="CoreAI")
+    parser.add_argument(
+        "--compute-units",
+        choices=_COMPUTE_UNITS,
+        default=CoreMLComputeUnits.ALL.value,
+        help=(
+            "Target compute units; selects an ANE-compatible CoreML attention "
+            "graph when applicable."
+        ),
+    )
     parser.add_argument(
         "--compile-platform",
         action="append",
@@ -184,6 +197,10 @@ def _build_compression_config(parsed: argparse.Namespace) -> QuantizerConfig | N
     return _build_quantizer_config(parsed)
 
 
+def _parse_compute_units(value: str) -> CoreMLComputeUnits:
+    return CoreMLComputeUnits(value)
+
+
 def _parse_backend(value: str) -> ExportBackend:
     backend = _BACKENDS.get(value.casefold())
     if backend is None:
@@ -240,6 +257,7 @@ def _export_for_backend(
     *,
     compressor: NeedleCompressor | None = None,
     model_metadata: AIModelAssetMetadata | None = None,
+    compute_units: CoreMLComputeUnits = CoreMLComputeUnits.ALL,
     compile_platforms: Sequence[str] = (),
 ) -> Path:
     if backend == ExportBackend.CoreAI:
@@ -260,6 +278,7 @@ def _export_for_backend(
             output,
             compressor=compressor,
             model_metadata=model_metadata,
+            compute_units=compute_units,
         )
     raise ValueError(f"Unsupported backend: {backend.value}")
 
@@ -270,12 +289,14 @@ def _export_needle_coreml(
     *,
     compressor: NeedleCompressor | None = None,
     model_metadata: AIModelAssetMetadata | None = None,
+    compute_units: CoreMLComputeUnits = CoreMLComputeUnits.ALL,
 ) -> Path:
     return export_needle_coreml(
         source,
         output,
         compressor=compressor,
         model_metadata=model_metadata,
+        compute_units=compute_units,
     )
 
 
@@ -286,6 +307,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
         backend = _parse_backend(parsed.backend)
         compressor = _build_compressor(parsed)
         model_metadata = _build_authoring_metadata(parsed)
+        compute_units = _parse_compute_units(parsed.compute_units)
     except ValueError as error:
         parser.error(str(error))
 
@@ -296,6 +318,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
             parsed.output,
             compressor=compressor,
             model_metadata=model_metadata,
+            compute_units=compute_units,
             compile_platforms=parsed.compile_platforms,
         )
     sys.stdout.write(f"{output_directory}\n")

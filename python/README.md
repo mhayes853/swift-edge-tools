@@ -81,6 +81,16 @@ python3 cli.py \
   --compile-platform macOS
 ```
 
+With CoreML CPU/GPU execution and native SDPA:
+
+```bash
+python3 cli.py \
+  --backend coreml \
+  --source Cactus-Compute/needle-hf \
+  --output ./build/coreml-export \
+  --compute-units cpu-and-gpu
+```
+
 With metadata and quantizer config files:
 
 ```bash
@@ -99,6 +109,14 @@ The CLI accepts JSON or YAML for:
 Ahead-of-time compilation flags:
 
 - `--compile-platform PLATFORM`
+
+Compute-unit flags:
+
+- `--compute-units {all,cpu-only,cpu-and-gpu,cpu-and-ne}`
+
+For CoreML, `all` and `cpu-and-ne` select the ANE-compatible decomposed
+attention graph. `cpu-only` and `cpu-and-gpu` select native SDPA. CoreAI
+always exports native SDPA; this option does not alter its graph.
 
 Supported compression convenience flags:
 
