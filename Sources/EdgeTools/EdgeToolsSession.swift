@@ -3,7 +3,7 @@ import Observation
 
 // MARK: - EdgeToolsSession
 
-public final class EdgeToolsSession<Engine: EdgeToolEngine>: Sendable, Observable {
+public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable, Observable {
   fileprivate let engine: Engine
   private let _systemPrompt: Lock<String>
   private let _activeStreams = Lock([EdgeToolsSessionStream]())
@@ -80,7 +80,7 @@ extension EdgeToolsSession {
 // MARK: - Generate
 
 public struct EdgeToolsSessionGeneration: Sendable {
-  public let engineGeneration: EdgeToolEngineGeneration
+  public let engineGeneration: EdgeToolsEngineGeneration
   public let toolCalls: EdgeToolCallCollection
 }
 
@@ -153,7 +153,7 @@ public final class EdgeToolsSessionStream: Sendable, Observable, Identifiable {
     }
   }
 
-  fileprivate init<Engine: EdgeToolEngine>(
+  fileprivate init<Engine: EdgeToolsEngine>(
     session: EdgeToolsSession<Engine>,
     tools: [any EdgeTool],
     with prompt: String,
@@ -174,7 +174,7 @@ public final class EdgeToolsSessionStream: Sendable, Observable, Identifiable {
     self.state.withLock { $0.task = task }
   }
 
-  private func runGeneration<Engine: EdgeToolEngine>(
+  private func runGeneration<Engine: EdgeToolsEngine>(
     session: EdgeToolsSession<Engine>,
     tools: [any EdgeTool],
     prompt: String,
@@ -252,7 +252,7 @@ public final class EdgeToolsSessionStream: Sendable, Observable, Identifiable {
       generationTask.stop()
     }
 
-    let generation: EdgeToolEngineGeneration
+    let generation: EdgeToolsEngineGeneration
     do {
       generation = try await generationTask.value
       try Task.checkCancellation()

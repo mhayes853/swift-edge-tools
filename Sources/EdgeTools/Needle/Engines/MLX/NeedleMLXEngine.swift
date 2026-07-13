@@ -7,8 +7,8 @@
 
   // MARK: - NeedleMLXEngine
 
-  public final class NeedleMLXEngine: EdgeToolEngine {
-    public struct GenerateParameters: EdgeToolEngineGenerateParameters {
+  public final class NeedleMLXEngine: EdgeToolsEngine {
+    public struct GenerateParameters: EdgeToolsEngineGenerateParameters {
       public static var `default`: Self {
         Self()
       }
@@ -128,7 +128,7 @@
       prompt: EdgeToolsPrompt,
       parameters: GenerateParameters,
       channel: EdgeToolsGenerationChannel
-    ) throws -> some EdgeToolEngineGenerationTask {
+    ) throws -> some EdgeToolsEngineGenerationTask {
       let isStopped = ManagedAtomic(false)
       let task = Task {
         try self.state.withLock { state in
@@ -150,7 +150,7 @@
       channel: EdgeToolsGenerationChannel,
       state: inout sending State,
       isStopped: ManagedAtomic<Bool>
-    ) throws -> EdgeToolEngineGeneration {
+    ) throws -> EdgeToolsEngineGeneration {
       try Task.checkCancellation()
       guard !isStopped.load(ordering: .relaxed) else { return .empty }
 
@@ -238,7 +238,7 @@
       metadata.mlxEnginePostDecodeMemorySnapshot = postDecodeSnapshot
       metadata.generationConfidence = confidence.mean
       metadata.perTokenConfidences = confidence.perTokenConfidences
-      return EdgeToolEngineGeneration(
+      return EdgeToolsEngineGeneration(
         prefillMetrics: prefillMetrics,
         decodeMetrics: EdgeToolsDecodeMetrics(
           tokens: generatedTokens.count,

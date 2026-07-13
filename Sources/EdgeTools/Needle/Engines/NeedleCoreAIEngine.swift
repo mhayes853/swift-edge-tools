@@ -4,8 +4,8 @@
   import Atomics
 
   @available(anyAppleOS 27.0, *)
-  public final class NeedleCoreAIEngine: EdgeToolEngine {
-    public struct GenerateParameters: EdgeToolEngineGenerateParameters {
+  public final class NeedleCoreAIEngine: EdgeToolsEngine {
+    public struct GenerateParameters: EdgeToolsEngineGenerateParameters {
       public static var `default`: Self { Self() }
 
       private var _sampler: @Sendable () -> any EdgeToolsSampler<NDArray>
@@ -170,7 +170,7 @@
       prompt: EdgeToolsPrompt,
       parameters: GenerateParameters,
       channel: EdgeToolsGenerationChannel
-    ) throws -> some EdgeToolEngineGenerationTask {
+    ) throws -> some EdgeToolsEngineGenerationTask {
       let isStopped = ManagedAtomic(false)
       let task = Task {
         let range = parameters.toolCallRange
@@ -202,7 +202,7 @@
       matcher: consuming XGrammarMatcher,
       configuration: NeedleModelConfiguration,
       isStopped: ManagedAtomic<Bool>
-    ) async throws -> EdgeToolEngineGeneration {
+    ) async throws -> EdgeToolsEngineGeneration {
       try Task.checkCancellation()
       guard !isStopped.load(ordering: .relaxed) else { return .empty }
 
@@ -270,7 +270,7 @@
       var metadata = EdgeToolsMetadata()
       metadata.generationConfidence = confidence.mean
       metadata.perTokenConfidences = confidence.perTokenConfidences
-      return EdgeToolEngineGeneration(
+      return EdgeToolsEngineGeneration(
         prefillMetrics: prefillMetrics,
         decodeMetrics: EdgeToolsDecodeMetrics(
           tokens: generatedTokens.count,

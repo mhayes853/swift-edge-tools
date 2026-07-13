@@ -2,10 +2,10 @@ import EdgeTools
 import Foundation
 
 private typealias MockGenerationError = any Error
-private typealias MockGenerationTaskValue = Task<EdgeToolEngineGeneration, MockGenerationError>
+private typealias MockGenerationTaskValue = Task<EdgeToolsEngineGeneration, MockGenerationError>
 
-final class MockEngine: EdgeToolEngine, Sendable {
-  final class GenerationTask: EdgeToolEngineGenerationTask {
+final class MockEngine: EdgeToolsEngine, Sendable {
+  final class GenerationTask: EdgeToolsEngineGenerationTask {
     private let task: MockGenerationTaskValue
     private let stopGeneration: @Sendable () -> Void
 
@@ -17,7 +17,7 @@ final class MockEngine: EdgeToolEngine, Sendable {
       self.stopGeneration = stopGeneration
     }
 
-    var value: EdgeToolEngineGeneration {
+    var value: EdgeToolsEngineGeneration {
       get async throws {
         try await self.task.value
       }
@@ -28,7 +28,7 @@ final class MockEngine: EdgeToolEngine, Sendable {
     }
   }
 
-  struct GenerateParameters: EdgeToolEngineGenerateParameters {
+  struct GenerateParameters: EdgeToolsEngineGenerateParameters {
     static let `default` = GenerateParameters()
   }
 
@@ -211,7 +211,7 @@ final class MockEngine: EdgeToolEngine, Sendable {
       }
 
       if let error = thrownError { throw error }
-      return EdgeToolEngineGeneration(
+      return EdgeToolsEngineGeneration(
         prefillMetrics: EdgeToolsPrefillMetrics(tokens: 0, duration: .zero),
         decodeMetrics: EdgeToolsDecodeMetrics(
           tokens: emittedTokens.count,

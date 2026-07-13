@@ -1,8 +1,8 @@
-// MARK: - EdgeToolEngine
+// MARK: - EdgeToolsEngine
 
-public protocol EdgeToolEngine: Sendable {
-  associatedtype GenerateParameters: EdgeToolEngineGenerateParameters
-  associatedtype GenerationTask: EdgeToolEngineGenerationTask
+public protocol EdgeToolsEngine: Sendable {
+  associatedtype GenerateParameters: EdgeToolsEngineGenerateParameters
+  associatedtype GenerationTask: EdgeToolsEngineGenerationTask
 
   func tokenize(prompt: EdgeToolsPrompt) async throws -> [EdgeToolsToken]
 
@@ -13,23 +13,23 @@ public protocol EdgeToolEngine: Sendable {
   ) throws -> GenerationTask
 }
 
-// MARK: - EdgeToolEngineGenerateParemeters
+// MARK: - EdgeToolsEngineGenerateParemeters
 
-public protocol EdgeToolEngineGenerateParameters: Sendable {
+public protocol EdgeToolsEngineGenerateParameters: Sendable {
   static var `default`: Self { get }
 }
 
-// MARK: - EdgeToolEngineGenerationTask
+// MARK: - EdgeToolsEngineGenerationTask
 
-public protocol EdgeToolEngineGenerationTask: Sendable {
-  var value: EdgeToolEngineGeneration { get async throws }
+public protocol EdgeToolsEngineGenerationTask: Sendable {
+  var value: EdgeToolsEngineGeneration { get async throws }
 
   func stop()
 }
 
-// MARK: - EdgeToolEngineGeneration
+// MARK: - EdgeToolsEngineGeneration
 
-public struct EdgeToolEngineGeneration: Sendable {
+public struct EdgeToolsEngineGeneration: Sendable {
   public var prefillMetrics: EdgeToolsPrefillMetrics
   public var decodeMetrics: EdgeToolsDecodeMetrics
   public var wasStopped: Bool
@@ -51,7 +51,7 @@ public struct EdgeToolEngineGeneration: Sendable {
   }
 }
 
-extension EdgeToolEngineGeneration {
+extension EdgeToolsEngineGeneration {
   public static let empty = Self(
     prefillMetrics: EdgeToolsPrefillMetrics(tokens: 0, duration: .zero),
     decodeMetrics: EdgeToolsDecodeMetrics(tokens: 0, duration: .zero, durationToFirstToken: .zero),

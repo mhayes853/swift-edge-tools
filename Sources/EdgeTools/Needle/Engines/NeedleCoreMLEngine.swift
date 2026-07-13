@@ -4,8 +4,8 @@
   import Foundation
 
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-  public final class NeedleCoreMLEngine: EdgeToolEngine {
-    public struct GenerateParameters: EdgeToolEngineGenerateParameters {
+  public final class NeedleCoreMLEngine: EdgeToolsEngine {
+    public struct GenerateParameters: EdgeToolsEngineGenerateParameters {
       public static var `default`: Self { Self() }
 
       private var _sampler: @Sendable () -> any EdgeToolsSampler<MLTensor>
@@ -159,7 +159,7 @@
       prompt: EdgeToolsPrompt,
       parameters: GenerateParameters,
       channel: EdgeToolsGenerationChannel
-    ) throws -> some EdgeToolEngineGenerationTask {
+    ) throws -> some EdgeToolsEngineGenerationTask {
       let isStopped = ManagedAtomic(false)
       let task = Task {
         let matcher = try self.state.withLock { state in
@@ -190,7 +190,7 @@
       matcher: consuming XGrammarMatcher,
       configuration: NeedleModelConfiguration,
       isStopped: ManagedAtomic<Bool>
-    ) async throws -> EdgeToolEngineGeneration {
+    ) async throws -> EdgeToolsEngineGeneration {
       try Task.checkCancellation()
       guard !isStopped.load(ordering: .relaxed) else { return .empty }
 
@@ -253,7 +253,7 @@
       var metadata = EdgeToolsMetadata()
       metadata.generationConfidence = confidence.mean
       metadata.perTokenConfidences = confidence.perTokenConfidences
-      return EdgeToolEngineGeneration(
+      return EdgeToolsEngineGeneration(
         prefillMetrics: prefillMetrics,
         decodeMetrics: EdgeToolsDecodeMetrics(
           tokens: generatedTokens.count,

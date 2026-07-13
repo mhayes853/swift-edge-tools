@@ -1,5 +1,5 @@
 ▿ EdgeToolsSessionGeneration
-  ▿ engineGeneration: EdgeToolEngineGeneration
+  ▿ engineGeneration: EdgeToolsEngineGeneration
     ▿ decodeMetrics: EdgeToolsDecodeMetrics
       ▿ duration: 0.454995583 seconds
         - _low: 454995583000000000
