@@ -274,7 +274,7 @@
   }
 
   @available(anyAppleOS 27.0, *)
-  final class CountingLogitsProcessor: NeedleCoreAIEngine.LogitsProcessor, @unchecked Sendable {
+  final class CountingLogitsProcessor: EdgeToolsLogitsProcessor, @unchecked Sendable {
     var promptCalls = 0
     var processCalls = 0
     var didSampleCalls = 0

@@ -82,8 +82,7 @@
     return logits
   }
 
-  @inlinable
-  @inline(__always)
+  @inline(always)
   func _applyBitmaskSIMDRow(
     logits: UnsafeMutablePointer<Float>,
     vocabularySize: Int,
@@ -103,8 +102,7 @@
     }
   }
 
-  @inlinable
-  @inline(__always)
+  @inline(always)
   func _bitmaskValue(maskBytes: UnsafeBufferPointer<UInt8>, index: Int) -> Float {
     let tableIndex = Int(maskBytes[index >> 3]) * 8 + (index & 7)
     return _bitmaskTable[tableIndex]

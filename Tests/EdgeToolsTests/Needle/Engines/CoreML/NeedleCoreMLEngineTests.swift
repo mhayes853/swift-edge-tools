@@ -225,8 +225,7 @@
   }
 
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-  final class CountingCoreMLLogitsProcessor: NeedleCoreMLEngine.LogitsProcessor, @unchecked Sendable
-  {
+  final class CountingCoreMLLogitsProcessor: EdgeToolsLogitsProcessor, @unchecked Sendable {
     var promptCalls = 0
     var processCalls = 0
     var didSampleCalls = 0
@@ -235,7 +234,7 @@
       self.promptCalls += 1
     }
 
-    func process(_ logits: MLTensor) async throws -> MLTensor {
+    func process(logits: inout MLTensor) async throws -> MLTensor {
       self.processCalls += 1
       return logits
     }

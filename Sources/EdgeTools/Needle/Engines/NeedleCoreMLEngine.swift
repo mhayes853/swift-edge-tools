@@ -8,14 +8,14 @@
     public struct GenerateParameters: EdgeToolEngineGenerateParameters {
       public static var `default`: Self { Self() }
 
-      private var _sampler: @Sendable () -> any Sampler
-      private var _processor: @Sendable () -> (any LogitsProcessor)?
+      private var _sampler: @Sendable () -> any EdgeToolsSampler<MLTensor>
+      private var _processor: @Sendable () -> (any EdgeToolsLogitsProcessor<MLTensor, MLTensor>)?
 
-      public var sampler: any Sampler {
+      public var sampler: any EdgeToolsSampler<MLTensor> {
         self._sampler()
       }
 
-      public var processor: (any LogitsProcessor)? {
+      public var processor: (any EdgeToolsLogitsProcessor<MLTensor, MLTensor>)? {
         self._processor()
       }
 
@@ -23,8 +23,11 @@
       public var maxTokens: Int?
 
       public init(
-        sampler: @autoclosure @escaping @Sendable () -> any Sampler = ArgmaxSampler(),
-        processor: @autoclosure @escaping @Sendable () -> (any LogitsProcessor)? = nil,
+        sampler: @autoclosure @escaping @Sendable () -> any EdgeToolsSampler<MLTensor> =
+          CoreMLArgmaxSampler(),
+        processor:
+          @autoclosure @escaping @Sendable () -> (any EdgeToolsLogitsProcessor<MLTensor, MLTensor>)? =
+          nil,
         toolCallRange: GrammarToolCallRange = .unbounded(minimum: 0),
         maxTokens: Int? = 1024
       ) {
@@ -221,12 +224,12 @@
           encoderOutputs: encoderOutputs,
           cache: &cache
         )
-        let stepLogits = decoderLogits.squeezingShape(at: 1)
-        let processedLogits = try await processor?.process(stepLogits) ?? stepLogits
+        var stepLogits = decoderLogits.squeezingShape(at: 1)
+        let processedLogits = try await processor?.process(logits: &stepLogits) ?? stepLogits
         let maskedLogits = applyBitmaskCoreML(logits: processedLogits, mask: matcher.bitmask())
         await confidence.addCoreML(logits: maskedLogits)
 
-        let tokenId = try await sampler.sample(maskedLogits)
+        let tokenId = try await sampler.sample(logits: maskedLogits)
         durationToFirstToken = durationToFirstToken ?? generateStart.duration(to: self.clock.now)
 
         let tokenString = self.tokenizer.withBorrowedLock {
@@ -266,7 +269,7 @@
     private func prefill(
       prompt: EdgeToolsPrompt,
       configuration: NeedleModelConfiguration,
-      processor: inout (any LogitsProcessor)?
+      processor: inout (any EdgeToolsLogitsProcessor<MLTensor, MLTensor>)?
     ) async throws -> (EncoderOutputs, EdgeToolsPrefillMetrics) {
       let promptTokens = self.tokenizer.withBorrowedLock {
         $0.encode(text: prompt.needleFormatted())
@@ -398,37 +401,6 @@
       func prediction(from inputs: [String: MLTensor]) async throws -> [String: MLTensor] {
         try await self.model.prediction(from: inputs)
       }
-    }
-  }
-
-  // MARK: - Sampler
-
-  @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-  extension NeedleCoreMLEngine {
-    public protocol Sampler {
-      func sample(_ logits: MLTensor) async throws -> EdgeToolsToken.ID
-    }
-
-    public struct ArgmaxSampler: Sampler {
-      public init() {}
-
-      public func sample(_ logits: MLTensor) async throws -> EdgeToolsToken.ID {
-        let indices = await logits.argmax(alongAxis: 1).shapedArray(of: Int32.self).scalars
-        return EdgeToolsToken.ID(indices.first ?? 0)
-      }
-    }
-  }
-
-  // MARK: - LogitsProcessor
-
-  @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-  extension NeedleCoreMLEngine {
-    public protocol LogitsProcessor {
-      mutating func prompt(_ prompt: MLTensor)
-
-      func process(_ logits: MLTensor) async throws -> MLTensor
-
-      mutating func didSample(token: EdgeToolsToken)
     }
   }
 
