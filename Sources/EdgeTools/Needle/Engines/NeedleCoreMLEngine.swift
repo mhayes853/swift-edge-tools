@@ -1,4 +1,4 @@
-#if CoreML && Sentencepiece && canImport(CoreML)
+#if CoreML && canImport(CoreML)
   import Atomics
   @preconcurrency import CoreML
   import Foundation
@@ -80,10 +80,9 @@
       editModelConfiguration: (inout MLModelConfiguration) -> Void = { _ in },
       editConfiguration: (inout NeedleModelConfiguration) -> Void = { _ in }
     ) async throws {
-      let tokenizer = try Self.loadTokenizer(
-        from: modelDirectoryURL.appending(path: "tokenizer.model")
-      )
-      let grammarEngine = tokenizer.withLock { XGrammarCompiler.needle(erasedTokenizer: $0) }
+      let tokenizer = try await loadEdgeToolsTokenizer(from: modelDirectoryURL)
+      let lockedTokenizer = Lock(consume tokenizer)
+      let grammarEngine = lockedTokenizer.withLock { XGrammarCompiler.needle(erasedTokenizer: $0) }
       guard let grammarEngine else {
         throw XGrammarError(message: "Needle requires a tokenizer with an EOS token.")
       }
@@ -104,7 +103,7 @@
       try await self.init(
         encoderModel: encoderModel,
         decoderModel: decoderModel,
-        tokenizer: consume tokenizer,
+        tokenizer: consume lockedTokenizer,
         configuration: configuration,
         grammarEngine: grammarEngine
       )
@@ -140,13 +139,6 @@
       self.encoderModel = EncoderModelActor(model: encoderModel)
       self.decoderModel = DecoderModelActor(model: decoderModel)
       self.tokenizer = consume tokenizer
-    }
-
-    private static func loadTokenizer(
-      from modelURL: URL
-    ) throws -> Lock<any EdgeToolsTokenizer & ~Copyable> {
-      let tokenizer = try EdgeToolsSPTokenizer(modelURL: modelURL)
-      return Lock(consume tokenizer)
     }
 
     public func tokenize(prompt: EdgeToolsPrompt) async throws -> [EdgeToolsToken] {
@@ -277,7 +269,7 @@
       processor: inout (any LogitsProcessor)?
     ) async throws -> (EncoderOutputs, EdgeToolsPrefillMetrics) {
       let promptTokens = self.tokenizer.withBorrowedLock {
-        edgeToolsEncode(text: prompt.needleFormatted(), using: $0)
+        $0.encode(text: prompt.needleFormatted())
       }
       guard promptTokens.count <= configuration.encoderMaxLength else {
         throw NeedleCoreMLEngineError.contextLengthExceeded(

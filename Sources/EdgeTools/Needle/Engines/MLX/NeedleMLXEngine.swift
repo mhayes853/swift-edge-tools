@@ -63,17 +63,24 @@
     public convenience init(
       from url: URL,
       editConfiguration: (inout NeedleModelConfiguration) -> Void = { _ in }
-    ) throws {
-      let tokenizer = try Self.loadTokenizer(from: url.appending(path: "tokenizer.model"))
+    ) async throws {
+      let tokenizer = try await loadEdgeToolsTokenizer(from: url)
+      let lockedTokenizer = Lock(consume tokenizer)
       let model = try loadNeedleMLXModel(
         from: url,
         editConfiguration: editConfiguration
       )
-      let grammarEngine = tokenizer.withLock { XGrammarCompiler.needle(erasedTokenizer: $0) }
+      let grammarEngine = lockedTokenizer.withLock {
+        XGrammarCompiler.needle(erasedTokenizer: $0)
+      }
       guard let grammarEngine else {
         throw XGrammarError(message: "Needle requires a tokenizer with an EOS token.")
       }
-      self.init(tokenizer: tokenizer, model: model, grammarEngine: consume grammarEngine)
+      self.init(
+        tokenizer: consume lockedTokenizer,
+        model: model,
+        grammarEngine: consume grammarEngine
+      )
     }
 
     public init<Tokenizer: EdgeToolsTokenizer & ~Copyable>(
@@ -104,13 +111,6 @@
         )
       )
       self.tokenizer = consume tokenizer
-    }
-
-    private static func loadTokenizer(
-      from modelURL: URL
-    ) throws -> Lock<any EdgeToolsTokenizer & ~Copyable> {
-      let tokenizer = try EdgeToolsSPTokenizer(modelURL: modelURL)
-      return Lock(consume tokenizer)
     }
 
     public func tokenize(prompt: EdgeToolsPrompt) async throws -> [EdgeToolsToken] {

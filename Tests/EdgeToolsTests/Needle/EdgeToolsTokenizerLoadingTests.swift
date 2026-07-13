@@ -1,0 +1,62 @@
+import CustomDump
+import EdgeTools
+import Foundation
+import Testing
+
+@Suite
+struct `EdgeToolsTokenizer Loading tests` {
+  @Test
+  func `Missing Tokenizer Describes Available Options`() async {
+    let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    let error = await #expect(throws: EdgeToolsTokenizerLoadingError.self) {
+      _ = try await loadEdgeToolsTokenizer(from: directory)
+    }
+    expectNoDifference(error?.message.contains("tokenizer.model"), true)
+    expectNoDifference(error?.message.contains("tokenizer.json"), true)
+  }
+
+  #if Transformers
+    @Test
+    func `Loads Transformers Tokenizer JSON`() async throws {
+      let directory = try self.makeTransformersTokenizerDirectory()
+      defer { try? FileManager.default.removeItem(at: directory) }
+
+      let tokenizer = try await loadEdgeToolsTokenizer(from: directory)
+      let tokenIDs = (
+        tokenizer.bosTokenId,
+        tokenizer.eosTokenId,
+        tokenizer.unknownTokenId
+      )
+      expectNoDifference(tokenIDs.0, 0)
+      expectNoDifference(tokenIDs.1, 2)
+      expectNoDifference(tokenIDs.2, 3)
+    }
+
+    private func makeTransformersTokenizerDirectory() throws -> URL {
+      let fileManager = FileManager.default
+      let directory = fileManager.temporaryDirectory.appending(path: UUID().uuidString)
+      try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+
+      let tokenizerURL = Bundle.module.url(
+        forResource: "test_tokenizer",
+        withExtension: "json"
+      )!
+      try fileManager.copyItem(
+        at: tokenizerURL,
+        to: directory.appending(path: "tokenizer.json")
+      )
+
+      let configurationURL = Bundle.module.url(
+        forResource: "test_tokenizer_config",
+        withExtension: "json"
+      )!
+      try fileManager.copyItem(
+        at: configurationURL,
+        to: directory.appending(path: "tokenizer_config.json")
+      )
+      return directory
+    }
+  #endif
+}

@@ -102,9 +102,8 @@
         cache: modelCache,
         cachePolicy: cachePolicy
       )
-      let lockedTokenizer = try Self.loadTokenizer(
-        from: modelDirectoryURL.appending(path: "tokenizer.model")
-      )
+      let tokenizer = try await loadEdgeToolsTokenizer(from: modelDirectoryURL)
+      let lockedTokenizer = Lock(consume tokenizer)
       let grammarEngine = lockedTokenizer.withLock { XGrammarCompiler.needle(erasedTokenizer: $0) }
       guard let grammarEngine else {
         throw XGrammarError(message: "Needle requires a tokenizer with an EOS token.")
@@ -148,13 +147,6 @@
       self.encoderFunction = try Self.loadFunction(named: FunctionName.main, from: encoderModel)
       self.decoderFunction = try Self.loadFunction(named: FunctionName.main, from: decoderModel)
       self.tokenizer = consume tokenizer
-    }
-
-    private static func loadTokenizer(
-      from modelURL: URL
-    ) throws -> Lock<any EdgeToolsTokenizer & ~Copyable> {
-      let tokenizer = try EdgeToolsSPTokenizer(modelURL: modelURL)
-      return Lock(consume tokenizer)
     }
   }
 
@@ -295,7 +287,7 @@
       stream: ComputeStream?
     ) async throws -> (EncoderOutputs, EdgeToolsPrefillMetrics) {
       let promptTokens = self.tokenizer.withBorrowedLock {
-        edgeToolsEncode(text: prompt.needleFormatted(), using: $0)
+        $0.encode(text: prompt.needleFormatted())
       }
       guard promptTokens.count <= configuration.encoderMaxLength else {
         throw NeedleCoreAIEngineError.contextLengthExceeded(

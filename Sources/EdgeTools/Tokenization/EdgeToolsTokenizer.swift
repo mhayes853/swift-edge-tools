@@ -1,10 +1,3 @@
-func edgeToolsEncode(
-  text: String,
-  using tokenizer: borrowing some EdgeToolsTokenizer & ~Copyable
-) -> [EdgeToolsToken.ID] {
-  tokenizer.encode(text: text)
-}
-
 public protocol EdgeToolsTokenizer: ~Copyable {
   var unknownTokenId: EdgeToolsToken.ID? { borrowing get }
   var bosTokenId: EdgeToolsToken.ID? { borrowing get }
