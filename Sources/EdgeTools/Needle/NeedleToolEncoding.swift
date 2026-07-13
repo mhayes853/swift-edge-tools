@@ -10,54 +10,26 @@ extension EdgeToolDefinition {
 }
 
 extension EdgeToolDefinition {
-  /// Encodes this tool definition as JSON data using the canonical Cactus
-  /// Needle field order — the same order the Python training data generator
-  /// uses (see `needle/dataset/generate.py` in cactus-compute/needle).
-  ///
-  /// Order for a tool definition:
-  ///   `name, description, arguments`
-  ///
-  /// Order for a schema object:
-  ///   1. `type` (if non-empty)
-  ///   2. generic annotation keywords: `title, description, default, examples,
-  ///      enum, const, allOf, anyOf, oneOf, not, if, then, else` (each omitted
-  ///      when nil)
-  ///   3. type-specific keys in JSON Schema order, branched on `type`:
-  ///      - object: `properties, required, minProperties, maxProperties,
-  ///        additionalProperties, patternProperties, propertyNames,
-  ///        dependentRequired`
-  ///      - array: `items, prefixItems, minItems, maxItems, uniqueItems,
-  ///        contains, minContains, maxContains`
-  ///      - integer/number: `multipleOf, minimum, exclusiveMinimum, maximum,
-  ///        exclusiveMaximum`
-  ///      - string: `minLength, maxLength, pattern`
-  public func needlePromptEncoded() -> Data {
-    var writer = JSONWriter()
-    writer.writeToolDefinition(self)
-    return Data(writer.buffer)
+  public func needlePromptEncoded() throws -> String {
+    let name = String(decoding: try JSONEncoder().encode(self.name), as: UTF8.self)
+    let description = String(decoding: try JSONEncoder().encode(self.description), as: UTF8.self)
+    let arguments = try self.arguments.needleGrammarEncoded()
+    return #"{"name":\#(name),"description":\#(description),"arguments":\#(arguments)}"#
   }
 }
 
 extension EdgeToolsGenerationSchema {
-  func needleGrammarEncoded() -> Data {
+  func needleGrammarEncoded() throws -> String {
     var writer = JSONWriter()
     writer.writeSchema(self)
-    return Data(writer.buffer)
+    return String(decoding: writer.buffer, as: UTF8.self)
   }
 }
 
 extension Sequence where Element == EdgeToolDefinition {
-  /// Encodes a list of tool definitions as a JSON array using the canonical
-  /// Cactus Needle field order. See ``encodedAsCanonicalJSON()`` for details.
-  public func needlePromptEncoded() -> Data {
-    var writer = JSONWriter()
-    writer.writeArray { writer in
-      for (offset, tool) in self.enumerated() {
-        if offset > 0 { writer.writeComma() }
-        writer.writeToolDefinition(tool)
-      }
-    }
-    return Data(writer.buffer)
+  public func needlePromptEncoded() throws -> String {
+    let definitions = try self.map { try $0.needlePromptEncoded() }
+    return "[\(definitions.joined(separator: ","))]"
   }
 }
 
@@ -87,43 +59,6 @@ private struct JSONWriter {
 
   var buffer = [UInt8]()
 
-  // MARK: - Top-level structure
-
-  mutating func writeArray(_ body: (inout JSONWriter) -> Void) {
-    self.buffer.append(Self.openBracket)
-    body(&self)
-    self.buffer.append(Self.closeBracket)
-  }
-
-  mutating func writeObject(_ body: (inout JSONWriter) -> Void) {
-    self.buffer.append(Self.openBrace)
-    body(&self)
-    self.buffer.append(Self.closeBrace)
-  }
-
-  mutating func writeComma() {
-    self.buffer.append(Self.comma)
-  }
-
-  mutating func writeColon() {
-    self.buffer.append(Self.colon)
-  }
-
-  // MARK: - Tool definition
-
-  mutating func writeToolDefinition(_ tool: EdgeToolDefinition) {
-    self.writeObject { writer in
-      writer.writeStringKey("name")
-      writer.writeString(tool.name)
-      writer.writeComma()
-      writer.writeStringKey("description")
-      writer.writeString(tool.description)
-      writer.writeComma()
-      writer.writeStringKey("arguments")
-      writer.writeSchema(tool.arguments)
-    }
-  }
-
   // MARK: - Schema
 
   mutating func writeSchema(_ schema: EdgeToolsGenerationSchema) {
@@ -140,18 +75,13 @@ private struct JSONWriter {
     for (offset, entry) in object.enumerated() {
       if offset > 0 { self.buffer.append(Self.comma) }
       self.writeString(entry.key.rawValue)
-      self.writeColon()
+      self.buffer.append(Self.colon)
       self.writeValue(entry.value)
     }
     self.buffer.append(Self.closeBrace)
   }
 
   // MARK: - Primitives
-
-  mutating func writeStringKey(_ key: String) {
-    self.writeString(key)
-    self.writeColon()
-  }
 
   mutating func writeString(_ value: String) {
     self.buffer.append(Self.quote)
@@ -234,7 +164,7 @@ private struct JSONWriter {
       for (offset, entry) in object.enumerated() {
         if offset > 0 { self.buffer.append(Self.comma) }
         self.writeString(entry.key)
-        self.writeColon()
+        self.buffer.append(Self.colon)
         self.writeValue(entry.value)
       }
       self.buffer.append(Self.closeBrace)

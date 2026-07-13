@@ -145,7 +145,7 @@
     }
 
     public func tokenize(prompt: EdgeToolsPrompt) async throws -> [EdgeToolsToken] {
-      self.tokenizer.withBorrowedLock { prompt.needleTokenized(using: $0) }
+      try self.tokenizer.withBorrowedLock { try prompt.needleTokenized(using: $0) }
     }
 
     public func clearCaches() {
@@ -271,8 +271,8 @@
       configuration: NeedleModelConfiguration,
       processor: inout (any EdgeToolsLogitsProcessor<MLTensor, MLTensor>)?
     ) async throws -> (EncoderOutputs, EdgeToolsPrefillMetrics) {
-      let promptTokens = self.tokenizer.withBorrowedLock {
-        $0.encode(text: prompt.needleFormatted())
+      let promptTokens = try self.tokenizer.withBorrowedLock {
+        try $0.encode(text: prompt.needleFormatted())
       }
       guard promptTokens.count <= configuration.encoderMaxLength else {
         throw NeedleCoreMLEngineError.contextLengthExceeded(

@@ -114,7 +114,7 @@
     }
 
     public func tokenize(prompt: EdgeToolsPrompt) async throws -> [EdgeToolsToken] {
-      self.tokenizer.withBorrowedLock { prompt.needleTokenized(using: $0) }
+      try self.tokenizer.withBorrowedLock { try prompt.needleTokenized(using: $0) }
     }
 
     public func clearCaches() {
@@ -258,8 +258,8 @@
       processor: inout (any LogitProcessor)?,
       synchronize: Bool
     ) throws -> (LMOutput?, EdgeToolsPrefillMetrics, Memory.Snapshot) {
-      let tokens = self.tokenizer.withBorrowedLock {
-        $0.encode(text: prompt.needleFormatted())
+      let tokens = try self.tokenizer.withBorrowedLock {
+        try $0.encode(text: prompt.needleFormatted())
       }
       let input = LMInput(text: LMInput.Text(tokens: MLXArray(tokens)))
       guard input.text.tokens.size <= model.configuration.encoderMaxLength else {

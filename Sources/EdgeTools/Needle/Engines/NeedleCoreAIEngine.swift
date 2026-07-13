@@ -156,7 +156,7 @@
   @available(anyAppleOS 27.0, *)
   extension NeedleCoreAIEngine {
     public func tokenize(prompt: EdgeToolsPrompt) async throws -> [EdgeToolsToken] {
-      self.tokenizer.withBorrowedLock { prompt.needleTokenized(using: $0) }
+      try self.tokenizer.withBorrowedLock { try prompt.needleTokenized(using: $0) }
     }
 
     public func clearCaches() {
@@ -289,8 +289,8 @@
       processor: inout (any EdgeToolsLogitsProcessor<NDArray, NDArray>)?,
       stream: ComputeStream?
     ) async throws -> (EncoderOutputs, EdgeToolsPrefillMetrics) {
-      let promptTokens = self.tokenizer.withBorrowedLock {
-        $0.encode(text: prompt.needleFormatted())
+      let promptTokens = try self.tokenizer.withBorrowedLock {
+        try $0.encode(text: prompt.needleFormatted())
       }
       guard promptTokens.count <= configuration.encoderMaxLength else {
         throw NeedleCoreAIEngineError.contextLengthExceeded(

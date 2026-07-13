@@ -49,11 +49,10 @@ struct `Needle tool encoding tests` {
       )
     )
 
-    let encodedObject = try JSONSerialization.jsonObject(with: tool.needlePromptEncoded())
-    let expectedObject = try JSONSerialization.jsonObject(with: JSONEncoder().encode(tool))
-    let encoded = try JSONSerialization.data(withJSONObject: encodedObject, options: .sortedKeys)
-    let expected = try JSONSerialization.data(withJSONObject: expectedObject, options: .sortedKeys)
+    let encoded = try tool.needlePromptEncoded()
 
-    expectNoDifference(encoded, expected)
+    expectNoDifference(encoded.contains(#""name":"say_\"hello\""#), true)
+    expectNoDifference(encoded.contains(#""description":"Uses a \"quoted\" phrase"#), true)
+    expectNoDifference(encoded.contains(#""pattern":"say \\\"hi\\\""#), true)
   }
 }

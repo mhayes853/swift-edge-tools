@@ -8,7 +8,7 @@
       prompt: EdgeToolsPrompt,
       using tokenizer: borrowing some EdgeToolsTokenizer & ~Copyable
     ) throws -> Self {
-      let tokens = tokenizer.encode(text: prompt.needleFormatted())
+      let tokens = tokenizer.encode(text: try prompt.needleFormatted())
       return LMInput(text: LMInput.Text(tokens: MLXArray(tokens)))
     }
   }

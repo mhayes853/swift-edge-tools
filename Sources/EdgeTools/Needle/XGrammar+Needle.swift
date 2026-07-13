@@ -95,7 +95,7 @@
     }
 
     private static func needleCall(_ tool: EdgeToolDefinition) throws -> XGrammarGrammar {
-      let schema = String(decoding: tool.arguments.needleGrammarEncoded(), as: UTF8.self)
+      let schema = try tool.arguments.needleGrammarEncoded()
       let arguments = try XGrammarGrammar(
         jsonSchema: schema,
         configuration: JSONSchemaConfiguration(
