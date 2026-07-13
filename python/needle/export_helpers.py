@@ -12,7 +12,7 @@ from huggingface_hub import snapshot_download
 from . import Needle, NeedleModelConfiguation
 from .torch_utils import load_state_dict, torch_dtype
 
-DEFAULT_SOURCE = "Cactus-Compute/needle-hf"
+DEFAULT_SOURCE = "Cactus-Compute/needle"
 CONFIG_FILENAMES = ("configuration.json", "config.json")
 TOKENIZER_FILENAMES = ("tokenizer.model", "tokenizer.json")
 DEFAULT_ENCODER_SAMPLE_LENGTH = 4
@@ -57,7 +57,7 @@ def resolve_model_source(source: str) -> ModelSourceFiles:
                 allow_patterns=[
                     "config.json",
                     "configuration.json",
-                    "model.safetensors",
+                    "*.safetensors",
                     "*.pkl",
                     "tokenizer.model",
                     "tokenizer.json",
@@ -123,9 +123,9 @@ def resolve_tokenizer_path(directory: Path) -> Path:
 
 
 def resolve_weights_path(directory: Path) -> Path:
-    safetensors_path = directory / "model.safetensors"
-    if safetensors_path.exists():
-        return safetensors_path
+    safetensors_paths = sorted(directory.glob("*.safetensors"))
+    if safetensors_paths:
+        return safetensors_paths[0]
 
     pickle_paths = sorted(directory.glob("*.pkl"))
     if pickle_paths:

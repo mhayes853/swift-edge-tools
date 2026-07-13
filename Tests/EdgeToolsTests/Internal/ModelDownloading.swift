@@ -3,19 +3,19 @@ import Foundation
 #if canImport(Hub)
   import Hub
 
-  func downloadNeedleHF() async throws -> URL {
+  func downloadNeedle() async throws -> URL {
     let hub = HubApi(downloadBase: URL.swiftEdgeToolsTestsDirectory)
-    let repo = Hub.Repo(id: "Cactus-Compute/needle-hf", type: .models)
+    let repo = Hub.Repo(id: "Cactus-Compute/needle", type: .models)
     let destination = hub.localRepoLocation(repo)
 
     if FileManager.default.fileExists(atPath: destination.path) {
-      print("=== Needle HF Model Already Downloaded At \(destination.path) ===")
+      print("=== Needle Model Already Downloaded At \(destination.path) ===")
       return destination
     }
 
-    print("=== Downloading Needle HF Model From \(repo.id) ===")
+    print("=== Downloading Needle Model From \(repo.id) ===")
     let url = try await hub.snapshot(from: repo)
-    print("=== Finished Downloading Needle HF Model To \(url.path) ===")
+    print("=== Finished Downloading Needle Model To \(url.path) ===")
     return url
   }
 #endif

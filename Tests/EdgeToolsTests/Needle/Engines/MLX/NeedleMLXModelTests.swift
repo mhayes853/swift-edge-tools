@@ -12,7 +12,7 @@
   struct `NeedleMLXModel tests` {
     @Test
     func `TokenIterator Usage`() async throws {
-      let url = try await downloadNeedleHF()
+      let url = try await downloadNeedle()
       var tokenizer = try self.tokenizer(url: url)
       let model = try loadNeedleMLXModel(from: url)
       let grammarEngine = XGrammarCompiler.needle(tokenizer: consume tokenizer)!

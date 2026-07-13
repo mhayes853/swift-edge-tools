@@ -22,13 +22,13 @@ pip install -e .
 
 The export script accepts either:
 
-1. A Hugging Face repo id, defaulting to `Cactus-Compute/needle-hf`
+1. A Hugging Face repo id, defaulting to `Cactus-Compute/needle`
 2. A local model directory
 
 The source directory or repo snapshot must contain:
 
 - `config.json` or `configuration.json`
-- `model.safetensors` or a `.pkl` weights file
+- a `.safetensors` weights file (preferred) or a `.pkl` weights file
 - `tokenizer.model` or `tokenizer.json`
 
 ## Export Output
@@ -62,7 +62,7 @@ With authoring metadata flags and quantization:
 
 ```bash
 python3 cli.py \
-  --source Cactus-Compute/needle-hf \
+  --source Cactus-Compute/needle \
   --output ./build/coreai-export \
   --authoring-author "Needle" \
   --authoring-description "CoreAI export" \
@@ -76,7 +76,7 @@ With ahead-of-time compilation:
 
 ```bash
 python3 cli.py \
-  --source Cactus-Compute/needle-hf \
+  --source Cactus-Compute/needle \
   --output ./build/coreai-export \
   --compile-platform macOS
 ```
@@ -86,7 +86,7 @@ With CoreML CPU/GPU execution and native SDPA:
 ```bash
 python3 cli.py \
   --backend coreml \
-  --source Cactus-Compute/needle-hf \
+  --source Cactus-Compute/needle \
   --output ./build/coreml-export \
   --compute-units cpu-and-gpu
 ```
@@ -95,7 +95,7 @@ With metadata and quantizer config files:
 
 ```bash
 python3 cli.py \
-  --source Cactus-Compute/needle-hf \
+  --source Cactus-Compute/needle \
   --output ./build/coreai-export \
   --authoring-metadata ./metadata.yaml \
   --quantizer-config ./quantizer.yaml
@@ -151,7 +151,7 @@ With an explicit source and output:
 
 Defaults:
 
-- source: `Cactus-Compute/needle-hf`
+- source: `Cactus-Compute/needle`
 - CoreAI output: `python/build/coreai-export`
 - CoreML output: `python/build/coreml-export`
 

@@ -12,7 +12,7 @@
     private let engine: NeedleMLXEngine
 
     init() async throws {
-      self.engine = try await NeedleMLXEngine(from: downloadNeedleHF())
+      self.engine = try await NeedleMLXEngine(from: downloadNeedle())
     }
 
     @Test
@@ -114,7 +114,7 @@
     @Test
     func `Generate With Untied Word Embeddings`() async throws {
       let engine = try await NeedleMLXEngine(
-        from: downloadNeedleHF(),
+        from: downloadNeedle(),
         editConfiguration: { configuration in
           configuration.tieWordEmbeddings = false
         }

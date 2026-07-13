@@ -4,6 +4,7 @@ from pathlib import Path
 
 import torch
 
+from needle.export_helpers import DEFAULT_SOURCE, resolve_weights_path
 from needle.torch_utils import extract_state_dict, load_state_dict, torch_dtype
 
 
@@ -17,6 +18,21 @@ class TorchUtilsTests(unittest.TestCase):
             state_dict = load_state_dict(weights_path)
 
         self.assertEqual(tuple(state_dict["model.embed_tokens.weight"].shape), (2, 2))
+
+    def test_default_source_is_needle_repository(self) -> None:
+        self.assertEqual(DEFAULT_SOURCE, "Cactus-Compute/needle")
+
+    def test_resolve_weights_path_prioritizes_safetensors(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            directory_path = Path(directory)
+            pickle_path = directory_path / "needle.pkl"
+            safetensors_path = directory_path / "weights.safetensors"
+            pickle_path.touch()
+            safetensors_path.touch()
+
+            weights_path = resolve_weights_path(directory_path)
+
+        self.assertEqual(weights_path, safetensors_path)
 
     def test_torch_dtype_lookup(self) -> None:
         self.assertEqual(torch_dtype("bfloat16"), torch.bfloat16)

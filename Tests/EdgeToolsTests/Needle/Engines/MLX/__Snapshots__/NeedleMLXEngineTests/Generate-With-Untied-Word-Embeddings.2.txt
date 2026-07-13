@@ -6,30 +6,30 @@
   ▿ (2 elements)
     ▿ key: EdgeToolsMetadataKey
       - rawValue: "MLXEngineGenerationStartMemorySnapshot"
-    ▿ value: Peak:   101M         (106451240)
+    ▿ value: Peak:   107M         (112990928)
 Active: 0K           (568)
-Cache:  117M         (123542502)
+Cache:  136M         (143539540)
       - activeMemory: 568
-      - cacheMemory: 123542502
-      - peakMemory: 106451240
+      - cacheMemory: 143539540
+      - peakMemory: 112990928
   ▿ (2 elements)
     ▿ key: EdgeToolsMetadataKey
       - rawValue: "MLXEnginePostDecodeMemorySnapshot"
-    ▿ value: Peak:   109M         (114757920)
-Active: 64M          (68000136)
-Cache:  60M          (63931542)
-      - activeMemory: 68000136
-      - cacheMemory: 63931542
-      - peakMemory: 114757920
+    ▿ value: Peak:   107M         (112990928)
+Active: 64M          (67738120)
+Cache:  80M          (84190596)
+      - activeMemory: 67738120
+      - cacheMemory: 84190596
+      - peakMemory: 112990928
   ▿ (2 elements)
     ▿ key: EdgeToolsMetadataKey
       - rawValue: "MLXEnginePostPrefillMemorySnapshot"
-    ▿ value: Peak:   101M         (106451240)
-Active: 53M          (56598668)
-Cache:  63M          (66944402)
-      - activeMemory: 56598668
-      - cacheMemory: 66944402
-      - peakMemory: 106451240
+    ▿ value: Peak:   107M         (112990928)
+Active: 53M          (56369292)
+Cache:  83M          (87170816)
+      - activeMemory: 56369292
+      - cacheMemory: 87170816
+      - peakMemory: 112990928
   ▿ (2 elements)
     ▿ key: EdgeToolsMetadataKey
       - rawValue: "PerTokenConfidences"

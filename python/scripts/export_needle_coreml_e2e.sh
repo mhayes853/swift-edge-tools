@@ -15,7 +15,7 @@ if ! "$PYTHON" -c 'import coreai_opt, coremltools' >/dev/null 2>&1; then
 	"$PYTHON" -m pip install -e "$PYTHON_DIR"
 fi
 
-SOURCE="${1:-Cactus-Compute/needle-hf}"
+SOURCE="${1:-Cactus-Compute/needle}"
 OUTPUT="${2:-$PYTHON_DIR/build/coreml-export}"
 if (($# >= 3)); then
 	EXTRA_ARGS=("${@:3}")
