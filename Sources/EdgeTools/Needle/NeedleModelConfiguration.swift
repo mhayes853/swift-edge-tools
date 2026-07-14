@@ -19,9 +19,10 @@ public struct NeedleModelConfiguration: Hashable, Sendable {
   public var maxSeqLen: Int?
   public var maxPositionEmbeddings: Int?
   private var _dtype: String?
+  private var _torchDType: String?
 
   public var dtype: String {
-    get { self._dtype ?? "bfloat16" }
+    get { self._dtype ?? self._torchDType ?? "bfloat16" }
     set { self._dtype = newValue }
   }
 
@@ -58,6 +59,7 @@ extension NeedleModelConfiguration: Codable {
     case maxSeqLen = "max_seq_len"
     case maxPositionEmbeddings = "max_position_embeddings"
     case _dtype = "dtype"
+    case _torchDType = "torch_dtype"
   }
 }
 
