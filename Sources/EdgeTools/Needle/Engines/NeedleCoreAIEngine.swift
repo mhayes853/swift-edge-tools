@@ -5,6 +5,8 @@
 
   @available(anyAppleOS 27.0, *)
   public final class NeedleCoreAIEngine: EdgeToolsEngine {
+    public typealias Prompt = NeedlePrompt
+
     public struct GenerateParameters: EdgeToolsEngineGenerateParameters {
       public static var `default`: Self { Self() }
 
@@ -155,8 +157,8 @@
 
   @available(anyAppleOS 27.0, *)
   extension NeedleCoreAIEngine {
-    public func tokenize(prompt: EdgeToolsPrompt) async throws -> [EdgeToolsToken] {
-      try self.tokenizer.withBorrowedLock { try prompt.needleTokenized(using: $0) }
+    public func tokenize(prompt: NeedlePrompt) async throws -> [EdgeToolsToken] {
+      try self.tokenizer.withBorrowedLock { try prompt.tokenized(using: $0) }
     }
 
     public func clearCaches() {
@@ -167,7 +169,7 @@
     }
 
     public func generate(
-      prompt: EdgeToolsPrompt,
+      prompt: NeedlePrompt,
       parameters: GenerateParameters,
       channel: EdgeToolsGenerationChannel
     ) throws -> some EdgeToolsEngineGenerationTask {
@@ -176,7 +178,7 @@
         let range = parameters.toolCallRange
         let matcher = try self.state.withLock { state in
           let matcher = try state.matcherPool.matcher(
-            tools: prompt.tools,
+            tools: prompt.tools.map(\.definition),
             range: range,
             compilingWith: state.grammarEngine
           )
@@ -196,7 +198,7 @@
     }
 
     private func generate(
-      prompt: EdgeToolsPrompt,
+      prompt: NeedlePrompt,
       parameters: GenerateParameters,
       channel: EdgeToolsGenerationChannel,
       matcher: consuming XGrammarMatcher,
@@ -284,13 +286,13 @@
     }
 
     private func prefill(
-      prompt: EdgeToolsPrompt,
+      prompt: NeedlePrompt,
       configuration: NeedleModelConfiguration,
       processor: inout (any EdgeToolsLogitsProcessor<NDArray, NDArray>)?,
       stream: ComputeStream?
     ) async throws -> (EncoderOutputs, EdgeToolsPrefillMetrics) {
       let promptTokens = try self.tokenizer.withBorrowedLock {
-        try $0.encode(text: prompt.needleFormatted())
+        try $0.encode(text: prompt.formatted())
       }
       guard promptTokens.count <= configuration.encoderMaxLength else {
         throw NeedleCoreAIEngineError.contextLengthExceeded(

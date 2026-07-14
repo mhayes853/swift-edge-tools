@@ -1,13 +1,14 @@
 // MARK: - EdgeToolsEngine
 
 public protocol EdgeToolsEngine: Sendable {
+  associatedtype Prompt: EdgeToolsPrompt
   associatedtype GenerateParameters: EdgeToolsEngineGenerateParameters
   associatedtype GenerationTask: EdgeToolsEngineGenerationTask
 
-  func tokenize(prompt: EdgeToolsPrompt) async throws -> [EdgeToolsToken]
+  func tokenize(prompt: Prompt) async throws -> [EdgeToolsToken]
 
   func generate(
-    prompt: EdgeToolsPrompt,
+    prompt: Prompt,
     parameters: GenerateParameters,
     channel: EdgeToolsGenerationChannel
   ) throws -> GenerationTask

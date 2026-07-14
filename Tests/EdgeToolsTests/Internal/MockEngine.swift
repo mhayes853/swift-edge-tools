@@ -5,6 +5,8 @@ private typealias MockGenerationError = any Error
 private typealias MockGenerationTaskValue = Task<EdgeToolsEngineGeneration, MockGenerationError>
 
 final class MockEngine: EdgeToolsEngine, Sendable {
+  typealias Prompt = NeedlePrompt
+
   final class GenerationTask: EdgeToolsEngineGenerationTask {
     private let task: MockGenerationTaskValue
     private let stopGeneration: @Sendable () -> Void
@@ -118,7 +120,7 @@ final class MockEngine: EdgeToolsEngine, Sendable {
 
   private let storage: Storage
   private let _generateCallCount = Lock(0)
-  private let tokenizeHandler: (@Sendable (EdgeToolsPrompt) -> [EdgeToolsToken])?
+  private let tokenizeHandler: (@Sendable (NeedlePrompt) -> [EdgeToolsToken])?
   private let _onGenerateStart = Lock<(@Sendable () -> Void)?>(nil)
   private let _onGenerateEnd = Lock<(@Sendable () -> Void)?>(nil)
 
@@ -148,7 +150,7 @@ final class MockEngine: EdgeToolsEngine, Sendable {
     self.tokenizeHandler = nil
   }
 
-  init(tokenize: @escaping @Sendable (EdgeToolsPrompt) -> [EdgeToolsToken]) {
+  init(tokenize: @escaping @Sendable (NeedlePrompt) -> [EdgeToolsToken]) {
     let storage = Storage()
     self.storage = storage
     self.tokenizeHandler = tokenize
@@ -158,7 +160,7 @@ final class MockEngine: EdgeToolsEngine, Sendable {
     MockEngine()
   }
 
-  func tokenize(prompt: EdgeToolsPrompt) async throws -> [EdgeToolsToken] {
+  func tokenize(prompt: NeedlePrompt) async throws -> [EdgeToolsToken] {
     self.tokenizeHandler?(prompt) ?? []
   }
 
@@ -167,7 +169,7 @@ final class MockEngine: EdgeToolsEngine, Sendable {
   }
 
   func generate(
-    prompt: EdgeToolsPrompt,
+    prompt: NeedlePrompt,
     parameters: GenerateParameters,
     channel: EdgeToolsGenerationChannel
   ) throws -> GenerationTask {

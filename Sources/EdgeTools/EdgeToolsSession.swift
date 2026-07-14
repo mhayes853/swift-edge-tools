@@ -5,21 +5,8 @@ import Observation
 
 public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable, Observable {
   fileprivate let engine: Engine
-  private let _systemPrompt: Lock<String>
   private let _activeStreams = Lock([EdgeToolsSessionStream]())
   private let observationRegistrar = ObservationRegistrar()
-
-  public var systemPrompt: String {
-    get {
-      self.observationRegistrar.access(self, keyPath: \.systemPrompt)
-      return self._systemPrompt.withLock { $0 }
-    }
-    set {
-      self.observationRegistrar.withMutation(of: self, keyPath: \.systemPrompt) {
-        self._systemPrompt.withLock { $0 = newValue }
-      }
-    }
-  }
 
   public var isResponding: Bool {
     !self.activeStreams.isEmpty
@@ -30,9 +17,8 @@ public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable, Observab
     return self._activeStreams.withLock { $0 }
   }
 
-  public init(engine: sending Engine, systemPrompt: String = "") {
+  public init(engine: sending Engine) {
     self.engine = engine
-    self._systemPrompt = Lock(systemPrompt)
   }
 
   fileprivate func removeActiveStream(_ stream: EdgeToolsSessionStream) {
@@ -47,32 +33,7 @@ public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable, Observab
 // MARK: - Tokenize
 
 extension EdgeToolsSession {
-  public func tokenize(
-    tools: [any EdgeTool],
-    with prompt: String,
-    systemPromptOverride: String?
-  ) async throws -> [EdgeToolsToken] {
-    try await self.tokenize(
-      tools: tools.map(\.definition),
-      with: prompt,
-      systemPromptOverride: systemPromptOverride
-    )
-  }
-
-  public func tokenize(
-    tools: [EdgeToolDefinition],
-    with prompt: String,
-    systemPromptOverride: String?
-  ) async throws -> [EdgeToolsToken] {
-    let prompt = EdgeToolsPrompt(
-      system: systemPromptOverride ?? self.systemPrompt,
-      user: prompt,
-      tools: tools
-    )
-    return try await self.tokenize(prompt: prompt)
-  }
-
-  public func tokenize(prompt: EdgeToolsPrompt) async throws -> [EdgeToolsToken] {
+  public func tokenize(prompt: Engine.Prompt) async throws -> [EdgeToolsToken] {
     try await self.engine.tokenize(prompt: prompt)
   }
 }
@@ -87,16 +48,12 @@ public struct EdgeToolsSessionGeneration: Sendable {
 extension EdgeToolsSession {
   @concurrent
   public func generate(
-    tools: [any EdgeTool],
-    with prompt: String,
-    systemPromptOverride: String? = nil,
+    prompt: Engine.Prompt,
     parameters: Engine.GenerateParameters = .default,
     shouldInvokeTools: @escaping @Sendable (AnyEdgeToolCall) -> Bool = { _ in true }
   ) async throws -> EdgeToolsSessionGeneration {
     let stream = self.stream(
-      tools: tools,
-      with: prompt,
-      systemPromptOverride: systemPromptOverride,
+      prompt: prompt,
       parameters: parameters,
       shouldInvokeTools: shouldInvokeTools
     )
@@ -155,18 +112,14 @@ public final class EdgeToolsSessionStream: Sendable, Observable, Identifiable {
 
   fileprivate init<Engine: EdgeToolsEngine>(
     session: EdgeToolsSession<Engine>,
-    tools: [any EdgeTool],
-    with prompt: String,
-    systemPrompt: String,
+    prompt: Engine.Prompt,
     parameters: Engine.GenerateParameters,
     shouldInvokeTools: @escaping @Sendable (AnyEdgeToolCall) -> Bool
   ) {
     let task = Task {
       return try await self.runGeneration(
         session: session,
-        tools: tools,
         prompt: prompt,
-        systemPrompt: systemPrompt,
         parameters: parameters,
         shouldInvokeTools: shouldInvokeTools
       )
@@ -176,9 +129,7 @@ public final class EdgeToolsSessionStream: Sendable, Observable, Identifiable {
 
   private func runGeneration<Engine: EdgeToolsEngine>(
     session: EdgeToolsSession<Engine>,
-    tools: [any EdgeTool],
-    prompt: String,
-    systemPrompt: String,
+    prompt: Engine.Prompt,
     parameters: Engine.GenerateParameters,
     shouldInvokeTools: @escaping @Sendable (AnyEdgeToolCall) -> Bool
   ) async throws -> EdgeToolsSessionGeneration {
@@ -198,13 +149,8 @@ public final class EdgeToolsSessionStream: Sendable, Observable, Identifiable {
       return stoppedBeforeGeneration
     }
 
-    let edgeToolsPrompt = EdgeToolsPrompt(
-      system: systemPrompt,
-      user: prompt,
-      tools: tools.map(\.definition)
-    )
     let toolsByName = Dictionary(
-      uniqueKeysWithValues: tools.map { ($0.name.snakeCased(), $0) }
+      uniqueKeysWithValues: prompt.tools.map { ($0.name.snakeCased(), $0) }
     )
     let shouldInvokeToolsBox = Lock(shouldInvokeTools)
 
@@ -227,7 +173,7 @@ public final class EdgeToolsSessionStream: Sendable, Observable, Identifiable {
         }
       )
       generationTask = try session.engine.generate(
-        prompt: edgeToolsPrompt,
+        prompt: prompt,
         parameters: parameters,
         channel: channel
       )
@@ -467,20 +413,16 @@ extension EdgeToolsSessionStream {
 
 extension EdgeToolsSession {
   public func stream(
-    tools: [any EdgeTool],
-    with prompt: String,
-    systemPromptOverride: String? = nil,
+    prompt: Engine.Prompt,
     parameters: Engine.GenerateParameters = .default,
     shouldInvokeTools: @escaping @Sendable (AnyEdgeToolCall) -> Bool = { _ in true }
   ) -> EdgeToolsSessionStream {
-    if let message = duplicateToolNameError(tools.map(\.name)) {
+    if let message = duplicateToolNameError(prompt.tools.map(\.name)) {
       assertionFailure(message)
     }
     let stream = EdgeToolsSessionStream(
       session: self,
-      tools: tools,
-      with: prompt,
-      systemPrompt: systemPromptOverride ?? self.systemPrompt,
+      prompt: prompt,
       parameters: parameters,
       shouldInvokeTools: shouldInvokeTools
     )

@@ -8,6 +8,8 @@
   // MARK: - NeedleMLXEngine
 
   public final class NeedleMLXEngine: EdgeToolsEngine {
+    public typealias Prompt = NeedlePrompt
+
     public struct GenerateParameters: EdgeToolsEngineGenerateParameters {
       public static var `default`: Self {
         Self()
@@ -113,8 +115,8 @@
       self.tokenizer = consume tokenizer
     }
 
-    public func tokenize(prompt: EdgeToolsPrompt) async throws -> [EdgeToolsToken] {
-      try self.tokenizer.withBorrowedLock { try prompt.needleTokenized(using: $0) }
+    public func tokenize(prompt: NeedlePrompt) async throws -> [EdgeToolsToken] {
+      try self.tokenizer.withBorrowedLock { try prompt.tokenized(using: $0) }
     }
 
     public func clearCaches() {
@@ -125,7 +127,7 @@
     }
 
     public func generate(
-      prompt: EdgeToolsPrompt,
+      prompt: NeedlePrompt,
       parameters: GenerateParameters,
       channel: EdgeToolsGenerationChannel
     ) throws -> some EdgeToolsEngineGenerationTask {
@@ -145,7 +147,7 @@
     }
 
     private func generate(
-      prompt: EdgeToolsPrompt,
+      prompt: NeedlePrompt,
       parameters: GenerateParameters,
       channel: EdgeToolsGenerationChannel,
       state: inout sending State,
@@ -155,7 +157,7 @@
       guard !isStopped.load(ordering: .relaxed) else { return .empty }
 
       let matcher = try state.matcherPool.matcher(
-        tools: prompt.tools,
+        tools: prompt.tools.map(\.definition),
         range: parameters.toolCallRange,
         compilingWith: state.grammarEngine
       )
@@ -252,14 +254,14 @@
     }
 
     private func prefill(
-      prompt: EdgeToolsPrompt,
+      prompt: NeedlePrompt,
       model: NeedleMLXModel,
       cache: [any KVCache],
       processor: inout (any LogitProcessor)?,
       synchronize: Bool
     ) throws -> (LMOutput?, EdgeToolsPrefillMetrics, Memory.Snapshot) {
       let tokens = try self.tokenizer.withBorrowedLock {
-        try $0.encode(text: prompt.needleFormatted())
+        try $0.encode(text: prompt.formatted())
       }
       let input = LMInput(text: LMInput.Text(tokens: MLXArray(tokens)))
       guard input.text.tokens.size <= model.configuration.encoderMaxLength else {

@@ -5,10 +5,10 @@
 
   extension LMInput {
     public static func needle(
-      prompt: EdgeToolsPrompt,
+      prompt: NeedlePrompt,
       using tokenizer: borrowing some EdgeToolsTokenizer & ~Copyable
     ) throws -> Self {
-      let tokens = tokenizer.encode(text: try prompt.needleFormatted())
+      let tokens = tokenizer.encode(text: try prompt.formatted())
       return LMInput(text: LMInput.Text(tokens: MLXArray(tokens)))
     }
   }

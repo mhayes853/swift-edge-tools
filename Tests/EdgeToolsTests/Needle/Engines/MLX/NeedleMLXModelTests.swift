@@ -16,7 +16,7 @@
       var tokenizer = try self.tokenizer(url: url)
       let model = try loadNeedleMLXModel(from: url)
       let grammarEngine = XGrammarCompiler.needle(tokenizer: consume tokenizer)!
-      let grammar = try XGrammarGrammar.needle(tools: EdgeToolsPrompt.sendAdventureEmail.tools)
+      let grammar = try XGrammarGrammar.needle(tools: NeedlePrompt.sendAdventureEmail.tools.map(\.definition))
       let matcher = try grammarEngine.compile(grammar)
       
       tokenizer = try self.tokenizer(url: url)

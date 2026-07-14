@@ -36,7 +36,7 @@
     private func assertTokensSnapshot(system: String, user: String) throws {
       let tokenizer = try EdgeToolsSPTokenizer(modelURL: .testTokenizerModel)
       let input = try LMInput.needle(
-        prompt: EdgeToolsPrompt(system: system, user: user, tools: [.sendEmail]),
+        prompt: NeedlePrompt(system: system, user: user, tools: [DefinitionTool(.sendEmail)]),
         using: consume tokenizer
       )
       assertSnapshot(of: input.text.tokens.asArray(Int32.self), as: .dump)

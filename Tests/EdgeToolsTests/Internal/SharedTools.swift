@@ -2,12 +2,31 @@ import EdgeTools
 
 // MARK: - Default Prompts
 
-extension EdgeToolsPrompt {
+extension NeedlePrompt {
   static let sendAdventureEmail = Self(
     system: "",
     user: "Send an email to Henry asking him to go on an adventure.",
-    tools: [.sendEmail]
+    tools: [DefinitionTool(.sendEmail)]
   )
+}
+
+// MARK: - DefinitionTool
+
+struct DefinitionTool: EdgeTool {
+  typealias Input = String
+  typealias Output = String
+
+  let definition: EdgeToolDefinition
+
+  init(_ definition: EdgeToolDefinition) {
+    self.definition = definition
+  }
+
+  var name: String { self.definition.name }
+  var description: String { self.definition.description }
+  var arguments: EdgeToolsGenerationSchema { self.definition.arguments }
+
+  func invoke(input: String) async throws -> sending String { "" }
 }
 
 // MARK: - SendEmailTool

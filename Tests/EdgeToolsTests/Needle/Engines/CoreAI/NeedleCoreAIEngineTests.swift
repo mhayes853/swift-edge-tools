@@ -217,10 +217,7 @@
     func `Generate Through EdgeToolsSession`() async throws {
       let engine = try await makeNeedleCoreAIEngine()
       let session = EdgeToolsSession(engine: engine)
-      let generation = try await session.generate(
-        tools: [SendEmailTool()],
-        with: EdgeToolsPrompt.sendAdventureEmail.user
-      )
+      let generation = try await session.generate(prompt: .sendAdventureEmail)
 
       expectNoDifference(generation.engineGeneration.wasStopped, false)
       withKnownIssue {
@@ -255,10 +252,10 @@
     @available(anyAppleOS 27.0, *)
     func `Generate Throws When Prompt Exceeds Context Length`() async throws {
       let engine = try await makeNeedleCoreAIEngine()
-      let prompt = EdgeToolsPrompt(
+      let prompt = NeedlePrompt(
         system: "",
         user: String(repeating: "token ", count: 2_000),
-        tools: [.sendEmail]
+        tools: [DefinitionTool(.sendEmail)]
       )
 
       let error = await #expect(throws: NeedleCoreAIEngineError.self) {
