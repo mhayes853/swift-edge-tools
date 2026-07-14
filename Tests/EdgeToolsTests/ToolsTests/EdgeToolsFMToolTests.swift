@@ -33,17 +33,6 @@
 
     @Test
     @available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0, *)
-    func `Preserves Edge Tools Value And Typed Arguments`() throws {
-      let input = try EdgeToolsFMToolInput<WeatherArgs>(
-        edgeToolsValue: ["city": "Brooklyn", "units": "metric"]
-      )
-
-      expectNoDifference(input.edgeToolsValue, ["city": "Brooklyn", "units": "metric"])
-      expectNoDifference(input.arguments, WeatherArgs(city: "Brooklyn", units: "metric"))
-    }
-
-    @Test
-    @available(iOS 26.0, macOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0, *)
     func `Invokes FoundationModels Tool From Wrapped Input`() async throws {
       let tool = EdgeToolsFMTool(WeatherTool())
       let input = try EdgeToolsFMToolInput<WeatherArgs>(
@@ -56,8 +45,6 @@
 
       expectNoDifference(output, "Sunny in Brooklyn (metric)")
     }
-
-    private static let jsonEncoder = JSONEncoder()
   }
 
   @Generable(description: "Weather query arguments")

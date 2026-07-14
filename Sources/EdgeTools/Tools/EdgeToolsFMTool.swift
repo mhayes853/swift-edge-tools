@@ -34,16 +34,14 @@
     Arguments: ConvertibleFromGeneratedContent & Sendable
   >: ConvertibleFromEdgeToolsValue, Sendable {
     public let arguments: Arguments
-    public let edgeToolsValue: EdgeToolsValue
 
-    public init(arguments: Arguments, edgeToolsValue: EdgeToolsValue) {
+    public init(arguments: Arguments) {
       self.arguments = arguments
-      self.edgeToolsValue = edgeToolsValue
     }
 
     public init(edgeToolsValue: EdgeToolsValue) throws {
       let generatedContent = try GeneratedContent(edgeToolsValue: edgeToolsValue)
-      self.init(arguments: try Arguments(generatedContent), edgeToolsValue: edgeToolsValue)
+      self.init(arguments: try Arguments(generatedContent))
     }
   }
 
