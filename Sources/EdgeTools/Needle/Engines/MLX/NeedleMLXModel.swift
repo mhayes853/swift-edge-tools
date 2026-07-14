@@ -250,15 +250,19 @@
   private final class NeedleDecoder: Module {
     let layers: [NeedleDecoderBlock]
     @ModuleInfo(key: "norm") var finalNorm: ZCRMSNorm
-    private let _inverseRope: MLXArray
+    private let _ropeTable: MLXArray
 
     init(configuration: NeedleModelConfiguration) {
       self.layers = (0..<configuration.decoderLayers)
         .map { _ in NeedleDecoderBlock(configuration: configuration) }
       self._finalNorm.wrappedValue = ZCRMSNorm(configuration: configuration)
-      self._inverseRope = RoPEFrequencies.inverse(
+      let inverseRope = RoPEFrequencies.inverse(
         headDimensions: configuration.attentionHeadDimensions,
         theta: configuration.ropeTheta
+      )
+      self._ropeTable = RoPEFrequencies.table(
+        inverse: inverseRope,
+        length: configuration.encoderMaxLength
       )
     }
 
@@ -269,9 +273,10 @@
       precomputedCrossAttention: [ProjectedAttentionKV],
       caches: [any KVCache]?,
     ) -> MLXArray {
-      let ropeFrequencies = RoPEFrequencies(
-        inverse: self._inverseRope,
-        sequenceLength: (caches?.first?.offset ?? 0) + x.dim(1),
+      let ropeFrequencies = RoPEFrequencies.fromTable(
+        self._ropeTable,
+        offset: caches?.first?.offset ?? 0,
+        sequenceLength: x.dim(1),
         dtype: x.dtype
       )
       var x = x
@@ -409,7 +414,7 @@
 
       if let ropeFrequencies {
         projectedKV = ProjectedAttentionKV(
-          keys: ropeFrequencies.apply(to: projectedKV.keys, offset: cache?.offset),
+          keys: ropeFrequencies.apply(to: projectedKV.keys),
           values: projectedKV.values
         )
       }
@@ -449,7 +454,7 @@
       queries = self.queryNorm(queries)
 
       if let ropeFrequencies {
-        queries = ropeFrequencies.apply(to: queries, offset: cache?.offset)
+        queries = ropeFrequencies.apply(to: queries)
       }
 
       let output = attentionWithCacheUpdate(
@@ -496,6 +501,14 @@
       return 1.0 / pow(theta, positions / headDimensions)
     }
 
+    static func table(inverse: MLXArray, length: Int) -> MLXArray {
+      let positions = MLXArray(0..<length).asType(.float32)
+      let frequencies =
+        expandedDimensions(positions, axis: 1) * expandedDimensions(inverse, axis: 0)
+      let embeddings = concatenated([frequencies, frequencies], axis: -1)
+      return stacked([MLX.sin(embeddings), MLX.cos(embeddings)])
+    }
+
     init(inverse: MLXArray, sequenceLength: Int, dtype: DType) {
       let positions = MLXArray(0..<sequenceLength).asType(.float32)
       let frequencies =
@@ -505,19 +518,33 @@
       self.cos = expandedDimensions(MLX.cos(embeddings), axis: 0).asType(dtype)
     }
 
-    func apply(to x: MLXArray, offset: Int?) -> MLXArray {
-      let offset = offset ?? 0
-      let sin = expandedDimensions(
-        self.sin[.ellipsis, offset..<(offset + x.dim(2)), 0...],
-        axis: 1
+    static func fromTable(
+      _ table: MLXArray,
+      offset: Int,
+      sequenceLength: Int,
+      dtype: DType
+    ) -> Self {
+      let positions = offset..<(offset + sequenceLength)
+      return Self(
+        sin: table[0..<1, positions, 0...].asType(dtype),
+        cos: table[1..<2, positions, 0...].asType(dtype)
       )
-      let cos = expandedDimensions(
-        self.cos[.ellipsis, offset..<(offset + x.dim(2)), 0...],
-        axis: 1
+    }
+
+    private init(sin: MLXArray, cos: MLXArray) {
+      self.sin = sin
+      self.cos = cos
+    }
+
+    func apply(to input: MLXArray) -> MLXArray {
+      let sin = expandedDimensions(self.sin, axis: 1)
+      let cos = expandedDimensions(self.cos, axis: 1)
+      let half = input.dim(-1) / 2
+      let rotated = concatenated(
+        [-input[.ellipsis, half...], input[.ellipsis, ..<half]],
+        axis: -1
       )
-      let half = x.dim(-1) / 2
-      let rotated = concatenated([-x[.ellipsis, half...], x[.ellipsis, ..<half]], axis: -1)
-      return (x * cos) + (rotated * sin)
+      return (input * cos) + (rotated * sin)
     }
   }
 

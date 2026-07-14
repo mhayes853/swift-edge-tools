@@ -82,20 +82,16 @@ struct `NeedleToolCallParser tests` {
 
   @Test
   func `Ignores Malformed Calls`() {
-    let calls = self.parse([
-      #"<tool_call> [{"name":"get_weather","arguments":{"location":}}]"#
-    ])
+    let calls = self.parse([#"<tool_call> [{"name":"get_weather","arguments":{"location":}}]"#])
 
     expectNoDifference(calls, [])
   }
 
   @Test
   func `Preserves The Raw Tool Name`() throws {
-    let calls = self.parse([
-      #"<tool_call> [{"name":"getWeather","arguments":{"location":"Seoul"}}]"#
-    ])
-
+    let calls = self.parse([#"<tool_call> [{"name":"getWeather","arguments":{"location":"Seoul"}}]"#])
     let call = try #require(calls.first)
+
     expectNoDifference(call.name, "getWeather")
   }
 

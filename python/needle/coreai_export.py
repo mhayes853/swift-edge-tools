@@ -160,11 +160,7 @@ def _prepare_module_for_coreai_export(
 ) -> torch.nn.Module:
     if compressor is None:
         return module
-    return compressor.compress(
-        module,
-        sample_args,
-        dynamic_shapes=dynamic_shapes,
-    )
+    return compressor.compress(module, sample_args, dynamic_shapes=dynamic_shapes)
 
 
 def _persist_program(
