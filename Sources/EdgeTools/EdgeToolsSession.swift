@@ -244,7 +244,7 @@ public final class EdgeToolsSessionStream: Sendable, Observable, Identifiable {
       let toolCall = try? EdgeToolCall(
         id: EdgeToolCallID(),
         tool: concrete,
-        rawValue: rawToolCall.arguments
+        rawInput: rawToolCall.arguments
       )
       return toolCall.map { AnyEdgeToolCall($0) }
     }

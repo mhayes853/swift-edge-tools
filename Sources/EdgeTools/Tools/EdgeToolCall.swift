@@ -53,7 +53,7 @@ public final class EdgeToolCall<Tool: EdgeTool>: Sendable, Observable, Identifia
   private let state: Lock<State>
   private let registrar = ObservationRegistrar()
 
-  public let rawValue: EdgeToolsValue
+  public let rawValue: EdgeRawToolCall
   public let input: Tool.Input
   public let id: EdgeToolCallID
   public let tool: Tool
@@ -99,12 +99,12 @@ public final class EdgeToolCall<Tool: EdgeTool>: Sendable, Observable, Identifia
   public init(
     id: EdgeToolCallID,
     tool: Tool,
-    rawValue: EdgeToolsValue
+    rawInput: EdgeToolsValue
   ) throws(Tool.Input.EdgeToolsConversionFailure) {
     self.id = id
     self.tool = tool
-    self.rawValue = rawValue
-    self.input = try Tool.Input(edgeToolsValue: rawValue)
+    self.rawValue = EdgeRawToolCall(name: tool.name, arguments: rawInput)
+    self.input = try Tool.Input(edgeToolsValue: rawInput)
     self.state = Lock(State())
   }
 
@@ -140,7 +140,7 @@ public final class AnyEdgeToolCall: Sendable, Observable, Identifiable {
     self.base.erasedTool
   }
 
-  public var rawValue: EdgeToolsValue {
+  public var rawValue: EdgeRawToolCall {
     self.base.erasedRawValue
   }
 
@@ -174,7 +174,7 @@ public final class AnyEdgeToolCall: Sendable, Observable, Identifiable {
 private protocol _AnyEdgeToolCall: Sendable {
   var erasedID: EdgeToolCallID { get }
   var erasedTool: any EdgeTool { get }
-  var erasedRawValue: EdgeToolsValue { get }
+  var erasedRawValue: EdgeRawToolCall { get }
   var erasedInput: any ConvertibleFromEdgeToolsValue & Sendable { get }
   var erasedStatus: EdgeToolCallStatus<any Sendable> { get }
   var erasedOutput: any Sendable { get async throws }
@@ -183,7 +183,7 @@ private protocol _AnyEdgeToolCall: Sendable {
 extension EdgeToolCall: _AnyEdgeToolCall {
   var erasedID: EdgeToolCallID { self.id }
   var erasedTool: any EdgeTool { self.tool }
-  var erasedRawValue: EdgeToolsValue { self.rawValue }
+  var erasedRawValue: EdgeRawToolCall { self.rawValue }
 
   var erasedInput: any ConvertibleFromEdgeToolsValue & Sendable {
     self.input

@@ -62,7 +62,7 @@
       expectNoDifference(generation.toolCalls[0].tool.name, "get_weather")
       let args = try #require(generation.toolCalls[0].input as? WeatherArgs)
       expectNoDifference(args.location, "Seoul")
-      expectNoDifference(generation.toolCalls[0].rawValue, ["location": "Seoul"])
+      expectNoDifference(generation.toolCalls[0].rawValue.arguments, ["location": "Seoul"])
     }
 
     @Test
@@ -341,6 +341,7 @@
 
       expectNoDifference(generation.toolCalls.count, 1)
       expectNoDifference(generation.toolCalls[0].tool.name, "getWeather")
+      expectNoDifference(generation.toolCalls[0].rawValue.name, "getWeather")
       let args = try #require(generation.toolCalls[0].input as? WeatherArgs)
       expectNoDifference(args.location, "Seoul")
     }
