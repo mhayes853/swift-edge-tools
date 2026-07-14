@@ -4,7 +4,7 @@ import Foundation
 private typealias MockGenerationError = any Error
 private typealias MockGenerationTaskValue = Task<EdgeToolsEngineGeneration, MockGenerationError>
 
-final class MockEngine: EdgeToolsEngine, Sendable {
+final class MockEngine: EdgeToolsPrefillableEngine, Sendable {
   typealias Prompt = NeedlePrompt
 
   final class GenerationTask: EdgeToolsEngineGenerationTask {
@@ -121,6 +121,8 @@ final class MockEngine: EdgeToolsEngine, Sendable {
   private let storage: Storage
   private let _generateCallCount = Lock(0)
   private let tokenizeHandler: (@Sendable (NeedlePrompt) -> [EdgeToolsToken])?
+  private let _prefillHandler =
+    Lock<(@Sendable (NeedlePrompt) throws -> EdgeToolsEnginePrefill)?>(nil)
   private let _onGenerateStart = Lock<(@Sendable () -> Void)?>(nil)
   private let _onGenerateEnd = Lock<(@Sendable () -> Void)?>(nil)
 
@@ -156,6 +158,13 @@ final class MockEngine: EdgeToolsEngine, Sendable {
     self.tokenizeHandler = tokenize
   }
 
+  init(prefill: @escaping @Sendable (NeedlePrompt) throws -> EdgeToolsEnginePrefill) {
+    let storage = Storage()
+    self.storage = storage
+    self.tokenizeHandler = nil
+    self._prefillHandler.withLock { $0 = prefill }
+  }
+
   static func live() -> MockEngine {
     MockEngine()
   }
@@ -166,6 +175,14 @@ final class MockEngine: EdgeToolsEngine, Sendable {
 
   func push(_ event: Event?) {
     self.storage.push(event)
+  }
+
+  func prefill(promptPrefix: NeedlePrompt) async throws -> EdgeToolsEnginePrefill {
+    let handler = self._prefillHandler.withLock { $0 }
+    return try handler?(promptPrefix)
+      ?? EdgeToolsEnginePrefill(
+        metrics: EdgeToolsPrefillMetrics(tokens: 0, duration: .zero)
+      )
   }
 
   func generate(

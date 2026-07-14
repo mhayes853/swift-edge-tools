@@ -38,6 +38,14 @@ extension EdgeToolsSession {
   }
 }
 
+// MARK: - Prefill
+
+extension EdgeToolsSession where Engine: EdgeToolsPrefillableEngine {
+  public func prefill(promptPrefix: Engine.Prompt) async throws -> EdgeToolsEnginePrefill {
+    try await self.engine.prefill(promptPrefix: promptPrefix)
+  }
+}
+
 // MARK: - Generate
 
 public struct EdgeToolsSessionGeneration: Sendable {

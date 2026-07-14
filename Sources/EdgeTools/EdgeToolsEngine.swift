@@ -14,6 +14,27 @@ public protocol EdgeToolsEngine: Sendable {
   ) throws -> GenerationTask
 }
 
+// MARK: - EdgeToolsPrefillableEngine
+
+public protocol EdgeToolsPrefillableEngine: EdgeToolsEngine {
+  func prefill(promptPrefix: Prompt) async throws -> EdgeToolsEnginePrefill
+}
+
+// MARK: - EdgeToolsEnginePrefill
+
+public struct EdgeToolsEnginePrefill: Sendable {
+  public var metrics: EdgeToolsPrefillMetrics
+  public var metadata: EdgeToolsMetadata
+
+  public init(
+    metrics: EdgeToolsPrefillMetrics,
+    metadata: EdgeToolsMetadata = [:]
+  ) {
+    self.metrics = metrics
+    self.metadata = metadata
+  }
+}
+
 // MARK: - EdgeToolsEngineGenerateParemeters
 
 public protocol EdgeToolsEngineGenerateParameters: Sendable {
