@@ -7,14 +7,28 @@ import Testing
 @Suite
 struct `EdgeToolCall tests` {
   @Test
-  func `Status Starts As Idle`() {
-    let call = EdgeToolCall(id: EdgeToolCallID(), tool: EchoTool(), input: "hello")
+  func `Status Starts As Idle`() throws {
+    let call = try EdgeToolCall(id: EdgeToolCallID(), tool: EchoTool(), rawValue: "hello")
     expectNoDifference(call.status.isIdle, true)
   }
 
   @Test
+  func `Preserves Raw Value`() throws {
+    let call = try EdgeToolCall(id: EdgeToolCallID(), tool: EchoTool(), rawValue: "hello")
+    expectNoDifference(call.rawValue, "hello")
+    expectNoDifference(AnyEdgeToolCall(call).rawValue, "hello")
+  }
+
+  @Test
+  func `Rejects A Raw Value That Cannot Be Converted To The Tool Input`() {
+    #expect(throws: EdgeToolsValueTypeError(expected: .string, received: .integer)) {
+      try EdgeToolCall(id: EdgeToolCallID(), tool: EchoTool(), rawValue: 1)
+    }
+  }
+
+  @Test
   func `Invoke Returns Output And Status Becomes Finished`() async throws {
-    let call = EdgeToolCall(id: EdgeToolCallID(), tool: EchoTool(), input: "hello")
+    let call = try EdgeToolCall(id: EdgeToolCallID(), tool: EchoTool(), rawValue: "hello")
     let output = try await call.output
 
     let expectedOutput = "echo: hello"
@@ -24,10 +38,10 @@ struct `EdgeToolCall tests` {
 
   @Test
   func `Status Is Running While Tool Is Executing`() async throws {
-    let call = EdgeToolCall(
+    let call = try EdgeToolCall(
       id: EdgeToolCallID(),
       tool: DelayedCountingTool(duration: .milliseconds(300), output: "done"),
-      input: ""
+      rawValue: ""
     )
 
     _ = Task { try await call.output }
@@ -39,13 +53,13 @@ struct `EdgeToolCall tests` {
   @Test
   func `Invoke Deduplicates Concurrent Calls`() async throws {
     let tool = DelayedCountingTool(duration: .milliseconds(200), output: "result")
-    let call = EdgeToolCall(id: EdgeToolCallID(), tool: tool, input: "")
+    let call = try EdgeToolCall(id: EdgeToolCallID(), tool: tool, rawValue: "")
 
-    async let a = try await call.output
-    async let b = try await call.output
-    async let c = try await call.output
+    async let firstOutput = try await call.output
+    async let secondOutput = try await call.output
+    async let thirdOutput = try await call.output
 
-    let results = try await [a, b, c]
+    let results = try await [firstOutput, secondOutput, thirdOutput]
 
     expectNoDifference(results, ["result", "result", "result"])
     expectNoDifference(tool.invokeCount, 1)
@@ -54,7 +68,7 @@ struct `EdgeToolCall tests` {
   @Test
   func `Invoke Returns Cached Result After Completion`() async throws {
     let tool = DelayedCountingTool(duration: .milliseconds(0), output: "cached")
-    let call = EdgeToolCall(id: EdgeToolCallID(), tool: tool, input: "")
+    let call = try EdgeToolCall(id: EdgeToolCallID(), tool: tool, rawValue: "")
 
     let first = try await call.output
     let second = try await call.output
@@ -66,10 +80,10 @@ struct `EdgeToolCall tests` {
 
   @Test
   func `Invoke Propagates Errors And Status Becomes Finished With Failure`() async throws {
-    let call = EdgeToolCall(
+    let call = try EdgeToolCall(
       id: EdgeToolCallID(),
       tool: ThrowingTool(error: ToolError(message: "boom")),
-      input: ""
+      rawValue: ""
     )
 
     await #expect(throws: ToolError.self) {
@@ -86,7 +100,7 @@ struct `EdgeToolCall tests` {
       duration: .milliseconds(50),
       error: ToolError(message: "failed")
     )
-    let call = EdgeToolCall(id: EdgeToolCallID(), tool: tool, input: "")
+    let call = try EdgeToolCall(id: EdgeToolCallID(), tool: tool, rawValue: "")
 
     await #expect(throws: ToolError.self) {
       _ = try await call.output
@@ -100,10 +114,10 @@ struct `EdgeToolCall tests` {
 
   @Test
   func `Cancellation Returns CancellationError`() async throws {
-    let call = EdgeToolCall(
+    let call = try EdgeToolCall(
       id: EdgeToolCallID(),
       tool: CancellableTool(duration: .seconds(10)),
-      input: ""
+      rawValue: ""
     )
 
     let task = Task { try await call.output }
@@ -121,7 +135,7 @@ struct `EdgeToolCall tests` {
 
   @Test
   func `Status Is Observable`() async throws {
-    let call = EdgeToolCall(id: EdgeToolCallID(), tool: EchoTool(), input: "blob")
+    let call = try EdgeToolCall(id: EdgeToolCallID(), tool: EchoTool(), rawValue: "blob")
 
     let didChange = Lock(false)
     withObservationTracking {

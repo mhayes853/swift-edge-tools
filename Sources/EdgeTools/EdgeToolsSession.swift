@@ -241,8 +241,12 @@ public final class EdgeToolsSessionStream: Sendable, Observable, Identifiable {
     guard let tool = toolsByName[rawToolCall.name.snakeCased()] else { return nil }
 
     func open<Tool: EdgeTool>(_ concrete: Tool) -> AnyEdgeToolCall? {
-      guard let input = try? Tool.Input(edgeToolsValue: rawToolCall.arguments) else { return nil }
-      return AnyEdgeToolCall(EdgeToolCall(id: EdgeToolCallID(), tool: concrete, input: input))
+      let toolCall = try? EdgeToolCall(
+        id: EdgeToolCallID(),
+        tool: concrete,
+        rawValue: rawToolCall.arguments
+      )
+      return toolCall.map { AnyEdgeToolCall($0) }
     }
     return open(tool)
   }

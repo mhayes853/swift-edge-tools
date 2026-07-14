@@ -53,6 +53,7 @@ public final class EdgeToolCall<Tool: EdgeTool>: Sendable, Observable, Identifia
   private let state: Lock<State>
   private let registrar = ObservationRegistrar()
 
+  public let rawValue: EdgeToolsValue
   public let input: Tool.Input
   public let id: EdgeToolCallID
   public let tool: Tool
@@ -95,10 +96,15 @@ public final class EdgeToolCall<Tool: EdgeTool>: Sendable, Observable, Identifia
     }
   }
 
-  public init(id: EdgeToolCallID, tool: Tool, input: Tool.Input) {
+  public init(
+    id: EdgeToolCallID,
+    tool: Tool,
+    rawValue: EdgeToolsValue
+  ) throws(Tool.Input.EdgeToolsConversionFailure) {
     self.id = id
     self.tool = tool
-    self.input = input
+    self.rawValue = rawValue
+    self.input = try Tool.Input(edgeToolsValue: rawValue)
     self.state = Lock(State())
   }
 
@@ -131,23 +137,27 @@ public final class EdgeToolCall<Tool: EdgeTool>: Sendable, Observable, Identifia
 
 public final class AnyEdgeToolCall: Sendable, Observable, Identifiable {
   public var tool: any EdgeTool {
-    self.base._tool
+    self.base.erasedTool
+  }
+
+  public var rawValue: EdgeToolsValue {
+    self.base.erasedRawValue
   }
 
   public var input: any ConvertibleFromEdgeToolsValue & Sendable {
-    self.base._input
+    self.base.erasedInput
   }
 
   public var status: EdgeToolCallStatus<any Sendable> {
-    self.base._status
+    self.base.erasedStatus
   }
 
   public var id: EdgeToolCallID {
-    self.base._id
+    self.base.erasedID
   }
 
   public var output: any Sendable {
-    get async throws { try await self.base._output }
+    get async throws { try await self.base.erasedOutput }
   }
 
   private let base: _AnyEdgeToolCall
@@ -162,26 +172,28 @@ public final class AnyEdgeToolCall: Sendable, Observable, Identifiable {
 }
 
 private protocol _AnyEdgeToolCall: Sendable {
-  var _id: EdgeToolCallID { get }
-  var _tool: any EdgeTool { get }
-  var _input: any ConvertibleFromEdgeToolsValue & Sendable { get }
-  var _status: EdgeToolCallStatus<any Sendable> { get }
-  var _output: any Sendable { get async throws }
+  var erasedID: EdgeToolCallID { get }
+  var erasedTool: any EdgeTool { get }
+  var erasedRawValue: EdgeToolsValue { get }
+  var erasedInput: any ConvertibleFromEdgeToolsValue & Sendable { get }
+  var erasedStatus: EdgeToolCallStatus<any Sendable> { get }
+  var erasedOutput: any Sendable { get async throws }
 }
 
 extension EdgeToolCall: _AnyEdgeToolCall {
-  var _id: EdgeToolCallID { self.id }
-  var _tool: any EdgeTool { self.tool }
+  var erasedID: EdgeToolCallID { self.id }
+  var erasedTool: any EdgeTool { self.tool }
+  var erasedRawValue: EdgeToolsValue { self.rawValue }
 
-  var _input: any ConvertibleFromEdgeToolsValue & Sendable {
+  var erasedInput: any ConvertibleFromEdgeToolsValue & Sendable {
     self.input
   }
 
-  var _status: EdgeToolCallStatus<any Sendable> {
+  var erasedStatus: EdgeToolCallStatus<any Sendable> {
     self.status.map { $0 }
   }
 
-  var _output: any Sendable {
+  var erasedOutput: any Sendable {
     get async throws { try await self.output }
   }
 }
