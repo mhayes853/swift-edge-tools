@@ -243,10 +243,7 @@ public final class EdgeToolsSessionStream: Sendable, Observable, Identifiable {
 
     let shouldStopGeneration = self.state.withLock { state in
       state.generationTaskStop = { generationTask.stop() }
-      if state.wasStoppedBeforeGeneration {
-        return true
-      }
-      return false
+      return state.wasStoppedBeforeGeneration
     }
     if shouldStopGeneration {
       generationTask.stop()
