@@ -1,74 +1,112 @@
 ▿ EdgeToolsSessionGeneration
   ▿ engineGeneration: EdgeToolsEngineGeneration
     ▿ decodeMetrics: EdgeToolsDecodeMetrics
-      ▿ duration: 0.71772625 seconds
-        - _low: 717726250000000000
+      ▿ duration: 1.248879542 seconds
+        - _low: 1248879542000000000
         - _high: 0
-      ▿ durationToFirstToken: 0.083535792 seconds
-        - _low: 83535792000000000
+      ▿ durationToFirstToken: 0.08260125 seconds
+        - _low: 82601250000000000
         - _high: 0
-      - tokens: 46
+      - tokens: 84
     ▿ metadata: 2 key/value pairs
       ▿ (2 elements)
         ▿ key: EdgeToolsMetadataKey
           - rawValue: "GenerationConfidence"
-        - value: 0.91456115
+        - value: 0.91324455
       ▿ (2 elements)
         ▿ key: EdgeToolsMetadataKey
           - rawValue: "PerTokenConfidences"
-        ▿ value: 46 elements
+        ▿ value: 84 elements
           - 1.0
-          - 0.9686196
-          - 0.99999917
+          - 0.9545628
+          - 0.9999988
           - 1.0
-          - 0.99999976
+          - 0.99999964
           - 1.0
-          - 0.9999999
-          - 0.9999678
-          - 0.9999831
+          - 0.99999964
+          - 0.99979013
+          - 0.9999759
           - 1.0
-          - 0.909907
-          - 0.99997723
-          - 0.61138195
-          - 0.8594279
-          - 0.7051763
-          - 0.95976204
-          - 0.9999999
-          - 0.99997354
+          - 0.992062
+          - 0.99998736
+          - 0.8056322
+          - 0.84840786
+          - 0.7570767
+          - 0.91367656
           - 1.0
-          - 0.9996567
-          - 0.99999774
-          - 0.99999976
-          - 0.99832565
+          - 0.9999987
+          - 1.0
+          - 0.9999745
+          - 0.99999225
+          - 0.99999964
+          - 0.994615
+          - 0.6791787
+          - 0.7826625
+          - 0.98866826
+          - 0.6943027
+          - 0.99986017
+          - 0.99889696
           - 0.5312094
-          - 0.56985265
-          - 0.9863631
-          - 0.9579516
-          - 0.9999864
-          - 0.9996613
+          - 0.6654106
+          - 0.99444515
+          - 0.9954261
+          - 0.79182106
+          - 0.95531917
+          - 0.89478946
+          - 0.9942251
+          - 0.99986017
+          - 0.9998666
+          - 0.95430803
+          - 0.65665823
+          - 0.6076632
+          - 0.5621765
+          - 0.99895155
+          - 0.9999993
+          - 0.99999535
+          - 1.0
+          - 0.999998
+          - 0.9894499
+          - 0.99974686
+          - 0.9999993
+          - 0.9905874
+          - 0.9999883
+          - 0.69925445
+          - 0.7905303
+          - 0.6451199
+          - 0.992597
+          - 1.0
+          - 0.9999988
+          - 1.0
+          - 0.9999895
+          - 0.99994874
+          - 0.99999976
+          - 0.99509466
           - 0.6513549
-          - 0.7310586
-          - 0.99553156
-          - 0.9942697
-          - 0.8267118
-          - 0.9678385
-          - 0.89978373
-          - 0.99486035
-          - 0.99988043
-          - 0.9999292
-          - 0.923644
-          - 0.53509843
-          - 0.5506074
-          - 0.96124375
-          - 0.98677725
-          - 0.9940428
+          - 0.9324533
+          - 0.97838473
+          - 0.941007
+          - 0.9998416
+          - 0.9968273
+          - 0.62245935
+          - 0.56985265
+          - 0.75346667
+          - 0.9896718
+          - 0.9953904
+          - 0.99793327
+          - 0.77321637
+          - 0.80193585
+          - 0.86431044
+          - 0.98780584
+          - 0.9998727
+          - 0.9998416
+          - 0.74316806
           - 1.0
     ▿ prefillMetrics: EdgeToolsPrefillMetrics
-      ▿ duration: 0.058181292 seconds
-        - _low: 58181292000000000
+      ▿ duration: 0.057170042 seconds
+        - _low: 57170042000000000
         - _high: 0
-      - tokens: 137
-    ▿ tokens: 46 elements
+      - tokens: 132
+    ▿ tokens: 84 elements
       ▿ EdgeToolsToken
         - id: 4
         - stringValue: "<tool_call>"
@@ -193,37 +231,134 @@
         - id: 8071
         - stringValue: "["
       ▿ EdgeToolsToken
-        - id: 8039
-        - stringValue: "\""
+        - id: 271
+        - stringValue: "{\""
       ▿ EdgeToolsToken
-        - id: 8059
-        - stringValue: "}"
+        - id: 431
+        - stringValue: "}},{\""
       ▿ EdgeToolsToken
-        - id: 8059
-        - stringValue: "}"
+        - id: 294
+        - stringValue: "name"
       ▿ EdgeToolsToken
-        - id: 8072
-        - stringValue: "]"
+        - id: 264
+        - stringValue: "\":\""
+      ▿ EdgeToolsToken
+        - id: 818
+        - stringValue: "send"
+      ▿ EdgeToolsToken
+        - id: 8062
+        - stringValue: "_"
+      ▿ EdgeToolsToken
+        - id: 820
+        - stringValue: "email"
+      ▿ EdgeToolsToken
+        - id: 265
+        - stringValue: "\",\""
+      ▿ EdgeToolsToken
+        - id: 393
+        - stringValue: "arguments"
+      ▿ EdgeToolsToken
+        - id: 282
+        - stringValue: "\":{\""
+      ▿ EdgeToolsToken
+        - id: 2876
+        - stringValue: "address"
+      ▿ EdgeToolsToken
+        - id: 264
+        - stringValue: "\":\""
+      ▿ EdgeToolsToken
+        - id: 280
+        - stringValue: "he"
+      ▿ EdgeToolsToken
+        - id: 1665
+        - stringValue: "nder"
+      ▿ EdgeToolsToken
+        - id: 1127
+        - stringValue: "ry"
+      ▿ EdgeToolsToken
+        - id: 8181
+        - stringValue: "@"
+      ▿ EdgeToolsToken
+        - id: 8057
+        - stringValue: "g"
+      ▿ EdgeToolsToken
+        - id: 497
+        - stringValue: "mail"
+      ▿ EdgeToolsToken
+        - id: 8063
+        - stringValue: "."
+      ▿ EdgeToolsToken
+        - id: 869
+        - stringValue: "com"
+      ▿ EdgeToolsToken
+        - id: 265
+        - stringValue: "\",\""
+      ▿ EdgeToolsToken
+        - id: 979
+        - stringValue: "subject"
+      ▿ EdgeToolsToken
+        - id: 264
+        - stringValue: "\":\""
+      ▿ EdgeToolsToken
+        - id: 8103
+        - stringValue: "H"
+      ▿ EdgeToolsToken
+        - id: 637
+        - stringValue: "el"
+      ▿ EdgeToolsToken
+        - id: 363
+        - stringValue: "lo"
+      ▿ EdgeToolsToken
+        - id: 265
+        - stringValue: "\",\""
+      ▿ EdgeToolsToken
+        - id: 1519
+        - stringValue: "body"
+      ▿ EdgeToolsToken
+        - id: 264
+        - stringValue: "\":\""
+      ▿ EdgeToolsToken
+        - id: 8084
+        - stringValue: "I"
+      ▿ EdgeToolsToken
+        - id: 647
+        - stringValue: " am"
+      ▿ EdgeToolsToken
+        - id: 365
+        - stringValue: " w"
+      ▿ EdgeToolsToken
+        - id: 269
+        - stringValue: "ri"
+      ▿ EdgeToolsToken
+        - id: 490
+        - stringValue: "ting"
+      ▿ EdgeToolsToken
+        - id: 314
+        - stringValue: " to"
+      ▿ EdgeToolsToken
+        - id: 3245
+        - stringValue: " go"
+      ▿ EdgeToolsToken
+        - id: 442
+        - stringValue: " on"
+      ▿ EdgeToolsToken
+        - id: 439
+        - stringValue: " an"
+      ▿ EdgeToolsToken
+        - id: 1746
+        - stringValue: " ad"
+      ▿ EdgeToolsToken
+        - id: 628
+        - stringValue: "vent"
+      ▿ EdgeToolsToken
+        - id: 491
+        - stringValue: "ure"
+      ▿ EdgeToolsToken
+        - id: 4369
+        - stringValue: ".\"}}]"
       ▿ EdgeToolsToken
         - id: 1
         - stringValue: ""
     - wasStopped: false
   ▿ toolCalls: EdgeToolCallCollection
-    ▿ elements: 1 element
-      ▿ AnyEdgeToolCall
-        ▿ base: EdgeToolCall<SendEmailTool>
-          ▿ id: EdgeToolCallID
-            - rawValue: "07DF9029-6FD3-4A75-9EDA-43FE4DFFE174"
-          ▿ input: Input
-            - address: "henderry@gmail.com"
-            - body: "Could you please go on an adventure?["
-            - subject: "Hello"
-          ▿ registrar: ObservationRegistrar
-            ▿ extent: Extent
-              ▿ context: Context
-                ▿ state: _ManagedCriticalState<State>
-                  - buffer: LockedBuffer
-          - state: (0 elements)
-          ▿ tool: SendEmailTool
-            - description: "Sends an email to a recipient with an email address."
-            - name: "sendEmail"
+    - elements: 0 elements

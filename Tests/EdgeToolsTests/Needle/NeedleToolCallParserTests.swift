@@ -57,10 +57,13 @@ struct `NeedleToolCallParser tests` {
     ])
 
     let call = try #require(calls.first)
-    expectNoDifference(
-      call.arguments,
-      ["text": "literal}_and]_inside_string", "title": "{draft}"]
-    )
+    guard case .object(let arguments) = call.arguments else {
+      Issue.record("Expected object arguments.")
+      return
+    }
+
+    expectNoDifference(arguments["text"], "literal}_and]_inside_string")
+    expectNoDifference(arguments["title"], "{draft}")
   }
 
   @Test
