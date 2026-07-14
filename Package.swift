@@ -20,6 +20,7 @@ let package = Package(
     .trait(name: "XGrammar", description: "XGrammar-powered structured generation."),
     .trait(name: "Sentencepiece", description: "Pretrained Sentencepiece tokenizer support."),
     .trait(name: "Transformers", description: "swift-transformers tokenizer support."),
+    .trait(name: "FoundationModels", description: "Apple FoundationModels interoperability."),
     .trait(name: "MLX", description: "MLX engine support.", enabledTraits: ["XGrammar"]),
     .trait(
       name: "CoreAI",
@@ -27,7 +28,11 @@ let package = Package(
       enabledTraits: ["XGrammar"]
     ),
     .trait(name: "CoreML", description: "CoreML engine support.", enabledTraits: ["XGrammar"]),
-    .default(enabledTraits: ["XGrammar", "MLX", "Sentencepiece", "CoreAI", "CoreML"])
+    .default(
+      enabledTraits: [
+        "XGrammar", "MLX", "Sentencepiece", "FoundationModels", "CoreAI", "CoreML"
+      ]
+    )
   ],
   dependencies: [
     .package(url: "https://github.com/ml-explore/mlx-swift-lm", from: "3.31.3"),

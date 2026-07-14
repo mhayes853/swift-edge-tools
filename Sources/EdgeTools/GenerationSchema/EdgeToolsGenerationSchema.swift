@@ -34,11 +34,7 @@ public enum EdgeToolsGenerationSchema: Hashable, Sendable {
   }
 
   public init(_ schemas: some Sequence<Self>) {
-    self = schemas.reduce(Self.object(OrderedDictionary<Key, EdgeToolsValue>())) {
-      partialResult,
-      schema in
-      partialResult.merging(schema)
-    }
+    self = schemas.reduce(Self.object([:])) { $0.merging($1) }
   }
 
   public var objectValue: OrderedDictionary<Key, EdgeToolsValue>? {
