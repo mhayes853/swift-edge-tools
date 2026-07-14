@@ -4,7 +4,7 @@ import Observation
 // MARK: - EdgeToolsSession
 
 public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable, Observable {
-  fileprivate let engine: Engine
+  public let engine: Engine
   private let _activeStreams = Lock([EdgeToolsSessionStream]())
   private let observationRegistrar = ObservationRegistrar()
 

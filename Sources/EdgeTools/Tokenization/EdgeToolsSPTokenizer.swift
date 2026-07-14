@@ -3,26 +3,26 @@
   import Foundation
 
   public struct EdgeToolsSPTokenizer: ~Copyable {
-    private let tokenizer: sp_tokenizer_t
+    public let handle: sp_tokenizer_t
 
     public var vocabularySize: Int {
-      Int(sp_tokenizer_vocab_size(self.tokenizer))
+      Int(sp_tokenizer_vocab_size(self.handle))
     }
 
     public var bosTokenId: EdgeToolsToken.ID? {
-      Self.optionalTokenID(sp_tokenizer_bos_token_id(self.tokenizer))
+      Self.optionalTokenID(sp_tokenizer_bos_token_id(self.handle))
     }
 
     public var eosTokenId: EdgeToolsToken.ID? {
-      Self.optionalTokenID(sp_tokenizer_eos_token_id(self.tokenizer))
+      Self.optionalTokenID(sp_tokenizer_eos_token_id(self.handle))
     }
 
     public var unknownTokenId: EdgeToolsToken.ID? {
-      Self.optionalTokenID(sp_tokenizer_unk_token_id(self.tokenizer))
+      Self.optionalTokenID(sp_tokenizer_unk_token_id(self.handle))
     }
 
     public var padTokenId: EdgeToolsToken.ID? {
-      Self.optionalTokenID(sp_tokenizer_pad_token_id(self.tokenizer))
+      Self.optionalTokenID(sp_tokenizer_pad_token_id(self.handle))
     }
 
     public init(modelURL: URL) throws {
@@ -47,16 +47,16 @@
     }
 
     init(tokenizer: consuming sp_tokenizer_t) {
-      self.tokenizer = tokenizer
+      self.handle = tokenizer
     }
 
     deinit {
-      sp_tokenizer_destroy(self.tokenizer)
+      sp_tokenizer_destroy(self.handle)
     }
 
     public func encode(text: String) -> [EdgeToolsToken.ID] {
       var size = 0
-      let tokenIds = sp_tokenizer_encode(self.tokenizer, text, &size)
+      let tokenIds = sp_tokenizer_encode(self.handle, text, &size)
       defer { tokenIds?.deallocate() }
       return Array(UnsafeBufferPointer(start: tokenIds, count: Int(size))).map(Int.init)
     }
@@ -64,7 +64,7 @@
     public func decode(tokens: [EdgeToolsToken.ID]) -> String {
       let tokenIds = tokens.map(Int32.init)
       let string = tokenIds.withUnsafeBufferPointer { tokenIdsPtr in
-        sp_tokenizer_decode(self.tokenizer, tokenIdsPtr.baseAddress, tokenIdsPtr.count, nil)
+        sp_tokenizer_decode(self.handle, tokenIdsPtr.baseAddress, tokenIdsPtr.count, nil)
       }
       defer { string?.deallocate() }
       return string.map { String(cString: $0) } ?? ""
@@ -73,7 +73,7 @@
     public func convertTokensToIds(_ tokens: [String]) -> [EdgeToolsToken.ID?] {
       let unknownTokenId = self.unknownTokenId
       return tokens.map { token in
-        let tokenId = Int(token.withCString { sp_tokenizer_token_to_id(self.tokenizer, $0) })
+        let tokenId = Int(token.withCString { sp_tokenizer_token_to_id(self.handle, $0) })
         return token == self.unknownToken || tokenId != unknownTokenId ? tokenId : nil
       }
     }
@@ -82,7 +82,7 @@
       ids.map { id in
         withUnsafeTemporaryAllocation(of: CChar.self, capacity: 256) { buffer in
           let result = sp_tokenizer_id_to_token(
-            self.tokenizer,
+            self.handle,
             Int32(id),
             buffer.baseAddress,
             buffer.count
