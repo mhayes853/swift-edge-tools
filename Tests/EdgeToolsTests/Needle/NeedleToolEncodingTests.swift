@@ -17,7 +17,7 @@ struct `Needle tool encoding tests` {
       ("Send", "send")
     ]
   )
-  func `Normalized Basics`(name: String, expectedName: String) {
+  func `Prompt Formatting Normalizes Tool Names`(name: String, expectedName: String) throws {
     let tool = EdgeToolDefinition(
       name: name,
       description: "Blob",
@@ -27,13 +27,14 @@ struct `Needle tool encoding tests` {
       )
     )
 
-    var expectedTool = tool
-    expectedTool.name = expectedName
-    expectNoDifference(tool.needleNormalized(), expectedTool)
+    let prompt = EdgeToolsPrompt(system: "", user: "", tools: [tool])
+    let formatted = try prompt.needleFormatted()
+
+    expectNoDifference(formatted.contains("\"name\":\"\(expectedName)\""), true)
   }
 
   @Test
-  func `Needle Prompt Encoding Escapes Quotes`() throws {
+  func `Needle Prompt Formatting Escapes Quotes`() throws {
     let tool = EdgeToolDefinition(
       name: "say_\"hello\"",
       description: "Uses a \"quoted\" phrase",
@@ -49,7 +50,8 @@ struct `Needle tool encoding tests` {
       )
     )
 
-    let encoded = try tool.needlePromptEncoded()
+    let prompt = EdgeToolsPrompt(system: "", user: "", tools: [tool])
+    let encoded = try prompt.needleFormatted()
 
     expectNoDifference(encoded.contains(#""name":"say_\"hello\""#), true)
     expectNoDifference(encoded.contains(#""description":"Uses a \"quoted\" phrase"#), true)
