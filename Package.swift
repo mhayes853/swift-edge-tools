@@ -188,10 +188,10 @@ let package = Package(
       ],
       exclude: [
         "GenerationSchemaTests/__Snapshots__",
-        "Needle/Engines/CoreAI/__Snapshots__",
-        "Needle/Engines/CoreML/__Snapshots__",
-        "Needle/Engines/MLX/__Snapshots__",
-        "Needle/__Snapshots__"
+        "Models/Needle/Engines/CoreAI/__Snapshots__",
+        "Models/Needle/Engines/CoreML/__Snapshots__",
+        "Models/Needle/Engines/MLX/__Snapshots__",
+        "Models/Needle/__Snapshots__"
       ],
       resources: [.process("Resources")]
     )
