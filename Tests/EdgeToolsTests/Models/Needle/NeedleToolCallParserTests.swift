@@ -74,10 +74,13 @@ struct `NeedleToolCallParser tests` {
     ])
 
     expectNoDifference(calls.map(\.name), ["get_weather", "get_weather"])
-    expectNoDifference(calls.map(\.arguments), [
-      ["location": "Seoul"],
-      ["location": "Paris"]
-    ])
+    expectNoDifference(
+      calls.map(\.arguments),
+      [
+        ["location": "Seoul"],
+        ["location": "Paris"]
+      ]
+    )
   }
 
   @Test
@@ -89,7 +92,9 @@ struct `NeedleToolCallParser tests` {
 
   @Test
   func `Preserves The Raw Tool Name`() throws {
-    let calls = self.parse([#"<tool_call> [{"name":"getWeather","arguments":{"location":"Seoul"}}]"#])
+    let calls = self.parse([
+      #"<tool_call> [{"name":"getWeather","arguments":{"location":"Seoul"}}]"#
+    ])
     let call = try #require(calls.first)
 
     expectNoDifference(call.name, "getWeather")

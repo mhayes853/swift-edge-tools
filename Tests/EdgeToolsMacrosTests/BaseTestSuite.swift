@@ -1,5 +1,5 @@
-import MacroTesting
 import EdgeToolsMacros
+import MacroTesting
 import SnapshotTesting
 import Testing
 

@@ -1,6 +1,6 @@
 import CustomDump
-import Foundation
 import EdgeTools
+import Foundation
 import Observation
 import Testing
 
@@ -41,7 +41,11 @@ struct `EdgeToolCall tests` {
 
   @Test
   func `Status Is Running While Tool Is Executing`() async throws {
-    let call = try EdgeToolCall(id: EdgeToolCallID(), tool: DelayedCountingTool(duration: .milliseconds(300), output: "done"), rawInput: "")
+    let call = try EdgeToolCall(
+      id: EdgeToolCallID(),
+      tool: DelayedCountingTool(duration: .milliseconds(300), output: "done"),
+      rawInput: ""
+    )
 
     _ = Task { try await call.output }
 
@@ -79,7 +83,11 @@ struct `EdgeToolCall tests` {
 
   @Test
   func `Invoke Propagates Errors And Status Becomes Finished With Failure`() async throws {
-    let call = try EdgeToolCall(id: EdgeToolCallID(), tool: ThrowingTool(error: ToolError(message: "boom")), rawInput: "")
+    let call = try EdgeToolCall(
+      id: EdgeToolCallID(),
+      tool: ThrowingTool(error: ToolError(message: "boom")),
+      rawInput: ""
+    )
 
     await #expect(throws: ToolError.self) {
       _ = try await call.output
@@ -109,7 +117,11 @@ struct `EdgeToolCall tests` {
 
   @Test
   func `Cancellation Returns CancellationError`() async throws {
-    let call = try EdgeToolCall(id: EdgeToolCallID(), tool: CancellableTool(duration: .seconds(10)), rawInput: "")
+    let call = try EdgeToolCall(
+      id: EdgeToolCallID(),
+      tool: CancellableTool(duration: .seconds(10)),
+      rawInput: ""
+    )
 
     let task = Task { try await call.output }
 

@@ -1,6 +1,6 @@
 import CustomDump
-import Foundation
 import EdgeTools
+import Foundation
 import Testing
 
 @Suite

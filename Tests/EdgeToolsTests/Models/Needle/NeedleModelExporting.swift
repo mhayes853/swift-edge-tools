@@ -1,5 +1,5 @@
-import Foundation
 import EdgeTools
+import Foundation
 
 private enum NeedleTestModelExport {
   static func export(
@@ -184,7 +184,9 @@ private enum NeedleTestModelExport {
       backend: "CoreML",
       outputDirectoryName: outputDirectoryName,
       arguments: arguments + compileArguments,
-      expectedFilesExist: { SelfCoreMLExport.filesExist(in: $0, compilePlatforms: compilePlatforms) },
+      expectedFilesExist: {
+        SelfCoreMLExport.filesExist(in: $0, compilePlatforms: compilePlatforms)
+      },
       errorMessage: { CoreMLModelExportError(message: $0) }
     )
   }
@@ -227,9 +229,10 @@ private enum NeedleTestModelExport {
           let compiledDirectory = directory.appending(path: "compiled").appending(path: platform)
           return fileManager.fileExists(
             atPath: compiledDirectory.appending(path: "encoder.mlmodelc").path()
-          ) && fileManager.fileExists(
-            atPath: compiledDirectory.appending(path: "decoder.mlmodelc").path()
           )
+            && fileManager.fileExists(
+              atPath: compiledDirectory.appending(path: "decoder.mlmodelc").path()
+            )
         }
       }
       return NeedleTestModelExport.hasTokenizer(in: directory)

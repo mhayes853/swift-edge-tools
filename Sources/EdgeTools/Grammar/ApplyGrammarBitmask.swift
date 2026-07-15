@@ -112,14 +112,16 @@
 // MARK: - Lookup Tables
 
 @usableFromInline
-let _bitmaskTable = (0..<256).flatMap { byte in
-  (0..<8).map { bit in ((byte >> bit) & 1) != 0 ? 0 : -Float.infinity }
-}
+let _bitmaskTable = (0..<256)
+  .flatMap { byte in
+    (0..<8).map { bit in ((byte >> bit) & 1) != 0 ? 0 : -Float.infinity }
+  }
 
 @usableFromInline
 let _bitmaskSIMDTable = _bitmaskTable.withUnsafeBufferPointer { table in
-  (0..<256).map { byte in
-    UnsafeRawPointer(table.baseAddress!.advanced(by: byte * 8))
-      .loadUnaligned(as: SIMD8<Float>.self)
-  }
+  (0..<256)
+    .map { byte in
+      UnsafeRawPointer(table.baseAddress!.advanced(by: byte * 8))
+        .loadUnaligned(as: SIMD8<Float>.self)
+    }
 }

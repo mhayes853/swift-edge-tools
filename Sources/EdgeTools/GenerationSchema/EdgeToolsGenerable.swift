@@ -239,7 +239,10 @@ extension Array: ConvertibleFromEdgeToolsValue where Element: ConvertibleFromEdg
 extension Dictionary: EdgeToolsGenerable
 where Key == String, Value: EdgeToolsGenerable {
   public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
-    EdgeToolsGenerationSchema(.type(.object), .additionalProperties(Value.edgeToolsGenerationSchema))
+    EdgeToolsGenerationSchema(
+      .type(.object),
+      .additionalProperties(Value.edgeToolsGenerationSchema)
+    )
   }
 }
 

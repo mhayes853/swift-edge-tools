@@ -52,7 +52,12 @@
       ),
       TestCase(
         name: "ArrayValue",
-        schema: EdgeToolsGenerationSchema(.type(.array), .items(.string), .minItems(1), .maxItems(3)),
+        schema: EdgeToolsGenerationSchema(
+          .type(.array),
+          .items(.string),
+          .minItems(1),
+          .maxItems(3)
+        ),
         expectedFragments: [#""minItems":1"#, #""maxItems":3"#],
         isSupported: true
       ),

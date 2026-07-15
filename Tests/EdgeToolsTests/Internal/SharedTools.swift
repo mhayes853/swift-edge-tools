@@ -3,10 +3,12 @@ import EdgeTools
 // MARK: - Default Prompts
 
 extension NeedlePrompt {
+  static let sendAdventureEmailTools = [SendEmailTool()]
+  static let sendAdventureEmailDefinitions = sendAdventureEmailTools.map(\.definition)
+
   static let sendAdventureEmail = Self(
     system: "",
-    user: "Send an email to Henry asking him to go on an adventure.",
-    tools: [DefinitionTool(.sendEmail)]
+    user: "Send an email to Henry asking him to go on an adventure."
   )
 }
 
@@ -25,6 +27,7 @@ struct DefinitionTool: EdgeTool {
   var name: String { self.definition.name }
   var description: String { self.definition.description }
   var arguments: EdgeToolsGenerationSchema { self.definition.arguments }
+  var includesSchemaInInstructions: Bool { self.definition.includesSchemaInInstructions }
 
   func invoke(input: String) async throws -> sending String { "" }
 }
@@ -36,7 +39,8 @@ struct SendEmailTool: EdgeTool {
   struct Input: Sendable {
     @EdgeToolsGuide(
       .pattern("[a-z][a-z0-9]{1,10}@gmail\\.com"),
-      .description("The recipient's email address.")
+      .description("The recipient's email address."),
+      .examples(["blob@gmail.com"])
     )
     var address: String
 

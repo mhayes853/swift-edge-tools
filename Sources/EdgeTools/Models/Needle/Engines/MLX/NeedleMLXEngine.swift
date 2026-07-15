@@ -115,8 +115,11 @@
       self.tokenizer = consume tokenizer
     }
 
-    public func tokenize(prompt: NeedlePrompt) async throws -> [EdgeToolsToken] {
-      try self.tokenizer.withBorrowedLock { try prompt.tokenized(using: $0) }
+    public func tokenize(
+      prompt: NeedlePrompt,
+      tools: [EdgeToolDefinition] = []
+    ) async throws -> [EdgeToolsToken] {
+      try self.tokenizer.withBorrowedLock { try prompt.tokenized(tools: tools, using: $0) }
     }
 
     public func clearCaches() {
@@ -128,6 +131,7 @@
 
     public func generate(
       prompt: NeedlePrompt,
+      tools: [EdgeToolDefinition] = [],
       parameters: GenerateParameters,
       channel: EdgeToolsGenerationChannel
     ) throws -> some EdgeToolsEngineGenerationTask {
@@ -136,6 +140,7 @@
         try self.state.withLock { state in
           try self.generate(
             prompt: prompt,
+            tools: tools,
             parameters: parameters,
             channel: channel,
             state: &state,
@@ -148,6 +153,7 @@
 
     private func generate(
       prompt: NeedlePrompt,
+      tools: [EdgeToolDefinition],
       parameters: GenerateParameters,
       channel: EdgeToolsGenerationChannel,
       state: inout sending State,
@@ -157,7 +163,7 @@
       guard !isStopped.load(ordering: .relaxed) else { return .empty }
 
       let matcher = try state.matcherPool.matcher(
-        tools: prompt.tools.map(\.definition),
+        tools: tools,
         range: parameters.toolCallRange,
         compilingWith: state.grammarEngine
       )
@@ -175,6 +181,7 @@
       var cache = state.model.newCache(parameters: nil)
       let (prefillOutput, prefillMetrics, postPrefillSnapshot) = try self.prefill(
         prompt: prompt,
+        tools: tools,
         model: state.model,
         cache: cache,
         processor: &processor,
@@ -255,13 +262,14 @@
 
     private func prefill(
       prompt: NeedlePrompt,
+      tools: [EdgeToolDefinition],
       model: NeedleMLXModel,
       cache: [any KVCache],
       processor: inout (any LogitProcessor)?,
       synchronize: Bool
     ) throws -> (LMOutput?, EdgeToolsPrefillMetrics, Memory.Snapshot) {
       let tokens = try self.tokenizer.withBorrowedLock {
-        try $0.encode(text: prompt.formatted())
+        try $0.encode(text: prompt.formatted(tools: tools))
       }
       let input = LMInput(text: LMInput.Text(tokens: MLXArray(tokens)))
       guard input.text.tokens.size <= model.configuration.encoderMaxLength else {

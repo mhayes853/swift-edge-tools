@@ -14,6 +14,7 @@
       let tokens = Lock([EdgeToolsToken]())
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
+        tools: NeedlePrompt.sendAdventureEmailDefinitions,
         parameters: .default,
         channel: EdgeToolsGenerationChannel(
           onToken: { token in tokens.withLock { $0.append(token) } }
@@ -36,11 +37,13 @@
 
       let t1 = try engine.generate(
         prompt: .sendAdventureEmail,
+        tools: NeedlePrompt.sendAdventureEmailDefinitions,
         parameters: .default,
         channel: EdgeToolsGenerationChannel()
       )
       let t2 = try engine.generate(
         prompt: .sendAdventureEmail,
+        tools: NeedlePrompt.sendAdventureEmailDefinitions,
         parameters: .default,
         channel: EdgeToolsGenerationChannel()
       )
@@ -59,6 +62,7 @@
 
       let t1 = try engine.generate(
         prompt: .sendAdventureEmail,
+        tools: NeedlePrompt.sendAdventureEmailDefinitions,
         parameters: .default,
         channel: EdgeToolsGenerationChannel()
       )
@@ -66,6 +70,7 @@
 
       let t2 = try engine.generate(
         prompt: .sendAdventureEmail,
+        tools: NeedlePrompt.sendAdventureEmailDefinitions,
         parameters: .default,
         channel: EdgeToolsGenerationChannel()
       )
@@ -84,6 +89,7 @@
       let tokens = Lock([EdgeToolsToken]())
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
+        tools: NeedlePrompt.sendAdventureEmailDefinitions,
         parameters: .default,
         channel: EdgeToolsGenerationChannel(
           onToken: { token in tokens.withLock { $0.append(token) } }
@@ -104,6 +110,7 @@
       let params = NeedleCoreAIEngine.GenerateParameters(computeStream: ComputeStream())
       let task = try engine.generate(
         prompt: .sendAdventureEmail,
+        tools: NeedlePrompt.sendAdventureEmailDefinitions,
         parameters: params,
         channel: EdgeToolsGenerationChannel()
       )
@@ -123,6 +130,7 @@
       let generationTaskBox = Lock<NeedleCoreAIEngine.GenerationTask?>(nil)
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
+        tools: NeedlePrompt.sendAdventureEmailDefinitions,
         parameters: .default,
         channel: EdgeToolsGenerationChannel(
           onToken: { token in
@@ -148,6 +156,7 @@
       let task = Task {
         let generationTask = try engine.generate(
           prompt: .sendAdventureEmail,
+          tools: NeedlePrompt.sendAdventureEmailDefinitions,
           parameters: .default,
           channel: EdgeToolsGenerationChannel()
         )
@@ -167,6 +176,7 @@
       let tokens = Lock([EdgeToolsToken]())
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
+        tools: NeedlePrompt.sendAdventureEmailDefinitions,
         parameters: .default,
         channel: EdgeToolsGenerationChannel(
           onToken: { token in tokens.withLock { $0.append(token) } }
@@ -201,6 +211,7 @@
       let engine = try await makeNeedleCoreAIEngine(compilePlatforms: [compilePlatform])
       let task = try engine.generate(
         prompt: .sendAdventureEmail,
+        tools: NeedlePrompt.sendAdventureEmailDefinitions,
         parameters: .default,
         channel: EdgeToolsGenerationChannel()
       )
@@ -217,7 +228,10 @@
     func `Generate Through EdgeToolsSession`() async throws {
       let engine = try await makeNeedleCoreAIEngine()
       let session = EdgeToolsSession(engine: engine)
-      let generation = try await session.generate(prompt: .sendAdventureEmail)
+      let generation = try await session.generate(
+        prompt: .sendAdventureEmail,
+        tools: NeedlePrompt.sendAdventureEmailTools
+      )
 
       expectNoDifference(generation.engineGeneration.wasStopped, false)
       withKnownIssue {
@@ -238,6 +252,7 @@
       let processor = CountingLogitsProcessor()
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
+        tools: NeedlePrompt.sendAdventureEmailDefinitions,
         parameters: NeedleCoreAIEngine.GenerateParameters(processor: processor),
         channel: EdgeToolsGenerationChannel()
       )
@@ -254,8 +269,7 @@
       let engine = try await makeNeedleCoreAIEngine()
       let prompt = NeedlePrompt(
         system: "",
-        user: String(repeating: "token ", count: 2_000),
-        tools: [DefinitionTool(.sendEmail)]
+        user: String(repeating: "token ", count: 2_000)
       )
 
       let error = await #expect(throws: NeedleCoreAIEngineError.self) {
@@ -281,6 +295,7 @@
       let tokens = Lock([EdgeToolsToken]())
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
+        tools: NeedlePrompt.sendAdventureEmailDefinitions,
         parameters: .default,
         channel: EdgeToolsGenerationChannel(
           onToken: { token in tokens.withLock { $0.append(token) } }

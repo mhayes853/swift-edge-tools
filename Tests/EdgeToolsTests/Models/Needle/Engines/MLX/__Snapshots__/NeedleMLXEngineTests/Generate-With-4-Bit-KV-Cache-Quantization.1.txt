@@ -1,96 +1,154 @@
 ▿ EdgeToolsEngineGeneration
   ▿ decodeMetrics: EdgeToolsDecodeMetrics
-    ▿ duration: 0.99610825 seconds
-      - _low: 996108250000000000
+    ▿ duration: 2.402012167 seconds
+      - _low: 2402012167000000000
       - _high: 0
-    ▿ durationToFirstToken: 0.04447225 seconds
-      - _low: 44472250000000000
+    ▿ durationToFirstToken: 0.041134708 seconds
+      - _low: 41134708000000000
       - _high: 0
-    - tokens: 42
+    - tokens: 100
   ▿ metadata: 5 key/value pairs
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "GenerationConfidence"
-      - value: 0.9104519
+      - value: 0.8804349
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "MLXEngineGenerationStartMemorySnapshot"
-      ▿ value: Peak:   109M         (114419532)
+      ▿ value: Peak:   91M          (95988570)
 Active: 4K           (4384)
-Cache:  134M         (140574152)
+Cache:  126M         (132624850)
         - activeMemory: 4384
-        - cacheMemory: 140574152
-        - peakMemory: 114419532
+        - cacheMemory: 132624850
+        - peakMemory: 95988570
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "MLXEnginePostDecodeMemorySnapshot"
-      ▿ value: Peak:   109M         (114419532)
-Active: 54M          (56723656)
-Cache:  80M          (84265996)
-        - activeMemory: 56723656
-        - cacheMemory: 84265996
-        - peakMemory: 114419532
+      ▿ value: Peak:   91M          (95988570)
+Active: 54M          (56873114)
+Cache:  73M          (77270620)
+        - activeMemory: 56873114
+        - cacheMemory: 77270620
+        - peakMemory: 95988570
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "MLXEnginePostPrefillMemorySnapshot"
-      ▿ value: Peak:   109M         (114419532)
-Active: 54M          (56860404)
-Cache:  79M          (83718132)
-        - activeMemory: 56860404
-        - cacheMemory: 83718132
-        - peakMemory: 114419532
+      ▿ value: Peak:   91M          (95988570)
+Active: 54M          (56909646)
+Cache:  72M          (75719588)
+        - activeMemory: 56909646
+        - cacheMemory: 75719588
+        - peakMemory: 95988570
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "PerTokenConfidences"
-      ▿ value: 42 elements
+      ▿ value: 100 elements
         - 1.0
-        - 0.95129263
-        - 0.99999845
+        - 0.964389
+        - 0.999998
         - 1.0
         - 0.99999964
         - 1.0
+        - 0.9999999
+        - 0.9999697
+        - 0.9999851
+        - 1.0
+        - 0.9064817
+        - 0.9999746
+        - 0.6040047
+        - 0.8560119
+        - 0.632509
+        - 0.81911063
+        - 1.0
+        - 0.9999857
+        - 1.0
+        - 0.9999567
+        - 0.99999714
         - 0.99999976
-        - 0.99986017
-        - 0.99997854
+        - 0.99806935
+        - 0.53992975
+        - 0.56198716
+        - 0.9918379
+        - 0.9389985
+        - 0.9999809
+        - 0.9995999
+        - 0.53805816
+        - 0.7537254
+        - 0.9946814
+        - 0.9941841
+        - 0.77777123
+        - 0.9561222
+        - 0.887858
+        - 0.9950335
+        - 0.99985385
+        - 0.9998921
+        - 0.9152803
+        - 0.651645
+        - 0.5920362
+        - 0.57124376
+        - 0.9973284
+        - 0.9999167
+        - 0.99997544
         - 1.0
-        - 0.9936231
-        - 0.99998724
-        - 0.8128726
-        - 0.84128124
-        - 0.5165989
-        - 0.84659785
-        - 1.0
-        - 0.9999938
-        - 1.0
-        - 0.99995303
-        - 0.9999783
+        - 0.99997795
+        - 0.9937955
+        - 0.5203072
+        - 0.9999018
+        - 0.757484
+        - 0.89521974
+        - 0.7072959
+        - 0.8211614
+        - 0.9999629
+        - 0.85723335
+        - 0.5145253
+        - 0.96254855
+        - 0.9991769
+        - 0.92071635
+        - 0.5643333
+        - 0.9998958
+        - 0.7659712
+        - 0.999913
+        - 0.9999919
+        - 0.8488329
+        - 0.9625432
+        - 0.5426806
+        - 0.60046214
+        - 0.528413
+        - 0.6463676
+        - 0.96714926
         - 0.99999964
-        - 0.99476564
-        - 0.58696604
-        - 0.7518829
-        - 0.9868128
-        - 0.63343924
-        - 0.99979085
-        - 0.99876714
-        - 0.51393527
-        - 0.6395833
-        - 0.9933357
-        - 0.99487054
-        - 0.80119187
-        - 0.9563521
-        - 0.90759426
-        - 0.99452364
-        - 0.9998481
-        - 0.99986744
-        - 0.9628429
-        - 0.5606007
+        - 0.9997938
+        - 1.0
+        - 0.9999416
+        - 0.76908785
+        - 0.99958175
+        - 0.99170685
+        - 0.5408362
+        - 0.83313864
+        - 0.9900503
+        - 0.98212874
+        - 0.9982521
+        - 0.9983563
+        - 0.5772189
+        - 0.65034634
+        - 0.69910073
+        - 0.9758758
+        - 0.98733413
+        - 0.99559253
+        - 0.93748677
+        - 0.8244967
+        - 0.8169167
+        - 0.98795414
+        - 0.999864
+        - 0.99988234
+        - 0.6753065
         - 1.0
   ▿ prefillMetrics: EdgeToolsPrefillMetrics
-    ▿ duration: 0.039692917 seconds
-      - _low: 39692917000000000
+    ▿ duration: 0.036696875 seconds
+      - _low: 36696875000000000
       - _high: 0
-    - tokens: 132
-  ▿ tokens: 42 elements
+    - tokens: 150
+  ▿ tokens: 100 elements
     ▿ EdgeToolsToken
       - id: 4
       - stringValue: "<tool_call>"
@@ -212,8 +270,182 @@ Cache:  79M          (83718132)
       - id: 8105
       - stringValue: "?"
     ▿ EdgeToolsToken
-      - id: 503
-      - stringValue: "\"}}]"
+      - id: 8071
+      - stringValue: "["
+    ▿ EdgeToolsToken
+      - id: 271
+      - stringValue: "{\""
+    ▿ EdgeToolsToken
+      - id: 431
+      - stringValue: "}},{\""
+    ▿ EdgeToolsToken
+      - id: 294
+      - stringValue: "name"
+    ▿ EdgeToolsToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ EdgeToolsToken
+      - id: 818
+      - stringValue: "send"
+    ▿ EdgeToolsToken
+      - id: 8062
+      - stringValue: "_"
+    ▿ EdgeToolsToken
+      - id: 820
+      - stringValue: "email"
+    ▿ EdgeToolsToken
+      - id: 265
+      - stringValue: "\",\""
+    ▿ EdgeToolsToken
+      - id: 8044
+      - stringValue: "a"
+    ▿ EdgeToolsToken
+      - id: 8042
+      - stringValue: "r"
+    ▿ EdgeToolsToken
+      - id: 8057
+      - stringValue: "g"
+    ▿ EdgeToolsToken
+      - id: 339
+      - stringValue: "um"
+    ▿ EdgeToolsToken
+      - id: 381
+      - stringValue: "en"
+    ▿ EdgeToolsToken
+      - id: 8040
+      - stringValue: "t"
+    ▿ EdgeToolsToken
+      - id: 8046
+      - stringValue: "s"
+    ▿ EdgeToolsToken
+      - id: 282
+      - stringValue: "\":{\""
+    ▿ EdgeToolsToken
+      - id: 8044
+      - stringValue: "a"
+    ▿ EdgeToolsToken
+      - id: 8049
+      - stringValue: "d"
+    ▿ EdgeToolsToken
+      - id: 8049
+      - stringValue: "d"
+    ▿ EdgeToolsToken
+      - id: 8042
+      - stringValue: "r"
+    ▿ EdgeToolsToken
+      - id: 443
+      - stringValue: "es"
+    ▿ EdgeToolsToken
+      - id: 8046
+      - stringValue: "s"
+    ▿ EdgeToolsToken
+      - id: 8039
+      - stringValue: "\""
+    ▿ EdgeToolsToken
+      - id: 8048
+      - stringValue: ":"
+    ▿ EdgeToolsToken
+      - id: 8039
+      - stringValue: "\""
+    ▿ EdgeToolsToken
+      - id: 507
+      - stringValue: "un"
+    ▿ EdgeToolsToken
+      - id: 433
+      - stringValue: "der"
+    ▿ EdgeToolsToken
+      - id: 304
+      - stringValue: "al"
+    ▿ EdgeToolsToken
+      - id: 8040
+      - stringValue: "t"
+    ▿ EdgeToolsToken
+      - id: 500
+      - stringValue: "as"
+    ▿ EdgeToolsToken
+      - id: 8061
+      - stringValue: "y"
+    ▿ EdgeToolsToken
+      - id: 8181
+      - stringValue: "@"
+    ▿ EdgeToolsToken
+      - id: 8057
+      - stringValue: "g"
+    ▿ EdgeToolsToken
+      - id: 497
+      - stringValue: "mail"
+    ▿ EdgeToolsToken
+      - id: 8063
+      - stringValue: "."
+    ▿ EdgeToolsToken
+      - id: 869
+      - stringValue: "com"
+    ▿ EdgeToolsToken
+      - id: 265
+      - stringValue: "\",\""
+    ▿ EdgeToolsToken
+      - id: 979
+      - stringValue: "subject"
+    ▿ EdgeToolsToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ EdgeToolsToken
+      - id: 8103
+      - stringValue: "H"
+    ▿ EdgeToolsToken
+      - id: 637
+      - stringValue: "el"
+    ▿ EdgeToolsToken
+      - id: 363
+      - stringValue: "lo"
+    ▿ EdgeToolsToken
+      - id: 265
+      - stringValue: "\",\""
+    ▿ EdgeToolsToken
+      - id: 1519
+      - stringValue: "body"
+    ▿ EdgeToolsToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ EdgeToolsToken
+      - id: 8084
+      - stringValue: "I"
+    ▿ EdgeToolsToken
+      - id: 647
+      - stringValue: " am"
+    ▿ EdgeToolsToken
+      - id: 365
+      - stringValue: " w"
+    ▿ EdgeToolsToken
+      - id: 269
+      - stringValue: "ri"
+    ▿ EdgeToolsToken
+      - id: 490
+      - stringValue: "ting"
+    ▿ EdgeToolsToken
+      - id: 314
+      - stringValue: " to"
+    ▿ EdgeToolsToken
+      - id: 3245
+      - stringValue: " go"
+    ▿ EdgeToolsToken
+      - id: 442
+      - stringValue: " on"
+    ▿ EdgeToolsToken
+      - id: 439
+      - stringValue: " an"
+    ▿ EdgeToolsToken
+      - id: 1746
+      - stringValue: " ad"
+    ▿ EdgeToolsToken
+      - id: 628
+      - stringValue: "vent"
+    ▿ EdgeToolsToken
+      - id: 491
+      - stringValue: "ure"
+    ▿ EdgeToolsToken
+      - id: 4369
+      - stringValue: ".\"}}]"
     ▿ EdgeToolsToken
       - id: 1
       - stringValue: ""

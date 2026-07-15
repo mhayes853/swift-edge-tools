@@ -20,6 +20,7 @@
       let tokens = Lock([EdgeToolsToken]())
       let generationTask = try self.engine.generate(
         prompt: .sendAdventureEmail,
+        tools: NeedlePrompt.sendAdventureEmailDefinitions,
         parameters: .default,
         channel: EdgeToolsGenerationChannel(
           onToken: { token in tokens.withLock { $0.append(token) } }
@@ -39,6 +40,7 @@
       let tokens = Lock([EdgeToolsToken]())
       let generationTask = try self.engine.generate(
         prompt: .sendAdventureEmail,
+        tools: NeedlePrompt.sendAdventureEmailDefinitions,
         parameters: .default,
         channel: EdgeToolsGenerationChannel(
           onToken: { token in tokens.withLock { $0.append(token) } }
@@ -57,6 +59,7 @@
       let generationTaskBox = Lock<NeedleMLXEngine.GenerationTask?>(nil)
       let generationTask = try self.engine.generate(
         prompt: .sendAdventureEmail,
+        tools: NeedlePrompt.sendAdventureEmailDefinitions,
         parameters: .default,
         channel: EdgeToolsGenerationChannel(
           onToken: { token in
@@ -80,6 +83,7 @@
       let task = Task {
         let generationTask = try self.engine.generate(
           prompt: .sendAdventureEmail,
+          tools: NeedlePrompt.sendAdventureEmailDefinitions,
           parameters: .default,
           channel: EdgeToolsGenerationChannel()
         )
@@ -97,6 +101,7 @@
       let tokenStorage = Lock([EdgeToolsToken]())
       let generationTask = try self.engine.generate(
         prompt: .sendAdventureEmail,
+        tools: NeedlePrompt.sendAdventureEmailDefinitions,
         parameters: NeedleMLXEngine.GenerateParameters(kvCacheQuantizationBits: 4),
         channel: EdgeToolsGenerationChannel(
           onToken: { token in tokenStorage.withLock { $0.append(token) } }
@@ -123,6 +128,7 @@
       let tokenStorage = Lock([EdgeToolsToken]())
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
+        tools: NeedlePrompt.sendAdventureEmailDefinitions,
         parameters: .default,
         channel: EdgeToolsGenerationChannel(
           onToken: { token in tokenStorage.withLock { $0.append(token) } }
@@ -140,7 +146,10 @@
     @Test
     func `Generate Through EdgeToolsSession`() async throws {
       let session = EdgeToolsSession(engine: self.engine)
-      let generation = try await session.generate(prompt: .sendAdventureEmail)
+      let generation = try await session.generate(
+        prompt: .sendAdventureEmail,
+        tools: NeedlePrompt.sendAdventureEmailTools
+      )
       expectNoDifference(generation.engineGeneration.wasStopped, false)
       withKnownIssue {
         assertSnapshot(of: generation, as: .dump, record: .all)
@@ -163,6 +172,7 @@
 
       let generationTask = try self.engine.generate(
         prompt: .sendAdventureEmail,
+        tools: NeedlePrompt.sendAdventureEmailDefinitions,
         parameters: NeedleMLXEngine.GenerateParameters(processor: processor),
         channel: EdgeToolsGenerationChannel()
       )
@@ -177,6 +187,7 @@
     func `Generate Records Mean Confidence In Range Zero To One`() async throws {
       let generationTask = try self.engine.generate(
         prompt: .sendAdventureEmail,
+        tools: NeedlePrompt.sendAdventureEmailDefinitions,
         parameters: .default,
         channel: EdgeToolsGenerationChannel()
       )
@@ -196,8 +207,7 @@
     func `Generate Throws When Prompt Exceeds Context Length`() async throws {
       let prompt = NeedlePrompt(
         system: "",
-        user: String(repeating: "token ", count: 2_000),
-        tools: [DefinitionTool(.sendEmail)]
+        user: String(repeating: "token ", count: 2_000)
       )
 
       let error = await #expect(throws: NeedleMLXEngineError.self) {
@@ -213,7 +223,10 @@
 
     @Test
     func `Tokenize Base`() async throws {
-      let tokens = try await self.engine.tokenize(prompt: .sendAdventureEmail)
+      let tokens = try await self.engine.tokenize(
+        prompt: .sendAdventureEmail,
+        tools: NeedlePrompt.sendAdventureEmailDefinitions
+      )
       assertSnapshot(of: tokens, as: .dump)
     }
   }

@@ -3,31 +3,34 @@ import OrderedCollections
 
 // MARK: - NeedlePrompt
 
-public struct NeedlePrompt: EdgeToolsPrompt {
+public struct NeedlePrompt: Sendable {
   public var system: String
   public var user: String
-  public var tools: [any EdgeTool]
 
-  public init(system: String, user: String, tools: [any EdgeTool]) {
+  public init(system: String, user: String) {
     self.system = system
     self.user = user
-    self.tools = tools
   }
 }
 
 // MARK: - Formatting
 
 extension NeedlePrompt {
-  public func formatted() throws -> String {
+  public func formatted(tools: [EdgeToolDefinition]) throws -> String {
     let separator = self.system.isEmpty || self.user.isEmpty ? "" : "\n\n"
-    let toolsSchema = try self.tools.map(\.definition).map { $0.needleNormalized() }.needlePromptEncoded()
+    let toolsSchema =
+      try tools
+      .filter(\.includesSchemaInInstructions)
+      .map { $0.needleNormalized() }
+      .needlePromptEncoded()
     return "\(self.system)\(separator)\(self.user)<tools>\(toolsSchema)"
   }
 
   public func tokenized(
+    tools: [EdgeToolDefinition],
     using tokenizer: borrowing some EdgeToolsTokenizer & ~Copyable
   ) throws -> [EdgeToolsToken] {
-    let tokenIds = tokenizer.encode(text: try self.formatted())
+    let tokenIds = tokenizer.encode(text: try self.formatted(tools: tools))
     let tokens = tokenizer.convertIdsToTokens(tokenIds)
     return zip(tokenIds, tokens)
       .compactMap { (tokenId, token) in
@@ -105,7 +108,9 @@ private struct JSONWriter {
     }
   }
 
-  private mutating func writeSchemaObject(_ object: OrderedDictionary<EdgeToolsGenerationSchema.Key, EdgeToolsValue>) {
+  private mutating func writeSchemaObject(
+    _ object: OrderedDictionary<EdgeToolsGenerationSchema.Key, EdgeToolsValue>
+  ) {
     self.buffer.append(Self.openBrace)
     for (offset, entry) in object.enumerated() {
       if offset > 0 { self.buffer.append(Self.comma) }

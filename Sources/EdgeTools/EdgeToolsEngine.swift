@@ -1,14 +1,15 @@
 // MARK: - EdgeToolsEngine
 
 public protocol EdgeToolsEngine: Sendable {
-  associatedtype Prompt: EdgeToolsPrompt
+  associatedtype Prompt: Sendable
   associatedtype GenerateParameters: EdgeToolsEngineGenerateParameters
   associatedtype GenerationTask: EdgeToolsEngineGenerationTask
 
-  func tokenize(prompt: Prompt) async throws -> [EdgeToolsToken]
+  func tokenize(prompt: Prompt, tools: [EdgeToolDefinition]) async throws -> [EdgeToolsToken]
 
   func generate(
     prompt: Prompt,
+    tools: [EdgeToolDefinition],
     parameters: GenerateParameters,
     channel: EdgeToolsGenerationChannel
   ) throws -> GenerationTask
@@ -17,7 +18,10 @@ public protocol EdgeToolsEngine: Sendable {
 // MARK: - EdgeToolsPrefillableEngine
 
 public protocol EdgeToolsPrefillableEngine: EdgeToolsEngine {
-  func prefill(promptPrefix: Prompt) async throws -> EdgeToolsEnginePrefill
+  func prefill(
+    promptPrefix: Prompt,
+    tools: [EdgeToolDefinition]
+  ) async throws -> EdgeToolsEnginePrefill
 }
 
 // MARK: - EdgeToolsEnginePrefill

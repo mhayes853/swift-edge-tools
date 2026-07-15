@@ -95,7 +95,8 @@ extension EdgeToolsGenerableMacro {
     return structDecl
   }
 
-  private static func hasExistingEdgeToolsGenerationSchema(in declaration: StructDeclSyntax) -> Bool {
+  private static func hasExistingEdgeToolsGenerationSchema(in declaration: StructDeclSyntax) -> Bool
+  {
     declaration.memberBlock.members.contains { member in
       guard let variableDecl = member.decl.as(VariableDeclSyntax.self) else { return false }
       guard Self.isStatic(variableDecl) else { return false }
@@ -108,7 +109,8 @@ extension EdgeToolsGenerableMacro {
     }
   }
 
-  private static func hasExistingEdgeToolsValueInitializer(in declaration: StructDeclSyntax) -> Bool {
+  private static func hasExistingEdgeToolsValueInitializer(in declaration: StructDeclSyntax) -> Bool
+  {
     declaration.memberBlock.members.contains { member in
       guard let initializer = member.decl.as(InitializerDeclSyntax.self) else { return false }
       let parameters = initializer.signature.parameterClause.parameters
@@ -167,10 +169,15 @@ extension EdgeToolsGenerableMacro {
   ) -> [StoredProperty] {
     variableDecl.bindings.compactMap { binding in
       guard binding.accessorBlock == nil else { return nil }
-      guard let identifierPattern = binding.pattern.as(IdentifierPatternSyntax.self) else { return nil }
+      guard let identifierPattern = binding.pattern.as(IdentifierPatternSyntax.self) else {
+        return nil
+      }
       guard let type = binding.typeAnnotation?.type else {
         context.diagnose(
-          Diagnostic(node: Syntax(binding), message: SimpleDiagnostic("Stored properties must declare an explicit type."))
+          Diagnostic(
+            node: Syntax(binding),
+            message: SimpleDiagnostic("Stored properties must declare an explicit type.")
+          )
         )
         return nil
       }
@@ -181,7 +188,9 @@ extension EdgeToolsGenerableMacro {
         context.diagnose(
           Diagnostic(
             node: Syntax(variableDecl),
-            message: SimpleDiagnostic("Only one @EdgeToolsGuide attribute can be applied to a stored property.")
+            message: SimpleDiagnostic(
+              "Only one @EdgeToolsGuide attribute can be applied to a stored property."
+            )
           )
         )
       }
@@ -197,7 +206,9 @@ extension EdgeToolsGenerableMacro {
         context.diagnose(
           Diagnostic(
             node: Syntax(variableDecl),
-            message: SimpleDiagnostic("@EdgeToolsIgnored cannot be combined with @EdgeToolsGuide on the same property.")
+            message: SimpleDiagnostic(
+              "@EdgeToolsIgnored cannot be combined with @EdgeToolsGuide on the same property."
+            )
           )
         )
         isIgnored = false
@@ -207,14 +218,19 @@ extension EdgeToolsGenerableMacro {
         context.diagnose(
           Diagnostic(
             node: Syntax(variableDecl),
-            message: SimpleDiagnostic("@EdgeToolsIgnored requires an optional property or a default value.")
+            message: SimpleDiagnostic(
+              "@EdgeToolsIgnored requires an optional property or a default value."
+            )
           )
         )
         isIgnored = false
       }
 
       let schemaKey = guideSelection?.key ?? propertyName
-      let schemaExpression = Self.schemaExpression(typeName: typeName, guideSelection: guideSelection)
+      let schemaExpression = Self.schemaExpression(
+        typeName: typeName,
+        guideSelection: guideSelection
+      )
 
       return StoredProperty(
         name: propertyName,
@@ -268,7 +284,10 @@ extension EdgeToolsGenerableMacro {
         case "key":
           guard let value = Self.stringLiteralValue(from: argument.expression) else {
             context.diagnose(
-              Diagnostic(node: Syntax(argument), message: SimpleDiagnostic("key must be a string literal."))
+              Diagnostic(
+                node: Syntax(argument),
+                message: SimpleDiagnostic("key must be a string literal.")
+              )
             )
             continue
           }
@@ -290,12 +309,16 @@ extension EdgeToolsGenerableMacro {
     schemaFragments: [String]
   ) -> DeclSyntax {
     let activeProperties = properties.filter { !$0.isIgnored }
-    let propertyPairs = activeProperties.map { property in
-      "\(Self.quotedStringLiteral(property.schemaKey)): \(property.schemaExpression)"
-    }.joined(separator: ",\n          ")
-    let requiredProperties = activeProperties.filter { !$0.isOptional }.map { property in
-      Self.quotedStringLiteral(property.schemaKey)
-    }.joined(separator: ", ")
+    let propertyPairs =
+      activeProperties.map { property in
+        "\(Self.quotedStringLiteral(property.schemaKey)): \(property.schemaExpression)"
+      }
+      .joined(separator: ",\n          ")
+    let requiredProperties = activeProperties.filter { !$0.isOptional }
+      .map { property in
+        Self.quotedStringLiteral(property.schemaKey)
+      }
+      .joined(separator: ", ")
 
     var fragments = [".type(.object)"]
     fragments.append(contentsOf: schemaFragments)
@@ -329,15 +352,18 @@ extension EdgeToolsGenerableMacro {
     from properties: [StoredProperty],
     modifierPrefix: String
   ) -> DeclSyntax {
-    let assignments = properties.compactMap { property -> String? in
-      if property.isIgnored {
-        if property.hasDefaultValue {
-          return nil
+    let assignments =
+      properties.compactMap { property -> String? in
+        if property.isIgnored {
+          if property.hasDefaultValue {
+            return nil
+          }
+          return "self.\(property.name) = nil"
         }
-        return "self.\(property.name) = nil"
+        return
+          "self.\(property.name) = try \(property.initializerTypeName)(edgeToolsValue: _edgeToolsValue(object, forKey: \(Self.quotedStringLiteral(property.schemaKey))))"
       }
-      return "self.\(property.name) = try \(property.initializerTypeName)(edgeToolsValue: _edgeToolsValue(object, forKey: \(Self.quotedStringLiteral(property.schemaKey))))"
-    }.joined(separator: "\n")
+      .joined(separator: "\n")
 
     if assignments.isEmpty {
       return """
@@ -355,7 +381,9 @@ extension EdgeToolsGenerableMacro {
       """
   }
 
-  private static func edgeToolsGuideAttributes(in variableDecl: VariableDeclSyntax) -> [AttributeSyntax] {
+  private static func edgeToolsGuideAttributes(in variableDecl: VariableDeclSyntax)
+    -> [AttributeSyntax]
+  {
     variableDecl.attributes.compactMap { element in
       guard let attribute = element.as(AttributeSyntax.self) else { return nil }
       guard let identifierType = attribute.attributeName.as(IdentifierTypeSyntax.self) else {
@@ -366,19 +394,24 @@ extension EdgeToolsGenerableMacro {
     }
   }
 
-  private static func edgeToolsIgnoredAttribute(in variableDecl: VariableDeclSyntax) -> AttributeSyntax? {
-    variableDecl.attributes.compactMap { element in
-      guard let attribute = element.as(AttributeSyntax.self) else { return nil }
-      guard let identifierType = attribute.attributeName.as(IdentifierTypeSyntax.self) else {
-        return nil
+  private static func edgeToolsIgnoredAttribute(in variableDecl: VariableDeclSyntax)
+    -> AttributeSyntax?
+  {
+    variableDecl.attributes
+      .compactMap { element in
+        guard let attribute = element.as(AttributeSyntax.self) else { return nil }
+        guard let identifierType = attribute.attributeName.as(IdentifierTypeSyntax.self) else {
+          return nil
+        }
+        let name = identifierType.name.text
+        return name == "EdgeToolsIgnored" || name == "EdgeTools.EdgeToolsIgnored" ? attribute : nil
       }
-      let name = identifierType.name.text
-      return name == "EdgeToolsIgnored" || name == "EdgeTools.EdgeToolsIgnored" ? attribute : nil
-    }.first
+      .first
   }
 
   private static func isOptionalTypeName(_ typeName: String) -> Bool {
-    typeName.hasSuffix("?") || typeName.hasPrefix("Optional<") || typeName.hasPrefix("Swift.Optional<")
+    typeName.hasSuffix("?") || typeName.hasPrefix("Optional<")
+      || typeName.hasPrefix("Swift.Optional<")
   }
 
   private static func initializerTypeName(for typeName: String) -> String {
@@ -390,7 +423,8 @@ extension EdgeToolsGenerableMacro {
   }
 
   private static func quotedStringLiteral(_ value: String) -> String {
-    let escaped = value
+    let escaped =
+      value
       .replacingOccurrences(of: "\\", with: "\\\\")
       .replacingOccurrences(of: "\"", with: "\\\"")
       .replacingOccurrences(of: "\n", with: "\\n")
@@ -404,7 +438,7 @@ extension EdgeToolsGenerableMacro {
   }
 }
 
-fileprivate struct SimpleDiagnostic: DiagnosticMessage {
+private struct SimpleDiagnostic: DiagnosticMessage {
   let message: String
   let diagnosticID = MessageID(domain: "EdgeToolsMacros", id: "SimpleDiagnostic")
   let severity = DiagnosticSeverity.error

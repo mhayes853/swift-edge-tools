@@ -204,29 +204,33 @@
         if let separators = configuration.separators {
           return try separators.comma.withCString { comma in
             try separators.colon.withCString { colon in
-              try xgrammarRequiredHandle(xgrammar_grammar_init_json_schema(
-                jsonSchema,
-                configuration.anyWhitespace.intValue(as: Int32.self),
-                Int32(configuration.indent ?? -1),
-                comma,
-                colon,
-                configuration.isStrict.intValue(as: Int32.self),
-                Int32(configuration.maximumWhitespaceCount ?? -1),
-                configuration.anyOrder.intValue(as: Int32.self)
-              ))
+              try xgrammarRequiredHandle(
+                xgrammar_grammar_init_json_schema(
+                  jsonSchema,
+                  configuration.anyWhitespace.intValue(as: Int32.self),
+                  Int32(configuration.indent ?? -1),
+                  comma,
+                  colon,
+                  configuration.isStrict.intValue(as: Int32.self),
+                  Int32(configuration.maximumWhitespaceCount ?? -1),
+                  configuration.anyOrder.intValue(as: Int32.self)
+                )
+              )
             }
           }
         }
-        return try xgrammarRequiredHandle(xgrammar_grammar_init_json_schema(
-          jsonSchema,
-          configuration.anyWhitespace.intValue(as: Int32.self),
-          Int32(configuration.indent ?? -1),
-          nil,
-          nil,
-          configuration.isStrict.intValue(as: Int32.self),
-          Int32(configuration.maximumWhitespaceCount ?? -1),
-          configuration.anyOrder.intValue(as: Int32.self)
-        ))
+        return try xgrammarRequiredHandle(
+          xgrammar_grammar_init_json_schema(
+            jsonSchema,
+            configuration.anyWhitespace.intValue(as: Int32.self),
+            Int32(configuration.indent ?? -1),
+            nil,
+            nil,
+            configuration.isStrict.intValue(as: Int32.self),
+            Int32(configuration.maximumWhitespaceCount ?? -1),
+            configuration.anyOrder.intValue(as: Int32.self)
+          )
+        )
       }
     }
 

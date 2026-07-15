@@ -1,6 +1,6 @@
 import CustomDump
-import Foundation
 import EdgeTools
+import Foundation
 import Testing
 
 @Suite
@@ -31,7 +31,7 @@ struct `EdgeToolsGenerationSchema tests` {
     let value: EdgeToolsValue = .object([
       "b": 2,
       "a": 1,
-      "c": 3,
+      "c": 3
     ])
 
     guard case .object(let object) = value else {
@@ -74,7 +74,10 @@ struct `EdgeToolsGenerationSchema tests` {
       Issue.record("Expected object schema.")
       return
     }
-    expectNoDifference(Array(object.keys), [.type, .title, .description, .properties, .required, .additionalProperties])
+    expectNoDifference(
+      Array(object.keys),
+      [.type, .title, .description, .properties, .required, .additionalProperties]
+    )
   }
 
   @Test
@@ -102,7 +105,8 @@ struct `EdgeToolsGenerationSchema tests` {
     let schema = EdgeToolsGenerationSchema(
       .string,
       .minLength(1)
-    ).nullable()
+    )
+    .nullable()
 
     let data = try JSONEncoder().encode(schema)
     let json = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
@@ -137,7 +141,7 @@ struct `EdgeToolsGenerationSchema tests` {
           .type(.object),
           .properties([
             "id": .integer,
-            "name": .string,
+            "name": .string
           ]),
           .required(["id", "name"])
         )

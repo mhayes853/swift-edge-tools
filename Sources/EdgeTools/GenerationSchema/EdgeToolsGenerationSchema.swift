@@ -170,7 +170,8 @@ extension EdgeToolsGenerationSchema {
     .array(strings.map(EdgeToolsValue.string))
   }
 
-  private static func rawStringObject(_ object: OrderedDictionary<String, [String]>) -> EdgeToolsValue
+  private static func rawStringObject(_ object: OrderedDictionary<String, [String]>)
+    -> EdgeToolsValue
   {
     .object(
       OrderedDictionary(

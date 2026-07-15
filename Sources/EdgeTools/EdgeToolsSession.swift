@@ -21,6 +21,14 @@ public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable, Observab
     self.engine = engine
   }
 
+  fileprivate func registerActiveStream(_ stream: EdgeToolsSessionStream) {
+    self._activeStreams.withLock { activeStreams in
+      self.observationRegistrar.withMutation(of: self, keyPath: \.activeStreams) {
+        activeStreams.append(stream)
+      }
+    }
+  }
+
   fileprivate func removeActiveStream(_ stream: EdgeToolsSessionStream) {
     self._activeStreams.withLock { activeStreams in
       self.observationRegistrar.withMutation(of: self, keyPath: \.activeStreams) {
@@ -30,65 +38,103 @@ public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable, Observab
   }
 }
 
-// MARK: - Tokenize
-
 extension EdgeToolsSession {
-  public func tokenize(prompt: Engine.Prompt) async throws -> [EdgeToolsToken] {
-    try await self.engine.tokenize(prompt: prompt)
+  public func tokenize(
+    prompt: Engine.Prompt,
+    tools: [EdgeToolDefinition]
+  ) async throws -> [EdgeToolsToken] {
+    try await self.engine.tokenize(prompt: prompt, tools: tools)
   }
 }
-
-// MARK: - Prefill
 
 extension EdgeToolsSession where Engine: EdgeToolsPrefillableEngine {
-  public func prefill(promptPrefix: Engine.Prompt) async throws -> EdgeToolsEnginePrefill {
-    try await self.engine.prefill(promptPrefix: promptPrefix)
+  public func prefill(
+    promptPrefix: Engine.Prompt,
+    tools: [EdgeToolDefinition]
+  ) async throws -> EdgeToolsEnginePrefill {
+    try await self.engine.prefill(promptPrefix: promptPrefix, tools: tools)
   }
 }
-
-// MARK: - Generate
 
 public struct EdgeToolsSessionGeneration: Sendable {
   public let engineGeneration: EdgeToolsEngineGeneration
   public let toolCalls: EdgeToolCallCollection
 }
 
-extension EdgeToolsSession {
-  @concurrent
-  public func generate(
-    prompt: Engine.Prompt,
-    parameters: Engine.GenerateParameters = .default,
-    shouldInvokeTools: @escaping @Sendable (AnyEdgeToolCall) -> Bool = { _ in true }
-  ) async throws -> EdgeToolsSessionGeneration {
-    let stream = self.stream(
-      prompt: prompt,
-      parameters: parameters,
-      shouldInvokeTools: shouldInvokeTools
-    )
-    return try await stream.finalGeneration
-  }
+public struct EdgeToolsRawToolCallsGeneration: Sendable {
+  public let engineGeneration: EdgeToolsEngineGeneration
+  public let toolCalls: [EdgeRawToolCall]
 }
 
-// MARK: - Stream
+// MARK: - Tokens
 
-public final class EdgeToolsSessionStream: Sendable, Observable, Identifiable {
-  public var isGenerating: Bool {
-    self.registrar.access(self, keyPath: \.isGenerating)
-    return self.state.withLock { $0.result == nil }
+public struct EdgeToolsSessionTokens: AsyncSequence, Sendable {
+  public typealias Element = EdgeToolsToken
+
+  public struct AsyncIterator: AsyncIteratorProtocol {
+    fileprivate var base: AsyncThrowingStream<EdgeToolsToken, any Error>.AsyncIterator
+
+    public mutating func next() async throws -> EdgeToolsToken? {
+      try await self.base.next()
+    }
   }
 
-  public var isFinished: Bool {
-    self.registrar.access(self, keyPath: \.isFinished)
-    return self.state.withLock { $0.result != nil }
+  fileprivate let makeIterator: @Sendable () -> AsyncIterator
+
+  public func makeAsyncIterator() -> AsyncIterator { self.makeIterator() }
+}
+
+// MARK: - Raw Tool Calls
+
+public final class EdgeToolsRawToolCallsStream: Sendable, Observable, AsyncSequence {
+  public typealias Element = EdgeRawToolCall
+
+  public struct AsyncIterator: AsyncIteratorProtocol {
+    fileprivate var base: AsyncThrowingStream<EdgeRawToolCall, any Error>.AsyncIterator
+    public mutating func next() async throws -> EdgeRawToolCall? { try await self.base.next() }
   }
 
-  public var finalGeneration: EdgeToolsSessionGeneration {
+  private struct State {
+    var task: Task<EdgeToolsRawToolCallsGeneration, any Error>?
+    var hasStarted = false
+    var result: Result<EdgeToolsRawToolCallsGeneration, any Error>?
+    var wasStoppedBeforeGeneration = false
+    var stop: (@Sendable () -> Void)?
+    var calls = [EdgeRawToolCall]()
+    var tokens = [EdgeToolsToken]()
+    var callContinuations = [Int: AsyncThrowingStream<EdgeRawToolCall, any Error>.Continuation]()
+    var tokenContinuations = [Int: AsyncThrowingStream<EdgeToolsToken, any Error>.Continuation]()
+    var onToolCall: (@Sendable (EdgeRawToolCall, Int) -> Void)?
+    var onResult: (@Sendable (Result<EdgeToolsRawToolCallsGeneration, any Error>) -> Void)?
+    var nextID = 0
+  }
+
+  private let state = Lock(State())
+  private let registrar = ObservationRegistrar()
+  private let startGeneration:
+    @Sendable (
+      EdgeToolsRawToolCallsStream
+    ) -> Task<EdgeToolsRawToolCallsGeneration, any Error>
+
+  public var rawToolCalls: [EdgeRawToolCall] {
+    self.registrar.access(self, keyPath: \.rawToolCalls)
+    return self.state.withLock { $0.calls }
+  }
+
+  public var result: Result<EdgeToolsRawToolCallsGeneration, any Error>? {
+    self.registrar.access(self, keyPath: \.result)
+    return self.state.withLock { $0.result }
+  }
+
+  public var tokens: EdgeToolsSessionTokens {
+    EdgeToolsSessionTokens(makeIterator: { [weak self] in self!.makeTokenIterator() })
+  }
+
+  public var finalGeneration: EdgeToolsRawToolCallsGeneration {
     get async throws {
-      let task = self.state.withLock { $0.task! }  // NB: Task is set in init, so this is fine.
+      let task = self.state.withLock { $0.task! }
       return try await withTaskCancellationHandler {
-        let generation = try await task.value
-        try Task.checkCancellation()
-        return generation
+        try await task.value
       } onCancel: {
         self.stop()
         task.cancel()
@@ -96,352 +142,444 @@ public final class EdgeToolsSessionStream: Sendable, Observable, Identifiable {
     }
   }
 
+  fileprivate init<Engine: EdgeToolsEngine>(
+    session: EdgeToolsSession<Engine>,
+    prompt: Engine.Prompt,
+    tools: [EdgeToolDefinition],
+    parameters: Engine.GenerateParameters,
+    onToolCall: (@Sendable (EdgeRawToolCall, Int) -> Void)? = nil,
+    onResult: (@Sendable (Result<EdgeToolsRawToolCallsGeneration, any Error>) -> Void)? = nil
+  ) {
+    self.startGeneration = { stream in
+      Task {
+        try await stream.runGeneration(
+          session: session,
+          prompt: prompt,
+          tools: tools,
+          parameters: parameters
+        )
+      }
+    }
+    self.state.withLock {
+      $0.onToolCall = onToolCall
+      $0.onResult = onResult
+    }
+  }
+
+  fileprivate func start() {
+    let shouldStart = self.state.withLock { state in
+      guard !state.hasStarted else { return false }
+      state.hasStarted = true
+      return true
+    }
+    guard shouldStart else { return }
+    let task = self.startGeneration(self)
+    self.state.withLock { $0.task = task }
+  }
+
+  public func makeAsyncIterator() -> AsyncIterator {
+    let (stream, continuation) = AsyncThrowingStream<EdgeRawToolCall, any Error>.makeStream()
+    let (id, calls, result) = self.state.withLock { state in
+      let id = state.nextID
+      state.nextID += 1
+      guard state.result == nil else { return (id, state.calls, state.result) }
+      state.callContinuations[id] = continuation
+      return (id, state.calls, nil)
+    }
+    calls.forEach { continuation.yield($0) }
+    if let result {
+      switch result {
+      case .success: continuation.finish()
+      case .failure(let error): continuation.finish(throwing: error)
+      }
+    } else {
+      continuation.onTermination = { [weak self] reason in
+        guard case .cancelled = reason else { return }
+        self?.state.withLock { _ = $0.callContinuations.removeValue(forKey: id) }
+      }
+    }
+    return AsyncIterator(base: stream.makeAsyncIterator())
+  }
+
+  public func stop() {
+    let stop: (@Sendable () -> Void)? = self.state.withLock { state in
+      guard state.result == nil else { return nil }
+      guard let stop = state.stop else {
+        state.wasStoppedBeforeGeneration = true
+        return nil
+      }
+      return stop
+    }
+    stop?()
+  }
+
+  private func makeTokenIterator() -> EdgeToolsSessionTokens.AsyncIterator {
+    let (stream, continuation) = AsyncThrowingStream<EdgeToolsToken, any Error>.makeStream()
+    let (id, tokens, result) = self.state.withLock { state in
+      let id = state.nextID
+      state.nextID += 1
+      guard state.result == nil else { return (id, state.tokens, state.result) }
+      state.tokenContinuations[id] = continuation
+      return (id, state.tokens, nil)
+    }
+    tokens.forEach { continuation.yield($0) }
+    if let result {
+      switch result {
+      case .success: continuation.finish()
+      case .failure(let error): continuation.finish(throwing: error)
+      }
+    } else {
+      continuation.onTermination = { [weak self] reason in
+        guard case .cancelled = reason else { return }
+        self?.state.withLock { _ = $0.tokenContinuations.removeValue(forKey: id) }
+      }
+    }
+    return EdgeToolsSessionTokens.AsyncIterator(base: stream.makeAsyncIterator())
+  }
+
+  private func runGeneration<Engine: EdgeToolsEngine>(
+    session: EdgeToolsSession<Engine>,
+    prompt: Engine.Prompt,
+    tools: [EdgeToolDefinition],
+    parameters: Engine.GenerateParameters
+  ) async throws -> EdgeToolsRawToolCallsGeneration {
+    let wasStopped = self.state.withLock { $0.wasStoppedBeforeGeneration }
+    if wasStopped {
+      let generation = EdgeToolsRawToolCallsGeneration(
+        engineGeneration: .empty,
+        toolCalls: []
+      )
+      self.finish(with: .success(generation))
+      return generation
+    }
+
+    let channel = EdgeToolsGenerationChannel(
+      onToken: { [weak self] token in self?.emit(token: token) },
+      onToolCall: { [weak self] call in self?.emit(call: call) }
+    )
+    do {
+      let generationTask = try session.engine.generate(
+        prompt: prompt,
+        tools: tools,
+        parameters: parameters,
+        channel: channel
+      )
+      let shouldStop = self.state.withLock { state in
+        state.stop = { generationTask.stop() }
+        return state.wasStoppedBeforeGeneration
+      }
+      if shouldStop { generationTask.stop() }
+      let engineGeneration = try await generationTask.value
+      try Task.checkCancellation()
+      let generation = EdgeToolsRawToolCallsGeneration(
+        engineGeneration: engineGeneration,
+        toolCalls: self.rawToolCalls
+      )
+      self.finish(with: .success(generation))
+      return generation
+    } catch {
+      self.finish(with: .failure(error))
+      throw error
+    }
+  }
+
+  private func emit(token: EdgeToolsToken) {
+    let continuations = self.state.withLock { state in
+      state.tokens.append(token)
+      return Array(state.tokenContinuations.values)
+    }
+    continuations.forEach { $0.yield(token) }
+  }
+
+  private func emit(call: EdgeRawToolCall) {
+    let emission = self.registrar.withMutation(of: self, keyPath: \.rawToolCalls) {
+      self.state.withLock { state in
+        let index = state.calls.count
+        state.calls.append(call)
+        return (index, state.onToolCall, Array(state.callContinuations.values))
+      }
+    }
+    emission.1?(call, emission.0)
+    emission.2.forEach { $0.yield(call) }
+  }
+
+  private func finish(with result: Result<EdgeToolsRawToolCallsGeneration, any Error>) {
+    let completion = self.registrar.withMutation(of: self, keyPath: \.result) {
+      self.state.withLock { state in
+        state.result = result
+        let completion = (
+          state.onResult,
+          Array(state.callContinuations.values),
+          Array(state.tokenContinuations.values)
+        )
+        state.callContinuations.removeAll()
+        state.tokenContinuations.removeAll()
+        state.stop = nil
+        return completion
+      }
+    }
+    completion.0?(result)
+    switch result {
+    case .success:
+      completion.1.forEach { $0.finish() }
+      completion.2.forEach { $0.finish() }
+    case .failure(let error):
+      completion.1.forEach { $0.finish(throwing: error) }
+      completion.2.forEach { $0.finish(throwing: error) }
+    }
+  }
+}
+
+// MARK: - Typed Tool Calls
+
+public final class EdgeToolsSessionStream: Sendable, Observable, Identifiable, AsyncSequence {
+  public typealias Element = EdgeToolCallCollection.Element
+
+  public struct AsyncIterator: AsyncIteratorProtocol {
+    fileprivate var base: EdgeToolsRawToolCallsStream.AsyncIterator
+    fileprivate let stream: EdgeToolsSessionStream
+    private var rawIndex = 0
+
+    public mutating func next() async throws -> Element? {
+      while try await self.base.next() != nil {
+        defer { self.rawIndex += 1 }
+        if let call = self.stream.call(at: self.rawIndex) {
+          return call
+        }
+      }
+      return nil
+    }
+  }
+
+  private let rawStream: EdgeToolsRawToolCallsStream
+  private let storage: Storage
+
+  public var isGenerating: Bool {
+    self.result == nil
+  }
+
+  public var isFinished: Bool {
+    self.result != nil
+  }
+
+  public var tokens: EdgeToolsSessionTokens {
+    self.rawStream.tokens
+  }
+
   public var toolCalls: EdgeToolCallCollection {
-    self.registrar.access(self, keyPath: \.toolCalls)
-    return self.state.withLock { $0.toolCalls }
+    self.storage.toolCalls
   }
 
   public var result: Result<EdgeToolsSessionGeneration, any Error>? {
-    self.registrar.access(self, keyPath: \.result)
-    return self.state.withLock { $0.result }
+    self.storage.result
   }
 
-  private let state = Lock(State())
-  private let registrar = ObservationRegistrar()
-
-  deinit {
-    self.state.withLock { state in
-      state.task?.cancel()
-      if state.result == nil {
-        state.generationTaskStop?()
-      }
+  public var finalGeneration: EdgeToolsSessionGeneration {
+    get async throws {
+      _ = try await self.rawStream.finalGeneration
+      return try self.result!.get()
     }
   }
 
   fileprivate init<Engine: EdgeToolsEngine>(
     session: EdgeToolsSession<Engine>,
     prompt: Engine.Prompt,
+    tools: [any EdgeTool],
     parameters: Engine.GenerateParameters,
     shouldInvokeTools: @escaping @Sendable (AnyEdgeToolCall) -> Bool
   ) {
-    let task = Task {
-      return try await self.runGeneration(
-        session: session,
-        prompt: prompt,
-        parameters: parameters,
-        shouldInvokeTools: shouldInvokeTools
-      )
-    }
-    self.state.withLock { $0.task = task }
-  }
-
-  private func runGeneration<Engine: EdgeToolsEngine>(
-    session: EdgeToolsSession<Engine>,
-    prompt: Engine.Prompt,
-    parameters: Engine.GenerateParameters,
-    shouldInvokeTools: @escaping @Sendable (AnyEdgeToolCall) -> Bool
-  ) async throws -> EdgeToolsSessionGeneration {
-    let stoppedBeforeGeneration: EdgeToolsSessionGeneration? = self.state.withLock { state in
-      guard state.wasStoppedBeforeGeneration else { return nil }
-      let sessionGeneration = EdgeToolsSessionGeneration(
-        engineGeneration: .empty,
-        toolCalls: state.toolCalls
-      )
-      self.registrar.withMutation(of: self, keyPath: \.result) {
-        state.finish(with: .success(sessionGeneration))
-      }
-      return sessionGeneration
-    }
-    if let stoppedBeforeGeneration {
-      session.removeActiveStream(self)
-      return stoppedBeforeGeneration
-    }
-
-    let toolsByName = Dictionary(
-      uniqueKeysWithValues: prompt.tools.map { ($0.name.snakeCased(), $0) }
+    let storage = Storage()
+    let toolsByName = Dictionary(uniqueKeysWithValues: tools.map { ($0.name.snakeCased(), $0) })
+    self.storage = storage
+    self.rawStream = EdgeToolsRawToolCallsStream(
+      session: session,
+      prompt: prompt,
+      tools: tools.map(\.definition),
+      parameters: parameters,
+      onToolCall: { call, index in
+        storage.resolve(
+          call,
+          at: index,
+          toolsByName: toolsByName,
+          shouldInvokeTools: shouldInvokeTools
+        )
+      },
+      onResult: { result in storage.finish(result) }
     )
-    let shouldInvokeToolsBox = Lock(shouldInvokeTools)
-
-    let generationTask: Engine.GenerationTask
-    do {
-      let channel = EdgeToolsGenerationChannel(
-        onToken: { [weak self] token in
-          guard let self else { return }
-          self.state.withLock { $0.emitToken(token: token) }
-        },
-        onToolCall: { [weak self] rawToolCall in
-          guard let self else { return }
-          guard let call = self.resolve(rawToolCall, toolsByName: toolsByName) else { return }
-          let shouldInvoke = shouldInvokeToolsBox.withLock { $0 }
-          self.state.withLock { state in
-            self.registrar.withMutation(of: self, keyPath: \.toolCalls) {
-              state.emitToolCall(call, shouldInvoke: shouldInvoke)
-            }
-          }
-        }
-      )
-      generationTask = try session.engine.generate(
-        prompt: prompt,
-        parameters: parameters,
-        channel: channel
-      )
-    } catch {
-      self.state.withLock { state in
-        self.registrar.withMutation(of: self, keyPath: \.result) {
-          state.finish(with: .failure(error))
-        }
-      }
-      session.removeActiveStream(self)
-      throw error
-    }
-
-    let shouldStopGeneration = self.state.withLock { state in
-      state.generationTaskStop = { generationTask.stop() }
-      return state.wasStoppedBeforeGeneration
-    }
-    if shouldStopGeneration {
-      generationTask.stop()
-    }
-
-    let generation: EdgeToolsEngineGeneration
-    do {
-      generation = try await generationTask.value
-      try Task.checkCancellation()
-    } catch {
-      self.state.withLock { state in
-        self.registrar.withMutation(of: self, keyPath: \.result) {
-          state.finish(with: .failure(error))
-        }
-      }
-      session.removeActiveStream(self)
-      throw error
-    }
-    let sessionGeneration = self.state.withLock { state in
-      let sessionGeneration = EdgeToolsSessionGeneration(
-        engineGeneration: generation,
-        toolCalls: state.toolCalls
-      )
-      self.registrar.withMutation(of: self, keyPath: \.result) {
-        state.finish(with: .success(sessionGeneration))
-      }
-      return sessionGeneration
-    }
-    session.removeActiveStream(self)
-    return sessionGeneration
   }
 
-  public func stop() {
-    let generationTaskStop: (@Sendable () -> Void)? = self.state.withLock { state in
-      guard state.result == nil else { return nil }
-      guard let generationTaskStop = state.generationTaskStop else {
-        state.markStoppedBeforeGeneration()
-        return nil
-      }
-      return generationTaskStop
-    }
-    generationTaskStop?()
+  fileprivate func setOnFinish(_ onFinish: @escaping @Sendable () -> Void) {
+    self.storage.setOnFinish(onFinish)
   }
 
-  private func resolve(
-    _ rawToolCall: EdgeRawToolCall,
-    toolsByName: [String: any EdgeTool]
-  ) -> AnyEdgeToolCall? {
-    guard let tool = toolsByName[rawToolCall.name.snakeCased()] else { return nil }
-
-    func open<Tool: EdgeTool>(_ concrete: Tool) -> AnyEdgeToolCall? {
-      let toolCall = try? EdgeToolCall(
-        id: EdgeToolCallID(),
-        tool: concrete,
-        rawInput: rawToolCall.arguments
-      )
-      return toolCall.map { AnyEdgeToolCall($0) }
-    }
-    return open(tool)
-  }
-}
-
-extension EdgeToolsSessionStream: AsyncSequence {
-  public struct AsyncIterator: AsyncIteratorProtocol {
-    fileprivate var base: AsyncThrowingStream<AnyEdgeToolCall, any Error>.AsyncIterator
-
-    public mutating func next() async throws -> EdgeToolCallCollection.Element? {
-      try await self.base.next()
-    }
-
-    @available(iOS 18.0, macOS 15.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-    public mutating func next(
-      isolation actor: isolated (any Actor)?
-    ) async throws -> EdgeToolCallCollection.Element? {
-      try await self.base.next(isolation: actor)
-    }
+  fileprivate func start() {
+    self.rawStream.start()
   }
 
   public func makeAsyncIterator() -> AsyncIterator {
-    let (stream, continuation, id) = self.state.withLock { $0.takeToolCallStream() }
-    continuation.onTermination = { [weak self] reason in
-      switch reason {
-      case .cancelled: self?.state.withLock { $0.removeToolContinuation(id: id) }
-      default: break
-      }
-    }
-    return AsyncIterator(base: stream.makeAsyncIterator())
-  }
-}
-
-extension EdgeToolsSessionStream {
-  public struct Tokens: AsyncSequence {
-    fileprivate let stream: EdgeToolsSessionStream
-
-    public struct AsyncIterator: AsyncIteratorProtocol {
-      fileprivate var base: AsyncThrowingStream<EdgeToolsToken, any Error>.AsyncIterator
-
-      public mutating func next() async throws -> EdgeToolsToken? {
-        try await self.base.next()
-      }
-
-      @available(iOS 18.0, macOS 15.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-      public mutating func next(
-        isolation actor: isolated (any Actor)?
-      ) async throws -> EdgeToolsToken? {
-        try await self.base.next(isolation: actor)
-      }
-    }
-
-    public func makeAsyncIterator() -> AsyncIterator {
-      let (tokenStream, continuation, id) = self.stream.state.withLock { $0.takeTokenStream() }
-      continuation.onTermination = { [weak stream] reason in
-        switch reason {
-        case .cancelled: stream?.state.withLock { $0.removeTokenContinuation(id: id) }
-        default: break
-        }
-      }
-      return AsyncIterator(base: tokenStream.makeAsyncIterator())
-    }
+    AsyncIterator(base: self.rawStream.makeAsyncIterator(), stream: self)
   }
 
-  public var tokens: Tokens {
-    Tokens(stream: self)
+  public func stop() {
+    self.rawStream.stop()
   }
-}
 
-extension EdgeToolsSessionStream {
-  fileprivate struct State {
-    private(set) var result: Result<EdgeToolsSessionGeneration, any Error>?
-    private(set) var wasStoppedBeforeGeneration = false
-    var generationTaskStop: (@Sendable () -> Void)?
-    private var tokenContinuations =
-      [Int: AsyncThrowingStream<EdgeToolsToken, any Error>.Continuation]()
-    private var toolsContinuations =
-      [Int: AsyncThrowingStream<AnyEdgeToolCall, any Error>.Continuation]()
-    private var nextTokenContinuationID = 0
-    private var nextToolContinuationID = 0
-    private(set) var toolCalls = EdgeToolCallCollection()
-    var task: Task<EdgeToolsSessionGeneration, any Error>?
+  private func call(at index: Int) -> AnyEdgeToolCall? {
+    self.storage.call(at: index)
+  }
 
-    mutating func markStoppedBeforeGeneration() {
-      if self.result == nil {
-        self.wasStoppedBeforeGeneration = true
-      }
+  private final class Storage: Sendable, Observable {
+    private struct State {
+      var callsByRawIndex = [AnyEdgeToolCall?]()
+      var toolCalls = EdgeToolCallCollection()
+      var result: Result<EdgeToolsSessionGeneration, any Error>?
     }
 
-    mutating func takeTokenStream() -> (
-      AsyncThrowingStream<EdgeToolsToken, any Error>,
-      AsyncThrowingStream<EdgeToolsToken, any Error>.Continuation,
-      Int
+    private let state = Lock(State())
+    private let registrar = ObservationRegistrar()
+    private let onFinish = Lock<(@Sendable () -> Void)?>(nil)
+
+    var toolCalls: EdgeToolCallCollection {
+      self.registrar.access(self, keyPath: \.toolCalls)
+      return self.state.withLock { $0.toolCalls }
+    }
+
+    var result: Result<EdgeToolsSessionGeneration, any Error>? {
+      self.registrar.access(self, keyPath: \.result)
+      return self.state.withLock { $0.result }
+    }
+
+    func call(at index: Int) -> AnyEdgeToolCall? {
+      self.state.withLock { $0.callsByRawIndex[index] }
+    }
+
+    func resolve(
+      _ rawCall: EdgeRawToolCall,
+      at index: Int,
+      toolsByName: [String: any EdgeTool],
+      shouldInvokeTools: @escaping @Sendable (AnyEdgeToolCall) -> Bool
     ) {
-      let (stream, continuation) = AsyncThrowingStream<EdgeToolsToken, any Error>.makeStream()
-      let id = self.nextTokenContinuationID
-      self.nextTokenContinuationID += 1
-      self.tokenContinuations[id] = continuation
-      return (stream, continuation, id)
-    }
-
-    mutating func takeToolCallStream() -> (
-      AsyncThrowingStream<AnyEdgeToolCall, any Error>,
-      AsyncThrowingStream<AnyEdgeToolCall, any Error>.Continuation,
-      Int
-    ) {
-      let (stream, continuation) = AsyncThrowingStream<AnyEdgeToolCall, any Error>.makeStream()
-      let id = self.nextToolContinuationID
-      self.nextToolContinuationID += 1
-      self.toolsContinuations[id] = continuation
-      for call in self.toolCalls {
-        continuation.yield(call)
-      }
-      return (stream, continuation, id)
-    }
-
-    mutating func removeTokenContinuation(id: Int) {
-      self.tokenContinuations.removeValue(forKey: id)
-    }
-
-    mutating func removeToolContinuation(id: Int) {
-      self.toolsContinuations.removeValue(forKey: id)
-    }
-
-    func emitToken(token: EdgeToolsToken) {
-      for continuation in self.tokenContinuations.values {
-        continuation.yield(token)
-      }
-    }
-
-    mutating func emitToolCall(
-      _ toolCall: AnyEdgeToolCall,
-      shouldInvoke: (AnyEdgeToolCall) -> Bool
-    ) {
-      self.toolCalls.append(toolCall)
-      if shouldInvoke(toolCall) {
-        _ = Task { _ = try await toolCall.output }
-      }
-      for continuation in self.toolsContinuations.values {
-        continuation.yield(toolCall)
-      }
-    }
-
-    mutating func finish(with result: Result<EdgeToolsSessionGeneration, any Error>) {
-      self.generationTaskStop = nil
-      self.result = result
-      switch result {
-      case .success:
-        for continuation in self.tokenContinuations.values {
-          continuation.finish()
+      let call = Self.resolve(rawCall, toolsByName: toolsByName)
+      self.state.withLock { state in
+        guard state.callsByRawIndex.count == index else { return }
+        state.callsByRawIndex.append(call)
+        guard let call else { return }
+        self.registrar.withMutation(of: self, keyPath: \.toolCalls) {
+          state.toolCalls.append(call)
         }
-        for continuation in self.toolsContinuations.values {
-          continuation.finish()
-        }
-      case .failure(let error):
-        for continuation in self.tokenContinuations.values {
-          continuation.finish(throwing: error)
-        }
-        for continuation in self.toolsContinuations.values {
-          continuation.finish(throwing: error)
+        if shouldInvokeTools(call) {
+          _ = Task { _ = try await call.output }
         }
       }
-      self.tokenContinuations.removeAll()
-      self.toolsContinuations.removeAll()
+    }
+
+    func finish(_ rawResult: Result<EdgeToolsRawToolCallsGeneration, any Error>) {
+      let result = rawResult.map {
+        EdgeToolsSessionGeneration(engineGeneration: $0.engineGeneration, toolCalls: self.toolCalls)
+      }
+      let shouldFinish = self.state.withLock { state in
+        guard state.result == nil else { return false }
+        self.registrar.withMutation(of: self, keyPath: \.result) { state.result = result }
+        return true
+      }
+      if shouldFinish { self.onFinish.withLock { $0 }?() }
+    }
+
+    func setOnFinish(_ onFinish: @escaping @Sendable () -> Void) {
+      self.onFinish.withLock { $0 = onFinish }
+    }
+
+    private static func resolve(
+      _ rawCall: EdgeRawToolCall,
+      toolsByName: [String: any EdgeTool]
+    ) -> AnyEdgeToolCall? {
+      guard let tool = toolsByName[rawCall.name.snakeCased()] else { return nil }
+      func open<Tool: EdgeTool>(_ tool: Tool) -> AnyEdgeToolCall? {
+        guard
+          let call = try? EdgeToolCall(
+            id: EdgeToolCallID(),
+            tool: tool,
+            rawInput: rawCall.arguments
+          )
+        else { return nil }
+        return AnyEdgeToolCall(call)
+      }
+      return open(tool)
     }
   }
 }
 
 extension EdgeToolsSession {
+  public func streamRawToolCalls(
+    prompt: Engine.Prompt,
+    tools: [EdgeToolDefinition],
+    parameters: Engine.GenerateParameters = .default
+  ) -> EdgeToolsRawToolCallsStream {
+    if let message = duplicateToolNameError(tools.map(\.name)) {
+      assertionFailure(message)
+    }
+    let stream = EdgeToolsRawToolCallsStream(
+      session: self,
+      prompt: prompt,
+      tools: tools,
+      parameters: parameters
+    )
+    stream.start()
+    return stream
+  }
+
+  public func generateRawToolCalls(
+    prompt: Engine.Prompt,
+    tools: [EdgeToolDefinition],
+    parameters: Engine.GenerateParameters = .default
+  ) async throws -> EdgeToolsRawToolCallsGeneration {
+    try await self.streamRawToolCalls(
+      prompt: prompt,
+      tools: tools,
+      parameters: parameters
+    )
+    .finalGeneration
+  }
+
   public func stream(
     prompt: Engine.Prompt,
+    tools: [any EdgeTool],
     parameters: Engine.GenerateParameters = .default,
     shouldInvokeTools: @escaping @Sendable (AnyEdgeToolCall) -> Bool = { _ in true }
   ) -> EdgeToolsSessionStream {
-    if let message = duplicateToolNameError(prompt.tools.map(\.name)) {
+    if let message = duplicateToolNameError(tools.map(\.name)) {
       assertionFailure(message)
     }
     let stream = EdgeToolsSessionStream(
       session: self,
       prompt: prompt,
+      tools: tools,
       parameters: parameters,
       shouldInvokeTools: shouldInvokeTools
     )
-    self.observationRegistrar.withMutation(of: self, keyPath: \.activeStreams) {
-      self._activeStreams.withLock { $0.append(stream) }
+    self.registerActiveStream(stream)
+    stream.setOnFinish { [weak self, weak stream] in
+      guard let self, let stream else { return }
+      self.removeActiveStream(stream)
     }
+    stream.start()
     return stream
+  }
+
+  @concurrent
+  public func generate(
+    prompt: Engine.Prompt,
+    tools: [any EdgeTool],
+    parameters: Engine.GenerateParameters = .default,
+    shouldInvokeTools: @escaping @Sendable (AnyEdgeToolCall) -> Bool = { _ in true }
+  ) async throws -> EdgeToolsSessionGeneration {
+    try await self.stream(
+      prompt: prompt,
+      tools: tools,
+      parameters: parameters,
+      shouldInvokeTools: shouldInvokeTools
+    )
+    .finalGeneration
   }
 }
 
@@ -449,14 +587,10 @@ extension EdgeToolsSession {
 
 package func duplicateToolNameError(_ names: some Sequence<String>) -> String? {
   var grouped = [String: [String]]()
-  for name in names {
-    grouped[name.snakeCased(), default: []].append(name)
-  }
+  for name in names { grouped[name.snakeCased(), default: []].append(name) }
   let duplicates = grouped.filter { $0.value.count > 1 }
   guard !duplicates.isEmpty else { return nil }
-  return
-    duplicates
-    .sorted { $0.key < $1.key }
+  return duplicates.sorted { $0.key < $1.key }
     .map { normalized, originals in
       "The names \(originals.sorted().map { "'\($0)'" }.joined(separator: " and ")) all normalize to '\(normalized)'."
     }

@@ -40,11 +40,13 @@
     else {
       throw XGrammarError.invalidRepetitionRange
     }
-    let handle = try xgrammarRequiredHandle(xgrammar_grammar_repeat(
-      grammar.handle,
-      Int32(range.lowerBound),
-      Int32(range.upperBound)
-    ))
+    let handle = try xgrammarRequiredHandle(
+      xgrammar_grammar_repeat(
+        grammar.handle,
+        Int32(range.lowerBound),
+        Int32(range.upperBound)
+      )
+    )
     return XGrammarGrammar(handle: handle)
   }
 
@@ -55,7 +57,9 @@
     guard range.lowerBound >= 0, Int32(exactly: range.lowerBound) != nil else {
       throw XGrammarError.invalidRepetitionRange
     }
-    let handle = try xgrammarRequiredHandle(xgrammar_grammar_repeat(grammar.handle, Int32(range.lowerBound), -1))
+    let handle = try xgrammarRequiredHandle(
+      xgrammar_grammar_repeat(grammar.handle, Int32(range.lowerBound), -1)
+    )
     return XGrammarGrammar(handle: handle)
   }
 #endif

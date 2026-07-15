@@ -78,13 +78,15 @@ public struct EdgeToolsTokenizerLoadingError: Hashable, Sendable, Error {
     #endif
 
     return Self(
-      message: "No compatible tokenizer was found in \(directoryURL.path()). \(details.joined(separator: " "))"
+      message:
+        "No compatible tokenizer was found in \(directoryURL.path()). \(details.joined(separator: " "))"
     )
   }
 
   public static func unsupportedTransformersTokenizer(at tokenizerURL: URL) -> Self {
     Self(
-      message: "swift-transformers created an unsupported tokenizer type from \(tokenizerURL.path())."
+      message:
+        "swift-transformers created an unsupported tokenizer type from \(tokenizerURL.path())."
     )
   }
 }

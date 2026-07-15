@@ -1,6 +1,7 @@
 // MARK: - EdgeToolsMetadataKey
 
-public struct EdgeToolsMetadataKey: Hashable, Sendable, RawRepresentable, ExpressibleByStringLiteral {
+public struct EdgeToolsMetadataKey: Hashable, Sendable, RawRepresentable, ExpressibleByStringLiteral
+{
   public var rawValue: String
 
   public init(rawValue: String) {

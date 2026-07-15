@@ -1,6 +1,6 @@
 import CustomDump
-import Foundation
 import EdgeTools
+import Foundation
 import Testing
 
 @Suite
@@ -113,7 +113,10 @@ struct `EdgeToolsGenerable initialization tests` {
 
   @Test
   func `Initializes Dictionary`() throws {
-    expectNoDifference(try [String: Int](edgeToolsValue: ["one": 1, "two": 2]), ["one": 1, "two": 2])
+    expectNoDifference(
+      try [String: Int](edgeToolsValue: ["one": 1, "two": 2]),
+      ["one": 1, "two": 2]
+    )
   }
 
   @Test

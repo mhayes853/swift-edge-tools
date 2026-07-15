@@ -1,6 +1,6 @@
 import CustomDump
-import Foundation
 import EdgeTools
+import Foundation
 import Testing
 
 @Suite
@@ -9,12 +9,11 @@ struct `NeedlePrompt tests` {
   func `Formats Properly`() throws {
     let prompt = NeedlePrompt(
       system: "You are a helpful assistant who can send emails.",
-      user: "Send an email to Henry.",
-      tools: [DefinitionTool(.sendEmail)]
+      user: "Send an email to Henry."
     )
 
     expectNoDifference(
-      try prompt.formatted(),
+      try prompt.formatted(tools: [.sendEmail]),
       """
       You are a helpful assistant who can send emails.
 
@@ -28,13 +27,9 @@ struct `NeedlePrompt tests` {
 
   @Test
   func `Uses Canonical Tool And Schema Field Order`() throws {
-    let prompt = NeedlePrompt(
-      system: "",
-      user: "Weather?",
-      tools: [DefinitionTool(.getWeather)]
-    )
+    let prompt = NeedlePrompt(system: "", user: "Weather?")
 
-    let rendered = try prompt.formatted()
+    let rendered = try prompt.formatted(tools: [.getWeather])
     let jsonStart = rendered.firstIndex(of: "[") ?? rendered.endIndex
     let jsonSlice = rendered[jsonStart...]
 
@@ -66,13 +61,26 @@ struct `NeedlePrompt tests` {
       arguments: EdgeToolsGenerationSchema(
         .type(.object),
         .properties(["name": .string])
-      )
+      ),
+      includesSchemaInInstructions: true
     )
 
-    let prompt = NeedlePrompt(system: "", user: "", tools: [DefinitionTool(tool)])
-    let formatted = try prompt.formatted()
+    let prompt = NeedlePrompt(system: "", user: "")
+    let formatted = try prompt.formatted(tools: [tool])
 
     expectNoDifference(formatted.contains("\"name\":\"\(expectedName)\""), true)
+  }
+
+  @Test
+  func `Omits Schemas Known By The Model`() throws {
+    let prompt = NeedlePrompt(system: "", user: "")
+    var innate = EdgeToolDefinition.sendEmail
+    innate.includesSchemaInInstructions = false
+
+    let formatted = try prompt.formatted(tools: [innate, .getWeather])
+
+    expectNoDifference(formatted.contains(#""name":"send_email""#), false)
+    expectNoDifference(formatted.contains(#""name":"get_weather""#), true)
   }
 
   @Test
@@ -89,11 +97,12 @@ struct `NeedlePrompt tests` {
             .pattern(#"say \"hi\""#)
           )
         ])
-      )
+      ),
+      includesSchemaInInstructions: true
     )
 
-    let prompt = NeedlePrompt(system: "", user: "", tools: [DefinitionTool(tool)])
-    let formatted = try prompt.formatted()
+    let prompt = NeedlePrompt(system: "", user: "")
+    let formatted = try prompt.formatted(tools: [tool])
 
     expectNoDifference(formatted.contains(#""name":"say_\"hello\""#), true)
     expectNoDifference(formatted.contains(#""description":"Uses a \"quoted\" phrase"#), true)

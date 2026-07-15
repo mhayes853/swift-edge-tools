@@ -157,8 +157,11 @@
 
   @available(anyAppleOS 27.0, *)
   extension NeedleCoreAIEngine {
-    public func tokenize(prompt: NeedlePrompt) async throws -> [EdgeToolsToken] {
-      try self.tokenizer.withBorrowedLock { try prompt.tokenized(using: $0) }
+    public func tokenize(
+      prompt: NeedlePrompt,
+      tools: [EdgeToolDefinition] = []
+    ) async throws -> [EdgeToolsToken] {
+      try self.tokenizer.withBorrowedLock { try prompt.tokenized(tools: tools, using: $0) }
     }
 
     public func clearCaches() {
@@ -170,6 +173,7 @@
 
     public func generate(
       prompt: NeedlePrompt,
+      tools: [EdgeToolDefinition] = [],
       parameters: GenerateParameters,
       channel: EdgeToolsGenerationChannel
     ) throws -> some EdgeToolsEngineGenerationTask {
@@ -178,7 +182,7 @@
         let range = parameters.toolCallRange
         let matcher = try self.state.withLock { state in
           let matcher = try state.matcherPool.matcher(
-            tools: prompt.tools.map(\.definition),
+            tools: tools,
             range: range,
             compilingWith: state.grammarEngine
           )
@@ -187,6 +191,7 @@
         }
         return try await self.generate(
           prompt: prompt,
+          tools: tools,
           parameters: parameters,
           channel: channel,
           matcher: matcher,
@@ -199,6 +204,7 @@
 
     private func generate(
       prompt: NeedlePrompt,
+      tools: [EdgeToolDefinition],
       parameters: GenerateParameters,
       channel: EdgeToolsGenerationChannel,
       matcher: consuming XGrammarMatcher,
@@ -215,6 +221,7 @@
       let generateStart = self.clock.now
       let (encoderOutputs, prefillMetrics) = try await self.prefill(
         prompt: prompt,
+        tools: tools,
         configuration: configuration,
         processor: &processor,
         stream: stream
@@ -287,12 +294,13 @@
 
     private func prefill(
       prompt: NeedlePrompt,
+      tools: [EdgeToolDefinition],
       configuration: NeedleModelConfiguration,
       processor: inout (any EdgeToolsLogitsProcessor<NDArray, NDArray>)?,
       stream: ComputeStream?
     ) async throws -> (EncoderOutputs, EdgeToolsPrefillMetrics) {
       let promptTokens = try self.tokenizer.withBorrowedLock {
-        try $0.encode(text: prompt.formatted())
+        try $0.encode(text: prompt.formatted(tools: tools))
       }
       guard promptTokens.count <= configuration.encoderMaxLength else {
         throw NeedleCoreAIEngineError.contextLengthExceeded(

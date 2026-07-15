@@ -146,8 +146,11 @@
       self.tokenizer = consume tokenizer
     }
 
-    public func tokenize(prompt: NeedlePrompt) async throws -> [EdgeToolsToken] {
-      try self.tokenizer.withBorrowedLock { try prompt.tokenized(using: $0) }
+    public func tokenize(
+      prompt: NeedlePrompt,
+      tools: [EdgeToolDefinition] = []
+    ) async throws -> [EdgeToolsToken] {
+      try self.tokenizer.withBorrowedLock { try prompt.tokenized(tools: tools, using: $0) }
     }
 
     public func clearCaches() {
@@ -159,6 +162,7 @@
 
     public func generate(
       prompt: NeedlePrompt,
+      tools: [EdgeToolDefinition] = [],
       parameters: GenerateParameters,
       channel: EdgeToolsGenerationChannel
     ) throws -> some EdgeToolsEngineGenerationTask {
@@ -166,7 +170,7 @@
       let task = Task {
         let matcher = try self.state.withLock { state in
           let matcher = try state.matcherPool.matcher(
-            tools: prompt.tools.map(\.definition),
+            tools: tools,
             range: parameters.toolCallRange,
             compilingWith: state.grammarEngine
           )
@@ -175,6 +179,7 @@
         }
         return try await self.generate(
           prompt: prompt,
+          tools: tools,
           parameters: parameters,
           channel: channel,
           matcher: matcher,
@@ -187,6 +192,7 @@
 
     private func generate(
       prompt: NeedlePrompt,
+      tools: [EdgeToolDefinition],
       parameters: GenerateParameters,
       channel: EdgeToolsGenerationChannel,
       matcher: consuming XGrammarMatcher,
@@ -202,6 +208,7 @@
       let generateStart = self.clock.now
       let (encoderOutputs, prefillMetrics) = try await self.prefill(
         prompt: prompt,
+        tools: tools,
         configuration: configuration,
         processor: &processor
       )
@@ -270,11 +277,12 @@
 
     private func prefill(
       prompt: NeedlePrompt,
+      tools: [EdgeToolDefinition],
       configuration: NeedleModelConfiguration,
       processor: inout (any EdgeToolsLogitsProcessor<MLTensor, MLTensor>)?
     ) async throws -> (EncoderOutputs, EdgeToolsPrefillMetrics) {
       let promptTokens = try self.tokenizer.withBorrowedLock {
-        try $0.encode(text: prompt.formatted())
+        try $0.encode(text: prompt.formatted(tools: tools))
       }
       guard promptTokens.count <= configuration.encoderMaxLength else {
         throw NeedleCoreMLEngineError.contextLengthExceeded(
@@ -366,7 +374,8 @@
       from directory: URL,
       configuration: MLModelConfiguration
     ) async throws -> MLModel {
-      let aotCompiledURL = directory
+      let aotCompiledURL =
+        directory
         .appending(path: "compiled")
         .appending(path: Self.coreMLPlatform)
         .appending(path: "\(name).mlmodelc")

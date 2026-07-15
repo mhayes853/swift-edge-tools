@@ -14,10 +14,11 @@ extension EdgeToolDefinition {
           .examples(["blob@gmail.com"])
         ),
         "subject": .string,
-        "body": .string,
+        "body": .string
       ]),
       .required(["address", "subject", "body"])
-    )
+    ),
+    includesSchemaInInstructions: true
   )
 
   static let getWeather = Self(
@@ -28,7 +29,8 @@ extension EdgeToolDefinition {
       .properties(["location": .string]),
       .required(["location"]),
       .additionalProperties(false)
-    )
+    ),
+    includesSchemaInInstructions: true
   )
 
   static let complexTool = Self(
@@ -103,6 +105,7 @@ extension EdgeToolDefinition {
         "tags", "config"
       ]),
       .additionalProperties(false)
-    )
+    ),
+    includesSchemaInInstructions: true
   )
 }

@@ -81,9 +81,10 @@
       return DynamicGenerationSchema(
         name: name,
         description: description,
-        anyOf: try choices.enumerated().map { index, choice in
-          try self.convert(choice, name: "\(name)Choice\(index + 1)", path: "\(path)[\(index)]")
-        }
+        anyOf: try choices.enumerated()
+          .map { index, choice in
+            try self.convert(choice, name: "\(name)Choice\(index + 1)", path: "\(path)[\(index)]")
+          }
       )
     }
   }
@@ -100,17 +101,21 @@
       }
 
       let constant = node.string(for: .const).map(GenerationGuide<String>.constant)
-      let pattern = try node.string(for: .pattern).map { pattern in
-        do {
-          return GenerationGuide<String>.pattern(try Regex(pattern))
-        } catch {
-          throw EdgeToolsFMConversionError.malformedSchema(
-            path: "\(node.path).pattern",
-            description: String(describing: error)
-          )
+      let pattern = try node.string(for: .pattern)
+        .map { pattern in
+          do {
+            return GenerationGuide<String>.pattern(try Regex(pattern))
+          } catch {
+            throw EdgeToolsFMConversionError.malformedSchema(
+              path: "\(node.path).pattern",
+              description: String(describing: error)
+            )
+          }
         }
-      }
-      return DynamicGenerationSchema(type: String.self, guides: [constant, pattern].compactMap { $0 })
+      return DynamicGenerationSchema(
+        type: String.self,
+        guides: [constant, pattern].compactMap { $0 }
+      )
     }
 
     private func integer(node: FMSchemaNode) throws -> DynamicGenerationSchema {
@@ -122,7 +127,10 @@
     private func number(node: FMSchemaNode) throws -> DynamicGenerationSchema {
       let minimum = try node.double(for: .minimum).map(GenerationGuide<Double>.minimum)
       let maximum = try node.double(for: .maximum).map(GenerationGuide<Double>.maximum)
-      return DynamicGenerationSchema(type: Double.self, guides: [minimum, maximum].compactMap { $0 })
+      return DynamicGenerationSchema(
+        type: Double.self,
+        guides: [minimum, maximum].compactMap { $0 }
+      )
     }
 
     private func array(node: FMSchemaNode) throws -> DynamicGenerationSchema {
@@ -137,18 +145,19 @@
     private func object(node: FMSchemaNode, name: String?) throws -> DynamicGenerationSchema {
       try node.validateAdditionalProperties()
       let required = try node.requiredKeys()
-      let properties = try node.properties().map { key, schema in
-        let propertyNode = try FMSchemaNode(
-          schema: schema,
-          path: "\(node.path).properties.\(key)"
-        )
-        return DynamicGenerationSchema.Property(
-          name: key,
-          description: propertyNode.description,
-          schema: try self.convert(schema, name: Self.name(from: key), path: propertyNode.path),
-          isOptional: !required.contains(key)
-        )
-      }
+      let properties = try node.properties()
+        .map { key, schema in
+          let propertyNode = try FMSchemaNode(
+            schema: schema,
+            path: "\(node.path).properties.\(key)"
+          )
+          return DynamicGenerationSchema.Property(
+            name: key,
+            description: propertyNode.description,
+            schema: try self.convert(schema, name: Self.name(from: key), path: propertyNode.path),
+            isOptional: !required.contains(key)
+          )
+        }
       return DynamicGenerationSchema(
         name: try node.name(overriding: name),
         description: node.description,
@@ -223,9 +232,10 @@
           description: "Expected an array of schemas."
         )
       }
-      return try values.enumerated().map { index, value in
-        try Self.schema(from: value, path: "\(self.path).\(key.rawValue)[\(index)]")
-      }
+      return try values.enumerated()
+        .map { index, value in
+          try Self.schema(from: value, path: "\(self.path).\(key.rawValue)[\(index)]")
+        }
     }
 
     func properties() throws -> OrderedDictionary<String, EdgeToolsGenerationSchema> {
@@ -251,15 +261,17 @@
           description: "Expected an array of property names."
         )
       }
-      return try Set(values.map { value in
-        guard case .string(let key) = value else {
-          throw EdgeToolsFMConversionError.malformedSchema(
-            path: "\(self.path).required",
-            description: "Expected an array of property names."
-          )
+      return try Set(
+        values.map { value in
+          guard case .string(let key) = value else {
+            throw EdgeToolsFMConversionError.malformedSchema(
+              path: "\(self.path).required",
+              description: "Expected an array of property names."
+            )
+          }
+          return key
         }
-        return key
-      })
+      )
     }
 
     func strings(for key: EdgeToolsGenerationSchema.Key) throws -> [String]? {
@@ -342,13 +354,14 @@
     ) throws -> EdgeToolsGenerationSchema {
       switch value {
       case .boolean(let value): .boolean(value)
-      case .object(let object): .object(
-        OrderedDictionary(
-          uniqueKeysWithValues: object.map {
-            (EdgeToolsGenerationSchema.Key(rawValue: $0.key), $0.value)
-          }
+      case .object(let object):
+        .object(
+          OrderedDictionary(
+            uniqueKeysWithValues: object.map {
+              (EdgeToolsGenerationSchema.Key(rawValue: $0.key), $0.value)
+            }
+          )
         )
-      )
       default:
         throw EdgeToolsFMConversionError.malformedSchema(
           path: path,

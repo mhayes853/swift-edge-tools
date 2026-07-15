@@ -1,5 +1,5 @@
-import MacroTesting
 import EdgeToolsMacros
+import MacroTesting
 import Testing
 
 extension BaseTestSuite {

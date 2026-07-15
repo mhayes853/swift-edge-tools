@@ -25,7 +25,8 @@ extension EdgeTool {
     EdgeToolDefinition(
       name: self.name,
       description: self.description,
-      arguments: self.arguments
+      arguments: self.arguments,
+      includesSchemaInInstructions: self.includesSchemaInInstructions
     )
   }
 }
@@ -36,10 +37,17 @@ public struct EdgeToolDefinition: Hashable, Sendable, Codable {
   public var name: String
   public var description: String
   public var arguments: EdgeToolsGenerationSchema
+  public var includesSchemaInInstructions: Bool
 
-  public init(name: String, description: String, arguments: EdgeToolsGenerationSchema) {
+  public init(
+    name: String,
+    description: String,
+    arguments: EdgeToolsGenerationSchema,
+    includesSchemaInInstructions: Bool = true
+  ) {
     self.name = name
     self.description = description
     self.arguments = arguments
+    self.includesSchemaInInstructions = includesSchemaInInstructions
   }
 }

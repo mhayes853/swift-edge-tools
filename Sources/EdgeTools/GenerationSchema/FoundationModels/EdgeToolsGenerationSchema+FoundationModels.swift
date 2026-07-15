@@ -105,7 +105,9 @@
       in object: inout OrderedDictionary<Key, EdgeToolsValue>,
       path: String
     ) throws {
-      for key in [Key.items, .additionalProperties, .not, .if, .then, .else, .contains, .propertyNames] {
+      for key in [
+        Key.items, .additionalProperties, .not, .if, .then, .else, .contains, .propertyNames
+      ] {
         guard let value = object[key], case .object = value else { continue }
         object[key] = try Self.normalizedSchemaValue(value, path: "\(path).\(key.rawValue)")
       }
@@ -118,9 +120,10 @@
       for key in [Key.anyOf, .allOf, .oneOf, .prefixItems] {
         guard case .array(let values)? = object[key] else { continue }
         object[key] = .array(
-          try values.enumerated().map { index, value in
-            try Self.normalizedSchemaValue(value, path: "\(path).\(key.rawValue)[\(index)]")
-          }
+          try values.enumerated()
+            .map { index, value in
+              try Self.normalizedSchemaValue(value, path: "\(path).\(key.rawValue)[\(index)]")
+            }
         )
       }
     }
@@ -137,11 +140,12 @@
     private static func schema(from value: EdgeToolsValue, path: String) throws -> Self {
       switch value {
       case .boolean(let value): .boolean(value)
-      case .object(let object): .object(
-        OrderedDictionary(
-          uniqueKeysWithValues: object.map { (Key(rawValue: $0.key), $0.value) }
+      case .object(let object):
+        .object(
+          OrderedDictionary(
+            uniqueKeysWithValues: object.map { (Key(rawValue: $0.key), $0.value) }
+          )
         )
-      )
       default:
         throw EdgeToolsFMConversionError.malformedSchema(
           path: path,
