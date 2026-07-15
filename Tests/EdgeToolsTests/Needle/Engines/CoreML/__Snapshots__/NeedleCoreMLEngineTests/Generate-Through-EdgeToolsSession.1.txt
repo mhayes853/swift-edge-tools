@@ -1,11 +1,11 @@
 ▿ EdgeToolsSessionGeneration
   ▿ engineGeneration: EdgeToolsEngineGeneration
     ▿ decodeMetrics: EdgeToolsDecodeMetrics
-      ▿ duration: 0.825186792 seconds
-        - _low: 825186792000000000
+      ▿ duration: 0.828976917 seconds
+        - _low: 828976917000000000
         - _high: 0
-      ▿ durationToFirstToken: 0.088676333 seconds
-        - _low: 88676333000000000
+      ▿ durationToFirstToken: 0.08965675 seconds
+        - _low: 89656750000000000
         - _high: 0
       - tokens: 84
     ▿ metadata: 2 key/value pairs
@@ -102,8 +102,8 @@
           - 0.73885757
           - 1.0
     ▿ prefillMetrics: EdgeToolsPrefillMetrics
-      ▿ duration: 0.063621542 seconds
-        - _low: 63621542000000000
+      ▿ duration: 0.062584292 seconds
+        - _low: 62584292000000000
         - _high: 0
       - tokens: 132
     ▿ tokens: 84 elements

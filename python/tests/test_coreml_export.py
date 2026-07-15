@@ -7,10 +7,11 @@ from pathlib import Path
 from typing import Any, cast
 from unittest.mock import patch
 
-from coreai.runtime import AIModelAssetMetadata
-from coreai_opt.quantization import QuantizerConfig
 import coremltools as ct
 import torch
+from coreai.runtime import AIModelAssetMetadata
+from coreai_opt.palettization import KMeansPalettizerConfig
+from coreai_opt.quantization import QuantizerConfig
 
 from needle import Needle, NeedleModelConfiguation
 import needle.coreml_export as coreml_export
@@ -69,6 +70,15 @@ class CoreMLExportTests(unittest.TestCase):
 
     def test_export_needle_coreml_supports_quantizer_compressor(self) -> None:
         compressor = CoreMLQuantizerCompressor(QuantizerConfig.presets.w8())
+        self._assert_export_runs_end_to_end(compressor=compressor)
+
+    def test_export_needle_coreml_supports_quantizer_and_palettizer_compressor(
+        self,
+    ) -> None:
+        compressor = CoreMLQuantizerCompressor(
+            QuantizerConfig.presets.w8(),
+            palettizer_config=KMeansPalettizerConfig(),
+        )
         self._assert_export_runs_end_to_end(compressor=compressor)
 
     def test_coreml_export_uses_native_sdpa_without_ane(self) -> None:

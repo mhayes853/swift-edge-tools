@@ -9,6 +9,7 @@ from unittest.mock import patch
 import torch
 from coreai.authoring.asset import AIModelAsset
 from coreai.runtime import AIModelAssetMetadata
+from coreai_opt.palettization import KMeansPalettizerConfig
 from coreai_opt.quantization import QuantizerConfig
 
 from needle import Needle, NeedleModelConfiguation
@@ -111,6 +112,15 @@ class CoreAIExportTests(unittest.TestCase):
 
     def test_export_needle_coreai_supports_quantizer_compressor(self) -> None:
         compressor = CoreAIQuantizerCompressor(QuantizerConfig.presets.w8())
+        self._assert_export_runs_end_to_end(compressor=compressor)
+
+    def test_export_needle_coreai_supports_quantizer_and_palettizer_compressor(
+        self,
+    ) -> None:
+        compressor = CoreAIQuantizerCompressor(
+            QuantizerConfig.presets.w8(),
+            palettizer_config=KMeansPalettizerConfig(),
+        )
         self._assert_export_runs_end_to_end(compressor=compressor)
 
     def test_export_needle_coreai_supports_ahead_of_time_compilation(self) -> None:

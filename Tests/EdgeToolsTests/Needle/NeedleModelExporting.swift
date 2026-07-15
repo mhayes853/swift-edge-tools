@@ -111,13 +111,16 @@ private enum NeedleTestModelExport {
   @available(anyAppleOS 27.0, *)
   func makeNeedleCoreAIEngine(
     quantizerPreset: String? = nil,
+    palettizerBits: Int? = nil,
     compilePlatforms: [String] = []
   ) async throws -> NeedleCoreAIEngine {
     var arguments = quantizerPreset.map { ["--quantizer-preset", $0] } ?? []
+    arguments += palettizerBits.map { ["--palettizer-n-bits", String($0)] } ?? []
     arguments += compilePlatforms.flatMap { ["--compile-platform", $0] }
     let directory = try await exportNeedleCoreAI(
       outputDirectoryName: SelfCoreAIExport.outputDirectoryName(
         quantizerPreset: quantizerPreset,
+        palettizerBits: palettizerBits,
         compilePlatforms: compilePlatforms
       ),
       arguments: arguments
@@ -144,16 +147,21 @@ private enum NeedleTestModelExport {
 
     static func outputDirectoryName(
       quantizerPreset: String?,
+      palettizerBits: Int?,
       compilePlatforms: [String]
     ) -> String {
       let compileSuffix =
         compilePlatforms.isEmpty
         ? ""
         : "-aot-" + compilePlatforms.joined(separator: "-")
-      if let quantizerPreset {
-        return "coreai-export-v5-\(quantizerPreset)\(compileSuffix)"
-      }
-      return "coreai-export-v5\(compileSuffix)"
+      let compressionSuffix = [
+        quantizerPreset,
+        palettizerBits.map { "palette\($0)" }
+      ]
+      .compactMap { $0 }
+      .joined(separator: "-")
+      let suffix = compressionSuffix.isEmpty ? "" : "-\(compressionSuffix)"
+      return "coreai-export-v5\(suffix)\(compileSuffix)"
     }
   }
 
@@ -184,12 +192,15 @@ private enum NeedleTestModelExport {
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
   func makeNeedleCoreMLEngine(
     quantizerPreset: String? = nil,
+    palettizerBits: Int? = nil,
     compilePlatforms: [String] = []
   ) async throws -> NeedleCoreMLEngine {
-    let arguments = quantizerPreset.map { ["--quantizer-preset", $0] } ?? []
+    var arguments = quantizerPreset.map { ["--quantizer-preset", $0] } ?? []
+    arguments += palettizerBits.map { ["--palettizer-n-bits", String($0)] } ?? []
     let directory = try await exportNeedleCoreML(
       outputDirectoryName: SelfCoreMLExport.outputDirectoryName(
         quantizerPreset: quantizerPreset,
+        palettizerBits: palettizerBits,
         compilePlatforms: compilePlatforms
       ),
       arguments: arguments,
@@ -228,16 +239,21 @@ private enum NeedleTestModelExport {
 
     static func outputDirectoryName(
       quantizerPreset: String?,
+      palettizerBits: Int?,
       compilePlatforms: [String]
     ) -> String {
       let compileSuffix =
         compilePlatforms.isEmpty
         ? ""
         : "-aot-" + compilePlatforms.joined(separator: "-")
-      if let quantizerPreset {
-        return "coreml-export-v17-\(quantizerPreset)\(compileSuffix)"
-      }
-      return "coreml-export-v17\(compileSuffix)"
+      let compressionSuffix = [
+        quantizerPreset,
+        palettizerBits.map { "palette\($0)" }
+      ]
+      .compactMap { $0 }
+      .joined(separator: "-")
+      let suffix = compressionSuffix.isEmpty ? "" : "-\(compressionSuffix)"
+      return "coreml-export-v17\(suffix)\(compileSuffix)"
     }
   }
 

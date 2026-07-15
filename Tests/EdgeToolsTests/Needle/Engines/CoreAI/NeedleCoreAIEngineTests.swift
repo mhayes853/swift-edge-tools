@@ -270,6 +270,33 @@
     }
   }
 
+  extension `NeedleCoreAIEngine tests` {
+    @Test
+    @available(anyAppleOS 27.0, *)
+    func `Generate Basics With W8 Quantized And W4 Palettized Export`() async throws {
+      let engine = try await makeNeedleCoreAIEngine(
+        quantizerPreset: "w8",
+        palettizerBits: 4
+      )
+      let tokens = Lock([EdgeToolsToken]())
+      let generationTask = try engine.generate(
+        prompt: .sendAdventureEmail,
+        parameters: .default,
+        channel: EdgeToolsGenerationChannel(
+          onToken: { token in tokens.withLock { $0.append(token) } }
+        )
+      )
+      let generation = try await generationTask.value
+
+      expectNoDifference(generation.wasStopped, false)
+      withKnownIssue {
+        assertSnapshot(of: generation, as: .dump, record: .all)
+        assertSnapshot(of: generation.metadata, as: .dump, record: .all)
+        assertSnapshot(of: generation.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
+      }
+    }
+  }
+
   @available(anyAppleOS 27.0, *)
   final class CountingLogitsProcessor: EdgeToolsLogitsProcessor, @unchecked Sendable {
     var promptCalls = 0

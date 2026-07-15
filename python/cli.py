@@ -6,13 +6,19 @@ import io
 import json
 import sys
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import yaml
 from coreai.runtime import AIModelAssetMetadata
 from coreai_opt import ExportBackend
+from coreai_opt.palettization import (
+    KMeansPalettizerConfig,
+    ModuleKMeansPalettizerConfig,
+    PalettizationSpec,
+)
 from coreai_opt.quantization import QuantizerConfig
-import yaml
 
 from needle.coreai_export import export_needle_coreai
 from needle.coreml_export import (
@@ -27,11 +33,18 @@ from needle.needle_compression import (
 )
 
 _QUANTIZER_PRESETS = ("w4", "w4_per_block", "w8")
+_PALETTIZER_N_BITS = (1, 2, 3, 4, 6, 8)
 _COMPUTE_UNITS = tuple(compute_units.value for compute_units in CoreMLComputeUnits)
 _BACKENDS = {
     "coreai": ExportBackend.CoreAI,
     "coreml": ExportBackend.CoreML,
 }
+
+
+@dataclass(frozen=True)
+class CompressionConfig:
+    quantizer: QuantizerConfig | None = None
+    palettizer: KMeansPalettizerConfig | None = None
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -70,6 +83,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--quantizer-config")
     parser.add_argument("--quantizer-preset", choices=_QUANTIZER_PRESETS)
     parser.add_argument("--quantizer-execution-mode", choices=("graph", "eager"))
+    parser.add_argument("--palettizer-config")
+    parser.add_argument("--palettizer-n-bits", choices=_PALETTIZER_N_BITS, type=int)
     return parser
 
 
@@ -177,7 +192,7 @@ def _apply_metadata_mapping(
             )
 
 
-def _build_compression_config(parsed: argparse.Namespace) -> QuantizerConfig | None:
+def _build_compression_config(parsed: argparse.Namespace) -> CompressionConfig | None:
     has_quantizer_inputs = any(
         [
             parsed.quantizer_config,
@@ -185,16 +200,26 @@ def _build_compression_config(parsed: argparse.Namespace) -> QuantizerConfig | N
             parsed.quantizer_execution_mode,
         ]
     )
-
-    if not has_quantizer_inputs:
+    has_palettizer_inputs = any(
+        [
+            parsed.palettizer_config,
+            parsed.palettizer_n_bits is not None,
+        ]
+    )
+    if not has_quantizer_inputs and not has_palettizer_inputs:
         return None
-
     if parsed.quantizer_config and parsed.quantizer_preset:
         raise ValueError(
             "--quantizer-config and --quantizer-preset are mutually exclusive"
         )
-
-    return _build_quantizer_config(parsed)
+    if parsed.palettizer_config and parsed.palettizer_n_bits is not None:
+        raise ValueError(
+            "--palettizer-config and --palettizer-n-bits are mutually exclusive"
+        )
+    return CompressionConfig(
+        quantizer=_build_quantizer_config(parsed) if has_quantizer_inputs else None,
+        palettizer=_build_palettizer_config(parsed) if has_palettizer_inputs else None,
+    )
 
 
 def _parse_compute_units(value: str) -> CoreMLComputeUnits:
@@ -213,14 +238,18 @@ def _build_compressor(parsed: argparse.Namespace) -> NeedleCompressor | None:
     compression_config = _build_compression_config(parsed)
     if compression_config is None:
         return None
-    if isinstance(compression_config, QuantizerConfig):
-        backend = _parse_backend(parsed.backend)
-        if backend == ExportBackend.CoreAI:
-            return CoreAIQuantizerCompressor(compression_config)
-        if backend == ExportBackend.CoreML:
-            return CoreMLQuantizerCompressor(compression_config)
-        raise ValueError(f"Unsupported quantizer backend: {backend.value}")
-    raise TypeError("Unsupported compression config type")
+    backend = _parse_backend(parsed.backend)
+    if backend == ExportBackend.CoreAI:
+        return CoreAIQuantizerCompressor(
+            compression_config.quantizer,
+            palettizer_config=compression_config.palettizer,
+        )
+    if backend == ExportBackend.CoreML:
+        return CoreMLQuantizerCompressor(
+            compression_config.quantizer,
+            palettizer_config=compression_config.palettizer,
+        )
+    raise ValueError(f"Unsupported compression backend: {backend.value}")
 
 
 def _build_quantizer_config(parsed: argparse.Namespace) -> QuantizerConfig:
@@ -234,6 +263,25 @@ def _build_quantizer_config(parsed: argparse.Namespace) -> QuantizerConfig:
     if parsed.quantizer_execution_mode is not None:
         config.set_execution_mode(parsed.quantizer_execution_mode)
     return config
+
+
+def _build_palettizer_config(parsed: argparse.Namespace) -> KMeansPalettizerConfig:
+    if parsed.palettizer_config:
+        return _load_compression_config(
+            parsed.palettizer_config,
+            KMeansPalettizerConfig,
+        )
+    palettization_spec = PalettizationSpec(n_bits=parsed.palettizer_n_bits)
+    return KMeansPalettizerConfig(
+        global_config=ModuleKMeansPalettizerConfig(
+            op_input_spec={},
+            op_output_spec={},
+            op_state_spec={
+                "weight": palettization_spec,
+                "in_proj_weight": palettization_spec,
+            },
+        )
+    )
 
 
 def _load_compression_config(path: str | Path, config_type: type[Any]):

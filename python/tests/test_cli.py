@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 from coreai.authoring.asset import AIModelAsset
 from coreai.runtime import AIModelAssetMetadata
+from coreai_opt.palettization import KMeansPalettizerConfig, PalettizationSpec
 from coreai_opt.quantization import QuantizerConfig
 import torch
 import yaml
@@ -143,17 +144,103 @@ class CLITests(unittest.TestCase):
                         str(config_path),
                     ],
                 ),
+                (
+                    "quantized and palettized",
+                    [
+                        "--output",
+                        str(directory / "out"),
+                        "--quantizer-preset",
+                        "w8",
+                        "--palettizer-n-bits",
+                        "4",
+                    ],
+                ),
             ]
 
             for name, arguments in cases:
                 with self.subTest(case=name):
                     parsed = parse_arguments(arguments)
-                    config = self._unwrap_quantizer_config(
+                    compression_config = self._unwrap_value(
                         _build_compression_config(parsed)
                     )
-                    self.assertEqual(config.execution_mode.value, "eager")
+                    quantizer_config = self._unwrap_quantizer_config(
+                        compression_config.quantizer
+                    )
+                    if name == "quantized and palettized":
+                        palettizer_config = self._unwrap_palettizer_config(
+                            compression_config.palettizer
+                        )
+                        global_config = palettizer_config.global_config
+                        if global_config is None:
+                            self.fail("Expected a global palettizer configuration")
+                        state_spec = global_config.op_state_spec
+                        if state_spec is None:
+                            self.fail("Expected a weight palettization specification")
+                        weight_spec = state_spec["weight"]
+                        self.assertIsInstance(weight_spec, PalettizationSpec)
+                        self.assertEqual(cast(PalettizationSpec, weight_spec).n_bits, 4)
+                    else:
+                        self.assertEqual(quantizer_config.execution_mode.value, "eager")
         finally:
             directory_ctx.cleanup()
+
+    def test_build_compression_config_loads_palettizer_config(self) -> None:
+        directory_ctx = tempfile.TemporaryDirectory()
+        try:
+            directory = Path(directory_ctx.name)
+            config_path = directory / "palettizer.yaml"
+            config_path.write_text(
+                yaml.safe_dump(
+                    {
+                        "global_config": {
+                            "op_input_spec": {},
+                            "op_output_spec": {},
+                            "op_state_spec": {"weight": {"n_bits": 6}},
+                        }
+                    }
+                )
+            )
+            parsed = parse_arguments(
+                [
+                    "--output",
+                    str(directory / "out"),
+                    "--palettizer-config",
+                    str(config_path),
+                ]
+            )
+
+            compression_config = self._unwrap_value(_build_compression_config(parsed))
+            palettizer_config = self._unwrap_palettizer_config(
+                compression_config.palettizer
+            )
+            global_config = palettizer_config.global_config
+            if global_config is None:
+                self.fail("Expected a global palettizer configuration")
+            state_spec = global_config.op_state_spec
+            if state_spec is None:
+                self.fail("Expected a weight palettization specification")
+            weight_spec = state_spec["weight"]
+            self.assertIsInstance(weight_spec, PalettizationSpec)
+            self.assertEqual(cast(PalettizationSpec, weight_spec).n_bits, 6)
+        finally:
+            directory_ctx.cleanup()
+
+    def test_build_compression_config_rejects_conflicting_palettizer_inputs(
+        self,
+    ) -> None:
+        parsed = parse_arguments(
+            [
+                "--output",
+                "./build/coreai-export",
+                "--palettizer-config",
+                "palettizer.json",
+                "--palettizer-n-bits",
+                "4",
+            ]
+        )
+
+        with self.assertRaisesRegex(ValueError, "mutually exclusive"):
+            _build_compression_config(parsed)
 
     def test_main_passes_compile_platforms_to_export(self) -> None:
         with patch("cli.export_needle_coreai") as export_needle_coreai_mock:
@@ -335,6 +422,10 @@ class CLITests(unittest.TestCase):
     def _unwrap_quantizer_config(self, config: object) -> QuantizerConfig:
         self.assertIsInstance(config, QuantizerConfig)
         return cast(QuantizerConfig, config)
+
+    def _unwrap_palettizer_config(self, config: object) -> KMeansPalettizerConfig:
+        self.assertIsInstance(config, KMeansPalettizerConfig)
+        return cast(KMeansPalettizerConfig, config)
 
     def _unwrap_value(self, value: _T | None) -> _T:
         self.assertIsNotNone(value)
