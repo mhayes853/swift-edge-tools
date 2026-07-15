@@ -32,7 +32,6 @@
     return Int(index)
   }
 
-
   @inline(always)
   func _argmaxScalar(
     count: Int,

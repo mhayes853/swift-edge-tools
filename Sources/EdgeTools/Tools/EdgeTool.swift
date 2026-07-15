@@ -7,6 +7,7 @@ public protocol EdgeTool<Input, Output>: Sendable {
   var name: String { get }
   var description: String { get }
   var arguments: EdgeToolsGenerationSchema { get }
+  var includesSchemaInInstructions: Bool { get }
 
   func invoke(input: Input) async throws -> Output
 }
@@ -18,6 +19,8 @@ extension EdgeTool where Input: EdgeToolsGenerable {
 }
 
 extension EdgeTool {
+  public var includesSchemaInInstructions: Bool { true }
+
   public var definition: EdgeToolDefinition {
     EdgeToolDefinition(
       name: self.name,

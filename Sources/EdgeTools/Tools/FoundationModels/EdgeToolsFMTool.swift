@@ -14,6 +14,7 @@
 
     public var name: String { self.base.name }
     public var description: String { self.base.description }
+    public var includesSchemaInInstructions: Bool { self.base.includesSchemaInInstructions }
 
     public init(_ base: Base) {
       self.base = base
