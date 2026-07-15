@@ -4,27 +4,53 @@ import Observation
 // MARK: - EdgeToolsSession
 
 public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable, Observable {
+  private struct ActiveStreams: Sendable {
+    var rawToolCallStreams = [EdgeToolsRawToolCallsStream]()
+    var toolCallStreams = [EdgeToolsSessionStream]()
+  }
+
   public let engine: Engine
-  private let _activeStreams = Lock([EdgeToolsSessionStream]())
+  private let _activeStreams = Lock(ActiveStreams())
   private let observationRegistrar = ObservationRegistrar()
 
   public var isResponding: Bool {
     !self.activeStreams.isEmpty
   }
 
-  public var activeStreams: [EdgeToolsSessionStream] {
+  public var activeStreams: EdgeToolsSessionActiveStreams {
     self.observationRegistrar.access(self, keyPath: \.activeStreams)
-    return self._activeStreams.withLock { $0 }
+    return self._activeStreams.withLock {
+      EdgeToolsSessionActiveStreams(
+        rawToolCallStreams: $0.rawToolCallStreams,
+        toolCallStreams: $0.toolCallStreams
+      )
+    }
   }
 
   public init(engine: sending Engine) {
     self.engine = engine
   }
 
+  fileprivate func registerActiveStream(_ stream: EdgeToolsRawToolCallsStream) {
+    self._activeStreams.withLock { activeStreams in
+      self.observationRegistrar.withMutation(of: self, keyPath: \.activeStreams) {
+        activeStreams.rawToolCallStreams.append(stream)
+      }
+    }
+  }
+
   fileprivate func registerActiveStream(_ stream: EdgeToolsSessionStream) {
     self._activeStreams.withLock { activeStreams in
       self.observationRegistrar.withMutation(of: self, keyPath: \.activeStreams) {
-        activeStreams.append(stream)
+        activeStreams.toolCallStreams.append(stream)
+      }
+    }
+  }
+
+  fileprivate func removeActiveStream(_ stream: EdgeToolsRawToolCallsStream) {
+    self._activeStreams.withLock { activeStreams in
+      self.observationRegistrar.withMutation(of: self, keyPath: \.activeStreams) {
+        activeStreams.rawToolCallStreams.removeAll { $0 === stream }
       }
     }
   }
@@ -32,7 +58,7 @@ public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable, Observab
   fileprivate func removeActiveStream(_ stream: EdgeToolsSessionStream) {
     self._activeStreams.withLock { activeStreams in
       self.observationRegistrar.withMutation(of: self, keyPath: \.activeStreams) {
-        activeStreams.removeAll { $0 === stream }
+        activeStreams.toolCallStreams.removeAll { $0 === stream }
       }
     }
   }
@@ -64,6 +90,15 @@ public struct EdgeToolsSessionGeneration: Sendable {
 public struct EdgeToolsRawToolCallsGeneration: Sendable {
   public let engineGeneration: EdgeToolsEngineGeneration
   public let toolCalls: [EdgeRawToolCall]
+}
+
+public struct EdgeToolsSessionActiveStreams: Sendable {
+  public let rawToolCallStreams: [EdgeToolsRawToolCallsStream]
+  public let toolCallStreams: [EdgeToolsSessionStream]
+
+  public var isEmpty: Bool {
+    self.rawToolCallStreams.isEmpty
+  }
 }
 
 // MARK: - Tokens
@@ -106,6 +141,7 @@ public final class EdgeToolsRawToolCallsStream: Sendable, Observable, AsyncSeque
     var tokenContinuations = [Int: AsyncThrowingStream<EdgeToolsToken, any Error>.Continuation]()
     var onToolCall: (@Sendable (EdgeRawToolCall, Int) -> Void)?
     var onResult: (@Sendable (Result<EdgeToolsRawToolCallsGeneration, any Error>) -> Void)?
+    var onFinish: (@Sendable () -> Void)?
     var nextID = 0
   }
 
@@ -175,6 +211,10 @@ public final class EdgeToolsRawToolCallsStream: Sendable, Observable, AsyncSeque
     guard shouldStart else { return }
     let task = self.startGeneration(self)
     self.state.withLock { $0.task = task }
+  }
+
+  fileprivate func setOnFinish(_ onFinish: @escaping @Sendable () -> Void) {
+    self.state.withLock { $0.onFinish = onFinish }
   }
 
   public func makeAsyncIterator() -> AsyncIterator {
@@ -309,6 +349,7 @@ public final class EdgeToolsRawToolCallsStream: Sendable, Observable, AsyncSeque
         state.result = result
         let completion = (
           state.onResult,
+          state.onFinish,
           Array(state.callContinuations.values),
           Array(state.tokenContinuations.values)
         )
@@ -319,13 +360,14 @@ public final class EdgeToolsRawToolCallsStream: Sendable, Observable, AsyncSeque
       }
     }
     completion.0?(result)
+    completion.1?()
     switch result {
     case .success:
-      completion.1.forEach { $0.finish() }
       completion.2.forEach { $0.finish() }
+      completion.3.forEach { $0.finish() }
     case .failure(let error):
-      completion.1.forEach { $0.finish(throwing: error) }
       completion.2.forEach { $0.finish(throwing: error) }
+      completion.3.forEach { $0.finish(throwing: error) }
     }
   }
 }
@@ -351,7 +393,7 @@ public final class EdgeToolsSessionStream: Sendable, Observable, Identifiable, A
     }
   }
 
-  private let rawStream: EdgeToolsRawToolCallsStream
+  fileprivate let rawStream: EdgeToolsRawToolCallsStream
   private let storage: Storage
 
   public var isGenerating: Bool {
@@ -524,6 +566,11 @@ extension EdgeToolsSession {
       tools: tools,
       parameters: parameters
     )
+    self.registerActiveStream(stream)
+    stream.setOnFinish { [weak self, weak stream] in
+      guard let self, let stream else { return }
+      self.removeActiveStream(stream)
+    }
     stream.start()
     return stream
   }
@@ -557,7 +604,12 @@ extension EdgeToolsSession {
       parameters: parameters,
       shouldInvokeTools: shouldInvokeTools
     )
+    self.registerActiveStream(stream.rawStream)
     self.registerActiveStream(stream)
+    stream.rawStream.setOnFinish { [weak self, weak rawStream = stream.rawStream] in
+      guard let self, let rawStream else { return }
+      self.removeActiveStream(rawStream)
+    }
     stream.setOnFinish { [weak self, weak stream] in
       guard let self, let stream else { return }
       self.removeActiveStream(stream)

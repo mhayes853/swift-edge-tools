@@ -440,24 +440,26 @@
       let stream2 = session.stream(prompt: .test(user: "hi"), tools: [])
 
       let activeStreams = session.activeStreams
-      expectNoDifference(activeStreams.count, 2)
-      expectNoDifference(activeStreams.contains { $0 === stream1 }, true)
-      expectNoDifference(activeStreams.contains { $0 === stream2 }, true)
+      expectNoDifference(activeStreams.rawToolCallStreams.count, 2)
+      expectNoDifference(activeStreams.toolCallStreams.count, 2)
+      expectNoDifference(activeStreams.toolCallStreams.contains { $0 === stream1 }, true)
+      expectNoDifference(activeStreams.toolCallStreams.contains { $0 === stream2 }, true)
 
       engine.push(.finish)
       engine.push(nil)
       _ = try await stream1.finalGeneration
 
       let activeStreamsAfterFirst = session.activeStreams
-      expectNoDifference(activeStreamsAfterFirst.count, 1)
-      expectNoDifference(activeStreamsAfterFirst.contains { $0 === stream1 }, false)
-      expectNoDifference(activeStreamsAfterFirst.contains { $0 === stream2 }, true)
+      expectNoDifference(activeStreamsAfterFirst.rawToolCallStreams.count, 1)
+      expectNoDifference(activeStreamsAfterFirst.toolCallStreams.count, 1)
+      expectNoDifference(activeStreamsAfterFirst.toolCallStreams.contains { $0 === stream1 }, false)
+      expectNoDifference(activeStreamsAfterFirst.toolCallStreams.contains { $0 === stream2 }, true)
 
       engine.push(.finish)
       engine.push(nil)
       _ = try await stream2.finalGeneration
 
-      expectNoDifference(session.activeStreams.count, 0)
+      expectNoDifference(session.activeStreams.isEmpty, true)
     }
 
     @Test
