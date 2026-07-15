@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import subprocess
-import tempfile
 import typing
 from collections import Counter
 from collections.abc import Mapping, Sequence
@@ -20,23 +19,6 @@ import needle.export_helpers as export_helpers
 from . import Needle, NeedleModelConfiguation
 from .needle_compression import NeedleCompressor
 
-_ENCODER_INPUT_NAMES = ["input_ids"]
-_ENCODER_OUTPUT_NAMES = [
-    "cross_attention_mask",
-    "encoder_projected_k",
-    "encoder_projected_v",
-]
-_DECODER_INPUT_NAMES = [
-    "input_ids",
-    "cache_position",
-    "self_attention_mask",
-    "cross_attention_mask",
-    "encoder_projected_k",
-    "encoder_projected_v",
-    "key_cache",
-    "value_cache",
-]
-_DECODER_OUTPUT_NAMES = ["logits", "updated_key_cache", "updated_value_cache"]
 _COREML_COMPILE_PLATFORMS = {
     "macos": "macOS",
     "ios": "iOS",
@@ -86,16 +68,15 @@ def export_needle_coreml(
     compile_platforms: Sequence[str] = (),
 ) -> Path:
     compile_platforms = _validated_compile_platforms(compile_platforms)
-    source_files = export_helpers.resolve_model_source(source)
-    configuration = export_helpers.load_configuration(source_files.configuration_path)
+    source_files, configuration, output_directory = export_helpers.prepare_export(
+        source,
+        output_directory,
+    )
     needle = _load_needle_coreml_model(
         configuration,
         source_files.weights_path,
         use_native_sdpa=compute_units.uses_native_sdpa,
     )
-
-    output_directory = Path(output_directory).expanduser().resolve()
-    output_directory.mkdir(parents=True, exist_ok=True)
 
     encoder_model, decoder_model = convert_needle_coreml_models(
         needle,
@@ -143,18 +124,18 @@ def convert_needle_coreml_models(
     *,
     compressor: NeedleCompressor | None = None,
 ) -> tuple[MLModel, MLModel]:
+    encoder_spec = export_helpers.encoder_export_spec(configuration)
     encoder_sample = (
         export_helpers.sample_encoder_input(
             configuration,
             configuration.encoder_max_length,
         ),
     )
-    encoder_shapes = export_helpers.encoder_dynamic_shapes(configuration)
-    encoder_module = _prepare_module_for_coreml_export(
+    encoder_module = export_helpers.prepare_module_for_export(
         needle.encoder,
         encoder_sample,
         compressor=compressor,
-        dynamic_shapes=encoder_shapes,
+        dynamic_shapes=encoder_spec.dynamic_shapes,
     )
     encoder_model = typing.cast(
         MLModel,
@@ -162,25 +143,25 @@ def convert_needle_coreml_models(
             export_helpers.export_program(
                 encoder_module,
                 encoder_sample,
-                dynamic_shapes=encoder_shapes,
+                dynamic_shapes=encoder_spec.dynamic_shapes,
                 decomposition_table={},
             ),
             convert_to="mlprogram",
             minimum_deployment_target=ct.target.macOS15,
             compute_precision=ct.precision.FLOAT16,
             skip_model_load=True,
-            inputs=_coreml_input_tensor_types(_ENCODER_INPUT_NAMES, encoder_sample),
+            inputs=_coreml_input_tensor_types(encoder_spec.input_names, encoder_sample),
             outputs=_coreml_output_tensor_types(
-                _ENCODER_OUTPUT_NAMES,
+                encoder_spec.output_names,
                 encoder_module(*encoder_sample),
-                dtype_overrides=dict.fromkeys(_ENCODER_OUTPUT_NAMES, np.float16),
+                dtype_overrides=dict.fromkeys(encoder_spec.output_names, np.float16),
             ),
         ),
     )
     encoder_model = _rename_model_features(
         encoder_model,
-        input_names=_ENCODER_INPUT_NAMES,
-        output_names=_ENCODER_OUTPUT_NAMES,
+        input_names=encoder_spec.input_names,
+        output_names=encoder_spec.output_names,
     )
 
     encoder_outputs = encoder_module(*encoder_sample)
@@ -191,26 +172,12 @@ def convert_needle_coreml_models(
         ),
         *export_helpers.empty_decoder_caches(configuration, dtype=torch.float32),
     )
-    decoder_shapes = (
-        *export_helpers.decoder_dynamic_shapes(configuration),
-        {
-            0: torch.export.Dim.STATIC,
-            1: torch.export.Dim.STATIC,
-            2: torch.export.Dim.STATIC,
-            3: torch.export.Dim.STATIC,
-        },
-        {
-            0: torch.export.Dim.STATIC,
-            1: torch.export.Dim.STATIC,
-            2: torch.export.Dim.STATIC,
-            3: torch.export.Dim.STATIC,
-        },
-    )
-    decoder_module = _prepare_module_for_coreml_export(
+    decoder_spec = export_helpers.decoder_export_spec(configuration)
+    decoder_module = export_helpers.prepare_module_for_export(
         needle.decoder,
         decoder_sample,
         compressor=compressor,
-        dynamic_shapes=decoder_shapes,
+        dynamic_shapes=decoder_spec.dynamic_shapes,
     )
     decoder_model = typing.cast(
         MLModel,
@@ -218,7 +185,7 @@ def convert_needle_coreml_models(
             export_helpers.export_program(
                 decoder_module,
                 decoder_sample,
-                dynamic_shapes=decoder_shapes,
+                dynamic_shapes=decoder_spec.dynamic_shapes,
                 decomposition_table={},
             ),
             convert_to="mlprogram",
@@ -226,7 +193,7 @@ def convert_needle_coreml_models(
             compute_precision=ct.precision.FLOAT16,
             skip_model_load=True,
             inputs=_coreml_input_tensor_types(
-                _DECODER_INPUT_NAMES,
+                decoder_spec.input_names,
                 decoder_sample,
                 dtype_overrides=dict.fromkeys(
                     (
@@ -241,7 +208,7 @@ def convert_needle_coreml_models(
                 ),
             ),
             outputs=_coreml_output_tensor_types(
-                _DECODER_OUTPUT_NAMES,
+                decoder_spec.output_names,
                 decoder_module(*decoder_sample),
                 dtype_overrides={
                     "updated_key_cache": np.float16,
@@ -252,26 +219,10 @@ def convert_needle_coreml_models(
     )
     decoder_model = _rename_model_features(
         decoder_model,
-        input_names=_DECODER_INPUT_NAMES,
-        output_names=_DECODER_OUTPUT_NAMES,
+        input_names=decoder_spec.input_names,
+        output_names=decoder_spec.output_names,
     )
     return encoder_model, decoder_model
-
-
-def _prepare_module_for_coreml_export(
-    module: torch.nn.Module,
-    sample_args: tuple[torch.Tensor, ...],
-    *,
-    compressor: NeedleCompressor | None = None,
-    dynamic_shapes: dict[str, Any] | tuple[Any, ...] | list[Any] | None = None,
-) -> torch.nn.Module:
-    if compressor is None:
-        return module
-    return compressor.compress(
-        module,
-        sample_args,
-        dynamic_shapes=dynamic_shapes,
-    )
 
 
 def _numpy_dtype(dtype: torch.dtype) -> Any:
@@ -353,18 +304,26 @@ def _persist_model(
     metadata: AIModelAssetMetadata | None = None,
     compile_platforms: Sequence[str] = (),
 ) -> None:
-    if compile_platforms:
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            source_path = Path(temporary_directory) / f"{name}.mlpackage"
-            _save_model(model, source_path, metadata=metadata)
+    export_helpers.persist_export_artifact(
+        model,
+        output_directory=output_directory,
+        name=name,
+        extension=".mlpackage",
+        metadata=metadata,
+        compile_platforms=compile_platforms,
+        save=lambda artifact, path, metadata: _save_model(
+            artifact,
+            path,
+            metadata=metadata,
+        ),
+        compile_artifact=lambda source_path, output_directory, platforms: (
             _compile_model(
                 source_path,
                 output_directory=output_directory,
-                platforms=compile_platforms,
+                platforms=platforms,
             )
-        return
-
-    _save_model(model, output_directory / f"{name}.mlpackage", metadata=metadata)
+        ),
+    )
 
 
 def _save_model(

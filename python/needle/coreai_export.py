@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import subprocess
-import tempfile
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
 
 import needle.export_helpers as export_helpers
 import torch
@@ -24,16 +22,15 @@ def export_needle_coreai(
     model_metadata: AIModelAssetMetadata | None = None,
     compile_platforms: Sequence[str] = (),
 ) -> Path:
-    source_files = export_helpers.resolve_model_source(source)
-    configuration = export_helpers.load_configuration(source_files.configuration_path)
+    source_files, configuration, output_directory = export_helpers.prepare_export(
+        source,
+        output_directory,
+    )
     needle = export_helpers.load_needle_model(
         configuration,
         source_files.weights_path,
         use_native_sdpa=True,
     )
-
-    output_directory = Path(output_directory).expanduser().resolve()
-    output_directory.mkdir(parents=True, exist_ok=True)
 
     encoder_program, decoder_program = convert_needle_coreai_programs(
         needle,
@@ -64,6 +61,7 @@ def convert_needle_coreai_programs(
     *,
     compressor: NeedleCompressor | None = None,
 ) -> tuple[AIProgram, AIProgram]:
+    encoder_spec = export_helpers.encoder_export_spec(configuration)
     encoder_sample = (
         export_helpers.sample_encoder_input(
             configuration,
@@ -74,12 +72,11 @@ def convert_needle_coreai_programs(
         *export_helpers.sample_decoder_inputs(needle, configuration),
         *export_helpers.empty_decoder_caches(configuration, dtype=torch.float32),
     )
-    encoder_shapes = export_helpers.encoder_dynamic_shapes(configuration)
-    encoder_module = _prepare_module_for_coreai_export(
+    encoder_module = export_helpers.prepare_module_for_export(
         needle.encoder,
         encoder_sample,
         compressor=compressor,
-        dynamic_shapes=encoder_shapes,
+        dynamic_shapes=encoder_spec.dynamic_shapes,
     )
 
     encoder_program = (
@@ -89,39 +86,21 @@ def convert_needle_coreai_programs(
             export_fn=lambda module: export_helpers.export_program(
                 module,
                 encoder_sample,
-                dynamic_shapes=encoder_shapes,
+                dynamic_shapes=encoder_spec.dynamic_shapes,
             ),
-            input_names=["input_ids"],
-            output_names=[
-                "cross_attention_mask",
-                "encoder_projected_k",
-                "encoder_projected_v",
-            ],
+            input_names=encoder_spec.input_names,
+            output_names=encoder_spec.output_names,
         )
         .to_coreai()
     )
     encoder_program.optimize()
 
-    decoder_shapes = (
-        *export_helpers.decoder_dynamic_shapes(configuration),
-        {
-            0: torch.export.Dim.STATIC,
-            1: torch.export.Dim.STATIC,
-            2: torch.export.Dim.STATIC,
-            3: torch.export.Dim.STATIC,
-        },
-        {
-            0: torch.export.Dim.STATIC,
-            1: torch.export.Dim.STATIC,
-            2: torch.export.Dim.STATIC,
-            3: torch.export.Dim.STATIC,
-        },
-    )
-    decoder_module = _prepare_module_for_coreai_export(
+    decoder_spec = export_helpers.decoder_export_spec(configuration)
+    decoder_module = export_helpers.prepare_module_for_export(
         needle.decoder,
         decoder_sample,
         compressor=compressor,
-        dynamic_shapes=decoder_shapes,
+        dynamic_shapes=decoder_spec.dynamic_shapes,
     )
     decoder_program = (
         TorchConverter()
@@ -130,37 +109,16 @@ def convert_needle_coreai_programs(
             export_fn=lambda module: export_helpers.export_program(
                 module,
                 decoder_sample,
-                dynamic_shapes=decoder_shapes,
+                dynamic_shapes=decoder_spec.dynamic_shapes,
             ),
-            input_names=[
-                "input_ids",
-                "cache_position",
-                "self_attention_mask",
-                "cross_attention_mask",
-                "encoder_projected_k",
-                "encoder_projected_v",
-                "key_cache",
-                "value_cache",
-            ],
-            output_names=["logits", "updated_key_cache", "updated_value_cache"],
+            input_names=decoder_spec.input_names,
+            output_names=decoder_spec.output_names,
         )
         .to_coreai()
     )
     decoder_program.optimize()
 
     return encoder_program, decoder_program
-
-
-def _prepare_module_for_coreai_export(
-    module: torch.nn.Module,
-    sample_args: tuple[torch.Tensor, ...],
-    *,
-    compressor: NeedleCompressor | None = None,
-    dynamic_shapes: dict[str, Any] | tuple[Any, ...] | list[Any] | None = None,
-) -> torch.nn.Module:
-    if compressor is None:
-        return module
-    return compressor.compress(module, sample_args, dynamic_shapes=dynamic_shapes)
 
 
 def _persist_program(
@@ -171,18 +129,26 @@ def _persist_program(
     metadata: AIModelAssetMetadata | None = None,
     compile_platforms: Sequence[str] = (),
 ) -> None:
-    if compile_platforms:
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            source_asset_path = Path(temporary_directory) / f"{name}.aimodel"
-            _save_program(program, source_asset_path, metadata=metadata)
+    export_helpers.persist_export_artifact(
+        program,
+        output_directory=output_directory,
+        name=name,
+        extension=".aimodel",
+        metadata=metadata,
+        compile_platforms=compile_platforms,
+        save=lambda artifact, path, metadata: _save_program(
+            artifact,
+            path,
+            metadata=metadata,
+        ),
+        compile_artifact=lambda source_path, output_directory, platforms: (
             _compile_model_asset(
-                source_asset_path,
+                source_path,
                 output_directory=output_directory,
-                platforms=compile_platforms,
+                platforms=platforms,
             )
-        return
-
-    _save_program(program, output_directory / f"{name}.aimodel", metadata=metadata)
+        ),
+    )
 
 
 def _save_program(

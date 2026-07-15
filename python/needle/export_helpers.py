@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import shutil
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 import torch
 from coreai_torch import get_decomp_table
 from huggingface_hub import snapshot_download
 
 from . import Needle, NeedleModelConfiguation
+from .needle_compression import NeedleCompressor
 from .torch_utils import load_state_dict, torch_dtype
 
 DEFAULT_SOURCE = "Cactus-Compute/needle"
@@ -17,6 +19,27 @@ CONFIG_FILENAMES = ("configuration.json", "config.json")
 TOKENIZER_FILENAMES = ("tokenizer.model", "tokenizer.json")
 DEFAULT_ENCODER_SAMPLE_LENGTH = 4
 DEFAULT_DECODER_SAMPLE_LENGTH = 1
+
+Artifact = TypeVar("Artifact")
+
+
+@dataclass(frozen=True)
+class ModuleExportSpec:
+    input_names: tuple[str, ...]
+    output_names: tuple[str, ...]
+    dynamic_shapes: tuple[Any, ...]
+
+
+def prepare_module_for_export(
+    module: torch.nn.Module,
+    sample_args: tuple[torch.Tensor, ...],
+    *,
+    compressor: NeedleCompressor | None = None,
+    dynamic_shapes: dict[str, Any] | tuple[Any, ...] | list[Any] | None = None,
+) -> torch.nn.Module:
+    if compressor is None:
+        return module
+    return compressor.compress(module, sample_args, dynamic_shapes=dynamic_shapes)
 
 
 def empty_decoder_caches(
@@ -74,6 +97,17 @@ def resolve_model_source(source: str) -> ModelSourceFiles:
 
 def load_configuration(configuration_path: str | Path) -> NeedleModelConfiguation:
     return NeedleModelConfiguation.from_file(configuration_path)
+
+
+def prepare_export(
+    source: str,
+    output_directory: str | Path,
+) -> tuple[ModelSourceFiles, NeedleModelConfiguation, Path]:
+    source_files = resolve_model_source(source)
+    configuration = load_configuration(source_files.configuration_path)
+    output_directory = Path(output_directory).expanduser().resolve()
+    output_directory.mkdir(parents=True, exist_ok=True)
+    return source_files, configuration, output_directory
 
 
 def load_needle_model(
@@ -206,6 +240,49 @@ def sample_decoder_inputs_from_encoder_outputs(
     )
 
 
+def encoder_export_spec(
+    configuration: NeedleModelConfiguation,
+) -> ModuleExportSpec:
+    return ModuleExportSpec(
+        input_names=("input_ids",),
+        output_names=(
+            "cross_attention_mask",
+            "encoder_projected_k",
+            "encoder_projected_v",
+        ),
+        dynamic_shapes=encoder_dynamic_shapes(configuration),
+    )
+
+
+def decoder_export_spec(
+    configuration: NeedleModelConfiguation,
+) -> ModuleExportSpec:
+    cache_shapes = {
+        0: torch.export.Dim.STATIC,
+        1: torch.export.Dim.STATIC,
+        2: torch.export.Dim.STATIC,
+        3: torch.export.Dim.STATIC,
+    }
+    return ModuleExportSpec(
+        input_names=(
+            "input_ids",
+            "cache_position",
+            "self_attention_mask",
+            "cross_attention_mask",
+            "encoder_projected_k",
+            "encoder_projected_v",
+            "key_cache",
+            "value_cache",
+        ),
+        output_names=("logits", "updated_key_cache", "updated_value_cache"),
+        dynamic_shapes=(
+            *decoder_dynamic_shapes(configuration),
+            dict(cache_shapes),
+            dict(cache_shapes),
+        ),
+    )
+
+
 def encoder_dynamic_shapes(
     configuration: NeedleModelConfiguation,
 ) -> tuple[dict[int, Any], ...]:
@@ -247,6 +324,29 @@ def decoder_dynamic_shapes(
             4: torch.export.Dim.STATIC,
         },
     )
+
+
+def persist_export_artifact(
+    artifact: Artifact,
+    *,
+    output_directory: Path,
+    name: str,
+    extension: str,
+    metadata: Any | None,
+    compile_platforms: Sequence[str],
+    save: Callable[[Artifact, Path, Any | None], None],
+    compile_artifact: Callable[[Path, Path, Sequence[str]], None],
+) -> None:
+    output_path = output_directory / f"{name}{extension}"
+    if compile_platforms:
+        from tempfile import TemporaryDirectory
+
+        with TemporaryDirectory() as temporary_directory:
+            source_path = Path(temporary_directory) / output_path.name
+            save(artifact, source_path, metadata)
+            compile_artifact(source_path, output_directory, compile_platforms)
+        return
+    save(artifact, output_path, metadata)
 
 
 def export_program(
