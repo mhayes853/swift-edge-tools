@@ -58,7 +58,7 @@
     }
 
     private let state: Lock<State>
-    private let tokenizer: Lock<any EdgeToolsTokenizer & ~Copyable>
+    private let tokenizer: Lock<any EdgeToolsTokenizer>
 
     private let clock = ContinuousClock()
 
@@ -66,7 +66,7 @@
       from url: URL,
       editConfiguration: (inout NeedleModelConfiguration) -> Void = { _ in }
     ) async throws {
-      let tokenizer = try await loadEdgeToolsTokenizer(from: url)
+      let tokenizer = try await loadEdgeToolsTokenizer(from: url, isNeedleModel: true)
       let lockedTokenizer = Lock(consume tokenizer)
       let model = try loadNeedleMLXModel(
         from: url,
@@ -85,7 +85,7 @@
       )
     }
 
-    public init<Tokenizer: EdgeToolsTokenizer & ~Copyable>(
+    public init<Tokenizer: EdgeToolsTokenizer>(
       tokenizer: consuming sending Tokenizer,
       model: sending NeedleMLXModel,
       grammarEngine: consuming sending XGrammarCompiler
@@ -101,7 +101,7 @@
     }
 
     private init(
-      tokenizer: consuming sending Lock<any EdgeToolsTokenizer & ~Copyable>,
+      tokenizer: consuming sending Lock<any EdgeToolsTokenizer>,
       model: sending NeedleMLXModel,
       grammarEngine: consuming sending XGrammarCompiler
     ) {

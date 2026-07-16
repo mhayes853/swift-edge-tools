@@ -1,7 +1,3 @@
-[submodule "Sources/CNeedleSentencepiece/sentencepiece"]
-	path = Sources/CSentencepiece/sentencepiece
-	url = https://github.com/google/sentencepiece
-	branch = master
 [submodule "Sources/CXGrammar/xgrammar"]
 	path = Sources/CXGrammar/xgrammar
 	url = https://github.com/mlc-ai/xgrammar.git

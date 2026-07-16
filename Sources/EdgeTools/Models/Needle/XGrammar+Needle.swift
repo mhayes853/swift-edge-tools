@@ -5,7 +5,7 @@
 
   extension XGrammarTokenizerInfo {
     public static func needle(
-      tokenizer: borrowing some EdgeToolsTokenizer & ~Copyable
+      tokenizer: borrowing some EdgeToolsTokenizer
     ) throws -> XGrammarTokenizerInfo {
       try Self.needle(
         vocabulary: tokenizer.convertIdsToTokens(Array(0..<8192)),
@@ -14,7 +14,7 @@
     }
 
     static func needle(
-      erasedTokenizer tokenizer: borrowing any EdgeToolsTokenizer & ~Copyable
+      erasedTokenizer tokenizer: borrowing any EdgeToolsTokenizer
     ) throws -> XGrammarTokenizerInfo {
       try Self.needle(
         vocabulary: tokenizer.convertIdsToTokens(Array(0..<8192)),

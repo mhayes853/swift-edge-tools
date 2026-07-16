@@ -46,8 +46,8 @@
       assertSnapshot(of: tokenizer.decode(tokens: tokens), as: .lines)
     }
 
-    private func tokenizer(url: URL) throws -> EdgeToolsSPTokenizer {
-      try EdgeToolsSPTokenizer(modelURL: url.appending(path: "tokenizer.model"))
+    private func tokenizer(url: URL) throws -> NeedleSPTokenizer {
+      try NeedleSPTokenizer(modelURL: url.appending(path: "tokenizer.model"))
     }
   }
 

@@ -1,4 +1,0 @@
-module CSentencepiece {
-    header "bridging.h"
-    export *
-}

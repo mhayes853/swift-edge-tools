@@ -1,4 +1,4 @@
-#if XGrammar && Sentencepiece
+#if XGrammar
   import CustomDump
   import EdgeTools
   import Testing
@@ -6,7 +6,7 @@
   @Suite
   struct `Tool call grammar common tests`: ~Copyable {
     private let compiler: XGrammarCompiler
-    private let tokenizer: EdgeToolsSPTokenizer
+    private let tokenizer: NeedleSPTokenizer
     private let eosToken: EdgeToolsToken.ID
 
     init() throws {
@@ -174,7 +174,8 @@
         <tool_call>{"name":"getWeather","arguments":{"location":"Seoul"}}</tool_call>\
         <tool_call>{"name":"getWeather","arguments":{"location":"Paris"}}</tool_call>
         """,
-      unknownToolCall: #"<tool_call>{"name":"unknown","arguments":{"location":"Seoul"}}</tool_call>"#,
+      unknownToolCall:
+        #"<tool_call>{"name":"unknown","arguments":{"location":"Seoul"}}</tool_call>"#,
       wrongTypeCall: #"<tool_call>{"name":"integerTool","arguments":{"value":"oops"}}</tool_call>"#,
       complexCall:
         """
@@ -190,14 +191,17 @@
       makeParser: { QwenXMLToolCallParser() },
       expectedComplexName: "complexTool",
       emptyCall: "",
-      simpleCall: "<tool_call><function=getWeather><parameter=location>Seoul</parameter></function></tool_call>",
+      simpleCall:
+        "<tool_call><function=getWeather><parameter=location>Seoul</parameter></function></tool_call>",
       twoCalls:
         """
         <tool_call><function=getWeather><parameter=location>Seoul</parameter></function></tool_call>\
         <tool_call><function=getWeather><parameter=location>Paris</parameter></function></tool_call>
         """,
-      unknownToolCall: "<tool_call><function=unknown><parameter=location>Seoul</parameter></function></tool_call>",
-      wrongTypeCall: "<tool_call><function=integerTool><parameter=value>oops</parameter></function></tool_call>",
+      unknownToolCall:
+        "<tool_call><function=unknown><parameter=location>Seoul</parameter></function></tool_call>",
+      wrongTypeCall:
+        "<tool_call><function=integerTool><parameter=value>oops</parameter></function></tool_call>",
       complexCall:
         """
         <tool_call><function=complexTool><parameter=title>alpha</parameter>\
@@ -216,14 +220,17 @@
       makeParser: { FunctionGemmaToolCallParser() },
       expectedComplexName: "complexTool",
       emptyCall: "",
-      simpleCall: "<start_function_call>call:getWeather{location:<escape>Seoul<escape>}<end_function_call>",
+      simpleCall:
+        "<start_function_call>call:getWeather{location:<escape>Seoul<escape>}<end_function_call>",
       twoCalls:
         """
         <start_function_call>call:getWeather{location:<escape>Seoul<escape>}<end_function_call>\
         <start_function_call>call:getWeather{location:<escape>Paris<escape>}<end_function_call>
         """,
-      unknownToolCall: "<start_function_call>call:unknown{location:<escape>Seoul<escape>}<end_function_call>",
-      wrongTypeCall: "<start_function_call>call:integerTool{value:<escape>oops<escape>}<end_function_call>",
+      unknownToolCall:
+        "<start_function_call>call:unknown{location:<escape>Seoul<escape>}<end_function_call>",
+      wrongTypeCall:
+        "<start_function_call>call:integerTool{value:<escape>oops<escape>}<end_function_call>",
       complexCall:
         """
         <start_function_call>call:complexTool{title:<escape>alpha<escape>,count:<escape>3.5<escape>,\

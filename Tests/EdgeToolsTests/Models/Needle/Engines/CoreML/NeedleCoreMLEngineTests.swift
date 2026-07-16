@@ -1,4 +1,4 @@
-#if CoreML && Sentencepiece && canImport(CoreML)
+#if CoreML && canImport(CoreML)
   import CoreML
   import CustomDump
   import EdgeTools

@@ -1,4 +1,4 @@
-#if XGrammar && Sentencepiece
+#if XGrammar
   import CustomDump
   import EdgeTools
   import Testing
@@ -6,7 +6,7 @@
   @Suite(.serialized)
   struct `LFM XGrammarCompiler tests`: ~Copyable {
     private let compiler: XGrammarCompiler
-    private let tokenizer: EdgeToolsSPTokenizer
+    private let tokenizer: NeedleSPTokenizer
     private let eosToken: EdgeToolsToken.ID
 
     init() throws {
@@ -81,10 +81,11 @@
     }
 
     private static func expressions(in ebnf: String) -> [String] {
-      ebnf.split(separator: "\n").compactMap { line in
-        guard let separator = line.range(of: "::=") else { return nil }
-        return line[separator.upperBound...].trimmingCharacters(in: .whitespaces)
-      }
+      ebnf.split(separator: "\n")
+        .compactMap { line in
+          guard let separator = line.range(of: "::=") else { return nil }
+          return line[separator.upperBound...].trimmingCharacters(in: .whitespaces)
+        }
     }
 
     private static var getForecast: EdgeToolDefinition {

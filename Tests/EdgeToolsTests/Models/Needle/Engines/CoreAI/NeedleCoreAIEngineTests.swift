@@ -1,4 +1,4 @@
-#if swift(>=6.4) && CoreAI && Sentencepiece && canImport(CoreAI)
+#if swift(>=6.4) && CoreAI && canImport(CoreAI)
   import CoreAI
   import CustomDump
   import EdgeTools

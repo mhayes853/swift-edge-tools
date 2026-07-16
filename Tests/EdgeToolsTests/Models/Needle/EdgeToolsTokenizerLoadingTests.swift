@@ -11,10 +11,26 @@ struct `EdgeToolsTokenizer Loading tests` {
     defer { try? FileManager.default.removeItem(at: directory) }
 
     let error = await #expect(throws: EdgeToolsTokenizerLoadingError.self) {
-      _ = try await loadEdgeToolsTokenizer(from: directory)
+      _ = try await loadEdgeToolsTokenizer(from: directory, isNeedleModel: true)
     }
     expectNoDifference(error?.message.contains("tokenizer.model"), true)
     expectNoDifference(error?.message.contains("tokenizer.json"), true)
+  }
+
+  @Test
+  func `Does Not Load SentencePiece Tokenizer For Non Needle Model`() async throws {
+    let fileManager = FileManager.default
+    let directory = fileManager.temporaryDirectory.appending(path: UUID().uuidString)
+    try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? fileManager.removeItem(at: directory) }
+    try fileManager.copyItem(
+      at: .testTokenizerModel,
+      to: directory.appending(path: "tokenizer.model")
+    )
+
+    await #expect(throws: EdgeToolsTokenizerLoadingError.self) {
+      _ = try await loadEdgeToolsTokenizer(from: directory, isNeedleModel: false)
+    }
   }
 
   #if Transformers
@@ -23,7 +39,7 @@ struct `EdgeToolsTokenizer Loading tests` {
       let directory = try self.makeTransformersTokenizerDirectory()
       defer { try? FileManager.default.removeItem(at: directory) }
 
-      let tokenizer = try await loadEdgeToolsTokenizer(from: directory)
+      let tokenizer = try await loadEdgeToolsTokenizer(from: directory, isNeedleModel: false)
       let tokenIDs = (
         tokenizer.bosTokenId,
         tokenizer.eosTokenId,

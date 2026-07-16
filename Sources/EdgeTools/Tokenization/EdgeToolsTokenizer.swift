@@ -1,4 +1,4 @@
-public protocol EdgeToolsTokenizer: ~Copyable {
+public protocol EdgeToolsTokenizer: Sendable {
   var unknownTokenId: EdgeToolsToken.ID? { borrowing get }
   var bosTokenId: EdgeToolsToken.ID? { borrowing get }
   var eosTokenId: EdgeToolsToken.ID? { borrowing get }
@@ -10,7 +10,7 @@ public protocol EdgeToolsTokenizer: ~Copyable {
   borrowing func convertIdsToTokens(_ ids: [EdgeToolsToken.ID]) -> [String?]
 }
 
-extension EdgeToolsTokenizer where Self: ~Copyable {
+extension EdgeToolsTokenizer {
   public func tokenize(text: String) -> [String] {
     self.encode(text: text).compactMap { self.convertIdToToken($0) }
   }

@@ -91,7 +91,7 @@ private enum NeedleTestModelExport {
   }
 }
 
-#if swift(>=6.4) && CoreAI && Sentencepiece && canImport(CoreAI)
+#if swift(>=6.4) && CoreAI && canImport(CoreAI)
   import CoreAI
 
   @available(anyAppleOS 27.0, *)
@@ -170,7 +170,7 @@ private enum NeedleTestModelExport {
   }
 #endif
 
-#if CoreML && Sentencepiece && canImport(CoreML)
+#if CoreML && canImport(CoreML)
   import CoreML
 
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)

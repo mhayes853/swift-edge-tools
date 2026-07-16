@@ -1,4 +1,4 @@
-extension EdgeToolsTokenizer where Self: ~Copyable {
+extension EdgeToolsTokenizer {
   public var toolsToken: String { "<tools>" }
 
   public var toolsTokenId: EdgeToolsToken.ID? {

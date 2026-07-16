@@ -1,4 +1,4 @@
-#if XGrammar && Sentencepiece
+#if XGrammar
   import CustomDump
   import EdgeTools
   import Testing
@@ -9,7 +9,7 @@
   @Suite
   struct `XGrammarMatcher tests`: ~Copyable {
     private let engine: XGrammarCompiler
-    private let tokenizer: EdgeToolsSPTokenizer
+    private let tokenizer: NeedleSPTokenizer
     private let eosToken: EdgeToolsToken.ID
 
     init() throws {
@@ -144,7 +144,7 @@
   @Suite
   struct `Memory usage tests`: ~Copyable {
     private let engine: XGrammarCompiler
-    private let tokenizer: EdgeToolsSPTokenizer
+    private let tokenizer: NeedleSPTokenizer
 
     init() throws {
       let tokenizer = try makeTestTokenizer()

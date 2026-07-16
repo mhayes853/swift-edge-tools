@@ -29,7 +29,9 @@ jobs:
   #     - name: Select Xcode ${{ matrix.xcode }}
   #       run: sudo xcode-select -s /Applications/Xcode_${{ matrix.xcode }}.app
   #     - name: Run ${{ matrix.config }} tests
-  #       run: swift test --configuration ${{ matrix.config }} --disable-experimental-prebuilts --enable-all-traits
+  #       run: >
+  #         swift test --configuration ${{ matrix.config }}
+  #         --disable-experimental-prebuilts --enable-all-traits
 
   python-macos:
     name: Python Tests (macOS)
@@ -61,7 +63,8 @@ jobs:
   #       with:
   #         submodules: recursive
   #     - name: "Test Swift Package on Linux"
-  #       run: swift test --disable-experimental-prebuilts --traits XGrammar,Sentencepiece
+  #       run: >
+  #         swift test --disable-experimental-prebuilts --traits XGrammar
 
   # android:
   #   name: Android
@@ -75,7 +78,8 @@ jobs:
   #       uses: swift-android-sdk/swift-android-action@v2
   #       with:
   #         swift-version: 6.3
-  #         swift-build-flags: --disable-experimental-prebuilts --traits XGrammar,Sentencepiece
+  #         swift-build-flags: >
+  #           --disable-experimental-prebuilts --traits XGrammar
   #         run-tests: false # NB: Emulator seems to take too long to boot
 
   # wasm:
@@ -95,9 +99,16 @@ jobs:
   #     - name: Install Swift SDK for WebAssembly
   #       run: |
   #         set -ex
-  #         swift sdk install https://download.swift.org/swift-6.2.3-release/wasm-sdk/swift-6.2.3-RELEASE/swift-6.2.3-RELEASE_wasm.artifactbundle.tar.gz --checksum 394040ecd5260e68bb02f6c20aeede733b9b90702c2204e178f3e42413edad2a
+  #         sdk_url="https://download.swift.org/swift-6.2.3-release/wasm-sdk/"
+  #         sdk_url+="swift-6.2.3-RELEASE/"
+  #         sdk_url+="swift-6.2.3-RELEASE_wasm.artifactbundle.tar.gz"
+  #         checksum="394040ecd5260e68bb02f6c20aeede733"
+  #         checksum+="b9b90702c2204e178f3e42413edad2a"
+  #         swift sdk install "$sdk_url" --checksum "$checksum"
   #     - name: Build Swift Package for WebAssembly
-  #       run: swift build --swift-sdk swift-6.2.3-RELEASE_wasm --target Needle -Xlinker -z -Xlinker stack-size=$((1024 * 1024)) --traits XGrammar,Sentencepiece
+  #       run: >
+  #         swift build --swift-sdk swift-6.2.3-RELEASE_wasm --target Needle
+  #         -Xlinker -z -Xlinker stack-size=$((1024 * 1024)) --traits XGrammar
 
   # windows:
   #   name: Windows
@@ -113,4 +124,5 @@ jobs:
   #         branch: swift-6.3-release
   #         tag: 6.3-RELEASE
   #     - name: "Test Swift Package on Windows"
-  #       run: swift test --disable-experimental-prebuilts --traits XGrammar,Sentencepiece
+  #       run: >
+  #         swift test --disable-experimental-prebuilts --traits XGrammar

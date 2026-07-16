@@ -78,7 +78,7 @@
     private let configuration: NeedleModelConfiguration
     private let encoderFunction: InferenceFunction
     private let decoderFunction: InferenceFunction
-    private let tokenizer: Lock<any EdgeToolsTokenizer & ~Copyable>
+    private let tokenizer: Lock<any EdgeToolsTokenizer>
     private let clock = ContinuousClock()
 
     public convenience init(
@@ -107,7 +107,10 @@
         cache: modelCache,
         cachePolicy: cachePolicy
       )
-      let tokenizer = try await loadEdgeToolsTokenizer(from: modelDirectoryURL)
+      let tokenizer = try await loadEdgeToolsTokenizer(
+        from: modelDirectoryURL,
+        isNeedleModel: true
+      )
       let lockedTokenizer = Lock(consume tokenizer)
       let grammarEngine = lockedTokenizer.withLock {
         try? XGrammarCompiler(tokenizerInfo: try XGrammarTokenizerInfo.needle(erasedTokenizer: $0))
@@ -124,7 +127,7 @@
       )
     }
 
-    public convenience init<Tokenizer: EdgeToolsTokenizer & ~Copyable>(
+    public convenience init<Tokenizer: EdgeToolsTokenizer>(
       encoderModel: AIModel,
       decoderModel: AIModel,
       tokenizer: consuming sending Tokenizer,
@@ -143,7 +146,7 @@
     private init(
       encoderModel: AIModel,
       decoderModel: AIModel,
-      tokenizer: consuming sending Lock<any EdgeToolsTokenizer & ~Copyable>,
+      tokenizer: consuming sending Lock<any EdgeToolsTokenizer>,
       configuration: NeedleModelConfiguration,
       grammarEngine: consuming sending XGrammarCompiler
     ) throws {

@@ -1,4 +1,4 @@
-#if XGrammar && Sentencepiece
+#if XGrammar
   import CustomDump
   import Foundation
   import EdgeTools
@@ -10,7 +10,7 @@
   struct `NeedleXGrammarCompiler tests`: ~Copyable {
     @Suite
     struct `Range tests`: ~Copyable {
-      private let tokenizer: EdgeToolsSPTokenizer
+      private let tokenizer: NeedleSPTokenizer
       private let eosToken: EdgeToolsToken.ID
 
       init() throws {
@@ -206,7 +206,7 @@
   @Suite
   struct `Needle XGrammar matcher tests`: ~Copyable {
     private let engine: XGrammarCompiler
-    private let tokenizer: EdgeToolsSPTokenizer
+    private let tokenizer: NeedleSPTokenizer
     private let eosToken: EdgeToolsToken.ID
 
     init() throws {
@@ -401,14 +401,14 @@
   // MARK: - Helpers
 
   private func requiredNeedleCompiler(
-    tokenizer: borrowing some EdgeToolsTokenizer & ~Copyable
+    tokenizer: borrowing some EdgeToolsTokenizer
   ) throws -> XGrammarCompiler {
     let tokenizerInfo = try XGrammarTokenizerInfo.needle(tokenizer: tokenizer)
     return try XGrammarCompiler(tokenizerInfo: tokenizerInfo)
   }
 
   private func requiredNeedleCompiler(
-    erasedTokenizer tokenizer: borrowing any EdgeToolsTokenizer & ~Copyable
+    erasedTokenizer tokenizer: borrowing any EdgeToolsTokenizer
   ) throws -> XGrammarCompiler {
     let tokenizerInfo = try XGrammarTokenizerInfo.needle(tokenizer: tokenizer)
     return try XGrammarCompiler(tokenizerInfo: tokenizerInfo)
