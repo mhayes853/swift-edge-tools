@@ -154,7 +154,11 @@
           return DynamicGenerationSchema.Property(
             name: key,
             description: propertyNode.description,
-            schema: try self.convert(schema, name: Self.name(from: key), path: propertyNode.path),
+            schema: try self.convert(
+              schema,
+              name: key.schemaPascalCased,
+              path: propertyNode.path
+            ),
             isOptional: !required.contains(key)
           )
         }
@@ -165,14 +169,11 @@
       )
     }
 
-    private static func name(from value: String) -> String {
-      let components = value.split { !$0.isLetter && !$0.isNumber }
-      return components.map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined()
-    }
   }
 
   // MARK: - Schema Node
 
+  @available(iOS 26.4, macOS 26.4, watchOS 27.0, tvOS 26.4, visionOS 26.4, *)
   private struct FMSchemaNode {
     typealias Object = OrderedDictionary<EdgeToolsGenerationSchema.Key, EdgeToolsValue>
 
@@ -219,7 +220,10 @@
           description: "Expected a schema."
         )
       }
-      return try Self.schema(from: value, path: "\(self.path).\(key.rawValue)")
+      return try EdgeToolsGenerationSchema.schema(
+        from: value,
+        path: "\(self.path).\(key.rawValue)"
+      )
     }
 
     func schemas(
@@ -234,7 +238,10 @@
       }
       return try values.enumerated()
         .map { index, value in
-          try Self.schema(from: value, path: "\(self.path).\(key.rawValue)[\(index)]")
+          try EdgeToolsGenerationSchema.schema(
+            from: value,
+            path: "\(self.path).\(key.rawValue)[\(index)]"
+          )
         }
     }
 
@@ -248,7 +255,13 @@
       }
       return try OrderedDictionary(
         uniqueKeysWithValues: properties.map { key, value in
-          (key, try Self.schema(from: value, path: "\(self.path).properties.\(key)"))
+          (
+            key,
+            try EdgeToolsGenerationSchema.schema(
+              from: value,
+              path: "\(self.path).properties.\(key)"
+            )
+          )
         }
       )
     }
@@ -348,27 +361,6 @@
       }
     }
 
-    private static func schema(
-      from value: EdgeToolsValue,
-      path: String
-    ) throws -> EdgeToolsGenerationSchema {
-      switch value {
-      case .boolean(let value): .boolean(value)
-      case .object(let object):
-        .object(
-          OrderedDictionary(
-            uniqueKeysWithValues: object.map {
-              (EdgeToolsGenerationSchema.Key(rawValue: $0.key), $0.value)
-            }
-          )
-        )
-      default:
-        throw EdgeToolsFMConversionError.malformedSchema(
-          path: path,
-          description: "Expected a schema object."
-        )
-      }
-    }
   }
 
   // MARK: - Helpers

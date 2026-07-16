@@ -111,7 +111,7 @@
       let lockedTokenizer = Lock(consume tokenizer)
       let grammarEngine = lockedTokenizer.withLock { XGrammarCompiler.needle(erasedTokenizer: $0) }
       guard let grammarEngine else {
-        throw XGrammarError(message: "Needle requires a tokenizer with an EOS token.")
+        throw NeedleCoreAIEngineError.failedToLoadGrammarEngine
       }
       try await self.init(
         encoderModel: encoderModel,
@@ -585,6 +585,10 @@
 
     public static let failedToLoadConfiguration = Self(
       message: "Could not load model configuration."
+    )
+
+    public static let failedToLoadGrammarEngine = Self(
+      message: "Could not load grammar engine."
     )
 
     public static func failedToLoadFunction(name: String) -> Self {

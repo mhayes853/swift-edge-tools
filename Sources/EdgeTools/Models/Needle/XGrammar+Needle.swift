@@ -68,30 +68,7 @@
       for tool in tools.dropFirst() {
         call = try call.union(XGrammarGrammar.needleCall(tool))
       }
-      let separatedCall = try XGrammarGrammar(literal: ",").concatenate(call)
-
-      switch range {
-      case .exact(let count):
-        return try XGrammarGrammar.needleCallList(
-          call: call,
-          separatedCall: separatedCall,
-          minimum: count,
-          maximum: count
-        )
-      case .bounded(let bounds):
-        return try XGrammarGrammar.needleCallList(
-          call: call,
-          separatedCall: separatedCall,
-          minimum: bounds.lowerBound,
-          maximum: bounds.upperBound
-        )
-      case .unbounded(let minimum):
-        return try XGrammarGrammar.needleUnboundedCallList(
-          call: call,
-          separatedCall: separatedCall,
-          minimum: minimum
-        )
-      }
+      return try Self.repeatingToolCall(call, separator: ",", range: range)
     }
 
     private static func needleCall(_ tool: EdgeToolDefinition) throws -> XGrammarGrammar {
@@ -111,31 +88,6 @@
       return try withArguments.concatenate(XGrammarGrammar(literal: "}"))
     }
 
-    private static func needleCallList(
-      call: borrowing XGrammarGrammar,
-      separatedCall: borrowing XGrammarGrammar,
-      minimum: Int,
-      maximum: Int
-    ) throws -> XGrammarGrammar {
-      guard minimum >= 0, maximum >= minimum else {
-        throw NeedleXGrammarError.invalidToolInvocationRange
-      }
-      guard maximum > 0 else { return try XGrammarGrammar(literal: "") }
-      let repeatedCalls = try separatedCall.repeated((Swift.max(0, minimum - 1))...(maximum - 1))
-      let nonempty = try call.concatenate(repeatedCalls)
-      return minimum == 0 ? try nonempty.optional() : nonempty
-    }
-
-    private static func needleUnboundedCallList(
-      call: borrowing XGrammarGrammar,
-      separatedCall: borrowing XGrammarGrammar,
-      minimum: Int
-    ) throws -> XGrammarGrammar {
-      guard minimum >= 0 else { throw NeedleXGrammarError.invalidToolInvocationRange }
-      let repeatedCalls = try separatedCall.repeated(Swift.max(0, minimum - 1)...)
-      let nonempty = try call.concatenate(repeatedCalls)
-      return minimum == 0 ? try nonempty.optional() : nonempty
-    }
   }
 
   extension ToolCallGrammarMatcherPool {

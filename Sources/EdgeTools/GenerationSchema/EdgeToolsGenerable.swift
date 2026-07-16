@@ -79,7 +79,7 @@ extension Float: EdgeToolsGenerable {
   }
 }
 
-extension Int8: EdgeToolsGenerable {
+extension EdgeToolsGenerable where Self: FixedWidthInteger, Self: SignedInteger {
   public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema { .integer }
 
   public init(edgeToolsValue: EdgeToolsValue) throws {
@@ -87,39 +87,7 @@ extension Int8: EdgeToolsGenerable {
   }
 }
 
-extension Int16: EdgeToolsGenerable {
-  public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema { .integer }
-
-  public init(edgeToolsValue: EdgeToolsValue) throws {
-    self = try Self.integer(from: edgeToolsValue)
-  }
-}
-
-extension Int32: EdgeToolsGenerable {
-  public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema { .integer }
-
-  public init(edgeToolsValue: EdgeToolsValue) throws {
-    self = try Self.integer(from: edgeToolsValue)
-  }
-}
-
-extension Int64: EdgeToolsGenerable {
-  public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema { .integer }
-
-  public init(edgeToolsValue: EdgeToolsValue) throws {
-    self = try Self.integer(from: edgeToolsValue)
-  }
-}
-
-extension Int: EdgeToolsGenerable {
-  public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema { .integer }
-
-  public init(edgeToolsValue: EdgeToolsValue) throws {
-    self = try Self.integer(from: edgeToolsValue)
-  }
-}
-
-extension UInt8: EdgeToolsGenerable {
+extension EdgeToolsGenerable where Self: FixedWidthInteger, Self: UnsignedInteger {
   public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
     EdgeToolsGenerationSchema(.integer, .minimum(0))
   }
@@ -129,65 +97,22 @@ extension UInt8: EdgeToolsGenerable {
   }
 }
 
-extension UInt16: EdgeToolsGenerable {
-  public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
-    EdgeToolsGenerationSchema(.integer, .minimum(0))
-  }
-
-  public init(edgeToolsValue: EdgeToolsValue) throws {
-    self = try Self.integer(from: edgeToolsValue)
-  }
-}
-
-extension UInt32: EdgeToolsGenerable {
-  public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
-    EdgeToolsGenerationSchema(.integer, .minimum(0))
-  }
-
-  public init(edgeToolsValue: EdgeToolsValue) throws {
-    self = try Self.integer(from: edgeToolsValue)
-  }
-}
-
-extension UInt64: EdgeToolsGenerable {
-  public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
-    EdgeToolsGenerationSchema(.integer, .minimum(0))
-  }
-
-  public init(edgeToolsValue: EdgeToolsValue) throws {
-    self = try Self.integer(from: edgeToolsValue)
-  }
-}
-
-extension UInt: EdgeToolsGenerable {
-  public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
-    EdgeToolsGenerationSchema(.integer, .minimum(0))
-  }
-
-  public init(edgeToolsValue: EdgeToolsValue) throws {
-    self = try Self.integer(from: edgeToolsValue)
-  }
-}
+extension Int8: EdgeToolsGenerable {}
+extension Int16: EdgeToolsGenerable {}
+extension Int32: EdgeToolsGenerable {}
+extension Int64: EdgeToolsGenerable {}
+extension Int: EdgeToolsGenerable {}
+extension UInt8: EdgeToolsGenerable {}
+extension UInt16: EdgeToolsGenerable {}
+extension UInt32: EdgeToolsGenerable {}
+extension UInt64: EdgeToolsGenerable {}
+extension UInt: EdgeToolsGenerable {}
 
 @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-extension Int128: EdgeToolsGenerable {
-  public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema { .integer }
-
-  public init(edgeToolsValue: EdgeToolsValue) throws {
-    self = try Self.integer(from: edgeToolsValue)
-  }
-}
+extension Int128: EdgeToolsGenerable {}
 
 @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-extension UInt128: EdgeToolsGenerable {
-  public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
-    EdgeToolsGenerationSchema(.integer, .minimum(0))
-  }
-
-  public init(edgeToolsValue: EdgeToolsValue) throws {
-    self = try Self.integer(from: edgeToolsValue)
-  }
-}
+extension UInt128: EdgeToolsGenerable {}
 
 // MARK: - Foundation
 

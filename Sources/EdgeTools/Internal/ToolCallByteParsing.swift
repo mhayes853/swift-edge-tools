@@ -1,6 +1,30 @@
 import Foundation
 import OrderedCollections
 
+private struct JSONStringState: Hashable, Sendable {
+  private var isInsideString = false
+  private var isEscaping = false
+
+  mutating func consume(_ byte: UInt8) -> Bool {
+    guard self.isInsideString else {
+      if byte == UInt8(ascii: "\"") {
+        self.isInsideString = true
+        return false
+      }
+      return true
+    }
+
+    if self.isEscaping {
+      self.isEscaping = false
+    } else if byte == UInt8(ascii: "\\") {
+      self.isEscaping = true
+    } else if byte == UInt8(ascii: "\"") {
+      self.isInsideString = false
+    }
+    return false
+  }
+}
+
 extension Array where Element == UInt8 {
   func firstRange(of needle: [UInt8], startingAt start: Int = 0) -> Range<Int>? {
     guard !needle.isEmpty, start <= self.count - needle.count else { return nil }
@@ -16,25 +40,12 @@ extension Array where Element == UInt8 {
   func firstCompleteJSONObjectRange() -> Range<Int>? {
     guard self.first == UInt8(ascii: "{") else { return nil }
     var depth = 0
-    var isInsideString = false
-    var isEscaping = false
+    var stringState = JSONStringState()
 
     for index in self.indices {
       let byte = self[index]
-      if isInsideString {
-        if isEscaping {
-          isEscaping = false
-        } else if byte == UInt8(ascii: "\\") {
-          isEscaping = true
-        } else if byte == UInt8(ascii: "\"") {
-          isInsideString = false
-        }
-        continue
-      }
-
-      if byte == UInt8(ascii: "\"") {
-        isInsideString = true
-      } else if byte == UInt8(ascii: "{") {
+      guard stringState.consume(byte) else { continue }
+      if byte == UInt8(ascii: "{") {
         depth += 1
       } else if byte == UInt8(ascii: "}") {
         depth -= 1
@@ -47,22 +58,11 @@ extension Array where Element == UInt8 {
 
   func firstRangeOutsideJSONString(of needle: [UInt8]) -> Range<Int>? {
     var index = 0
-    var isInsideString = false
-    var isEscaping = false
+    var stringState = JSONStringState()
 
     while index < self.count {
       let byte = self[index]
-      if isInsideString {
-        if isEscaping {
-          isEscaping = false
-        } else if byte == UInt8(ascii: "\\") {
-          isEscaping = true
-        } else if byte == UInt8(ascii: "\"") {
-          isInsideString = false
-        }
-      } else if byte == UInt8(ascii: "\"") {
-        isInsideString = true
-      } else if self[index...].starts(with: needle) {
+      if stringState.consume(byte), self[index...].starts(with: needle) {
         return index..<(index + needle.count)
       }
       index += 1

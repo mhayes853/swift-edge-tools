@@ -89,7 +89,7 @@
       let lockedTokenizer = Lock(consume tokenizer)
       let grammarEngine = lockedTokenizer.withLock { XGrammarCompiler.needle(erasedTokenizer: $0) }
       guard let grammarEngine else {
-        throw XGrammarError(message: "Needle requires a tokenizer with an EOS token.")
+        throw NeedleCoreMLEngineError.failedToLoadGrammarEngine
       }
 
       var configuration = try Self.decodeConfiguration(from: modelDirectoryURL)
@@ -114,23 +114,20 @@
       )
     }
 
-    public init<Tokenizer: EdgeToolsTokenizer & ~Copyable>(
+    public convenience init<Tokenizer: EdgeToolsTokenizer & ~Copyable>(
       encoderModel: sending MLModel,
       decoderModel: sending MLModel,
       tokenizer: consuming sending Tokenizer,
       configuration: NeedleModelConfiguration,
       grammarEngine: consuming sending XGrammarCompiler
     ) {
-      self.state = Lock(
-        State(
-          grammarEngine: consume grammarEngine,
-          matcherPool: ToolCallGrammarMatcherPool.needle()
-        )
+      self.init(
+        encoderModel: encoderModel,
+        decoderModel: decoderModel,
+        tokenizer: Lock(consume tokenizer),
+        configuration: configuration,
+        grammarEngine: consume grammarEngine
       )
-      self.configuration = configuration
-      self.encoderModel = EncoderModelActor(model: encoderModel)
-      self.decoderModel = DecoderModelActor(model: decoderModel)
-      self.tokenizer = Lock(consume tokenizer)
     }
 
     private init(
@@ -459,6 +456,10 @@
 
     public static let failedToLoadConfiguration = Self(
       message: "Could not load model configuration."
+    )
+
+    public static let failedToLoadGrammarEngine = Self(
+      message: "Could not load grammar engine."
     )
 
     public static func grammarRejectedToken(token: EdgeToolsToken) -> Self {

@@ -137,7 +137,7 @@
         .edgeToolsValue
     }
 
-    private static func schema(from value: EdgeToolsValue, path: String) throws -> Self {
+    static func schema(from value: EdgeToolsValue, path: String) throws -> Self {
       switch value {
       case .boolean(let value): .boolean(value)
       case .object(let object):
@@ -155,9 +155,16 @@
     }
 
     private static func inferredName(from path: String) -> String {
-      let components = path.split { !$0.isLetter && !$0.isNumber }
-      let name = components.map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined()
+      let name = path.schemaPascalCased
       return name.isEmpty ? "GeneratedContent" : name
+    }
+  }
+
+  extension String {
+    var schemaPascalCased: String {
+      self.split { !$0.isLetter && !$0.isNumber }
+        .map { $0.prefix(1).uppercased() + $0.dropFirst() }
+        .joined()
     }
   }
 
