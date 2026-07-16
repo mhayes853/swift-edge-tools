@@ -12,7 +12,7 @@
     private let tokenizer: EdgeToolsSPTokenizer
 
     init() throws {
-      let tokenizer = try EdgeToolsSPTokenizer(modelURL: .testTokenizerModel)
+      let tokenizer = try makeTestTokenizer()
       let engine = try requiredNeedleCompiler(tokenizer: tokenizer)
       self.tokenizer = tokenizer
       self.engine = engine
@@ -52,10 +52,8 @@
       private let eosToken: EdgeToolsToken.ID
 
       init() throws {
-        let tokenizer = try EdgeToolsSPTokenizer(modelURL: .testTokenizerModel)
-        guard let eosToken = tokenizer.eosTokenId else {
-          throw XGrammarError(message: "Needle requires a tokenizer with an EOS token.")
-        }
+        let tokenizer = try makeTestTokenizer()
+        let eosToken = try requiredTestEOSToken(tokenizer: tokenizer)
         self.tokenizer = tokenizer
         self.eosToken = eosToken
       }
@@ -68,7 +66,7 @@
       func `Default Unbounded Range Accepts Empty Tool Call List`() throws {
         let engine = try self.makeEngine()
         let matcher = try engine.compile(try XGrammarGrammar.needle(tools: [.getWeather]))
-        assertAccepts(
+        assertGrammarAccepts(
           #"<tool_call> []"#,
           matcher: matcher,
           tokenizer: self.tokenizer,
@@ -82,7 +80,12 @@
         let matcher = try engine.compile(try XGrammarGrammar.needle(tools: [.getWeather]))
         let calls =
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#
-        assertAccepts(calls, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
+        assertGrammarAccepts(
+          calls,
+          matcher: matcher,
+          tokenizer: self.tokenizer,
+          eosToken: self.eosToken
+        )
       }
 
       @Test
@@ -91,7 +94,7 @@
         let matcher = try engine.compile(
           try XGrammarGrammar.needle(tools: [.getWeather], range: .unbounded(minimum: 1))
         )
-        assertRejects(
+        assertGrammarRejects(
           #"<tool_call> []"#,
           matcher: matcher,
           tokenizer: self.tokenizer,
@@ -105,7 +108,7 @@
         let matcher = try engine.compile(
           try XGrammarGrammar.needle(tools: [.getWeather], range: .unbounded(minimum: 1))
         )
-        assertAccepts(
+        assertGrammarAccepts(
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
           matcher: matcher,
           tokenizer: self.tokenizer,
@@ -121,7 +124,12 @@
         )
         let calls =
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#
-        assertRejects(calls, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
+        assertGrammarRejects(
+          calls,
+          matcher: matcher,
+          tokenizer: self.tokenizer,
+          eosToken: self.eosToken
+        )
       }
 
       @Test
@@ -130,7 +138,7 @@
         let emptyMatcher = try engine.compile(
           try XGrammarGrammar.needle(tools: [.getWeather], range: .bounded(0...1))
         )
-        assertAccepts(
+        assertGrammarAccepts(
           #"<tool_call> []"#,
           matcher: emptyMatcher,
           tokenizer: self.tokenizer,
@@ -139,7 +147,7 @@
         let singleMatcher = try engine.compile(
           try XGrammarGrammar.needle(tools: [.getWeather], range: .bounded(0...1))
         )
-        assertAccepts(
+        assertGrammarAccepts(
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
           matcher: singleMatcher,
           tokenizer: self.tokenizer,
@@ -153,7 +161,7 @@
         let singleMatcher = try engine.compile(
           try XGrammarGrammar.needle(tools: [.getWeather], range: .bounded(2...3))
         )
-        assertRejects(
+        assertGrammarRejects(
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
           matcher: singleMatcher,
           tokenizer: self.tokenizer,
@@ -163,7 +171,7 @@
         let pairMatcher = try engine.compile(
           try XGrammarGrammar.needle(tools: [.getWeather], range: .bounded(2...3))
         )
-        assertAccepts(
+        assertGrammarAccepts(
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#,
           matcher: pairMatcher,
           tokenizer: self.tokenizer,
@@ -177,7 +185,7 @@
         let matcher = try engine.compile(
           try XGrammarGrammar.needle(tools: [], range: .bounded(1...1))
         )
-        assertAccepts(
+        assertGrammarAccepts(
           #"<tool_call> []"#,
           matcher: matcher,
           tokenizer: self.tokenizer,
@@ -191,7 +199,7 @@
         let matcher = try engine.compile(
           try XGrammarGrammar.needle(tools: [.getWeather], range: .exact(0))
         )
-        assertAccepts(
+        assertGrammarAccepts(
           #"<tool_call> []"#,
           matcher: matcher,
           tokenizer: self.tokenizer,
@@ -207,7 +215,12 @@
         )
         let calls =
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}},{"name":"get_weather","arguments":{"location":"Tokyo"}}]"#
-        assertAccepts(calls, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
+        assertGrammarAccepts(
+          calls,
+          matcher: matcher,
+          tokenizer: self.tokenizer,
+          eosToken: self.eosToken
+        )
       }
 
       @Test
@@ -216,13 +229,13 @@
         let matcher = try engine.compile(
           try XGrammarGrammar.needle(tools: [.getWeather], range: .exact(0))
         )
-        assertAccepts(
+        assertGrammarAccepts(
           #"<tool_call> []"#,
           matcher: matcher,
           tokenizer: self.tokenizer,
           eosToken: self.eosToken
         )
-        assertRejects(
+        assertGrammarRejects(
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
           matcher: matcher,
           tokenizer: self.tokenizer,
@@ -248,145 +261,31 @@
       private let eosToken: EdgeToolsToken.ID
 
       init() throws {
-        let tokenizer = try EdgeToolsSPTokenizer(modelURL: .testTokenizerModel)
-        guard let eosToken = tokenizer.eosTokenId else {
-          throw XGrammarError(message: "Needle requires a tokenizer with an EOS token.")
-        }
+        let tokenizer = try makeTestTokenizer()
+        let eosToken = try requiredTestEOSToken(tokenizer: tokenizer)
         let engine = try requiredNeedleCompiler(tokenizer: tokenizer)
         self.tokenizer = tokenizer
         self.eosToken = eosToken
         self.engine = engine
       }
-
-      @Test
-      func `Reset Restores Initial State`() throws {
-        let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.getWeather]))
-        let call = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
-
-        for tokenId in encodedGrammarText(call, tokenizer: self.tokenizer) {
-          matcher.accept(tokenId: tokenId)
-        }
-        expectNoDifference(matcher.accept(tokenId: self.eosToken), true)
-        expectNoDifference(matcher.isCompleted, true)
-        expectNoDifference(matcher.isTerminated, true)
-
-        matcher.reset()
-        expectNoDifference(matcher.isCompleted, false)
-        expectNoDifference(matcher.isTerminated, false)
-      }
-
-      @Test
-      func `Rollback Allows Accepting Alternative Branch`() throws {
-        let matcher = try self.engine.compile(
-          try XGrammarGrammar.needle(tools: [.sendEmail, .getWeather])
-        )
-
-        let firstBitmask = matcher.bitmask()
-        let firstAllowedIndex = firstBitmask.storage
-          .enumerated()
-          .flatMap { word in (0..<32).map { (word.offset, $0) } }
-          .first { (wordIndex, bit) in
-            (firstBitmask.storage[wordIndex] & (1 << bit)) != 0
-          }
-        guard let (wordIndex, bit) = firstAllowedIndex else {
-          Issue.record("Expected at least one allowed token in the initial bitmask")
-          return
-        }
-        let firstAllowed = wordIndex * 32 + bit
-        expectNoDifference(matcher.accept(tokenId: EdgeToolsToken.ID(firstAllowed)), true)
-
-        matcher.rollback(1)
-        expectNoDifference(matcher.isCompleted, false)
-      }
-
-      @Test
-      func `Completion State Transitions`() throws {
-        let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.getWeather]))
-        let call = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
-
-        expectNoDifference(matcher.isCompleted, false)
-        expectNoDifference(matcher.isTerminated, false)
-
-        for tokenId in encodedGrammarText(call, tokenizer: self.tokenizer) {
-          expectNoDifference(matcher.accept(tokenId: tokenId), true)
-        }
-        expectNoDifference(matcher.isCompleted, true)
-        expectNoDifference(matcher.isTerminated, false)
-
-        expectNoDifference(matcher.accept(tokenId: self.eosToken), true)
-        expectNoDifference(matcher.isCompleted, true)
-        expectNoDifference(matcher.isTerminated, true)
-      }
-
-      @Test
-      func `Fork Preserves Accept State`() throws {
-        let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.getWeather]))
-
-        let tokens = encodedGrammarText(
-          #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
-          tokenizer: self.tokenizer
-        )
-        let forkPoint = tokens.count / 2
-        guard !tokens.isEmpty, forkPoint > 0, forkPoint < tokens.count else {
-          Issue.record("Tokenizer produced an unexpected token split for test text")
-          return
-        }
-
-        for i in 0..<forkPoint {
-          expectNoDifference(matcher.accept(tokenId: tokens[i]), true)
-        }
-        let forked = try matcher.fork()
-
-        for i in forkPoint..<tokens.count {
-          expectNoDifference(matcher.accept(tokenId: tokens[i]), true)
-        }
-        expectNoDifference(matcher.accept(tokenId: self.eosToken), true)
-        expectNoDifference(matcher.isTerminated, true)
-
-        for i in forkPoint..<tokens.count {
-          expectNoDifference(forked.accept(tokenId: tokens[i]), true)
-        }
-        expectNoDifference(forked.accept(tokenId: self.eosToken), true)
-        expectNoDifference(forked.isTerminated, true)
-      }
-
-      @Test
-      func `Bitmask Disallows Eos Before Completion`() throws {
-        let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.sendEmail]))
-
-        let bitmask = matcher.bitmask()
-        expectNoDifference(bitmask[self.eosToken], false)
-      }
-
-      @Test
-      func `Bitmask Allows Eos After Completion`() throws {
-        let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.getWeather]))
-        let call = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
-
-        for tokenId in encodedGrammarText(call, tokenizer: self.tokenizer) {
-          expectNoDifference(matcher.accept(tokenId: tokenId), true)
-        }
-        expectNoDifference(matcher.isCompleted, true)
-
-        let bitmask = matcher.bitmask()
-        expectNoDifference(bitmask[self.eosToken], true)
-      }
-
-      @Test
-      func `Bitmask Has Expected Size`() throws {
-        let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.sendEmail]))
-        let bitmask = matcher.bitmask()
-        expectNoDifference(bitmask.count, 8192)
-      }
-
       @Test
       func `Accepts Valid Complex Tool Call`() throws {
         let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.complexTool]))
 
         let call =
-          #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1,"BETA_LABEL":2},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}}]"#
+          [
+            #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id""#,
+            #":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1,"BETA_LABEL":2},"window":3,"tuple_args":["alph"#,
+            #"a",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}}]"#
+          ]
+          .joined()
 
-        assertAccepts(call, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
+        assertGrammarAccepts(
+          call,
+          matcher: matcher,
+          tokenizer: self.tokenizer,
+          eosToken: self.eosToken
+        )
       }
 
       @Test
@@ -395,7 +294,12 @@
 
         let call = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
 
-        assertAccepts(call, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
+        assertGrammarAccepts(
+          call,
+          matcher: matcher,
+          tokenizer: self.tokenizer,
+          eosToken: self.eosToken
+        )
       }
 
       @Test
@@ -405,7 +309,12 @@
         let calls =
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Henry's Altar"}}]"#
 
-        assertAccepts(calls, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
+        assertGrammarAccepts(
+          calls,
+          matcher: matcher,
+          tokenizer: self.tokenizer,
+          eosToken: self.eosToken
+        )
       }
 
       @Test
@@ -417,7 +326,12 @@
         let calls =
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"send_email","arguments":{"address":"blob@gmail.com","subject":"Hello","body":"World"}}]"#
 
-        assertAccepts(calls, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
+        assertGrammarAccepts(
+          calls,
+          matcher: matcher,
+          tokenizer: self.tokenizer,
+          eosToken: self.eosToken
+        )
       }
 
       @Test
@@ -425,9 +339,19 @@
         let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.complexTool]))
 
         let call =
-          #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"]}}]"#
+          [
+            #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id""#,
+            #":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"opt"#,
+            #"ional_note":null,"tags":["a","b"]}}]"#
+          ]
+          .joined()
 
-        assertRejects(call, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
+        assertGrammarRejects(
+          call,
+          matcher: matcher,
+          tokenizer: self.tokenizer,
+          eosToken: self.eosToken
+        )
       }
 
       @Test
@@ -435,9 +359,19 @@
         let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.complexTool]))
 
         let call =
-          #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":"3.5","enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}}]"#
+          [
+            #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":"3.5","enabled":true,"mode":"execute","ticket_i"#,
+            #"d":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"o"#,
+            #"ptional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}}]"#
+          ]
+          .joined()
 
-        assertRejects(call, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
+        assertGrammarRejects(
+          call,
+          matcher: matcher,
+          tokenizer: self.tokenizer,
+          eosToken: self.eosToken
+        )
       }
 
       @Test
@@ -445,9 +379,19 @@
         let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.complexTool]))
 
         let call =
-          #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"alpha":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}}]"#
+          [
+            #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id""#,
+            #":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"alpha":1},"window":3,"tuple_args":["alpha",2,true],"opt"#,
+            #"ional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}}]"#
+          ]
+          .joined()
 
-        assertRejects(call, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
+        assertGrammarRejects(
+          call,
+          matcher: matcher,
+          tokenizer: self.tokenizer,
+          eosToken: self.eosToken
+        )
       }
 
       @Test
@@ -455,9 +399,19 @@
         let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.complexTool]))
 
         let call =
-          #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]},"extra":1}}]"#
+          [
+            #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id""#,
+            #":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"opt"#,
+            #"ional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]},"extra":1}}]"#
+          ]
+          .joined()
 
-        assertRejects(call, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
+        assertGrammarRejects(
+          call,
+          matcher: matcher,
+          tokenizer: self.tokenizer,
+          eosToken: self.eosToken
+        )
       }
 
       @Test
@@ -465,9 +419,19 @@
         let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.complexTool]))
 
         let call =
-          #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}]"#
+          [
+            #"<tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,"mode":"execute","ticket_id""#,
+            #":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1},"window":3,"tuple_args":["alpha",2,true],"opt"#,
+            #"ional_note":null,"tags":["a","b"],"config":{"threshold":0.75,"flags":[true,false]}}]"#
+          ]
+          .joined()
 
-        assertRejects(call, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
+        assertGrammarRejects(
+          call,
+          matcher: matcher,
+          tokenizer: self.tokenizer,
+          eosToken: self.eosToken
+        )
       }
 
       @Test
@@ -476,75 +440,18 @@
 
         let call = #"toolcall [{"name":"not_a_real_tool","arguments":{"location":"Seoul"}}]"#
 
-        assertRejects(call, matcher: matcher, tokenizer: self.tokenizer, eosToken: self.eosToken)
+        assertGrammarRejects(
+          call,
+          matcher: matcher,
+          tokenizer: self.tokenizer,
+          eosToken: self.eosToken
+        )
       }
     }
 
-    @Suite
-    struct `Memory usage tests`: ~Copyable {
-      private let engine: XGrammarCompiler
-      private let tokenizer: EdgeToolsSPTokenizer
-
-      init() throws {
-        let tokenizer = try EdgeToolsSPTokenizer(modelURL: .testTokenizerModel)
-        let engine = try requiredNeedleCompiler(tokenizer: tokenizer)
-        self.tokenizer = tokenizer
-        self.engine = engine
-      }
-
-      @Test
-      func `Cache Size Is Zero Before First Compile`() {
-        expectNoDifference(self.engine.cacheSizeBytes, 0)
-        expectNoDifference(self.engine.cacheLimitBytes, 0)
-      }
-
-      @Test
-      func `Cache Size Becomes Non-Negative After Compile`() throws {
-        _ = try self.engine.compile(try XGrammarGrammar.needle(tools: [.getWeather]))
-        expectNoDifference(self.engine.cacheSizeBytes >= 0, true)
-      }
-
-      @Test
-      func `Cache Limit Becomes Reportable After Compile`() throws {
-        _ = try self.engine.compile(try XGrammarGrammar.needle(tools: [.getWeather]))
-        expectNoDifference(
-          self.engine.cacheLimitBytes == -1 || self.engine.cacheLimitBytes >= 0,
-          true
-        )
-      }
-
-      @Test
-      func `Matcher Reports Non-Zero Memory Size`() throws {
-        let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.getWeather]))
-        expectNoDifference(matcher.memorySizeBytes > 0, true)
-      }
-
-      @Test
-      func `Forked Matcher Reports Equal Memory Size`() throws {
-        let matcher = try self.engine.compile(try XGrammarGrammar.needle(tools: [.getWeather]))
-        let forked = try matcher.fork()
-        expectNoDifference(forked.memorySizeBytes, matcher.memorySizeBytes)
-      }
-
-      @Test
-      func `More Tools Yield Larger Compiled Grammar`() throws {
-        let single = try self.engine.compile(try XGrammarGrammar.needle(tools: [.getWeather]))
-        let many = try self.engine.compile(
-          try XGrammarGrammar.needle(tools: [.getWeather, .sendEmail, .complexTool])
-        )
-        expectNoDifference(many.memorySizeBytes > single.memorySizeBytes, true)
-      }
-    }
   }
 
   // MARK: - Helpers
-
-  private struct RejectedToken: Hashable, Sendable {
-    let index: Int
-    let tokenId: EdgeToolsToken.ID
-    let token: String
-    let prefix: String
-  }
 
   private func requiredNeedleCompiler(
     tokenizer: borrowing some EdgeToolsTokenizer & ~Copyable
@@ -563,60 +470,4 @@
     }
     return compiler
   }
-
-  private func firstRejectedToken(
-    in text: String,
-    matcher: borrowing XGrammarMatcher,
-    tokenizer: borrowing some EdgeToolsTokenizer & ~Copyable
-  ) -> RejectedToken? {
-    let tokenIds = encodedGrammarText(text, tokenizer: tokenizer)
-    for (index, tokenId) in tokenIds.enumerated() {
-      guard !matcher.accept(tokenId: tokenId) else { continue }
-      let token = tokenizer.convertIdToToken(tokenId) ?? ""
-      let prefix = tokenizer.decode(tokens: Array(tokenIds.prefix(index + 1)))
-      return RejectedToken(index: index, tokenId: tokenId, token: token, prefix: prefix)
-    }
-    return nil
-  }
-
-  private func encodedGrammarText(
-    _ text: String,
-    tokenizer: borrowing some EdgeToolsTokenizer & ~Copyable
-  ) -> [EdgeToolsToken.ID] {
-    let tokenIds = tokenizer.encode(text: text)
-    guard let firstTokenId = tokenIds.first else { return tokenIds }
-    let firstToken = tokenizer.convertIdToToken(firstTokenId) ?? ""
-    if firstToken.hasPrefix("▁") {
-      return Array(tokenIds.dropFirst())
-    }
-    return tokenIds
-  }
-
-  private func assertAccepts(
-    _ text: String,
-    matcher: borrowing XGrammarMatcher,
-    tokenizer: borrowing some EdgeToolsTokenizer & ~Copyable,
-    eosToken: EdgeToolsToken.ID
-  ) {
-    if let rejected = firstRejectedToken(in: text, matcher: matcher, tokenizer: tokenizer) {
-      Issue.record(
-        "Rejected token \(rejected.tokenId) '\(rejected.token)' at index \(rejected.index) for prefix: \(rejected.prefix)"
-      )
-      return
-    }
-    expectNoDifference(matcher.accept(tokenId: eosToken), true)
-  }
-
-  private func assertRejects(
-    _ text: String,
-    matcher: borrowing XGrammarMatcher,
-    tokenizer: borrowing some EdgeToolsTokenizer & ~Copyable,
-    eosToken: EdgeToolsToken.ID
-  ) {
-    guard firstRejectedToken(in: text, matcher: matcher, tokenizer: tokenizer) == nil else {
-      return
-    }
-    expectNoDifference(matcher.accept(tokenId: eosToken), false)
-  }
-
 #endif
