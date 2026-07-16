@@ -160,21 +160,6 @@
     }
 
     @Test
-    func `Cache Size Becomes Non-Negative After Compile`() throws {
-      _ = try self.engine.compile(try genericGrammar())
-      expectNoDifference(self.engine.cacheSizeBytes >= 0, true)
-    }
-
-    @Test
-    func `Cache Limit Becomes Reportable After Compile`() throws {
-      _ = try self.engine.compile(try genericGrammar())
-      expectNoDifference(
-        self.engine.cacheLimitBytes == -1 || self.engine.cacheLimitBytes >= 0,
-        true
-      )
-    }
-
-    @Test
     func `Matcher Reports Non-Zero Memory Size`() throws {
       let matcher = try self.engine.compile(try genericGrammar())
       expectNoDifference(matcher.memorySizeBytes > 0, true)

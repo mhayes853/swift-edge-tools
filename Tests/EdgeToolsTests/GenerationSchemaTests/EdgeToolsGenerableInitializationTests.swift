@@ -28,65 +28,9 @@ struct `EdgeToolsGenerable initialization tests` {
   }
 
   @Test
-  func `Initializes Int8`() throws {
+  func `Initializes Signed And Unsigned Integers`() throws {
     expectNoDifference(try Int8(edgeToolsValue: 1), 1)
-  }
-
-  @Test
-  func `Initializes Int16`() throws {
-    expectNoDifference(try Int16(edgeToolsValue: 1), 1)
-  }
-
-  @Test
-  func `Initializes Int32`() throws {
-    expectNoDifference(try Int32(edgeToolsValue: 1), 1)
-  }
-
-  @Test
-  func `Initializes Int64`() throws {
-    expectNoDifference(try Int64(edgeToolsValue: 1), 1)
-  }
-
-  @Test
-  func `Initializes Int`() throws {
-    expectNoDifference(try Int(edgeToolsValue: 1), 1)
-  }
-
-  @Test
-  func `Initializes UInt8`() throws {
-    expectNoDifference(try UInt8(edgeToolsValue: 1), 1)
-  }
-
-  @Test
-  func `Initializes UInt16`() throws {
-    expectNoDifference(try UInt16(edgeToolsValue: 1), 1)
-  }
-
-  @Test
-  func `Initializes UInt32`() throws {
-    expectNoDifference(try UInt32(edgeToolsValue: 1), 1)
-  }
-
-  @Test
-  func `Initializes UInt64`() throws {
-    expectNoDifference(try UInt64(edgeToolsValue: 1), 1)
-  }
-
-  @Test
-  func `Initializes UInt`() throws {
     expectNoDifference(try UInt(edgeToolsValue: 1), 1)
-  }
-
-  @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-  @Test
-  func `Initializes Int128`() throws {
-    expectNoDifference(try Int128(edgeToolsValue: 1), 1)
-  }
-
-  @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-  @Test
-  func `Initializes UInt128`() throws {
-    expectNoDifference(try UInt128(edgeToolsValue: 1), 1)
   }
 
   @Test

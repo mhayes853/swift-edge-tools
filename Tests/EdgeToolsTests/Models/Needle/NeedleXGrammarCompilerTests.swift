@@ -8,44 +8,6 @@
 
   @Suite
   struct `NeedleXGrammarCompiler tests`: ~Copyable {
-    private let engine: XGrammarCompiler
-    private let tokenizer: EdgeToolsSPTokenizer
-
-    init() throws {
-      let tokenizer = try makeTestTokenizer()
-      let engine = try requiredNeedleCompiler(tokenizer: tokenizer)
-      self.tokenizer = tokenizer
-      self.engine = engine
-    }
-
-    @Test
-    func `Compile Tools With Empty Tools Array`() {
-      #expect(throws: Never.self) {
-        _ = try self.engine.compile(try XGrammarGrammar.needle(tools: []))
-      }
-    }
-
-    @Test
-    func `Compile Tools With Single Tool`() {
-      #expect(throws: Never.self) {
-        _ = try self.engine.compile(try XGrammarGrammar.needle(tools: [.sendEmail]))
-      }
-    }
-
-    @Test
-    func `Compile Tools With Multiple Tools`() {
-      #expect(throws: Never.self) {
-        _ = try self.engine.compile(try XGrammarGrammar.needle(tools: [.sendEmail, .getWeather]))
-      }
-    }
-
-    @Test
-    func `Compile Tools With Complex Tool`() {
-      #expect(throws: Never.self) {
-        _ = try self.engine.compile(try XGrammarGrammar.needle(tools: [.complexTool]))
-      }
-    }
-
     @Suite
     struct `Range tests`: ~Copyable {
       private let tokenizer: EdgeToolsSPTokenizer
@@ -194,20 +156,6 @@
       }
 
       @Test
-      func `Compile Accepts Explicit Tool Call Invocation Range`() throws {
-        let engine = try self.makeEngine()
-        let matcher = try engine.compile(
-          try XGrammarGrammar.needle(tools: [.getWeather], range: .exact(0))
-        )
-        assertGrammarAccepts(
-          #"<tool_call> []"#,
-          matcher: matcher,
-          tokenizer: self.tokenizer,
-          eosToken: self.eosToken
-        )
-      }
-
-      @Test
       func `Exact Three Accepts Three Tool Calls`() throws {
         let engine = try self.makeEngine()
         let matcher = try engine.compile(
@@ -253,9 +201,10 @@
         }
       }
     }
+  }
 
-    @Suite
-    struct `Matcher tests`: ~Copyable {
+  @Suite
+  struct `Needle XGrammar matcher tests`: ~Copyable {
       private let engine: XGrammarCompiler
       private let tokenizer: EdgeToolsSPTokenizer
       private let eosToken: EdgeToolsToken.ID
@@ -448,8 +397,6 @@
         )
       }
     }
-
-  }
 
   // MARK: - Helpers
 

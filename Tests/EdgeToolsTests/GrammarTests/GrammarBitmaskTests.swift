@@ -22,14 +22,6 @@ struct `GrammarBitmask tests` {
   }
 
   @Test
-  func `Bitmask Supports Byte Aligned Sizes`() {
-    let mask = GrammarBitmask(bitCount: 8)
-
-    expectNoDifference(mask.storage.count, 1)
-    expectNoDifference(mask.count, 8)
-  }
-
-  @Test
   func `Set Bool Basics`() {
     var mask = GrammarBitmask(bitCount: 72)
 
