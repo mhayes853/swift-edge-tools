@@ -66,8 +66,6 @@
     }
   }
 
-  // swiftlint:disable:next force_try
-  nonisolated(unsafe) private let lfmTopLevelArgumentRuleRegex = try! Regex(
-    #"root_(?:[0-9]+|part_[0-9]+)"#
-  )
+  nonisolated(unsafe) private let lfmTopLevelArgumentRuleRegex =
+    /root_(?:[0-9]+|part_[0-9]+)/
 #endif

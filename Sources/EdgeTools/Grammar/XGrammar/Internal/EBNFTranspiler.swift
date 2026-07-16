@@ -77,9 +77,7 @@
       var outputStart = source.startIndex
 
       for match in source.matches(of: literalRegex) {
-        guard let literalRange = match.output[1].range else {
-          throw ToolCallXGrammarError.unsupportedSchema
-        }
+        let literalRange = match.output.1.startIndex..<match.output.1.endIndex
         output.append(contentsOf: source[outputStart..<literalRange.lowerBound])
         let encodedValue = source[literalRange].dropFirst().dropLast()
         let value = Self.decodeLiteral(encodedValue)
@@ -97,7 +95,9 @@
       in source: String,
       aliases: [String: String]
     ) -> String {
-      let literalRanges = source.matches(of: literalRegex).compactMap { $0.output[1].range }
+      let literalRanges = source.matches(of: literalRegex).map {
+        $0.output.1.startIndex..<$0.output.1.endIndex
+      }
       var output = ""
       var outputStart = source.startIndex
       for match in source.matches(of: ruleReferenceRegex) {
@@ -156,15 +156,10 @@
     }
   }
 
-  nonisolated(unsafe) private let literalRegex = try! Regex(
-    #"(?:^|[^\\])(\"(?:\\.|[^\"\\])*\")"#
-  )
+  nonisolated(unsafe) private let literalRegex = /(?:^|[^\\])(\"(?:\\.|[^\"\\])*\")/
 
-  nonisolated(unsafe) private let toolCallContinuationReferenceRegex = try! Regex(
-    #"\b(?:root(?:_[A-Za-z0-9]+)*|xml_object(?:_[A-Za-z0-9]+)*)\b"#
-  )
+  nonisolated(unsafe) private let toolCallContinuationReferenceRegex =
+    /\b(?:root(?:_[A-Za-z0-9]+)*|xml_object(?:_[A-Za-z0-9]+)*)\b/
 
-  nonisolated(unsafe) private let ruleReferenceRegex = try! Regex(
-    #"\b[A-Za-z_][A-Za-z0-9_]*\b"#
-  )
+  nonisolated(unsafe) private let ruleReferenceRegex = /\b[A-Za-z_][A-Za-z0-9_]*\b/
 #endif
