@@ -4,27 +4,23 @@ import Observation
 // MARK: - EdgeToolsSession
 
 public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable, Observable {
-  private struct ActiveStreams: Sendable {
-    var rawToolCallStreams = [EdgeToolsRawToolCallsStream]()
-    var toolCallStreams = [EdgeToolsSessionStream]()
-  }
-
   public let engine: Engine
-  private let _activeStreams = Lock(ActiveStreams())
+  private let _activeRawToolCallStreams = Lock([EdgeToolsRawToolCallsStream]())
+  private let _activeToolCallStreams = Lock([EdgeToolsSessionStream]())
   private let observationRegistrar = ObservationRegistrar()
 
   public var isResponding: Bool {
-    !self.activeStreams.isEmpty
+    !self.activeRawToolCallStreams.isEmpty || !self.activeToolCallStreams.isEmpty
   }
 
-  public var activeStreams: EdgeToolsSessionActiveStreams {
-    self.observationRegistrar.access(self, keyPath: \.activeStreams)
-    return self._activeStreams.withLock {
-      EdgeToolsSessionActiveStreams(
-        rawToolCallStreams: $0.rawToolCallStreams,
-        toolCallStreams: $0.toolCallStreams
-      )
-    }
+  public var activeRawToolCallStreams: [EdgeToolsRawToolCallsStream] {
+    self.observationRegistrar.access(self, keyPath: \.activeRawToolCallStreams)
+    return self._activeRawToolCallStreams.withLock { $0 }
+  }
+
+  public var activeToolCallStreams: [EdgeToolsSessionStream] {
+    self.observationRegistrar.access(self, keyPath: \.activeToolCallStreams)
+    return self._activeToolCallStreams.withLock { $0 }
   }
 
   public init(engine: sending Engine) {
@@ -32,33 +28,33 @@ public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable, Observab
   }
 
   fileprivate func registerActiveStream(_ stream: EdgeToolsRawToolCallsStream) {
-    self._activeStreams.withLock { activeStreams in
-      self.observationRegistrar.withMutation(of: self, keyPath: \.activeStreams) {
-        activeStreams.rawToolCallStreams.append(stream)
+    self._activeRawToolCallStreams.withLock { streams in
+      self.observationRegistrar.withMutation(of: self, keyPath: \.activeRawToolCallStreams) {
+        streams.append(stream)
       }
     }
   }
 
   fileprivate func registerActiveStream(_ stream: EdgeToolsSessionStream) {
-    self._activeStreams.withLock { activeStreams in
-      self.observationRegistrar.withMutation(of: self, keyPath: \.activeStreams) {
-        activeStreams.toolCallStreams.append(stream)
+    self._activeToolCallStreams.withLock { streams in
+      self.observationRegistrar.withMutation(of: self, keyPath: \.activeToolCallStreams) {
+        streams.append(stream)
       }
     }
   }
 
   fileprivate func removeActiveStream(_ stream: EdgeToolsRawToolCallsStream) {
-    self._activeStreams.withLock { activeStreams in
-      self.observationRegistrar.withMutation(of: self, keyPath: \.activeStreams) {
-        activeStreams.rawToolCallStreams.removeAll { $0 === stream }
+    self._activeRawToolCallStreams.withLock { streams in
+      self.observationRegistrar.withMutation(of: self, keyPath: \.activeRawToolCallStreams) {
+        streams.removeAll { $0 === stream }
       }
     }
   }
 
   fileprivate func removeActiveStream(_ stream: EdgeToolsSessionStream) {
-    self._activeStreams.withLock { activeStreams in
-      self.observationRegistrar.withMutation(of: self, keyPath: \.activeStreams) {
-        activeStreams.toolCallStreams.removeAll { $0 === stream }
+    self._activeToolCallStreams.withLock { streams in
+      self.observationRegistrar.withMutation(of: self, keyPath: \.activeToolCallStreams) {
+        streams.removeAll { $0 === stream }
       }
     }
   }
@@ -90,15 +86,6 @@ public struct EdgeToolsSessionGeneration: Sendable {
 public struct EdgeToolsRawToolCallsGeneration: Sendable {
   public let engineGeneration: EdgeToolsEngineGeneration
   public let toolCalls: [EdgeRawToolCall]
-}
-
-public struct EdgeToolsSessionActiveStreams: Sendable {
-  public let rawToolCallStreams: [EdgeToolsRawToolCallsStream]
-  public let toolCallStreams: [EdgeToolsSessionStream]
-
-  public var isEmpty: Bool {
-    self.rawToolCallStreams.isEmpty
-  }
 }
 
 // MARK: - Tokens

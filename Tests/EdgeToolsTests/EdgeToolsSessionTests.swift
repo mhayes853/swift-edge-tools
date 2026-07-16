@@ -393,7 +393,7 @@
 
       let didChange = Lock(false)
       withObservationTracking {
-        _ = session.activeStreams
+        _ = session.activeToolCallStreams
       } onChange: {
         didChange.withLock { $0 = true }
       }
@@ -439,27 +439,30 @@
 
       let stream2 = session.stream(prompt: .test(user: "hi"), tools: [])
 
-      let activeStreams = session.activeStreams
-      expectNoDifference(activeStreams.rawToolCallStreams.count, 2)
-      expectNoDifference(activeStreams.toolCallStreams.count, 2)
-      expectNoDifference(activeStreams.toolCallStreams.contains { $0 === stream1 }, true)
-      expectNoDifference(activeStreams.toolCallStreams.contains { $0 === stream2 }, true)
+      let activeRawToolCallStreams = session.activeRawToolCallStreams
+      let activeToolCallStreams = session.activeToolCallStreams
+      expectNoDifference(activeRawToolCallStreams.count, 2)
+      expectNoDifference(activeToolCallStreams.count, 2)
+      expectNoDifference(activeToolCallStreams.contains { $0 === stream1 }, true)
+      expectNoDifference(activeToolCallStreams.contains { $0 === stream2 }, true)
 
       engine.push(.finish)
       engine.push(nil)
       _ = try await stream1.finalGeneration
 
-      let activeStreamsAfterFirst = session.activeStreams
-      expectNoDifference(activeStreamsAfterFirst.rawToolCallStreams.count, 1)
-      expectNoDifference(activeStreamsAfterFirst.toolCallStreams.count, 1)
-      expectNoDifference(activeStreamsAfterFirst.toolCallStreams.contains { $0 === stream1 }, false)
-      expectNoDifference(activeStreamsAfterFirst.toolCallStreams.contains { $0 === stream2 }, true)
+      let activeRawToolCallStreamsAfterFirst = session.activeRawToolCallStreams
+      let activeToolCallStreamsAfterFirst = session.activeToolCallStreams
+      expectNoDifference(activeRawToolCallStreamsAfterFirst.count, 1)
+      expectNoDifference(activeToolCallStreamsAfterFirst.count, 1)
+      expectNoDifference(activeToolCallStreamsAfterFirst.contains { $0 === stream1 }, false)
+      expectNoDifference(activeToolCallStreamsAfterFirst.contains { $0 === stream2 }, true)
 
       engine.push(.finish)
       engine.push(nil)
       _ = try await stream2.finalGeneration
 
-      expectNoDifference(session.activeStreams.isEmpty, true)
+      expectNoDifference(session.activeRawToolCallStreams.isEmpty, true)
+      expectNoDifference(session.activeToolCallStreams.isEmpty, true)
     }
 
     @Test
