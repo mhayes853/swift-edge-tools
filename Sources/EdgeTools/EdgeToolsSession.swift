@@ -382,6 +382,14 @@ public final class EdgeToolsSessionStream: Sendable, Observable, Identifiable, A
     fileprivate let stream: EdgeToolsSessionStream
     private var rawIndex = 0
 
+    fileprivate init(
+      base: EdgeToolsRawToolCallsStream.AsyncIterator,
+      stream: EdgeToolsSessionStream
+    ) {
+      self.base = base
+      self.stream = stream
+    }
+
     public mutating func next() async throws -> Element? {
       while try await self.base.next() != nil {
         defer { self.rawIndex += 1 }

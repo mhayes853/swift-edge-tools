@@ -109,7 +109,9 @@
       )
       let tokenizer = try await loadEdgeToolsTokenizer(from: modelDirectoryURL)
       let lockedTokenizer = Lock(consume tokenizer)
-      let grammarEngine = lockedTokenizer.withLock { XGrammarCompiler.needle(erasedTokenizer: $0) }
+      let grammarEngine = lockedTokenizer.withLock {
+        try? XGrammarCompiler(tokenizerInfo: try XGrammarTokenizerInfo.needle(erasedTokenizer: $0))
+      }
       guard let grammarEngine else {
         throw NeedleCoreAIEngineError.failedToLoadGrammarEngine
       }
@@ -146,7 +148,10 @@
       grammarEngine: consuming sending XGrammarCompiler
     ) throws {
       self.state = Lock(
-        State(grammarEngine: consume grammarEngine, matcherPool: ToolCallGrammarMatcherPool.needle())
+        State(
+          grammarEngine: consume grammarEngine,
+          matcherPool: ToolCallGrammarMatcherPool.needle()
+        )
       )
       self.configuration = configuration
       self.encoderFunction = try Self.loadFunction(named: FunctionName.main, from: encoderModel)

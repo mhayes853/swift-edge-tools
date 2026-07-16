@@ -24,14 +24,14 @@
         tools: [.getWeather, Self.getForecast],
         range: .exact(1)
       )
-      let expressions = try Self.expressions(in: grammar.ebnf)
+      let expressions = Self.expressions(in: grammar.ebnf)
 
       expectNoDifference(Set(expressions).count, expressions.count)
     }
 
     @Test
     func `LFM Python Uses Keyword Arguments And Nested Dictionaries`() throws {
-      let validMatcher = try self.compiler.compile(
+      let validMatcher = try self.compiler.makeMatcher(
         try XGrammarGrammar.lfmPython(tools: [Self.nestedTool], range: .exact(1))
       )
       let valid =
@@ -46,7 +46,7 @@
         eosToken: self.eosToken
       )
 
-      let optionalMatcher = try self.compiler.compile(
+      let optionalMatcher = try self.compiler.makeMatcher(
         try XGrammarGrammar.lfmPython(tools: [Self.nestedTool], range: .exact(1))
       )
       assertGrammarAccepts(
@@ -59,7 +59,7 @@
         eosToken: self.eosToken
       )
 
-      let topLevelJSONMatcher = try self.compiler.compile(
+      let topLevelJSONMatcher = try self.compiler.makeMatcher(
         try XGrammarGrammar.lfmPython(tools: [Self.nestedTool], range: .exact(1))
       )
       assertGrammarRejects(
@@ -69,7 +69,7 @@
         eosToken: self.eosToken
       )
 
-      let nestedKeywordMatcher = try self.compiler.compile(
+      let nestedKeywordMatcher = try self.compiler.makeMatcher(
         try XGrammarGrammar.lfmPython(tools: [Self.nestedTool], range: .exact(1))
       )
       assertGrammarRejects(

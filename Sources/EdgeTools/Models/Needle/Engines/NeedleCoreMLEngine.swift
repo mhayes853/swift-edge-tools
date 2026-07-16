@@ -87,7 +87,9 @@
     ) async throws {
       let tokenizer = try await loadEdgeToolsTokenizer(from: modelDirectoryURL)
       let lockedTokenizer = Lock(consume tokenizer)
-      let grammarEngine = lockedTokenizer.withLock { XGrammarCompiler.needle(erasedTokenizer: $0) }
+      let grammarEngine = lockedTokenizer.withLock {
+        try? XGrammarCompiler(tokenizerInfo: try XGrammarTokenizerInfo.needle(erasedTokenizer: $0))
+      }
       guard let grammarEngine else {
         throw NeedleCoreMLEngineError.failedToLoadGrammarEngine
       }

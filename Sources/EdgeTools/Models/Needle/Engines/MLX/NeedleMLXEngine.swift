@@ -73,7 +73,7 @@
         editConfiguration: editConfiguration
       )
       let grammarEngine = lockedTokenizer.withLock {
-        XGrammarCompiler.needle(erasedTokenizer: $0)
+        try? XGrammarCompiler(tokenizerInfo: try XGrammarTokenizerInfo.needle(erasedTokenizer: $0))
       }
       guard let grammarEngine else {
         throw NeedleMLXEngineError.failedToLoadGrammarEngine

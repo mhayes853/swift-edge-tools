@@ -1,47 +1,47 @@
 #if XGrammar
   import Foundation
 
-  extension XGrammarCompiler {
-    public typealias Matcher = XGrammarMatcher
+  // MARK: - Tokenizer Info
 
+  extension XGrammarTokenizerInfo {
     public static func needle(
-      tokenizer: borrowing some EdgeToolsTokenizer & ~Copyable,
-      configuration: Configuration = Configuration()
-    ) -> XGrammarCompiler? {
-      Self.makeNeedleCompiler(
+      tokenizer: borrowing some EdgeToolsTokenizer & ~Copyable
+    ) throws -> XGrammarTokenizerInfo {
+      try Self.needle(
         vocabulary: tokenizer.convertIdsToTokens(Array(0..<8192)),
-        eosTokenID: tokenizer.eosTokenId,
-        configuration: configuration
+        eosTokenID: tokenizer.eosTokenId
       )
     }
 
     static func needle(
-      erasedTokenizer tokenizer: borrowing any EdgeToolsTokenizer & ~Copyable,
-      configuration: Configuration = Configuration()
-    ) -> XGrammarCompiler? {
-      Self.makeNeedleCompiler(
+      erasedTokenizer tokenizer: borrowing any EdgeToolsTokenizer & ~Copyable
+    ) throws -> XGrammarTokenizerInfo {
+      try Self.needle(
         vocabulary: tokenizer.convertIdsToTokens(Array(0..<8192)),
-        eosTokenID: tokenizer.eosTokenId,
-        configuration: configuration
+        eosTokenID: tokenizer.eosTokenId
       )
     }
 
-    private static func makeNeedleCompiler(
+    private static func needle(
       vocabulary: [String?],
-      eosTokenID: EdgeToolsToken.ID?,
-      configuration: Configuration
-    ) -> XGrammarCompiler? {
-      guard let eosTokenID, vocabulary.allSatisfy({ $0 != nil }) else { return nil }
-      return try? XGrammarCompiler(
-        encodedVocabulary: vocabulary.map { $0! },
+      eosTokenID: EdgeToolsToken.ID?
+    ) throws -> XGrammarTokenizerInfo {
+      guard let eosTokenID, vocabulary.allSatisfy({ $0 != nil }) else {
+        throw XGrammarError(
+          message: "Needle requires a tokenizer with an EOS token and full vocabulary."
+        )
+      }
+      return try XGrammarTokenizerInfo(
+        encodedVocabulary: vocabulary.compactMap { $0 },
         vocabularyType: .byteFallback,
         vocabularySize: vocabulary.count,
         stopTokenIDs: [eosTokenID],
-        addPrefixSpace: true,
-        configuration: configuration
+        addPrefixSpace: true
       )
     }
   }
+
+  // MARK: - Grammar
 
   extension XGrammarGrammar {
     public static func needle(
@@ -72,7 +72,7 @@
     }
 
     private static func needleCall(_ tool: EdgeToolDefinition) throws -> XGrammarGrammar {
-      let schema = try tool.arguments.orderedKeyEncoded()
+      let schema = tool.arguments.orderedKeyEncoded()
       let arguments = try XGrammarGrammar(
         jsonSchema: schema,
         configuration: JSONSchemaConfiguration(
@@ -87,8 +87,15 @@
       let withArguments = try argumentsPrefix.concatenate(arguments)
       return try withArguments.concatenate(XGrammarGrammar(literal: "}"))
     }
-
   }
+
+  // MARK: - Error
+
+  public enum NeedleXGrammarError: Error, Hashable, Sendable {
+    case invalidToolInvocationRange
+  }
+
+  // MARK: - Helpers
 
   extension ToolCallGrammarMatcherPool {
     static func needle(maxCount: Int = 8) -> ToolCallGrammarMatcherPool {
@@ -98,9 +105,5 @@
         makeGrammar: { try XGrammarGrammar.needle(tools: $0, range: $1) }
       )
     }
-  }
-
-  public enum NeedleXGrammarError: Error, Hashable, Sendable {
-    case invalidToolInvocationRange
   }
 #endif

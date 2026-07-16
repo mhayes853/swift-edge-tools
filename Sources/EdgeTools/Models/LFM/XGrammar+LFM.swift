@@ -34,7 +34,7 @@
     }
 
     private static func lfmPythonCall(_ tool: EdgeToolDefinition) throws -> XGrammarGrammar {
-      let jsonArguments = try Self.strictJSONArguments(for: tool)
+      let jsonArguments = Self.strictJSONArguments(for: tool)
       var document = try XGrammarEBNFDocument(jsonArguments.ebnf)
       try document.mapLiterals { ruleName, value, suffix in
         switch value {

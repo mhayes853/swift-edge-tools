@@ -42,7 +42,7 @@
     }
 
     private static func qwenJSONCall(_ tool: EdgeToolDefinition) throws -> XGrammarGrammar {
-      let arguments = try Self.strictJSONArguments(for: tool)
+      let arguments = Self.strictJSONArguments(for: tool)
       let encodedName = String(decoding: try JSONEncoder().encode(tool.name), as: UTF8.self)
       let prefix = try XGrammarGrammar(
         literal: "<tool_call>{\"name\":\(encodedName),\"arguments\":"
@@ -52,7 +52,7 @@
     }
 
     private static func qwenXMLCall(_ tool: EdgeToolDefinition) throws -> XGrammarGrammar {
-      let arguments = try Self.qwenXMLArguments(for: tool)
+      let arguments = Self.qwenXMLArguments(for: tool)
       let prefix = try XGrammarGrammar(literal: "<tool_call><function=\(tool.name)>")
       let withArguments = try prefix.concatenate(arguments)
       return try withArguments.concatenate(

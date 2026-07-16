@@ -4,10 +4,8 @@
 #include <cstdint>
 #include <cstring>
 #include <exception>
-#include <limits>
 #include <optional>
 #include <string>
-#include <thread>
 #include <type_traits>
 #include <vector>
 
@@ -36,12 +34,17 @@ auto with_error_handling(Body&& body) -> std::invoke_result_t<Body> {
     }
 }
 
+struct XGrammarTokenizerInfoHandle {
+    xgrammar::TokenizerInfo tokenizer_info;
+};
+
 struct XGrammarCompilerHandle {
     xgrammar::TokenizerInfo tokenizer_info;
-    std::optional<xgrammar::GrammarCompiler> compiler = std::nullopt;
-    int64_t memory_limit = kXGrammarUnlimited;
-    int64_t max_threads = kXGrammarUnlimited;
-    bool is_cache_enabled = true;
+    xgrammar::GrammarCompiler compiler;
+};
+
+struct XGrammarCompiledGrammarHandle {
+    xgrammar::CompiledGrammar compiled_grammar;
 };
 
 struct XGrammarMatcherHandle {
@@ -54,14 +57,22 @@ struct XGrammarGrammarHandle {
     xgrammar::Grammar grammar;
 };
 
-int64_t normalized_memory_limit(int64_t limit) {
-    return limit < 0 ? kXGrammarUnlimited : limit;
+template <typename Value, typename Error>
+Value value_or_throw(std::variant<Value, Error> result) {
+    if (const auto* value = std::get_if<Value>(&result)) {
+        return *value;
+    }
+    const auto& error = std::get<Error>(result);
+    std::visit([](const auto& value) { throw std::runtime_error(value.what()); }, error);
+    std::abort();
 }
 
-int64_t normalized_max_threads(int64_t threads) {
-    return threads > 0 && threads <= std::numeric_limits<int>::max()
-        ? threads
-        : kXGrammarUnlimited;
+size_t write_string(const std::string& string, char* buffer, size_t buffer_capacity) {
+    const size_t required_capacity = string.size() + 1;
+    if (buffer && buffer_capacity >= required_capacity) {
+        std::memcpy(buffer, string.c_str(), required_capacity);
+    }
+    return required_capacity;
 }
 
 xgrammar::VocabType vocab_type(xgrammar_vocab_type_t type) {
@@ -124,21 +135,6 @@ xgrammar::Grammar repeated_grammar(
     return grammar_from_structural_tag(tag);
 }
 
-xgrammar::GrammarCompiler& compiler_for(XGrammarCompilerHandle* handle) {
-    if (!handle->compiler.has_value()) {
-        const int max_threads = handle->max_threads == kXGrammarUnlimited
-            ? static_cast<int>(std::thread::hardware_concurrency())
-            : static_cast<int>(handle->max_threads);
-        handle->compiler.emplace(
-            handle->tokenizer_info,
-            max_threads,
-            handle->is_cache_enabled,
-            handle->memory_limit
-        );
-    }
-    return *handle->compiler;
-}
-
 std::vector<xgrammar::Grammar> grammar_vector(
     const xgrammar_grammar_t* grammars,
     size_t grammar_count
@@ -166,7 +162,7 @@ const char* xgrammar_last_error_message(void) {
     return last_error.c_str();
 }
 
-xgrammar_compiler_t xgrammar_compiler_init(
+xgrammar_tokenizer_info_t xgrammar_tokenizer_info_init(
     const char* const* encoded_vocab,
     size_t encoded_vocab_count,
     xgrammar_vocab_type_t type,
@@ -176,72 +172,90 @@ xgrammar_compiler_t xgrammar_compiler_init(
     int add_prefix_space
 ) {
     return with_error_handling([&] {
-        if (!encoded_vocab) {
-            throw std::invalid_argument("Expected a vocabulary.");
-        }
-        if (vocab_size < kXGrammarUnlimited) {
-            throw std::invalid_argument("Vocabulary size must be non-negative or unlimited.");
-        }
-        if (stop_token_id_count > 0 && !stop_token_ids) {
-            throw std::invalid_argument("Expected stop token IDs.");
+        if (!encoded_vocab || vocab_size < kXGrammarUnlimited || (stop_token_id_count > 0 && !stop_token_ids)) {
+            throw std::invalid_argument("Invalid tokenizer information.");
         }
         const std::vector<std::string> vocabulary(encoded_vocab, encoded_vocab + encoded_vocab_count);
-        const std::optional<int> optional_vocab_size = vocab_size == kXGrammarUnlimited
-            ? std::nullopt
-            : std::optional<int>(vocab_size);
-        const std::optional<std::vector<int32_t>> optional_stop_token_ids = stop_token_id_count == 0
-            ? std::nullopt
-            : std::optional<std::vector<int32_t>>(
-                std::vector<int32_t>(stop_token_ids, stop_token_ids + stop_token_id_count)
-            );
-        const xgrammar::TokenizerInfo tokenizer_info(
-            vocabulary,
-            vocab_type(type),
-            optional_vocab_size,
-            optional_stop_token_ids,
-            add_prefix_space != 0
-        );
-        return new XGrammarCompilerHandle{tokenizer_info};
+        const auto optional_vocab_size = vocab_size == kXGrammarUnlimited
+            ? std::optional<int>{} : std::optional<int>{vocab_size};
+        const auto optional_stop_token_ids = stop_token_id_count == 0
+            ? std::optional<std::vector<int32_t>>{}
+            : std::optional<std::vector<int32_t>>{std::vector<int32_t>(stop_token_ids, stop_token_ids + stop_token_id_count)};
+        return new XGrammarTokenizerInfoHandle{xgrammar::TokenizerInfo(
+            vocabulary, vocab_type(type), optional_vocab_size, optional_stop_token_ids, add_prefix_space != 0
+        )};
     });
 }
 
-void xgrammar_compiler_set_memory_limit(xgrammar_compiler_t compiler, int64_t limit) {
-    if (!compiler) return;
-    auto handle = static_cast<XGrammarCompilerHandle*>(compiler);
-    handle->compiler = std::nullopt;
-    handle->memory_limit = normalized_memory_limit(limit);
+xgrammar_tokenizer_info_t xgrammar_tokenizer_info_from_vocab_and_metadata(
+    const char* const* encoded_vocab,
+    size_t encoded_vocab_count,
+    const char* metadata
+) {
+    return with_error_handling([&] {
+        if (!encoded_vocab || !metadata) throw std::invalid_argument("Expected vocabulary and metadata.");
+        return new XGrammarTokenizerInfoHandle{xgrammar::TokenizerInfo::FromVocabAndMetadata(
+            std::vector<std::string>(encoded_vocab, encoded_vocab + encoded_vocab_count), metadata
+        )};
+    });
 }
 
-void xgrammar_compiler_set_max_threads(xgrammar_compiler_t compiler, int64_t threads) {
-    if (!compiler) return;
-    auto handle = static_cast<XGrammarCompilerHandle*>(compiler);
-    handle->compiler = std::nullopt;
-    handle->max_threads = normalized_max_threads(threads);
+size_t xgrammar_tokenizer_info_detect_metadata_from_hf(
+    const char* backend_json,
+    char* buffer,
+    size_t buffer_capacity
+) {
+    return with_error_handling([&] {
+        if (!backend_json) throw std::invalid_argument("Expected Hugging Face backend JSON.");
+        return write_string(xgrammar::TokenizerInfo::DetectMetadataFromHF(backend_json), buffer, buffer_capacity);
+    });
 }
 
-void xgrammar_compiler_set_cache_enabled(xgrammar_compiler_t compiler, int is_enabled) {
-    if (!compiler) return;
-    auto handle = static_cast<XGrammarCompilerHandle*>(compiler);
-    handle->compiler = std::nullopt;
-    handle->is_cache_enabled = is_enabled != 0;
+size_t xgrammar_tokenizer_info_serialize_json(
+    xgrammar_tokenizer_info_t tokenizer_info,
+    char* buffer,
+    size_t buffer_capacity
+) {
+    return with_error_handling([&] {
+        if (!tokenizer_info) throw std::invalid_argument("Expected tokenizer information.");
+        return write_string(static_cast<XGrammarTokenizerInfoHandle*>(tokenizer_info)->tokenizer_info.SerializeJSON(), buffer, buffer_capacity);
+    });
+}
+
+xgrammar_tokenizer_info_t xgrammar_tokenizer_info_deserialize_json(const char* json) {
+    return with_error_handling([&] {
+        if (!json) throw std::invalid_argument("Expected tokenizer information JSON.");
+        return new XGrammarTokenizerInfoHandle{value_or_throw(xgrammar::TokenizerInfo::DeserializeJSON(json))};
+    });
+}
+
+void xgrammar_tokenizer_info_destroy(xgrammar_tokenizer_info_t tokenizer_info) {
+    delete static_cast<XGrammarTokenizerInfoHandle*>(tokenizer_info);
+}
+
+xgrammar_compiler_t xgrammar_compiler_init(
+    xgrammar_tokenizer_info_t tokenizer_info,
+    int32_t max_threads,
+    int cache_enabled,
+    int64_t max_memory_bytes
+) {
+    return with_error_handling([&] {
+        if (!tokenizer_info || max_threads <= 0) throw std::invalid_argument("Invalid compiler configuration.");
+        const auto info = static_cast<XGrammarTokenizerInfoHandle*>(tokenizer_info)->tokenizer_info;
+        return new XGrammarCompilerHandle{info, xgrammar::GrammarCompiler(info, max_threads, cache_enabled != 0, max_memory_bytes)};
+    });
 }
 
 int64_t xgrammar_compiler_cache_size_bytes(xgrammar_compiler_t compiler) {
-    if (!compiler) return 0;
-    const auto handle = static_cast<XGrammarCompilerHandle*>(compiler);
-    return handle->compiler ? handle->compiler->GetCacheSizeBytes() : 0;
+    return compiler ? static_cast<XGrammarCompilerHandle*>(compiler)->compiler.GetCacheSizeBytes() : 0;
 }
 
 int64_t xgrammar_compiler_cache_limit_bytes(xgrammar_compiler_t compiler) {
-    if (!compiler) return 0;
-    const auto handle = static_cast<XGrammarCompilerHandle*>(compiler);
-    return handle->compiler ? handle->compiler->CacheLimitBytes() : 0;
+    return compiler ? static_cast<XGrammarCompilerHandle*>(compiler)->compiler.CacheLimitBytes() : 0;
 }
 
 void xgrammar_compiler_clear_cache(xgrammar_compiler_t compiler) {
-    if (!compiler) return;
-    const auto handle = static_cast<XGrammarCompilerHandle*>(compiler);
-    if (handle->compiler) handle->compiler->ClearCache();
+    if (compiler) static_cast<XGrammarCompilerHandle*>(compiler)->compiler.ClearCache();
 }
 
 void xgrammar_compiler_destroy(xgrammar_compiler_t compiler) {
@@ -310,19 +324,28 @@ xgrammar_grammar_t xgrammar_grammar_init_structural_tag(const char* structural_t
     });
 }
 
-size_t xgrammar_grammar_ebnf(
-    xgrammar_grammar_t grammar,
-    char* buffer,
-    size_t buffer_capacity
-) {
+xgrammar_grammar_t xgrammar_grammar_builtin_json(void) {
+    return with_error_handling([&] { return new XGrammarGrammarHandle{xgrammar::Grammar::BuiltinJSONGrammar()}; });
+}
+
+size_t xgrammar_grammar_ebnf(xgrammar_grammar_t grammar, char* buffer, size_t buffer_capacity) {
     return with_error_handling([&] {
         if (!grammar) throw std::invalid_argument("Expected a grammar.");
-        const std::string ebnf = static_cast<XGrammarGrammarHandle*>(grammar)->grammar.ToString();
-        const size_t required_capacity = ebnf.size() + 1;
-        if (buffer && buffer_capacity >= required_capacity) {
-            std::memcpy(buffer, ebnf.c_str(), required_capacity);
-        }
-        return required_capacity;
+        return write_string(static_cast<XGrammarGrammarHandle*>(grammar)->grammar.ToString(), buffer, buffer_capacity);
+    });
+}
+
+size_t xgrammar_grammar_serialize_json(xgrammar_grammar_t grammar, char* buffer, size_t buffer_capacity) {
+    return with_error_handling([&] {
+        if (!grammar) throw std::invalid_argument("Expected a grammar.");
+        return write_string(static_cast<XGrammarGrammarHandle*>(grammar)->grammar.SerializeJSON(), buffer, buffer_capacity);
+    });
+}
+
+xgrammar_grammar_t xgrammar_grammar_deserialize_json(const char* json) {
+    return with_error_handling([&] {
+        if (!json) throw std::invalid_argument("Expected grammar JSON.");
+        return new XGrammarGrammarHandle{value_or_throw(xgrammar::Grammar::DeserializeJSON(json))};
     });
 }
 
@@ -372,17 +395,84 @@ void xgrammar_grammar_destroy(xgrammar_grammar_t grammar) {
 }
 
 
-xgrammar_matcher_t xgrammar_compile_matcher(
-    xgrammar_compiler_t compiler,
-    xgrammar_grammar_t grammar
+xgrammar_compiled_grammar_t xgrammar_compiler_compile_grammar(
+    xgrammar_compiler_t compiler, xgrammar_grammar_t grammar
 ) {
     return with_error_handling([&] {
         if (!compiler || !grammar) throw std::invalid_argument("Expected a compiler and grammar.");
-        auto compiler_handle = static_cast<XGrammarCompilerHandle*>(compiler);
+        const auto compiler_handle = static_cast<XGrammarCompilerHandle*>(compiler);
         const auto grammar_handle = static_cast<XGrammarGrammarHandle*>(grammar);
-        const auto compiled = compiler_for(compiler_handle).CompileGrammar(grammar_handle->grammar);
-        const auto bitmask_word_count = xgrammar::GetBitmaskSize(compiler_handle->tokenizer_info.GetVocabSize());
-        return new XGrammarMatcherHandle{xgrammar::GrammarMatcher(compiled), compiled, bitmask_word_count};
+        return new XGrammarCompiledGrammarHandle{compiler_handle->compiler.CompileGrammar(grammar_handle->grammar)};
+    });
+}
+
+xgrammar_grammar_t xgrammar_compiled_grammar_grammar(xgrammar_compiled_grammar_t compiled_grammar) {
+    return with_error_handling([&] {
+        if (!compiled_grammar) throw std::invalid_argument("Expected a compiled grammar.");
+        return new XGrammarGrammarHandle{static_cast<XGrammarCompiledGrammarHandle*>(compiled_grammar)->compiled_grammar.GetGrammar()};
+    });
+}
+
+xgrammar_tokenizer_info_t xgrammar_compiled_grammar_tokenizer_info(xgrammar_compiled_grammar_t compiled_grammar) {
+    return with_error_handling([&] {
+        if (!compiled_grammar) throw std::invalid_argument("Expected a compiled grammar.");
+        return new XGrammarTokenizerInfoHandle{static_cast<XGrammarCompiledGrammarHandle*>(compiled_grammar)->compiled_grammar.GetTokenizerInfo()};
+    });
+}
+
+int64_t xgrammar_compiled_grammar_memory_size_bytes(xgrammar_compiled_grammar_t compiled_grammar) {
+    return compiled_grammar
+        ? static_cast<int64_t>(static_cast<XGrammarCompiledGrammarHandle*>(compiled_grammar)->compiled_grammar.MemorySizeBytes())
+        : 0;
+}
+
+size_t xgrammar_compiled_grammar_serialize_json(
+    xgrammar_compiled_grammar_t compiled_grammar,
+    char* buffer,
+    size_t buffer_capacity
+) {
+    return with_error_handling([&] {
+        if (!compiled_grammar) throw std::invalid_argument("Expected a compiled grammar.");
+        return write_string(static_cast<XGrammarCompiledGrammarHandle*>(compiled_grammar)->compiled_grammar.SerializeJSON(), buffer, buffer_capacity);
+    });
+}
+
+xgrammar_compiled_grammar_t xgrammar_compiled_grammar_deserialize_json(
+    const char* json,
+    xgrammar_tokenizer_info_t tokenizer_info
+) {
+    return with_error_handling([&] {
+        if (!json || !tokenizer_info) throw std::invalid_argument("Expected compiled grammar JSON and tokenizer information.");
+        const auto info = static_cast<XGrammarTokenizerInfoHandle*>(tokenizer_info)->tokenizer_info;
+        return new XGrammarCompiledGrammarHandle{value_or_throw(xgrammar::CompiledGrammar::DeserializeJSON(json, info))};
+    });
+}
+
+void xgrammar_compiled_grammar_destroy(xgrammar_compiled_grammar_t compiled_grammar) {
+    delete static_cast<XGrammarCompiledGrammarHandle*>(compiled_grammar);
+}
+
+xgrammar_matcher_t xgrammar_matcher_init(
+    xgrammar_compiled_grammar_t compiled_grammar,
+    const int32_t* override_stop_token_ids,
+    size_t override_stop_token_id_count,
+    int terminate_without_stop_token,
+    int32_t max_rollback_tokens
+) {
+    return with_error_handling([&] {
+        if (!compiled_grammar || (override_stop_token_id_count > 0 && !override_stop_token_ids)) {
+            throw std::invalid_argument("Invalid matcher configuration.");
+        }
+        const auto compiled = static_cast<XGrammarCompiledGrammarHandle*>(compiled_grammar)->compiled_grammar;
+        const auto stop_tokens = override_stop_token_id_count == 0
+            ? std::optional<std::vector<int>>{}
+            : std::optional<std::vector<int>>{std::vector<int>(override_stop_token_ids, override_stop_token_ids + override_stop_token_id_count)};
+        const auto bitmask_word_count = xgrammar::GetBitmaskSize(compiled.GetTokenizerInfo().GetVocabSize());
+        return new XGrammarMatcherHandle{
+            xgrammar::GrammarMatcher(compiled, stop_tokens, terminate_without_stop_token != 0, max_rollback_tokens),
+            compiled,
+            bitmask_word_count
+        };
     });
 }
 
@@ -419,6 +509,10 @@ int xgrammar_matcher_accept_token(xgrammar_matcher_t matcher, int token) {
     return matcher ? static_cast<XGrammarMatcherHandle*>(matcher)->matcher.AcceptToken(token) : -1;
 }
 
+int xgrammar_matcher_accept_string(xgrammar_matcher_t matcher, const char* string) {
+    return matcher && string ? static_cast<XGrammarMatcherHandle*>(matcher)->matcher.AcceptString(string) : -1;
+}
+
 int xgrammar_matcher_is_completed(xgrammar_matcher_t matcher) {
     return matcher ? static_cast<XGrammarMatcherHandle*>(matcher)->matcher.IsCompleted() : -1;
 }
@@ -433,12 +527,6 @@ void xgrammar_matcher_rollback(xgrammar_matcher_t matcher, int num_tokens) {
 
 void xgrammar_matcher_reset(xgrammar_matcher_t matcher) {
     if (matcher) static_cast<XGrammarMatcherHandle*>(matcher)->matcher.Reset();
-}
-
-int64_t xgrammar_matcher_memory_size_bytes(xgrammar_matcher_t matcher) {
-    if (!matcher) return 0;
-    const auto handle = static_cast<const XGrammarMatcherHandle*>(matcher);
-    return static_cast<int64_t>(handle->compiled_grammar.MemorySizeBytes());
 }
 
 void xgrammar_matcher_destroy(xgrammar_matcher_t matcher) {

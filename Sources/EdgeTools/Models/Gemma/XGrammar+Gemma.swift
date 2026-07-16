@@ -21,7 +21,7 @@
     private static func functionGemmaCall(
       _ tool: EdgeToolDefinition
     ) throws -> XGrammarGrammar {
-      let xmlArguments = try Self.qwenXMLArguments(for: tool)
+      let xmlArguments = Self.qwenXMLArguments(for: tool)
       var document = try XGrammarEBNFDocument(xmlArguments.ebnf)
       try document.mapLiterals { ruleName, value, suffix in
         if value == "</parameter>" {
@@ -50,7 +50,7 @@
     }
 
     private static func gemma4Call(_ tool: EdgeToolDefinition) throws -> XGrammarGrammar {
-      let jsonArguments = try Self.strictJSONArguments(for: tool)
+      let jsonArguments = Self.strictJSONArguments(for: tool)
       var document = try XGrammarEBNFDocument(jsonArguments.ebnf)
       try document.mapLiterals { _, value, suffix in
         let isBeforePropertyColon = suffix.contains(#"":""#)

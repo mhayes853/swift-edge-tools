@@ -27,109 +27,133 @@
       self.message = message
     }
 
+    public static let invalidTokenizerInfo = Self(
+      message: "Invalid XGrammar tokenizer information."
+    )
+    public static let invalidHuggingFaceMetadata = Self(
+      message: "Invalid Hugging Face tokenizer metadata."
+    )
+    public static let invalidJSONSchemaConfiguration = Self(
+      message: "Invalid XGrammar JSON Schema configuration."
+    )
     public static let invalidCompilerConfiguration = Self(
       message: "Invalid XGrammar compiler configuration."
+    )
+    public static let invalidMatcherConfiguration = Self(
+      message: "Invalid XGrammar matcher configuration."
     )
     public static let invalidRepetitionRange = Self(message: "Invalid XGrammar repetition range.")
     public static let emptyGrammarCollection = Self(message: "Expected at least one grammar.")
   }
 
-  func xgrammarRequiredHandle<Handle>(_ handle: Handle?) throws -> Handle {
-    guard let handle else {
-      throw XGrammarError(message: String(cString: xgrammar_last_error_message()))
-    }
-    return handle
-  }
+  // MARK: - XGrammarTokenizerInfo
 
-  // MARK: - XGrammarCompiler
+  public struct XGrammarTokenizerInfo: ~Copyable {
+    private struct HuggingFaceMetadata: Decodable {
+      let vocabularyType: Int
+      let addPrefixSpace: Bool
 
-  public struct XGrammarCompiler: ~Copyable {
-    public struct Configuration: Hashable, Sendable {
-      public var memoryLimitBytes: Int64?
-      public var maximumThreads: Int?
-      public var isCacheEnabled: Bool
-
-      public init(
-        memoryLimitBytes: Int64? = nil,
-        maximumThreads: Int? = nil,
-        isCacheEnabled: Bool = true
-      ) {
-        self.memoryLimitBytes = memoryLimitBytes
-        self.maximumThreads = maximumThreads
-        self.isCacheEnabled = isCacheEnabled
+      enum CodingKeys: String, CodingKey {
+        case vocabularyType = "vocab_type"
+        case addPrefixSpace = "add_prefix_space"
       }
     }
 
-    public let handle: xgrammar_compiler_t
-
-    public var cacheSizeBytes: Int64 {
-      xgrammar_compiler_cache_size_bytes(self.handle)
-    }
-
-    public var cacheLimitBytes: Int64 {
-      xgrammar_compiler_cache_limit_bytes(self.handle)
-    }
+    public let handle: xgrammar_tokenizer_info_t
 
     public init(
       encodedVocabulary: [String],
-      vocabularyType: XGrammarVocabularyType = .raw,
+      vocabularyType: XGrammarVocabularyType,
       vocabularySize: Int? = nil,
       stopTokenIDs: [Int] = [],
-      addPrefixSpace: Bool = false,
-      configuration: Configuration = Configuration()
+      addPrefixSpace: Bool = false
     ) throws {
-      guard vocabularySize.map({ $0 >= 0 }) ?? true,
-        stopTokenIDs.allSatisfy({ Int32(exactly: $0) != nil })
-      else {
-        throw XGrammarError.invalidCompilerConfiguration
+      guard vocabularySize.map({ $0 >= 0 }) ?? true else {
+        throw XGrammarError.invalidTokenizerInfo
       }
-
-      let handle = try withCopiedCStringPointerBuffer(encodedVocabulary) { vocabulary in
-        try stopTokenIDs.map(Int32.init)
-          .withUnsafeBufferPointer { stopTokenIDs in
-            let compiler = xgrammar_compiler_init(
+      let vocabularySize = try vocabularySize.map {
+        try xgrammarInt32($0, error: .invalidTokenizerInfo)
+      }
+      let stopTokenIDs = try stopTokenIDs.map {
+        try xgrammarInt32($0, error: .invalidTokenizerInfo)
+      }
+      self.handle = try withCopiedCStringPointerBuffer(encodedVocabulary) { vocabulary in
+        try stopTokenIDs.withUnsafeBufferPointer { stopTokenIDs in
+          try xgrammarRequiredHandle(
+            xgrammar_tokenizer_info_init(
               vocabulary.baseAddress,
               vocabulary.count,
               vocabularyType.rawValue,
-              Int32(vocabularySize ?? -1),
+              vocabularySize ?? -1,
               stopTokenIDs.baseAddress,
               stopTokenIDs.count,
               addPrefixSpace.intValue(as: Int32.self)
             )
-            return try xgrammarRequiredHandle(compiler)
-          }
+          )
+        }
       }
-      self.handle = handle
-      self.apply(configuration: configuration)
     }
 
-    public init(handle: consuming xgrammar_compiler_t) {
+    public init(encodedVocabulary: [String], metadata: String) throws {
+      self.handle = try withCopiedCStringPointerBuffer(encodedVocabulary) { vocabulary in
+        try metadata.withCString {
+          try xgrammarRequiredHandle(
+            xgrammar_tokenizer_info_from_vocab_and_metadata(
+              vocabulary.baseAddress,
+              vocabulary.count,
+              $0
+            )
+          )
+        }
+      }
+    }
+
+    public init(serializedJSON: String) throws {
+      self.handle = try serializedJSON.withCString {
+        try xgrammarRequiredHandle(xgrammar_tokenizer_info_deserialize_json($0))
+      }
+    }
+
+    public init(handle: consuming xgrammar_tokenizer_info_t) {
       self.handle = consume handle
     }
 
-    deinit {
-      xgrammar_compiler_destroy(self.handle)
+    deinit { xgrammar_tokenizer_info_destroy(self.handle) }
+
+    public static func metadata(huggingFaceBackendJSON: String) throws -> String {
+      try huggingFaceBackendJSON.withCString { backendJSON in
+        try xgrammarString { xgrammar_tokenizer_info_detect_metadata_from_hf(backendJSON, $0, $1) }
+      }
     }
 
-    public func apply(configuration: Configuration) {
-      xgrammar_compiler_set_memory_limit(self.handle, configuration.memoryLimitBytes ?? -1)
-      xgrammar_compiler_set_max_threads(self.handle, Int64(configuration.maximumThreads ?? -1))
-      xgrammar_compiler_set_cache_enabled(
-        self.handle,
-        configuration.isCacheEnabled.intValue(as: Int32.self)
+    public static func huggingFace(
+      encodedVocabulary: [String],
+      backendJSON: String,
+      stopTokenIDs: [Int] = []
+    ) throws -> XGrammarTokenizerInfo {
+      let metadata = try Self.metadata(huggingFaceBackendJSON: backendJSON)
+      let decodedMetadata = try JSONDecoder()
+        .decode(
+          HuggingFaceMetadata.self,
+          from: Data(metadata.utf8)
+        )
+      let vocabularyType: XGrammarVocabularyType
+      switch decodedMetadata.vocabularyType {
+      case 0: vocabularyType = .raw
+      case 1: vocabularyType = .byteFallback
+      case 2: vocabularyType = .byteLevel
+      default: throw XGrammarError.invalidHuggingFaceMetadata
+      }
+      return try XGrammarTokenizerInfo(
+        encodedVocabulary: encodedVocabulary,
+        vocabularyType: vocabularyType,
+        stopTokenIDs: stopTokenIDs,
+        addPrefixSpace: decodedMetadata.addPrefixSpace
       )
     }
 
-    public func clearCache() {
-      xgrammar_compiler_clear_cache(self.handle)
-    }
-
-    public borrowing func compile(
-      _ grammar: borrowing XGrammarGrammar
-    ) throws -> XGrammarMatcher {
-      try XGrammarMatcher(
-        handle: xgrammarRequiredHandle(xgrammar_compile_matcher(self.handle, grammar.handle))
-      )
+    public func serializedJSON() throws -> String {
+      try xgrammarString { xgrammar_tokenizer_info_serialize_json(self.handle, $0, $1) }
     }
   }
 
@@ -140,7 +164,6 @@
       public struct Separators: Hashable, Sendable {
         public var comma: String
         public var colon: String
-
         public init(comma: String, colon: String) {
           self.comma = comma
           self.colon = colon
@@ -175,8 +198,8 @@
 
     public init(ebnf: String, rootRuleName: String = "root") throws {
       self.handle = try ebnf.withCString { ebnf in
-        try rootRuleName.withCString { rootRuleName in
-          try xgrammarRequiredHandle(xgrammar_grammar_init_ebnf(ebnf, rootRuleName))
+        try rootRuleName.withCString {
+          try xgrammarRequiredHandle(xgrammar_grammar_init_ebnf(ebnf, $0))
         }
       }
     }
@@ -203,22 +226,26 @@
     ) throws {
       guard configuration.indent.map({ $0 >= 0 }) ?? true,
         configuration.maximumWhitespaceCount.map({ $0 >= 0 }) ?? true
-      else {
-        throw XGrammarError.invalidCompilerConfiguration
+      else { throw XGrammarError.invalidJSONSchemaConfiguration }
+      let indent = try configuration.indent.map {
+        try xgrammarInt32($0, error: .invalidJSONSchemaConfiguration)
       }
-      self.handle = try jsonSchema.withCString { jsonSchema in
+      let maximumWhitespaceCount = try configuration.maximumWhitespaceCount.map {
+        try xgrammarInt32($0, error: .invalidJSONSchemaConfiguration)
+      }
+      self.handle = try jsonSchema.withCString { schema in
         if let separators = configuration.separators {
           return try separators.comma.withCString { comma in
             try separators.colon.withCString { colon in
               try xgrammarRequiredHandle(
                 xgrammar_grammar_init_json_schema(
-                  jsonSchema,
+                  schema,
                   configuration.anyWhitespace.intValue(as: Int32.self),
-                  Int32(configuration.indent ?? -1),
+                  indent ?? -1,
                   comma,
                   colon,
                   configuration.isStrict.intValue(as: Int32.self),
-                  Int32(configuration.maximumWhitespaceCount ?? -1),
+                  maximumWhitespaceCount ?? -1,
                   configuration.anyOrder.intValue(as: Int32.self)
                 )
               )
@@ -227,16 +254,22 @@
         }
         return try xgrammarRequiredHandle(
           xgrammar_grammar_init_json_schema(
-            jsonSchema,
+            schema,
             configuration.anyWhitespace.intValue(as: Int32.self),
-            Int32(configuration.indent ?? -1),
+            indent ?? -1,
             nil,
             nil,
             configuration.isStrict.intValue(as: Int32.self),
-            Int32(configuration.maximumWhitespaceCount ?? -1),
+            maximumWhitespaceCount ?? -1,
             configuration.anyOrder.intValue(as: Int32.self)
           )
         )
+      }
+    }
+
+    public init(serializedJSON: String) throws {
+      self.handle = try serializedJSON.withCString {
+        try xgrammarRequiredHandle(xgrammar_grammar_deserialize_json($0))
       }
     }
 
@@ -244,40 +277,27 @@
       self.handle = consume handle
     }
 
-    deinit {
-      xgrammar_grammar_destroy(self.handle)
+    deinit { xgrammar_grammar_destroy(self.handle) }
+
+    public static func builtinJSONGrammar() -> XGrammarGrammar {
+      XGrammarGrammar(handle: xgrammar_grammar_builtin_json()!)
     }
 
     public var ebnf: String {
-      get throws {
-        let requiredCapacity = xgrammar_grammar_ebnf(self.handle, nil, 0)
-        guard requiredCapacity > 0 else {
-          throw XGrammarError(message: String(cString: xgrammar_last_error_message()))
-        }
-        var buffer = [CChar](repeating: 0, count: Int(requiredCapacity))
-        let returnedCapacity = buffer.withUnsafeMutableBufferPointer {
-          xgrammar_grammar_ebnf(self.handle, $0.baseAddress, $0.count)
-        }
-        guard returnedCapacity == requiredCapacity else {
-          throw XGrammarError(message: String(cString: xgrammar_last_error_message()))
-        }
-        guard
-          let ebnf = String(
-            bytes: buffer.dropLast().map { UInt8(bitPattern: $0) },
-            encoding: .utf8
-          )
-        else {
-          throw XGrammarError(message: "XGrammar returned invalid UTF-8 EBNF.")
-        }
-        return ebnf
-      }
+      let capacity = xgrammar_grammar_ebnf(self.handle, nil, 0)
+      return xgrammarString(
+        { xgrammar_grammar_ebnf(self.handle, $0, $1) },
+        capacity: capacity
+      )
+    }
+
+    public func serializedJSON() throws -> String {
+      try xgrammarString { xgrammar_grammar_serialize_json(self.handle, $0, $1) }
     }
 
     private static func escapeEBNFLiteral(_ literal: String) -> String {
       literal.reduce(into: "") { result, character in
-        if character == "\\" || character == "\"" {
-          result.append("\\")
-        }
+        if character == "\\" || character == "\"" { result.append("\\") }
         result.append(character)
       }
     }
@@ -288,16 +308,12 @@
       try EdgeTools.concatenate(self, grammar)
     }
 
-    public borrowing func union(
-      _ grammar: borrowing XGrammarGrammar
-    ) throws -> XGrammarGrammar {
+    public borrowing func union(_ grammar: borrowing XGrammarGrammar) throws -> XGrammarGrammar {
       try EdgeTools.union(self, grammar)
     }
 
     public borrowing func optional() throws -> XGrammarGrammar {
-      try XGrammarGrammar(
-        handle: xgrammarRequiredHandle(xgrammar_grammar_optional(self.handle))
-      )
+      try XGrammarGrammar(handle: xgrammarRequiredHandle(xgrammar_grammar_optional(self.handle)))
     }
 
     public borrowing func repeated(exactly count: Int) throws -> XGrammarGrammar {
@@ -313,21 +329,127 @@
     }
   }
 
+  // MARK: - XGrammarCompiledGrammar
+
+  public struct XGrammarCompiledGrammar: ~Copyable {
+    public let handle: xgrammar_compiled_grammar_t
+
+    public init(handle: consuming xgrammar_compiled_grammar_t) {
+      self.handle = consume handle
+    }
+
+    public init(serializedJSON: String, tokenizerInfo: borrowing XGrammarTokenizerInfo) throws {
+      self.handle = try serializedJSON.withCString {
+        try xgrammarRequiredHandle(
+          xgrammar_compiled_grammar_deserialize_json($0, tokenizerInfo.handle)
+        )
+      }
+    }
+
+    deinit { xgrammar_compiled_grammar_destroy(self.handle) }
+
+    public var grammar: XGrammarGrammar {
+      XGrammarGrammar(handle: xgrammar_compiled_grammar_grammar(self.handle)!)
+    }
+
+    public var tokenizerInfo: XGrammarTokenizerInfo {
+      XGrammarTokenizerInfo(handle: xgrammar_compiled_grammar_tokenizer_info(self.handle)!)
+    }
+
+    public var memorySizeBytes: Int64 {
+      xgrammar_compiled_grammar_memory_size_bytes(self.handle)
+    }
+
+    public func serializedJSON() throws -> String {
+      try xgrammarString { xgrammar_compiled_grammar_serialize_json(self.handle, $0, $1) }
+    }
+  }
+
+  // MARK: - XGrammarCompiler
+
+  public struct XGrammarCompiler: ~Copyable {
+    public let handle: xgrammar_compiler_t
+
+    public init(
+      tokenizerInfo: borrowing XGrammarTokenizerInfo,
+      maxThreads: Int = 8,
+      cacheEnabled: Bool = true,
+      maxMemoryBytes: Int64 = -1
+    ) throws {
+      let maxThreads = try xgrammarInt32(
+        maxThreads,
+        error: .invalidCompilerConfiguration
+      )
+      guard maxThreads > 0 else { throw XGrammarError.invalidCompilerConfiguration }
+      self.handle = try xgrammarRequiredHandle(
+        xgrammar_compiler_init(
+          tokenizerInfo.handle,
+          maxThreads,
+          cacheEnabled.intValue(as: Int32.self),
+          maxMemoryBytes
+        )
+      )
+    }
+
+    public init(handle: consuming xgrammar_compiler_t) {
+      self.handle = consume handle
+    }
+
+    deinit { xgrammar_compiler_destroy(self.handle) }
+
+    public var cacheSizeBytes: Int64 {
+      xgrammar_compiler_cache_size_bytes(self.handle)
+    }
+
+    public var cacheLimitBytes: Int64 {
+      xgrammar_compiler_cache_limit_bytes(self.handle)
+    }
+
+    public func clearCache() {
+      xgrammar_compiler_clear_cache(self.handle)
+    }
+
+    public borrowing func compile(
+      _ grammar: borrowing XGrammarGrammar
+    ) throws -> XGrammarCompiledGrammar {
+      try XGrammarCompiledGrammar(
+        handle: xgrammarRequiredHandle(
+          xgrammar_compiler_compile_grammar(self.handle, grammar.handle)
+        )
+      )
+    }
+  }
+
   // MARK: - XGrammarMatcher
 
   public struct XGrammarMatcher: ~Copyable {
     public let handle: xgrammar_matcher_t
 
-    public var isCompleted: Bool {
-      xgrammar_matcher_is_completed(self.handle).boolValue
-    }
+    public init(
+      compiledGrammar: borrowing XGrammarCompiledGrammar,
+      overrideStopTokenIDs: [Int] = [],
+      terminateWithoutStopToken: Bool = false,
+      maxRollbackTokens: Int = -1
+    ) throws {
+      let maxRollbackTokens = try xgrammarInt32(
+        maxRollbackTokens,
+        error: .invalidMatcherConfiguration
+      )
+      let overrideStopTokenIDs = try overrideStopTokenIDs.map {
+        try xgrammarInt32($0, error: .invalidMatcherConfiguration)
+      }
 
-    public var isTerminated: Bool {
-      xgrammar_matcher_is_terminated(self.handle).boolValue
-    }
-
-    public var memorySizeBytes: Int64 {
-      xgrammar_matcher_memory_size_bytes(self.handle)
+      self.handle = try overrideStopTokenIDs.withUnsafeBufferPointer {
+        try xgrammarRequiredHandle(
+          xgrammar_matcher_init(
+            compiledGrammar.handle,
+            $0.baseAddress,
+            $0.count,
+            terminateWithoutStopToken.intValue(as: Int32.self),
+            maxRollbackTokens
+          )
+        )
+      }
     }
 
     public init(handle: consuming xgrammar_matcher_t) {
@@ -338,11 +460,18 @@
       xgrammar_matcher_destroy(self.handle)
     }
 
+    public var isCompleted: Bool {
+      xgrammar_matcher_is_completed(self.handle).boolValue
+    }
+
+    public var isTerminated: Bool {
+      xgrammar_matcher_is_terminated(self.handle).boolValue
+    }
+
     public func bitmask() -> GrammarBitmask {
       var bitmask = GrammarBitmask(bitCount: Int(xgrammar_matcher_bit_count(self.handle)))
-      _ = bitmask.storage.withUnsafeMutableBytes { bytes in
-        let words = bytes.bindMemory(to: Int32.self)
-        return xgrammar_matcher_bitmask(self.handle, words.baseAddress)
+      _ = bitmask.storage.withUnsafeMutableBytes {
+        xgrammar_matcher_bitmask(self.handle, $0.bindMemory(to: Int32.self).baseAddress)
       }
       return bitmask
     }
@@ -352,7 +481,12 @@
       xgrammar_matcher_accept_token(self.handle, Int32(tokenId)).boolValue
     }
 
-    public func rollback(_ tokenCount: Int) {
+    @discardableResult
+    public func accept(string: String) -> Bool {
+      string.withCString { xgrammar_matcher_accept_string(self.handle, $0).boolValue }
+    }
+
+    public func rollback(_ tokenCount: Int = 1) {
       xgrammar_matcher_rollback(self.handle, Int32(tokenCount))
     }
 
@@ -360,11 +494,41 @@
       xgrammar_matcher_reset(self.handle)
     }
 
-    public borrowing func fork() throws -> XGrammarMatcher {
-      try XGrammarMatcher(
-        handle: xgrammarRequiredHandle(xgrammar_matcher_fork(self.handle))
-      )
+    public borrowing func fork() -> XGrammarMatcher {
+      XGrammarMatcher(handle: xgrammar_matcher_fork(self.handle)!)
     }
   }
 
+  // MARK: - Helpers
+
+  func xgrammarRequiredHandle<Handle>(_ handle: Handle?) throws -> Handle {
+    guard let handle else {
+      throw XGrammarError(message: String(cString: xgrammar_last_error_message()))
+    }
+    return handle
+  }
+
+  func xgrammarInt32(_ value: Int, error: XGrammarError) throws -> Int32 {
+    guard let value = Int32(exactly: value) else { throw error }
+    return value
+  }
+
+  private func xgrammarString(
+    _ body: (UnsafeMutablePointer<CChar>?, Int) -> Int
+  ) throws -> String {
+    let capacity = body(nil, 0)
+    guard capacity > 0 else {
+      throw XGrammarError(message: String(cString: xgrammar_last_error_message()))
+    }
+    return xgrammarString(body, capacity: capacity)
+  }
+
+  private func xgrammarString(
+    _ body: (UnsafeMutablePointer<CChar>?, Int) -> Int,
+    capacity: Int
+  ) -> String {
+    var buffer = [CChar](repeating: 0, count: capacity)
+    _ = buffer.withUnsafeMutableBufferPointer { body($0.baseAddress, $0.count) }
+    return buffer.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
+  }
 #endif

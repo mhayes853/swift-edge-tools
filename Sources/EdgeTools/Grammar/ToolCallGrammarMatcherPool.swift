@@ -11,8 +11,8 @@
         self.matcher = consume matcher
       }
 
-      func fork() throws -> XGrammarMatcher {
-        try self.matcher.fork()
+      func fork() -> XGrammarMatcher {
+        self.matcher.fork()
       }
     }
 
@@ -45,11 +45,12 @@
       let key = Key(tools: self.normalizeTools(Array(tools)), range: range)
       if let cached = self.entries[key] {
         self.touch(key)
-        return try cached.fork()
+        return cached.fork()
       }
       let grammar = try self.makeGrammar(key.tools, key.range)
-      let matcher = try compiler.compile(grammar)
-      return try self.insert(key, matcher: consume matcher)
+      let compiledGrammar = try compiler.compile(grammar)
+      let matcher = try XGrammarMatcher(compiledGrammar: compiledGrammar)
+      return self.insert(key, matcher: consume matcher)
     }
 
     func clear() {
@@ -65,7 +66,7 @@
     private func insert(
       _ key: Key,
       matcher: consuming XGrammarMatcher
-    ) throws -> XGrammarMatcher {
+    ) -> XGrammarMatcher {
       let cached = CachedMatcher(consume matcher)
       if self.entries.count >= self.maxCount, let leastRecentlyUsed = self.order.first {
         self.entries.removeValue(forKey: leastRecentlyUsed)
@@ -73,7 +74,7 @@
       }
       self.entries[key] = cached
       self.order.append(key)
-      return try cached.fork()
+      return cached.fork()
     }
   }
 #endif

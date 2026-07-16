@@ -23,7 +23,7 @@
 
     @Test
     func `Reset Restores Initial State`() throws {
-      let matcher = try self.engine.compile(try genericGrammar())
+      let matcher = try self.engine.makeMatcher(try genericGrammar())
       let call = genericGrammarText
 
       for tokenId in encodedGrammarText(call, tokenizer: self.tokenizer) {
@@ -40,7 +40,7 @@
 
     @Test
     func `Rollback Allows Accepting Alternative Branch`() throws {
-      let matcher = try self.engine.compile(try genericGrammar())
+      let matcher = try self.engine.makeMatcher(try genericGrammar())
 
       let firstBitmask = matcher.bitmask()
       let firstAllowedIndex = firstBitmask.storage
@@ -62,7 +62,7 @@
 
     @Test
     func `Completion State Transitions`() throws {
-      let matcher = try self.engine.compile(try genericGrammar())
+      let matcher = try self.engine.makeMatcher(try genericGrammar())
       let call = genericGrammarText
 
       expectNoDifference(matcher.isCompleted, false)
@@ -81,7 +81,7 @@
 
     @Test
     func `Fork Preserves Accept State`() throws {
-      let matcher = try self.engine.compile(try genericGrammar())
+      let matcher = try self.engine.makeMatcher(try genericGrammar())
 
       let tokens = encodedGrammarText(
         genericGrammarText,
@@ -96,7 +96,7 @@
       for tokenIndex in 0..<forkPoint {
         expectNoDifference(matcher.accept(tokenId: tokens[tokenIndex]), true)
       }
-      let forked = try matcher.fork()
+      let forked = matcher.fork()
 
       for tokenIndex in forkPoint..<tokens.count {
         expectNoDifference(matcher.accept(tokenId: tokens[tokenIndex]), true)
@@ -113,7 +113,7 @@
 
     @Test
     func `Bitmask Disallows Eos Before Completion`() throws {
-      let matcher = try self.engine.compile(try genericGrammar())
+      let matcher = try self.engine.makeMatcher(try genericGrammar())
 
       let bitmask = matcher.bitmask()
       expectNoDifference(bitmask[self.eosToken], false)
@@ -121,7 +121,7 @@
 
     @Test
     func `Bitmask Allows Eos After Completion`() throws {
-      let matcher = try self.engine.compile(try genericGrammar())
+      let matcher = try self.engine.makeMatcher(try genericGrammar())
       let call = genericGrammarText
 
       for tokenId in encodedGrammarText(call, tokenizer: self.tokenizer) {
@@ -135,7 +135,7 @@
 
     @Test
     func `Bitmask Has Expected Size`() throws {
-      let matcher = try self.engine.compile(try genericGrammar())
+      let matcher = try self.engine.makeMatcher(try genericGrammar())
       let bitmask = matcher.bitmask()
       expectNoDifference(bitmask.count, 8192)
     }
@@ -156,27 +156,28 @@
     @Test
     func `Cache Size Is Zero Before First Compile`() {
       expectNoDifference(self.engine.cacheSizeBytes, 0)
-      expectNoDifference(self.engine.cacheLimitBytes, 0)
+      expectNoDifference(self.engine.cacheLimitBytes, -1)
     }
 
     @Test
-    func `Matcher Reports Non-Zero Memory Size`() throws {
-      let matcher = try self.engine.compile(try genericGrammar())
-      expectNoDifference(matcher.memorySizeBytes > 0, true)
+    func `Compiled Grammar Reports Non-Zero Memory Size`() throws {
+      let compiledGrammar = try self.engine.compile(try genericGrammar())
+      expectNoDifference(compiledGrammar.memorySizeBytes > 0, true)
     }
 
     @Test
-    func `Forked Matcher Reports Equal Memory Size`() throws {
-      let matcher = try self.engine.compile(try genericGrammar())
-      let forked = try matcher.fork()
-      expectNoDifference(forked.memorySizeBytes, matcher.memorySizeBytes)
+    func `Forked Matcher Preserves Compiled Grammar Memory Size`() throws {
+      let compiledGrammar = try self.engine.compile(try genericGrammar())
+      let matcher = try XGrammarMatcher(compiledGrammar: compiledGrammar)
+      _ = matcher.fork()
+      expectNoDifference(compiledGrammar.memorySizeBytes > 0, true)
     }
 
     @Test
-    func `Larger Grammar Has Larger Compiled Matcher`() throws {
-      let smallerMatcher = try self.engine.compile(try XGrammarGrammar(literal: "a"))
-      let largerMatcher = try self.engine.compile(try genericGrammar())
-      expectNoDifference(largerMatcher.memorySizeBytes > smallerMatcher.memorySizeBytes, true)
+    func `Larger Grammar Has Larger Compiled Grammar`() throws {
+      let smallerGrammar = try self.engine.compile(try XGrammarGrammar(literal: "a"))
+      let largerGrammar = try self.engine.compile(try genericGrammar())
+      expectNoDifference(largerGrammar.memorySizeBytes > smallerGrammar.memorySizeBytes, true)
     }
   }
 

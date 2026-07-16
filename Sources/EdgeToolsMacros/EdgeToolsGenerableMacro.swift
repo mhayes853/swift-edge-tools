@@ -398,7 +398,7 @@ extension EdgeToolsGenerableMacro {
     -> AttributeSyntax?
   {
     variableDecl.attributes
-      .compactMap { element in
+      .compactMap { element -> AttributeSyntax? in
         guard let attribute = element.as(AttributeSyntax.self) else { return nil }
         guard let identifierType = attribute.attributeName.as(IdentifierTypeSyntax.self) else {
           return nil

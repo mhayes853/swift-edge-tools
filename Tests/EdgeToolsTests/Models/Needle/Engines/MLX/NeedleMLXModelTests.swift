@@ -15,9 +15,11 @@
       let url = try await downloadNeedle()
       var tokenizer = try self.tokenizer(url: url)
       let model = try loadNeedleMLXModel(from: url)
-      let grammarEngine = XGrammarCompiler.needle(tokenizer: consume tokenizer)!
+      let tokenizerInfo = try XGrammarTokenizerInfo.needle(tokenizer: tokenizer)
+      let grammarEngine = try XGrammarCompiler(tokenizerInfo: tokenizerInfo)
       let grammar = try XGrammarGrammar.needle(tools: [.sendEmail])
-      let matcher = try grammarEngine.compile(grammar)
+      let compiledGrammar = try grammarEngine.compile(grammar)
+      let matcher = try XGrammarMatcher(compiledGrammar: compiledGrammar)
 
       tokenizer = try self.tokenizer(url: url)
 

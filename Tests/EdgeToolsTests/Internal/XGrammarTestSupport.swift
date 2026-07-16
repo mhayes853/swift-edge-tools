@@ -16,6 +16,13 @@
     return eosToken
   }
 
+  extension XGrammarCompiler {
+    func makeMatcher(_ grammar: borrowing XGrammarGrammar) throws -> XGrammarMatcher {
+      let compiledGrammar = try self.compile(grammar)
+      return try XGrammarMatcher(compiledGrammar: compiledGrammar)
+    }
+  }
+
   func makeGenericXGrammarCompiler(
     tokenizer: borrowing some EdgeToolsTokenizer & ~Copyable
   ) throws -> XGrammarCompiler {
@@ -25,13 +32,14 @@
         message: "The test tokenizer must provide an EOS token and full vocabulary."
       )
     }
-    return try XGrammarCompiler(
-      encodedVocabulary: vocabulary.map { $0! },
+    let tokenizerInfo = try XGrammarTokenizerInfo(
+      encodedVocabulary: vocabulary.compactMap { $0 },
       vocabularyType: .byteFallback,
       vocabularySize: vocabulary.count,
       stopTokenIDs: [eosToken],
       addPrefixSpace: true
     )
+    return try XGrammarCompiler(tokenizerInfo: tokenizerInfo)
   }
 
   func encodedGrammarText(

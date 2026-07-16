@@ -1,21 +1,29 @@
 #if XGrammar
   extension XGrammarGrammar {
-    static func strictJSONArguments(for tool: EdgeToolDefinition) throws -> XGrammarGrammar {
-      try XGrammarGrammar(
-        jsonSchema: tool.arguments.orderedKeyEncoded(),
-        configuration: JSONSchemaConfiguration(
-          anyWhitespace: false,
-          separators: .init(comma: ",", colon: ":"),
-          isStrict: true
+    static func strictJSONArguments(for tool: EdgeToolDefinition) -> XGrammarGrammar {
+      guard
+        let grammar = try? XGrammarGrammar(
+          jsonSchema: tool.arguments.orderedKeyEncoded(),
+          configuration: JSONSchemaConfiguration(
+            anyWhitespace: false,
+            separators: .init(comma: ",", colon: ":"),
+            isStrict: true
+          )
         )
-      )
+      else {
+        preconditionFailure("Edge tool arguments must produce a valid JSON Schema.")
+      }
+      return grammar
     }
 
-    static func qwenXMLArguments(for tool: EdgeToolDefinition) throws -> XGrammarGrammar {
-      let schema = try tool.arguments.orderedKeyEncoded()
+    static func qwenXMLArguments(for tool: EdgeToolDefinition) -> XGrammarGrammar {
+      let schema = tool.arguments.orderedKeyEncoded()
       let structuralTag =
         #"{"type":"structural_tag","format":{"type":"json_schema","json_schema":\#(schema),"style":"qwen_xml","any_order":false}}"#
-      return try XGrammarGrammar(structuralTagJSON: structuralTag)
+      guard let grammar = try? XGrammarGrammar(structuralTagJSON: structuralTag) else {
+        preconditionFailure("Edge tool arguments must produce a valid Qwen XML structural tag.")
+      }
+      return grammar
     }
 
     static func toolCalls(

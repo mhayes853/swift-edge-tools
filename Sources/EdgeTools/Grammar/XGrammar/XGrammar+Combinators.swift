@@ -34,18 +34,11 @@
     _ grammar: borrowing XGrammarGrammar,
     _ range: ClosedRange<Int>
   ) throws -> XGrammarGrammar {
-    guard range.lowerBound >= 0,
-      Int32(exactly: range.lowerBound) != nil,
-      Int32(exactly: range.upperBound) != nil
-    else {
-      throw XGrammarError.invalidRepetitionRange
-    }
+    guard range.lowerBound >= 0 else { throw XGrammarError.invalidRepetitionRange }
+    let lowerBound = try xgrammarInt32(range.lowerBound, error: .invalidRepetitionRange)
+    let upperBound = try xgrammarInt32(range.upperBound, error: .invalidRepetitionRange)
     let handle = try xgrammarRequiredHandle(
-      xgrammar_grammar_repeat(
-        grammar.handle,
-        Int32(range.lowerBound),
-        Int32(range.upperBound)
-      )
+      xgrammar_grammar_repeat(grammar.handle, lowerBound, upperBound)
     )
     return XGrammarGrammar(handle: handle)
   }
@@ -54,11 +47,10 @@
     _ grammar: borrowing XGrammarGrammar,
     _ range: PartialRangeFrom<Int>
   ) throws -> XGrammarGrammar {
-    guard range.lowerBound >= 0, Int32(exactly: range.lowerBound) != nil else {
-      throw XGrammarError.invalidRepetitionRange
-    }
+    guard range.lowerBound >= 0 else { throw XGrammarError.invalidRepetitionRange }
+    let lowerBound = try xgrammarInt32(range.lowerBound, error: .invalidRepetitionRange)
     let handle = try xgrammarRequiredHandle(
-      xgrammar_grammar_repeat(grammar.handle, Int32(range.lowerBound), -1)
+      xgrammar_grammar_repeat(grammar.handle, lowerBound, -1)
     )
     return XGrammarGrammar(handle: handle)
   }

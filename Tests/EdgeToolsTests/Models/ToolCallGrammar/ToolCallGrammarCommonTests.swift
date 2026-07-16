@@ -21,7 +21,7 @@
     @Test
     func `All Grammars Accept An Empty Tool Call Collection`() throws {
       for fixture in toolCallGrammarTestFixtures {
-        let matcher = try self.compiler.compile(
+        let matcher = try self.compiler.makeMatcher(
           try fixture.makeGrammar([.getWeather], .exact(0))
         )
         assertGrammarAccepts(
@@ -36,7 +36,7 @@
     @Test
     func `All Grammars Accept A Simple Tool Call`() throws {
       for fixture in toolCallGrammarTestFixtures {
-        let matcher = try self.compiler.compile(
+        let matcher = try self.compiler.makeMatcher(
           try fixture.makeGrammar([.getWeather], .exact(1))
         )
         assertGrammarAccepts(
@@ -51,7 +51,7 @@
     @Test
     func `All Grammars Accept The Complex Tool`() throws {
       for fixture in toolCallGrammarTestFixtures {
-        let matcher = try self.compiler.compile(
+        let matcher = try self.compiler.makeMatcher(
           try fixture.makeGrammar([.complexTool], .exact(1))
         )
         assertGrammarAccepts(
@@ -66,7 +66,7 @@
     @Test
     func `All Grammars Reject Unknown Tools And Wrong Argument Types`() throws {
       for fixture in toolCallGrammarTestFixtures {
-        let unknownToolMatcher = try self.compiler.compile(
+        let unknownToolMatcher = try self.compiler.makeMatcher(
           try fixture.makeGrammar([.getWeather], .exact(1))
         )
         assertGrammarRejects(
@@ -76,7 +76,7 @@
           eosToken: self.eosToken
         )
 
-        let wrongTypeMatcher = try self.compiler.compile(
+        let wrongTypeMatcher = try self.compiler.makeMatcher(
           try fixture.makeGrammar([.integerTool], .exact(1))
         )
         assertGrammarRejects(
@@ -100,7 +100,7 @@
     @Test
     func `All Grammars Enforce Tool Call Ranges`() throws {
       for fixture in toolCallGrammarTestFixtures {
-        let acceptingMatcher = try self.compiler.compile(
+        let acceptingMatcher = try self.compiler.makeMatcher(
           try fixture.makeGrammar([.getWeather], .exact(2))
         )
         assertGrammarAccepts(
@@ -110,7 +110,7 @@
           eosToken: self.eosToken
         )
 
-        let rejectingMatcher = try self.compiler.compile(
+        let rejectingMatcher = try self.compiler.makeMatcher(
           try fixture.makeGrammar([.getWeather], .exact(1))
         )
         assertGrammarRejects(
