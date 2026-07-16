@@ -97,9 +97,9 @@
 
   // MARK: - Helpers
 
-  extension ToolCallGrammarMatcherPool {
-    static func needle(maxCount: Int = 8) -> ToolCallGrammarMatcherPool {
-      ToolCallGrammarMatcherPool(
+  extension XGrammarToolCallMatcherPool {
+    static func needle(maxCount: Int = 8) -> XGrammarToolCallMatcherPool {
+      XGrammarToolCallMatcherPool(
         maxCount: maxCount,
         normalizeTools: { $0.map { $0.needleNormalized() } },
         makeGrammar: { try XGrammarGrammar.needle(tools: $0, range: $1) }

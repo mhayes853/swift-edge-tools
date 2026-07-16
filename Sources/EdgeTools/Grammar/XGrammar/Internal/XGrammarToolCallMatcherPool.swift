@@ -1,5 +1,5 @@
 #if XGrammar
-  final class ToolCallGrammarMatcherPool {
+  final class XGrammarToolCallMatcherPool {
     typealias NormalizeTools = @Sendable ([EdgeToolDefinition]) -> [EdgeToolDefinition]
     typealias MakeGrammar =
       @Sendable ([EdgeToolDefinition], GrammarToolCallRange) throws -> XGrammarGrammar

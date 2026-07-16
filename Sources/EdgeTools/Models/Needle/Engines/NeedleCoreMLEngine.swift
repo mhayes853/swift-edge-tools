@@ -42,7 +42,7 @@
 
     private struct State: ~Copyable {
       let grammarEngine: XGrammarCompiler
-      let matcherPool: ToolCallGrammarMatcherPool
+      let matcherPool: XGrammarToolCallMatcherPool
     }
 
     private struct EncoderOutputs {
@@ -142,7 +142,7 @@
       self.state = Lock(
         State(
           grammarEngine: consume grammarEngine,
-          matcherPool: ToolCallGrammarMatcherPool.needle()
+          matcherPool: XGrammarToolCallMatcherPool.needle()
         )
       )
       self.configuration = configuration
