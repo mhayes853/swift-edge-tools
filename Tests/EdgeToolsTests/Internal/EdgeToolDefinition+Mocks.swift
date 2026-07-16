@@ -33,6 +33,17 @@ extension EdgeToolDefinition {
     includesSchemaInInstructions: true
   )
 
+  static let integerTool = Self(
+    name: "integerTool",
+    description: "Accepts an integer.",
+    arguments: EdgeToolsGenerationSchema(
+      .type(.object),
+      .properties(["value": .integer]),
+      .required(["value"]),
+      .additionalProperties(false)
+    )
+  )
+
   static let complexTool = Self(
     name: "complexTool",
     description: "A tool with broad parameter coverage.",

@@ -187,6 +187,12 @@
       }
     }
 
+    public init(structuralTagJSON: String) throws {
+      self.handle = try structuralTagJSON.withCString {
+        try xgrammarRequiredHandle(xgrammar_grammar_init_structural_tag($0))
+      }
+    }
+
     public init(literal: String) throws {
       try self.init(ebnf: "root ::= \"\(Self.escapeEBNFLiteral(literal))\"")
     }
@@ -295,15 +301,15 @@
     }
 
     public borrowing func repeated(exactly count: Int) throws -> XGrammarGrammar {
-      try `repeat`(self, exactly: count)
+      try repeatGrammar(self, exactly: count)
     }
 
     public borrowing func repeated(_ range: ClosedRange<Int>) throws -> XGrammarGrammar {
-      try `repeat`(self, range)
+      try repeatGrammar(self, range)
     }
 
     public borrowing func repeated(_ range: PartialRangeFrom<Int>) throws -> XGrammarGrammar {
-      try `repeat`(self, range)
+      try repeatGrammar(self, range)
     }
   }
 
@@ -360,4 +366,5 @@
       )
     }
   }
+
 #endif

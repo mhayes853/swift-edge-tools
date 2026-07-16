@@ -83,11 +83,8 @@ picojson::value grammar_format(const xgrammar::Grammar& grammar) {
     return picojson::value(format);
 }
 
-xgrammar::Grammar grammar_from_structural_tag(const picojson::object& format) {
-    picojson::object structural_tag;
-    structural_tag["type"] = picojson::value("structural_tag");
-    structural_tag["format"] = picojson::value(format);
-    const auto result = xgrammar::Grammar::FromStructuralTag(picojson::value(structural_tag).serialize());
+xgrammar::Grammar grammar_from_structural_tag_json(const std::string& structural_tag_json) {
+    const auto result = xgrammar::Grammar::FromStructuralTag(structural_tag_json);
     if (const auto* grammar = std::get_if<xgrammar::Grammar>(&result)) {
         return *grammar;
     }
@@ -98,6 +95,13 @@ xgrammar::Grammar grammar_from_structural_tag(const picojson::object& format) {
         structural_tag_error
     );
     throw std::runtime_error("Unknown structural tag error.");
+}
+
+xgrammar::Grammar grammar_from_structural_tag(const picojson::object& format) {
+    picojson::object structural_tag;
+    structural_tag["type"] = picojson::value("structural_tag");
+    structural_tag["format"] = picojson::value(format);
+    return grammar_from_structural_tag_json(picojson::value(structural_tag).serialize());
 }
 
 xgrammar::Grammar optional_grammar(const xgrammar::Grammar& grammar) {
@@ -296,6 +300,13 @@ xgrammar_grammar_t xgrammar_grammar_init_regex(const char* regex) {
     return with_error_handling([&] {
         if (!regex) throw std::invalid_argument("Expected a regular expression.");
         return new XGrammarGrammarHandle{xgrammar::Grammar::FromRegex(regex)};
+    });
+}
+
+xgrammar_grammar_t xgrammar_grammar_init_structural_tag(const char* structural_tag_json) {
+    return with_error_handling([&] {
+        if (!structural_tag_json) throw std::invalid_argument("Expected a structural tag.");
+        return new XGrammarGrammarHandle{grammar_from_structural_tag_json(structural_tag_json)};
     });
 }
 

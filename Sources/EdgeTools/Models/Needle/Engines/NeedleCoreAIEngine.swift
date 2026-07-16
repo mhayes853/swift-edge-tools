@@ -49,7 +49,7 @@
 
     private struct State: ~Copyable {
       let grammarEngine: XGrammarCompiler
-      let matcherPool: NeedleGrammarMatcherPool
+      let matcherPool: ToolCallGrammarMatcherPool
     }
 
     private struct EncoderOutputs {
@@ -146,7 +146,7 @@
       grammarEngine: consuming sending XGrammarCompiler
     ) throws {
       self.state = Lock(
-        State(grammarEngine: consume grammarEngine, matcherPool: NeedleGrammarMatcherPool())
+        State(grammarEngine: consume grammarEngine, matcherPool: ToolCallGrammarMatcherPool.needle())
       )
       self.configuration = configuration
       self.encoderFunction = try Self.loadFunction(named: FunctionName.main, from: encoderModel)

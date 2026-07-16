@@ -54,7 +54,7 @@
     private struct State: ~Copyable {
       let grammarEngine: XGrammarCompiler
       let model: NeedleMLXModel
-      let matcherPool: NeedleGrammarMatcherPool
+      let matcherPool: ToolCallGrammarMatcherPool
     }
 
     private let state: Lock<State>
@@ -94,7 +94,7 @@
         State(
           grammarEngine: consume grammarEngine,
           model: model,
-          matcherPool: NeedleGrammarMatcherPool()
+          matcherPool: ToolCallGrammarMatcherPool.needle()
         )
       )
       self.tokenizer = Lock(consume tokenizer)
@@ -109,7 +109,7 @@
         State(
           grammarEngine: consume grammarEngine,
           model: model,
-          matcherPool: NeedleGrammarMatcherPool()
+          matcherPool: ToolCallGrammarMatcherPool.needle()
         )
       )
       self.tokenizer = consume tokenizer

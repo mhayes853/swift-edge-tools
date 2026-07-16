@@ -51,7 +51,7 @@ extension EdgeToolDefinition {
   fileprivate func needlePromptEncoded() throws -> String {
     let name = String(decoding: try JSONEncoder().encode(self.name), as: UTF8.self)
     let description = String(decoding: try JSONEncoder().encode(self.description), as: UTF8.self)
-    let arguments = try self.arguments.needleGrammarEncoded()
+    let arguments = try self.arguments.orderedKeyEncoded()
     return #"{"name":\#(name),"description":\#(description),"arguments":\#(arguments)}"#
   }
 }
@@ -66,7 +66,7 @@ extension Sequence where Element == EdgeToolDefinition {
 // MARK: - Generation Schema
 
 extension EdgeToolsGenerationSchema {
-  func needleGrammarEncoded() throws -> String {
+  func orderedKeyEncoded() throws -> String {
     var writer = JSONWriter()
     writer.writeSchema(self)
     return String(decoding: writer.buffer, as: UTF8.self)

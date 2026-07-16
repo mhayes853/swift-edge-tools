@@ -54,6 +54,7 @@ xgrammar_grammar_t xgrammar_grammar_init_json_schema(
     int any_order
 );
 xgrammar_grammar_t xgrammar_grammar_init_regex(const char* regex);
+xgrammar_grammar_t xgrammar_grammar_init_structural_tag(const char* structural_tag_json);
 size_t xgrammar_grammar_ebnf(
     xgrammar_grammar_t grammar,
     char* buffer,

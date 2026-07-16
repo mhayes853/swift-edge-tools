@@ -1,5 +1,9 @@
 #if XGrammar
-  final class NeedleGrammarMatcherPool {
+  final class ToolCallGrammarMatcherPool {
+    typealias NormalizeTools = @Sendable ([EdgeToolDefinition]) -> [EdgeToolDefinition]
+    typealias MakeGrammar =
+      @Sendable ([EdgeToolDefinition], GrammarToolCallRange) throws -> XGrammarGrammar
+
     private final class CachedMatcher {
       private let matcher: XGrammarMatcher
 
@@ -18,11 +22,19 @@
     }
 
     private let maxCount: Int
+    private let normalizeTools: NormalizeTools
+    private let makeGrammar: MakeGrammar
     private var entries = [Key: CachedMatcher]()
     private var order = [Key]()
 
-    init(maxCount: Int = 8) {
+    init(
+      maxCount: Int = 8,
+      normalizeTools: @escaping NormalizeTools = { $0 },
+      makeGrammar: @escaping MakeGrammar
+    ) {
       self.maxCount = maxCount
+      self.normalizeTools = normalizeTools
+      self.makeGrammar = makeGrammar
     }
 
     func matcher(
@@ -30,12 +42,12 @@
       range: GrammarToolCallRange,
       compilingWith compiler: borrowing XGrammarCompiler
     ) throws -> XGrammarMatcher {
-      let key = Key(tools: tools.map { $0.needleNormalized() }, range: range)
+      let key = Key(tools: self.normalizeTools(Array(tools)), range: range)
       if let cached = self.entries[key] {
         self.touch(key)
         return try cached.fork()
       }
-      let grammar = try XGrammarGrammar.needle(tools: key.tools, range: key.range)
+      let grammar = try self.makeGrammar(key.tools, key.range)
       let matcher = try compiler.compile(grammar)
       return try self.insert(key, matcher: consume matcher)
     }

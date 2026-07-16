@@ -1,6 +1,27 @@
 import Foundation
 import OrderedCollections
 
+// MARK: - QwenJSONToolCallParser
+
+public struct QwenJSONToolCallParser: EdgeToolCallParser, Sendable {
+  private var block = IncrementalToolCallBlock(
+    opener: "<tool_call>",
+    closer: "</tool_call>"
+  )
+
+  public init() {}
+
+  public mutating func accept(token: EdgeToolsToken) -> EdgeRawToolCall? {
+    self.block.append(token)
+    while let payload = self.block.nextPayload(respectingJSONStringBoundaries: true) {
+      if let call = try? JSONDecoder().decode(EdgeRawToolCall.self, from: payload) {
+        return call
+      }
+    }
+    return nil
+  }
+}
+
 // MARK: - QwenXMLToolCallParser
 
 public struct QwenXMLToolCallParser: EdgeToolCallParser, Sendable {
@@ -81,5 +102,6 @@ public struct QwenXMLToolCallParser: EdgeToolCallParser, Sendable {
 
 // MARK: - Qwen
 
+public typealias Qwen3ToolCallParser = QwenJSONToolCallParser
 public typealias Qwen3P5ToolCallParser = QwenXMLToolCallParser
 public typealias Qwen3P6ToolCallParser = QwenXMLToolCallParser

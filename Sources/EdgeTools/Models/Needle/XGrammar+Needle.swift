@@ -95,7 +95,7 @@
     }
 
     private static func needleCall(_ tool: EdgeToolDefinition) throws -> XGrammarGrammar {
-      let schema = try tool.arguments.needleGrammarEncoded()
+      let schema = try tool.arguments.orderedKeyEncoded()
       let arguments = try XGrammarGrammar(
         jsonSchema: schema,
         configuration: JSONSchemaConfiguration(
@@ -135,6 +135,16 @@
       let repeatedCalls = try separatedCall.repeated(Swift.max(0, minimum - 1)...)
       let nonempty = try call.concatenate(repeatedCalls)
       return minimum == 0 ? try nonempty.optional() : nonempty
+    }
+  }
+
+  extension ToolCallGrammarMatcherPool {
+    static func needle(maxCount: Int = 8) -> ToolCallGrammarMatcherPool {
+      ToolCallGrammarMatcherPool(
+        maxCount: maxCount,
+        normalizeTools: { $0.map { $0.needleNormalized() } },
+        makeGrammar: { try XGrammarGrammar.needle(tools: $0, range: $1) }
+      )
     }
   }
 

@@ -1,8 +1,46 @@
 import Foundation
 
+// MARK: - FunctionGemmaToolCallParser
+
+public struct FunctionGemmaToolCallParser: EdgeToolCallParser, Sendable {
+  private var core = GemmaToolCallParserCore(
+    syntax: GemmaToolCallSyntax(
+      opener: "<start_function_call>",
+      closer: "<end_function_call>",
+      stringMarker: "<escape>",
+      decodesMarkedValues: true
+    )
+  )
+
+  public init() {}
+
+  public mutating func accept(token: EdgeToolsToken) -> EdgeRawToolCall? {
+    self.core.accept(token: token)
+  }
+}
+
+// MARK: - Gemma4ToolCallParser
+
+public struct Gemma4ToolCallParser: EdgeToolCallParser, Sendable {
+  private var core = GemmaToolCallParserCore(
+    syntax: GemmaToolCallSyntax(
+      opener: "<|tool_call>",
+      closer: "<tool_call|>",
+      stringMarker: "<|\"|>",
+      decodesMarkedValues: false
+    )
+  )
+
+  public init() {}
+
+  public mutating func accept(token: EdgeToolsToken) -> EdgeRawToolCall? {
+    self.core.accept(token: token)
+  }
+}
+
 // MARK: - GemmaToolCallSyntax
 
-struct GemmaToolCallSyntax: Hashable, Sendable {
+private struct GemmaToolCallSyntax: Hashable, Sendable {
   let opener: [UInt8]
   let closer: [UInt8]
   let stringMarker: String
@@ -18,7 +56,7 @@ struct GemmaToolCallSyntax: Hashable, Sendable {
 
 // MARK: - GemmaToolCallParserCore
 
-struct GemmaToolCallParserCore: Sendable {
+private struct GemmaToolCallParserCore: Sendable {
   private let syntax: GemmaToolCallSyntax
   private var buffer = [UInt8]()
   private var isInsideCall = false

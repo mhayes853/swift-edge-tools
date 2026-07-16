@@ -23,14 +23,14 @@
     return XGrammarGrammar(handle: handle)
   }
 
-  public func `repeat`(
+  public func repeatGrammar(
     _ grammar: borrowing XGrammarGrammar,
     exactly count: Int
   ) throws -> XGrammarGrammar {
-    try `repeat`(grammar, count...count)
+    try repeatGrammar(grammar, count...count)
   }
 
-  public func `repeat`(
+  public func repeatGrammar(
     _ grammar: borrowing XGrammarGrammar,
     _ range: ClosedRange<Int>
   ) throws -> XGrammarGrammar {
@@ -50,7 +50,7 @@
     return XGrammarGrammar(handle: handle)
   }
 
-  public func `repeat`(
+  public func repeatGrammar(
     _ grammar: borrowing XGrammarGrammar,
     _ range: PartialRangeFrom<Int>
   ) throws -> XGrammarGrammar {
