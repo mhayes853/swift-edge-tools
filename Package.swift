@@ -49,6 +49,7 @@ let package = Package(
       name: "EdgeTools",
       dependencies: [
         "EdgeToolsMacros",
+        .product(name: "HeapModule", package: "swift-collections"),
         .product(name: "OrderedCollections", package: "swift-collections"),
         .product(name: "Atomics", package: "swift-atomics"),
         .product(name: "MLX", package: "mlx-swift", condition: .when(traits: ["MLX"])),

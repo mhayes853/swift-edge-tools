@@ -1,3 +1,5 @@
+import HeapModule
+
 // MARK: - NeedleSPTokenizer
 
 public struct NeedleSPTokenizer: Sendable {
@@ -11,7 +13,7 @@ public struct NeedleSPTokenizer: Sendable {
   private let pieceIds: [PieceBytes: EdgeToolsToken.ID]
   private let mergePieces: [PieceBytes: MergePiece]
   private let userDefinedPieces: [PieceBytes]
-  private let byteIds: [EdgeToolsToken.ID?]
+  private let byteIds: [EdgeToolsToken.ID]?
   private let unknownSurface: String
   private let normalization: Normalization
 
@@ -27,7 +29,7 @@ public struct NeedleSPTokenizer: Sendable {
     let mergePieces = Dictionary(
       uniqueKeysWithValues: model.pieces.compactMap { piece in
         piece.type == .normal
-          ? (PieceBytes(piece.text.utf8), MergePiece(score: piece.score))
+          ? (PieceBytes(piece.text.utf8), piece.score)
           : nil
       }
     )
@@ -246,9 +248,7 @@ private struct Symbol {
 
 private typealias PieceBytes = [UInt8]
 
-private struct MergePiece: Hashable, Sendable {
-  let score: Float
-}
+private typealias MergePiece = Float
 
 private struct MergeCandidate: Comparable, Hashable, Sendable {
   let left: Int
@@ -261,60 +261,19 @@ private struct MergeCandidate: Comparable, Hashable, Sendable {
   }
 }
 
-private struct MergeHeap {
-  private var elements = [MergeCandidate]()
-
-  mutating func insert(_ element: MergeCandidate) {
-    self.elements.append(element)
-    var child = self.elements.count - 1
-    while child > 0 {
-      let parent = (child - 1) / 2
-      guard self.elements[parent] < self.elements[child] else { return }
-      self.elements.swapAt(child, parent)
-      child = parent
-    }
-  }
-
-  mutating func removeMaximum() -> MergeCandidate? {
-    guard !self.elements.isEmpty else { return nil }
-    if self.elements.count == 1 {
-      return self.elements.removeLast()
-    }
-
-    let maximum = self.elements[0]
-    self.elements[0] = self.elements.removeLast()
-    self.heapify()
-    return maximum
-  }
-
-  private mutating func heapify() {
-    var parent = 0
-    while true {
-      let left = parent * 2 + 1
-      guard left < self.elements.count else { return }
-      let right = left + 1
-      let child =
-        right < self.elements.count && self.elements[left] < self.elements[right] ? right : left
-      guard self.elements[parent] < self.elements[child] else { return }
-      self.elements.swapAt(parent, child)
-      parent = child
-    }
-  }
-}
-
 private struct BPEEncoder {
   private var symbols: [Symbol]
   private let mergePieces: [PieceBytes: MergePiece]
   private let pieceIds: [PieceBytes: EdgeToolsToken.ID]
-  private let byteIds: [EdgeToolsToken.ID?]
+  private let byteIds: [EdgeToolsToken.ID]?
   private let unknownTokenId: EdgeToolsToken.ID?
-  private var merges = MergeHeap()
+  private var merges = Heap<MergeCandidate>()
 
   init(
     symbols: [Symbol],
     mergePieces: [PieceBytes: MergePiece],
     pieceIds: [PieceBytes: EdgeToolsToken.ID],
-    byteIds: [EdgeToolsToken.ID?],
+    byteIds: [EdgeToolsToken.ID]?,
     unknownTokenId: EdgeToolsToken.ID?
   ) {
     self.symbols = symbols
@@ -344,7 +303,7 @@ private struct BPEEncoder {
         MergeCandidate(
           left: left,
           right: right,
-          score: $0.score,
+          score: $0,
           byteCount: bytes.count
         )
       }
@@ -360,7 +319,7 @@ private struct BPEEncoder {
   }
 
   private mutating func mergeSymbols() {
-    while let merge = self.merges.removeMaximum() {
+    while let merge = self.merges.popMax() {
       guard self.canApply(merge) else { continue }
       self.apply(merge)
     }
@@ -400,8 +359,8 @@ private struct BPEEncoder {
       let symbol = self.symbols[index]
       if let id = self.pieceIds[PieceBytes(symbol.bytes)] {
         ids.append(id)
-      } else if !self.byteIds.isEmpty {
-        ids.append(contentsOf: symbol.bytes.compactMap { self.byteIds[Int($0)] })
+      } else if let byteIds = self.byteIds {
+        ids.append(contentsOf: symbol.bytes.map { byteIds[Int($0)] })
       } else if let unknownTokenId = self.unknownTokenId {
         ids.append(unknownTokenId)
       }
@@ -451,13 +410,11 @@ private struct SentencePieceDecoder {
     }
 
     switch piece.type {
-    case .control:
-      break
     case .unknown:
       self.decoded.append(contentsOf: self.unknownSurface.utf8)
     case .normal, .userDefined:
       self.appendText(piece.text)
-    case .unused, .byte:
+    case .control, .unused, .byte:
       break
     }
   }
@@ -548,22 +505,20 @@ private struct SentencePieceModel {
     else {
       throw NeedleSPTokenizerError.invalidUnknownPiece()
     }
-    if self.trainer.byteFallback {
-      guard self.byteIds().allSatisfy({ $0 != nil }) else {
-        throw NeedleSPTokenizerError.incompleteByteFallbackVocabulary()
-      }
+    if self.trainer.byteFallback, self.byteIds() == nil {
+      throw NeedleSPTokenizerError.incompleteByteFallbackVocabulary()
     }
   }
 
-  func byteIds() -> [EdgeToolsToken.ID?] {
-    guard self.trainer.byteFallback else { return [] }
+  func byteIds() -> [EdgeToolsToken.ID]? {
+    guard self.trainer.byteFallback else { return nil }
     var ids = [EdgeToolsToken.ID?](repeating: nil, count: 256)
     for (id, piece) in self.pieces.enumerated() where piece.type == .byte {
-      if let byte = piece.byteValue {
-        ids[Int(byte)] = id
-      }
+      guard let byte = piece.byteValue else { continue }
+      ids[Int(byte)] = id
     }
-    return ids
+    let byteIds = ids.compactMap { $0 }
+    return byteIds.count == ids.count ? byteIds : nil
   }
 }
 
