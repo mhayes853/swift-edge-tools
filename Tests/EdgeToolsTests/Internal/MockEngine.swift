@@ -240,6 +240,7 @@ final class MockEngine: EdgeToolsPrefillableEngine, Sendable {
       }
 
       if let error = thrownError { throw error }
+      let response = emittedTokens.map(\.stringValue).joined()
       return EdgeToolsEngineGeneration(
         prefillMetrics: EdgeToolsPrefillMetrics(tokens: 0, duration: .zero),
         decodeMetrics: EdgeToolsDecodeMetrics(
@@ -248,7 +249,8 @@ final class MockEngine: EdgeToolsPrefillableEngine, Sendable {
           durationToFirstToken: .zero
         ),
         wasStopped: wasStopped,
-        tokens: emittedTokens
+        tokens: emittedTokens,
+        response: response
       )
     }
     return GenerationTask(task: task) {

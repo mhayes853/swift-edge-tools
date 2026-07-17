@@ -60,6 +60,7 @@ public struct EdgeToolsEngineGeneration: Sendable {
   public var decodeMetrics: EdgeToolsDecodeMetrics
   public var wasStopped: Bool
   public var tokens: [EdgeToolsToken]
+  public var response: String
   public var metadata: EdgeToolsMetadata
 
   public init(
@@ -67,12 +68,14 @@ public struct EdgeToolsEngineGeneration: Sendable {
     decodeMetrics: EdgeToolsDecodeMetrics,
     wasStopped: Bool,
     tokens: [EdgeToolsToken],
+    response: String,
     metadata: EdgeToolsMetadata = [:]
   ) {
     self.prefillMetrics = prefillMetrics
     self.decodeMetrics = decodeMetrics
     self.wasStopped = wasStopped
     self.tokens = tokens
+    self.response = response
     self.metadata = metadata
   }
 }
@@ -82,7 +85,8 @@ extension EdgeToolsEngineGeneration {
     prefillMetrics: EdgeToolsPrefillMetrics(tokens: 0, duration: .zero),
     decodeMetrics: EdgeToolsDecodeMetrics(tokens: 0, duration: .zero, durationToFirstToken: .zero),
     wasStopped: true,
-    tokens: []
+    tokens: [],
+    response: ""
   )
 
   public var isEmpty: Bool {
@@ -90,6 +94,7 @@ extension EdgeToolsEngineGeneration {
       && self.decodeMetrics == Self.empty.decodeMetrics
       && self.wasStopped
       && self.tokens.isEmpty
+      && self.response.isEmpty
       && self.metadata.isEmpty
   }
 }

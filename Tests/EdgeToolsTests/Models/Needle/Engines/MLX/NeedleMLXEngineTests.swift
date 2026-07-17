@@ -31,7 +31,6 @@
       withKnownIssue {
         assertSnapshot(of: generation, as: .dump, record: .all)
         assertSnapshot(of: generation.metadata, as: .dump, record: .all)
-        assertSnapshot(of: generation.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
       }
     }
 
@@ -49,7 +48,7 @@
       let generation = try await generationTask.value
 
       let streamedResponse = tokens.withLock { $0.map(\.stringValue).joined() }
-      let finalResponse = generation.tokens.map(\.stringValue).joined()
+      let finalResponse = generation.response
       expectNoDifference(streamedResponse, finalResponse)
     }
 

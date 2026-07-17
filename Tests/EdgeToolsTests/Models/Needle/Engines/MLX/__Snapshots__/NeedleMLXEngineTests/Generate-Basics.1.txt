@@ -1,10 +1,10 @@
 ▿ EdgeToolsEngineGeneration
   ▿ decodeMetrics: EdgeToolsDecodeMetrics
-    ▿ duration: 1.253729709 seconds
-      - _low: 1253729709000000000
+    ▿ duration: 1.281708333 seconds
+      - _low: 1281708333000000000
       - _high: 0
-    ▿ durationToFirstToken: 0.068894375 seconds
-      - _low: 68894375000000000
+    ▿ durationToFirstToken: 0.074918625 seconds
+      - _low: 74918625000000000
       - _high: 0
     - tokens: 84
   ▿ metadata: 5 key/value pairs
@@ -24,21 +24,21 @@ Cache:  2K           (2272)
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "MLXEnginePostDecodeMemorySnapshot"
-      ▿ value: Peak:   83M          (87538946)
+      ▿ value: Peak:   91M          (95742758)
 Active: 57M          (59889282)
-Cache:  57M          (60526944)
+Cache:  65M          (68201826)
         - activeMemory: 59889282
-        - cacheMemory: 60526944
-        - peakMemory: 87538946
+        - cacheMemory: 68201826
+        - peakMemory: 95742758
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "MLXEnginePostPrefillMemorySnapshot"
-      ▿ value: Peak:   62M          (65174904)
+      ▿ value: Peak:   65M          (68869540)
 Active: 54M          (56909646)
-Cache:  42M          (44087680)
+Cache:  45M          (48063106)
         - activeMemory: 56909646
-        - cacheMemory: 44087680
-        - peakMemory: 65174904
+        - cacheMemory: 48063106
+        - peakMemory: 68869540
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "PerTokenConfidences"
@@ -128,10 +128,11 @@ Cache:  42M          (44087680)
         - 0.7321682
         - 1.0
   ▿ prefillMetrics: EdgeToolsPrefillMetrics
-    ▿ duration: 0.059659375 seconds
-      - _low: 59659375000000000
+    ▿ duration: 0.0641075 seconds
+      - _low: 64107500000000000
       - _high: 0
     - tokens: 150
+  - response: "<tool_call> [{\"name\":\"send_email\",\"arguments\":{\"address\":\"henderry@gmail.com\",\"subject\":\"Hello\",\"body\":\"Could you please go on an adventure?[{\"}},{\"name\":\"send_email\",\"arguments\":{\"address\":\"adventure@gmail.com\",\"subject\":\"Hello\",\"body\":\"I am writing to go on an adventure.\"}}]"
   ▿ tokens: 84 elements
     ▿ EdgeToolsToken
       - id: 4

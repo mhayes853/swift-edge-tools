@@ -190,6 +190,10 @@ struct `EdgeToolsSession tests` {
     await #expect(throws: ToolError.self) {
       _ = try await stream.finalGeneration
     }
+    let response = try #require(stream.response)
+    #expect(throws: ToolError.self) {
+      try response.get()
+    }
   }
 
   @Test

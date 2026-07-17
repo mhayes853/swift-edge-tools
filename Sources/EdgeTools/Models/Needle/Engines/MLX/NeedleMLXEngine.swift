@@ -58,7 +58,7 @@
     }
 
     private let state: Lock<State>
-    private let tokenizer: Lock<any EdgeToolsTokenizer>
+    private let tokenizer: any EdgeToolsTokenizer
 
     private let clock = ContinuousClock()
 
@@ -67,19 +67,18 @@
       editConfiguration: (inout NeedleModelConfiguration) -> Void = { _ in }
     ) async throws {
       let tokenizer = try await loadEdgeToolsTokenizer(from: url, isNeedleModel: true)
-      let lockedTokenizer = Lock(consume tokenizer)
       let model = try loadNeedleMLXModel(
         from: url,
         editConfiguration: editConfiguration
       )
-      let grammarEngine = lockedTokenizer.withLock {
-        try? XGrammarCompiler(tokenizerInfo: try XGrammarTokenizerInfo.needle(erasedTokenizer: $0))
-      }
+      let grammarEngine = try? XGrammarCompiler(
+        tokenizerInfo: try XGrammarTokenizerInfo.needle(erasedTokenizer: tokenizer)
+      )
       guard let grammarEngine else {
         throw NeedleMLXEngineError.failedToLoadGrammarEngine
       }
       self.init(
-        tokenizer: consume lockedTokenizer,
+        tokenizer: consume tokenizer,
         model: model,
         grammarEngine: consume grammarEngine
       )
@@ -97,11 +96,11 @@
           matcherPool: XGrammarToolCallMatcherPool.needle()
         )
       )
-      self.tokenizer = Lock(consume tokenizer)
+      self.tokenizer = consume tokenizer
     }
 
     private init(
-      tokenizer: consuming sending Lock<any EdgeToolsTokenizer>,
+      tokenizer: consuming sending any EdgeToolsTokenizer,
       model: sending NeedleMLXModel,
       grammarEngine: consuming sending XGrammarCompiler
     ) {
@@ -119,7 +118,7 @@
       prompt: NeedlePrompt,
       tools: [EdgeToolDefinition] = []
     ) async throws -> [EdgeToolsToken] {
-      try self.tokenizer.withBorrowedLock { try prompt.tokenized(tools: tools, using: $0) }
+      try prompt.tokenized(tools: tools, using: self.tokenizer)
     }
 
     public func clearCaches() {
@@ -198,7 +197,7 @@
       while !matcher.isTerminated
         && !isStopped.load(ordering: .relaxed)
         && detokenizer.tokenIds.count < (parameters.maxTokens ?? .max)
-        && generatedTokens.last?.id != self.tokenizer.withBorrowedLock({ $0.eosTokenId })
+        && generatedTokens.last?.id != self.tokenizer.eosTokenId
       {
         try Task.checkCancellation()
         let processedLogits = processor?.process(logits: output.logits) ?? output.logits
@@ -212,9 +211,7 @@
         let tokenId = token.item(EdgeToolsToken.ID.self)
 
         durationToFirstToken = durationToFirstToken ?? generateStart.duration(to: self.clock.now)
-        let tokenString = self.tokenizer.withBorrowedLock {
-          detokenizer.decode(tokenId: tokenId, using: $0)
-        }
+        let tokenString = detokenizer.decode(tokenId: tokenId, using: self.tokenizer)
         let needleToken = EdgeToolsToken(id: tokenId, stringValue: tokenString)
         generatedTokens.append(needleToken)
         guard matcher.accept(tokenId: needleToken.id) else {
@@ -247,6 +244,7 @@
       metadata.mlxEnginePostDecodeMemorySnapshot = postDecodeSnapshot
       metadata.generationConfidence = confidence.mean
       metadata.perTokenConfidences = confidence.perTokenConfidences
+      let response = self.tokenizer.decode(tokens: detokenizer.tokenIds)
       return EdgeToolsEngineGeneration(
         prefillMetrics: prefillMetrics,
         decodeMetrics: EdgeToolsDecodeMetrics(
@@ -256,6 +254,7 @@
         ),
         wasStopped: isStopped.load(ordering: .relaxed),
         tokens: generatedTokens,
+        response: response,
         metadata: metadata
       )
     }
@@ -268,9 +267,7 @@
       processor: inout (any LogitProcessor)?,
       synchronize: Bool
     ) throws -> (LMOutput?, EdgeToolsPrefillMetrics, Memory.Snapshot) {
-      let tokens = try self.tokenizer.withBorrowedLock {
-        try $0.encode(text: prompt.formatted(tools: tools))
-      }
+      let tokens = try self.tokenizer.encode(text: prompt.formatted(tools: tools))
       let input = LMInput(text: LMInput.Text(tokens: MLXArray(tokens)))
       guard input.text.tokens.size <= model.configuration.encoderMaxLength else {
         throw NeedleMLXEngineError.contextLengthExceeded(

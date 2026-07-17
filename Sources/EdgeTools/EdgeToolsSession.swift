@@ -81,11 +81,19 @@ extension EdgeToolsSession where Engine: EdgeToolsPrefillableEngine {
 public struct EdgeToolsSessionGeneration: Sendable {
   public let engineGeneration: EdgeToolsEngineGeneration
   public let toolCalls: EdgeToolCallCollection
+
+  public var response: String {
+    self.engineGeneration.response
+  }
 }
 
 public struct EdgeToolsRawToolCallsGeneration: Sendable {
   public let engineGeneration: EdgeToolsEngineGeneration
   public let toolCalls: [EdgeRawToolCall]
+
+  public var response: String {
+    self.engineGeneration.response
+  }
 }
 
 // MARK: - Tokens
@@ -147,6 +155,10 @@ public final class EdgeToolsRawToolCallsStream: Sendable, Observable, AsyncSeque
   public var result: Result<EdgeToolsRawToolCallsGeneration, any Error>? {
     self.registrar.access(self, keyPath: \.result)
     return self.state.withLock { $0.result }
+  }
+
+  public var response: Result<String, any Error>? {
+    self.result.map { $0.map(\.response) }
   }
 
   public var tokens: EdgeToolsSessionTokens {
@@ -409,6 +421,10 @@ public final class EdgeToolsSessionStream: Sendable, Observable, Identifiable, A
 
   public var result: Result<EdgeToolsSessionGeneration, any Error>? {
     self.storage.result
+  }
+
+  public var response: Result<String, any Error>? {
+    self.result.map { $0.map(\.response) }
   }
 
   public var finalGeneration: EdgeToolsSessionGeneration {
