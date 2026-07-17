@@ -18,12 +18,12 @@ public struct NeedleModelConfiguration: Hashable, Sendable {
   public var tieWordEmbeddings: Bool = true
   public var maxSeqLen: Int?
   public var maxPositionEmbeddings: Int?
-  private var _dtype: String?
-  private var _torchDType: String?
+  private var dtypeValue: String?
+  private var torchDTypeValue: String?
 
   public var dtype: String {
-    get { self._dtype ?? self._torchDType ?? "bfloat16" }
-    set { self._dtype = newValue }
+    get { self.dtypeValue ?? self.torchDTypeValue ?? "bfloat16" }
+    set { self.dtypeValue = newValue }
   }
 
   public var attentionHeadDimensions: Int {
@@ -58,8 +58,8 @@ extension NeedleModelConfiguration: Codable {
     case tieWordEmbeddings = "tie_word_embeddings"
     case maxSeqLen = "max_seq_len"
     case maxPositionEmbeddings = "max_position_embeddings"
-    case _dtype = "dtype"
-    case _torchDType = "torch_dtype"
+    case dtypeValue = "dtype"
+    case torchDTypeValue = "torch_dtype"
   }
 }
 
@@ -67,13 +67,6 @@ extension NeedleModelConfiguration: Codable {
 
 extension NeedleModelConfiguration {
   static func decode(in directory: URL, decoder: JSONDecoder = JSONDecoder()) throws -> Self? {
-    let configurationURLs = [
-      directory.appending(path: "configuration.json"),
-      directory.appending(path: "config.json")
-    ]
-    for url in configurationURLs where FileManager.default.fileExists(atPath: url.path()) {
-      return try decoder.decode(Self.self, from: Data(contentsOf: url))
-    }
-    return nil
+    try decodeModelConfiguration(Self.self, in: directory, decoder: decoder)
   }
 }

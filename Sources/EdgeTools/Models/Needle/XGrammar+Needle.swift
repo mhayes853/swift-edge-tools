@@ -13,15 +13,6 @@
       )
     }
 
-    static func needle(
-      erasedTokenizer tokenizer: borrowing any EdgeToolsTokenizer
-    ) throws -> XGrammarTokenizerInfo {
-      try Self.needle(
-        vocabulary: tokenizer.convertIdsToTokens(Array(0..<8192)),
-        eosTokenID: tokenizer.eosTokenId
-      )
-    }
-
     private static func needle(
       vocabulary: [String?],
       eosTokenID: EdgeToolsToken.ID?

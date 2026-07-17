@@ -107,12 +107,9 @@
         cache: modelCache,
         cachePolicy: cachePolicy
       )
-      let tokenizer = try await loadEdgeToolsTokenizer(
-        from: modelDirectoryURL,
-        isNeedleModel: true
-      )
+      let tokenizer = try await loadEdgeToolsTokenizer(from: modelDirectoryURL)
       let grammarEngine = try? XGrammarCompiler(
-        tokenizerInfo: try XGrammarTokenizerInfo.needle(erasedTokenizer: tokenizer)
+        tokenizerInfo: try XGrammarTokenizerInfo.needle(tokenizer: tokenizer)
       )
       guard let grammarEngine else {
         throw NeedleCoreAIEngineError.failedToLoadGrammarEngine
@@ -120,7 +117,7 @@
       try await self.init(
         encoderModel: encoderModel,
         decoderModel: decoderModel,
-        tokenizer: consume tokenizer,
+        tokenizer: tokenizer,
         configuration: configuration,
         grammarEngine: consume grammarEngine
       )
@@ -308,7 +305,7 @@
     ) async throws -> (EncoderOutputs, EdgeToolsPrefillMetrics) {
       let promptTokens = try self.tokenizer.encode(text: prompt.formatted(tools: tools))
       guard promptTokens.count <= configuration.encoderMaxLength else {
-        throw NeedleCoreAIEngineError.contextLengthExceeded(
+        throw NeedleModelError.contextLengthExceeded(
           tokens: promptTokens.count,
           maximum: configuration.encoderMaxLength
         )
@@ -607,9 +604,6 @@
       )
     }
 
-    public static func contextLengthExceeded(tokens: Int, maximum: Int) -> Self {
-      Self(message: "Prompt token count (\(tokens)) exceeds the model context length (\(maximum)).")
-    }
 
     public static let missingModelOutputs = Self(
       message: "CoreAI model did not return expected outputs."

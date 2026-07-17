@@ -14,7 +14,10 @@
     func `TokenIterator Usage`() async throws {
       let url = try await downloadNeedle()
       var tokenizer = try self.tokenizer(url: url)
-      let model = try loadNeedleMLXModel(from: url)
+      let model = try loadEdgeToolsMLXLanguageModel(
+        NeedleEdgeToolsMLXModelConfiguration.self,
+        from: url
+      )
       let tokenizerInfo = try XGrammarTokenizerInfo.needle(tokenizer: tokenizer)
       let grammarEngine = try XGrammarCompiler(tokenizerInfo: tokenizerInfo)
       let grammar = try XGrammarGrammar.needle(tools: [.sendEmail])

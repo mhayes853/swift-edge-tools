@@ -5,31 +5,41 @@ import Foundation
 #endif
 
 package func loadEdgeToolsTokenizer(
-  from directoryURL: URL,
-  isNeedleModel: Bool
+  from directoryURL: URL
 ) async throws -> sending any EdgeToolsTokenizer {
   let fileManager = FileManager.default
-  let sentencepieceURL = directoryURL.appending(path: "tokenizer.model")
+  let sentencePieceURL = directoryURL.appending(path: "tokenizer.model")
   let transformersURL = directoryURL.appending(path: "tokenizer.json")
+  let hasSentencePieceModel = fileManager.fileExists(atPath: sentencePieceURL.path())
+  let hasTransformersTokenizer = fileManager.fileExists(atPath: transformersURL.path())
+  var failures = [String]()
 
-  if isNeedleModel, fileManager.fileExists(atPath: sentencepieceURL.path()) {
-    return try NeedleSPTokenizer(modelURL: sentencepieceURL)
+  if hasSentencePieceModel {
+    do {
+      return try NeedleSPTokenizer(modelURL: sentencePieceURL)
+    } catch {
+      failures.append("tokenizer.model could not be loaded: \(error)")
+    }
   }
 
   #if Transformers
-    if fileManager.fileExists(atPath: transformersURL.path()) {
-      return try await loadTransformersTokenizer(
-        from: directoryURL,
-        tokenizerURL: transformersURL
-      )
+    if hasTransformersTokenizer {
+      do {
+        return try await loadTransformersTokenizer(
+          from: directoryURL,
+          tokenizerURL: transformersURL
+        )
+      } catch {
+        failures.append("tokenizer.json could not be loaded: \(error)")
+      }
     }
   #endif
 
   throw EdgeToolsTokenizerLoadingError.noCompatibleTokenizer(
     in: directoryURL,
-    isNeedleModel: isNeedleModel,
-    hasSentencePieceModel: fileManager.fileExists(atPath: sentencepieceURL.path()),
-    hasTransformersTokenizer: fileManager.fileExists(atPath: transformersURL.path())
+    hasSentencePieceModel: hasSentencePieceModel,
+    hasTransformersTokenizer: hasTransformersTokenizer,
+    failures: failures
   )
 }
 
@@ -38,24 +48,24 @@ public struct EdgeToolsTokenizerLoadingError: Hashable, Sendable, Error {
 
   public static func noCompatibleTokenizer(
     in directoryURL: URL,
-    isNeedleModel: Bool,
     hasSentencePieceModel: Bool,
-    hasTransformersTokenizer: Bool
+    hasTransformersTokenizer: Bool,
+    failures: [String] = []
   ) -> Self {
     var details = [String]()
 
-    if isNeedleModel {
-      if hasSentencePieceModel {
-        details.append("tokenizer.model is not a supported Needle SentencePiece BPE model.")
-      } else {
-        details.append("tokenizer.model was not found.")
-      }
+    if hasSentencePieceModel {
+      details.append("tokenizer.model is not a supported SentencePiece BPE model.")
     } else {
-      details.append("Needle tokenizer.model lookup was skipped for a non-Needle model.")
+      details.append("tokenizer.model was not found.")
     }
 
     #if Transformers
-      details.append("Transformers is enabled, but tokenizer.json was not found.")
+      if hasTransformersTokenizer {
+        details.append("tokenizer.json is not a supported Transformers tokenizer.")
+      } else {
+        details.append("tokenizer.json was not found.")
+      }
     #else
       if hasTransformersTokenizer {
         details.append(
@@ -68,16 +78,7 @@ public struct EdgeToolsTokenizerLoadingError: Hashable, Sendable, Error {
       }
     #endif
 
-    #if !Transformers
-      if isNeedleModel {
-        details.append(
-          "Provide a Needle tokenizer.model or enable Transformers to load tokenizer.json."
-        )
-      } else {
-        details.append("Enable Transformers to load tokenizer.json.")
-      }
-    #endif
-
+    details.append(contentsOf: failures)
     return Self(
       message:
         "No compatible tokenizer was found in \(directoryURL.path()). \(details.joined(separator: " "))"

@@ -8,11 +8,13 @@
   import MLXLMCommon
 
   @Suite(.serialized, .enabledIfXcode())
-  struct `NeedleMLXEngine tests` {
-    private let engine: NeedleMLXEngine
+  struct `EdgeToolsMLXEngine tests` {
+    private typealias Engine = EdgeToolsMLXEngine<NeedleEdgeToolsMLXModelConfiguration>
+
+    private let engine: Engine
 
     init() async throws {
-      self.engine = try await NeedleMLXEngine(from: downloadNeedle())
+      self.engine = try await Engine(from: downloadNeedle())
     }
 
     @Test
@@ -55,7 +57,7 @@
     @Test
     func `Generate Stops And Returns Stopped Generation`() async throws {
       let tokens = Lock([EdgeToolsToken]())
-      let generationTaskBox = Lock<NeedleMLXEngine.GenerationTask?>(nil)
+      let generationTaskBox = Lock<Engine.GenerationTask?>(nil)
       let generationTask = try self.engine.generate(
         prompt: .sendAdventureEmail,
         tools: NeedlePrompt.sendAdventureEmailDefinitions,
@@ -101,7 +103,7 @@
       let generationTask = try self.engine.generate(
         prompt: .sendAdventureEmail,
         tools: NeedlePrompt.sendAdventureEmailDefinitions,
-        parameters: NeedleMLXEngine.GenerateParameters(kvCacheQuantizationBits: 4),
+        parameters: Engine.GenerateParameters(kvCacheQuantizationBits: 4),
         channel: EdgeToolsGenerationChannel(
           onToken: { token in tokenStorage.withLock { $0.append(token) } }
         )
@@ -117,9 +119,9 @@
 
     @Test
     func `Generate With Untied Word Embeddings`() async throws {
-      let engine = try await NeedleMLXEngine(
+      let engine = try await Engine(
         from: downloadNeedle(),
-        editConfiguration: { configuration in
+        editModelConfiguration: { configuration in
           configuration.tieWordEmbeddings = false
         }
       )
@@ -172,7 +174,7 @@
       let generationTask = try self.engine.generate(
         prompt: .sendAdventureEmail,
         tools: NeedlePrompt.sendAdventureEmailDefinitions,
-        parameters: NeedleMLXEngine.GenerateParameters(processor: processor),
+        parameters: Engine.GenerateParameters(processor: processor),
         channel: EdgeToolsGenerationChannel()
       )
       _ = try await generationTask.value
@@ -209,7 +211,7 @@
         user: String(repeating: "token ", count: 2_000)
       )
 
-      let error = await #expect(throws: NeedleMLXEngineError.self) {
+      let error = await #expect(throws: NeedleModelError.self) {
         let generationTask = try self.engine.generate(
           prompt: prompt,
           parameters: .default,

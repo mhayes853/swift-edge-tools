@@ -1,9 +1,60 @@
 #if MLX && canImport(MLX)
+  import Foundation
   import MLX
-  import MLXNN
   import MLXLLM
   import MLXLMCommon
-  import Foundation
+  import MLXNN
+
+  // MARK: - NeedleEdgeToolsMLXModelConfiguration
+
+  public enum NeedleEdgeToolsMLXModelConfiguration: EdgeToolsMLXModelConfiguration {
+    public typealias ModelConfiguration = NeedleModelConfiguration
+    public typealias Prompt = NeedlePrompt
+    public typealias ToolCallParser = NeedleToolCallParser
+    public typealias LanguageModel = NeedleMLXModel
+
+    public static func grammar(
+      tools: [EdgeToolDefinition],
+      range: GrammarToolCallRange
+    ) throws -> XGrammarGrammar {
+      try XGrammarGrammar.needle(tools: tools, range: range)
+    }
+
+    public static func grammarCompiler(
+      using tokenizer: borrowing any EdgeToolsTokenizer
+    ) throws -> XGrammarCompiler {
+      try XGrammarCompiler(tokenizerInfo: XGrammarTokenizerInfo.needle(tokenizer: tokenizer))
+    }
+
+    public static func languageModel(
+      configuration: NeedleModelConfiguration
+    ) -> sending NeedleMLXModel {
+      NeedleMLXModel(configuration: configuration)
+    }
+
+    public static func tokenize(
+      prompt: NeedlePrompt,
+      tools: [EdgeToolDefinition],
+      using tokenizer: borrowing any EdgeToolsTokenizer
+    ) throws -> LMInput {
+      let tokens = tokenizer.encode(text: try prompt.formatted(tools: tools))
+      return LMInput(text: LMInput.Text(tokens: MLXArray(tokens)))
+    }
+  }
+
+
+  // MARK: - LMInput + Needle
+
+  extension LMInput {
+    public static func needle(
+      prompt: NeedlePrompt,
+      tools: [EdgeToolDefinition],
+      using tokenizer: borrowing some EdgeToolsTokenizer
+    ) throws -> Self {
+      let tokens = tokenizer.encode(text: try prompt.formatted(tools: tools))
+      return LMInput(text: LMInput.Text(tokens: MLXArray(tokens)))
+    }
+  }
 
   // MARK: - NeedleMLXModel
 
@@ -41,6 +92,12 @@
       cache: [any KVCache],
       windowSize: Int?
     ) throws -> PrepareResult {
+      guard input.text.tokens.size <= self.configuration.encoderMaxLength else {
+        throw NeedleModelError.contextLengthExceeded(
+          tokens: input.text.tokens.size,
+          maximum: self.configuration.encoderMaxLength
+        )
+      }
       let output = try self.prepare(input.text.tokens, cache: cache, windowSize: windowSize)
       return output.map { .logits($0) } ?? .tokens(input.text)
     }
@@ -201,19 +258,19 @@
     }
 
     func callAsFunction(
-      _ x: MLXArray,
+      _ input: MLXArray,
       mask: MLXFast.ScaledDotProductAttentionMaskMode
     ) -> MLXArray {
       let ropeFrequencies = RoPEFrequencies(
         inverse: self._inverseRope,
-        sequenceLength: x.dim(1),
-        dtype: x.dtype
+        sequenceLength: input.dim(1),
+        dtype: input.dtype
       )
-      var x = x
+      var hiddenStates = input
       for layer in self.layers {
-        x = layer(x, mask: mask, ropeFrequencies: ropeFrequencies)
+        hiddenStates = layer(hiddenStates, mask: mask, ropeFrequencies: ropeFrequencies)
       }
-      return self.finalNorm(x)
+      return self.finalNorm(hiddenStates)
     }
   }
 
@@ -229,11 +286,11 @@
     }
 
     func callAsFunction(
-      _ x: MLXArray,
+      _ input: MLXArray,
       mask: MLXFast.ScaledDotProductAttentionMaskMode,
       ropeFrequencies: RoPEFrequencies
     ) -> MLXArray {
-      let normed = self.inputLayerNorm(x)
+      let normed = self.inputLayerNorm(input)
       let attention = self.attention(
         q: normed,
         kv: normed,
@@ -241,7 +298,7 @@
         ropeFrequencies: ropeFrequencies,
         cache: nil
       )
-      return gatedResidual(x, gate: self.attentionGate, sublayer: attention)
+      return gatedResidual(input, gate: self.attentionGate, sublayer: attention)
     }
   }
 
@@ -267,7 +324,7 @@
     }
 
     func callAsFunction(
-      _ x: MLXArray,
+      _ input: MLXArray,
       selfMask: MLXFast.ScaledDotProductAttentionMaskMode,
       crossMask: MLXFast.ScaledDotProductAttentionMaskMode,
       precomputedCrossAttention: [ProjectedAttentionKV],
@@ -276,15 +333,15 @@
       let ropeFrequencies = RoPEFrequencies.fromTable(
         self._ropeTable,
         offset: caches?.first?.offset ?? 0,
-        sequenceLength: x.dim(1),
-        dtype: x.dtype
+        sequenceLength: input.dim(1),
+        dtype: input.dtype
       )
-      var x = x
+      var hiddenStates = input
       let optionalCaches = caches?.map { $0 as (any KVCache)? }
       let caches = optionalCaches ?? Array(repeating: nil, count: self.layers.count)
       for (index, (layer, caches)) in zip(self.layers, caches).enumerated() {
-        x = layer(
-          x,
+        hiddenStates = layer(
+          hiddenStates,
           selfMask: selfMask,
           crossMask: crossMask,
           precomputedCrossAttention: precomputedCrossAttention[index],
@@ -292,7 +349,7 @@
           cache: caches
         )
       }
-      return self.finalNorm(x)
+      return self.finalNorm(hiddenStates)
     }
   }
 
@@ -314,14 +371,14 @@
     }
 
     func callAsFunction(
-      _ x: MLXArray,
+      _ input: MLXArray,
       selfMask: MLXFast.ScaledDotProductAttentionMaskMode,
       crossMask: MLXFast.ScaledDotProductAttentionMaskMode,
       precomputedCrossAttention: ProjectedAttentionKV,
       ropeFrequencies: RoPEFrequencies,
       cache: (any KVCache)?
     ) -> MLXArray {
-      let selfNormed = self.inputLayerNorm(x)
+      let selfNormed = self.inputLayerNorm(input)
       let selfAttention = self.selfAttention(
         q: selfNormed,
         kv: selfNormed,
@@ -331,7 +388,7 @@
       )
 
       let gatedSelfAttention = gatedResidual(
-        x,
+        input,
         gate: self.selfAttentionGate,
         sublayer: selfAttention
       )
@@ -404,7 +461,7 @@
     }
 
     func callAsFunction(
-      q: MLXArray,
+      q query: MLXArray,
       kv: MLXArray,
       mask: MLXFast.ScaledDotProductAttentionMaskMode,
       ropeFrequencies: RoPEFrequencies?,
@@ -420,7 +477,7 @@
       }
 
       return self.callAsFunction(
-        q: q,
+        q: query,
         projectedKV: projectedKV,
         mask: mask,
         ropeFrequencies: ropeFrequencies,
@@ -442,13 +499,13 @@
     }
 
     func callAsFunction(
-      q: MLXArray,
+      q query: MLXArray,
       projectedKV: ProjectedAttentionKV,
       mask: MLXFast.ScaledDotProductAttentionMaskMode,
       ropeFrequencies: RoPEFrequencies?,
       cache: (any KVCache)?
     ) -> MLXArray {
-      var queries = self.queryProjection(q)
+      var queries = self.queryProjection(query)
       queries = unflatten(queries, axis: -1, shape: [self.heads, self.headDimensions])
         .transposed(0, 2, 1, 3)
       queries = self.queryNorm(queries)
@@ -485,8 +542,8 @@
       super.init()
     }
 
-    func callAsFunction(_ x: MLXArray) -> MLXArray {
-      rmsNorm(x, weight: 1.0 + self.weight.asType(x.dtype), eps: self.eps)
+    func callAsFunction(_ input: MLXArray) -> MLXArray {
+      rmsNorm(input, weight: 1.0 + self.weight.asType(input.dtype), eps: self.eps)
     }
   }
 
@@ -550,8 +607,12 @@
 
   // MARK: - Helpers
 
-  private func gatedResidual(_ x: MLXArray, gate: MLXArray, sublayer: MLXArray) -> MLXArray {
-    clip(x + sigmoid(gate).asType(sublayer.dtype) * sublayer, min: -65500.0, max: 65500.0)
+  private func gatedResidual(
+    _ input: MLXArray,
+    gate: MLXArray,
+    sublayer: MLXArray
+  ) -> MLXArray {
+    clip(input + sigmoid(gate).asType(sublayer.dtype) * sublayer, min: -65500.0, max: 65500.0)
   }
 
   private func paddingMask(inputIds: MLXArray, padTokenId: Int) -> MLXArray {
