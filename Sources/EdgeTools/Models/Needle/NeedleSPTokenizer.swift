@@ -1,3 +1,4 @@
+import Foundation
 import HeapModule
 
 // MARK: - NeedleSPTokenizer
@@ -10,47 +11,74 @@ public struct NeedleSPTokenizer: Sendable {
   public let padTokenId: EdgeToolsToken.ID?
 
   private let pieces: [SentencePiece]
-  private let pieceIds: [PieceBytes: EdgeToolsToken.ID]
-  private let mergePieces: [PieceBytes: MergePiece]
-  private let userDefinedPieces: [PieceBytes]
+  private let pieceIds: [[UInt8]: EdgeToolsToken.ID]
+  private let pieceScores: [[UInt8]: Float]
+  private let userDefinedPieces: [[UInt8]]
   private let byteIds: [EdgeToolsToken.ID]?
   private let unknownSurface: String
   private let normalization: Normalization
 
   public init<Bytes: Collection>(data: Bytes) throws where Bytes.Element == UInt8 {
-    let model = try SentencePieceModel(bytes: Array(data))
+    do {
+      let model = ProtobufMessage(bytes: Array(data))
+      let pieces = try model.messages(field: 1).map(SentencePiece.init)
+      let trainer = try model.lastMessage(field: 2) ?? ProtobufMessage(bytes: [])
+      let normalizer = try model.lastMessage(field: 3) ?? ProtobufMessage(bytes: [])
+      let modelType = (try trainer.lastInt32(field: 3)) ?? 1
+      let normalizerName = (try normalizer.lastString(field: 1)) ?? ""
 
-    let pieceIds = Dictionary(
-      uniqueKeysWithValues: model.pieces.enumerated()
-        .map { (PieceBytes($0.element.text.utf8), $0.offset) }
-    )
-    let mergePieces = Dictionary(
-      uniqueKeysWithValues: model.pieces.compactMap { piece in
-        piece.type == .normal ? (PieceBytes(piece.text.utf8), piece.score) : nil
+      guard modelType == 2 else {
+        throw NeedleSPTokenizerError(message: "NeedleSPTokenizer only supports SentencePiece BPE models.")
       }
-    )
-    let userDefinedPieces = model.pieces
-      .filter { $0.type == .userDefined }
-      .map { PieceBytes($0.text.utf8) }
-      .sorted { $0.count > $1.count }
-    let byteIds = try model.byteIds()
+      guard
+        (try normalizer.lastBytes(field: 2) ?? []).isEmpty,
+        normalizerName.isEmpty || normalizerName == "identity"
+      else {
+        throw NeedleSPTokenizerError(message: "NeedleSPTokenizer only supports identity normalization.")
+      }
+      guard try model.lastBytes(field: 5) == nil else {
+        throw NeedleSPTokenizerError(message: "NeedleSPTokenizer does not support SentencePiece denormalizers.")
+      }
+      guard !pieces.isEmpty else {
+        throw NeedleSPTokenizerError(message: "SentencePiece model contains no pieces.")
+      }
 
-    self.bosTokenId = Self.optionalTokenId((try model.trainer.lastInt32(field: 41)) ?? 1)
-    self.eosTokenId = Self.optionalTokenId((try model.trainer.lastInt32(field: 42)) ?? 2)
-    self.unknownTokenId = Self.optionalTokenId((try model.trainer.lastInt32(field: 40)) ?? 0)
-    self.padTokenId = Self.optionalTokenId((try model.trainer.lastInt32(field: 43)) ?? -1)
-    self.pieces = model.pieces
-    self.pieceIds = pieceIds
-    self.mergePieces = mergePieces
-    self.userDefinedPieces = userDefinedPieces
-    self.byteIds = byteIds
-    self.unknownSurface = (try model.trainer.lastString(field: 44)) ?? " ⁇ "
-    self.normalization = Normalization(
-      addDummyPrefix: (try model.normalizer.lastBool(field: 3)) ?? true,
-      removeExtraWhitespaces: (try model.normalizer.lastBool(field: 4)) ?? true,
-      escapeWhitespaces: (try model.normalizer.lastBool(field: 5)) ?? true,
-      treatWhitespaceAsSuffix: (try model.trainer.lastBool(field: 24)) ?? false
-    )
+      let userDefinedPieces = pieces
+        .filter { $0.type == .userDefined }
+        .map { Array($0.text.utf8) }
+        .sorted { $0.count > $1.count }
+      guard !userDefinedPieces.contains(where: \.isEmpty) else {
+        throw NeedleSPTokenizerError(message: "SentencePiece model contains an empty user-defined piece.")
+      }
+      let usesByteFallback = (try trainer.lastBool(field: 35)) ?? false
+
+      self.bosTokenId = Self.tokenId((try trainer.lastInt32(field: 41)) ?? 1, in: pieces)
+      self.eosTokenId = Self.tokenId((try trainer.lastInt32(field: 42)) ?? 2, in: pieces)
+      self.unknownTokenId = Self.tokenId((try trainer.lastInt32(field: 40)) ?? 0, in: pieces)
+      self.padTokenId = Self.tokenId((try trainer.lastInt32(field: 43)) ?? -1, in: pieces)
+      self.pieces = pieces
+      self.pieceIds = Dictionary(
+        pieces.enumerated().map { (Array($0.element.text.utf8), $0.offset) },
+        uniquingKeysWith: { first, _ in first }
+      )
+      self.pieceScores = Dictionary(
+        pieces.compactMap { piece in
+          piece.type == .normal ? (Array(piece.text.utf8), piece.score) : nil
+        },
+        uniquingKeysWith: { first, _ in first }
+      )
+      self.userDefinedPieces = userDefinedPieces
+      self.byteIds = try Self.byteIds(in: pieces, enabled: usesByteFallback)
+      self.unknownSurface = (try trainer.lastString(field: 44)) ?? " ⁇ "
+      self.normalization = Normalization(
+        addDummyPrefix: (try normalizer.lastBool(field: 3)) ?? true,
+        removeExtraWhitespaces: (try normalizer.lastBool(field: 4)) ?? true,
+        escapeWhitespaces: (try normalizer.lastBool(field: 5)) ?? true,
+        treatWhitespaceAsSuffix: (try trainer.lastBool(field: 24)) ?? false
+      )
+    } catch let error as ProtobufReaderError {
+      throw NeedleSPTokenizerError(message: "SentencePiece protobuf \(error.needleMessage)")
+    }
   }
 
   public func encode(text: String) -> [EdgeToolsToken.ID] {
@@ -59,7 +87,7 @@ public struct NeedleSPTokenizer: Sendable {
 
     var encoder = BPEEncoder(
       symbols: self.makeSymbols(from: normalized),
-      mergePieces: self.mergePieces,
+      pieceScores: self.pieceScores,
       pieceIds: self.pieceIds,
       byteIds: self.byteIds,
       unknownTokenId: self.unknownTokenId
@@ -79,7 +107,7 @@ public struct NeedleSPTokenizer: Sendable {
   }
 
   public func convertTokensToIds(_ tokens: [String]) -> [EdgeToolsToken.ID?] {
-    tokens.map { self.pieceIds[PieceBytes($0.utf8)] }
+    tokens.map { self.pieceIds[Array($0.utf8)] }
   }
 
   public func convertIdsToTokens(_ ids: [EdgeToolsToken.ID]) -> [String?] {
@@ -152,8 +180,28 @@ public struct NeedleSPTokenizer: Sendable {
     return symbols
   }
 
-  private static func optionalTokenId(_ id: Int32) -> EdgeToolsToken.ID? {
-    id >= 0 ? Int(id) : nil
+  private static func tokenId(_ id: Int32, in pieces: [SentencePiece]) -> EdgeToolsToken.ID? {
+    pieces.indices.contains(Int(id)) ? Int(id) : nil
+  }
+
+  private static func byteIds(
+    in pieces: [SentencePiece],
+    enabled: Bool
+  ) throws -> [EdgeToolsToken.ID]? {
+    guard enabled else { return nil }
+    var ids = [EdgeToolsToken.ID?](repeating: nil, count: 256)
+    for (id, piece) in pieces.enumerated() where piece.type == .byte {
+      if let byte = piece.byteValue {
+        ids[Int(byte)] = id
+      }
+    }
+    let byteIds = ids.compactMap { $0 }
+    guard byteIds.count == ids.count else {
+      throw NeedleSPTokenizerError(
+        message: "SentencePiece byte fallback requires all 256 byte pieces."
+      )
+    }
+    return byteIds
   }
 
   private static func utf8ScalarLength(startingWith byte: UInt8) -> Int {
@@ -169,48 +217,28 @@ public struct NeedleSPTokenizer: Sendable {
 
 extension NeedleSPTokenizer: EdgeToolsTokenizer {}
 
+extension NeedleSPTokenizer {
+  public init(modelURL: URL) throws {
+    guard modelURL.isFileURL, !modelURL.hasDirectoryPath else {
+      throw NeedleSPTokenizerError(message: "\(modelURL.path()): file not found")
+    }
+
+    do {
+      try self.init(data: Data(contentsOf: modelURL))
+    } catch let error as NeedleSPTokenizerError {
+      throw error
+    } catch {
+      throw NeedleSPTokenizerError(message: "\(modelURL.path()): file not found")
+    }
+  }
+}
+
 // MARK: - NeedleSPTokenizerError
 
 public struct NeedleSPTokenizerError: Hashable, Sendable, Error {
   public let message: String
 
-  public static func unsupportedModelType() -> Self {
-    Self(message: "NeedleSPTokenizer only supports SentencePiece BPE models.")
-  }
-
-  public static func unsupportedNormalizer() -> Self {
-    Self(message: "NeedleSPTokenizer only supports identity normalization.")
-  }
-
-  public static func unsupportedDenormalizer() -> Self {
-    Self(message: "NeedleSPTokenizer does not support SentencePiece denormalizers.")
-  }
-
-  public static func emptyPiece() -> Self {
-    Self(message: "SentencePiece model contains an empty user-defined piece.")
-  }
-
-  public static func duplicatePieces() -> Self {
-    Self(message: "SentencePiece model contains duplicate pieces.")
-  }
-
-  public static func invalidUnknownPiece() -> Self {
-    Self(message: "SentencePiece model must contain a valid unknown piece at its configured ID.")
-  }
-
-  public static func incompleteByteFallbackVocabulary() -> Self {
-    Self(message: "SentencePiece byte fallback requires all 256 byte pieces.")
-  }
-
-  public static func malformedProtobuf(_ reason: String) -> Self {
-    Self(message: "SentencePiece protobuf \(reason)")
-  }
-
-  public static func fileNotFound(atPath path: String) -> Self {
-    Self(message: "\(path): file not found")
-  }
-
-  private init(message: String) {
+  init(message: String) {
     self.message = message
   }
 }
@@ -233,10 +261,6 @@ private struct Symbol {
   var bytes: [UInt8]
 }
 
-private typealias PieceBytes = [UInt8]
-
-private typealias MergePiece = Float
-
 private struct MergeCandidate: Comparable, Hashable, Sendable {
   let left: Int
   let right: Int
@@ -249,30 +273,21 @@ private struct MergeCandidate: Comparable, Hashable, Sendable {
 }
 
 private struct BPEEncoder {
-  private var symbols: [Symbol]
-  private let mergePieces: [PieceBytes: MergePiece]
-  private let pieceIds: [PieceBytes: EdgeToolsToken.ID]
-  private let byteIds: [EdgeToolsToken.ID]?
-  private let unknownTokenId: EdgeToolsToken.ID?
-  private var merges = Heap<MergeCandidate>()
-
-  init(
-    symbols: [Symbol],
-    mergePieces: [PieceBytes: MergePiece],
-    pieceIds: [PieceBytes: EdgeToolsToken.ID],
-    byteIds: [EdgeToolsToken.ID]?,
-    unknownTokenId: EdgeToolsToken.ID?
-  ) {
-    self.symbols = symbols
-    self.mergePieces = mergePieces
-    self.pieceIds = pieceIds
-    self.byteIds = byteIds
-    self.unknownTokenId = unknownTokenId
-  }
+  var symbols: [Symbol]
+  let pieceScores: [[UInt8]: Float]
+  let pieceIds: [[UInt8]: EdgeToolsToken.ID]
+  let byteIds: [EdgeToolsToken.ID]?
+  let unknownTokenId: EdgeToolsToken.ID?
+  var merges = Heap<MergeCandidate>()
 
   mutating func encode() -> [EdgeToolsToken.ID] {
-    self.seedMerges()
-    self.mergeSymbols()
+    for right in self.symbols.indices.dropFirst() {
+      self.insertCandidate(left: right - 1, right: right)
+    }
+    while let merge = self.merges.popMax() {
+      guard self.canApply(merge) else { continue }
+      self.apply(merge)
+    }
     return self.tokenIds()
   }
 
@@ -285,7 +300,7 @@ private struct BPEEncoder {
     else { return nil }
 
     let bytes = self.symbols[left].bytes + self.symbols[right].bytes
-    return self.mergePieces[PieceBytes(bytes)]
+    return self.pieceScores[bytes]
       .map {
         MergeCandidate(
           left: left,
@@ -296,20 +311,8 @@ private struct BPEEncoder {
       }
   }
 
-  private mutating func seedMerges() {
-    guard self.symbols.count > 1 else { return }
-    for right in 1..<self.symbols.count {
-      if let candidate = self.candidate(left: right - 1, right: right) {
-        self.merges.insert(candidate)
-      }
-    }
-  }
-
-  private mutating func mergeSymbols() {
-    while let merge = self.merges.popMax() {
-      guard self.canApply(merge) else { continue }
-      self.apply(merge)
-    }
+  private mutating func insertCandidate(left: Int, right: Int) {
+    self.candidate(left: left, right: right).map { self.merges.insert($0) }
   }
 
   private func canApply(_ merge: MergeCandidate) -> Bool {
@@ -328,15 +331,8 @@ private struct BPEEncoder {
     }
     self.symbols[merge.right].bytes.removeAll(keepingCapacity: false)
 
-    if let previous = self.candidate(
-      left: self.symbols[merge.left].previous,
-      right: merge.left
-    ) {
-      self.merges.insert(previous)
-    }
-    if let next = self.candidate(left: merge.left, right: self.symbols[merge.left].next) {
-      self.merges.insert(next)
-    }
+    self.insertCandidate(left: self.symbols[merge.left].previous, right: merge.left)
+    self.insertCandidate(left: merge.left, right: self.symbols[merge.left].next)
   }
 
   private func tokenIds() -> [EdgeToolsToken.ID] {
@@ -344,7 +340,7 @@ private struct BPEEncoder {
     var index = 0
     while index >= 0 {
       let symbol = self.symbols[index]
-      if let id = self.pieceIds[PieceBytes(symbol.bytes)] {
+      if let id = self.pieceIds[symbol.bytes] {
         ids.append(id)
       } else if let byteIds = self.byteIds {
         ids.append(contentsOf: symbol.bytes.map { byteIds[Int($0)] })
@@ -410,8 +406,7 @@ private struct SentencePieceDecoder {
     var text = piece
     if self.expectsBeginningWhitespace
       && (self.normalization.addDummyPrefix || self.normalization.removeExtraWhitespaces)
-      && text.hasPrefix(sentencePieceSpaceSymbol)
-    {
+      && text.hasPrefix(sentencePieceSpaceSymbol) {
       text.removeFirst()
       if !self.normalization.removeExtraWhitespaces {
         self.expectsBeginningWhitespace = false
@@ -426,66 +421,6 @@ private struct SentencePieceDecoder {
     guard !self.byteRun.isEmpty else { return }
     self.decoded.append(contentsOf: String(decoding: self.byteRun, as: UTF8.self).utf8)
     self.byteRun.removeAll(keepingCapacity: true)
-  }
-}
-
-private struct SentencePieceModel {
-  let pieces: [SentencePiece]
-  let trainer: ProtobufMessage
-  let normalizer: ProtobufMessage
-
-  init(bytes: [UInt8]) throws {
-    do {
-      let message = ProtobufMessage(bytes: bytes)
-      self.pieces = try message.messages(field: 1).map(SentencePiece.init)
-      self.trainer = try message.lastMessage(field: 2) ?? ProtobufMessage(bytes: [])
-      self.normalizer = try message.lastMessage(field: 3) ?? ProtobufMessage(bytes: [])
-      let hasDenormalizer = try message.lastBytes(field: 5) != nil
-      try self.validate(hasDenormalizer: hasDenormalizer)
-    } catch let error as ProtobufReaderError {
-      throw NeedleSPTokenizerError.malformedProtobuf(error.message)
-    }
-  }
-
-  private func validate(hasDenormalizer: Bool) throws {
-    let modelType = (try self.trainer.lastInt32(field: 3)) ?? 1
-    let normalizerName = (try self.normalizer.lastString(field: 1)) ?? ""
-    let precompiledMap = (try self.normalizer.lastBytes(field: 2)) ?? []
-    let unknownId = (try self.trainer.lastInt32(field: 40)) ?? 0
-    let byteFallback = (try self.trainer.lastBool(field: 35)) ?? false
-
-    guard modelType == 2 else {
-      throw NeedleSPTokenizerError.unsupportedModelType()
-    }
-    guard precompiledMap.isEmpty, normalizerName.isEmpty || normalizerName == "identity" else {
-      throw NeedleSPTokenizerError.unsupportedNormalizer()
-    }
-    guard !hasDenormalizer else {
-      throw NeedleSPTokenizerError.unsupportedDenormalizer()
-    }
-    guard !self.pieces.contains(where: { $0.type == .userDefined && $0.text.isEmpty }) else {
-      throw NeedleSPTokenizerError.emptyPiece()
-    }
-    guard Set(self.pieces.map { PieceBytes($0.text.utf8) }).count == self.pieces.count else {
-      throw NeedleSPTokenizerError.duplicatePieces()
-    }
-    guard self.pieces.indices.contains(Int(unknownId)), self.pieces[Int(unknownId)].type == .unknown else {
-      throw NeedleSPTokenizerError.invalidUnknownPiece()
-    }
-    if byteFallback, try self.byteIds() == nil {
-      throw NeedleSPTokenizerError.incompleteByteFallbackVocabulary()
-    }
-  }
-
-  func byteIds() throws -> [EdgeToolsToken.ID]? {
-    guard (try self.trainer.lastBool(field: 35)) ?? false else { return nil }
-    var ids = [EdgeToolsToken.ID?](repeating: nil, count: 256)
-    for (id, piece) in self.pieces.enumerated() where piece.type == .byte {
-      guard let byte = piece.byteValue else { continue }
-      ids[Int(byte)] = id
-    }
-    let byteIds = ids.compactMap { $0 }
-    return byteIds.count == ids.count ? byteIds : nil
   }
 }
 
@@ -518,16 +453,16 @@ private struct SentencePiece: Hashable, Sendable {
     self.score = (try message.lastFixed32(field: 2)).map { Float(bitPattern: $0) } ?? 0
     let rawType = (try message.lastInt32(field: 3)) ?? 1
     guard let type = PieceType(rawValue: rawType) else {
-      throw NeedleSPTokenizerError.malformedProtobuf("contains an unknown piece type.")
+      throw NeedleSPTokenizerError(
+        message: "SentencePiece protobuf contains an unknown piece type."
+      )
     }
     self.type = type
   }
 }
 
-// MARK: - ProtobufReaderError
-
 extension ProtobufReaderError {
-  fileprivate var message: String {
+  fileprivate var needleMessage: String {
     switch self {
     case .truncated: "is truncated."
     case .invalidTag: "contains an invalid tag."

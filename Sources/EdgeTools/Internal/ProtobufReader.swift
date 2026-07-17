@@ -31,10 +31,6 @@ struct ProtobufReader {
     throw ProtobufReaderError.overflowingVarint
   }
 
-  mutating func readBool() throws(ProtobufReaderError) -> Bool {
-    try self.readVarint() != 0
-  }
-
   mutating func readFixed32() throws(ProtobufReaderError) -> UInt32 {
     let bytes = try self.read(count: 4)
     return bytes.enumerated().reduce(0) { result, element in
@@ -83,6 +79,8 @@ struct ProtobufReader {
     return Array(self.bytes[self.offset..<(self.offset + count)])
   }
 }
+
+// MARK: - ProtobufMessage
 
 struct ProtobufMessage {
   let bytes: [UInt8]
