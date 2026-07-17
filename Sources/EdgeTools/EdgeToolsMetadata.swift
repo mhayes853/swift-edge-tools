@@ -1,7 +1,50 @@
+// MARK: - EdgeToolsMetadataKey
+
+public struct EdgeToolsMetadataKey: Hashable, Sendable, RawRepresentable, ExpressibleByStringLiteral
+{
+  public var rawValue: String
+
+  public init(rawValue: String) {
+    self.rawValue = rawValue
+  }
+
+  public init(stringLiteral value: StringLiteralType) {
+    self.init(rawValue: value)
+  }
+}
+
+// MARK: - EdgeToolsMetadataKey + Confidence
+
+extension EdgeToolsMetadataKey {
+  public static let generationConfidence =
+    EdgeToolsMetadataKey(rawValue: "GenerationConfidence")
+
+  public static let perTokenConfidences =
+    EdgeToolsMetadataKey(rawValue: "PerTokenConfidences")
+}
+
+// MARK: - EdgeToolsMetadata
+
+public typealias EdgeToolsMetadata = [EdgeToolsMetadataKey: any Sendable]
+
+// MARK: - EdgeToolsMetadata + Confidence
+
+extension EdgeToolsMetadata {
+  public var generationConfidence: Float? {
+    get { self[.generationConfidence] as? Float }
+    set { self[.generationConfidence] = newValue }
+  }
+
+  public var perTokenConfidences: [Float]? {
+    get { self[.perTokenConfidences] as? [Float] }
+    set { self[.perTokenConfidences] = newValue }
+  }
+}
+
 #if MLX && canImport(MLX)
   import MLX
 
-  // MARK: - EdgeToolsMetadataKey
+  // MARK: - EdgeToolsMetadataKey + MLX
 
   extension EdgeToolsMetadataKey {
     public static let mlxEngineGenerationStartMemorySnapshot =
@@ -14,7 +57,7 @@
       EdgeToolsMetadataKey(rawValue: "MLXEnginePostDecodeMemorySnapshot")
   }
 
-  // MARK: - EdgeToolsMetadata
+  // MARK: - EdgeToolsMetadata + MLX
 
   extension EdgeToolsMetadata {
     public var mlxEngineGenerationStartMemorySnapshot: Memory.Snapshot? {

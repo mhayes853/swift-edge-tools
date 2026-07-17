@@ -130,9 +130,8 @@ let package = Package(
         )
       ],
       exclude: [
-        "GenerationSchemaTests/__Snapshots__",
-        "Models/Needle/Engines/CoreAI/__Snapshots__",
-        "Models/Needle/Engines/CoreML/__Snapshots__",
+        "GenerationSchema/__Snapshots__",
+        "Models/Needle/Engines/__Snapshots__",
         "Models/Needle/Engines/MLX/__Snapshots__",
         "Models/Needle/__Snapshots__"
       ],

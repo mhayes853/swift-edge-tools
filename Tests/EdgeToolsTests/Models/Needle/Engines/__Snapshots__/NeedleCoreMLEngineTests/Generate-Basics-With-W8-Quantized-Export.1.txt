@@ -1,113 +1,111 @@
 ▿ EdgeToolsEngineGeneration
   ▿ decodeMetrics: EdgeToolsDecodeMetrics
-    ▿ duration: 1.131691 seconds
-      - _low: 1131691000000000000
+    ▿ duration: 0.886387666 seconds
+      - _low: 886387666000000000
       - _high: 0
-    ▿ durationToFirstToken: 0.09902075 seconds
-      - _low: 99020750000000000
+    ▿ durationToFirstToken: 0.096814417 seconds
+      - _low: 96814417000000000
       - _high: 0
-    - tokens: 86
+    - tokens: 84
   ▿ metadata: 2 key/value pairs
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "GenerationConfidence"
-      - value: 0.93739027
+      - value: 0.912329
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "PerTokenConfidences"
-      ▿ value: 86 elements
+      ▿ value: 84 elements
         - 1.0
-        - 0.97650176
+        - 0.96498734
+        - 0.9999988
+        - 1.0
         - 0.99999964
         - 1.0
-        - 0.9999999
+        - 0.99999976
+        - 0.9999337
+        - 0.9999869
         - 1.0
-        - 0.9999999
-        - 0.99998176
-        - 0.9999968
+        - 0.91117966
+        - 0.9999691
+        - 0.5841526
+        - 0.8109285
+        - 0.6815414
+        - 0.96095175
         - 1.0
-        - 0.9130583
-        - 0.9999877
-        - 0.6579781
-        - 0.87726665
-        - 0.8610715
-        - 0.97997653
+        - 0.99999714
         - 1.0
-        - 0.9999995
-        - 1.0
-        - 0.999992
-        - 0.9999989
-        - 1.0
-        - 0.9994288
-        - 0.5794004
-        - 0.999884
-        - 0.99808073
-        - 0.97804123
-        - 0.99999654
-        - 0.9999101
-        - 0.57367843
-        - 0.59455127
-        - 0.9570174
-        - 0.8529355
-        - 0.9969957
-        - 0.9806178
-        - 0.867092
-        - 0.9899768
-        - 0.9761746
-        - 0.999627
-        - 0.99997115
-        - 0.99996006
-        - 0.8296645
-        - 0.63431686
-        - 0.648689
-        - 0.67832696
-        - 0.9992489
-        - 1.0
-        - 0.9999993
-        - 1.0
-        - 0.9999995
-        - 0.999273
-        - 0.9999815
-        - 1.0
-        - 0.9716717
-        - 0.99999475
-        - 0.7371582
-        - 0.99973935
-        - 0.99771726
-        - 0.9588471
-        - 0.9999999
-        - 0.99999845
-        - 1.0
-        - 0.99999607
+        - 0.9999753
         - 0.9999963
+        - 0.99999976
+        - 0.99800736
+        - 0.56985265
+        - 0.58699644
+        - 0.9893885
+        - 0.952425
+        - 0.99998486
+        - 0.99954945
+        - 0.575588
+        - 0.684264
+        - 0.9951137
+        - 0.9952217
+        - 0.80286485
+        - 0.9687528
+        - 0.88070095
+        - 0.9943963
+        - 0.9998313
+        - 0.9998857
+        - 0.9251201
+        - 0.82768893
+        - 0.5161077
+        - 0.58130306
+        - 0.9972584
+        - 0.9999987
+        - 0.99999475
         - 1.0
-        - 0.99758923
-        - 0.947381
-        - 0.9997527
-        - 0.9990415
-        - 0.9984445
-        - 0.9999957
-        - 0.99928826
-        - 0.6406359
-        - 0.61578125
-        - 0.7614498
-        - 0.99366105
-        - 0.997851
-        - 0.9976519
-        - 0.9548373
-        - 0.9589241
-        - 0.9493182
-        - 0.9991559
-        - 0.99997747
-        - 0.99995553
-        - 0.7411123
+        - 0.99999726
+        - 0.9964516
+        - 0.99990535
+        - 0.9999993
+        - 0.9545628
+        - 0.99998164
+        - 0.5688949
+        - 0.9989183
+        - 0.996858
+        - 0.92206234
+        - 0.9999999
+        - 0.9999869
+        - 1.0
+        - 0.99998677
+        - 0.9999776
+        - 0.9999999
+        - 0.9955662
+        - 0.61138195
+        - 0.81757444
+        - 0.9835338
+        - 0.99458885
+        - 0.9999794
+        - 0.99762183
+        - 0.5926666
+        - 0.5640985
+        - 0.74279505
+        - 0.9896718
+        - 0.9965166
+        - 0.99701905
+        - 0.7851851
+        - 0.82810634
+        - 0.8308001
+        - 0.9885583
+        - 0.9998574
+        - 0.99988866
+        - 0.7287483
         - 1.0
   ▿ prefillMetrics: EdgeToolsPrefillMetrics
-    ▿ duration: 0.065343167 seconds
-      - _low: 65343167000000000
+    ▿ duration: 0.064035375 seconds
+      - _low: 64035375000000000
       - _high: 0
     - tokens: 150
-  ▿ tokens: 86 elements
+  ▿ tokens: 84 elements
     ▿ EdgeToolsToken
       - id: 4
       - stringValue: "<tool_call>"
@@ -178,14 +176,14 @@
       - id: 264
       - stringValue: "\":\""
     ▿ EdgeToolsToken
-      - id: 1355
-      - stringValue: "Ad"
+      - id: 8103
+      - stringValue: "H"
     ▿ EdgeToolsToken
-      - id: 628
-      - stringValue: "vent"
+      - id: 637
+      - stringValue: "el"
     ▿ EdgeToolsToken
-      - id: 491
-      - stringValue: "ure"
+      - id: 363
+      - stringValue: "lo"
     ▿ EdgeToolsToken
       - id: 265
       - stringValue: "\",\""
@@ -196,17 +194,11 @@
       - id: 264
       - stringValue: "\":\""
     ▿ EdgeToolsToken
-      - id: 8103
-      - stringValue: "H"
+      - id: 8076
+      - stringValue: "C"
     ▿ EdgeToolsToken
-      - id: 1265
-      - stringValue: "ey"
-    ▿ EdgeToolsToken
-      - id: 8052
-      - stringValue: ","
-    ▿ EdgeToolsToken
-      - id: 1789
-      - stringValue: " could"
+      - id: 837
+      - stringValue: "ould"
     ▿ EdgeToolsToken
       - id: 885
       - stringValue: " you"
@@ -307,14 +299,14 @@
       - id: 264
       - stringValue: "\":\""
     ▿ EdgeToolsToken
-      - id: 1355
-      - stringValue: "Ad"
+      - id: 8103
+      - stringValue: "H"
     ▿ EdgeToolsToken
-      - id: 628
-      - stringValue: "vent"
+      - id: 637
+      - stringValue: "el"
     ▿ EdgeToolsToken
-      - id: 491
-      - stringValue: "ure"
+      - id: 363
+      - stringValue: "lo"
     ▿ EdgeToolsToken
       - id: 265
       - stringValue: "\",\""
