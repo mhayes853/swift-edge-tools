@@ -3,7 +3,7 @@ import HeapModule
 // MARK: - NeedleSPTokenizer
 
 public struct NeedleSPTokenizer: Sendable {
-  public let vocabularySize: Int
+  public var vocabularySize: Int { self.pieces.count }
   public let bosTokenId: EdgeToolsToken.ID?
   public let eosTokenId: EdgeToolsToken.ID?
   public let unknownTokenId: EdgeToolsToken.ID?
@@ -22,39 +22,34 @@ public struct NeedleSPTokenizer: Sendable {
 
     let pieceIds = Dictionary(
       uniqueKeysWithValues: model.pieces.enumerated()
-        .map {
-          (PieceBytes($0.element.text.utf8), $0.offset)
-        }
+        .map { (PieceBytes($0.element.text.utf8), $0.offset) }
     )
     let mergePieces = Dictionary(
       uniqueKeysWithValues: model.pieces.compactMap { piece in
-        piece.type == .normal
-          ? (PieceBytes(piece.text.utf8), piece.score)
-          : nil
+        piece.type == .normal ? (PieceBytes(piece.text.utf8), piece.score) : nil
       }
     )
     let userDefinedPieces = model.pieces
       .filter { $0.type == .userDefined }
       .map { PieceBytes($0.text.utf8) }
       .sorted { $0.count > $1.count }
-    let byteIds = model.byteIds()
+    let byteIds = try model.byteIds()
 
-    self.vocabularySize = model.pieces.count
-    self.bosTokenId = Self.optionalTokenId(model.trainer.bosId)
-    self.eosTokenId = Self.optionalTokenId(model.trainer.eosId)
-    self.unknownTokenId = Self.optionalTokenId(model.trainer.unknownId)
-    self.padTokenId = Self.optionalTokenId(model.trainer.padId)
+    self.bosTokenId = Self.optionalTokenId((try model.trainer.lastInt32(field: 41)) ?? 1)
+    self.eosTokenId = Self.optionalTokenId((try model.trainer.lastInt32(field: 42)) ?? 2)
+    self.unknownTokenId = Self.optionalTokenId((try model.trainer.lastInt32(field: 40)) ?? 0)
+    self.padTokenId = Self.optionalTokenId((try model.trainer.lastInt32(field: 43)) ?? -1)
     self.pieces = model.pieces
     self.pieceIds = pieceIds
     self.mergePieces = mergePieces
     self.userDefinedPieces = userDefinedPieces
     self.byteIds = byteIds
-    self.unknownSurface = model.trainer.unknownSurface
+    self.unknownSurface = (try model.trainer.lastString(field: 44)) ?? " ⁇ "
     self.normalization = Normalization(
-      addDummyPrefix: model.normalizer.addDummyPrefix,
-      removeExtraWhitespaces: model.normalizer.removeExtraWhitespaces,
-      escapeWhitespaces: model.normalizer.escapeWhitespaces,
-      treatWhitespaceAsSuffix: model.trainer.treatWhitespaceAsSuffix
+      addDummyPrefix: (try model.normalizer.lastBool(field: 3)) ?? true,
+      removeExtraWhitespaces: (try model.normalizer.lastBool(field: 4)) ?? true,
+      escapeWhitespaces: (try model.normalizer.lastBool(field: 5)) ?? true,
+      treatWhitespaceAsSuffix: (try model.trainer.lastBool(field: 24)) ?? false
     )
   }
 
@@ -179,10 +174,6 @@ extension NeedleSPTokenizer: EdgeToolsTokenizer {}
 public struct NeedleSPTokenizerError: Hashable, Sendable, Error {
   public let message: String
 
-  public static func emptyModel() -> Self {
-    Self(message: "SentencePiece model contains no pieces.")
-  }
-
   public static func unsupportedModelType() -> Self {
     Self(message: "NeedleSPTokenizer only supports SentencePiece BPE models.")
   }
@@ -195,12 +186,8 @@ public struct NeedleSPTokenizerError: Hashable, Sendable, Error {
     Self(message: "NeedleSPTokenizer does not support SentencePiece denormalizers.")
   }
 
-  public static func unsupportedUnusedPieces() -> Self {
-    Self(message: "NeedleSPTokenizer does not support unused SentencePiece pieces.")
-  }
-
   public static func emptyPiece() -> Self {
-    Self(message: "SentencePiece model contains an empty piece.")
+    Self(message: "SentencePiece model contains an empty user-defined piece.")
   }
 
   public static func duplicatePieces() -> Self {
@@ -208,7 +195,7 @@ public struct NeedleSPTokenizerError: Hashable, Sendable, Error {
   }
 
   public static func invalidUnknownPiece() -> Self {
-    Self(message: "SentencePiece model must contain exactly one valid unknown piece.")
+    Self(message: "SentencePiece model must contain a valid unknown piece at its configured ID.")
   }
 
   public static func incompleteByteFallbackVocabulary() -> Self {
@@ -443,75 +430,55 @@ private struct SentencePieceDecoder {
 }
 
 private struct SentencePieceModel {
-  var pieces = [SentencePiece]()
-  var trainer = TrainerSpec()
-  var normalizer = NormalizerSpec()
-  var hasDenormalizer = false
+  let pieces: [SentencePiece]
+  let trainer: ProtobufMessage
+  let normalizer: ProtobufMessage
 
   init(bytes: [UInt8]) throws {
     do {
-      var reader = ProtobufReader(bytes: bytes)
-      while !reader.isAtEnd {
-        let tag = try reader.readTag()
-        switch (tag.field, tag.wire) {
-        case (1, 2):
-          self.pieces.append(try SentencePiece(bytes: reader.readLengthDelimited()))
-        case (2, 2):
-          self.trainer = try TrainerSpec(bytes: reader.readLengthDelimited())
-        case (3, 2):
-          self.normalizer = try NormalizerSpec(bytes: reader.readLengthDelimited())
-        case (5, 2):
-          self.hasDenormalizer = true
-          _ = try reader.readLengthDelimited()
-        default:
-          try reader.skip(wire: tag.wire)
-        }
-      }
+      let message = ProtobufMessage(bytes: bytes)
+      self.pieces = try message.messages(field: 1).map(SentencePiece.init)
+      self.trainer = try message.lastMessage(field: 2) ?? ProtobufMessage(bytes: [])
+      self.normalizer = try message.lastMessage(field: 3) ?? ProtobufMessage(bytes: [])
+      let hasDenormalizer = try message.lastBytes(field: 5) != nil
+      try self.validate(hasDenormalizer: hasDenormalizer)
     } catch let error as ProtobufReaderError {
       throw NeedleSPTokenizerError.malformedProtobuf(error.message)
     }
-    try self.validate()
   }
 
-  private func validate() throws {
-    guard !self.pieces.isEmpty else {
-      throw NeedleSPTokenizerError.emptyModel()
-    }
-    guard self.trainer.modelType == 2 else {
+  private func validate(hasDenormalizer: Bool) throws {
+    let modelType = (try self.trainer.lastInt32(field: 3)) ?? 1
+    let normalizerName = (try self.normalizer.lastString(field: 1)) ?? ""
+    let precompiledMap = (try self.normalizer.lastBytes(field: 2)) ?? []
+    let unknownId = (try self.trainer.lastInt32(field: 40)) ?? 0
+    let byteFallback = (try self.trainer.lastBool(field: 35)) ?? false
+
+    guard modelType == 2 else {
       throw NeedleSPTokenizerError.unsupportedModelType()
     }
-    guard self.normalizer.precompiledCharactersMap.isEmpty,
-      self.normalizer.name.isEmpty || self.normalizer.name == "identity"
-    else {
+    guard precompiledMap.isEmpty, normalizerName.isEmpty || normalizerName == "identity" else {
       throw NeedleSPTokenizerError.unsupportedNormalizer()
     }
-    guard !self.hasDenormalizer else {
+    guard !hasDenormalizer else {
       throw NeedleSPTokenizerError.unsupportedDenormalizer()
     }
-    guard !self.pieces.contains(where: { $0.type == .unused }) else {
-      throw NeedleSPTokenizerError.unsupportedUnusedPieces()
-    }
-    guard self.pieces.allSatisfy({ !$0.text.isEmpty }) else {
+    guard !self.pieces.contains(where: { $0.type == .userDefined && $0.text.isEmpty }) else {
       throw NeedleSPTokenizerError.emptyPiece()
     }
     guard Set(self.pieces.map { PieceBytes($0.text.utf8) }).count == self.pieces.count else {
       throw NeedleSPTokenizerError.duplicatePieces()
     }
-    guard self.pieces.filter({ $0.type == .unknown }).count == 1 else {
+    guard self.pieces.indices.contains(Int(unknownId)), self.pieces[Int(unknownId)].type == .unknown else {
       throw NeedleSPTokenizerError.invalidUnknownPiece()
     }
-    guard self.pieces.indices.contains(Int(self.trainer.unknownId)),
-      self.pieces[Int(self.trainer.unknownId)].type == .unknown
-    else {
-      throw NeedleSPTokenizerError.invalidUnknownPiece()
-    }
-    if self.trainer.byteFallback, self.byteIds() == nil {
+    if byteFallback, try self.byteIds() == nil {
       throw NeedleSPTokenizerError.incompleteByteFallbackVocabulary()
     }
   }
 
-  func byteIds() -> [EdgeToolsToken.ID]? {
-    guard self.trainer.byteFallback else { return nil }
+  func byteIds() throws -> [EdgeToolsToken.ID]? {
+    guard (try self.trainer.lastBool(field: 35)) ?? false else { return nil }
     var ids = [EdgeToolsToken.ID?](repeating: nil, count: 256)
     for (id, piece) in self.pieces.enumerated() where piece.type == .byte {
       guard let byte = piece.byteValue else { continue }
@@ -546,79 +513,28 @@ private struct SentencePiece: Hashable, Sendable {
     return UInt8(String(decoding: bytes[3...4], as: UTF8.self), radix: 16)
   }
 
-  init(bytes: [UInt8]) throws {
-    var reader = ProtobufReader(bytes: bytes)
-    while !reader.isAtEnd {
-      let tag = try reader.readTag()
-      switch (tag.field, tag.wire) {
-      case (1, 2): self.text = try reader.readString()
-      case (2, 5): self.score = Float(bitPattern: try reader.readFixed32())
-      case (3, 0):
-        let rawValue = Int32(truncatingIfNeeded: try reader.readVarint())
-        guard let type = PieceType(rawValue: rawValue) else {
-          throw NeedleSPTokenizerError.malformedProtobuf("contains an unknown piece type.")
-        }
-        self.type = type
-      default: try reader.skip(wire: tag.wire)
-      }
+  init(message: ProtobufMessage) throws {
+    self.text = (try message.lastString(field: 1)) ?? ""
+    self.score = (try message.lastFixed32(field: 2)).map { Float(bitPattern: $0) } ?? 0
+    let rawType = (try message.lastInt32(field: 3)) ?? 1
+    guard let type = PieceType(rawValue: rawType) else {
+      throw NeedleSPTokenizerError.malformedProtobuf("contains an unknown piece type.")
     }
+    self.type = type
   }
 }
 
-private struct TrainerSpec {
-  var modelType: Int32 = 1
-  var treatWhitespaceAsSuffix = false
-  var byteFallback = false
-  var unknownId: Int32 = 0
-  var bosId: Int32 = 1
-  var eosId: Int32 = 2
-  var padId: Int32 = -1
-  var unknownSurface = " ⁇ "
+// MARK: - ProtobufReaderError
 
-  init() {}
-
-  init(bytes: [UInt8]) throws {
-    self.init()
-    var reader = ProtobufReader(bytes: bytes)
-    while !reader.isAtEnd {
-      let tag = try reader.readTag()
-      switch (tag.field, tag.wire) {
-      case (3, 0): self.modelType = Int32(truncatingIfNeeded: try reader.readVarint())
-      case (24, 0): self.treatWhitespaceAsSuffix = try reader.readBool()
-      case (35, 0): self.byteFallback = try reader.readBool()
-      case (40, 0): self.unknownId = Int32(truncatingIfNeeded: try reader.readVarint())
-      case (41, 0): self.bosId = Int32(truncatingIfNeeded: try reader.readVarint())
-      case (42, 0): self.eosId = Int32(truncatingIfNeeded: try reader.readVarint())
-      case (43, 0): self.padId = Int32(truncatingIfNeeded: try reader.readVarint())
-      case (44, 2): self.unknownSurface = try reader.readString()
-      default: try reader.skip(wire: tag.wire)
-      }
-    }
-  }
-}
-
-private struct NormalizerSpec {
-  var name = ""
-  var precompiledCharactersMap = [UInt8]()
-  var addDummyPrefix = true
-  var removeExtraWhitespaces = true
-  var escapeWhitespaces = true
-
-  init() {}
-
-  init(bytes: [UInt8]) throws {
-    self.init()
-    var reader = ProtobufReader(bytes: bytes)
-    while !reader.isAtEnd {
-      let tag = try reader.readTag()
-      switch (tag.field, tag.wire) {
-      case (1, 2): self.name = try reader.readString()
-      case (2, 2): self.precompiledCharactersMap = try reader.readLengthDelimited()
-      case (3, 0): self.addDummyPrefix = try reader.readBool()
-      case (4, 0): self.removeExtraWhitespaces = try reader.readBool()
-      case (5, 0): self.escapeWhitespaces = try reader.readBool()
-      default: try reader.skip(wire: tag.wire)
-      }
+extension ProtobufReaderError {
+  fileprivate var message: String {
+    switch self {
+    case .truncated: "is truncated."
+    case .invalidTag: "contains an invalid tag."
+    case .overflowingVarint: "contains an overflowing varint."
+    case .fieldTooLarge: "contains a field that is too large."
+    case .invalidUTF8: "contains invalid UTF-8."
+    case .unsupportedWireType(let wire): "contains unsupported wire type \(wire)."
     }
   }
 }

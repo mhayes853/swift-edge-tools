@@ -37,10 +37,9 @@ struct ProtobufReader {
 
   mutating func readFixed32() throws(ProtobufReaderError) -> UInt32 {
     let bytes = try self.read(count: 4)
-    return bytes.enumerated()
-      .reduce(0) { result, element in
-        result | UInt32(element.element) << UInt32(element.offset * 8)
-      }
+    return bytes.enumerated().reduce(0) { result, element in
+      result | UInt32(element.element) << UInt32(element.offset * 8)
+    }
   }
 
   mutating func readLengthDelimited() throws(ProtobufReaderError) -> [UInt8] {
@@ -59,11 +58,21 @@ struct ProtobufReader {
   mutating func skip(wire: Int) throws(ProtobufReaderError) {
     switch wire {
     case 0: _ = try self.readVarint()
-    case 1: _ = try self.read(count: 8)
-    case 2: _ = try self.readLengthDelimited()
-    case 5: _ = try self.read(count: 4)
+    case 1: try self.skip(count: 8)
+    case 2:
+      let length = try self.readVarint()
+      guard length <= UInt64(Int.max) else { throw ProtobufReaderError.fieldTooLarge }
+      try self.skip(count: Int(length))
+    case 5: try self.skip(count: 4)
     default: throw ProtobufReaderError.unsupportedWireType(wire)
     }
+  }
+
+  private mutating func skip(count: Int) throws(ProtobufReaderError) {
+    guard count >= 0, count <= self.bytes.count - self.offset else {
+      throw ProtobufReaderError.truncated
+    }
+    self.offset += count
   }
 
   private mutating func read(count: Int) throws(ProtobufReaderError) -> [UInt8] {
@@ -72,6 +81,62 @@ struct ProtobufReader {
     }
     defer { self.offset += count }
     return Array(self.bytes[self.offset..<(self.offset + count)])
+  }
+}
+
+struct ProtobufMessage {
+  let bytes: [UInt8]
+
+  func lastBool(field: Int) throws -> Bool? {
+    try self.lastVarint(field: field).map { $0 != 0 }
+  }
+
+  func lastInt32(field: Int) throws -> Int32? {
+    try self.lastVarint(field: field).map { Int32(truncatingIfNeeded: $0) }
+  }
+
+  func lastFixed32(field: Int) throws -> UInt32? {
+    try self.values(field: field, wire: 5) { try $0.readFixed32() }.last
+  }
+
+  func lastString(field: Int) throws -> String? {
+    try self.values(field: field, wire: 2) { try $0.readString() }.last
+  }
+
+  func lastBytes(field: Int) throws -> [UInt8]? {
+    try self.values(field: field, wire: 2) { try $0.readLengthDelimited() }.last
+  }
+
+  func lastMessage(field: Int) throws -> Self? {
+    try self.messages(field: field).last
+  }
+
+  func messages(field: Int) throws -> [Self] {
+    try self.values(field: field, wire: 2) {
+      Self(bytes: try $0.readLengthDelimited())
+    }
+  }
+
+  private func lastVarint(field: Int) throws -> UInt64? {
+    try self.values(field: field, wire: 0) { try $0.readVarint() }.last
+  }
+
+  private func values<Value>(
+    field: Int,
+    wire: Int,
+    decode: (inout ProtobufReader) throws -> Value
+  ) throws -> [Value] {
+    var reader = ProtobufReader(bytes: self.bytes)
+    var values = [Value]()
+    while !reader.isAtEnd {
+      let tag = try reader.readTag()
+      if tag.field == field, tag.wire == wire {
+        values.append(try decode(&reader))
+      } else {
+        try reader.skip(wire: tag.wire)
+      }
+    }
+    return values
   }
 }
 
@@ -84,15 +149,4 @@ enum ProtobufReaderError: Hashable, Sendable, Error {
   case fieldTooLarge
   case invalidUTF8
   case unsupportedWireType(Int)
-
-  var message: String {
-    switch self {
-    case .invalidTag: "contains an invalid tag."
-    case .truncated: "is truncated."
-    case .overflowingVarint: "contains an overflowing varint."
-    case .fieldTooLarge: "contains a field that is too large."
-    case .invalidUTF8: "contains invalid UTF-8."
-    case .unsupportedWireType(let wire): "contains unsupported wire type \(wire)."
-    }
-  }
 }

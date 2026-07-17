@@ -230,6 +230,17 @@ struct `NeedleSPTokenizer tests` {
     }
   }
 
+  @Test
+  func `Allows Unused Pieces`() throws {
+    let unusedPiece = [UInt8]([0x0A, 0x08] + Array("<unused>".utf8) + [0x18, 0x05])
+    let model = self.minimalModel(modelType: 2, byteFallback: false)
+      + [0x0A, UInt8(unusedPiece.count)] + unusedPiece
+    let tokenizer = try NeedleSPTokenizer(data: model)
+
+    expectNoDifference(tokenizer.convertIdToToken(1), "<unused>")
+    expectNoDifference(tokenizer.decode(tokens: [1]), "")
+  }
+
   private func longPrompt() throws -> String {
     try NeedlePrompt(
       system: """
