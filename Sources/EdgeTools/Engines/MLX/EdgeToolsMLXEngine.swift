@@ -89,7 +89,7 @@
 
     public init(
       languageModel: sending Configuration.LanguageModel,
-      tokenizer: consuming sending any EdgeToolsTokenizer,
+      tokenizer: sending any EdgeToolsTokenizer,
       grammarEngine: consuming sending XGrammarCompiler
     ) {
       self.state = Lock(
@@ -100,7 +100,7 @@
           cachedPrefill: nil
         )
       )
-      self.tokenizer = consume tokenizer
+      self.tokenizer = tokenizer
     }
 
     public convenience init(
@@ -116,7 +116,7 @@
       let grammarEngine = try Configuration.grammarCompiler(using: tokenizer)
       self.init(
         languageModel: languageModel,
-        tokenizer: consume tokenizer,
+        tokenizer: tokenizer,
         grammarEngine: consume grammarEngine
       )
     }

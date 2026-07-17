@@ -27,7 +27,7 @@ extension NeedlePrompt {
 
   public func tokenized(
     tools: [EdgeToolDefinition],
-    using tokenizer: borrowing some EdgeToolsTokenizer
+    using tokenizer: some EdgeToolsTokenizer
   ) throws -> [EdgeToolsToken] {
     let tokenIds = tokenizer.encode(text: try self.formatted(tools: tools))
     let tokens = tokenizer.convertIdsToTokens(tokenIds)

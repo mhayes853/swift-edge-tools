@@ -401,14 +401,14 @@
   // MARK: - Helpers
 
   private func requiredNeedleCompiler(
-    tokenizer: borrowing some EdgeToolsTokenizer
+    tokenizer: some EdgeToolsTokenizer
   ) throws -> XGrammarCompiler {
     let tokenizerInfo = try XGrammarTokenizerInfo.needle(tokenizer: tokenizer)
     return try XGrammarCompiler(tokenizerInfo: tokenizerInfo)
   }
 
   private func requiredNeedleCompiler(
-    erasedTokenizer tokenizer: borrowing any EdgeToolsTokenizer
+    erasedTokenizer tokenizer: any EdgeToolsTokenizer
   ) throws -> XGrammarCompiler {
     let tokenizerInfo = try XGrammarTokenizerInfo.needle(tokenizer: tokenizer)
     return try XGrammarCompiler(tokenizerInfo: tokenizerInfo)

@@ -15,7 +15,7 @@
       let url = try await downloadNeedle()
       var tokenizer = try self.tokenizer(url: url)
       let model = try loadEdgeToolsMLXLanguageModel(
-        NeedleEdgeToolsMLXModelConfiguration.self,
+        NeedleMLXModelConfiguration.self,
         from: url
       )
       let tokenizerInfo = try XGrammarTokenizerInfo.needle(tokenizer: tokenizer)
@@ -30,7 +30,7 @@
         input: try LMInput.needle(
           prompt: .sendAdventureEmail,
           tools: [.sendEmail],
-          using: consume tokenizer
+          using: tokenizer
         ),
         model: model,
         processor: EdgeToolsApplyBitmaskProcessorMLX(matcher: matcher),

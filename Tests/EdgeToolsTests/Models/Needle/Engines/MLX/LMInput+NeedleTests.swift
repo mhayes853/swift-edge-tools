@@ -38,7 +38,7 @@
       let input = try LMInput.needle(
         prompt: NeedlePrompt(system: system, user: user),
         tools: [.sendEmail],
-        using: consume tokenizer
+        using: tokenizer
       )
       assertSnapshot(of: input.text.tokens.asArray(Int32.self), as: .dump)
     }

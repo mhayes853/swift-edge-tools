@@ -5,9 +5,9 @@
   import MLXLMCommon
   import MLXNN
 
-  // MARK: - NeedleEdgeToolsMLXModelConfiguration
+  // MARK: - NeedleMLXModelConfiguration
 
-  public enum NeedleEdgeToolsMLXModelConfiguration: EdgeToolsMLXModelConfiguration {
+  public enum NeedleMLXModelConfiguration: EdgeToolsMLXModelConfiguration {
     public typealias ModelConfiguration = NeedleModelConfiguration
     public typealias Prompt = NeedlePrompt
     public typealias ToolCallParser = NeedleToolCallParser
@@ -21,7 +21,7 @@
     }
 
     public static func grammarCompiler(
-      using tokenizer: borrowing any EdgeToolsTokenizer
+      using tokenizer: any EdgeToolsTokenizer
     ) throws -> XGrammarCompiler {
       try XGrammarCompiler(tokenizerInfo: XGrammarTokenizerInfo.needle(tokenizer: tokenizer))
     }
@@ -35,13 +35,12 @@
     public static func tokenize(
       prompt: NeedlePrompt,
       tools: [EdgeToolDefinition],
-      using tokenizer: borrowing any EdgeToolsTokenizer
+      using tokenizer: any EdgeToolsTokenizer
     ) throws -> LMInput {
       let tokens = tokenizer.encode(text: try prompt.formatted(tools: tools))
       return LMInput(text: LMInput.Text(tokens: MLXArray(tokens)))
     }
   }
-
 
   // MARK: - LMInput + Needle
 
@@ -49,7 +48,7 @@
     public static func needle(
       prompt: NeedlePrompt,
       tools: [EdgeToolDefinition],
-      using tokenizer: borrowing some EdgeToolsTokenizer
+      using tokenizer: some EdgeToolsTokenizer
     ) throws -> Self {
       let tokens = tokenizer.encode(text: try prompt.formatted(tools: tools))
       return LMInput(text: LMInput.Text(tokens: MLXArray(tokens)))

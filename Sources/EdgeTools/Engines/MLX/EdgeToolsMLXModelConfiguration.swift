@@ -15,7 +15,7 @@
     ) throws -> XGrammarGrammar
 
     static func grammarCompiler(
-      using tokenizer: borrowing any EdgeToolsTokenizer
+      using tokenizer: any EdgeToolsTokenizer
     ) throws -> XGrammarCompiler
 
     static func languageModel(configuration: ModelConfiguration) -> sending LanguageModel
@@ -23,7 +23,7 @@
     static func tokenize(
       prompt: Prompt,
       tools: [EdgeToolDefinition],
-      using tokenizer: borrowing any EdgeToolsTokenizer
+      using tokenizer: any EdgeToolsTokenizer
     ) throws -> LMInput
   }
 

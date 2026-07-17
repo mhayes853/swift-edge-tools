@@ -8,8 +8,8 @@
   import MLXLMCommon
 
   @Suite(.serialized, .enabledIfXcode())
-  struct `EdgeToolsMLXEngine tests` {
-    private typealias Engine = EdgeToolsMLXEngine<NeedleEdgeToolsMLXModelConfiguration>
+  struct `NeedleMLXEngine tests` {
+    private typealias Engine = EdgeToolsMLXEngine<NeedleMLXModelConfiguration>
 
     private let engine: Engine
 

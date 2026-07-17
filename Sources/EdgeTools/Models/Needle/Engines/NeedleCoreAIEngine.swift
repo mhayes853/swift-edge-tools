@@ -126,14 +126,14 @@
     public convenience init<Tokenizer: EdgeToolsTokenizer>(
       encoderModel: AIModel,
       decoderModel: AIModel,
-      tokenizer: consuming sending Tokenizer,
+      tokenizer: sending Tokenizer,
       configuration: NeedleModelConfiguration,
       grammarEngine: consuming sending XGrammarCompiler
     ) throws {
       try self.init(
         encoderModel: encoderModel,
         decoderModel: decoderModel,
-        tokenizer: consume tokenizer,
+        tokenizer: tokenizer,
         configuration: configuration,
         grammarEngine: consume grammarEngine
       )
@@ -142,7 +142,7 @@
     private init(
       encoderModel: AIModel,
       decoderModel: AIModel,
-      tokenizer: consuming sending any EdgeToolsTokenizer,
+      tokenizer: sending any EdgeToolsTokenizer,
       configuration: NeedleModelConfiguration,
       grammarEngine: consuming sending XGrammarCompiler
     ) throws {
@@ -155,7 +155,7 @@
       self.configuration = configuration
       self.encoderFunction = try Self.loadFunction(named: FunctionName.main, from: encoderModel)
       self.decoderFunction = try Self.loadFunction(named: FunctionName.main, from: decoderModel)
-      self.tokenizer = consume tokenizer
+      self.tokenizer = tokenizer
     }
   }
 

@@ -118,14 +118,14 @@
     public convenience init<Tokenizer: EdgeToolsTokenizer>(
       encoderModel: sending MLModel,
       decoderModel: sending MLModel,
-      tokenizer: consuming sending Tokenizer,
+      tokenizer: sending Tokenizer,
       configuration: NeedleModelConfiguration,
       grammarEngine: consuming sending XGrammarCompiler
     ) {
       self.init(
         encoderModel: encoderModel,
         decoderModel: decoderModel,
-        tokenizer: consume tokenizer,
+        tokenizer: tokenizer,
         configuration: configuration,
         grammarEngine: consume grammarEngine
       )
@@ -134,7 +134,7 @@
     private init(
       encoderModel: sending MLModel,
       decoderModel: sending MLModel,
-      tokenizer: consuming sending any EdgeToolsTokenizer,
+      tokenizer: sending any EdgeToolsTokenizer,
       configuration: NeedleModelConfiguration,
       grammarEngine: consuming sending XGrammarCompiler
     ) {
@@ -147,7 +147,7 @@
       self.configuration = configuration
       self.encoderModel = EncoderModelActor(model: encoderModel)
       self.decoderModel = DecoderModelActor(model: decoderModel)
-      self.tokenizer = consume tokenizer
+      self.tokenizer = tokenizer
     }
 
     public func tokenize(

@@ -6,7 +6,7 @@ struct StreamingDetokenizer {
 
   mutating func decode(
     tokenId: EdgeToolsToken.ID,
-    using tokenizer: borrowing some EdgeToolsTokenizer
+    using tokenizer: some EdgeToolsTokenizer
   ) -> String {
     self.tokenIds.append(tokenId)
     let decodedResponse = tokenizer.decode(tokens: self.tokenIds)
