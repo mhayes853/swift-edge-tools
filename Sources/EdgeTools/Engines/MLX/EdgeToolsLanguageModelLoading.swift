@@ -4,16 +4,14 @@
   import MLXNN
   import MLXLMCommon
 
-  package func loadEdgeToolsMLXLanguageModel<
-    Configuration: EdgeToolsMLXModelConfiguration
-  >(
-    _ configuration: Configuration.Type,
+  package func loadEdgeToolsLanguageModel<Model: EdgeToolsLanguageModel>(
+    _ model: Model.Type,
     from directoryURL: URL,
-    editModelConfiguration: (inout Configuration.ModelConfiguration) -> Void = { _ in }
-  ) throws -> sending Configuration.LanguageModel {
+    editModelConfiguration: (inout Model.ModelConfiguration) -> Void = { _ in }
+  ) throws -> Model {
     guard
       var modelConfiguration = try decodeModelConfiguration(
-        Configuration.ModelConfiguration.self,
+        Model.ModelConfiguration.self,
         in: directoryURL
       )
     else {
@@ -21,17 +19,16 @@
     }
     editModelConfiguration(&modelConfiguration)
 
-    let languageModel = configuration.languageModel(configuration: modelConfiguration)
     return try populateEdgeToolsMLXWeights(
-      in: languageModel,
+      in: Model(configuration: modelConfiguration),
       from: directoryURL
     )
   }
 
   private func populateEdgeToolsMLXWeights<LanguageModel: MLXLMCommon.LanguageModel>(
-    in languageModel: sending LanguageModel,
+    in languageModel: LanguageModel,
     from directoryURL: URL
-  ) throws -> sending LanguageModel {
+  ) throws -> LanguageModel {
     let fileManager = FileManager.default
     guard let enumerator = fileManager.enumerator(
       at: directoryURL,

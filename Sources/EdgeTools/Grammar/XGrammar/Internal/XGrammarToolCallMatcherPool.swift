@@ -1,8 +1,8 @@
 #if XGrammar
   final class XGrammarToolCallMatcherPool {
-    typealias NormalizeTools = @Sendable ([EdgeToolDefinition]) -> [EdgeToolDefinition]
+    typealias NormalizeTools = ([EdgeToolDefinition]) -> [EdgeToolDefinition]
     typealias MakeGrammar =
-      @Sendable ([EdgeToolDefinition], GrammarToolCallRange) throws -> XGrammarGrammar
+      ([EdgeToolDefinition], GrammarToolCallRange) throws -> XGrammarGrammar
 
     private final class CachedMatcher {
       private let matcher: XGrammarMatcher

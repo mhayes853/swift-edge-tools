@@ -5,43 +5,6 @@
   import MLXLMCommon
   import MLXNN
 
-  // MARK: - NeedleMLXModelConfiguration
-
-  public enum NeedleMLXModelConfiguration: EdgeToolsMLXModelConfiguration {
-    public typealias ModelConfiguration = NeedleModelConfiguration
-    public typealias Prompt = NeedlePrompt
-    public typealias ToolCallParser = NeedleToolCallParser
-    public typealias LanguageModel = NeedleMLXModel
-
-    public static func grammar(
-      tools: [EdgeToolDefinition],
-      range: GrammarToolCallRange
-    ) throws -> XGrammarGrammar {
-      try XGrammarGrammar.needle(tools: tools, range: range)
-    }
-
-    public static func grammarCompiler(
-      using tokenizer: any EdgeToolsTokenizer
-    ) throws -> XGrammarCompiler {
-      try XGrammarCompiler(tokenizerInfo: XGrammarTokenizerInfo.needle(tokenizer: tokenizer))
-    }
-
-    public static func languageModel(
-      configuration: NeedleModelConfiguration
-    ) -> sending NeedleMLXModel {
-      NeedleMLXModel(configuration: configuration)
-    }
-
-    public static func tokenize(
-      prompt: NeedlePrompt,
-      tools: [EdgeToolDefinition],
-      using tokenizer: any EdgeToolsTokenizer
-    ) throws -> sending LMInput {
-      let tokens = tokenizer.encode(text: try prompt.formatted(tools: tools))
-      return LMInput(text: LMInput.Text(tokens: MLXArray(tokens)))
-    }
-  }
-
   // MARK: - LMInput + Needle
 
   extension LMInput {
@@ -188,6 +151,36 @@
         logits: (self.lmHead ?? self.model.embedding).asLinear(output),
         state: LMOutput.State(crossAttentionStates: encoderOutput)
       )
+    }
+  }
+
+  // MARK: - EdgeToolsLanguageModel
+
+  extension NeedleMLXModel: EdgeToolsLanguageModel {
+    public typealias ModelConfiguration = NeedleModelConfiguration
+    public typealias Prompt = NeedlePrompt
+    public typealias ToolCallParser = NeedleToolCallParser
+
+    public func grammar(
+      tools: [EdgeToolDefinition],
+      range: GrammarToolCallRange
+    ) throws -> XGrammarGrammar {
+      try XGrammarGrammar.needle(tools: tools, range: range)
+    }
+
+    public func grammarCompiler(
+      using tokenizer: any EdgeToolsTokenizer
+    ) throws -> XGrammarCompiler {
+      try XGrammarCompiler(tokenizerInfo: XGrammarTokenizerInfo.needle(tokenizer: tokenizer))
+    }
+
+    public func tokenize(
+      prompt: NeedlePrompt,
+      tools: [EdgeToolDefinition],
+      using tokenizer: any EdgeToolsTokenizer
+    ) throws -> sending LMInput {
+      let tokens = tokenizer.encode(text: try prompt.formatted(tools: tools))
+      return LMInput(text: LMInput.Text(tokens: MLXArray(tokens)))
     }
   }
 

@@ -14,8 +14,8 @@
     func `TokenIterator Usage`() async throws {
       let url = try await downloadNeedle()
       var tokenizer = try self.tokenizer(url: url)
-      let model = try loadEdgeToolsMLXLanguageModel(
-        NeedleMLXModelConfiguration.self,
+      let model = try loadEdgeToolsLanguageModel(
+        NeedleMLXModel.self,
         from: url
       )
       let tokenizerInfo = try XGrammarTokenizerInfo.needle(tokenizer: tokenizer)

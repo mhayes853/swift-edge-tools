@@ -9,7 +9,7 @@
 
   @Suite(.serialized, .enabledIfXcode())
   struct `NeedleMLXEngine tests` {
-    private typealias Engine = EdgeToolsMLXEngine<NeedleMLXModelConfiguration>
+    private typealias Engine = EdgeToolsMLXEngine<NeedleMLXModel>
 
     private let engine: Engine
 

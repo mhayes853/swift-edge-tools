@@ -1,16 +1,15 @@
 #if MLX && canImport(MLX)
   import MLX
   import MLXNN
+  import MLXLLM
   import MLXLMCommon
   import Foundation
   import Atomics
 
   // MARK: - EdgeToolsMLXEngine
 
-  public final class EdgeToolsMLXEngine<
-    Configuration: EdgeToolsMLXModelConfiguration
-  >: EdgeToolsEngine {
-    public typealias Prompt = Configuration.Prompt
+  public final class EdgeToolsMLXEngine<Model: EdgeToolsLanguageModel>: EdgeToolsEngine {
+    public typealias Prompt = Model.Prompt
 
     public struct GenerateParameters: EdgeToolsEngineGenerateParameters {
       public static var `default`: Self {
@@ -68,7 +67,7 @@
 
     private struct State: ~Copyable {
       let grammarEngine: XGrammarCompiler
-      let languageModel: Configuration.LanguageModel
+      let model: Model
       let matcherPool: XGrammarToolCallMatcherPool
       var cachedPrefill: CachedPrefill?
     }
@@ -78,52 +77,70 @@
     private let clock = ContinuousClock()
 
     public init(
-      languageModel: sending Configuration.LanguageModel,
+      model: sending Model,
       tokenizer: sending any EdgeToolsTokenizer,
       grammarEngine: consuming sending XGrammarCompiler
     ) {
       self.state = Lock(
         State(
           grammarEngine: consume grammarEngine,
-          languageModel: languageModel,
-          matcherPool: XGrammarToolCallMatcherPool(makeGrammar: Configuration.grammar),
+          model: model,
+          matcherPool: XGrammarToolCallMatcherPool(makeGrammar: model.grammar),
           cachedPrefill: nil
         )
       )
       self.tokenizer = tokenizer
     }
 
+    private init(
+      loadingFrom directoryURL: URL,
+      tokenizer: sending any EdgeToolsTokenizer,
+      editModelConfiguration: (inout Model.ModelConfiguration) -> Void
+    ) throws {
+      self.state = try Lock {
+        let model = try loadEdgeToolsLanguageModel(
+          Model.self,
+          from: directoryURL,
+          editModelConfiguration: editModelConfiguration
+        )
+        let grammarEngine = try model.grammarCompiler(using: tokenizer)
+        return State(
+          grammarEngine: consume grammarEngine,
+          model: model,
+          matcherPool: XGrammarToolCallMatcherPool(makeGrammar: model.grammar),
+          cachedPrefill: nil
+        )
+      }
+      self.tokenizer = tokenizer
+    }
+
     public convenience init(
       from directoryURL: URL,
-      editModelConfiguration: (inout Configuration.ModelConfiguration) -> Void = { _ in }
+      editModelConfiguration: (inout Model.ModelConfiguration) -> Void = { _ in }
     ) async throws {
       let tokenizer = try await loadEdgeToolsTokenizer(from: directoryURL)
-      let languageModel = try loadEdgeToolsMLXLanguageModel(
-        Configuration.self,
-        from: directoryURL,
-        editModelConfiguration: editModelConfiguration
-      )
-      let grammarEngine = try Configuration.grammarCompiler(using: tokenizer)
-      self.init(
-        languageModel: languageModel,
+      try self.init(
+        loadingFrom: directoryURL,
         tokenizer: tokenizer,
-        grammarEngine: consume grammarEngine
+        editModelConfiguration: editModelConfiguration
       )
     }
 
     public func tokenize(
-      prompt: Configuration.Prompt,
+      prompt: Model.Prompt,
       tools: [EdgeToolDefinition] = []
     ) async throws -> [EdgeToolsToken] {
-      let input = try Configuration.tokenize(
-        prompt: prompt,
-        tools: tools,
-        using: self.tokenizer
-      )
-      let tokenIDs = input.text.tokens.asArray(EdgeToolsToken.ID.self)
-      let tokens = self.tokenizer.convertIdsToTokens(tokenIDs)
-      return zip(tokenIDs, tokens).compactMap { tokenID, token in
-        token.map { EdgeToolsToken(id: tokenID, stringValue: $0) }
+      try self.state.withBorrowedLock { state in
+        let input = try state.model.tokenize(
+          prompt: prompt,
+          tools: tools,
+          using: self.tokenizer
+        )
+        let tokenIDs = input.text.tokens.asArray(EdgeToolsToken.ID.self)
+        let tokens = self.tokenizer.convertIdsToTokens(tokenIDs)
+        return zip(tokenIDs, tokens).compactMap { tokenID, token in
+          token.map { EdgeToolsToken(id: tokenID, stringValue: $0) }
+        }
       }
     }
 
@@ -136,7 +153,7 @@
     }
 
     public func generate(
-      prompt: Configuration.Prompt,
+      prompt: Model.Prompt,
       tools: [EdgeToolDefinition] = [],
       parameters: GenerateParameters,
       channel: EdgeToolsGenerationChannel
@@ -158,7 +175,7 @@
     }
 
     private func generate(
-      prompt: Configuration.Prompt,
+      prompt: Model.Prompt,
       tools: [EdgeToolDefinition],
       parameters: GenerateParameters,
       channel: EdgeToolsGenerationChannel,
@@ -179,7 +196,7 @@
         synchronize: parameters.synchronizeStreamForMemorySnapshots
       )
       let generateStart = self.clock.now
-      let input = try Configuration.tokenize(
+      let input = try state.model.tokenize(
         prompt: prompt,
         tools: tools,
         using: self.tokenizer
@@ -198,7 +215,7 @@
       var durationToFirstToken: Duration?
 
       var detokenizer = StreamingDetokenizer()
-      var parser = Configuration.ToolCallParser()
+      var parser = Model.ToolCallParser()
       var generatedTokens = [EdgeToolsToken]()
       var confidence = EdgeToolsConfidenceState()
       while !matcher.isTerminated
@@ -238,7 +255,7 @@
         )
 
         let inputText = LMInput.Text(tokens: sampledToken)
-        output = state.languageModel(
+        output = state.model(
           inputText[text: .newAxis],
           cache: cache,
           state: output.state
@@ -287,7 +304,7 @@
         let output = if suffixCount == 0 {
           cachedPrefill.output
         } else {
-          state.languageModel(
+          state.model(
             input.text[cachedPrefill.tokenIDs.count...][text: .newAxis],
             cache: cache,
             state: cachedPrefill.output.state
@@ -306,11 +323,11 @@
         )
       }
 
-      let cache = state.languageModel.newCache(parameters: nil)
+      let cache = state.model.newCache(parameters: nil)
       let prefillStart = self.clock.now
       let output = try self.prepare(
         input: input,
-        languageModel: state.languageModel,
+        model: state.model,
         cache: cache,
         processor: &processor
       )
@@ -329,17 +346,17 @@
 
     private func prepare(
       input: LMInput,
-      languageModel: Configuration.LanguageModel,
+      model: Model,
       cache: [any KVCache],
       processor: inout (any LogitProcessor)?
     ) throws -> LMOutput {
       processor?.prompt(input.text.tokens)
-      switch try languageModel.prepare(input, cache: cache, windowSize: nil) {
+      switch try model.prepare(input, cache: cache, windowSize: nil) {
       case .logits(let output):
         return output
       case .tokens(let tokens):
         guard tokens.tokens.size > 0 else { throw EdgeToolsMLXEngineError.emptyInput }
-        return languageModel(
+        return model(
           tokens[text: .newAxis],
           cache: cache.isEmpty ? nil : cache,
           state: nil
@@ -350,20 +367,19 @@
 
   // MARK: - EdgeToolsPrefillableEngine
 
-  extension EdgeToolsMLXEngine: EdgeToolsPrefillableEngine
-  where Configuration: EdgeToolsPrefillableMLXModelConfiguration {
+  extension EdgeToolsMLXEngine: EdgeToolsPrefillableEngine where Model: LLMModel {
     public func prefill(
-      promptPrefix: Configuration.Prompt,
+      promptPrefix: Model.Prompt,
       tools: [EdgeToolDefinition]
     ) async throws -> EdgeToolsEnginePrefill {
-      try Task.checkCancellation()
-      let input = try Configuration.tokenize(
-        prompt: promptPrefix,
-        tools: tools,
-        using: self.tokenizer
-      )
-      return try self.state.withLock(input) { state, input in
-        try self.prefill(input: input, state: &state)
+      try self.state.withLock { state in
+        try Task.checkCancellation()
+        let input = try state.model.tokenize(
+          prompt: promptPrefix,
+          tools: tools,
+          using: self.tokenizer
+        )
+        return try self.prefill(input: input, state: &state)
       }
     }
 
@@ -373,12 +389,12 @@
     ) throws -> EdgeToolsEnginePrefill {
       try Task.checkCancellation()
       let tokenIDs = input.text.tokens.asArray(EdgeToolsToken.ID.self)
-      let cache = state.languageModel.newCache(parameters: nil)
+      let cache = state.model.newCache(parameters: nil)
       var processor: (any LogitProcessor)?
       let prefillStart = self.clock.now
       let output = try self.prepare(
         input: input,
-        languageModel: state.languageModel,
+        model: state.model,
         cache: cache,
         processor: &processor
       )

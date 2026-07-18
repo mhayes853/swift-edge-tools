@@ -23,6 +23,16 @@ package struct Lock<Value: ~Copyable>: ~Copyable {
     #endif
   }
 
+  package init<E: Error>(_ makeValue: () throws(E) -> Value) throws(E) {
+    #if canImport(Darwin) && canImport(Foundation)
+      let value = try makeValue()
+      self.value = UnsafeMutablePointer<Value>.allocate(capacity: 1)
+      self.value.initialize(to: value)
+    #else
+      self.lock = Mutex(try makeValue())
+    #endif
+  }
+
   deinit {
     #if canImport(Darwin) && canImport(Foundation)
       self.value.deinitialize(count: 1)
@@ -42,18 +52,6 @@ package struct Lock<Value: ~Copyable>: ~Copyable {
     #endif
   }
 
-  package borrowing func withLock<TransferredValue, Result: ~Copyable, E: Error>(
-    _ input: sending TransferredValue,
-    _ body: (inout sending Value, sending TransferredValue) throws(E) -> sending Result
-  ) throws(E) -> sending Result {
-    #if canImport(Darwin) && canImport(Foundation)
-      self.lock.lock()
-      defer { self.lock.unlock() }
-      return try body(&self.value.pointee, input)
-    #else
-      try self.lock.withLock { try body(&$0, input) }
-    #endif
-  }
 
   package borrowing func withBorrowedLock<Result: ~Copyable, E: Error>(
     _ body: (borrowing Value) throws(E) -> sending Result

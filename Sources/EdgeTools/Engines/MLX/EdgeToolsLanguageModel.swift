@@ -1,34 +1,29 @@
 #if MLX && canImport(MLX)
   import MLXLMCommon
 
-  // MARK: - EdgeToolsMLXModelConfiguration
+  // MARK: - EdgeToolsLanguageModel
 
-  public protocol EdgeToolsMLXModelConfiguration: Sendable {
+  public protocol EdgeToolsLanguageModel: LanguageModel {
     associatedtype ModelConfiguration: Decodable
     associatedtype Prompt: Sendable
     associatedtype ToolCallParser: EdgeToolCallParser
-    associatedtype LanguageModel: MLXLMCommon.LanguageModel
 
-    static func grammar(
+    init(configuration: ModelConfiguration)
+
+    func grammar(
       tools: [EdgeToolDefinition],
       range: GrammarToolCallRange
     ) throws -> XGrammarGrammar
 
-    static func grammarCompiler(
+    func grammarCompiler(
       using tokenizer: any EdgeToolsTokenizer
     ) throws -> XGrammarCompiler
 
-    static func languageModel(configuration: ModelConfiguration) -> sending LanguageModel
-
-    static func tokenize(
+    func tokenize(
       prompt: Prompt,
       tools: [EdgeToolDefinition],
       using tokenizer: any EdgeToolsTokenizer
     ) throws -> sending LMInput
   }
 
-  // MARK: - EdgeToolsPrefillableMLXModelConfiguration
-
-  public protocol EdgeToolsPrefillableMLXModelConfiguration:
-    EdgeToolsMLXModelConfiguration {}
 #endif
