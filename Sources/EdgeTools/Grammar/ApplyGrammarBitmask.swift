@@ -5,9 +5,9 @@
   import MLXLMCommon
 
   public final class EdgeToolsApplyBitmaskProcessorMLX: LogitProcessor {
-    public private(set) var matcher: XGrammarMatcher
+    public private(set) var matcher: XGRMatcher
 
-    public init(matcher: consuming XGrammarMatcher) {
+    public init(matcher: consuming XGRMatcher) {
       self.matcher = consume matcher
     }
 

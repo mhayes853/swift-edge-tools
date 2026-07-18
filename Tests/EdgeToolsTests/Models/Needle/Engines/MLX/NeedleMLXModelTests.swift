@@ -18,11 +18,11 @@
         NeedleMLXModel.self,
         from: url
       )
-      let tokenizerInfo = try XGrammarTokenizerInfo.needle(tokenizer: tokenizer)
-      let grammarEngine = try XGrammarCompiler(tokenizerInfo: tokenizerInfo)
-      let grammar = try XGrammarGrammar.needle(tools: [.sendEmail])
+      let tokenizerInfo = try XGRTokenizerInfo.needle(tokenizer: tokenizer)
+      let grammarEngine = try XGRCompiler(tokenizerInfo: tokenizerInfo)
+      let grammar = try XGRGrammar.needle(tools: [.sendEmail])
       let compiledGrammar = try grammarEngine.compile(grammar)
-      let matcher = try XGrammarMatcher(compiledGrammar: compiledGrammar)
+      let matcher = try XGRMatcher(compiledGrammar: compiledGrammar)
 
       tokenizer = try self.tokenizer(url: url)
 

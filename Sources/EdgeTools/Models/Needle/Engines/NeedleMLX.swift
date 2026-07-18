@@ -164,14 +164,14 @@
     public func grammar(
       tools: [EdgeToolDefinition],
       range: GrammarToolCallRange
-    ) throws -> XGrammarGrammar {
-      try XGrammarGrammar.needle(tools: tools, range: range)
+    ) throws -> XGRGrammar {
+      try XGRGrammar.needle(tools: tools, range: range)
     }
 
     public func grammarCompiler(
       using tokenizer: any EdgeToolsTokenizer
-    ) throws -> XGrammarCompiler {
-      try XGrammarCompiler(tokenizerInfo: XGrammarTokenizerInfo.needle(tokenizer: tokenizer))
+    ) throws -> XGRCompiler {
+      try XGRCompiler(tokenizerInfo: XGRTokenizerInfo.needle(tokenizer: tokenizer))
     }
 
     public func tokenize(

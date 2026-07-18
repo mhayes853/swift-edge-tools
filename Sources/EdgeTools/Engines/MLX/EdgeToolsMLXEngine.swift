@@ -66,9 +66,9 @@
     }
 
     private struct State: ~Copyable {
-      let grammarEngine: XGrammarCompiler
+      let grammarEngine: XGRCompiler
       let model: Model
-      let matcherPool: XGrammarToolCallMatcherPool
+      let matcherPool: XGRToolCallMatcherPool
       var cachedPrefill: CachedPrefill?
     }
 
@@ -79,13 +79,13 @@
     public init(
       model: sending Model,
       tokenizer: sending any EdgeToolsTokenizer,
-      grammarEngine: consuming sending XGrammarCompiler
+      grammarEngine: consuming sending XGRCompiler
     ) {
       self.state = Lock(
         State(
           grammarEngine: consume grammarEngine,
           model: model,
-          matcherPool: XGrammarToolCallMatcherPool(makeGrammar: model.grammar),
+          matcherPool: XGRToolCallMatcherPool(makeGrammar: model.grammar),
           cachedPrefill: nil
         )
       )
@@ -107,7 +107,7 @@
         return State(
           grammarEngine: consume grammarEngine,
           model: model,
-          matcherPool: XGrammarToolCallMatcherPool(makeGrammar: model.grammar),
+          matcherPool: XGRToolCallMatcherPool(makeGrammar: model.grammar),
           cachedPrefill: nil
         )
       }

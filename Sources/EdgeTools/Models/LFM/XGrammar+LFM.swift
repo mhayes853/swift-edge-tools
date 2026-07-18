@@ -1,41 +1,41 @@
 #if XGrammar
   import Foundation
 
-  extension XGrammarGrammar {
+  extension XGRGrammar {
     public static func lfm2(
       tools: some Sequence<EdgeToolDefinition>,
       range: GrammarToolCallRange = .unbounded(minimum: 0)
-    ) throws -> XGrammarGrammar {
+    ) throws -> XGRGrammar {
       try Self.lfmPython(tools: tools, range: range)
     }
 
     public static func lfm2P5(
       tools: some Sequence<EdgeToolDefinition>,
       range: GrammarToolCallRange = .unbounded(minimum: 0)
-    ) throws -> XGrammarGrammar {
+    ) throws -> XGRGrammar {
       try Self.lfmPython(tools: tools, range: range)
     }
 
     public static func lfmPython(
       tools: some Sequence<EdgeToolDefinition>,
       range: GrammarToolCallRange = .unbounded(minimum: 0)
-    ) throws -> XGrammarGrammar {
+    ) throws -> XGRGrammar {
       let calls = try Self.toolCalls(tools: Array(tools), separator: ",", range: range) {
         try Self.lfmPythonCall($0)
       }
-      let prefix = try XGrammarGrammar(literal: "<|tool_call_start|>[")
+      let prefix = try XGRGrammar(literal: "<|tool_call_start|>[")
       let withCalls = try prefix.concatenate(calls)
       let grammar = try withCalls.concatenate(
-        XGrammarGrammar(literal: "]<|tool_call_end|>")
+        XGRGrammar(literal: "]<|tool_call_end|>")
       )
-      var document = try XGrammarEBNFDocument(grammar.ebnf)
+      var document = try XGREBNFDocument(grammar.ebnf)
       document.removeDuplicateRules()
-      return try XGrammarGrammar(ebnf: document.source)
+      return try XGRGrammar(ebnf: document.source)
     }
 
-    private static func lfmPythonCall(_ tool: EdgeToolDefinition) throws -> XGrammarGrammar {
+    private static func lfmPythonCall(_ tool: EdgeToolDefinition) throws -> XGRGrammar {
       let jsonArguments = Self.strictJSONArguments(for: tool)
-      var document = try XGrammarEBNFDocument(jsonArguments.ebnf)
+      var document = try XGREBNFDocument(jsonArguments.ebnf)
       try document.mapLiterals { ruleName, value, suffix in
         switch value {
         case "true": return "True"
@@ -55,10 +55,10 @@
         return value
       }
 
-      let arguments = try XGrammarGrammar(ebnf: document.source)
-      let prefix = try XGrammarGrammar(literal: "\(tool.name)(")
+      let arguments = try XGRGrammar(ebnf: document.source)
+      let prefix = try XGRGrammar(literal: "\(tool.name)(")
       let withArguments = try prefix.concatenate(arguments)
-      return try withArguments.concatenate(XGrammarGrammar(literal: ")"))
+      return try withArguments.concatenate(XGRGrammar(literal: ")"))
     }
 
     private static func isLFMTopLevelArgumentRule(_ name: String) -> Bool {

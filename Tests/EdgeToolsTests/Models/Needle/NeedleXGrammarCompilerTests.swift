@@ -7,7 +7,7 @@
   // MARK: - Suite
 
   @Suite
-  struct `NeedleXGrammarCompiler tests`: ~Copyable {
+  struct `NeedleXGRCompiler tests`: ~Copyable {
     @Suite
     struct `Range tests`: ~Copyable {
       private let tokenizer: NeedleSPTokenizer
@@ -20,14 +20,14 @@
         self.eosToken = eosToken
       }
 
-      private func makeEngine() throws -> XGrammarCompiler {
+      private func makeEngine() throws -> XGRCompiler {
         try requiredNeedleCompiler(tokenizer: self.tokenizer)
       }
 
       @Test
       func `Default Unbounded Range Accepts Empty Tool Call List`() throws {
         let engine = try self.makeEngine()
-        let matcher = try engine.makeMatcher(try XGrammarGrammar.needle(tools: [.getWeather]))
+        let matcher = try engine.makeMatcher(try XGRGrammar.needle(tools: [.getWeather]))
         assertGrammarAccepts(
           #"<tool_call> []"#,
           matcher: matcher,
@@ -39,7 +39,7 @@
       @Test
       func `Default Unbounded Range Accepts Multiple Tool Calls`() throws {
         let engine = try self.makeEngine()
-        let matcher = try engine.makeMatcher(try XGrammarGrammar.needle(tools: [.getWeather]))
+        let matcher = try engine.makeMatcher(try XGRGrammar.needle(tools: [.getWeather]))
         let calls =
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#
         assertGrammarAccepts(
@@ -54,7 +54,7 @@
       func `Unbounded With Min One Rejects Empty Tool Call List`() throws {
         let engine = try self.makeEngine()
         let matcher = try engine.makeMatcher(
-          try XGrammarGrammar.needle(tools: [.getWeather], range: .unbounded(minimum: 1))
+          try XGRGrammar.needle(tools: [.getWeather], range: .unbounded(minimum: 1))
         )
         assertGrammarRejects(
           #"<tool_call> []"#,
@@ -68,7 +68,7 @@
       func `Unbounded With Min One Accepts Single Tool Call`() throws {
         let engine = try self.makeEngine()
         let matcher = try engine.makeMatcher(
-          try XGrammarGrammar.needle(tools: [.getWeather], range: .unbounded(minimum: 1))
+          try XGRGrammar.needle(tools: [.getWeather], range: .unbounded(minimum: 1))
         )
         assertGrammarAccepts(
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
@@ -82,7 +82,7 @@
       func `Bounded Max One Rejects Two Tool Calls`() throws {
         let engine = try self.makeEngine()
         let matcher = try engine.makeMatcher(
-          try XGrammarGrammar.needle(tools: [.getWeather], range: .bounded(0...1))
+          try XGRGrammar.needle(tools: [.getWeather], range: .bounded(0...1))
         )
         let calls =
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#
@@ -98,7 +98,7 @@
       func `Bounded Max One Accepts Empty And Single Tool Call`() throws {
         let engine = try self.makeEngine()
         let emptyMatcher = try engine.makeMatcher(
-          try XGrammarGrammar.needle(tools: [.getWeather], range: .bounded(0...1))
+          try XGRGrammar.needle(tools: [.getWeather], range: .bounded(0...1))
         )
         assertGrammarAccepts(
           #"<tool_call> []"#,
@@ -107,7 +107,7 @@
           eosToken: self.eosToken
         )
         let singleMatcher = try engine.makeMatcher(
-          try XGrammarGrammar.needle(tools: [.getWeather], range: .bounded(0...1))
+          try XGRGrammar.needle(tools: [.getWeather], range: .bounded(0...1))
         )
         assertGrammarAccepts(
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
@@ -121,7 +121,7 @@
       func `Bounded Range Rejects Out Of Range Counts`() throws {
         let engine = try self.makeEngine()
         let singleMatcher = try engine.makeMatcher(
-          try XGrammarGrammar.needle(tools: [.getWeather], range: .bounded(2...3))
+          try XGRGrammar.needle(tools: [.getWeather], range: .bounded(2...3))
         )
         assertGrammarRejects(
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
@@ -131,7 +131,7 @@
         )
 
         let pairMatcher = try engine.makeMatcher(
-          try XGrammarGrammar.needle(tools: [.getWeather], range: .bounded(2...3))
+          try XGRGrammar.needle(tools: [.getWeather], range: .bounded(2...3))
         )
         assertGrammarAccepts(
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#,
@@ -145,7 +145,7 @@
       func `Empty Tools Ignores Invocation Range`() throws {
         let engine = try self.makeEngine()
         let matcher = try engine.makeMatcher(
-          try XGrammarGrammar.needle(tools: [], range: .bounded(1...1))
+          try XGRGrammar.needle(tools: [], range: .bounded(1...1))
         )
         assertGrammarAccepts(
           #"<tool_call> []"#,
@@ -159,7 +159,7 @@
       func `Exact Three Accepts Three Tool Calls`() throws {
         let engine = try self.makeEngine()
         let matcher = try engine.makeMatcher(
-          try XGrammarGrammar.needle(tools: [.getWeather], range: .exact(3))
+          try XGRGrammar.needle(tools: [.getWeather], range: .exact(3))
         )
         let calls =
           #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}},{"name":"get_weather","arguments":{"location":"Tokyo"}}]"#
@@ -175,7 +175,7 @@
       func `Exact Zero Accepts Only Empty Tool Call List`() throws {
         let engine = try self.makeEngine()
         let matcher = try engine.makeMatcher(
-          try XGrammarGrammar.needle(tools: [.getWeather], range: .exact(0))
+          try XGRGrammar.needle(tools: [.getWeather], range: .exact(0))
         )
         assertGrammarAccepts(
           #"<tool_call> []"#,
@@ -194,9 +194,9 @@
       @Test
       func `Negative Minimum Tool Calls Throws Error`() throws {
         let engine = try self.makeEngine()
-        #expect(throws: NeedleXGrammarError.invalidToolInvocationRange) {
+        #expect(throws: NeedleXGRError.invalidToolInvocationRange) {
           _ = try engine.makeMatcher(
-            try XGrammarGrammar.needle(tools: [.getWeather], range: .unbounded(minimum: -1))
+            try XGRGrammar.needle(tools: [.getWeather], range: .unbounded(minimum: -1))
           )
         }
       }
@@ -204,8 +204,8 @@
   }
 
   @Suite
-  struct `Needle XGrammar matcher tests`: ~Copyable {
-    private let engine: XGrammarCompiler
+  struct `Needle XGR matcher tests`: ~Copyable {
+    private let engine: XGRCompiler
     private let tokenizer: NeedleSPTokenizer
     private let eosToken: EdgeToolsToken.ID
 
@@ -219,7 +219,7 @@
     }
     @Test
     func `Accepts Valid Complex Tool Call`() throws {
-      let matcher = try self.engine.makeMatcher(try XGrammarGrammar.needle(tools: [.complexTool]))
+      let matcher = try self.engine.makeMatcher(try XGRGrammar.needle(tools: [.complexTool]))
 
       let call = #"""
         <tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,
@@ -239,7 +239,7 @@
 
     @Test
     func `Accepts Valid Simple Tool Call`() throws {
-      let matcher = try self.engine.makeMatcher(try XGrammarGrammar.needle(tools: [.getWeather]))
+      let matcher = try self.engine.makeMatcher(try XGRGrammar.needle(tools: [.getWeather]))
 
       let call = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
 
@@ -253,7 +253,7 @@
 
     @Test
     func `Accepts Multiple Consecutive Tool Calls`() throws {
-      let matcher = try self.engine.makeMatcher(try XGrammarGrammar.needle(tools: [.getWeather]))
+      let matcher = try self.engine.makeMatcher(try XGRGrammar.needle(tools: [.getWeather]))
 
       let calls =
         #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Henry's Altar"}}]"#
@@ -269,7 +269,7 @@
     @Test
     func `Accepts Multiple Distinct Tool Calls`() throws {
       let matcher = try self.engine.makeMatcher(
-        try XGrammarGrammar.needle(tools: [.getWeather, .sendEmail])
+        try XGRGrammar.needle(tools: [.getWeather, .sendEmail])
       )
 
       let calls =
@@ -285,7 +285,7 @@
 
     @Test
     func `Rejects Missing Required Field`() throws {
-      let matcher = try self.engine.makeMatcher(try XGrammarGrammar.needle(tools: [.complexTool]))
+      let matcher = try self.engine.makeMatcher(try XGRGrammar.needle(tools: [.complexTool]))
 
       let call = #"""
         <tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,
@@ -305,7 +305,7 @@
 
     @Test
     func `Rejects Wrong Type`() throws {
-      let matcher = try self.engine.makeMatcher(try XGrammarGrammar.needle(tools: [.complexTool]))
+      let matcher = try self.engine.makeMatcher(try XGRGrammar.needle(tools: [.complexTool]))
 
       let call = #"""
         <tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":"3.5","enabled":true,
@@ -325,7 +325,7 @@
 
     @Test
     func `Rejects Invalid Pattern Properties`() throws {
-      let matcher = try self.engine.makeMatcher(try XGrammarGrammar.needle(tools: [.complexTool]))
+      let matcher = try self.engine.makeMatcher(try XGRGrammar.needle(tools: [.complexTool]))
 
       let call = #"""
         <tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,
@@ -345,7 +345,7 @@
 
     @Test
     func `Rejects Extra Property`() throws {
-      let matcher = try self.engine.makeMatcher(try XGrammarGrammar.needle(tools: [.complexTool]))
+      let matcher = try self.engine.makeMatcher(try XGRGrammar.needle(tools: [.complexTool]))
 
       let call = #"""
         <tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,
@@ -365,7 +365,7 @@
 
     @Test
     func `Rejects Malformed JSON`() throws {
-      let matcher = try self.engine.makeMatcher(try XGrammarGrammar.needle(tools: [.complexTool]))
+      let matcher = try self.engine.makeMatcher(try XGRGrammar.needle(tools: [.complexTool]))
 
       let call = #"""
         <tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,
@@ -385,7 +385,7 @@
 
     @Test
     func `Rejects Invalid Tool Name`() throws {
-      let matcher = try self.engine.makeMatcher(try XGrammarGrammar.needle(tools: [.getWeather]))
+      let matcher = try self.engine.makeMatcher(try XGRGrammar.needle(tools: [.getWeather]))
 
       let call = #"toolcall [{"name":"not_a_real_tool","arguments":{"location":"Seoul"}}]"#
 
@@ -402,15 +402,15 @@
 
   private func requiredNeedleCompiler(
     tokenizer: some EdgeToolsTokenizer
-  ) throws -> XGrammarCompiler {
-    let tokenizerInfo = try XGrammarTokenizerInfo.needle(tokenizer: tokenizer)
-    return try XGrammarCompiler(tokenizerInfo: tokenizerInfo)
+  ) throws -> XGRCompiler {
+    let tokenizerInfo = try XGRTokenizerInfo.needle(tokenizer: tokenizer)
+    return try XGRCompiler(tokenizerInfo: tokenizerInfo)
   }
 
   private func requiredNeedleCompiler(
     erasedTokenizer tokenizer: any EdgeToolsTokenizer
-  ) throws -> XGrammarCompiler {
-    let tokenizerInfo = try XGrammarTokenizerInfo.needle(tokenizer: tokenizer)
-    return try XGrammarCompiler(tokenizerInfo: tokenizerInfo)
+  ) throws -> XGRCompiler {
+    let tokenizerInfo = try XGRTokenizerInfo.needle(tokenizer: tokenizer)
+    return try XGRCompiler(tokenizerInfo: tokenizerInfo)
   }
 #endif

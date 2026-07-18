@@ -1,17 +1,17 @@
 #if XGrammar
-  final class XGrammarToolCallMatcherPool {
+  final class XGRToolCallMatcherPool {
     typealias NormalizeTools = ([EdgeToolDefinition]) -> [EdgeToolDefinition]
     typealias MakeGrammar =
-      ([EdgeToolDefinition], GrammarToolCallRange) throws -> XGrammarGrammar
+      ([EdgeToolDefinition], GrammarToolCallRange) throws -> XGRGrammar
 
     private final class CachedMatcher {
-      private let matcher: XGrammarMatcher
+      private let matcher: XGRMatcher
 
-      init(_ matcher: consuming XGrammarMatcher) {
+      init(_ matcher: consuming XGRMatcher) {
         self.matcher = consume matcher
       }
 
-      func fork() -> XGrammarMatcher {
+      func fork() -> XGRMatcher {
         self.matcher.fork()
       }
     }
@@ -40,8 +40,8 @@
     func matcher(
       tools: some Sequence<EdgeToolDefinition>,
       range: GrammarToolCallRange,
-      compilingWith compiler: borrowing XGrammarCompiler
-    ) throws -> XGrammarMatcher {
+      compilingWith compiler: borrowing XGRCompiler
+    ) throws -> XGRMatcher {
       let key = Key(tools: self.normalizeTools(Array(tools)), range: range)
       if let cached = self.entries[key] {
         self.touch(key)
@@ -49,7 +49,7 @@
       }
       let grammar = try self.makeGrammar(key.tools, key.range)
       let compiledGrammar = try compiler.compile(grammar)
-      let matcher = try XGrammarMatcher(compiledGrammar: compiledGrammar)
+      let matcher = try XGRMatcher(compiledGrammar: compiledGrammar)
       return self.insert(key, matcher: consume matcher)
     }
 
@@ -65,8 +65,8 @@
 
     private func insert(
       _ key: Key,
-      matcher: consuming XGrammarMatcher
-    ) -> XGrammarMatcher {
+      matcher: consuming XGRMatcher
+    ) -> XGRMatcher {
       let cached = CachedMatcher(consume matcher)
       if self.entries.count >= self.maxCount, let leastRecentlyUsed = self.order.first {
         self.entries.removeValue(forKey: leastRecentlyUsed)

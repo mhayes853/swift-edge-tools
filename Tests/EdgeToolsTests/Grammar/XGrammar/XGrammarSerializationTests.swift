@@ -4,15 +4,15 @@
   import Testing
 
   @Suite
-  struct `XGrammar serialization tests` {
+  struct `XGR serialization tests` {
     @Test
     func `Tokenizer Info Round Trips Through JSON`() throws {
-      let tokenizerInfo = try XGrammarTokenizerInfo(
+      let tokenizerInfo = try XGRTokenizerInfo(
         encodedVocabulary: ["a", ""],
         vocabularyType: .raw,
         stopTokenIDs: [1]
       )
-      let restoredTokenizerInfo = try XGrammarTokenizerInfo(
+      let restoredTokenizerInfo = try XGRTokenizerInfo(
         serializedJSON: try tokenizerInfo.serializedJSON()
       )
 
@@ -22,19 +22,19 @@
 
     @Test
     func `Grammar And Compiled Grammar Round Trip Through JSON`() throws {
-      let tokenizerInfo = try XGrammarTokenizerInfo(
+      let tokenizerInfo = try XGRTokenizerInfo(
         encodedVocabulary: ["a", ""],
         vocabularyType: .raw,
         stopTokenIDs: [1]
       )
-      let grammar = try XGrammarGrammar(literal: "a")
-      let restoredGrammar = try XGrammarGrammar(serializedJSON: grammar.serializedJSON())
+      let grammar = try XGRGrammar(literal: "a")
+      let restoredGrammar = try XGRGrammar(serializedJSON: grammar.serializedJSON())
       let ebnf = grammar.ebnf
       expectNoDifference(restoredGrammar.ebnf, ebnf)
 
-      let compiler = try XGrammarCompiler(tokenizerInfo: tokenizerInfo)
+      let compiler = try XGRCompiler(tokenizerInfo: tokenizerInfo)
       let compiledGrammar = try compiler.compile(grammar)
-      let restoredCompiledGrammar = try XGrammarCompiledGrammar(
+      let restoredCompiledGrammar = try XGRCompiledGrammar(
         serializedJSON: try compiledGrammar.serializedJSON(),
         tokenizerInfo: tokenizerInfo
       )
@@ -45,8 +45,8 @@
     func `Hugging Face Metadata Detects Byte Fallback And Prefix Space`() throws {
       let backendJSON =
         #"{"decoder":{"type":"ByteFallback"},"normalizer":{"type":"Prepend","prepend":"▁"}}"#
-      let metadata = try XGrammarTokenizerInfo.metadata(huggingFaceBackendJSON: backendJSON)
-      let tokenizerInfo = try XGrammarTokenizerInfo.huggingFace(
+      let metadata = try XGRTokenizerInfo.metadata(huggingFaceBackendJSON: backendJSON)
+      let tokenizerInfo = try XGRTokenizerInfo.huggingFace(
         encodedVocabulary: ["a", ""],
         backendJSON: backendJSON
       )

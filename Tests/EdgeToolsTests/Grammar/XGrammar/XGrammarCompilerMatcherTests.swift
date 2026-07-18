@@ -7,15 +7,15 @@
     #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
 
   @Suite
-  struct `XGrammarMatcher tests`: ~Copyable {
-    private let engine: XGrammarCompiler
+  struct `XGRMatcher tests`: ~Copyable {
+    private let engine: XGRCompiler
     private let tokenizer: NeedleSPTokenizer
     private let eosToken: EdgeToolsToken.ID
 
     init() throws {
       let tokenizer = try makeTestTokenizer()
       let eosToken = try requiredTestEOSToken(tokenizer: tokenizer)
-      let engine = try makeGenericXGrammarCompiler(tokenizer: tokenizer)
+      let engine = try makeGenericXGRCompiler(tokenizer: tokenizer)
       self.tokenizer = tokenizer
       self.eosToken = eosToken
       self.engine = engine
@@ -143,12 +143,12 @@
 
   @Suite
   struct `Memory usage tests`: ~Copyable {
-    private let engine: XGrammarCompiler
+    private let engine: XGRCompiler
     private let tokenizer: NeedleSPTokenizer
 
     init() throws {
       let tokenizer = try makeTestTokenizer()
-      let engine = try makeGenericXGrammarCompiler(tokenizer: tokenizer)
+      let engine = try makeGenericXGRCompiler(tokenizer: tokenizer)
       self.tokenizer = tokenizer
       self.engine = engine
     }
@@ -168,20 +168,20 @@
     @Test
     func `Forked Matcher Preserves Compiled Grammar Memory Size`() throws {
       let compiledGrammar = try self.engine.compile(try genericGrammar())
-      let matcher = try XGrammarMatcher(compiledGrammar: compiledGrammar)
+      let matcher = try XGRMatcher(compiledGrammar: compiledGrammar)
       _ = matcher.fork()
       expectNoDifference(compiledGrammar.memorySizeBytes > 0, true)
     }
 
     @Test
     func `Larger Grammar Has Larger Compiled Grammar`() throws {
-      let smallerGrammar = try self.engine.compile(try XGrammarGrammar(literal: "a"))
+      let smallerGrammar = try self.engine.compile(try XGRGrammar(literal: "a"))
       let largerGrammar = try self.engine.compile(try genericGrammar())
       expectNoDifference(largerGrammar.memorySizeBytes > smallerGrammar.memorySizeBytes, true)
     }
   }
 
-  private func genericGrammar() throws -> XGrammarGrammar {
-    try XGrammarGrammar(literal: genericGrammarText)
+  private func genericGrammar() throws -> XGRGrammar {
+    try XGRGrammar(literal: genericGrammarText)
   }
 #endif

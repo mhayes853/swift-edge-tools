@@ -13,11 +13,11 @@
     func grammar(
       tools: [EdgeToolDefinition],
       range: GrammarToolCallRange
-    ) throws -> XGrammarGrammar
+    ) throws -> XGRGrammar
 
     func grammarCompiler(
       using tokenizer: any EdgeToolsTokenizer
-    ) throws -> XGrammarCompiler
+    ) throws -> XGRCompiler
 
     func tokenize(
       prompt: Prompt,

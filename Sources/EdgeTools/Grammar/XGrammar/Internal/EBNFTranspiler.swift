@@ -1,7 +1,7 @@
 #if XGrammar
   import Foundation
 
-  struct XGrammarEBNFDocument: Hashable, Sendable {
+  struct XGREBNFDocument: Hashable, Sendable {
     struct Rule: Hashable, Sendable {
       let name: String
       var body: String
@@ -15,15 +15,15 @@
         if let separator = line.range(of: "::=") {
           let name = line[..<separator.lowerBound].trimmingCharacters(in: .whitespaces)
           let body = line[separator.upperBound...].trimmingCharacters(in: .whitespaces)
-          guard !name.isEmpty else { throw ToolCallXGrammarError.unsupportedSchema }
+          guard !name.isEmpty else { throw ToolCallXGRError.unsupportedSchema }
           rules.append(Rule(name: name, body: body))
         } else if !line.trimmingCharacters(in: .whitespaces).isEmpty {
-          guard !rules.isEmpty else { throw ToolCallXGrammarError.unsupportedSchema }
+          guard !rules.isEmpty else { throw ToolCallXGRError.unsupportedSchema }
           rules[rules.count - 1].body += "\n" + line
         }
       }
       guard rules.contains(where: { $0.name == "root" }) else {
-        throw ToolCallXGrammarError.unsupportedSchema
+        throw ToolCallXGRError.unsupportedSchema
       }
       self.rules = rules
     }

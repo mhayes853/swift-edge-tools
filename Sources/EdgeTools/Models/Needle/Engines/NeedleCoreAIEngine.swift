@@ -48,8 +48,8 @@
     }
 
     private struct State: ~Copyable {
-      let grammarEngine: XGrammarCompiler
-      let matcherPool: XGrammarToolCallMatcherPool
+      let grammarEngine: XGRCompiler
+      let matcherPool: XGRToolCallMatcherPool
     }
 
     private struct EncoderOutputs {
@@ -108,8 +108,8 @@
         cachePolicy: cachePolicy
       )
       let tokenizer = try await loadEdgeToolsTokenizer(from: modelDirectoryURL)
-      let grammarEngine = try? XGrammarCompiler(
-        tokenizerInfo: try XGrammarTokenizerInfo.needle(tokenizer: tokenizer)
+      let grammarEngine = try? XGRCompiler(
+        tokenizerInfo: try XGRTokenizerInfo.needle(tokenizer: tokenizer)
       )
       guard let grammarEngine else {
         throw NeedleCoreAIEngineError.failedToLoadGrammarEngine
@@ -128,7 +128,7 @@
       decoderModel: AIModel,
       tokenizer: sending Tokenizer,
       configuration: NeedleModelConfiguration,
-      grammarEngine: consuming sending XGrammarCompiler
+      grammarEngine: consuming sending XGRCompiler
     ) throws {
       try self.init(
         encoderModel: encoderModel,
@@ -144,12 +144,12 @@
       decoderModel: AIModel,
       tokenizer: sending any EdgeToolsTokenizer,
       configuration: NeedleModelConfiguration,
-      grammarEngine: consuming sending XGrammarCompiler
+      grammarEngine: consuming sending XGRCompiler
     ) throws {
       self.state = Lock(
         State(
           grammarEngine: consume grammarEngine,
-          matcherPool: XGrammarToolCallMatcherPool.needle()
+          matcherPool: XGRToolCallMatcherPool.needle()
         )
       )
       self.configuration = configuration
@@ -211,7 +211,7 @@
       tools: [EdgeToolDefinition],
       parameters: GenerateParameters,
       channel: EdgeToolsGenerationChannel,
-      matcher: consuming XGrammarMatcher,
+      matcher: consuming XGRMatcher,
       configuration: NeedleModelConfiguration,
       isStopped: ManagedAtomic<Bool>
     ) async throws -> EdgeToolsEngineGeneration {

@@ -11,35 +11,35 @@
     tokenizer: some EdgeToolsTokenizer
   ) throws -> EdgeToolsToken.ID {
     guard let eosToken = tokenizer.eosTokenId else {
-      throw XGrammarError(message: "The test tokenizer must provide an EOS token.")
+      throw XGRError(message: "The test tokenizer must provide an EOS token.")
     }
     return eosToken
   }
 
-  extension XGrammarCompiler {
-    func makeMatcher(_ grammar: borrowing XGrammarGrammar) throws -> XGrammarMatcher {
+  extension XGRCompiler {
+    func makeMatcher(_ grammar: borrowing XGRGrammar) throws -> XGRMatcher {
       let compiledGrammar = try self.compile(grammar)
-      return try XGrammarMatcher(compiledGrammar: compiledGrammar)
+      return try XGRMatcher(compiledGrammar: compiledGrammar)
     }
   }
 
-  func makeGenericXGrammarCompiler(
+  func makeGenericXGRCompiler(
     tokenizer: some EdgeToolsTokenizer
-  ) throws -> XGrammarCompiler {
+  ) throws -> XGRCompiler {
     let vocabulary = tokenizer.convertIdsToTokens(Array(0..<8192))
     guard let eosToken = tokenizer.eosTokenId, vocabulary.allSatisfy({ $0 != nil }) else {
-      throw XGrammarError(
+      throw XGRError(
         message: "The test tokenizer must provide an EOS token and full vocabulary."
       )
     }
-    let tokenizerInfo = try XGrammarTokenizerInfo(
+    let tokenizerInfo = try XGRTokenizerInfo(
       encodedVocabulary: vocabulary.compactMap { $0 },
       vocabularyType: .byteFallback,
       vocabularySize: vocabulary.count,
       stopTokenIDs: [eosToken],
       addPrefixSpace: true
     )
-    return try XGrammarCompiler(tokenizerInfo: tokenizerInfo)
+    return try XGRCompiler(tokenizerInfo: tokenizerInfo)
   }
 
   func encodedGrammarText(
@@ -57,7 +57,7 @@
 
   func assertGrammarAccepts(
     _ text: String,
-    matcher: borrowing XGrammarMatcher,
+    matcher: borrowing XGRMatcher,
     tokenizer: some EdgeToolsTokenizer,
     eosToken: EdgeToolsToken.ID
   ) {
@@ -75,7 +75,7 @@
 
   func assertGrammarRejects(
     _ text: String,
-    matcher: borrowing XGrammarMatcher,
+    matcher: borrowing XGRMatcher,
     tokenizer: some EdgeToolsTokenizer,
     eosToken: EdgeToolsToken.ID
   ) {
@@ -94,7 +94,7 @@
 
   private func firstRejectedGrammarToken(
     in text: String,
-    matcher: borrowing XGrammarMatcher,
+    matcher: borrowing XGRMatcher,
     tokenizer: some EdgeToolsTokenizer
   ) -> RejectedGrammarToken? {
     let tokenIds = encodedGrammarText(text, tokenizer: tokenizer)

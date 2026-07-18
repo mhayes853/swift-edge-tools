@@ -5,13 +5,13 @@
 
   @Suite
   struct `Tool call grammar common tests`: ~Copyable {
-    private let compiler: XGrammarCompiler
+    private let compiler: XGRCompiler
     private let tokenizer: NeedleSPTokenizer
     private let eosToken: EdgeToolsToken.ID
 
     init() throws {
       let tokenizer = try makeTestTokenizer()
-      let compiler = try makeGenericXGrammarCompiler(tokenizer: tokenizer)
+      let compiler = try makeGenericXGRCompiler(tokenizer: tokenizer)
       let eosToken = try requiredTestEOSToken(tokenizer: tokenizer)
       self.tokenizer = tokenizer
       self.compiler = compiler
@@ -126,7 +126,7 @@
   struct ToolCallGrammarTestFixture: Sendable, CustomStringConvertible {
     let name: String
     let makeGrammar:
-      @Sendable ([EdgeToolDefinition], GrammarToolCallRange) throws -> XGrammarGrammar
+      @Sendable ([EdgeToolDefinition], GrammarToolCallRange) throws -> XGRGrammar
     let makeParser: @Sendable () -> any EdgeToolCallParser
     let expectedComplexName: String
     let emptyCall: String
@@ -142,7 +142,7 @@
   let toolCallGrammarTestFixtures = [
     ToolCallGrammarTestFixture(
       name: "Needle",
-      makeGrammar: { try XGrammarGrammar.needle(tools: $0, range: $1) },
+      makeGrammar: { try XGRGrammar.needle(tools: $0, range: $1) },
       makeParser: { NeedleToolCallParser() },
       expectedComplexName: "complex_tool",
       emptyCall: "<tool_call> []",
@@ -164,7 +164,7 @@
     ),
     ToolCallGrammarTestFixture(
       name: "Qwen JSON",
-      makeGrammar: { try XGrammarGrammar.qwenJSON(tools: $0, range: $1) },
+      makeGrammar: { try XGRGrammar.qwenJSON(tools: $0, range: $1) },
       makeParser: { QwenJSONToolCallParser() },
       expectedComplexName: "complexTool",
       emptyCall: "",
@@ -187,7 +187,7 @@
     ),
     ToolCallGrammarTestFixture(
       name: "Qwen XML",
-      makeGrammar: { try XGrammarGrammar.qwenXML(tools: $0, range: $1) },
+      makeGrammar: { try XGRGrammar.qwenXML(tools: $0, range: $1) },
       makeParser: { QwenXMLToolCallParser() },
       expectedComplexName: "complexTool",
       emptyCall: "",
@@ -216,7 +216,7 @@
     ),
     ToolCallGrammarTestFixture(
       name: "FunctionGemma",
-      makeGrammar: { try XGrammarGrammar.functionGemma(tools: $0, range: $1) },
+      makeGrammar: { try XGRGrammar.functionGemma(tools: $0, range: $1) },
       makeParser: { FunctionGemmaToolCallParser() },
       expectedComplexName: "complexTool",
       emptyCall: "",
@@ -244,7 +244,7 @@
     ),
     ToolCallGrammarTestFixture(
       name: "Gemma 4",
-      makeGrammar: { try XGrammarGrammar.gemma4(tools: $0, range: $1) },
+      makeGrammar: { try XGRGrammar.gemma4(tools: $0, range: $1) },
       makeParser: { Gemma4ToolCallParser() },
       expectedComplexName: "complexTool",
       emptyCall: "",
@@ -267,7 +267,7 @@
     ),
     ToolCallGrammarTestFixture(
       name: "LFM Python",
-      makeGrammar: { try XGrammarGrammar.lfmPython(tools: $0, range: $1) },
+      makeGrammar: { try XGRGrammar.lfmPython(tools: $0, range: $1) },
       makeParser: { LFMPythonToolCallParser() },
       expectedComplexName: "complexTool",
       emptyCall: "<|tool_call_start|>[]<|tool_call_end|>",

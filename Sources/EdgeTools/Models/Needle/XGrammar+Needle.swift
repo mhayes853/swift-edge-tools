@@ -1,12 +1,12 @@
 #if XGrammar
   import Foundation
 
-  // MARK: - Tokenizer Info
+  // MARK: - XGR Tokenizer Info
 
-  extension XGrammarTokenizerInfo {
+  extension XGRTokenizerInfo {
     public static func needle(
       tokenizer: some EdgeToolsTokenizer
-    ) throws -> XGrammarTokenizerInfo {
+    ) throws -> XGRTokenizerInfo {
       try Self.needle(
         vocabulary: tokenizer.convertIdsToTokens(Array(0..<8192)),
         eosTokenID: tokenizer.eosTokenId
@@ -16,13 +16,13 @@
     private static func needle(
       vocabulary: [String?],
       eosTokenID: EdgeToolsToken.ID?
-    ) throws -> XGrammarTokenizerInfo {
+    ) throws -> XGRTokenizerInfo {
       guard let eosTokenID, vocabulary.allSatisfy({ $0 != nil }) else {
-        throw XGrammarError(
+        throw XGRError(
           message: "Needle requires a tokenizer with an EOS token and full vocabulary."
         )
       }
-      return try XGrammarTokenizerInfo(
+      return try XGRTokenizerInfo(
         encodedVocabulary: vocabulary.compactMap { $0 },
         vocabularyType: .byteFallback,
         vocabularySize: vocabulary.count,
@@ -34,37 +34,37 @@
 
   // MARK: - Grammar
 
-  extension XGrammarGrammar {
+  extension XGRGrammar {
     public static func needle(
       tools: some Sequence<EdgeToolDefinition>,
       range: GrammarToolCallRange = .unbounded(minimum: 0)
-    ) throws -> XGrammarGrammar {
-      let calls = try XGrammarGrammar.needleCalls(
+    ) throws -> XGRGrammar {
+      let calls = try XGRGrammar.needleCalls(
         tools: tools.map { $0.needleNormalized() },
         range: range
       )
-      let prefix = try XGrammarGrammar(literal: "<tool_call> [")
+      let prefix = try XGRGrammar(literal: "<tool_call> [")
       let prefixedCalls = try prefix.concatenate(calls)
-      return try prefixedCalls.concatenate(XGrammarGrammar(literal: "]"))
+      return try prefixedCalls.concatenate(XGRGrammar(literal: "]"))
     }
 
     private static func needleCalls(
       tools: [EdgeToolDefinition],
       range: GrammarToolCallRange
-    ) throws -> XGrammarGrammar {
-      guard range.lowerBound >= 0 else { throw NeedleXGrammarError.invalidToolInvocationRange }
-      guard let firstTool = tools.first else { return try XGrammarGrammar(literal: "") }
+    ) throws -> XGRGrammar {
+      guard range.lowerBound >= 0 else { throw NeedleXGRError.invalidToolInvocationRange }
+      guard let firstTool = tools.first else { return try XGRGrammar(literal: "") }
 
-      var call = try XGrammarGrammar.needleCall(firstTool)
+      var call = try XGRGrammar.needleCall(firstTool)
       for tool in tools.dropFirst() {
-        call = try call.union(XGrammarGrammar.needleCall(tool))
+        call = try call.union(XGRGrammar.needleCall(tool))
       }
       return try Self.repeatingToolCall(call, separator: ",", range: range)
     }
 
-    private static func needleCall(_ tool: EdgeToolDefinition) throws -> XGrammarGrammar {
+    private static func needleCall(_ tool: EdgeToolDefinition) throws -> XGRGrammar {
       let schema = tool.arguments.orderedKeyEncoded()
-      let arguments = try XGrammarGrammar(
+      let arguments = try XGRGrammar(
         jsonSchema: schema,
         configuration: JSONSchemaConfiguration(
           anyWhitespace: false,
@@ -72,28 +72,28 @@
           isStrict: true
         )
       )
-      let namePrefix = try XGrammarGrammar(literal: "{\"name\":\"")
-      let named = try namePrefix.concatenate(XGrammarGrammar(literal: tool.name))
-      let argumentsPrefix = try named.concatenate(XGrammarGrammar(literal: "\",\"arguments\":"))
+      let namePrefix = try XGRGrammar(literal: "{\"name\":\"")
+      let named = try namePrefix.concatenate(XGRGrammar(literal: tool.name))
+      let argumentsPrefix = try named.concatenate(XGRGrammar(literal: "\",\"arguments\":"))
       let withArguments = try argumentsPrefix.concatenate(arguments)
-      return try withArguments.concatenate(XGrammarGrammar(literal: "}"))
+      return try withArguments.concatenate(XGRGrammar(literal: "}"))
     }
   }
 
   // MARK: - Error
 
-  public enum NeedleXGrammarError: Error, Hashable, Sendable {
+  public enum NeedleXGRError: Error, Hashable, Sendable {
     case invalidToolInvocationRange
   }
 
   // MARK: - Helpers
 
-  extension XGrammarToolCallMatcherPool {
-    static func needle(maxCount: Int = 8) -> XGrammarToolCallMatcherPool {
-      XGrammarToolCallMatcherPool(
+  extension XGRToolCallMatcherPool {
+    static func needle(maxCount: Int = 8) -> XGRToolCallMatcherPool {
+      XGRToolCallMatcherPool(
         maxCount: maxCount,
         normalizeTools: { $0.map { $0.needleNormalized() } },
-        makeGrammar: { try XGrammarGrammar.needle(tools: $0, range: $1) }
+        makeGrammar: { try XGRGrammar.needle(tools: $0, range: $1) }
       )
     }
   }
