@@ -24,7 +24,7 @@
       prompt: Prompt,
       tools: [EdgeToolDefinition],
       using tokenizer: any EdgeToolsTokenizer
-    ) throws -> LMInput
+    ) throws -> sending LMInput
   }
 
   // MARK: - EdgeToolsPrefillableMLXModelConfiguration

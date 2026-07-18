@@ -59,16 +59,6 @@
       let output: LMOutput
     }
 
-    // NB: This is safe because the engine transfers the input once into a synchronous locked
-    // critical section and never accesses the original value concurrently.
-    private struct SendableInput: @unchecked Sendable {
-      let value: LMInput
-
-      init(_ value: consuming LMInput) {
-        self.value = value
-      }
-    }
-
     private struct GenerationPreparation {
       let output: LMOutput
       let cache: [any KVCache]
@@ -372,25 +362,22 @@
         tools: tools,
         using: self.tokenizer
       )
-      let tokenIDs = input.text.tokens.asArray(EdgeToolsToken.ID.self)
-      let sendableInput = SendableInput(consume input)
-
-      return try self.state.withLock { state in
-        try self.prefill(input: sendableInput, tokenIDs: tokenIDs, state: &state)
+      return try self.state.withLock(input) { state, input in
+        try self.prefill(input: input, state: &state)
       }
     }
 
     private func prefill(
-      input: SendableInput,
-      tokenIDs: [EdgeToolsToken.ID],
+      input: sending LMInput,
       state: inout sending State
     ) throws -> EdgeToolsEnginePrefill {
       try Task.checkCancellation()
+      let tokenIDs = input.text.tokens.asArray(EdgeToolsToken.ID.self)
       let cache = state.languageModel.newCache(parameters: nil)
       var processor: (any LogitProcessor)?
       let prefillStart = self.clock.now
       let output = try self.prepare(
-        input: input.value,
+        input: input,
         languageModel: state.languageModel,
         cache: cache,
         processor: &processor
