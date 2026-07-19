@@ -21,6 +21,8 @@
   // MARK: - NeedleMLXModel
 
   public final class NeedleMLXModel: Module, LanguageModel, KVCacheDimensionProvider {
+    public var vocabularySize: Int { self.configuration.vocabularySize }
+
     public var kvHeads: [Int] {
       [Int](repeating: self.configuration.kvHeads, count: self.configuration.hiddenLayers)
     }
@@ -168,19 +170,24 @@
       try XGRGrammar.needle(tools: tools, range: range)
     }
 
-    public func grammarCompiler(
-      using tokenizer: any EdgeToolsTokenizer
-    ) throws -> XGRCompiler {
-      try XGRCompiler(tokenizerInfo: XGRTokenizerInfo.needle(tokenizer: tokenizer))
-    }
-
-    public func tokenize(
+    public func process(
       prompt: NeedlePrompt,
       tools: [EdgeToolDefinition],
       using tokenizer: any EdgeToolsTokenizer
     ) throws -> sending LMInput {
       let tokens = tokenizer.encode(text: try prompt.formatted(tools: tools))
       return LMInput(text: LMInput.Text(tokens: MLXArray(tokens)))
+    }
+  }
+
+  public typealias NeedleMLXEngine = EdgeToolsMLXEngine<NeedleMLXModel>
+
+  extension NeedleMLXEngine {
+    public convenience init(from directoryURL: URL) async throws {
+      try await self.init(
+        from: directoryURL,
+        model: { NeedleMLXModel(configuration: $0) }
+      )
     }
   }
 

@@ -3,86 +3,32 @@ import Foundation
 // MARK: - FunctionGemmaToolCallParser
 
 public struct FunctionGemmaToolCallParser: EdgeToolCallParser, Sendable {
-  private var core = GemmaToolCallParserCore(
-    syntax: GemmaToolCallSyntax(
-      opener: "<start_function_call>",
-      closer: "<end_function_call>",
-      stringMarker: "<escape>",
-      decodesMarkedValues: true
-    )
-  )
+  private static let opener = Array("<start_function_call>".utf8)
+  private static let closer = Array("<end_function_call>".utf8)
+  private static let stringMarker = Array("<escape>".utf8)
 
-  public init() {}
-
-  public mutating func accept(token: EdgeToolsToken) -> EdgeRawToolCall? {
-    self.core.accept(token: token)
-  }
-}
-
-// MARK: - Gemma4ToolCallParser
-
-public struct Gemma4ToolCallParser: EdgeToolCallParser, Sendable {
-  private var core = GemmaToolCallParserCore(
-    syntax: GemmaToolCallSyntax(
-      opener: "<|tool_call>",
-      closer: "<tool_call|>",
-      stringMarker: "<|\"|>",
-      decodesMarkedValues: false
-    )
-  )
-
-  public init() {}
-
-  public mutating func accept(token: EdgeToolsToken) -> EdgeRawToolCall? {
-    self.core.accept(token: token)
-  }
-}
-
-// MARK: - GemmaToolCallSyntax
-
-private struct GemmaToolCallSyntax: Hashable, Sendable {
-  let opener: [UInt8]
-  let closer: [UInt8]
-  let stringMarker: String
-  let decodesMarkedValues: Bool
-
-  init(opener: String, closer: String, stringMarker: String, decodesMarkedValues: Bool) {
-    self.opener = Array(opener.utf8)
-    self.closer = Array(closer.utf8)
-    self.stringMarker = stringMarker
-    self.decodesMarkedValues = decodesMarkedValues
-  }
-}
-
-// MARK: - GemmaToolCallParserCore
-
-private struct GemmaToolCallParserCore: Sendable {
-  private let syntax: GemmaToolCallSyntax
   private var buffer = [UInt8]()
   private var isInsideCall = false
 
-  init(syntax: GemmaToolCallSyntax) {
-    self.syntax = syntax
-  }
+  public init() {}
 
-  mutating func accept(token: EdgeToolsToken) -> EdgeRawToolCall? {
+  public mutating func accept(token: EdgeToolsToken) -> EdgeRawToolCall? {
     self.buffer.append(contentsOf: token.stringValue.utf8)
 
     while true {
       if !self.isInsideCall {
-        guard let openerRange = self.buffer.firstRange(of: self.syntax.opener) else {
-          self.buffer.retainPossiblePrefix(of: self.syntax.opener)
+        guard let openerRange = self.buffer.firstRange(of: Self.opener) else {
+          self.buffer.retainPossiblePrefix(of: Self.opener)
           return nil
         }
         self.buffer.removeSubrange(..<openerRange.upperBound)
         self.isInsideCall = true
       }
 
-      let stringMarker = Array(self.syntax.stringMarker.utf8)
       guard
         let closerRange = self.buffer.firstRange(
-          of: self.syntax.closer,
-          outside: stringMarker
+          of: Self.closer,
+          outside: Self.stringMarker
         )
       else { return nil }
 
@@ -90,7 +36,7 @@ private struct GemmaToolCallParserCore: Sendable {
       self.buffer.removeSubrange(..<closerRange.upperBound)
       self.isInsideCall = false
       guard let payload = String(data: payloadData, encoding: .utf8) else { continue }
-      var reader = GemmaCallReader(source: payload, syntax: self.syntax)
+      var reader = FunctionGemmaCallReader(source: payload)
       if let call = reader.parse() {
         return call
       }
@@ -122,14 +68,14 @@ extension Array where Element == UInt8 {
   }
 }
 
-// MARK: - GemmaCallReader
+// MARK: - FunctionGemmaCallReader
 
-private struct GemmaCallReader: ToolCallValueReader {
-  let syntax: GemmaToolCallSyntax
+private struct FunctionGemmaCallReader: ToolCallValueReader {
+  private static let stringMarker = "<escape>"
+
   var cursor: ToolCallStringCursor
 
-  init(source: String, syntax: GemmaToolCallSyntax) {
-    self.syntax = syntax
+  init(source: String) {
     self.cursor = ToolCallStringCursor(source)
   }
 
@@ -159,7 +105,7 @@ private struct GemmaCallReader: ToolCallValueReader {
 
   mutating func parseValue() -> EdgeToolsValue? {
     self.cursor.skipWhitespace()
-    if self.cursor.remainder.hasPrefix(self.syntax.stringMarker) {
+    if self.cursor.remainder.hasPrefix(Self.stringMarker) {
       return self.parseMarkedValue()
     }
     guard let character = self.cursor.current else { return nil }
@@ -189,12 +135,10 @@ private struct GemmaCallReader: ToolCallValueReader {
   }
 
   private mutating func parseMarkedValue() -> EdgeToolsValue? {
-    guard self.cursor.consume(self.syntax.stringMarker) else { return nil }
-    guard let value = self.cursor.read(until: self.syntax.stringMarker) else { return nil }
-    guard self.cursor.consume(self.syntax.stringMarker) else { return nil }
-    guard self.syntax.decodesMarkedValues, let data = value.data(using: .utf8) else {
-      return .string(value)
-    }
+    guard self.cursor.consume(Self.stringMarker) else { return nil }
+    guard let value = self.cursor.read(until: Self.stringMarker) else { return nil }
+    guard self.cursor.consume(Self.stringMarker) else { return nil }
+    guard let data = value.data(using: .utf8) else { return .string(value) }
     return (try? JSONDecoder().decode(EdgeToolsValue.self, from: data)) ?? .string(value)
   }
 

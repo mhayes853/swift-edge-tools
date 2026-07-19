@@ -218,8 +218,8 @@ let toolCallParserTestFixtures = [
     ]
   ),
   ToolCallParserTestFixture(
-    name: "LFM Python",
-    makeParser: { LFMPythonToolCallParser() },
+    name: "LFM2 Python",
+    makeParser: { LFM2PythonToolCallParser() },
     noCalls: ["There are no tools to call."],
     emptyArguments: ["<|tool_call_start|>[empty()]<|tool_call_end|>"],
     complexCall: [
@@ -278,38 +278,6 @@ let toolCallParserTestFixtures = [
       "👩🏽",
       "\u{200D}",
       "💻 漢字 한글 العربية<escape>}<end_function_call>"
-    ]
-  ),
-  ToolCallParserTestFixture(
-    name: "Gemma4",
-    makeParser: { Gemma4ToolCallParser() },
-    noCalls: ["There are no tools to call."],
-    emptyArguments: ["<|tool_call>call:empty{}<tool_call|>"],
-    complexCall: [
-      #"""
-      <|tool_call>call:complex{
-      destination:{city:<|"|>東京<|"|>,country:<|"|>日本<|"|>},
-      activities:[{name:<|"|>寿司<|"|>,duration:2},{name:<|"|>متحف<|"|>,duration:3}],
-      tags:[<|"|>é<|"|>,<|"|>👩🏽‍💻<|"|>,<|"|>🇺🇳<|"|>],
-      enabled:true,rating:4.5,missing:null,
-      note:<|"|>braces {[]} and "quotes" \ slash
-      line<|"|>}<tool_call|>
-      """#
-    ],
-    multipleCalls: [
-      "<|tool_call>call:first{value:1}<tool_call|>",
-      "<|tool_call>call:second{value:2}<tool_call|>"
-    ],
-    malformedThenValid: [
-      "<|tool_call>call:bad{value:}<tool_call|>",
-      "<|tool_call>call:valid{value:2}<tool_call|>"
-    ],
-    unicodeCall: [
-      "<|tool_call>call:unicode{value:<|\"|>e",
-      "\u{301}",
-      "👩🏽",
-      "\u{200D}",
-      "💻 漢字 한글 العربية<|\"|>}<tool_call|>"
     ]
   )
 ]

@@ -279,7 +279,7 @@
         user: String(repeating: "token ", count: 2_000)
       )
 
-      let error = await #expect(throws: NeedleCoreMLEngineError.self) {
+      let error = await #expect(throws: NeedleModelError.self) {
         let generationTask = try engine.generate(
           prompt: prompt,
           parameters: .default,

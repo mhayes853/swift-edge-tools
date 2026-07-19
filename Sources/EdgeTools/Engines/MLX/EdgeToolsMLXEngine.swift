@@ -78,31 +78,27 @@
 
     public init(
       model: sending Model,
-      tokenizer: sending any EdgeToolsTokenizer,
-      grammarEngine: consuming sending XGRCompiler
-    ) {
-      self.state = Lock(
-        State(
+      tokenizer: sending any EdgeToolsTokenizer
+    ) throws {
+      self.state = try Lock {
+        let grammarEngine = try model.grammarCompiler(using: tokenizer)
+        return State(
           grammarEngine: consume grammarEngine,
           model: model,
           matcherPool: XGRToolCallMatcherPool(makeGrammar: model.grammar),
           cachedPrefill: nil
         )
-      )
+      }
       self.tokenizer = tokenizer
     }
 
     private init(
       loadingFrom directoryURL: URL,
       tokenizer: sending any EdgeToolsTokenizer,
-      editModelConfiguration: (inout Model.ModelConfiguration) -> Void
+      model: (Model.ModelConfiguration) throws -> Model
     ) throws {
       self.state = try Lock {
-        let model = try loadEdgeToolsLanguageModel(
-          Model.self,
-          from: directoryURL,
-          editModelConfiguration: editModelConfiguration
-        )
+        let model = try loadEdgeToolsLanguageModel(Model.self, from: directoryURL, model: model)
         let grammarEngine = try model.grammarCompiler(using: tokenizer)
         return State(
           grammarEngine: consume grammarEngine,
@@ -116,13 +112,13 @@
 
     public convenience init(
       from directoryURL: URL,
-      editModelConfiguration: (inout Model.ModelConfiguration) -> Void = { _ in }
+      model: (Model.ModelConfiguration) throws -> Model
     ) async throws {
       let tokenizer = try await loadEdgeToolsTokenizer(from: directoryURL)
       try self.init(
         loadingFrom: directoryURL,
         tokenizer: tokenizer,
-        editModelConfiguration: editModelConfiguration
+        model: model
       )
     }
 
@@ -131,16 +127,17 @@
       tools: [EdgeToolDefinition] = []
     ) async throws -> [EdgeToolsToken] {
       try self.state.withBorrowedLock { state in
-        let input = try state.model.tokenize(
+        let input = try state.model.process(
           prompt: prompt,
           tools: tools,
           using: self.tokenizer
         )
         let tokenIDs = input.text.tokens.asArray(EdgeToolsToken.ID.self)
         let tokens = self.tokenizer.convertIdsToTokens(tokenIDs)
-        return zip(tokenIDs, tokens).compactMap { tokenID, token in
-          token.map { EdgeToolsToken(id: tokenID, stringValue: $0) }
-        }
+        return zip(tokenIDs, tokens)
+          .compactMap { tokenID, token in
+            token.map { EdgeToolsToken(id: tokenID, stringValue: $0) }
+          }
       }
     }
 
@@ -196,7 +193,7 @@
         synchronize: parameters.synchronizeStreamForMemorySnapshots
       )
       let generateStart = self.clock.now
-      let input = try state.model.tokenize(
+      let input = try state.model.process(
         prompt: prompt,
         tools: tools,
         using: self.tokenizer
@@ -301,15 +298,16 @@
         let prefillStart = self.clock.now
         processor?.prompt(input.text.tokens)
         let cache = cachedPrefill.cache.map { $0.copy() }
-        let output = if suffixCount == 0 {
-          cachedPrefill.output
-        } else {
-          state.model(
-            input.text[cachedPrefill.tokenIDs.count...][text: .newAxis],
-            cache: cache,
-            state: cachedPrefill.output.state
-          )
-        }
+        let output =
+          if suffixCount == 0 {
+            cachedPrefill.output
+          } else {
+            state.model(
+              input.text[cachedPrefill.tokenIDs.count...][text: .newAxis],
+              cache: cache,
+              state: cachedPrefill.output.state
+            )
+          }
         let metrics = EdgeToolsPrefillMetrics(
           tokens: suffixCount,
           duration: prefillStart.duration(to: self.clock.now)
@@ -374,7 +372,7 @@
     ) async throws -> EdgeToolsEnginePrefill {
       try self.state.withLock { state in
         try Task.checkCancellation()
-        let input = try state.model.tokenize(
+        let input = try state.model.process(
           prompt: promptPrefix,
           tools: tools,
           using: self.tokenizer
@@ -384,7 +382,7 @@
     }
 
     private func prefill(
-      input: sending LMInput,
+      input: consuming sending LMInput,
       state: inout sending State
     ) throws -> EdgeToolsEnginePrefill {
       try Task.checkCancellation()
@@ -439,6 +437,9 @@
       message: "Could not load model configuration."
     )
     public static let failedToLoadWeights = Self(message: "Could not load model weights.")
+    public static let unsupportedTokenizer = Self(
+      message: "The model does not support the provided tokenizer."
+    )
 
     public static func grammarRejectedToken(token: EdgeToolsToken) -> Self {
       Self(

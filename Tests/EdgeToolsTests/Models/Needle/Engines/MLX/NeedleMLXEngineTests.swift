@@ -121,8 +121,10 @@
     func `Generate With Untied Word Embeddings`() async throws {
       let engine = try await Engine(
         from: downloadNeedle(),
-        editModelConfiguration: { configuration in
+        model: { configuration in
+          var configuration = configuration
           configuration.tieWordEmbeddings = false
+          return NeedleMLXModel(configuration: configuration)
         }
       )
 

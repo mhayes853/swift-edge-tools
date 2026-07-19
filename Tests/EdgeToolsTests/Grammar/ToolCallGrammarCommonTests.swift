@@ -125,8 +125,7 @@
 
   struct ToolCallGrammarTestFixture: Sendable, CustomStringConvertible {
     let name: String
-    let makeGrammar:
-      @Sendable ([EdgeToolDefinition], GrammarToolCallRange) throws -> XGRGrammar
+    let makeGrammar: @Sendable ([EdgeToolDefinition], GrammarToolCallRange) throws -> XGRGrammar
     let makeParser: @Sendable () -> any EdgeToolCallParser
     let expectedComplexName: String
     let emptyCall: String
@@ -243,32 +242,9 @@
         """
     ),
     ToolCallGrammarTestFixture(
-      name: "Gemma 4",
-      makeGrammar: { try XGRGrammar.gemma4(tools: $0, range: $1) },
-      makeParser: { Gemma4ToolCallParser() },
-      expectedComplexName: "complexTool",
-      emptyCall: "",
-      simpleCall: "<|tool_call>call:getWeather{location:<|\"|>Seoul<|\"|>}<tool_call|>",
-      twoCalls:
-        """
-        <|tool_call>call:getWeather{location:<|"|>Seoul<|"|>}<tool_call|>\
-        <|tool_call>call:getWeather{location:<|"|>Paris<|"|>}<tool_call|>
-        """,
-      unknownToolCall: "<|tool_call>call:unknown{location:<|\"|>Seoul<|\"|>}<tool_call|>",
-      wrongTypeCall: "<|tool_call>call:integerTool{value:<|\"|>oops<|\"|>}<tool_call|>",
-      complexCall:
-        """
-        <|tool_call>call:complexTool{title:<|"|>alpha<|"|>,count:3.5,enabled:true,mode:<|"|>execute<|"|>,\
-        ticket_id:<|"|>ABC-12<|"|>,priority:4,routing:{region:<|"|>us-west<|"|>},\
-        labels:{ALPHA:1,BETA_LABEL:2},window:3,tuple_args:[<|"|>alpha<|"|>,2,true],\
-        optional_note:null,tags:[<|"|>a<|"|>,<|"|>b<|"|>],\
-        config:{threshold:0.75,flags:[true,false]}}<tool_call|>
-        """
-    ),
-    ToolCallGrammarTestFixture(
-      name: "LFM Python",
-      makeGrammar: { try XGRGrammar.lfmPython(tools: $0, range: $1) },
-      makeParser: { LFMPythonToolCallParser() },
+      name: "LFM2 Python",
+      makeGrammar: { try XGRGrammar.lfm2Python(tools: $0, range: $1) },
+      makeParser: { LFM2PythonToolCallParser() },
       expectedComplexName: "complexTool",
       emptyCall: "<|tool_call_start|>[]<|tool_call_end|>",
       simpleCall: #"<|tool_call_start|>[getWeather(location="Seoul")]<|tool_call_end|>"#,

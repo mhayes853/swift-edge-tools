@@ -1,9 +1,9 @@
 import Foundation
 import OrderedCollections
 
-// MARK: - LFMPythonToolCallParser
+// MARK: - LFM2PythonToolCallParser
 
-public struct LFMPythonToolCallParser: EdgeToolCallParser, Sendable {
+public struct LFM2PythonToolCallParser: EdgeToolCallParser, Sendable {
   private var list = IncrementalToolCallList(opener: "<|tool_call_start|>")
 
   public init() {}
@@ -21,10 +21,10 @@ public struct LFMPythonToolCallParser: EdgeToolCallParser, Sendable {
   }
 }
 
-// MARK: - LFM
+// MARK: - LFM2
 
-public typealias LFM2ToolCallParser = LFMPythonToolCallParser
-public typealias LFM2P5ToolCallParser = LFMPythonToolCallParser
+public typealias LFM2ToolCallParser = LFM2PythonToolCallParser
+public typealias LFM2P5ToolCallParser = LFM2PythonToolCallParser
 
 // MARK: - Python Call Boundaries
 

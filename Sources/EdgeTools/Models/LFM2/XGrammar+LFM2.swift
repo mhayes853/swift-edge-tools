@@ -6,22 +6,22 @@
       tools: some Sequence<EdgeToolDefinition>,
       range: GrammarToolCallRange = .unbounded(minimum: 0)
     ) throws -> XGRGrammar {
-      try Self.lfmPython(tools: tools, range: range)
+      try Self.lfm2Python(tools: tools, range: range)
     }
 
     public static func lfm2P5(
       tools: some Sequence<EdgeToolDefinition>,
       range: GrammarToolCallRange = .unbounded(minimum: 0)
     ) throws -> XGRGrammar {
-      try Self.lfmPython(tools: tools, range: range)
+      try Self.lfm2Python(tools: tools, range: range)
     }
 
-    public static func lfmPython(
+    public static func lfm2Python(
       tools: some Sequence<EdgeToolDefinition>,
       range: GrammarToolCallRange = .unbounded(minimum: 0)
     ) throws -> XGRGrammar {
       let calls = try Self.toolCalls(tools: Array(tools), separator: ",", range: range) {
-        try Self.lfmPythonCall($0)
+        try Self.pythonCall($0)
       }
       let prefix = try XGRGrammar(literal: "<|tool_call_start|>[")
       let withCalls = try prefix.concatenate(calls)
@@ -33,7 +33,7 @@
       return try XGRGrammar(ebnf: document.source)
     }
 
-    private static func lfmPythonCall(_ tool: EdgeToolDefinition) throws -> XGRGrammar {
+    private static func pythonCall(_ tool: EdgeToolDefinition) throws -> XGRGrammar {
       let jsonArguments = Self.strictJSONArguments(for: tool)
       var document = try XGREBNFDocument(jsonArguments.ebnf)
       try document.mapLiterals { ruleName, value, suffix in

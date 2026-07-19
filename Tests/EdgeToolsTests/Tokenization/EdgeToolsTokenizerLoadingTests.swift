@@ -38,14 +38,16 @@ struct `EdgeToolsTokenizer Loading tests` {
       defer { try? FileManager.default.removeItem(at: directory) }
 
       let tokenizer = try await loadEdgeToolsTokenizer(from: directory)
+      let preTrainedTokenizer = try #require(tokenizer as? EdgeToolsPreTrainedTokenizer)
       let tokenIDs = (
-        tokenizer.bosTokenId,
-        tokenizer.eosTokenId,
-        tokenizer.unknownTokenId
+        preTrainedTokenizer.bosTokenId,
+        preTrainedTokenizer.eosTokenId,
+        preTrainedTokenizer.unknownTokenId
       )
       expectNoDifference(tokenIDs.0, 0)
       expectNoDifference(tokenIDs.1, 2)
       expectNoDifference(tokenIDs.2, 3)
+      expectNoDifference(preTrainedTokenizer.backendJSON.contains("\"model\""), false)
     }
 
     private func makeTransformersTokenizerDirectory() throws -> URL {

@@ -4,7 +4,7 @@
   import Testing
 
   @Suite(.serialized)
-  struct `LFM XGRCompiler tests`: ~Copyable {
+  struct `LFM2 XGRCompiler tests`: ~Copyable {
     private let compiler: XGRCompiler
     private let tokenizer: NeedleSPTokenizer
     private let eosToken: EdgeToolsToken.ID
@@ -19,8 +19,8 @@
     }
 
     @Test
-    func `LFM Python Removes Duplicate EBNF Rules`() throws {
-      let grammar = try XGRGrammar.lfmPython(
+    func `LFM2 Python Removes Duplicate EBNF Rules`() throws {
+      let grammar = try XGRGrammar.lfm2Python(
         tools: [.getWeather, Self.getForecast],
         range: .exact(1)
       )
@@ -30,9 +30,9 @@
     }
 
     @Test
-    func `LFM Python Uses Keyword Arguments And Nested Dictionaries`() throws {
+    func `LFM2 Python Uses Keyword Arguments And Nested Dictionaries`() throws {
       let validMatcher = try self.compiler.makeMatcher(
-        try XGRGrammar.lfmPython(tools: [Self.nestedTool], range: .exact(1))
+        try XGRGrammar.lfm2Python(tools: [Self.nestedTool], range: .exact(1))
       )
       let valid =
         """
@@ -47,7 +47,7 @@
       )
 
       let optionalMatcher = try self.compiler.makeMatcher(
-        try XGRGrammar.lfmPython(tools: [Self.nestedTool], range: .exact(1))
+        try XGRGrammar.lfm2Python(tools: [Self.nestedTool], range: .exact(1))
       )
       assertGrammarAccepts(
         """
@@ -60,7 +60,7 @@
       )
 
       let topLevelJSONMatcher = try self.compiler.makeMatcher(
-        try XGRGrammar.lfmPython(tools: [Self.nestedTool], range: .exact(1))
+        try XGRGrammar.lfm2Python(tools: [Self.nestedTool], range: .exact(1))
       )
       assertGrammarRejects(
         #"<|tool_call_start|>[nested("payload":{"enabled":True,"child":{"missing":None,"items":[]}})]<|tool_call_end|>"#,
@@ -70,7 +70,7 @@
       )
 
       let nestedKeywordMatcher = try self.compiler.makeMatcher(
-        try XGRGrammar.lfmPython(tools: [Self.nestedTool], range: .exact(1))
+        try XGRGrammar.lfm2Python(tools: [Self.nestedTool], range: .exact(1))
       )
       assertGrammarRejects(
         #"<|tool_call_start|>[nested(payload={"enabled"=True,"child":{"missing":None,"items":[]}})]<|tool_call_end|>"#,

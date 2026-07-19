@@ -3,11 +3,11 @@ import EdgeTools
 import Testing
 
 @Suite
-struct `LFMPythonToolCallParser tests` {
+struct `Qwen3ToolCallParser tests` {
   @Test
   func `Decodes Escaped Unicode Surrogate Pairs`() throws {
-    var parser = LFMPythonToolCallParser()
-    let source = #"<|tool_call_start|>[emoji(value='\uD83D\uDE00')]<|tool_call_end|>"#
+    var parser = Qwen3ToolCallParser()
+    let source = #"<tool_call>{"name":"emoji","arguments":{"value":"\uD83D\uDE00"}}</tool_call>"#
     let parsed = parser.accept(token: EdgeToolsToken(id: 0, stringValue: source))
     let call = try #require(parsed)
 

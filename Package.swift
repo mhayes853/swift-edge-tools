@@ -20,7 +20,11 @@ let package = Package(
     .trait(name: "XGrammar", description: "XGrammar-powered structured generation."),
     .trait(name: "Transformers", description: "swift-transformers tokenizer support."),
     .trait(name: "FoundationModels", description: "Apple FoundationModels interoperability."),
-    .trait(name: "MLX", description: "MLX engine support.", enabledTraits: ["XGrammar"]),
+    .trait(
+      name: "MLX",
+      description: "MLX engine support.",
+      enabledTraits: ["XGrammar", "Transformers"]
+    ),
     .trait(
       name: "CoreAI",
       description: "CoreAI engine support (experimental).",
@@ -133,7 +137,11 @@ let package = Package(
         "GenerationSchema/__Snapshots__",
         "Models/Needle/Engines/__Snapshots__",
         "Models/Needle/Engines/MLX/__Snapshots__",
-        "Models/Needle/__Snapshots__"
+        "Models/Needle/__Snapshots__",
+        "Models/Qwen3/__Snapshots__",
+        "Models/Qwen3P5/__Snapshots__",
+        "Models/FunctionGemma/__Snapshots__",
+        "Models/LFM2/__Snapshots__"
       ],
       resources: [.process("Resources")]
     )

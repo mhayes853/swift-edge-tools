@@ -16,7 +16,8 @@
       var tokenizer = try self.tokenizer(url: url)
       let model = try loadEdgeToolsLanguageModel(
         NeedleMLXModel.self,
-        from: url
+        from: url,
+        model: { NeedleMLXModel(configuration: $0) }
       )
       let tokenizerInfo = try XGRTokenizerInfo.needle(tokenizer: tokenizer)
       let grammarEngine = try XGRCompiler(tokenizerInfo: tokenizerInfo)

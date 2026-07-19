@@ -102,6 +102,10 @@ public struct EdgeToolsTokenizerLoadingError: Hashable, Sendable, Error {
     guard let tokenizer = tokenizer as? PreTrainedTokenizer else {
       throw EdgeToolsTokenizerLoadingError.unsupportedTransformersTokenizer(at: tokenizerURL)
     }
-    return tokenizer
+    let backendJSON = try loadHuggingFaceBackendJSON(from: tokenizerURL)
+    return EdgeToolsPreTrainedTokenizer(
+      tokenizer: tokenizer,
+      backendJSON: backendJSON
+    )
   }
 #endif
