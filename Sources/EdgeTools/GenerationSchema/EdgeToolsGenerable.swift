@@ -1,11 +1,12 @@
 #if canImport(Foundation)
   import Foundation
 #endif
+import OrderedCollections
 
 // MARK: - EdgeToolsGenerable
 
 /// A type that can generate a generation schema description of itself.
-public protocol EdgeToolsGenerable: ConvertibleFromEdgeToolsValue {
+public protocol EdgeToolsGenerable: ConvertibleFromEdgeToolsValue, ConvertibleToEdgeToolsValue {
   /// The generation schema describing this type.
   static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema { get }
 }
@@ -25,6 +26,18 @@ extension EdgeToolsValue: ConvertibleFromEdgeToolsValue {
   }
 }
 
+// MARK: - ConvertibleToEdgeToolsValue
+
+/// A type that can produce an ``EdgeToolsValue`` representation of itself.
+public protocol ConvertibleToEdgeToolsValue {
+  /// An ``EdgeToolsValue`` representation of this value.
+  var edgeToolsValue: EdgeToolsValue { get }
+}
+
+extension EdgeToolsValue: ConvertibleToEdgeToolsValue {
+  public var edgeToolsValue: EdgeToolsValue { self }
+}
+
 // MARK: - Scalar Types
 
 extension String: EdgeToolsGenerable {
@@ -36,6 +49,8 @@ extension String: EdgeToolsGenerable {
     }
     self = string
   }
+
+  public var edgeToolsValue: EdgeToolsValue { .string(self) }
 }
 
 extension Bool: EdgeToolsGenerable {
@@ -47,6 +62,8 @@ extension Bool: EdgeToolsGenerable {
     }
     self = boolean
   }
+
+  public var edgeToolsValue: EdgeToolsValue { .boolean(self) }
 }
 
 extension Double: EdgeToolsGenerable {
@@ -62,6 +79,8 @@ extension Double: EdgeToolsGenerable {
       throw EdgeToolsValueTypeError(expected: .number, received: edgeToolsValue.type)
     }
   }
+
+  public var edgeToolsValue: EdgeToolsValue { .number(self) }
 }
 
 extension Float: EdgeToolsGenerable {
@@ -77,6 +96,8 @@ extension Float: EdgeToolsGenerable {
       throw EdgeToolsValueTypeError(expected: .number, received: edgeToolsValue.type)
     }
   }
+
+  public var edgeToolsValue: EdgeToolsValue { .number(Double(self)) }
 }
 
 extension EdgeToolsGenerable where Self: FixedWidthInteger, Self: SignedInteger {
@@ -85,6 +106,8 @@ extension EdgeToolsGenerable where Self: FixedWidthInteger, Self: SignedInteger 
   public init(edgeToolsValue: EdgeToolsValue) throws {
     self = try Self.integer(from: edgeToolsValue)
   }
+
+  public var edgeToolsValue: EdgeToolsValue { .integer(Int(self)) }
 }
 
 extension EdgeToolsGenerable where Self: FixedWidthInteger, Self: UnsignedInteger {
@@ -94,6 +117,15 @@ extension EdgeToolsGenerable where Self: FixedWidthInteger, Self: UnsignedIntege
 
   public init(edgeToolsValue: EdgeToolsValue) throws {
     self = try Self.integer(from: edgeToolsValue)
+  }
+
+  public var edgeToolsValue: EdgeToolsValue {
+    let asInt = Int(truncatingIfNeeded: self)
+    precondition(
+      asInt >= 0,
+      "\(Self.self) value \(self) exceeds Int.max and cannot be encoded as an EdgeToolsValue integer."
+    )
+    return .integer(asInt)
   }
 }
 
@@ -126,6 +158,10 @@ extension UInt128: EdgeToolsGenerable {}
       }
       self = Data(string.utf8)
     }
+
+    public var edgeToolsValue: EdgeToolsValue {
+      .string(String(decoding: self, as: UTF8.self))
+    }
   }
 
   extension Decimal: EdgeToolsGenerable {
@@ -140,6 +176,10 @@ extension UInt128: EdgeToolsGenerable {}
       default:
         throw EdgeToolsValueTypeError(expected: .number, received: edgeToolsValue.type)
       }
+    }
+
+    public var edgeToolsValue: EdgeToolsValue {
+      .string("\(self)")
     }
   }
 #endif
@@ -159,6 +199,10 @@ extension Array: ConvertibleFromEdgeToolsValue where Element: ConvertibleFromEdg
     }
     self = try array.map { try Element(edgeToolsValue: $0) }
   }
+}
+
+extension Array: ConvertibleToEdgeToolsValue where Element: ConvertibleToEdgeToolsValue {
+  public var edgeToolsValue: EdgeToolsValue { .array(self.map(\.edgeToolsValue)) }
 }
 
 extension Dictionary: EdgeToolsGenerable
@@ -185,6 +229,17 @@ where Key == String, Value: ConvertibleFromEdgeToolsValue {
   }
 }
 
+extension Dictionary: ConvertibleToEdgeToolsValue
+where Key == String, Value: ConvertibleToEdgeToolsValue {
+  public var edgeToolsValue: EdgeToolsValue {
+    .object(
+      OrderedDictionary(
+        uniqueKeysWithValues: self.map { key, value in (key, value.edgeToolsValue) }
+      )
+    )
+  }
+}
+
 extension Optional: EdgeToolsGenerable where Wrapped: EdgeToolsGenerable {
   public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
     Wrapped.edgeToolsGenerationSchema.nullable()
@@ -198,6 +253,15 @@ extension Optional: ConvertibleFromEdgeToolsValue where Wrapped: ConvertibleFrom
       self = nil
     default:
       self = try Wrapped(edgeToolsValue: edgeToolsValue)
+    }
+  }
+}
+
+extension Optional: ConvertibleToEdgeToolsValue where Wrapped: ConvertibleToEdgeToolsValue {
+  public var edgeToolsValue: EdgeToolsValue {
+    switch self {
+    case .none: .null
+    case .some(let wrapped): wrapped.edgeToolsValue
     }
   }
 }
@@ -218,6 +282,8 @@ extension Optional: ConvertibleFromEdgeToolsValue where Wrapped: ConvertibleFrom
         throw EdgeToolsValueTypeError(expected: .number, received: edgeToolsValue.type)
       }
     }
+
+    public var edgeToolsValue: EdgeToolsValue { .number(Double(self)) }
   }
 #endif
 

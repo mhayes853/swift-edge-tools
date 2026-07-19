@@ -36,6 +36,15 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro, MemberAttribut
       )
     }
 
+    if !Self.hasExistingEdgeToolsValueProperty(in: structDecl) {
+      members.append(
+        Self.edgeToolsValueProperty(
+          from: properties,
+          modifierPrefix: modifierPrefix
+        )
+      )
+    }
+
     return members
   }
 
@@ -116,6 +125,19 @@ extension EdgeToolsGenerableMacro {
       let parameters = initializer.signature.parameterClause.parameters
       guard parameters.count == 1, let parameter = parameters.first else { return false }
       return parameter.firstName.text == "edgeToolsValue"
+    }
+  }
+
+  private static func hasExistingEdgeToolsValueProperty(in declaration: StructDeclSyntax) -> Bool {
+    declaration.memberBlock.members.contains { member in
+      guard let variableDecl = member.decl.as(VariableDeclSyntax.self) else { return false }
+      guard !Self.isStatic(variableDecl) else { return false }
+      return variableDecl.bindings.contains { binding in
+        guard let identifierPattern = binding.pattern.as(IdentifierPatternSyntax.self) else {
+          return false
+        }
+        return identifierPattern.identifier.text == "edgeToolsValue"
+      }
     }
   }
 
@@ -377,6 +399,38 @@ extension EdgeToolsGenerableMacro {
       \(raw: modifierPrefix)init(edgeToolsValue: EdgeToolsValue) throws {
         let object = try _edgeToolsRequireObjectValue(edgeToolsValue)
         \(raw: assignments)
+      }
+      """
+  }
+
+  private static func edgeToolsValueProperty(
+    from properties: [StoredProperty],
+    modifierPrefix: String
+  ) -> DeclSyntax {
+    let entries =
+      properties.compactMap { property -> String? in
+        guard !property.isIgnored else { return nil }
+        let valueExpression =
+          property.isOptional
+          ? "self.\(property.name)?.edgeToolsValue"
+          : "self.\(property.name).edgeToolsValue"
+        return
+          "(key: \(Self.quotedStringLiteral(property.schemaKey)), value: \(valueExpression))"
+      }
+
+    if entries.isEmpty {
+      return """
+        \(raw: modifierPrefix)var edgeToolsValue: EdgeToolsValue {
+          _edgeToolsBuildObjectValue()
+        }
+        """
+    }
+
+    return """
+      \(raw: modifierPrefix)var edgeToolsValue: EdgeToolsValue {
+        _edgeToolsBuildObjectValue(
+          \(raw: entries.joined(separator: ",\n          "))
+        )
       }
       """
   }

@@ -4,7 +4,7 @@ import OrderedCollections
 
 /// Generates ``EdgeToolsGenerable`` support for a struct.
 @attached(extension, conformances: EdgeToolsGenerable)
-@attached(member, names: named(edgeToolsGenerationSchema), named(init))
+@attached(member, names: named(edgeToolsGenerationSchema), named(init), named(edgeToolsValue))
 @attached(memberAttribute)
 public macro EdgeToolsGenerable(
   _ schema: EdgeToolsGenerationSchema...
@@ -40,4 +40,18 @@ public func _edgeToolsValue(
   forKey key: String
 ) -> EdgeToolsValue {
   object[key] ?? .null
+}
+
+@inlinable
+@inline(__always)
+public func _edgeToolsBuildObjectValue(
+  _ entries: (key: String, value: EdgeToolsValue?)...
+) -> EdgeToolsValue {
+  var object = OrderedDictionary<String, EdgeToolsValue>()
+  for entry in entries {
+    if let value = entry.value {
+      object[entry.key] = value
+    }
+  }
+  return .object(object)
 }

@@ -34,6 +34,12 @@ extension BaseTestSuite {
             let object = try _edgeToolsRequireObjectValue(edgeToolsValue)
             self.name = try String(edgeToolsValue: _edgeToolsValue(object, forKey: "name"))
           }
+
+          var edgeToolsValue: EdgeToolsValue {
+            _edgeToolsBuildObjectValue(
+              (key: "name", value: self.name.edgeToolsValue)
+            )
+          }
         }
 
         extension Person: EdgeToolsGenerable {
@@ -71,6 +77,12 @@ extension BaseTestSuite {
             let object = try _edgeToolsRequireObjectValue(edgeToolsValue)
             self.firstName = try String(edgeToolsValue: _edgeToolsValue(object, forKey: "first_name"))
           }
+
+          var edgeToolsValue: EdgeToolsValue {
+            _edgeToolsBuildObjectValue(
+              (key: "first_name", value: self.firstName.edgeToolsValue)
+            )
+          }
         }
 
         extension Person: EdgeToolsGenerable {
@@ -106,6 +118,12 @@ extension BaseTestSuite {
             let object = try _edgeToolsRequireObjectValue(edgeToolsValue)
             self.title = try Optional<String>(edgeToolsValue: _edgeToolsValue(object, forKey: "title"))
           }
+
+          var edgeToolsValue: EdgeToolsValue {
+            _edgeToolsBuildObjectValue(
+              (key: "title", value: self.title?.edgeToolsValue)
+            )
+          }
         }
 
         extension Payload: EdgeToolsGenerable {
@@ -138,6 +156,10 @@ extension BaseTestSuite {
           init(edgeToolsValue: EdgeToolsValue) throws {
             let object = try _edgeToolsRequireObjectValue(edgeToolsValue)
             self.internalID = nil
+          }
+
+          var edgeToolsValue: EdgeToolsValue {
+            _edgeToolsBuildObjectValue()
           }
         }
 
@@ -189,6 +211,12 @@ extension BaseTestSuite {
             let object = try _edgeToolsRequireObjectValue(edgeToolsValue)
             self.address = try Address(edgeToolsValue: _edgeToolsValue(object, forKey: "address"))
           }
+
+          var edgeToolsValue: EdgeToolsValue {
+            _edgeToolsBuildObjectValue(
+              (key: "address", value: self.address.edgeToolsValue)
+            )
+          }
         }
 
         extension Person: EdgeToolsGenerable {
@@ -238,6 +266,12 @@ extension BaseTestSuite {
           init(edgeToolsValue: EdgeToolsValue) throws {
             let object = try _edgeToolsRequireObjectValue(edgeToolsValue)
             self.addresses = try [Address](edgeToolsValue: _edgeToolsValue(object, forKey: "addresses"))
+          }
+
+          var edgeToolsValue: EdgeToolsValue {
+            _edgeToolsBuildObjectValue(
+              (key: "addresses", value: self.addresses.edgeToolsValue)
+            )
           }
         }
 
