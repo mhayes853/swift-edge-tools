@@ -1,10 +1,10 @@
 ▿ EdgeToolsEngineGeneration
   ▿ decodeMetrics: EdgeToolsDecodeMetrics
-    ▿ duration: 1.430389792 seconds
-      - _low: 1430389792000000000
+    ▿ duration: 2.715115792 seconds
+      - _low: 2715115792000000000
       - _high: 0
-    ▿ durationToFirstToken: 0.038567416 seconds
-      - _low: 38567416000000000
+    ▿ durationToFirstToken: 0.11813475 seconds
+      - _low: 118134750000000000
       - _high: 0
     - tokens: 84
   ▿ metadata: 5 key/value pairs
@@ -15,30 +15,30 @@
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "MLXEngineGenerationStartMemorySnapshot"
-      ▿ value: Peak:   109M         (115292954)
-Active: 109M         (114371214)
-Cache:  75M          (78651588)
-        - activeMemory: 114371214
-        - cacheMemory: 78651588
-        - peakMemory: 115292954
+      ▿ value: Peak:   1493M        (1565674026)
+Active: 260M         (273146016)
+Cache:  2741M        (2874706894)
+        - activeMemory: 273146016
+        - cacheMemory: 2874706894
+        - peakMemory: 1565674026
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "MLXEnginePostDecodeMemorySnapshot"
-      ▿ value: Peak:   150M         (157287402)
-Active: 115M         (121270034)
-Cache:  81M          (85147840)
-        - activeMemory: 121270034
-        - cacheMemory: 85147840
-        - peakMemory: 157287402
+      ▿ value: Peak:   1493M        (1565674026)
+Active: 115M         (121296136)
+Cache:  2886M        (3026556774)
+        - activeMemory: 121296136
+        - cacheMemory: 3026556774
+        - peakMemory: 1565674026
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "MLXEnginePostPrefillMemorySnapshot"
-      ▿ value: Peak:   146M         (153588352)
-Active: 115M         (120913674)
-Cache:  79M          (83407048)
-        - activeMemory: 120913674
-        - cacheMemory: 83407048
-        - peakMemory: 153588352
+      ▿ value: Peak:   1493M        (1565674026)
+Active: 115M         (120939776)
+Cache:  2886M        (3026913134)
+        - activeMemory: 120939776
+        - cacheMemory: 3026913134
+        - peakMemory: 1565674026
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "PerTokenConfidences"
@@ -128,8 +128,8 @@ Cache:  79M          (83407048)
         - 0.7321682
         - 1.0
   ▿ prefillMetrics: EdgeToolsPrefillMetrics
-    ▿ duration: 0.03194075 seconds
-      - _low: 31940750000000000
+    ▿ duration: 0.104397 seconds
+      - _low: 104397000000000000
       - _high: 0
     - tokens: 150
   - response: "<tool_call> [{\"name\":\"send_email\",\"arguments\":{\"address\":\"henderry@gmail.com\",\"subject\":\"Hello\",\"body\":\"Could you please go on an adventure?[{\"}},{\"name\":\"send_email\",\"arguments\":{\"address\":\"adventure@gmail.com\",\"subject\":\"Hello\",\"body\":\"I am writing to go on an adventure.\"}}]"

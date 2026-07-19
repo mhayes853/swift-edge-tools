@@ -79,6 +79,7 @@ private enum NeedleTestModelExport {
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()
+      .deletingLastPathComponent()
     return packageDirectory.appending(path: "python")
   }
 

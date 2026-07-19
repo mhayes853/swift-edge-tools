@@ -78,9 +78,16 @@ struct `EdgeToolsEncoding tests` {
   @Test
   func `Dictionary Encodes To Object Value`() {
     expectNoDifference([String: Int]().edgeToolsValue, .object([:]))
+
+    let encoded = ["one": 1, "two": 2].edgeToolsValue
+    guard case .object(let object) = encoded else {
+      Issue.record("Expected dictionary to encode as an object value.")
+      return
+    }
+    let expected = ["one": EdgeToolsValue.integer(1), "two": .integer(2)]
     expectNoDifference(
-      ["one": 1, "two": 2].edgeToolsValue,
-      .object(["one": .integer(1), "two": .integer(2)])
+      Dictionary(uniqueKeysWithValues: object.map { ($0.key, $0.value) }),
+      expected
     )
   }
 
