@@ -70,6 +70,24 @@ extension Array where Element == UInt8 {
     return nil
   }
 
+  func firstRange(of needle: [UInt8], outside marker: [UInt8]) -> Range<Int>? {
+    var index = 0
+    var isInsideMarker = false
+    while index < self.count {
+      if let markerRange = self.firstRange(of: marker, startingAt: index), markerRange.lowerBound == index {
+        isInsideMarker.toggle()
+        index = markerRange.upperBound
+      } else if !isInsideMarker,
+        let needleRange = self.firstRange(of: needle, startingAt: index), needleRange.lowerBound == index
+      {
+        return needleRange
+      } else {
+        index += 1
+      }
+    }
+    return nil
+  }
+
   mutating func removeLeadingASCIIWhitespaceAndCommas() {
     while let first = self.first {
       guard first == UInt8(ascii: ",") || first.isASCIIWhitespace else { return }
@@ -164,6 +182,20 @@ struct IncrementalToolCallBlock: Hashable, Sendable {
   }
 
   mutating func nextPayload(respectingJSONStringBoundaries: Bool) -> Data? {
+    let closer = self.closer
+    return self.nextPayload { buffer in
+      respectingJSONStringBoundaries
+        ? buffer.firstRangeOutsideJSONString(of: closer)
+        : buffer.firstRange(of: closer)
+    }
+  }
+
+  mutating func nextPayload(outside marker: [UInt8]) -> Data? {
+    let closer = self.closer
+    return self.nextPayload { $0.firstRange(of: closer, outside: marker) }
+  }
+
+  private mutating func nextPayload(findCloser: ([UInt8]) -> Range<Int>?) -> Data? {
     if !self.isInsideBlock {
       guard let openerRange = self.buffer.firstRange(of: self.opener) else {
         self.buffer.retainPossiblePrefix(of: self.opener)
@@ -173,11 +205,7 @@ struct IncrementalToolCallBlock: Hashable, Sendable {
       self.isInsideBlock = true
     }
 
-    let closerRange =
-      respectingJSONStringBoundaries
-      ? self.buffer.firstRangeOutsideJSONString(of: self.closer)
-      : self.buffer.firstRange(of: self.closer)
-    guard let closerRange else { return nil }
+    guard let closerRange = findCloser(self.buffer) else { return nil }
     let payload = Data(self.buffer[..<closerRange.lowerBound])
     self.buffer.removeSubrange(..<closerRange.upperBound)
     self.isInsideBlock = false

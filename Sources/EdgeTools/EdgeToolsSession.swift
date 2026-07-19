@@ -111,7 +111,9 @@ public struct EdgeToolsSessionTokens: AsyncSequence, Sendable {
 
   fileprivate let makeIterator: @Sendable () -> AsyncIterator
 
-  public func makeAsyncIterator() -> AsyncIterator { self.makeIterator() }
+  public func makeAsyncIterator() -> AsyncIterator {
+    self.makeIterator()
+  }
 }
 
 // MARK: - Raw Tool Calls
@@ -121,7 +123,10 @@ public final class EdgeToolsRawToolCallsStream: Sendable, Observable, AsyncSeque
 
   public struct AsyncIterator: AsyncIteratorProtocol {
     fileprivate var base: AsyncThrowingStream<EdgeRawToolCall, any Error>.AsyncIterator
-    public mutating func next() async throws -> EdgeRawToolCall? { try await self.base.next() }
+
+    public mutating func next() async throws -> EdgeRawToolCall? {
+      try await self.base.next()
+    }
   }
 
   private struct State {

@@ -3,66 +3,21 @@ import Foundation
 // MARK: - FunctionGemmaToolCallParser
 
 public struct FunctionGemmaToolCallParser: EdgeToolCallParser, Sendable {
-  private static let opener = Array("<start_function_call>".utf8)
-  private static let closer = Array("<end_function_call>".utf8)
   private static let stringMarker = Array("<escape>".utf8)
 
-  private var buffer = [UInt8]()
-  private var isInsideCall = false
+  private var block = IncrementalToolCallBlock(
+    opener: "<start_function_call>",
+    closer: "<end_function_call>"
+  )
 
   public init() {}
 
   public mutating func accept(token: EdgeToolsToken) -> EdgeRawToolCall? {
-    self.buffer.append(contentsOf: token.stringValue.utf8)
-
-    while true {
-      if !self.isInsideCall {
-        guard let openerRange = self.buffer.firstRange(of: Self.opener) else {
-          self.buffer.retainPossiblePrefix(of: Self.opener)
-          return nil
-        }
-        self.buffer.removeSubrange(..<openerRange.upperBound)
-        self.isInsideCall = true
-      }
-
-      guard
-        let closerRange = self.buffer.firstRange(
-          of: Self.closer,
-          outside: Self.stringMarker
-        )
-      else { return nil }
-
-      let payloadData = Data(self.buffer[..<closerRange.lowerBound])
-      self.buffer.removeSubrange(..<closerRange.upperBound)
-      self.isInsideCall = false
+    self.block.append(token)
+    while let payloadData = self.block.nextPayload(outside: Self.stringMarker) {
       guard let payload = String(data: payloadData, encoding: .utf8) else { continue }
       var reader = FunctionGemmaCallReader(source: payload)
-      if let call = reader.parse() {
-        return call
-      }
-    }
-  }
-}
-
-extension Array where Element == UInt8 {
-  fileprivate func firstRange(of needle: [UInt8], outside marker: [UInt8]) -> Range<Int>? {
-    var index = 0
-    var isInsideMarkedValue = false
-    while index < self.count {
-      if let markerRange = self.firstRange(of: marker, startingAt: index),
-        markerRange.lowerBound == index
-      {
-        isInsideMarkedValue.toggle()
-        index = markerRange.upperBound
-        continue
-      }
-      if !isInsideMarkedValue,
-        let needleRange = self.firstRange(of: needle, startingAt: index),
-        needleRange.lowerBound == index
-      {
-        return needleRange
-      }
-      index += 1
+      if let call = reader.parse() { return call }
     }
     return nil
   }
@@ -114,23 +69,7 @@ private struct FunctionGemmaCallReader: ToolCallValueReader {
       self.cursor.advance()
       return self.parseObjectBody().map(EdgeToolsValue.object)
     case "[": return self.parseArray()
-    default:
-      let token = self.parseBareValue()
-      return switch token {
-      case "true", "True": true
-      case "false", "False": false
-      case "null", "None": .null
-      default:
-        if token.isEmpty {
-          nil
-        } else if let integer = Int(token) {
-          .integer(integer)
-        } else if let number = Double(token) {
-          .number(number)
-        } else {
-          .string(token)
-        }
-      }
+    default: return Self.parseBareValue(self.readBareValue())
     }
   }
 
@@ -142,8 +81,26 @@ private struct FunctionGemmaCallReader: ToolCallValueReader {
     return (try? JSONDecoder().decode(EdgeToolsValue.self, from: data)) ?? .string(value)
   }
 
-  private mutating func parseBareValue() -> String {
+  private mutating func readBareValue() -> String {
     self.cursor.read { ![",", "}", "]"].contains($0) }
       .trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  private static func parseBareValue(_ token: String) -> EdgeToolsValue? {
+    return switch token {
+    case "true", "True": true
+    case "false", "False": false
+    case "null", "None": .null
+    default:
+      if token.isEmpty {
+        nil
+      } else if let integer = Int(token) {
+        .integer(integer)
+      } else if let number = Double(token) {
+        .number(number)
+      } else {
+        .string(token)
+      }
+    }
   }
 }

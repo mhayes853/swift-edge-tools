@@ -1,143 +1,105 @@
 import Foundation
 
 package func loadHuggingFaceBackendJSON(from tokenizerURL: URL) throws -> String {
-  let data = try Data(contentsOf: tokenizerURL, options: .alwaysMapped)
-  return try huggingFaceBackendJSON(from: data)
+  try huggingFaceBackendJSON(from: Data(contentsOf: tokenizerURL, options: .alwaysMapped))
 }
 
 package func huggingFaceBackendJSON(from data: Data) throws -> String {
   try data.withUnsafeBytes { bytes in
-    let buffer = bytes.bindMemory(to: UInt8.self)
-    var scanner = JSONTopLevelScanner(buffer: buffer)
-    let values = try scanner.values(for: ["decoder", "normalizer", "pre_tokenizer"])
-    let fields = ["decoder", "normalizer", "pre_tokenizer"]
-      .compactMap { key -> String? in
-        guard let range = values[key] else { return nil }
-        let value = String(decoding: buffer[range], as: UTF8.self)
-        return "\(SelfEncodedJSON.string(key)):\(value)"
-      }
-    return "{\(fields.joined(separator: ","))}"
+    var scanner = HuggingFaceBackendJSONScanner(buffer: bytes.bindMemory(to: UInt8.self))
+    return "{\(try scanner.metadataFields().joined(separator: ","))}"
   }
 }
 
-private enum SelfEncodedJSON {
-  static func string(_ value: String) -> String {
-    var result = "\""
-    for scalar in value.unicodeScalars {
-      switch scalar.value {
-      case 0x22: result += "\\\""
-      case 0x5C: result += "\\\\"
-      case 0x00...0x1F: result += String(format: "\\u%04X", scalar.value)
-      default: result.unicodeScalars.append(scalar)
-      }
-    }
-    result += "\""
-    return result
-  }
-}
+private struct HuggingFaceBackendJSONScanner {
+  private static let metadataKeys = ["decoder", "normalizer", "pre_tokenizer"]
 
-private struct JSONTopLevelScanner {
   let buffer: UnsafeBufferPointer<UInt8>
   var index = 0
 
-  mutating func values(for selectedKeys: Set<String>) throws -> [String: Range<Int>] {
+  mutating func metadataFields() throws -> [String] {
     self.skipWhitespace()
     try self.consume(0x7B)
     self.skipWhitespace()
 
-    var values = [String: Range<Int>]()
-    guard !self.consumeIfPresent(0x7D) else { return values }
-
-    while true {
-      let key = try self.readString()
+    var values = [Range<Int>?](repeating: nil, count: Self.metadataKeys.count)
+    while !self.consumeIfPresent(0x7D) {
+      let key = try self.stringRange()
       self.skipWhitespace()
       try self.consume(0x3A)
       self.skipWhitespace()
-      let valueRange = try self.readValueRange()
-      if selectedKeys.contains(key) {
-        values[key] = valueRange
+
+      let value = try self.valueRange()
+      if let metadataIndex = Self.metadataKeys.firstIndex(where: {
+        self.buffer[key].elementsEqual("\"\($0)\"".utf8)
+      }) {
+        values[metadataIndex] = value
       }
-      if values.count == selectedKeys.count {
-        return values
-      }
+      if values.allSatisfy({ $0 != nil }) { break }
 
       self.skipWhitespace()
-      if self.consumeIfPresent(0x7D) {
-        return values
-      }
+      if self.consumeIfPresent(0x7D) { break }
       try self.consume(0x2C)
       self.skipWhitespace()
     }
+
+    return try zip(Self.metadataKeys, values).compactMap { key, value in
+      guard let value else { return nil }
+      guard let jsonValue = String(bytes: self.buffer[value], encoding: .utf8) else {
+        throw HuggingFaceBackendJSONError.invalidJSON
+      }
+      return "\"\(key)\":\(jsonValue)"
+    }
   }
 
-  private mutating func readString() throws -> String {
-    let range = try self.readStringRange()
-    let data = Data(self.buffer[range])
-    return try JSONDecoder().decode(String.self, from: data)
-  }
-
-  private mutating func readStringRange() throws -> Range<Int> {
+  private mutating func stringRange() throws -> Range<Int> {
     let start = self.index
     try self.consume(0x22)
     var escaped = false
     while self.index < self.buffer.count {
       let byte = self.buffer[self.index]
       self.index += 1
-      if escaped {
-        escaped = false
-      } else if byte == 0x5C {
-        escaped = true
-      } else if byte == 0x22 {
-        return start..<self.index
-      }
+      if byte == 0x22, !escaped { return start..<self.index }
+      escaped = byte == 0x5C && !escaped
     }
     throw HuggingFaceBackendJSONError.invalidJSON
   }
 
-  private mutating func readValueRange() throws -> Range<Int> {
+  private mutating func valueRange() throws -> Range<Int> {
     let start = self.index
-    guard self.index < self.buffer.count else {
-      throw HuggingFaceBackendJSONError.invalidJSON
-    }
+    guard self.index < self.buffer.count else { throw HuggingFaceBackendJSONError.invalidJSON }
 
     switch self.buffer[self.index] {
-    case 0x22:
-      _ = try self.readStringRange()
-    case 0x7B, 0x5B:
-      try self.skipContainer()
+    case 0x22: _ = try self.stringRange()
+    case 0x7B, 0x5B: try self.container()
     default:
-      while self.index < self.buffer.count {
-        let byte = self.buffer[self.index]
-        guard byte != 0x2C && byte != 0x7D else { break }
+      while self.index < self.buffer.count, ![0x2C, 0x7D].contains(self.buffer[self.index]) {
         self.index += 1
       }
     }
 
-    var end = self.index
-    while end > start && Self.isWhitespace(self.buffer[end - 1]) {
-      end -= 1
-    }
-    guard end > start else { throw HuggingFaceBackendJSONError.invalidJSON }
+    let end = self.buffer[start..<self.index].lastIndex(where: { !$0.isASCIIWhitespace })
+      .map { $0 + 1 }
+    guard let end, end > start else { throw HuggingFaceBackendJSONError.invalidJSON }
     return start..<end
   }
 
-  private mutating func skipContainer() throws {
-    var delimiters = [UInt8]()
+  private mutating func container() throws {
+    var endings = [UInt8]()
     while self.index < self.buffer.count {
       let byte = self.buffer[self.index]
       if byte == 0x22 {
-        _ = try self.readStringRange()
+        _ = try self.stringRange()
         continue
       }
+
       self.index += 1
       switch byte {
-      case 0x7B: delimiters.append(0x7D)
-      case 0x5B: delimiters.append(0x5D)
+      case 0x7B: endings.append(0x7D)
+      case 0x5B: endings.append(0x5D)
       case 0x7D, 0x5D:
-        guard delimiters.popLast() == byte else {
-          throw HuggingFaceBackendJSONError.invalidJSON
-        }
-        if delimiters.isEmpty { return }
+        guard endings.popLast() == byte else { throw HuggingFaceBackendJSONError.invalidJSON }
+        if endings.isEmpty { return }
       default: break
       }
     }
@@ -145,15 +107,13 @@ private struct JSONTopLevelScanner {
   }
 
   private mutating func skipWhitespace() {
-    while self.index < self.buffer.count && Self.isWhitespace(self.buffer[self.index]) {
+    while self.index < self.buffer.count, self.buffer[self.index].isASCIIWhitespace {
       self.index += 1
     }
   }
 
   private mutating func consume(_ byte: UInt8) throws {
-    guard self.consumeIfPresent(byte) else {
-      throw HuggingFaceBackendJSONError.invalidJSON
-    }
+    guard self.consumeIfPresent(byte) else { throw HuggingFaceBackendJSONError.invalidJSON }
   }
 
   private mutating func consumeIfPresent(_ byte: UInt8) -> Bool {
@@ -162,9 +122,6 @@ private struct JSONTopLevelScanner {
     return true
   }
 
-  private static func isWhitespace(_ byte: UInt8) -> Bool {
-    byte == 0x20 || byte == 0x0A || byte == 0x0D || byte == 0x09
-  }
 }
 
 package struct HuggingFaceBackendJSONError: Hashable, Sendable, Error {
