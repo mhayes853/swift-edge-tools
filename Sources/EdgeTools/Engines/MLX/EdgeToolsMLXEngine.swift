@@ -3,7 +3,11 @@
   import MLXNN
   import MLXLLM
   import MLXLMCommon
-  import Foundation
+  #if canImport(FoundationEssentials)
+    import FoundationEssentials
+  #else
+    import Foundation
+  #endif
   import Atomics
 
   // MARK: - EdgeToolsMLXEngine

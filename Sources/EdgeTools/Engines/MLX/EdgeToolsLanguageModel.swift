@@ -1,5 +1,4 @@
 #if MLX && canImport(MLX)
-  import Foundation
   import MLXLMCommon
 
   public protocol EdgeToolsLanguageModel: LanguageModel {

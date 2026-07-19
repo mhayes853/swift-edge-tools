@@ -1,6 +1,4 @@
 #if XGrammar
-  import Foundation
-
   extension XGRGrammar {
     public static func qwenJSON(
       tools: some Sequence<EdgeToolDefinition>,
@@ -20,7 +18,7 @@
 
     private static func qwenJSONCall(_ tool: EdgeToolDefinition) throws -> XGRGrammar {
       let arguments = Self.strictJSONArguments(for: tool)
-      let encodedName = String(decoding: try JSONEncoder().encode(tool.name), as: UTF8.self)
+      let encodedName = String(decoding: encodeEdgeToolsJSONString(tool.name), as: UTF8.self)
       let prefix = try XGRGrammar(
         literal: "<tool_call>{\"name\":\(encodedName),\"arguments\":"
       )

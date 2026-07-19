@@ -1,4 +1,10 @@
-import Foundation
+#if Foundation
+  #if canImport(FoundationEssentials)
+    import FoundationEssentials
+  #else
+    import Foundation
+  #endif
+#endif
 
 // MARK: - NeedleModelConfiguration
 
@@ -65,8 +71,10 @@ extension NeedleModelConfiguration: Codable {
 
 // MARK: - Loading
 
-extension NeedleModelConfiguration {
-  static func decode(in directory: URL, decoder: JSONDecoder = JSONDecoder()) throws -> Self? {
-    try decodeModelConfiguration(Self.self, in: directory, decoder: decoder)
+#if Foundation
+  extension NeedleModelConfiguration {
+    static func decode(in directory: URL, decoder: JSONDecoder = JSONDecoder()) throws -> Self? {
+      try decodeModelConfiguration(Self.self, in: directory, decoder: decoder)
+    }
   }
-}
+#endif

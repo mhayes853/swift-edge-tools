@@ -1,4 +1,3 @@
-import Foundation
 import OrderedCollections
 
 // MARK: - LFM2PythonToolCallParser
@@ -11,7 +10,7 @@ public struct LFM2PythonToolCallParser: EdgeToolCallParser, Sendable {
   public mutating func accept(token: EdgeToolsToken) -> EdgeRawToolCall? {
     self.list.append(token)
     while let sourceData = self.list.nextItem(findRange: { $0.firstCompletePythonCallRange() }) {
-      guard let source = String(data: sourceData, encoding: .utf8) else { continue }
+      let source = String(decoding: sourceData, as: UTF8.self)
       var reader = PythonCallReader(source: source)
       if let call = reader.parse() {
         return call

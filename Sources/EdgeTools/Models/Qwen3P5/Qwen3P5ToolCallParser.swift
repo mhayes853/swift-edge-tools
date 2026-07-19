@@ -1,4 +1,3 @@
-import Foundation
 import OrderedCollections
 
 public struct QwenXMLToolCallParser: EdgeToolCallParser, Sendable {
@@ -12,7 +11,7 @@ public struct QwenXMLToolCallParser: EdgeToolCallParser, Sendable {
   public mutating func accept(token: EdgeToolsToken) -> EdgeRawToolCall? {
     self.block.append(token)
     while let payloadData = self.block.nextPayload(respectingJSONStringBoundaries: false) {
-      guard let payload = String(data: payloadData, encoding: .utf8) else { continue }
+      let payload = String(decoding: payloadData, as: UTF8.self)
       if let call = Self.parse(payload) {
         return call
       }
@@ -26,8 +25,7 @@ public struct QwenXMLToolCallParser: EdgeToolCallParser, Sendable {
     guard let functionEnd = payload.range(of: "</function>", range: nameEnd..<payload.endIndex)
     else { return nil }
 
-    let name = payload[functionStart.upperBound..<nameEnd]
-      .trimmingCharacters(in: .whitespacesAndNewlines)
+    let name = payload[functionStart.upperBound..<nameEnd].trimmingWhitespace
     guard !name.isEmpty else { return nil }
 
     let bodyStart = payload.index(after: nameEnd)
@@ -52,11 +50,9 @@ public struct QwenXMLToolCallParser: EdgeToolCallParser, Sendable {
         )
       else { return nil }
 
-      let name = body[parameterStart.upperBound..<nameEnd]
-        .trimmingCharacters(in: .whitespacesAndNewlines)
+      let name = body[parameterStart.upperBound..<nameEnd].trimmingWhitespace
       guard !name.isEmpty else { return nil }
-      let source = body[valueStart..<parameterEnd.lowerBound]
-        .trimmingCharacters(in: .whitespacesAndNewlines)
+      let source = body[valueStart..<parameterEnd.lowerBound].trimmingWhitespace
       arguments[name] = Self.parseParameterValue(source)
       searchStart = parameterEnd.upperBound
     }
@@ -69,8 +65,7 @@ public struct QwenXMLToolCallParser: EdgeToolCallParser, Sendable {
     case "False": return false
     case "None": return nil
     default:
-      guard let data = source.data(using: .utf8) else { return .string(source) }
-      return (try? JSONDecoder().decode(EdgeToolsValue.self, from: data)) ?? .string(source)
+      return (try? decodeEdgeToolsJSON(Array(source.utf8))) ?? .string(source)
     }
   }
 }

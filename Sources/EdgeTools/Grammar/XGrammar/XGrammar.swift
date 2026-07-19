@@ -1,6 +1,5 @@
 #if XGrammar
   import CXGrammar
-  import Foundation
 
   // MARK: - XGRVocabularyType
 
@@ -49,16 +48,6 @@
   // MARK: - XGRTokenizerInfo
 
   public struct XGRTokenizerInfo: ~Copyable {
-    private struct HuggingFaceMetadata: Decodable {
-      let vocabularyType: Int
-      let addPrefixSpace: Bool
-
-      enum CodingKeys: String, CodingKey {
-        case vocabularyType = "vocab_type"
-        case addPrefixSpace = "add_prefix_space"
-      }
-    }
-
     public let handle: xgrammar_tokenizer_info_t
 
     public init(
@@ -132,13 +121,12 @@
       stopTokenIDs: [Int] = []
     ) throws -> XGRTokenizerInfo {
       let metadata = try Self.metadata(huggingFaceBackendJSON: backendJSON)
-      let decodedMetadata = try JSONDecoder()
-        .decode(
-          HuggingFaceMetadata.self,
-          from: Data(metadata.utf8)
-        )
+      guard case .object(let decodedMetadata) = try decodeEdgeToolsJSON(Array(metadata.utf8)),
+        case .integer(let vocabularyTypeValue) = decodedMetadata["vocab_type"],
+        case .boolean(let addPrefixSpace) = decodedMetadata["add_prefix_space"]
+      else { throw XGRError.invalidHuggingFaceMetadata }
       let vocabularyType: XGRVocabularyType
-      switch decodedMetadata.vocabularyType {
+      switch vocabularyTypeValue {
       case 0: vocabularyType = .raw
       case 1: vocabularyType = .byteFallback
       case 2: vocabularyType = .byteLevel
@@ -148,7 +136,7 @@
         encodedVocabulary: encodedVocabulary,
         vocabularyType: vocabularyType,
         stopTokenIDs: stopTokenIDs,
-        addPrefixSpace: decodedMetadata.addPrefixSpace
+        addPrefixSpace: addPrefixSpace
       )
     }
 

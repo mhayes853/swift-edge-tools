@@ -1,5 +1,3 @@
-import Foundation
-
 // MARK: - FunctionGemmaToolCallParser
 
 public struct FunctionGemmaToolCallParser: EdgeToolCallParser, Sendable {
@@ -15,7 +13,7 @@ public struct FunctionGemmaToolCallParser: EdgeToolCallParser, Sendable {
   public mutating func accept(token: EdgeToolsToken) -> EdgeRawToolCall? {
     self.block.append(token)
     while let payloadData = self.block.nextPayload(outside: Self.stringMarker) {
-      guard let payload = String(data: payloadData, encoding: .utf8) else { continue }
+      let payload = String(decoding: payloadData, as: UTF8.self)
       var reader = FunctionGemmaCallReader(source: payload)
       if let call = reader.parse() { return call }
     }
@@ -37,7 +35,7 @@ private struct FunctionGemmaCallReader: ToolCallValueReader {
   mutating func parse() -> EdgeRawToolCall? {
     self.cursor.skipWhitespace()
     guard self.cursor.consume("call:") else { return nil }
-    guard let name = self.cursor.read(until: "{")?.trimmingCharacters(in: .whitespacesAndNewlines),
+    guard let name = self.cursor.read(until: "{")?.trimmingWhitespace,
       !name.isEmpty,
       self.cursor.consume("{")
     else { return nil }
@@ -51,7 +49,7 @@ private struct FunctionGemmaCallReader: ToolCallValueReader {
 
   mutating func parseObjectKey() -> String? {
     guard
-      let key = self.cursor.read(until: ":")?.trimmingCharacters(in: .whitespacesAndNewlines),
+      let key = self.cursor.read(until: ":")?.trimmingWhitespace,
       !key.isEmpty,
       self.cursor.consume(":")
     else { return nil }
@@ -77,13 +75,11 @@ private struct FunctionGemmaCallReader: ToolCallValueReader {
     guard self.cursor.consume(Self.stringMarker) else { return nil }
     guard let value = self.cursor.read(until: Self.stringMarker) else { return nil }
     guard self.cursor.consume(Self.stringMarker) else { return nil }
-    guard let data = value.data(using: .utf8) else { return .string(value) }
-    return (try? JSONDecoder().decode(EdgeToolsValue.self, from: data)) ?? .string(value)
+    return (try? decodeEdgeToolsJSON(Array(value.utf8))) ?? .string(value)
   }
 
   private mutating func readBareValue() -> String {
-    self.cursor.read { ![",", "}", "]"].contains($0) }
-      .trimmingCharacters(in: .whitespacesAndNewlines)
+    self.cursor.read { ![",", "}", "]"].contains($0) }.trimmingWhitespace
   }
 
   private static func parseBareValue(_ token: String) -> EdgeToolsValue? {

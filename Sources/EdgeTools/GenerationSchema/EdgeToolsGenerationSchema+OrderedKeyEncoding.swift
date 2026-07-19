@@ -4,13 +4,29 @@ import OrderedCollections
 
 extension EdgeToolsGenerationSchema {
   public func orderedKeyEncoded() -> String {
-    var writer = OrderedKeyJSONWriter()
-    writer.writeSchema(self)
-    return String(decoding: writer.buffer, as: UTF8.self)
+    String(decoding: encodeEdgeToolsJSON(self), as: UTF8.self)
   }
 }
 
-private struct OrderedKeyJSONWriter {
+package func encodeEdgeToolsJSON(_ schema: EdgeToolsGenerationSchema) -> [UInt8] {
+  var writer = EdgeToolsJSONWriter()
+  writer.writeSchema(schema)
+  return writer.buffer
+}
+
+package func encodeEdgeToolsJSON(_ value: EdgeToolsValue) -> [UInt8] {
+  var writer = EdgeToolsJSONWriter()
+  writer.writeValue(value)
+  return writer.buffer
+}
+
+package func encodeEdgeToolsJSONString(_ value: String) -> [UInt8] {
+  var writer = EdgeToolsJSONWriter()
+  writer.writeString(value)
+  return writer.buffer
+}
+
+private struct EdgeToolsJSONWriter {
   static let openBracket = UInt8(0x5B)
   static let closeBracket = UInt8(0x5D)
   static let openBrace = UInt8(0x7B)
@@ -91,7 +107,7 @@ private struct OrderedKeyJSONWriter {
     self.buffer.append(contentsOf: (value ? "true" : "false").utf8)
   }
 
-  private mutating func writeValue(_ value: EdgeToolsValue) {
+  mutating func writeValue(_ value: EdgeToolsValue) {
     switch value {
     case .null:
       self.buffer.append(contentsOf: "null".utf8)

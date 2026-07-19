@@ -1,5 +1,9 @@
 #if MLX && canImport(MLX)
-  import Foundation
+  #if canImport(FoundationEssentials)
+    import FoundationEssentials
+  #else
+    import Foundation
+  #endif
   import MLXLMCommon
 
   package func loadEdgeToolsLanguageModel<Model: EdgeToolsLanguageModel>(

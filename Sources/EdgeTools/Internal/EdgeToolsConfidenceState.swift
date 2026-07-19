@@ -19,7 +19,6 @@ struct EdgeToolsConfidenceState {
 // MARK: - MLX
 
 #if MLX && canImport(MLX)
-  import Foundation
   import MLX
 
   extension EdgeToolsConfidenceState {
@@ -39,7 +38,6 @@ struct EdgeToolsConfidenceState {
 
 #if CoreML && canImport(CoreML)
   import CoreML
-  import Foundation
 
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
   extension EdgeToolsConfidenceState {
@@ -63,7 +61,6 @@ struct EdgeToolsConfidenceState {
 
 #if swift(>=6.4) && CoreAI && canImport(CoreAI)
   import CoreAI
-  import Foundation
 
   @available(anyAppleOS 27.0, *)
   extension EdgeToolsConfidenceState {

@@ -1,7 +1,11 @@
 import OrderedCollections
 
-#if canImport(Foundation)
-  import Foundation
+#if Foundation
+  #if canImport(FoundationEssentials)
+    import FoundationEssentials
+  #else
+    import Foundation
+  #endif
 #endif
 
 // MARK: - EdgeToolsGenerable
@@ -157,7 +161,7 @@ extension UInt128: EdgeToolsGenerable {}
 
 // MARK: - Foundation
 
-#if canImport(Foundation)
+#if Foundation
   extension Data: EdgeToolsGenerable {
     public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema { .string }
 

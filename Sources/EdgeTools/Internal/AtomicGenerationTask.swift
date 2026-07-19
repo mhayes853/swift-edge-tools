@@ -1,4 +1,4 @@
-#if canImport(Atomics)
+#if Atomics && canImport(Atomics)
   import Atomics
 
   final class AtomicGenerationTask: EdgeToolsEngineGenerationTask {

@@ -17,23 +17,37 @@ let package = Package(
     .library(name: "EdgeTools", targets: ["EdgeTools"])
   ],
   traits: [
+    .trait(name: "Foundation", description: "Foundation-specific conveniences."),
+    .trait(name: "Atomics", description: "Atomic engine generation coordination."),
     .trait(name: "XGrammar", description: "XGrammar-powered structured generation."),
-    .trait(name: "Transformers", description: "swift-transformers tokenizer support."),
-    .trait(name: "FoundationModels", description: "Apple FoundationModels interoperability."),
+    .trait(
+      name: "Transformers",
+      description: "swift-transformers tokenizer support.",
+      enabledTraits: ["Foundation"]
+    ),
+    .trait(
+      name: "FoundationModels",
+      description: "Apple FoundationModels interoperability.",
+      enabledTraits: ["Foundation"]
+    ),
     .trait(
       name: "MLX",
       description: "MLX engine support.",
-      enabledTraits: ["XGrammar", "Transformers"]
+      enabledTraits: ["XGrammar", "Transformers", "Foundation", "Atomics"]
     ),
     .trait(
       name: "CoreAI",
       description: "CoreAI engine support (experimental).",
-      enabledTraits: ["XGrammar"]
+      enabledTraits: ["XGrammar", "Foundation", "Atomics"]
     ),
-    .trait(name: "CoreML", description: "CoreML engine support.", enabledTraits: ["XGrammar"]),
+    .trait(
+      name: "CoreML",
+      description: "CoreML engine support.",
+      enabledTraits: ["XGrammar", "Foundation", "Atomics"]
+    ),
     .default(
       enabledTraits: [
-        "XGrammar", "MLX", "FoundationModels", "CoreAI", "CoreML"
+        "Foundation", "XGrammar", "MLX", "FoundationModels", "CoreAI", "CoreML"
       ]
     )
   ],
@@ -45,17 +59,31 @@ let package = Package(
     .package(url: "https://github.com/pointfreeco/swift-macro-testing", from: "0.6.5"),
     .package(url: "https://github.com/swiftlang/swift-syntax", "600.0.0"..<"603.0.0"),
     .package(url: "https://github.com/huggingface/swift-transformers", from: "1.3.0"),
+    .package(
+      url: "https://github.com/ibireme/yyjson.git",
+      revision: "de3700ab1778e236a8a571058463b6a5888cf262",
+      traits: [
+        "noWriter",
+        "noIncrementalReader",
+        "noUtilities",
+        "noFastFloatingPoint",
+        "strictStandardJSON"
+      ]
+    ),
     .package(url: "https://github.com/apple/swift-collections", from: "1.2.1"),
-    .package(url: "https://github.com/apple/swift-atomics", from: "1.3.0")
+    .package(url: "https://github.com/apple/swift-atomics", from: "1.3.0"),
+    .package(url: "https://github.com/apple/swift-system", from: "1.7.4")
   ],
   targets: [
     .target(
       name: "EdgeTools",
       dependencies: [
         "EdgeToolsMacros",
+        .product(name: "yyjson", package: "yyjson"),
         .product(name: "HeapModule", package: "swift-collections"),
         .product(name: "OrderedCollections", package: "swift-collections"),
-        .product(name: "Atomics", package: "swift-atomics"),
+        .product(name: "Atomics", package: "swift-atomics", condition: .when(traits: ["Atomics"])),
+        .product(name: "SystemPackage", package: "swift-system"),
         .product(name: "MLX", package: "mlx-swift", condition: .when(traits: ["MLX"])),
         .product(name: "MLXNN", package: "mlx-swift", condition: .when(traits: ["MLX"])),
         .product(name: "MLXLLM", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),

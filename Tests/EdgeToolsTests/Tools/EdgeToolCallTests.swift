@@ -7,6 +7,17 @@ import Testing
 @Suite
 struct `EdgeToolCall tests` {
   @Test
+  func `Generated ID Uses UUID Version Four Format`() {
+    let id = EdgeToolCallID().rawValue
+    let components = id.split(separator: "-", omittingEmptySubsequences: false)
+
+    expectNoDifference(components.map(\.count), [8, 4, 4, 4, 12])
+    expectNoDifference(components[2].first, "4")
+    expectNoDifference(components[3].first.map { "89AB".contains($0) }, true)
+    expectNoDifference(id.allSatisfy { $0 == "-" || $0.isHexDigit }, true)
+  }
+
+  @Test
   func `Status Starts As Idle`() throws {
     let call = try EdgeToolCall(id: EdgeToolCallID(), tool: EchoTool(), rawInput: "hello")
     expectNoDifference(call.status.isIdle, true)

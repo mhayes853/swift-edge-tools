@@ -1,5 +1,3 @@
-import Foundation
-
 // MARK: - NeedlePrompt
 
 public struct NeedlePrompt: Sendable {
@@ -48,8 +46,8 @@ extension EdgeToolDefinition {
   }
 
   fileprivate func needlePromptEncoded() throws -> String {
-    let name = String(decoding: try JSONEncoder().encode(self.name), as: UTF8.self)
-    let description = String(decoding: try JSONEncoder().encode(self.description), as: UTF8.self)
+    let name = String(decoding: encodeEdgeToolsJSONString(self.name), as: UTF8.self)
+    let description = String(decoding: encodeEdgeToolsJSONString(self.description), as: UTF8.self)
     let arguments = self.arguments.orderedKeyEncoded()
     return #"{"name":\#(name),"description":\#(description),"arguments":\#(arguments)}"#
   }

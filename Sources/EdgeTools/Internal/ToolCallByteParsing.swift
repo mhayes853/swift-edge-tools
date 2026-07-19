@@ -1,4 +1,3 @@
-import Foundation
 import OrderedCollections
 
 private struct JSONStringState: Hashable, Sendable {
@@ -74,11 +73,14 @@ extension Array where Element == UInt8 {
     var index = 0
     var isInsideMarker = false
     while index < self.count {
-      if let markerRange = self.firstRange(of: marker, startingAt: index), markerRange.lowerBound == index {
+      if let markerRange = self.firstRange(of: marker, startingAt: index),
+        markerRange.lowerBound == index
+      {
         isInsideMarker.toggle()
         index = markerRange.upperBound
       } else if !isInsideMarker,
-        let needleRange = self.firstRange(of: needle, startingAt: index), needleRange.lowerBound == index
+        let needleRange = self.firstRange(of: needle, startingAt: index),
+        needleRange.lowerBound == index
       {
         return needleRange
       } else {
@@ -124,7 +126,7 @@ struct IncrementalToolCallList: Hashable, Sendable {
 
   mutating func nextItem(
     findRange: ([UInt8]) -> Range<Int>?
-  ) -> Data? {
+  ) -> [UInt8]? {
     while true {
       guard self.enterBlockIfNeeded() else { return nil }
       guard self.consumeListStartIfNeeded() else { return nil }
@@ -138,7 +140,7 @@ struct IncrementalToolCallList: Hashable, Sendable {
       }
 
       guard let itemRange = findRange(self.buffer) else { return nil }
-      let item = Data(self.buffer[itemRange])
+      let item = Array(self.buffer[itemRange])
       self.buffer.removeSubrange(..<itemRange.upperBound)
       return item
     }
@@ -181,7 +183,7 @@ struct IncrementalToolCallBlock: Hashable, Sendable {
     self.buffer.append(contentsOf: token.stringValue.utf8)
   }
 
-  mutating func nextPayload(respectingJSONStringBoundaries: Bool) -> Data? {
+  mutating func nextPayload(respectingJSONStringBoundaries: Bool) -> [UInt8]? {
     let closer = self.closer
     return self.nextPayload { buffer in
       respectingJSONStringBoundaries
@@ -190,12 +192,12 @@ struct IncrementalToolCallBlock: Hashable, Sendable {
     }
   }
 
-  mutating func nextPayload(outside marker: [UInt8]) -> Data? {
+  mutating func nextPayload(outside marker: [UInt8]) -> [UInt8]? {
     let closer = self.closer
     return self.nextPayload { $0.firstRange(of: closer, outside: marker) }
   }
 
-  private mutating func nextPayload(findCloser: ([UInt8]) -> Range<Int>?) -> Data? {
+  private mutating func nextPayload(findCloser: ([UInt8]) -> Range<Int>?) -> [UInt8]? {
     if !self.isInsideBlock {
       guard let openerRange = self.buffer.firstRange(of: self.opener) else {
         self.buffer.retainPossiblePrefix(of: self.opener)
@@ -206,7 +208,7 @@ struct IncrementalToolCallBlock: Hashable, Sendable {
     }
 
     guard let closerRange = findCloser(self.buffer) else { return nil }
-    let payload = Data(self.buffer[..<closerRange.lowerBound])
+    let payload = Array(self.buffer[..<closerRange.lowerBound])
     self.buffer.removeSubrange(..<closerRange.upperBound)
     self.isInsideBlock = false
     return payload

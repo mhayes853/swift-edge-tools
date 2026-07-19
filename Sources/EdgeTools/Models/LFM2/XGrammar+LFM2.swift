@@ -1,6 +1,4 @@
 #if XGrammar
-  import Foundation
-
   extension XGRGrammar {
     public static func lfm2(
       tools: some Sequence<EdgeToolDefinition>,

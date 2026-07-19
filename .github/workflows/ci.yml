@@ -82,33 +82,33 @@ jobs:
   #           --disable-experimental-prebuilts --traits XGrammar
   #         run-tests: false # NB: Emulator seems to take too long to boot
 
-  # wasm:
-  #   name: Wasm
-  #   runs-on: ubuntu-latest
-  #   timeout-minutes: 10
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #       with:
-  #         submodules: recursive
-  #     - name: Install Swift 6.2.3
-  #       uses: swift-actions/setup-swift@v3
-  #       with:
-  #         swift-version: "6.2.3"
-  #         skip-verify-signature: true
-  #     - uses: bytecodealliance/actions/wasmtime/setup@v1
-  #     - name: Install Swift SDK for WebAssembly
-  #       run: |
-  #         set -ex
-  #         sdk_url="https://download.swift.org/swift-6.2.3-release/wasm-sdk/"
-  #         sdk_url+="swift-6.2.3-RELEASE/"
-  #         sdk_url+="swift-6.2.3-RELEASE_wasm.artifactbundle.tar.gz"
-  #         checksum="394040ecd5260e68bb02f6c20aeede733"
-  #         checksum+="b9b90702c2204e178f3e42413edad2a"
-  #         swift sdk install "$sdk_url" --checksum "$checksum"
-  #     - name: Build Swift Package for WebAssembly
-  #       run: >
-  #         swift build --swift-sdk swift-6.2.3-RELEASE_wasm --target Needle
-  #         -Xlinker -z -Xlinker stack-size=$((1024 * 1024)) --traits XGrammar
+  wasm:
+    name: WebAssembly
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install Swift 6.2.3
+        uses: swift-actions/setup-swift@v3
+        with:
+          swift-version: "6.2.3"
+          skip-verify-signature: true
+      - name: Install Swift SDK for WebAssembly
+        run: |
+          set -ex
+          sdk_url="https://download.swift.org/swift-6.2.3-release/wasm-sdk/"
+          sdk_url+="swift-6.2.3-RELEASE/"
+          sdk_url+="swift-6.2.3-RELEASE_wasm.artifactbundle.tar.gz"
+          checksum="394040ecd5260e68bb02f6c20aeede733"
+          checksum+="b9b90702c2204e178f3e42413edad2a"
+          swift sdk install "$sdk_url" --checksum "$checksum"
+      - name: Build Foundation-Free EdgeTools
+        run: >
+          swift build --swift-sdk swift-6.2.3-RELEASE_wasm
+          --target EdgeTools --disable-default-traits
+          --disable-experimental-prebuilts
 
   # windows:
   #   name: Windows

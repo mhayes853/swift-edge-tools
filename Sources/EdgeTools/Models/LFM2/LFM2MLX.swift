@@ -1,5 +1,9 @@
 #if MLX && Transformers && canImport(MLX)
-  import Foundation
+  #if canImport(FoundationEssentials)
+    import FoundationEssentials
+  #else
+    import Foundation
+  #endif
   import MLXLLM
 
   extension LFM2Model: EdgeToolsLanguageModel {

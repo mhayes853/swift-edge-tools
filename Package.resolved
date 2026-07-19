@@ -1,5 +1,5 @@
 {
-  "originHash" : "4276bc13aa30aaef6e43212a90791a11e9d5053e60ef2de5810e53dbe2d3552d",
+  "originHash" : "208ad54612a33ebe85de3374a08294816445db90613bb7f65a8388213d68055e",
   "pins" : [
     {
       "identity" : "eventsource",
@@ -177,8 +177,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/ibireme/yyjson.git",
       "state" : {
-        "revision" : "8b4a38dc994a110abaec8a400615567bd996105f",
-        "version" : "0.12.0"
+        "revision" : "de3700ab1778e236a8a571058463b6a5888cf262"
       }
     }
   ],

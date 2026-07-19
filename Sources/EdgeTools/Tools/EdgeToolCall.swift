@@ -1,4 +1,3 @@
-import Foundation
 import Observation
 
 // MARK: - EdgeToolCallID
@@ -12,8 +11,11 @@ public struct EdgeToolCallID:
     self.rawValue = rawValue
   }
 
-  public init() {
-    self.init(rawValue: UUID().uuidString)
+  public init(
+    randomNumberGenerator: some RandomNumberGenerator = SystemRandomNumberGenerator()
+  ) {
+    var randomNumberGenerator = randomNumberGenerator
+    self.init(rawValue: makeEdgeToolCallID(using: &randomNumberGenerator))
   }
 
   public init(stringLiteral value: StringLiteralType) {
@@ -29,6 +31,22 @@ public struct EdgeToolCallID:
     var container = encoder.singleValueContainer()
     try container.encode(self.rawValue)
   }
+}
+
+private func makeEdgeToolCallID(using generator: inout some RandomNumberGenerator) -> String {
+  var bytes = (0..<16).map { _ in UInt8.random(in: .min ... .max, using: &generator) }
+  bytes[6] = (bytes[6] & 0x0F) | 0x40
+  bytes[8] = (bytes[8] & 0x3F) | 0x80
+
+  let hexDigits = Array("0123456789ABCDEF".utf8)
+  var encoded = [UInt8]()
+  encoded.reserveCapacity(36)
+  for index in bytes.indices {
+    if [4, 6, 8, 10].contains(index) { encoded.append(UInt8(ascii: "-")) }
+    encoded.append(hexDigits[Int(bytes[index] >> 4)])
+    encoded.append(hexDigits[Int(bytes[index] & 0x0F)])
+  }
+  return String(decoding: encoded, as: UTF8.self)
 }
 
 // MARK: - EdgeToolCall

@@ -1,6 +1,4 @@
 #if XGrammar
-  import Foundation
-
   // MARK: - XGR Tokenizer Info
 
   extension XGRTokenizerInfo {

@@ -3,6 +3,28 @@
 A Swift runtime for local model tool calling, with built-in support for
 [Cactus Needle](https://github.com/cactus-compute/needle).
 
+## Package Traits
+
+`Foundation` is enabled by default and provides conveniences such as `URL`-based model
+loading and Foundation `Codable` integrations. Generic runtime code uses swift-system for
+file I/O and yyjson for JSON reading, so Foundation can be removed for constrained targets:
+
+```sh
+swift build --disable-default-traits
+```
+
+The `MLX`, `CoreML`, `CoreAI`, `Transformers`, and `FoundationModels` traits enable
+`Foundation` automatically. Foundation-free consumers can use `SystemPackage.FilePath`
+with the tokenizer and model-loading APIs. Individual conveniences can be restored without
+the engine traits:
+
+```sh
+swift build --disable-default-traits --traits Foundation
+```
+
+`XGrammar` and `Atomics` are separate traits so their dependencies are not built for a
+minimal Foundation-free target. Macro support remains available in every configuration.
+
 ## Usage
 
 ```swift

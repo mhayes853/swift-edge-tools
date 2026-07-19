@@ -1,10 +1,10 @@
 ▿ EdgeToolsEngineGeneration
   ▿ decodeMetrics: EdgeToolsDecodeMetrics
-    ▿ duration: 1.283963084 seconds
-      - _low: 1283963084000000000
+    ▿ duration: 1.406500333 seconds
+      - _low: 1406500333000000000
       - _high: 0
-    ▿ durationToFirstToken: 0.054193416 seconds
-      - _low: 54193416000000000
+    ▿ durationToFirstToken: 0.093420209 seconds
+      - _low: 93420209000000000
       - _high: 0
     - tokens: 84
   ▿ metadata: 5 key/value pairs
@@ -24,21 +24,21 @@ Cache:  902K         (924024)
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "MLXEnginePostDecodeMemorySnapshot"
-      ▿ value: Peak:   96M          (101014878)
+      ▿ value: Peak:   91M          (95568594)
 Active: 57M          (59889882)
-Cache:  63M          (66768200)
+Cache:  76M          (80387716)
         - activeMemory: 59889882
-        - cacheMemory: 66768200
-        - peakMemory: 101014878
+        - cacheMemory: 80387716
+        - peakMemory: 95568594
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "MLXEnginePostPrefillMemorySnapshot"
-      ▿ value: Peak:   76M          (79807986)
+      ▿ value: Peak:   91M          (95568594)
 Active: 56M          (59533522)
-Cache:  32M          (34505020)
+Cache:  53M          (56557688)
         - activeMemory: 59533522
-        - cacheMemory: 34505020
-        - peakMemory: 79807986
+        - cacheMemory: 56557688
+        - peakMemory: 95568594
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "PerTokenConfidences"
@@ -128,8 +128,8 @@ Cache:  32M          (34505020)
         - 0.7321682
         - 1.0
   ▿ prefillMetrics: EdgeToolsPrefillMetrics
-    ▿ duration: 0.040616291 seconds
-      - _low: 40616291000000000
+    ▿ duration: 0.077770416 seconds
+      - _low: 77770416000000000
       - _high: 0
     - tokens: 150
   - response: "<tool_call> [{\"name\":\"send_email\",\"arguments\":{\"address\":\"henderry@gmail.com\",\"subject\":\"Hello\",\"body\":\"Could you please go on an adventure?[{\"}},{\"name\":\"send_email\",\"arguments\":{\"address\":\"adventure@gmail.com\",\"subject\":\"Hello\",\"body\":\"I am writing to go on an adventure.\"}}]"

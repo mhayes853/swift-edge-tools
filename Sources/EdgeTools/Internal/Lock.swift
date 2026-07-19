@@ -1,5 +1,5 @@
-#if canImport(Darwin) && canImport(Foundation)
-  import Foundation
+#if canImport(Darwin) && canImport(os)
+  import os
 #endif
 
 #if canImport(Synchronization)
@@ -7,15 +7,15 @@
 #endif
 
 package struct Lock<Value: ~Copyable>: ~Copyable {
-  #if canImport(Darwin) && canImport(Foundation)
-    private let lock = NSLock()
+  #if canImport(Darwin) && canImport(os)
+    private let lock = OSAllocatedUnfairLock()
     private var value: UnsafeMutablePointer<Value>
   #else
     private let lock: Mutex<Value>
   #endif
 
   package init(_ value: consuming sending Value) {
-    #if canImport(Darwin) && canImport(Foundation)
+    #if canImport(Darwin) && canImport(os)
       self.value = UnsafeMutablePointer<Value>.allocate(capacity: 1)
       self.value.initialize(to: value)
     #else
@@ -24,7 +24,7 @@ package struct Lock<Value: ~Copyable>: ~Copyable {
   }
 
   package init<E: Error>(_ makeValue: () throws(E) -> Value) throws(E) {
-    #if canImport(Darwin) && canImport(Foundation)
+    #if canImport(Darwin) && canImport(os)
       let value = try makeValue()
       self.value = UnsafeMutablePointer<Value>.allocate(capacity: 1)
       self.value.initialize(to: value)
@@ -34,7 +34,7 @@ package struct Lock<Value: ~Copyable>: ~Copyable {
   }
 
   deinit {
-    #if canImport(Darwin) && canImport(Foundation)
+    #if canImport(Darwin) && canImport(os)
       self.value.deinitialize(count: 1)
       self.value.deallocate()
     #endif
@@ -43,7 +43,7 @@ package struct Lock<Value: ~Copyable>: ~Copyable {
   package borrowing func withLock<Result: ~Copyable, E: Error>(
     _ body: (inout sending Value) throws(E) -> sending Result
   ) throws(E) -> sending Result {
-    #if canImport(Darwin) && canImport(Foundation)
+    #if canImport(Darwin) && canImport(os)
       self.lock.lock()
       defer { self.lock.unlock() }
       return try body(&self.value.pointee)
@@ -52,11 +52,10 @@ package struct Lock<Value: ~Copyable>: ~Copyable {
     #endif
   }
 
-
   package borrowing func withBorrowedLock<Result: ~Copyable, E: Error>(
     _ body: (borrowing Value) throws(E) -> sending Result
   ) throws(E) -> sending Result {
-    #if canImport(Darwin) && canImport(Foundation)
+    #if canImport(Darwin) && canImport(os)
       self.lock.lock()
       defer { self.lock.unlock() }
       return try body(self.value.pointee)
@@ -66,4 +65,5 @@ package struct Lock<Value: ~Copyable>: ~Copyable {
   }
 }
 
+// Safe because this noncopyable wrapper uniquely owns its state and guards every access with a lock.
 extension Lock: @unchecked Sendable where Value: ~Copyable {}

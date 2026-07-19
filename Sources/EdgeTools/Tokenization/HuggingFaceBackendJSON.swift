@@ -1,14 +1,18 @@
-import Foundation
+import SystemPackage
 
-package func loadHuggingFaceBackendJSON(from tokenizerURL: URL) throws -> String {
-  try huggingFaceBackendJSON(from: Data(contentsOf: tokenizerURL, options: .alwaysMapped))
+package func loadHuggingFaceBackendJSON(from tokenizerPath: FilePath) throws -> String {
+  try withFileBytes(at: tokenizerPath) { try huggingFaceBackendJSON(from: $0) }
 }
 
-package func huggingFaceBackendJSON(from data: Data) throws -> String {
-  try data.withUnsafeBytes { bytes in
-    var scanner = HuggingFaceBackendJSONScanner(buffer: bytes.bindMemory(to: UInt8.self))
-    return "{\(try scanner.metadataFields().joined(separator: ","))}"
-  }
+package func huggingFaceBackendJSON<Bytes: Collection>(from data: Bytes) throws -> String
+where Bytes.Element == UInt8 {
+  let bytes = Array(data)
+  return try bytes.withUnsafeBufferPointer { try huggingFaceBackendJSON(from: $0) }
+}
+
+package func huggingFaceBackendJSON(from bytes: UnsafeBufferPointer<UInt8>) throws -> String {
+  var scanner = HuggingFaceBackendJSONScanner(buffer: bytes)
+  return "{\(try scanner.metadataFields().joined(separator: ","))}"
 }
 
 private struct HuggingFaceBackendJSONScanner {
@@ -43,13 +47,16 @@ private struct HuggingFaceBackendJSONScanner {
       self.skipWhitespace()
     }
 
-    return try zip(Self.metadataKeys, values).compactMap { key, value in
-      guard let value else { return nil }
-      guard let jsonValue = String(bytes: self.buffer[value], encoding: .utf8) else {
-        throw HuggingFaceBackendJSONError.invalidJSON
+    return try zip(Self.metadataKeys, values)
+      .compactMap { key, value in
+        guard let value else { return nil }
+        let bytes = self.buffer[value]
+        let jsonValue = String(decoding: bytes, as: UTF8.self)
+        guard jsonValue.utf8.elementsEqual(bytes) else {
+          throw HuggingFaceBackendJSONError.invalidJSON
+        }
+        return "\"\(key)\":\(jsonValue)"
       }
-      return "\"\(key)\":\(jsonValue)"
-    }
   }
 
   private mutating func stringRange() throws -> Range<Int> {

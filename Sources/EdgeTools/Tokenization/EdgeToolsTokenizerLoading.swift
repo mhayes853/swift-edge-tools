@@ -1,22 +1,29 @@
-import Foundation
+import SystemPackage
+
+#if Foundation
+  #if canImport(FoundationEssentials)
+    import FoundationEssentials
+  #else
+    import Foundation
+  #endif
+#endif
 
 #if Transformers
   import Tokenizers
 #endif
 
 package func loadEdgeToolsTokenizer(
-  from directoryURL: URL
+  from directoryPath: FilePath
 ) async throws -> sending any EdgeToolsTokenizer {
-  let fileManager = FileManager.default
-  let sentencePieceURL = directoryURL.appending(path: "tokenizer.model")
-  let transformersURL = directoryURL.appending(path: "tokenizer.json")
-  let hasSentencePieceModel = fileManager.fileExists(atPath: sentencePieceURL.path())
-  let hasTransformersTokenizer = fileManager.fileExists(atPath: transformersURL.path())
+  let sentencePiecePath = directoryPath.appending("tokenizer.model")
+  let transformersPath = directoryPath.appending("tokenizer.json")
+  let hasSentencePieceModel = fileExists(at: sentencePiecePath)
+  let hasTransformersTokenizer = fileExists(at: transformersPath)
   var failures = [String]()
 
   if hasSentencePieceModel {
     do {
-      return try NeedleSPTokenizer(modelURL: sentencePieceURL)
+      return try NeedleSPTokenizer(modelPath: sentencePiecePath)
     } catch {
       failures.append("tokenizer.model could not be loaded: \(error)")
     }
@@ -26,8 +33,8 @@ package func loadEdgeToolsTokenizer(
     if hasTransformersTokenizer {
       do {
         return try await loadTransformersTokenizer(
-          from: directoryURL,
-          tokenizerURL: transformersURL
+          from: directoryPath,
+          tokenizerPath: transformersPath
         )
       } catch {
         failures.append("tokenizer.json could not be loaded: \(error)")
@@ -36,18 +43,26 @@ package func loadEdgeToolsTokenizer(
   #endif
 
   throw EdgeToolsTokenizerLoadingError.noCompatibleTokenizer(
-    in: directoryURL,
+    in: directoryPath,
     hasSentencePieceModel: hasSentencePieceModel,
     hasTransformersTokenizer: hasTransformersTokenizer,
     failures: failures
   )
 }
 
+#if Foundation
+  package func loadEdgeToolsTokenizer(
+    from directoryURL: URL
+  ) async throws -> sending any EdgeToolsTokenizer {
+    try await loadEdgeToolsTokenizer(from: FilePath(directoryURL.path()))
+  }
+#endif
+
 public struct EdgeToolsTokenizerLoadingError: Hashable, Sendable, Error {
   public let message: String
 
   public static func noCompatibleTokenizer(
-    in directoryURL: URL,
+    in directoryPath: FilePath,
     hasSentencePieceModel: Bool,
     hasTransformersTokenizer: Bool,
     failures: [String] = []
@@ -81,28 +96,29 @@ public struct EdgeToolsTokenizerLoadingError: Hashable, Sendable, Error {
     details.append(contentsOf: failures)
     return Self(
       message:
-        "No compatible tokenizer was found in \(directoryURL.path()). \(details.joined(separator: " "))"
+        "No compatible tokenizer was found in \(directoryPath). \(details.joined(separator: " "))"
     )
   }
 
-  public static func unsupportedTransformersTokenizer(at tokenizerURL: URL) -> Self {
+  public static func unsupportedTransformersTokenizer(at tokenizerPath: FilePath) -> Self {
     Self(
       message:
-        "swift-transformers created an unsupported tokenizer type from \(tokenizerURL.path())."
+        "swift-transformers created an unsupported tokenizer type from \(tokenizerPath)."
     )
   }
 }
 
 #if Transformers
   private func loadTransformersTokenizer(
-    from directoryURL: URL,
-    tokenizerURL: URL
+    from directoryPath: FilePath,
+    tokenizerPath: FilePath
   ) async throws -> sending any EdgeToolsTokenizer {
+    let directoryURL = URL(fileURLWithPath: directoryPath.string, isDirectory: true)
     let tokenizer = try await AutoTokenizer.from(modelFolder: directoryURL)
     guard let tokenizer = tokenizer as? PreTrainedTokenizer else {
-      throw EdgeToolsTokenizerLoadingError.unsupportedTransformersTokenizer(at: tokenizerURL)
+      throw EdgeToolsTokenizerLoadingError.unsupportedTransformersTokenizer(at: tokenizerPath)
     }
-    let backendJSON = try loadHuggingFaceBackendJSON(from: tokenizerURL)
+    let backendJSON = try loadHuggingFaceBackendJSON(from: tokenizerPath)
     return EdgeToolsPreTrainedTokenizer(
       tokenizer: tokenizer,
       backendJSON: backendJSON

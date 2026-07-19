@@ -1,5 +1,13 @@
-import Foundation
 import HeapModule
+import SystemPackage
+
+#if Foundation
+  #if canImport(FoundationEssentials)
+    import FoundationEssentials
+  #else
+    import Foundation
+  #endif
+#endif
 
 // MARK: - NeedleSPTokenizer
 
@@ -218,20 +226,27 @@ public struct NeedleSPTokenizer: Sendable {
 extension NeedleSPTokenizer: EdgeToolsTokenizer {}
 
 extension NeedleSPTokenizer {
-  public init(modelURL: URL) throws {
-    guard modelURL.isFileURL, !modelURL.hasDirectoryPath else {
-      throw NeedleSPTokenizerError(message: "\(modelURL.path()): file not found")
-    }
-
+  public init(modelPath: FilePath) throws {
     do {
-      try self.init(data: Data(contentsOf: modelURL))
+      try self.init(data: readFile(at: modelPath))
     } catch let error as NeedleSPTokenizerError {
       throw error
     } catch {
-      throw NeedleSPTokenizerError(message: "\(modelURL.path()): file not found")
+      throw NeedleSPTokenizerError(message: "\(modelPath): file not found")
     }
   }
 }
+
+#if Foundation
+  extension NeedleSPTokenizer {
+    public init(modelURL: URL) throws {
+      guard modelURL.isFileURL, !modelURL.hasDirectoryPath else {
+        throw NeedleSPTokenizerError(message: "\(modelURL.path()): file not found")
+      }
+      try self.init(modelPath: FilePath(modelURL.path()))
+    }
+  }
+#endif
 
 // MARK: - NeedleSPTokenizerError
 

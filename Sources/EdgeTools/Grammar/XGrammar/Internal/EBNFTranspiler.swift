@@ -1,6 +1,4 @@
 #if XGrammar
-  import Foundation
-
   struct XGREBNFDocument: Hashable, Sendable {
     struct Rule: Hashable, Sendable {
       let name: String
@@ -13,11 +11,11 @@
       var rules = [Rule]()
       for line in source.split(separator: "\n", omittingEmptySubsequences: false) {
         if let separator = line.range(of: "::=") {
-          let name = line[..<separator.lowerBound].trimmingCharacters(in: .whitespaces)
-          let body = line[separator.upperBound...].trimmingCharacters(in: .whitespaces)
+          let name = line[..<separator.lowerBound].trimmingWhitespace
+          let body = line[separator.upperBound...].trimmingWhitespace
           guard !name.isEmpty else { throw ToolCallXGRError.unsupportedSchema }
           rules.append(Rule(name: name, body: body))
-        } else if !line.trimmingCharacters(in: .whitespaces).isEmpty {
+        } else if !line.trimmingWhitespace.isEmpty {
           guard !rules.isEmpty else { throw ToolCallXGRError.unsupportedSchema }
           rules[rules.count - 1].body += "\n" + line
         }
@@ -95,9 +93,8 @@
       in source: String,
       aliases: [String: String]
     ) -> String {
-      let literalRanges = source.matches(of: literalRegex).map {
-        $0.output.1.startIndex..<$0.output.1.endIndex
-      }
+      let literalRanges = source.matches(of: literalRegex)
+        .map { $0.output.1.startIndex..<$0.output.1.endIndex }
       var output = ""
       var outputStart = source.startIndex
       for match in source.matches(of: ruleReferenceRegex) {
