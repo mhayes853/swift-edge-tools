@@ -14,11 +14,13 @@
     public func prompt(_ prompt: MLXArray) {}
 
     public func didSample(token: MLXArray) {
+      guard !self.matcher.isTerminated else { return }
       self.matcher.accept(tokenId: token.item(EdgeToolsToken.ID.self))
     }
 
     public func process(logits: MLXArray) -> MLXArray {
-      applyBitmaskMLX(logits: logits, mask: self.matcher.bitmask())
+      guard !self.matcher.isTerminated else { return logits }
+      return applyBitmaskMLX(logits: logits, mask: self.matcher.bitmask())
     }
   }
 
