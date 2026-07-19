@@ -73,7 +73,7 @@ struct `EdgeToolsSession tests` {
     let engine = MockEngine(script: toolTokens.map { .token($0) } + [.finish])
     let session = EdgeToolsSession(engine: engine)
 
-    let generation = try await session.generateRawToolCalls(
+    let generation = try await session.generateRaw(
       prompt: .test(user: "call it"),
       tools: [.sendEmail]
     )
@@ -93,7 +93,7 @@ struct `EdgeToolsSession tests` {
     let engine = MockEngine(script: tokens.map { .token($0) } + [.finish])
     let session = EdgeToolsSession(engine: engine)
 
-    let stream = session.streamRawToolCalls(prompt: .test(user: "call them"), tools: [])
+    let stream = session.streamRaw(prompt: .test(user: "call them"), tools: [])
     var calls = [EdgeRawToolCall]()
     for try await call in stream {
       calls.append(call)
@@ -110,7 +110,7 @@ struct `EdgeToolsSession tests` {
     let tokens = rawToolCall.tokenize(using: tokenizer)
     let engine = MockEngine(script: tokens.map { .token($0) } + [.finish])
     let session = EdgeToolsSession(engine: engine)
-    let stream = session.streamRawToolCalls(prompt: .test(user: "weather"), tools: [])
+    let stream = session.streamRaw(prompt: .test(user: "weather"), tools: [])
 
     let didChange = Lock(false)
     withObservationTracking {
@@ -129,7 +129,7 @@ struct `EdgeToolsSession tests` {
     let tokens = "hi".tokenize(using: tokenizer)
     let engine = MockEngine(script: tokens.map { .token($0) } + [.finish])
     let session = EdgeToolsSession(engine: engine)
-    let stream = session.streamRawToolCalls(prompt: .test(user: "hi"), tools: [])
+    let stream = session.streamRaw(prompt: .test(user: "hi"), tools: [])
 
     let didChange = Lock(false)
     withObservationTracking {

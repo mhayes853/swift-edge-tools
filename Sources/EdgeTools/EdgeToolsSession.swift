@@ -4,7 +4,7 @@ import Observation
 
 public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable, Observable {
   public let engine: Engine
-  private let _activeRawToolCallStreams = Lock([EdgeToolsRawToolCallsStream]())
+  private let _activeRawToolCallStreams = Lock([EdgeToolsRawSessionStream]())
   private let _activeToolCallStreams = Lock([EdgeToolsSessionStream]())
   private let observationRegistrar = ObservationRegistrar()
 
@@ -12,7 +12,7 @@ public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable, Observab
     !self.activeRawToolCallStreams.isEmpty || !self.activeToolCallStreams.isEmpty
   }
 
-  public var activeRawToolCallStreams: [EdgeToolsRawToolCallsStream] {
+  public var activeRawToolCallStreams: [EdgeToolsRawSessionStream] {
     self.observationRegistrar.access(self, keyPath: \.activeRawToolCallStreams)
     return self._activeRawToolCallStreams.withLock { $0 }
   }
@@ -26,7 +26,7 @@ public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable, Observab
     self.engine = engine
   }
 
-  fileprivate func registerActiveStream(_ stream: EdgeToolsRawToolCallsStream) {
+  fileprivate func registerActiveStream(_ stream: EdgeToolsRawSessionStream) {
     self._activeRawToolCallStreams.withLock { streams in
       self.observationRegistrar.withMutation(of: self, keyPath: \.activeRawToolCallStreams) {
         streams.append(stream)
@@ -42,7 +42,7 @@ public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable, Observab
     }
   }
 
-  fileprivate func removeActiveStream(_ stream: EdgeToolsRawToolCallsStream) {
+  fileprivate func removeActiveStream(_ stream: EdgeToolsRawSessionStream) {
     self._activeRawToolCallStreams.withLock { streams in
       self.observationRegistrar.withMutation(of: self, keyPath: \.activeRawToolCallStreams) {
         streams.removeAll { $0 === stream }
@@ -117,7 +117,7 @@ public struct EdgeToolsSessionTokens: AsyncSequence, Sendable {
 
 // MARK: - Raw Tool Calls
 
-public final class EdgeToolsRawToolCallsStream: Sendable, Observable, AsyncSequence {
+public final class EdgeToolsRawSessionStream: Sendable, Observable, AsyncSequence {
   public typealias Element = EdgeRawToolCall
 
   public struct AsyncIterator: AsyncIteratorProtocol {
@@ -148,7 +148,7 @@ public final class EdgeToolsRawToolCallsStream: Sendable, Observable, AsyncSeque
   private let registrar = ObservationRegistrar()
   private let startGeneration:
     @Sendable (
-      EdgeToolsRawToolCallsStream
+      EdgeToolsRawSessionStream
     ) -> Task<EdgeToolsRawToolCallsGeneration, any Error>
 
   public var rawToolCalls: [EdgeRawToolCall] {
@@ -381,12 +381,12 @@ public final class EdgeToolsSessionStream: Sendable, Observable, Identifiable, A
   public typealias Element = EdgeToolCallCollection.Element
 
   public struct AsyncIterator: AsyncIteratorProtocol {
-    fileprivate var base: EdgeToolsRawToolCallsStream.AsyncIterator
+    fileprivate var base: EdgeToolsRawSessionStream.AsyncIterator
     fileprivate let stream: EdgeToolsSessionStream
     private var rawIndex = 0
 
     fileprivate init(
-      base: EdgeToolsRawToolCallsStream.AsyncIterator,
+      base: EdgeToolsRawSessionStream.AsyncIterator,
       stream: EdgeToolsSessionStream
     ) {
       self.base = base
@@ -404,7 +404,7 @@ public final class EdgeToolsSessionStream: Sendable, Observable, Identifiable, A
     }
   }
 
-  fileprivate let rawStream: EdgeToolsRawToolCallsStream
+  fileprivate let rawStream: EdgeToolsRawSessionStream
   private let storage: Storage
 
   public var isGenerating: Bool {
@@ -448,7 +448,7 @@ public final class EdgeToolsSessionStream: Sendable, Observable, Identifiable, A
     let storage = Storage()
     let toolsByName = Dictionary(uniqueKeysWithValues: tools.map { ($0.name.snakeCased(), $0) })
     self.storage = storage
-    self.rawStream = EdgeToolsRawToolCallsStream(
+    self.rawStream = EdgeToolsRawSessionStream(
       session: session,
       prompt: prompt,
       tools: tools.map(\.definition),
@@ -567,15 +567,15 @@ public final class EdgeToolsSessionStream: Sendable, Observable, Identifiable, A
 }
 
 extension EdgeToolsSession {
-  public func streamRawToolCalls(
+  public func streamRaw(
     prompt: Engine.Prompt,
     tools: [EdgeToolDefinition],
     parameters: Engine.GenerateParameters = .default
-  ) -> EdgeToolsRawToolCallsStream {
+  ) -> EdgeToolsRawSessionStream {
     if let message = duplicateToolNameError(tools.map(\.name)) {
       assertionFailure(message)
     }
-    let stream = EdgeToolsRawToolCallsStream(
+    let stream = EdgeToolsRawSessionStream(
       session: self,
       prompt: prompt,
       tools: tools,
@@ -590,12 +590,12 @@ extension EdgeToolsSession {
     return stream
   }
 
-  public func generateRawToolCalls(
+  public func generateRaw(
     prompt: Engine.Prompt,
     tools: [EdgeToolDefinition],
     parameters: Engine.GenerateParameters = .default
   ) async throws -> EdgeToolsRawToolCallsGeneration {
-    try await self.streamRawToolCalls(
+    try await self.streamRaw(
       prompt: prompt,
       tools: tools,
       parameters: parameters

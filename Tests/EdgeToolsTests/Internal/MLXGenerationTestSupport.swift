@@ -17,7 +17,7 @@
         maxTokens: 256
       )
 
-    let toolGeneration = try await session.generateRawToolCalls(
+    let toolGeneration = try await session.generateRaw(
       prompt: transcript,
       tools: [.weatherTest],
       parameters: parameters
@@ -34,7 +34,7 @@
       ])
     )
 
-    let responseGeneration = try await session.generateRawToolCalls(
+    let responseGeneration = try await session.generateRaw(
       prompt: transcript,
       tools: [.finalResponseTest],
       parameters: parameters
