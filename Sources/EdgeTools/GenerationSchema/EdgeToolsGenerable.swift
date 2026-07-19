@@ -1,7 +1,8 @@
+import OrderedCollections
+
 #if canImport(Foundation)
   import Foundation
 #endif
-import OrderedCollections
 
 // MARK: - EdgeToolsGenerable
 
@@ -36,6 +37,14 @@ public protocol ConvertibleToEdgeToolsValue {
 
 extension EdgeToolsValue: ConvertibleToEdgeToolsValue {
   public var edgeToolsValue: EdgeToolsValue { self }
+}
+
+// MARK: - EdgeToolsValue
+
+extension EdgeToolsValue: EdgeToolsGenerable {
+  /// The universal generation schema: a JSON Schema `true`, which accepts any
+  /// well-formed ``EdgeToolsValue``.
+  public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema { .universal }
 }
 
 // MARK: - Scalar Types

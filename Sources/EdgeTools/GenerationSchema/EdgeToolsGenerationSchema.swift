@@ -258,6 +258,10 @@ extension EdgeToolsGenerationSchema {
   public static var null: Self { .type(.null) }
   public static var boolean: Self { .type(.boolean) }
 
+  /// The universal generation schema, equivalent to JSON Schema `true` — it
+  /// accepts any well-formed value.
+  public static var universal: Self { .boolean(true) }
+
   public static func type(_ type: ValueType) -> Self {
     Self([.type: type.edgeToolsValue])
   }
