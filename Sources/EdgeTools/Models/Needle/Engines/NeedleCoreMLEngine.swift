@@ -86,12 +86,6 @@
       editConfiguration: (inout NeedleModelConfiguration) -> Void = { _ in }
     ) async throws {
       let tokenizer = try await loadEdgeToolsTokenizer(from: modelDirectoryURL)
-      let grammarEngine = try? XGRCompiler(
-        tokenizerInfo: try XGRTokenizerInfo.needle(tokenizer: tokenizer)
-      )
-      guard let grammarEngine else {
-        throw NeedleCoreMLEngineError.failedToLoadGrammarEngine
-      }
 
       var configuration = try Self.decodeConfiguration(from: modelDirectoryURL)
       editConfiguration(&configuration)
@@ -110,34 +104,19 @@
         encoderModel: encoderModel,
         decoderModel: decoderModel,
         tokenizer: tokenizer,
-        configuration: configuration,
-        grammarEngine: grammarEngine
+        configuration: configuration
       )
     }
 
-    public convenience init<Tokenizer: EdgeToolsTokenizer>(
-      encoderModel: sending MLModel,
-      decoderModel: sending MLModel,
-      tokenizer: sending Tokenizer,
-      configuration: NeedleModelConfiguration,
-      grammarEngine: consuming sending XGRCompiler
-    ) {
-      self.init(
-        encoderModel: encoderModel,
-        decoderModel: decoderModel,
-        tokenizer: tokenizer,
-        configuration: configuration,
-        grammarEngine: consume grammarEngine
-      )
-    }
-
-    private init(
+    public init(
       encoderModel: sending MLModel,
       decoderModel: sending MLModel,
       tokenizer: sending any EdgeToolsTokenizer,
-      configuration: NeedleModelConfiguration,
-      grammarEngine: consuming sending XGRCompiler
-    ) {
+      configuration: NeedleModelConfiguration
+    ) throws {
+      let grammarEngine = try XGRCompiler(
+        tokenizerInfo: XGRTokenizerInfo.needle(tokenizer: tokenizer)
+      )
       self.state = Lock(
         State(
           grammarEngine: consume grammarEngine,
@@ -455,10 +434,6 @@
 
     public static let failedToLoadConfiguration = Self(
       message: "Could not load model configuration."
-    )
-
-    public static let failedToLoadGrammarEngine = Self(
-      message: "Could not load grammar engine."
     )
 
     public static func grammarRejectedToken(token: EdgeToolsToken) -> Self {
