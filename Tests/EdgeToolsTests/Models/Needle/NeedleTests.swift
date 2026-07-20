@@ -557,14 +557,14 @@ struct NeedleConsolidatedTests {
   // MARK: - Helpers
 
   private func requiredNeedleCompiler(
-    tokenizer: some EdgeToolsTokenizer
+    tokenizer: some EdgeToolsXGRTokenizer
   ) throws -> XGRCompiler {
     let tokenizerInfo = try XGRTokenizerInfo.needle(tokenizer: tokenizer)
     return try XGRCompiler(tokenizerInfo: tokenizerInfo)
   }
 
   private func requiredNeedleCompiler(
-    erasedTokenizer tokenizer: any EdgeToolsTokenizer
+    erasedTokenizer tokenizer: any EdgeToolsXGRTokenizer
   ) throws -> XGRCompiler {
     let tokenizerInfo = try XGRTokenizerInfo.needle(tokenizer: tokenizer)
     return try XGRCompiler(tokenizerInfo: tokenizerInfo)

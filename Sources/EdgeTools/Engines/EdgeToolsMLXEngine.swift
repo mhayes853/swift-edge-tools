@@ -27,38 +27,21 @@
     ) throws -> XGRGrammar
 
     func grammarCompiler(
-      using tokenizer: any EdgeToolsTokenizer
+      using tokenizer: any EdgeToolsXGRTokenizer
     ) throws -> XGRCompiler
 
     func process(
       prompt: Prompt,
       tools: [EdgeToolDefinition],
-      using tokenizer: any EdgeToolsTokenizer
+      using tokenizer: any EdgeToolsXGRTokenizer
     ) throws -> sending LMInput
   }
 
   extension EdgeToolsLanguageModel {
     public func grammarCompiler(
-      using tokenizer: any EdgeToolsTokenizer
+      using tokenizer: any EdgeToolsXGRTokenizer
     ) throws -> XGRCompiler {
-      #if Transformers
-        if let tokenizer = tokenizer as? EdgeToolsPreTrainedTokenizer {
-          let vocabulary = tokenizer.convertIdsToTokens(Array(0..<self.vocabularySize))
-            .map { $0 ?? "" }
-          let tokenizerInfo = try XGRTokenizerInfo.huggingFace(
-            encodedVocabulary: vocabulary,
-            backendJSON: tokenizer.backendJSON,
-            stopTokenIDs: tokenizer.eosTokenId.map { [$0] } ?? []
-          )
-          return try XGRCompiler(tokenizerInfo: tokenizerInfo)
-        }
-      #endif
-
-      guard let tokenizer = tokenizer as? NeedleSPTokenizer else {
-        throw EdgeToolsMLXEngineError.unsupportedTokenizer
-      }
-      let tokenizerInfo = try XGRTokenizerInfo.needle(tokenizer: tokenizer)
-      return try XGRCompiler(tokenizerInfo: tokenizerInfo)
+      try XGRCompiler(tokenizerInfo: tokenizer.tokenizerInfo())
     }
   }
 #endif
@@ -163,12 +146,12 @@
     }
 
     private let state: Lock<State>
-    private let tokenizer: any EdgeToolsTokenizer
+    private let tokenizer: any EdgeToolsXGRTokenizer
     private let clock = ContinuousClock()
 
     public init(
       model: sending Model,
-      tokenizer: sending any EdgeToolsTokenizer
+      tokenizer: sending any EdgeToolsXGRTokenizer
     ) throws {
       self.state = try Lock {
         let grammarEngine = try model.grammarCompiler(using: tokenizer)
@@ -184,7 +167,7 @@
 
     private init(
       loadingFrom directoryURL: URL,
-      tokenizer: sending any EdgeToolsTokenizer,
+      tokenizer: sending any EdgeToolsXGRTokenizer,
       model: (Model.ModelConfiguration) throws -> Model
     ) throws {
       self.state = try Lock {
@@ -205,6 +188,9 @@
       model: (Model.ModelConfiguration) throws -> Model
     ) async throws {
       let tokenizer = try await loadEdgeToolsTokenizer(from: directoryURL)
+      guard let tokenizer = tokenizer as? any EdgeToolsXGRTokenizer else {
+        throw EdgeToolsMLXEngineError.unsupportedTokenizer
+      }
       try self.init(
         loadingFrom: directoryURL,
         tokenizer: tokenizer,
@@ -547,7 +533,7 @@
     public func process(
       prompt: EdgeToolsLLMPrompt,
       tools: [EdgeToolDefinition],
-      using tokenizer: any EdgeToolsTokenizer
+      using tokenizer: any EdgeToolsXGRTokenizer
     ) throws -> sending LMInput {
       guard let tokenizer = tokenizer as? EdgeToolsPreTrainedTokenizer else {
         throw EdgeToolsMLXEngineError.unsupportedTokenizer

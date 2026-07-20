@@ -78,7 +78,7 @@
     private let configuration: NeedleModelConfiguration
     private let encoderFunction: InferenceFunction
     private let decoderFunction: InferenceFunction
-    private let tokenizer: any EdgeToolsTokenizer
+    private let tokenizer: any EdgeToolsXGRTokenizer
     private let clock = ContinuousClock()
 
     public convenience init(
@@ -108,6 +108,9 @@
         cachePolicy: cachePolicy
       )
       let tokenizer = try await loadEdgeToolsTokenizer(from: modelDirectoryURL)
+      guard let tokenizer = tokenizer as? any EdgeToolsXGRTokenizer else {
+        throw NeedleCoreAIEngineError.unsupportedTokenizer
+      }
       try await self.init(
         encoderModel: encoderModel,
         decoderModel: decoderModel,
@@ -119,11 +122,11 @@
     public init(
       encoderModel: AIModel,
       decoderModel: AIModel,
-      tokenizer: sending any EdgeToolsTokenizer,
+      tokenizer: sending any EdgeToolsXGRTokenizer,
       configuration: NeedleModelConfiguration
     ) throws {
       let grammarEngine = try XGRCompiler(
-        tokenizerInfo: XGRTokenizerInfo.needle(tokenizer: tokenizer)
+        tokenizerInfo: try tokenizer.tokenizerInfo()
       )
       self.state = Lock(
         State(
@@ -566,6 +569,10 @@
 
     public static let failedToLoadConfiguration = Self(
       message: "Could not load model configuration."
+    )
+
+    public static let unsupportedTokenizer = Self(
+      message: "The model does not support the provided tokenizer."
     )
 
     public static func failedToLoadFunction(name: String) -> Self {

@@ -230,6 +230,14 @@ public struct NeedleSPTokenizer: Sendable {
 
 extension NeedleSPTokenizer: EdgeToolsTokenizer {}
 
+#if XGrammar
+  extension NeedleSPTokenizer: EdgeToolsXGRTokenizer {
+    public func tokenizerInfo() throws -> XGRTokenizerInfo {
+      try XGRTokenizerInfo.needle(tokenizer: self)
+    }
+  }
+#endif
+
 extension NeedleSPTokenizer {
   public init(modelPath: FilePath) throws {
     do {

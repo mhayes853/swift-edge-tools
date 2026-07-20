@@ -36,6 +36,22 @@ import SystemPackage
       self.tokenizer.convertIdsToTokens(ids)
     }
   }
+
+  #if XGrammar
+    extension EdgeToolsPreTrainedTokenizer: EdgeToolsXGRTokenizer {
+      public func tokenizerInfo() throws -> XGRTokenizerInfo {
+        var vocabulary = [String]()
+        while let token = self.convertIdToToken(vocabulary.count) {
+          vocabulary.append(token)
+        }
+        return try XGRTokenizerInfo.huggingFace(
+          encodedVocabulary: vocabulary,
+          backendJSON: self.backendJSON,
+          stopTokenIDs: self.eosTokenId.map { [$0] } ?? []
+        )
+      }
+    }
+  #endif
 #endif
 
 // MARK: - HF Backend JSON

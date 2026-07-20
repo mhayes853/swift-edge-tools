@@ -112,7 +112,7 @@ extension NeedlePrompt {
 
   public func tokenized(
     tools: [EdgeToolDefinition],
-    using tokenizer: some EdgeToolsTokenizer
+      using tokenizer: some EdgeToolsXGRTokenizer
   ) throws -> [EdgeToolsToken] {
     let tokenIds = tokenizer.encode(text: try self.formatted(tools: tools))
     let tokens = tokenizer.convertIdsToTokens(tokenIds)
@@ -174,7 +174,7 @@ public struct NeedleToolCallParser: EdgeToolCallParser, Sendable {
 
   extension XGRTokenizerInfo {
     public static func needle(
-      tokenizer: some EdgeToolsTokenizer
+      tokenizer: some EdgeToolsXGRTokenizer
     ) throws -> XGRTokenizerInfo {
       try Self.needle(
         vocabulary: tokenizer.convertIdsToTokens(Array(0..<8192)),

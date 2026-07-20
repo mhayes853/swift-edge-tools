@@ -50,6 +50,14 @@ extension EdgeToolsTokenizer {
   }
 }
 
+// MARK: - EdgeToolsXGRTokenizer
+
+#if XGrammar
+  public protocol EdgeToolsXGRTokenizer: EdgeToolsTokenizer {
+    func tokenizerInfo() throws -> XGRTokenizerInfo
+  }
+#endif
+
 // MARK: - Tokenizer Loading
 
 package func loadEdgeToolsTokenizer(
