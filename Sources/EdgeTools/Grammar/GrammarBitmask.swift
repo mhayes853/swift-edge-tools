@@ -54,6 +54,14 @@ extension GrammarBitmask: MutableCollection {
 
 extension GrammarBitmask: RandomAccessCollection {}
 
+@_transparent
+private func validateBitmaskCoverage(mask: GrammarBitmask, vocabularySize: Int) {
+  precondition(
+    mask.count >= vocabularySize,
+    "Grammar bitmask (\(mask.count) tokens) does not cover the model vocabulary (\(vocabularySize) tokens)."
+  )
+}
+
 // MARK: - MLX
 
 #if MLX && canImport(MLX)
@@ -79,6 +87,7 @@ extension GrammarBitmask: RandomAccessCollection {}
 
   public func applyBitmaskMLX(logits: MLXArray, mask: GrammarBitmask) -> MLXArray {
     let vocabularySize = logits.dim(1)
+    validateBitmaskCoverage(mask: mask, vocabularySize: vocabularySize)
     let table = MLXArray(bitmaskTable, [256, 8]).asType(logits.dtype)
     let mask = mask.storage.withUnsafeBytes { MLXArray($0)[.newAxis, 0...] }
     return logits[0..., 0..<vocabularySize]
@@ -91,10 +100,12 @@ extension GrammarBitmask: RandomAccessCollection {}
 #if CoreML && canImport(CoreML)
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
   public func applyBitmaskCoreML(logits: MLTensor, mask: GrammarBitmask) -> MLTensor {
+    let vocabularySize = logits.shape[1]
+    validateBitmaskCoverage(mask: mask, vocabularySize: vocabularySize)
     let maskTensor = mask.storage.withUnsafeBytes { bytes in
       let scalars = bytes.bindMemory(to: UInt8.self)
         .flatMap { bitmaskTable[(Int($0) * 8)..<(Int($0) * 8 + 8)] }
-      return MLTensor(shape: [1, logits.shape[1]], scalars: Array(scalars.prefix(logits.shape[1])))
+      return MLTensor(shape: [1, vocabularySize], scalars: Array(scalars.prefix(vocabularySize)))
     }
     return logits + maskTensor
   }
@@ -109,6 +120,7 @@ extension GrammarBitmask: RandomAccessCollection {}
     var logitsView = logits.mutableView(as: Float.self)
     let rowCount = logitsView.shape[0]
     let vocabularySize = logitsView.shape[1]
+    validateBitmaskCoverage(mask: mask, vocabularySize: vocabularySize)
     mask.storage.withUnsafeBytes { bytes in
       let maskBytes = bytes.bindMemory(to: UInt8.self)
       if logitsView.isContiguous {
@@ -175,44 +187,4 @@ let bitmaskSIMDTable = bitmaskTable.withUnsafeBufferPointer { table in
       UnsafeRawPointer(table.baseAddress!.advanced(by: byte * 8))
         .loadUnaligned(as: SIMD8<Float>.self)
     }
-}
-
-// MARK: - Tool Call Range
-
-public enum GrammarToolCallRange: Hashable, Sendable {
-  case unbounded(minimum: Int)
-  case bounded(ClosedRange<Int>)
-  case exact(Int)
-
-  public static func unbounded(_ range: PartialRangeFrom<Int>) -> Self {
-    .unbounded(minimum: range.lowerBound)
-  }
-
-  public static func bounded(_ range: PartialRangeThrough<Int>) -> Self {
-    .bounded(0...range.upperBound)
-  }
-
-  public static func bounded(_ range: PartialRangeUpTo<Int>) -> Self {
-    .bounded(0..<range.upperBound)
-  }
-
-  public static func bounded(_ range: Range<Int>) -> Self {
-    .bounded(range.lowerBound...(range.upperBound - 1))
-  }
-
-  public var lowerBound: Int {
-    switch self {
-    case .bounded(let range): range.lowerBound
-    case .exact(let count): count
-    case .unbounded(let minimum): minimum
-    }
-  }
-
-  public var upperBound: Int? {
-    switch self {
-    case .bounded(let range): range.upperBound
-    case .exact(let count): count
-    case .unbounded: nil
-    }
-  }
 }

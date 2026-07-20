@@ -41,7 +41,9 @@
     public func grammarCompiler(
       using tokenizer: any EdgeToolsXGRTokenizer
     ) throws -> XGRCompiler {
-      try XGRCompiler(tokenizerInfo: tokenizer.tokenizerInfo())
+      try XGRCompiler(
+        tokenizerInfo: tokenizer.tokenizerInfo(modelVocabularySize: self.vocabularySize)
+      )
     }
   }
 #endif

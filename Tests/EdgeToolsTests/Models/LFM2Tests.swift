@@ -4,7 +4,7 @@ import SnapshotTesting
 import Testing
 
 @Suite
-struct LFM2ConsolidatedTests {
+struct `LFM2 tests` {
   @Suite
   struct `LFM2PythonToolCallParser tests` {
     @Test

@@ -174,17 +174,20 @@ public struct NeedleToolCallParser: EdgeToolCallParser, Sendable {
 
   extension XGRTokenizerInfo {
     public static func needle(
-      tokenizer: some EdgeToolsXGRTokenizer
+      tokenizer: some EdgeToolsXGRTokenizer,
+      vocabularySize: Int = 8192
     ) throws -> XGRTokenizerInfo {
       try Self.needle(
-        vocabulary: tokenizer.convertIdsToTokens(Array(0..<8192)),
-        eosTokenID: tokenizer.eosTokenId
+        vocabulary: tokenizer.convertIdsToTokens(Array(0..<vocabularySize)),
+        eosTokenID: tokenizer.eosTokenId,
+        vocabularySize: vocabularySize
       )
     }
 
     private static func needle(
       vocabulary: [String?],
-      eosTokenID: EdgeToolsToken.ID?
+      eosTokenID: EdgeToolsToken.ID?,
+      vocabularySize: Int
     ) throws -> XGRTokenizerInfo {
       guard let eosTokenID, vocabulary.allSatisfy({ $0 != nil }) else {
         throw XGRError(
@@ -194,7 +197,7 @@ public struct NeedleToolCallParser: EdgeToolCallParser, Sendable {
       return try XGRTokenizerInfo(
         encodedVocabulary: vocabulary.compactMap { $0 },
         vocabularyType: .byteFallback,
-        vocabularySize: vocabulary.count,
+        vocabularySize: vocabularySize,
         stopTokenIDs: [eosTokenID],
         addPrefixSpace: true
       )

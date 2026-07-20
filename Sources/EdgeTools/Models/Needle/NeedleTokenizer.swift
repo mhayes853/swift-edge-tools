@@ -232,8 +232,9 @@ extension NeedleSPTokenizer: EdgeToolsTokenizer {}
 
 #if XGrammar
   extension NeedleSPTokenizer: EdgeToolsXGRTokenizer {
-    public func tokenizerInfo() throws -> XGRTokenizerInfo {
-      try XGRTokenizerInfo.needle(tokenizer: self)
+    public func tokenizerInfo(modelVocabularySize: Int? = nil) throws -> XGRTokenizerInfo {
+      let vocabularySize = modelVocabularySize ?? self.vocabularySize
+      return try XGRTokenizerInfo.needle(tokenizer: self, vocabularySize: vocabularySize)
     }
   }
 #endif

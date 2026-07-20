@@ -227,10 +227,16 @@
           encodedVocabulary: ["a", ""],
           backendJSON: backendJSON
         )
+        let paddedTokenizerInfo = try XGRTokenizerInfo.huggingFace(
+          encodedVocabulary: ["a", ""],
+          backendJSON: backendJSON,
+          modelVocabularySize: 8
+        )
 
         expectNoDifference(metadata.contains(#""vocab_type":1"#), true)
         expectNoDifference(metadata.contains(#""add_prefix_space":true"#), true)
         expectNoDifference(try tokenizerInfo.serializedJSON().isEmpty, false)
+        expectNoDifference(try paddedTokenizerInfo.serializedJSON().contains(#""vocab_size":8"#), true)
       }
     }
   }

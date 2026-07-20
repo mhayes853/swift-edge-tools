@@ -122,6 +122,7 @@
     public static func huggingFace(
       encodedVocabulary: [String],
       backendJSON: String,
+      modelVocabularySize: Int? = nil,
       stopTokenIDs: [Int] = []
     ) throws -> XGRTokenizerInfo {
       let metadata = try Self.metadata(huggingFaceBackendJSON: backendJSON)
@@ -139,6 +140,7 @@
       return try XGRTokenizerInfo(
         encodedVocabulary: encodedVocabulary,
         vocabularyType: vocabularyType,
+        vocabularySize: modelVocabularySize ?? encodedVocabulary.count,
         stopTokenIDs: stopTokenIDs,
         addPrefixSpace: addPrefixSpace
       )

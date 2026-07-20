@@ -4,7 +4,7 @@ import SnapshotTesting
 import Testing
 
 @Suite
-struct Qwen3P5ConsolidatedTests {
+struct `Qwen3P5 tests` {
   #if MLX && XGrammar && canImport(MLX)
     @Suite(.serialized, .enabledIfXcode())
     struct `Qwen3P5 MLX engine tests` {

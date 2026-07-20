@@ -4,7 +4,7 @@ import SnapshotTesting
 import Testing
 
 @Suite
-struct FunctionGemmaConsolidatedTests {
+struct `FunctionGemma tests` {
   #if MLX && XGrammar && canImport(MLX)
     @Suite(.serialized, .enabledIfXcode())
     struct `FunctionGemma MLX engine tests` {

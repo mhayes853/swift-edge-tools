@@ -4,7 +4,7 @@ import SnapshotTesting
 import Testing
 
 @Suite
-struct Qwen3ConsolidatedTests {
+struct `Qwen3 tests` {
   @Suite
   struct `Qwen3ToolCallParser tests` {
     @Test

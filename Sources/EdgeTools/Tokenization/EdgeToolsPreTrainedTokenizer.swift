@@ -39,14 +39,21 @@ import SystemPackage
 
   #if XGrammar
     extension EdgeToolsPreTrainedTokenizer: EdgeToolsXGRTokenizer {
-      public func tokenizerInfo() throws -> XGRTokenizerInfo {
+      public func tokenizerInfo(modelVocabularySize: Int? = nil) throws -> XGRTokenizerInfo {
         var vocabulary = [String]()
         while let token = self.convertIdToToken(vocabulary.count) {
           vocabulary.append(token)
         }
+        let vocabularySize = modelVocabularySize ?? vocabulary.count
+        guard vocabulary.count <= vocabularySize else {
+          throw XGRError(
+            message: "The model vocabulary size (\(vocabularySize)) is smaller than the tokenizer vocabulary (\(vocabulary.count))."
+          )
+        }
         return try XGRTokenizerInfo.huggingFace(
           encodedVocabulary: vocabulary,
           backendJSON: self.backendJSON,
+          modelVocabularySize: vocabularySize,
           stopTokenIDs: self.eosTokenId.map { [$0] } ?? []
         )
       }

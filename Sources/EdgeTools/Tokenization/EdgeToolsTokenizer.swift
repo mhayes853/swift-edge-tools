@@ -54,7 +54,7 @@ extension EdgeToolsTokenizer {
 
 #if XGrammar
   public protocol EdgeToolsXGRTokenizer: EdgeToolsTokenizer {
-    func tokenizerInfo() throws -> XGRTokenizerInfo
+    func tokenizerInfo(modelVocabularySize: Int?) throws -> XGRTokenizerInfo
   }
 #endif
 

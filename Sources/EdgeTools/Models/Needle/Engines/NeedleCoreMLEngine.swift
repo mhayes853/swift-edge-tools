@@ -118,7 +118,7 @@
       configuration: NeedleModelConfiguration
     ) throws {
       let grammarEngine = try XGRCompiler(
-        tokenizerInfo: try tokenizer.tokenizerInfo()
+        tokenizerInfo: try tokenizer.tokenizerInfo(modelVocabularySize: configuration.vocabularySize)
       )
       self.state = Lock(
         State(
