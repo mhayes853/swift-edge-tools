@@ -1,10 +1,6 @@
 #if swift(>=6.4) && CoreAI && canImport(CoreAI)
   import CoreAI
-  #if canImport(FoundationEssentials)
-    import FoundationEssentials
-  #else
-    import Foundation
-  #endif
+  import Foundation
   import Atomics
 
   @available(anyAppleOS 27.0, *)

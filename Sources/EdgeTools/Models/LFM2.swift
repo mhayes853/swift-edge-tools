@@ -1,11 +1,7 @@
 import OrderedCollections
 
 #if MLX && Transformers && canImport(MLX)
-  #if canImport(FoundationEssentials)
-    import FoundationEssentials
-  #else
-    import Foundation
-  #endif
+  import Foundation
   import MLXLLM
 
   // MARK: - LFM2 Model

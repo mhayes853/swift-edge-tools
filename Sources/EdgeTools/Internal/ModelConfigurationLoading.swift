@@ -1,11 +1,7 @@
 #if Foundation
   import SystemPackage
 
-  #if canImport(FoundationEssentials)
-    import FoundationEssentials
-  #else
-    import Foundation
-  #endif
+  import Foundation
 
   package func decodeModelConfiguration<Configuration: Decodable>(
     _ configuration: Configuration.Type,

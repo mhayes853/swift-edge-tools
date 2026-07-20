@@ -1,9 +1,5 @@
 #if MLX && canImport(MLX)
-  #if canImport(FoundationEssentials)
-    import FoundationEssentials
-  #else
-    import Foundation
-  #endif
+  import Foundation
   import MLX
   import MLXLLM
   import MLXLMCommon

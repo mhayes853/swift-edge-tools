@@ -1,9 +1,5 @@
 #if Foundation
-  #if canImport(FoundationEssentials)
-    import FoundationEssentials
-  #else
-    import Foundation
-  #endif
+  import Foundation
 #endif
 
 // MARK: - NeedleModelConfiguration

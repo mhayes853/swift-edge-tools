@@ -3,11 +3,7 @@
   import MLXNN
   import MLXLLM
   import MLXLMCommon
-  #if canImport(FoundationEssentials)
-    import FoundationEssentials
-  #else
-    import Foundation
-  #endif
+  import Foundation
   import Atomics
 #endif
 

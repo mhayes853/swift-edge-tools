@@ -2,11 +2,7 @@ import OrderedCollections
 import yyjson
 
 #if Foundation
-  #if canImport(FoundationEssentials)
-    import FoundationEssentials
-  #else
-    import Foundation
-  #endif
+  import Foundation
 #endif
 
 #if canImport(CoreGraphics)
