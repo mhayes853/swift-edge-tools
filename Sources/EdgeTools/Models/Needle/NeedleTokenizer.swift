@@ -502,15 +502,15 @@ extension ProtobufReaderError {
 // MARK: - Needle Tokenizer Integration
 
 extension EdgeToolsTokenizer {
-  public var toolsToken: String { "<tools>" }
+  public var needleToolsToken: String { "<tools>" }
 
-  public var toolsTokenId: EdgeToolsToken.ID? {
-    self.convertTokenToId(self.toolsToken)
+  public var needleToolsTokenId: EdgeToolsToken.ID? {
+    self.convertTokenToId(self.needleToolsToken)
   }
 
-  public var toolCallToken: String { "<tool_call>" }
+  public var needleToolCallToken: String { "<tool_call>" }
 
-  public var toolCallTokenId: EdgeToolsToken.ID? {
-    self.convertTokenToId(self.toolCallToken)
+  public var needleToolCallTokenId: EdgeToolsToken.ID? {
+    self.convertTokenToId(self.needleToolCallToken)
   }
 }

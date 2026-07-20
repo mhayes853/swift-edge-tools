@@ -25,15 +25,15 @@ struct `NeedleSPTokenizer tests` {
   @Test
   func `Needle Special Tokens Are Discoverable`() throws {
     let tokenizer = try NeedleSPTokenizer(modelURL: self.modelURL)
-    let toolsTokenId = tokenizer.toolsTokenId
-    let toolCallTokenId = tokenizer.toolCallTokenId
+    let toolsTokenId = tokenizer.needleToolsTokenId
+    let toolCallTokenId = tokenizer.needleToolCallTokenId
     guard let toolsTokenId, let toolCallTokenId else {
       Issue.record("Expected Needle special tokens in the vocabulary.")
       return
     }
 
-    expectNoDifference(tokenizer.toolsToken, "<tools>")
-    expectNoDifference(tokenizer.toolCallToken, "<tool_call>")
+    expectNoDifference(tokenizer.needleToolsToken, "<tools>")
+    expectNoDifference(tokenizer.needleToolCallToken, "<tool_call>")
     expectNoDifference(tokenizer.convertIdToToken(toolsTokenId), "<tools>")
     expectNoDifference(tokenizer.convertIdToToken(toolCallTokenId), "<tool_call>")
   }
