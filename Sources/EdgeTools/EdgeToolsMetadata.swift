@@ -1,3 +1,7 @@
+#if MLX && canImport(MLX)
+  import MLX
+#endif
+
 // MARK: - EdgeToolsMetadataKey
 
 public struct EdgeToolsMetadataKey: Hashable, Sendable, RawRepresentable, ExpressibleByStringLiteral
@@ -42,8 +46,6 @@ extension EdgeToolsMetadata {
 }
 
 #if MLX && canImport(MLX)
-  import MLX
-
   // MARK: - EdgeToolsMetadataKey + MLX
 
   extension EdgeToolsMetadataKey {

@@ -1,11 +1,3 @@
-// MARK: - EdgeToolsSampler
-
-public protocol EdgeToolsSampler<Logits> {
-  associatedtype Logits
-
-  func sample(logits: Logits) async throws -> EdgeToolsToken.ID
-}
-
 // MARK: - EdgeToolsLogitsProcessor
 
 public protocol EdgeToolsLogitsProcessor<Prompt, Logits> {

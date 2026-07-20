@@ -1,6 +1,14 @@
 import EdgeTools
 import Foundation
 
+#if swift(>=6.4) && CoreAI && canImport(CoreAI)
+  import CoreAI
+#endif
+
+#if CoreML && canImport(CoreML)
+  import CoreML
+#endif
+
 private enum NeedleTestModelExport {
   static func export(
     backend: String?,
@@ -93,8 +101,6 @@ private enum NeedleTestModelExport {
 }
 
 #if swift(>=6.4) && CoreAI && canImport(CoreAI)
-  import CoreAI
-
   @available(anyAppleOS 27.0, *)
   func exportNeedleCoreAI(
     outputDirectoryName: String = "coreai-export",
@@ -172,8 +178,6 @@ private enum NeedleTestModelExport {
 #endif
 
 #if CoreML && canImport(CoreML)
-  import CoreML
-
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
   func exportNeedleCoreML(
     outputDirectoryName: String = "coreml-export",

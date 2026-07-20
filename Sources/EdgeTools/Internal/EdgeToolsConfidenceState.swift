@@ -1,3 +1,15 @@
+#if MLX && canImport(MLX)
+  import MLX
+#endif
+
+#if CoreML && canImport(CoreML)
+  import CoreML
+#endif
+
+#if swift(>=6.4) && CoreAI && canImport(CoreAI)
+  import CoreAI
+#endif
+
 // MARK: - EdgeToolsConfidenceState
 
 struct EdgeToolsConfidenceState {
@@ -19,8 +31,6 @@ struct EdgeToolsConfidenceState {
 // MARK: - MLX
 
 #if MLX && canImport(MLX)
-  import MLX
-
   extension EdgeToolsConfidenceState {
     mutating func addMLX(logits: MLXArray) {
       self.add(confidence: tokenConfidenceMLX(logits: logits))
@@ -37,8 +47,6 @@ struct EdgeToolsConfidenceState {
 // MARK: - Core ML
 
 #if CoreML && canImport(CoreML)
-  import CoreML
-
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
   extension EdgeToolsConfidenceState {
     mutating func addCoreML(logits: MLTensor) async {
@@ -60,8 +68,6 @@ struct EdgeToolsConfidenceState {
 // MARK: - Core AI
 
 #if swift(>=6.4) && CoreAI && canImport(CoreAI)
-  import CoreAI
-
   @available(anyAppleOS 27.0, *)
   extension EdgeToolsConfidenceState {
     mutating func addCoreAI(logits: NDArray) throws {

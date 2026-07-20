@@ -1,0 +1,273 @@
+#if Foundation
+  #if canImport(FoundationEssentials)
+    import FoundationEssentials
+  #else
+    import Foundation
+  #endif
+#endif
+
+// MARK: - NeedleModelConfiguration
+
+public struct NeedleModelConfiguration: Hashable, Sendable {
+  public var vocabularySize: Int = 8192
+  public var dimensions: Int = 512
+  public var hiddenDimensions: Int = 512
+  public var attentionHeads: Int = 8
+  public var kvHeads: Int = 4
+  public var encoderLayers: Int = 12
+  public var decoderLayers: Int = 8
+  public var hiddenLayers: Int = 8
+  public var ropeTheta: Float = 10000.0
+  public var rmsNormEps: Float = 1e-6
+  public var padTokenId: EdgeToolsToken.ID = 0
+  public var decoderStartTokenId: EdgeToolsToken.ID = 1
+  public var tieWordEmbeddings: Bool = true
+  public var maxSeqLen: Int?
+  public var maxPositionEmbeddings: Int?
+  private var dtypeValue: String?
+  private var torchDTypeValue: String?
+
+  public var dtype: String {
+    get { self.dtypeValue ?? self.torchDTypeValue ?? "bfloat16" }
+    set { self.dtypeValue = newValue }
+  }
+
+  public var attentionHeadDimensions: Int {
+    self.dimensions / self.attentionHeads
+  }
+
+  public var kvDimensions: Int {
+    self.kvHeads * self.attentionHeadDimensions
+  }
+
+  public var encoderMaxLength: Int {
+    self.maxSeqLen ?? self.maxPositionEmbeddings ?? 1024
+  }
+}
+
+// MARK: - Codable
+
+extension NeedleModelConfiguration: Codable {
+  private enum CodingKeys: String, CodingKey {
+    case vocabularySize = "vocab_size"
+    case dimensions = "d_model"
+    case hiddenDimensions = "hidden_size"
+    case attentionHeads = "num_attention_heads"
+    case encoderLayers = "num_encoder_layers"
+    case decoderLayers = "num_decoder_layers"
+    case hiddenLayers = "num_hidden_layers"
+    case kvHeads = "num_kv_heads"
+    case ropeTheta = "rope_theta"
+    case rmsNormEps = "rms_norm_eps"
+    case padTokenId = "pad_token_id"
+    case decoderStartTokenId = "decoder_start_token_id"
+    case tieWordEmbeddings = "tie_word_embeddings"
+    case maxSeqLen = "max_seq_len"
+    case maxPositionEmbeddings = "max_position_embeddings"
+    case dtypeValue = "dtype"
+    case torchDTypeValue = "torch_dtype"
+  }
+}
+
+// MARK: - Loading
+
+#if Foundation
+  extension NeedleModelConfiguration {
+    static func decode(in directory: URL, decoder: JSONDecoder = JSONDecoder()) throws -> Self? {
+      try decodeModelConfiguration(Self.self, in: directory, decoder: decoder)
+    }
+  }
+#endif
+
+// MARK: - NeedleModelError
+
+public struct NeedleModelError: Hashable, Error {
+  public let message: String
+
+  public static func contextLengthExceeded(tokens: Int, maximum: Int) -> Self {
+    Self(message: "Prompt token count (\(tokens)) exceeds the model context length (\(maximum)).")
+  }
+}
+
+// MARK: - NeedlePrompt
+
+public struct NeedlePrompt: Sendable {
+  public var system: String
+  public var user: String
+
+  public init(system: String, user: String) {
+    self.system = system
+    self.user = user
+  }
+}
+
+// MARK: - Formatting
+
+extension NeedlePrompt {
+  public func formatted(tools: [EdgeToolDefinition]) throws -> String {
+    let separator = self.system.isEmpty || self.user.isEmpty ? "" : "\n\n"
+    let toolsSchema =
+      try tools
+      .filter(\.includesSchemaInInstructions)
+      .map { $0.needleNormalized() }
+      .needlePromptEncoded()
+    return "\(self.system)\(separator)\(self.user)<tools>\(toolsSchema)"
+  }
+
+  public func tokenized(
+    tools: [EdgeToolDefinition],
+    using tokenizer: some EdgeToolsTokenizer
+  ) throws -> [EdgeToolsToken] {
+    let tokenIds = tokenizer.encode(text: try self.formatted(tools: tools))
+    let tokens = tokenizer.convertIdsToTokens(tokenIds)
+    return zip(tokenIds, tokens)
+      .compactMap { (tokenId, token) in
+        token.map { EdgeToolsToken(id: tokenId, stringValue: $0) }
+      }
+  }
+}
+
+// MARK: - EdgeToolDefinition
+
+extension EdgeToolDefinition {
+  public func needleNormalized() -> Self {
+    var definition = self
+    definition.name = self.name.snakeCased()
+    return definition
+  }
+
+  fileprivate func needlePromptEncoded() throws -> String {
+    let name = OrderedKeyJSONWriter.encode(.string(self.name))
+    let description = OrderedKeyJSONWriter.encode(.string(self.description))
+    let arguments = self.arguments.orderedKeyEncoded()
+    return #"{"name":\#(name),"description":\#(description),"arguments":\#(arguments)}"#
+  }
+}
+
+extension Sequence where Element == EdgeToolDefinition {
+  fileprivate func needlePromptEncoded() throws -> String {
+    let definitions = try self.map { try $0.needlePromptEncoded() }
+    return "[\(definitions.joined(separator: ","))]"
+  }
+}
+
+// MARK: - NeedleToolCallParser
+
+public struct NeedleToolCallParser: EdgeToolCallParser, Sendable {
+  private var list = IncrementalToolCallList(opener: "<tool_call>")
+
+  public init() {}
+
+  public mutating func accept(token: EdgeToolsToken) -> EdgeRawToolCall? {
+    self.list.append(token)
+    while let objectData = self.list.nextItem(findRange: { $0.firstCompleteJSONObjectRange() }) {
+      if let value = try? decodeEdgeToolsJSON(objectData),
+        let call = EdgeRawToolCall(jsonValue: value)
+      {
+        return call
+      }
+    }
+    return nil
+  }
+}
+
+// MARK: - Needle Grammar
+
+#if XGrammar
+  // MARK: - XGR Tokenizer Info
+
+  extension XGRTokenizerInfo {
+    public static func needle(
+      tokenizer: some EdgeToolsTokenizer
+    ) throws -> XGRTokenizerInfo {
+      try Self.needle(
+        vocabulary: tokenizer.convertIdsToTokens(Array(0..<8192)),
+        eosTokenID: tokenizer.eosTokenId
+      )
+    }
+
+    private static func needle(
+      vocabulary: [String?],
+      eosTokenID: EdgeToolsToken.ID?
+    ) throws -> XGRTokenizerInfo {
+      guard let eosTokenID, vocabulary.allSatisfy({ $0 != nil }) else {
+        throw XGRError(
+          message: "Needle requires a tokenizer with an EOS token and full vocabulary."
+        )
+      }
+      return try XGRTokenizerInfo(
+        encodedVocabulary: vocabulary.compactMap { $0 },
+        vocabularyType: .byteFallback,
+        vocabularySize: vocabulary.count,
+        stopTokenIDs: [eosTokenID],
+        addPrefixSpace: true
+      )
+    }
+  }
+
+  // MARK: - Grammar
+
+  extension XGRGrammar {
+    public static func needle(
+      tools: some Sequence<EdgeToolDefinition>,
+      range: GrammarToolCallRange = .unbounded(minimum: 0)
+    ) throws -> XGRGrammar {
+      let calls = try XGRGrammar.needleCalls(
+        tools: tools.map { $0.needleNormalized() },
+        range: range
+      )
+      let prefix = try XGRGrammar(literal: "<tool_call> [")
+      let prefixedCalls = try prefix.concatenate(calls)
+      return try prefixedCalls.concatenate(XGRGrammar(literal: "]"))
+    }
+
+    private static func needleCalls(
+      tools: [EdgeToolDefinition],
+      range: GrammarToolCallRange
+    ) throws -> XGRGrammar {
+      guard range.lowerBound >= 0 else { throw NeedleXGRError.invalidToolInvocationRange }
+      guard let firstTool = tools.first else { return try XGRGrammar(literal: "") }
+
+      var call = try XGRGrammar.needleCall(firstTool)
+      for tool in tools.dropFirst() {
+        call = try call.union(XGRGrammar.needleCall(tool))
+      }
+      return try Self.repeatingToolCall(call, separator: ",", range: range)
+    }
+
+    private static func needleCall(_ tool: EdgeToolDefinition) throws -> XGRGrammar {
+      let schema = tool.arguments.orderedKeyEncoded()
+      let arguments = try XGRGrammar(
+        jsonSchema: schema,
+        configuration: JSONSchemaConfiguration(
+          anyWhitespace: false,
+          separators: .init(comma: ",", colon: ":"),
+          isStrict: true
+        )
+      )
+      let namePrefix = try XGRGrammar(literal: "{\"name\":\"")
+      let named = try namePrefix.concatenate(XGRGrammar(literal: tool.name))
+      let argumentsPrefix = try named.concatenate(XGRGrammar(literal: "\",\"arguments\":"))
+      let withArguments = try argumentsPrefix.concatenate(arguments)
+      return try withArguments.concatenate(XGRGrammar(literal: "}"))
+    }
+  }
+
+  // MARK: - Error
+
+  public enum NeedleXGRError: Error, Hashable, Sendable {
+    case invalidToolInvocationRange
+  }
+
+  // MARK: - Helpers
+
+  extension XGRToolCallMatcherPool {
+    static func needle(maxCount: Int = 8) -> XGRToolCallMatcherPool {
+      XGRToolCallMatcherPool(
+        maxCount: maxCount,
+        normalizeTools: { $0.map { $0.needleNormalized() } },
+        makeGrammar: { try XGRGrammar.needle(tools: $0, range: $1) }
+      )
+    }
+  }
+#endif

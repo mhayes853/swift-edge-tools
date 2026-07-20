@@ -165,10 +165,7 @@ let package = Package(
         "Models/Needle/Engines/__Snapshots__",
         "Models/Needle/Engines/MLX/__Snapshots__",
         "Models/Needle/__Snapshots__",
-        "Models/Qwen3/__Snapshots__",
-        "Models/Qwen3P5/__Snapshots__",
-        "Models/FunctionGemma/__Snapshots__",
-        "Models/LFM2/__Snapshots__"
+        "Models/__Snapshots__"
       ],
       resources: [.process("Resources")]
     )
