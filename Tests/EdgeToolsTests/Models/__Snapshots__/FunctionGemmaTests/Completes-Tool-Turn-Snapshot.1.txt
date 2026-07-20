@@ -8,6 +8,7 @@
       ▿ role: Role
         - rawValue: "system"
       - toolCalls: Optional<Array<EdgeRawToolCall>>.none
+      - toolName: Optional<String>.none
       - toolResponse: Optional<EdgeToolsValue>.none
     ▿ Message
       - audio: Optional<Array<Asset>>.none
@@ -17,6 +18,7 @@
       ▿ role: Role
         - rawValue: "user"
       - toolCalls: Optional<Array<EdgeRawToolCall>>.none
+      - toolName: Optional<String>.none
       - toolResponse: Optional<EdgeToolsValue>.none
     ▿ Message
       - audio: Optional<Array<Asset>>.none
@@ -34,6 +36,7 @@
                   ▿ value: EdgeToolsValue
                     - string: "Paris"
             - name: "getWeather"
+      - toolName: Optional<String>.none
       - toolResponse: Optional<EdgeToolsValue>.none
     ▿ Message
       - audio: Optional<Array<Asset>>.none
@@ -42,6 +45,8 @@
       ▿ role: Role
         - rawValue: "tool"
       - toolCalls: Optional<Array<EdgeRawToolCall>>.none
+      ▿ toolName: Optional<String>
+        - some: "getWeather"
       ▿ toolResponse: Optional<EdgeToolsValue>
         ▿ some: EdgeToolsValue
           ▿ object: 3 key/value pairs
@@ -60,9 +65,10 @@
     ▿ Message
       - audio: Optional<Array<Asset>>.none
       ▿ content: Optional<String>
-        - some: "It is sunny and 21ଌ in Paris."
+        - some: "It is sunny and 21xb0C in Paris."
       - images: Optional<Array<Asset>>.none
       ▿ role: Role
         - rawValue: "assistant"
       - toolCalls: Optional<Array<EdgeRawToolCall>>.none
+      - toolName: Optional<String>.none
       - toolResponse: Optional<EdgeToolsValue>.none

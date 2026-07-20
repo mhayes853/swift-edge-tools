@@ -27,11 +27,14 @@
     }
     transcript.messages.append(.assistant(toolCalls: toolGeneration.toolCalls))
     transcript.messages.append(
-      .tool([
-        "location": "Paris",
-        "condition": "sunny",
-        "temperatureCelsius": 21
-      ])
+      .tool(
+        name: "getWeather",
+        response: [
+          "location": "Paris",
+          "condition": "sunny",
+          "temperatureCelsius": 21
+        ]
+      )
     )
 
     let responseGeneration = try await session.generateRaw(

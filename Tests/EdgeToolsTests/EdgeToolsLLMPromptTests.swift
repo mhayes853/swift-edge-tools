@@ -51,11 +51,12 @@ struct `EdgeToolsLLMPrompt tests` {
   }
 
   @Test
-  func `Tool Response Preserves Structured Value`() {
+  func `Tool Response Preserves Name And Structured Value`() {
     let response: EdgeToolsValue = ["temperatureCelsius": 21]
-    let message = EdgeToolsLLMPrompt.Message.tool(response)
+    let message = EdgeToolsLLMPrompt.Message.tool(name: "getWeather", response: response)
 
     expectNoDifference(message.content, nil)
+    expectNoDifference(message.toolName, "getWeather")
     expectNoDifference(message.toolResponse, response)
   }
 }

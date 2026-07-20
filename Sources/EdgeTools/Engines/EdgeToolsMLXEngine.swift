@@ -550,26 +550,7 @@
 
   extension EdgeToolsLLMPrompt {
     fileprivate func mlxMessages() throws -> [MLXLMCommon.Message] {
-      let result = try self.messages.reduce(
-        into: (
-          messages: [MLXLMCommon.Message](),
-          pendingToolNames: [String](),
-          nextToolIndex: 0
-        )
-      ) { result, message in
-        var mlxMessage = try message.mlxMessage()
-        if message.role == .assistant {
-          result.pendingToolNames = message.toolCalls?.map(\.name) ?? []
-          result.nextToolIndex = 0
-        } else if message.role == .tool,
-          result.pendingToolNames.indices.contains(result.nextToolIndex)
-        {
-          mlxMessage["name"] = result.pendingToolNames[result.nextToolIndex]
-          result.nextToolIndex += 1
-        }
-        result.messages.append(mlxMessage)
-      }
-      return result.messages
+      try self.messages.map { try $0.mlxMessage() }
     }
 
   }
@@ -577,15 +558,18 @@
   extension EdgeToolsLLMPrompt.Message {
     package func mlxMessage() throws -> MLXLMCommon.Message {
       var message: MLXLMCommon.Message = ["role": self.role.rawValue]
-      if let content = self.content {
+      if let content {
         message["content"] = content
       }
-      if let toolResponse = self.toolResponse {
+      if let toolResponse {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         message["content"] = String(decoding: try encoder.encode(toolResponse), as: UTF8.self)
       }
-      if let toolCalls = self.toolCalls, !toolCalls.isEmpty {
+      if let toolName {
+        message["name"] = toolName
+      }
+      if let toolCalls, !toolCalls.isEmpty {
         message["tool_calls"] = toolCalls.map(\.mlxToolCall)
       }
       return message

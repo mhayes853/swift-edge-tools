@@ -34,6 +34,7 @@ extension EdgeToolsLLMPrompt {
     public var images: [Asset]?
     public var audio: [Asset]?
     public var toolCalls: [EdgeRawToolCall]?
+    public var toolName: String?
     public var toolResponse: EdgeToolsValue?
 
     public init(
@@ -42,6 +43,7 @@ extension EdgeToolsLLMPrompt {
       images: [Asset]? = nil,
       audio: [Asset]? = nil,
       toolCalls: [EdgeRawToolCall]? = nil,
+      toolName: String? = nil,
       toolResponse: EdgeToolsValue? = nil
     ) {
       self.role = role
@@ -49,6 +51,7 @@ extension EdgeToolsLLMPrompt {
       self.images = images
       self.audio = audio
       self.toolCalls = toolCalls
+      self.toolName = toolName
       self.toolResponse = toolResponse
     }
 
@@ -80,8 +83,8 @@ extension EdgeToolsLLMPrompt {
       )
     }
 
-    public static func tool(_ response: EdgeToolsValue) -> Self {
-      Self(role: .tool, toolResponse: response)
+    public static func tool(name: String, response: EdgeToolsValue) -> Self {
+      Self(role: .tool, toolName: name, toolResponse: response)
     }
   }
 }
