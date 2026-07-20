@@ -574,7 +574,8 @@ class _ZCRMSNorm(nn.Module):
         self.eps = eps
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return torch.rms_norm(x, (x.shape[-1],), 1 + self.weight.to(x.dtype), self.eps)
+        weight = self.weight.to(x.dtype) + torch.ones_like(self.weight, dtype=x.dtype)
+        return torch.rms_norm(x, (x.shape[-1],), weight, self.eps)
 
 
 def _update_kv_cache(

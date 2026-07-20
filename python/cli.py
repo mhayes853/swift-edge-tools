@@ -7,12 +7,12 @@ import json
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
 import yaml
 from coreai.runtime import AIModelAssetMetadata
-from coreai_opt import ExportBackend
 from coreai_opt.palettization import (
     KMeansPalettizerConfig,
     ModuleKMeansPalettizerConfig,
@@ -31,13 +31,24 @@ from needle.needle_compression import (
     CoreMLQuantizerCompressor,
     NeedleCompressor,
 )
+from needle.onnx_compression import MatMulNBitsONNXCompressor, ONNXCompressor
+from needle.onnx_export import export_needle_onnx
 
 _QUANTIZER_PRESETS = ("w4", "w4_per_block", "w8")
 _PALETTIZER_N_BITS = (1, 2, 3, 4, 6, 8)
 _COMPUTE_UNITS = tuple(compute_units.value for compute_units in CoreMLComputeUnits)
+
+
+class CLIBackend(Enum):
+    COREAI = "coreai"
+    COREML = "coreml"
+    ONNX = "onnx"
+
+
 _BACKENDS = {
-    "coreai": ExportBackend.CoreAI,
-    "coreml": ExportBackend.CoreML,
+    "coreai": CLIBackend.COREAI,
+    "coreml": CLIBackend.COREML,
+    "onnx": CLIBackend.ONNX,
 }
 
 
@@ -48,10 +59,11 @@ class CompressionConfig:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Export Needle CoreAI models")
+    parser = argparse.ArgumentParser(description="Export Needle models")
     parser.add_argument("--source", default=DEFAULT_SOURCE)
     parser.add_argument("--output", required=True)
     parser.add_argument("--backend", default="CoreAI")
+    parser.add_argument("--onnx-quantization", choices=("int4", "int8"))
     parser.add_argument(
         "--compute-units",
         choices=_COMPUTE_UNITS,
@@ -226,10 +238,10 @@ def _parse_compute_units(value: str) -> CoreMLComputeUnits:
     return CoreMLComputeUnits(value)
 
 
-def _parse_backend(value: str) -> ExportBackend:
+def _parse_backend(value: str) -> CLIBackend:
     backend = _BACKENDS.get(value.casefold())
     if backend is None:
-        supported = ", ".join(["CoreAI", "CoreML"])
+        supported = ", ".join(backend.value for backend in CLIBackend)
         raise ValueError(f"Unsupported backend {value!r}. Expected one of: {supported}")
     return backend
 
@@ -239,17 +251,29 @@ def _build_compressor(parsed: argparse.Namespace) -> NeedleCompressor | None:
     if compression_config is None:
         return None
     backend = _parse_backend(parsed.backend)
-    if backend == ExportBackend.CoreAI:
+    if backend == CLIBackend.COREAI:
         return CoreAIQuantizerCompressor(
             compression_config.quantizer,
             palettizer_config=compression_config.palettizer,
         )
-    if backend == ExportBackend.CoreML:
+    if backend == CLIBackend.COREML:
         return CoreMLQuantizerCompressor(
             compression_config.quantizer,
             palettizer_config=compression_config.palettizer,
         )
-    raise ValueError(f"Unsupported compression backend: {backend.value}")
+    raise ValueError(
+        "CoreAI/CoreML quantizer and palettizer options cannot be used with ONNX"
+    )
+
+
+def _build_onnx_compressor(parsed: argparse.Namespace) -> ONNXCompressor | None:
+    if parsed.onnx_quantization is None:
+        return None
+    if _parse_backend(parsed.backend) != CLIBackend.ONNX:
+        raise ValueError("--onnx-quantization requires --backend onnx")
+    if parsed.onnx_quantization == "int4":
+        return MatMulNBitsONNXCompressor.int4()
+    return MatMulNBitsONNXCompressor.int8()
 
 
 def _build_quantizer_config(parsed: argparse.Namespace) -> QuantizerConfig:
@@ -299,16 +323,17 @@ def _expect_string(value: Any, *, key: str) -> str:
 
 
 def _export_for_backend(
-    backend: ExportBackend,
+    backend: CLIBackend,
     source: str,
     output: str,
     *,
     compressor: NeedleCompressor | None = None,
+    onnx_compressor: ONNXCompressor | None = None,
     model_metadata: AIModelAssetMetadata | None = None,
     compute_units: CoreMLComputeUnits = CoreMLComputeUnits.ALL,
     compile_platforms: Sequence[str] = (),
 ) -> Path:
-    if backend == ExportBackend.CoreAI:
+    if backend == CLIBackend.COREAI:
         return export_needle_coreai(
             source,
             output,
@@ -316,7 +341,7 @@ def _export_for_backend(
             model_metadata=model_metadata,
             compile_platforms=compile_platforms,
         )
-    if backend == ExportBackend.CoreML:
+    if backend == CLIBackend.COREML:
         return _export_needle_coreml(
             source,
             output,
@@ -325,7 +350,12 @@ def _export_for_backend(
             compute_units=compute_units,
             compile_platforms=compile_platforms,
         )
-    raise ValueError(f"Unsupported backend: {backend.value}")
+    if backend == CLIBackend.ONNX:
+        return export_needle_onnx(
+            source,
+            output,
+            compressor=onnx_compressor,
+        )
 
 
 def _export_needle_coreml(
@@ -353,6 +383,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
     try:
         backend = _parse_backend(parsed.backend)
         compressor = _build_compressor(parsed)
+        onnx_compressor = _build_onnx_compressor(parsed)
         model_metadata = _build_authoring_metadata(parsed)
         compute_units = _parse_compute_units(parsed.compute_units)
     except ValueError as error:
@@ -364,6 +395,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
             parsed.source,
             parsed.output,
             compressor=compressor,
+            onnx_compressor=onnx_compressor,
             model_metadata=model_metadata,
             compute_units=compute_units,
             compile_platforms=parsed.compile_platforms,

@@ -4,14 +4,17 @@ version = "0.1.0"
 description = ""
 requires-python = ">=3.9"
 dependencies = [
-    "torch==2.10.0",
-    "coreai-opt>=0.2.1",
-    "coreai-torch==0.4.1",
-    "huggingface_hub>=1.21.0",
-    "PyYAML>=6.0",
-    "safetensors>=0.6.2",
-    "sentencepiece>=0.2.1",
-    "tokenizers>=0.22.1",
+  "torch==2.10.0",
+  "coreai-opt>=0.2.1",
+  "coreai-torch==0.4.1",
+  "huggingface_hub>=1.21.0",
+  "onnx>=1.16.0",
+  "onnxruntime>=1.23.2",
+  "onnxscript>=0.5.0",
+  "PyYAML>=6.0",
+  "safetensors>=0.6.2",
+  "sentencepiece>=0.2.1",
+  "tokenizers>=0.22.1",
 ]
 
 [build-system]
@@ -20,7 +23,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = ["needle"]
-package-dir = {needle = "needle"}
+package-dir = { needle = "needle" }
 py-modules = ["cli"]
 
 [project.scripts]

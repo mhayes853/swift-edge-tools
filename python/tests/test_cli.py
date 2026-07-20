@@ -9,12 +9,12 @@ from pathlib import Path
 from typing import TypeVar, cast
 from unittest.mock import patch
 
+import torch
+import yaml
 from coreai.authoring.asset import AIModelAsset
 from coreai.runtime import AIModelAssetMetadata
 from coreai_opt.palettization import KMeansPalettizerConfig, PalettizationSpec
 from coreai_opt.quantization import QuantizerConfig
-import torch
-import yaml
 
 from cli import (
     _build_authoring_metadata,
@@ -269,6 +269,28 @@ class CLITests(unittest.TestCase):
     def test_parse_backend_supports_case_insensitive_engine_names(self) -> None:
         self.assertEqual(_parse_backend("CoreAI").value, "coreai")
         self.assertEqual(_parse_backend("coreml").value, "coreml")
+        self.assertEqual(_parse_backend("OnNx").value, "onnx")
+
+    def test_main_passes_onnx_quantization_to_export(self) -> None:
+        with patch("cli.export_needle_onnx") as export_needle_onnx_mock:
+            export_needle_onnx_mock.return_value = Path("/tmp/onnx-export")
+
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "--output",
+                        "./build/onnx-export",
+                        "--backend",
+                        "onnx",
+                        "--onnx-quantization",
+                        "int4",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        compressor = export_needle_onnx_mock.call_args.kwargs["compressor"]
+        self.assertEqual(compressor.bits, 4)
 
     def test_main_passes_compile_platforms_to_coreml_export(self) -> None:
         with patch("cli._export_needle_coreml") as export_needle_coreml_mock:

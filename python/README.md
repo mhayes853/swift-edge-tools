@@ -1,6 +1,7 @@
 # Swift Needle Python Export
 
-This directory contains the Python-side Needle model, along with a CoreAI export workflow.
+This directory contains the Python-side Needle model and CoreAI, CoreML, and
+ONNX export workflows.
 
 ## Requirements
 
@@ -8,6 +9,9 @@ This directory contains the Python-side Needle model, along with a CoreAI export
 - `torch`
 - `coreai-torch`
 - `huggingface_hub`
+- `onnx`
+- `onnxruntime`
+- `onnxscript`
 - `safetensors`
 - `sentencepiece`
 - `tokenizers`
@@ -33,14 +37,11 @@ The source directory or repo snapshot must contain:
 
 ## Export Output
 
-The output bundle contains:
+Every output bundle contains `configuration.json` and `tokenizer.model` or
+`tokenizer.json`. CoreAI exports `encoder.aimodel` and `decoder.aimodel`, CoreML
+exports `.mlpackage` models, and ONNX exports `encoder.onnx` and `decoder.onnx`.
 
-- `encoder.aimodel`
-- `decoder.aimodel`
-- `configuration.json`
-- `tokenizer.model` or `tokenizer.json`
-
-If ahead-of-time compilation is enabled, the output contains compiled
+If CoreAI ahead-of-time compilation is enabled, the output contains compiled
 `encoder.*.aimodelc` and `decoder.*.aimodelc` assets instead of the source
 `.aimodel` directories.
 
@@ -79,6 +80,49 @@ python3 cli.py \
   --source Cactus-Compute/needle \
   --output ./build/coreai-export \
   --compile-platform macOS
+```
+
+With an ONNX export:
+
+```bash
+python3 cli.py \
+  --backend onnx \
+  --source Cactus-Compute/needle \
+  --output ./build/onnx-export
+```
+
+ONNX weight-only quantization uses ONNX Runtime's `MatMulNBits` representation:
+
+```bash
+python3 cli.py --backend onnx --onnx-quantization int4 --output ./build/onnx-int4
+python3 cli.py --backend onnx --onnx-quantization int8 --output ./build/onnx-int8
+```
+
+For custom compression, use the Python API:
+
+```python
+from pathlib import Path
+
+from needle import ONNXModelComponent, export_needle_onnx
+
+
+class CustomCompressor:
+    def compress(
+        self,
+        source: Path,
+        destination: Path,
+        *,
+        component: ONNXModelComponent,
+    ) -> None:
+        # Apply a caller-defined ONNX transformation and write destination.
+        compress_model(source, destination, component=component)
+
+
+export_needle_onnx(
+    "Cactus-Compute/needle",
+    "./build/onnx-custom",
+    compressor=CustomCompressor(),
+)
 ```
 
 With CoreML CPU/GPU execution and native SDPA:
@@ -126,6 +170,10 @@ Ahead-of-time compilation flags:
 
 - `--compile-platform PLATFORM`
 
+ONNX quantization flags:
+
+- `--onnx-quantization {int4,int8}`
+
 Compute-unit flags:
 
 - `--compute-units {all,cpu-only,cpu-and-gpu,cpu-and-ne}`
@@ -156,6 +204,7 @@ The repository also includes a runnable shell wrapper:
 
 ```bash
 ./scripts/export_needle_coreml_e2e.sh
+./scripts/export_needle_onnx_e2e.sh
 ```
 
 With an explicit source and output:
@@ -163,6 +212,7 @@ With an explicit source and output:
 ```bash
 ./scripts/export_needle_coreai_e2e.sh /path/to/needle-bundle ./build/coreai-export
 ./scripts/export_needle_coreml_e2e.sh /path/to/needle-bundle ./build/coreml-export
+./scripts/export_needle_onnx_e2e.sh /path/to/needle-bundle ./build/onnx-export int8
 ```
 
 Defaults:
@@ -170,11 +220,12 @@ Defaults:
 - source: `Cactus-Compute/needle`
 - CoreAI output: `python/build/coreai-export`
 - CoreML output: `python/build/coreml-export`
+- ONNX output: `python/build/onnx-export`
 
 ## Tests
 
 Run the Python tests from `python/`:
 
 ```bash
-python3 -m unittest tests.test_needle_torch tests.test_torch_utils tests.test_coreai_export tests.test_cli
+python3 -m unittest
 ```
