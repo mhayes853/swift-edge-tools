@@ -1,158 +1,71 @@
 import OrderedCollections
+import yyjson
 
 // MARK: - Ordered key encoding
 
 extension EdgeToolsGenerationSchema {
   public func orderedKeyEncoded() -> String {
-    String(decoding: encodeEdgeToolsJSON(self), as: UTF8.self)
+    OrderedKeyJSONWriter.encode(self.edgeToolsValue)
   }
 }
 
-package func encodeEdgeToolsJSON(_ schema: EdgeToolsGenerationSchema) -> [UInt8] {
-  var writer = EdgeToolsJSONWriter()
-  writer.writeSchema(schema)
-  return writer.buffer
-}
+package struct OrderedKeyJSONWriter: ~Copyable {
+  let document: UnsafeMutablePointer<yyjson_mut_doc>
 
-package func encodeEdgeToolsJSON(_ value: EdgeToolsValue) -> [UInt8] {
-  var writer = EdgeToolsJSONWriter()
-  writer.writeValue(value)
-  return writer.buffer
-}
+  deinit { yyjson_mut_doc_free(self.document) }
 
-package func encodeEdgeToolsJSONString(_ value: String) -> [UInt8] {
-  var writer = EdgeToolsJSONWriter()
-  writer.writeString(value)
-  return writer.buffer
-}
+  package static func encode(_ value: EdgeToolsValue) -> String {
+    let document = yyjson_mut_doc_new(nil)!
+    let writer = Self(document: document)
+    let root = writer.value(value)
+    yyjson_mut_doc_set_root(writer.document, root)
 
-private struct EdgeToolsJSONWriter {
-  static let openBracket = UInt8(0x5B)
-  static let closeBracket = UInt8(0x5D)
-  static let openBrace = UInt8(0x7B)
-  static let closeBrace = UInt8(0x7D)
-  static let comma = UInt8(0x2C)
-  static let colon = UInt8(0x3A)
-  static let quote = UInt8(0x22)
-  static let backslash = UInt8(0x5C)
-  static let backspace = UInt8(0x08)
-  static let formFeed = UInt8(0x0C)
-  static let newline = UInt8(0x0A)
-  static let carriageReturn = UInt8(0x0D)
-  static let tab = UInt8(0x09)
-  static let controlCharLimit = UInt8(0x20)
+    var length = 0
+    let output = yyjson_mut_write(writer.document, YYJSON_WRITE_INF_AND_NAN_AS_NULL, &length)!
+    defer { output.deallocate() }
 
-  static let hexDigitTable = [
-    UInt8(0x30), 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37,
-    0x38, 0x39, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66
-  ]
-  static let zero = UInt8(0x30)
-
-  var buffer = [UInt8]()
-
-  mutating func writeSchema(_ schema: EdgeToolsGenerationSchema) {
-    switch schema {
-    case .boolean(let value):
-      self.writeBool(value)
-    case .object(let object):
-      self.writeSchemaObject(object)
-    }
+    let bytes = UnsafeRawPointer(output).assumingMemoryBound(to: UInt8.self)
+    let buffer = UnsafeBufferPointer<UInt8>(start: bytes, count: length)
+    return String(bytes: buffer, encoding: .utf8)!
   }
 
-  private mutating func writeSchemaObject(
-    _ object: OrderedDictionary<EdgeToolsGenerationSchema.Key, EdgeToolsValue>
-  ) {
-    self.buffer.append(Self.openBrace)
-    for (offset, entry) in object.enumerated() {
-      if offset > 0 { self.buffer.append(Self.comma) }
-      self.writeString(entry.key.rawValue)
-      self.buffer.append(Self.colon)
-      self.writeValue(entry.value)
-    }
-    self.buffer.append(Self.closeBrace)
-  }
-
-  mutating func writeString(_ value: String) {
-    self.buffer.append(Self.quote)
-    for byte in value.utf8 {
-      switch byte {
-      case Self.quote: self.buffer.append(contentsOf: #"\""#.utf8)
-      case Self.backslash: self.buffer.append(contentsOf: #"\\"#.utf8)
-      case Self.backspace: self.buffer.append(contentsOf: #"\b"#.utf8)
-      case Self.formFeed: self.buffer.append(contentsOf: #"\f"#.utf8)
-      case Self.newline: self.buffer.append(contentsOf: #"\n"#.utf8)
-      case Self.carriageReturn: self.buffer.append(contentsOf: #"\r"#.utf8)
-      case Self.tab: self.buffer.append(contentsOf: #"\t"#.utf8)
-      default:
-        if byte < Self.controlCharLimit {
-          self.buffer.append(contentsOf: #"\u"#.utf8)
-          self.buffer.append(contentsOf: Self.encodeHexDigits(of: byte, count: 4))
-        } else {
-          self.buffer.append(byte)
-        }
-      }
-    }
-    self.buffer.append(Self.quote)
-  }
-
-  private mutating func writeInt(_ value: Int) {
-    self.buffer.append(contentsOf: String(value).utf8)
-  }
-
-  private mutating func writeDouble(_ value: Double) {
-    self.buffer.append(contentsOf: (value.isFinite ? String(value) : "null").utf8)
-  }
-
-  private mutating func writeBool(_ value: Bool) {
-    self.buffer.append(contentsOf: (value ? "true" : "false").utf8)
-  }
-
-  mutating func writeValue(_ value: EdgeToolsValue) {
+  func value(_ value: EdgeToolsValue) -> UnsafeMutablePointer<yyjson_mut_val>? {
     switch value {
-    case .null:
-      self.buffer.append(contentsOf: "null".utf8)
-    case .boolean(let bool):
-      self.writeBool(bool)
-    case .integer(let int):
-      self.writeInt(int)
-    case .number(let number):
-      self.writeDouble(number)
-    case .string(let string):
-      self.writeString(string)
-    case .array(let array):
-      self.writeValueArray(array)
-    case .object(let object):
-      self.writeObject(object)
+    case .null: yyjson_mut_null(self.document)
+    case .boolean(let value): yyjson_mut_bool(self.document, value)
+    case .integer(let value): yyjson_mut_sint(self.document, Int64(value))
+    case .number(let value): yyjson_mut_real(self.document, value)
+    case .string(let value): self.string(value)
+    case .array(let values): self.array(values)
+    case .object(let object): self.object(object)
     }
   }
 
-  private mutating func writeValueArray(_ values: [EdgeToolsValue]) {
-    self.buffer.append(Self.openBracket)
-    for (offset, value) in values.enumerated() {
-      if offset > 0 { self.buffer.append(Self.comma) }
-      self.writeValue(value)
+  func string(_ value: String) -> UnsafeMutablePointer<yyjson_mut_val>? {
+    value.withCString { characters in
+      yyjson_mut_strncpy(self.document, characters, value.utf8.count)
     }
-    self.buffer.append(Self.closeBracket)
   }
 
-  private mutating func writeObject(_ object: OrderedDictionary<String, EdgeToolsValue>) {
-    self.buffer.append(Self.openBrace)
-    for (offset, entry) in object.enumerated() {
-      if offset > 0 { self.buffer.append(Self.comma) }
-      self.writeString(entry.key)
-      self.buffer.append(Self.colon)
-      self.writeValue(entry.value)
+  private func array(_ values: [EdgeToolsValue]) -> UnsafeMutablePointer<yyjson_mut_val>? {
+    guard let array = yyjson_mut_arr(self.document) else { return nil }
+    for value in values {
+      guard let encodedValue = self.value(value), yyjson_mut_arr_add_val(array, encodedValue)
+      else { return nil }
     }
-    self.buffer.append(Self.closeBrace)
+    return array
   }
 
-  private static func encodeHexDigits(of byte: UInt8, count: Int) -> [UInt8] {
-    var result = [UInt8](repeating: Self.zero, count: count)
-    var value = UInt16(byte)
-    for index in stride(from: count - 1, through: 0, by: -1) {
-      result[index] = Self.hexDigitTable[Int(value & 0xF)]
-      value >>= 4
+  private func object(
+    _ object: OrderedDictionary<String, EdgeToolsValue>
+  ) -> UnsafeMutablePointer<yyjson_mut_val>? {
+    guard let encodedObject = yyjson_mut_obj(self.document) else { return nil }
+    for (key, value) in object {
+      guard let encodedKey = self.string(key),
+        let encodedValue = self.value(value),
+        yyjson_mut_obj_add(encodedObject, encodedKey, encodedValue)
+      else { return nil }
     }
-    return result
+    return encodedObject
   }
 }

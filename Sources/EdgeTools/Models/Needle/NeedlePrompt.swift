@@ -46,8 +46,8 @@ extension EdgeToolDefinition {
   }
 
   fileprivate func needlePromptEncoded() throws -> String {
-    let name = String(decoding: encodeEdgeToolsJSONString(self.name), as: UTF8.self)
-    let description = String(decoding: encodeEdgeToolsJSONString(self.description), as: UTF8.self)
+    let name = OrderedKeyJSONWriter.encode(.string(self.name))
+    let description = OrderedKeyJSONWriter.encode(.string(self.description))
     let arguments = self.arguments.orderedKeyEncoded()
     return #"{"name":\#(name),"description":\#(description),"arguments":\#(arguments)}"#
   }

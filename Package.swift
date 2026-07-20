@@ -63,7 +63,6 @@ let package = Package(
       url: "https://github.com/ibireme/yyjson.git",
       revision: "de3700ab1778e236a8a571058463b6a5888cf262",
       traits: [
-        "noWriter",
         "noIncrementalReader",
         "noUtilities",
         "noFastFloatingPoint",

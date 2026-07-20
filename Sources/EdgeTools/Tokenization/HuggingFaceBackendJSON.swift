@@ -4,12 +4,6 @@ package func loadHuggingFaceBackendJSON(from tokenizerPath: FilePath) throws -> 
   try withFileBytes(at: tokenizerPath) { try huggingFaceBackendJSON(from: $0) }
 }
 
-package func huggingFaceBackendJSON<Bytes: Collection>(from data: Bytes) throws -> String
-where Bytes.Element == UInt8 {
-  let bytes = Array(data)
-  return try bytes.withUnsafeBufferPointer { try huggingFaceBackendJSON(from: $0) }
-}
-
 package func huggingFaceBackendJSON(from bytes: UnsafeBufferPointer<UInt8>) throws -> String {
   var scanner = HuggingFaceBackendJSONScanner(buffer: bytes)
   return "{\(try scanner.metadataFields().joined(separator: ","))}"
@@ -23,14 +17,14 @@ private struct HuggingFaceBackendJSONScanner {
 
   mutating func metadataFields() throws -> [String] {
     self.skipWhitespace()
-    try self.consume(0x7B)
+    try self.consume(.jsonOpenObject)
     self.skipWhitespace()
 
     var values = [Range<Int>?](repeating: nil, count: Self.metadataKeys.count)
-    while !self.consumeIfPresent(0x7D) {
+    while !self.consumeIfPresent(.jsonCloseObject) {
       let key = try self.stringRange()
       self.skipWhitespace()
-      try self.consume(0x3A)
+      try self.consume(.jsonColon)
       self.skipWhitespace()
 
       let value = try self.valueRange()
@@ -42,8 +36,8 @@ private struct HuggingFaceBackendJSONScanner {
       if values.allSatisfy({ $0 != nil }) { break }
 
       self.skipWhitespace()
-      if self.consumeIfPresent(0x7D) { break }
-      try self.consume(0x2C)
+      if self.consumeIfPresent(.jsonCloseObject) { break }
+      try self.consume(.jsonComma)
       self.skipWhitespace()
     }
 
@@ -51,8 +45,7 @@ private struct HuggingFaceBackendJSONScanner {
       .compactMap { key, value in
         guard let value else { return nil }
         let bytes = self.buffer[value]
-        let jsonValue = String(decoding: bytes, as: UTF8.self)
-        guard jsonValue.utf8.elementsEqual(bytes) else {
+        guard let jsonValue = String(bytes: bytes, encoding: .utf8) else {
           throw HuggingFaceBackendJSONError.invalidJSON
         }
         return "\"\(key)\":\(jsonValue)"
@@ -61,13 +54,13 @@ private struct HuggingFaceBackendJSONScanner {
 
   private mutating func stringRange() throws -> Range<Int> {
     let start = self.index
-    try self.consume(0x22)
+    try self.consume(.jsonQuote)
     var escaped = false
     while self.index < self.buffer.count {
       let byte = self.buffer[self.index]
       self.index += 1
-      if byte == 0x22, !escaped { return start..<self.index }
-      escaped = byte == 0x5C && !escaped
+      if byte == .jsonQuote, !escaped { return start..<self.index }
+      escaped = byte == .jsonEscape && !escaped
     }
     throw HuggingFaceBackendJSONError.invalidJSON
   }
@@ -77,10 +70,11 @@ private struct HuggingFaceBackendJSONScanner {
     guard self.index < self.buffer.count else { throw HuggingFaceBackendJSONError.invalidJSON }
 
     switch self.buffer[self.index] {
-    case 0x22: _ = try self.stringRange()
-    case 0x7B, 0x5B: try self.container()
+    case .jsonQuote: _ = try self.stringRange()
+    case .jsonOpenObject, .jsonOpenArray: try self.container()
     default:
-      while self.index < self.buffer.count, ![0x2C, 0x7D].contains(self.buffer[self.index]) {
+      while self.index < self.buffer.count,
+        ![.jsonComma, .jsonCloseObject].contains(self.buffer[self.index]) {
         self.index += 1
       }
     }
@@ -95,16 +89,16 @@ private struct HuggingFaceBackendJSONScanner {
     var endings = [UInt8]()
     while self.index < self.buffer.count {
       let byte = self.buffer[self.index]
-      if byte == 0x22 {
+      if byte == .jsonQuote {
         _ = try self.stringRange()
         continue
       }
 
       self.index += 1
       switch byte {
-      case 0x7B: endings.append(0x7D)
-      case 0x5B: endings.append(0x5D)
-      case 0x7D, 0x5D:
+      case .jsonOpenObject: endings.append(.jsonCloseObject)
+      case .jsonOpenArray: endings.append(.jsonCloseArray)
+      case .jsonCloseObject, .jsonCloseArray:
         guard endings.popLast() == byte else { throw HuggingFaceBackendJSONError.invalidJSON }
         if endings.isEmpty { return }
       default: break

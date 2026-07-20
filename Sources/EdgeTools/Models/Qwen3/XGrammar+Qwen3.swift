@@ -18,7 +18,7 @@
 
     private static func qwenJSONCall(_ tool: EdgeToolDefinition) throws -> XGRGrammar {
       let arguments = Self.strictJSONArguments(for: tool)
-      let encodedName = String(decoding: encodeEdgeToolsJSONString(tool.name), as: UTF8.self)
+      let encodedName = OrderedKeyJSONWriter.encode(.string(tool.name))
       let prefix = try XGRGrammar(
         literal: "<tool_call>{\"name\":\(encodedName),\"arguments\":"
       )

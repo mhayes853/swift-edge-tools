@@ -27,6 +27,19 @@ struct `EdgeToolsGenerationSchema tests` {
   }
 
   @Test
+  func `Ordered Key JSON Escapes Strings And Preserves Nonfinite Number Behavior`() {
+    let value: EdgeToolsValue = .object([
+      "escaped": .string("null\u{0}byte"),
+      "nonfinite": .number(.infinity)
+    ])
+
+    expectNoDifference(
+      OrderedKeyJSONWriter.encode(value),
+      #"{"escaped":"null\u0000byte","nonfinite":null}"#
+    )
+  }
+
+  @Test
   func `Edge Tools Value Object Preserves Key Ordering`() {
     let value: EdgeToolsValue = .object([
       "b": 2,

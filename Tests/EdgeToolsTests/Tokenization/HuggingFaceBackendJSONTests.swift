@@ -17,7 +17,7 @@ struct `HuggingFace Backend JSON tests` {
       }
       """#
 
-    let projected = try huggingFaceBackendJSON(from: Data(source.utf8))
+    let projected = try projectedBackendJSON(from: source)
     let object = try JSONDecoder().decode(ProjectedBackend.self, from: Data(projected.utf8))
 
     expectNoDifference(object.decoder.type, "Sequence")
@@ -35,7 +35,7 @@ struct `HuggingFace Backend JSON tests` {
         "model": {"vocab": {"token": 0}}
       }
       """#
-    let projected = try huggingFaceBackendJSON(from: Data(source.utf8))
+    let projected = try projectedBackendJSON(from: source)
 
     expectNoDifference(
       try XGRTokenizerInfo.metadata(huggingFaceBackendJSON: projected),
@@ -51,10 +51,15 @@ struct `HuggingFace Backend JSON tests` {
       + vocabulary
       + #"}}}"#
 
-    let projected = try huggingFaceBackendJSON(from: Data(source.utf8))
+    let projected = try projectedBackendJSON(from: source)
 
     expectNoDifference(projected, #"{"decoder":{"type":"ByteFallback"}}"#)
     #expect(projected.utf8.count < 100)
+  }
+
+  private func projectedBackendJSON(from source: String) throws -> String {
+    let bytes = Array(source.utf8)
+    return try bytes.withUnsafeBufferPointer { try huggingFaceBackendJSON(from: $0) }
   }
 
   private struct ProjectedBackend: Decodable {
