@@ -33,6 +33,7 @@ public struct NeedleSPTokenizer: Sendable {
 
       guard modelType == 2 else {
         throw NeedleSPTokenizerError(
+          code: .unsupportedModelType,
           message: "NeedleSPTokenizer only supports SentencePiece BPE models."
         )
       }
@@ -41,16 +42,21 @@ public struct NeedleSPTokenizer: Sendable {
         normalizerName.isEmpty || normalizerName == "identity"
       else {
         throw NeedleSPTokenizerError(
+          code: .unsupportedNormalization,
           message: "NeedleSPTokenizer only supports identity normalization."
         )
       }
       guard try model.lastBytes(field: 5) == nil else {
         throw NeedleSPTokenizerError(
+          code: .unsupportedDenormalizer,
           message: "NeedleSPTokenizer does not support SentencePiece denormalizers."
         )
       }
       guard !pieces.isEmpty else {
-        throw NeedleSPTokenizerError(message: "SentencePiece model contains no pieces.")
+        throw NeedleSPTokenizerError(
+          code: .emptyModel,
+          message: "SentencePiece model contains no pieces."
+        )
       }
 
       let userDefinedPieces =
@@ -60,6 +66,7 @@ public struct NeedleSPTokenizer: Sendable {
         .sorted { $0.count > $1.count }
       guard !userDefinedPieces.contains(where: \.isEmpty) else {
         throw NeedleSPTokenizerError(
+          code: .emptyUserDefinedPiece,
           message: "SentencePiece model contains an empty user-defined piece."
         )
       }
@@ -89,8 +96,6 @@ public struct NeedleSPTokenizer: Sendable {
         escapeWhitespaces: (try normalizer.lastBool(field: 5)) ?? true,
         treatWhitespaceAsSuffix: (try trainer.lastBool(field: 24)) ?? false
       )
-    } catch let error as ProtobufReaderError {
-      throw NeedleSPTokenizerError(message: "SentencePiece protobuf \(error.needleMessage)")
     }
   }
 
@@ -211,6 +216,7 @@ public struct NeedleSPTokenizer: Sendable {
     let byteIds = ids.compactMap { $0 }
     guard byteIds.count == ids.count else {
       throw NeedleSPTokenizerError(
+        code: .incompleteByteFallbackVocabulary,
         message: "SentencePiece byte fallback requires all 256 byte pieces."
       )
     }
@@ -246,7 +252,7 @@ extension NeedleSPTokenizer {
     } catch let error as NeedleSPTokenizerError {
       throw error
     } catch {
-      throw NeedleSPTokenizerError(message: "\(modelPath): file not found")
+      throw NeedleSPTokenizerError.missingModelFile(at: modelPath.string)
     }
   }
 }
@@ -255,7 +261,7 @@ extension NeedleSPTokenizer {
   extension NeedleSPTokenizer {
     public init(modelURL: URL) throws {
       guard modelURL.isFileURL, !modelURL.hasDirectoryPath else {
-        throw NeedleSPTokenizerError(message: "\(modelURL.path()): file not found")
+        throw NeedleSPTokenizerError.missingModelFile(at: modelURL.path())
       }
       try self.init(modelPath: FilePath(modelURL.path()))
     }
@@ -265,10 +271,40 @@ extension NeedleSPTokenizer {
 // MARK: - NeedleSPTokenizerError
 
 public struct NeedleSPTokenizerError: Hashable, Sendable, Error {
+  public struct Code: RawRepresentable, Hashable, Sendable {
+    public let rawValue: String
+
+    public init(rawValue: String) {
+      self.rawValue = rawValue
+    }
+
+    public static let unsupportedModelType = Self(rawValue: "unsupported-model-type")
+    public static let unsupportedNormalization = Self(rawValue: "unsupported-normalization")
+    public static let unsupportedDenormalizer = Self(rawValue: "unsupported-denormalizer")
+    public static let emptyModel = Self(rawValue: "empty-model")
+    public static let emptyUserDefinedPiece = Self(rawValue: "empty-user-defined-piece")
+    public static let incompleteByteFallbackVocabulary = Self(
+      rawValue: "incomplete-byte-fallback-vocabulary"
+    )
+    public static let invalidProtobuf = Self(rawValue: "invalid-protobuf")
+    public static let missingModelFile = Self(rawValue: "missing-model-file")
+    public static let unknownPieceType = Self(rawValue: "unknown-piece-type")
+  }
+
+  public let code: Code
   public let message: String
 
-  init(message: String) {
+  public init(code: Code, message: String) {
+    self.code = code
     self.message = message
+  }
+
+  static func invalidProtobuf(message: String) -> Self {
+    Self(code: .invalidProtobuf, message: "SentencePiece protobuf \(message)")
+  }
+
+  static func missingModelFile(at path: String) -> Self {
+    Self(code: .missingModelFile, message: "\(path): file not found")
   }
 }
 
@@ -484,23 +520,11 @@ private struct SentencePiece: Hashable, Sendable {
     let rawType = (try message.lastInt32(field: 3)) ?? 1
     guard let type = PieceType(rawValue: rawType) else {
       throw NeedleSPTokenizerError(
+        code: .unknownPieceType,
         message: "SentencePiece protobuf contains an unknown piece type."
       )
     }
     self.type = type
-  }
-}
-
-extension ProtobufReaderError {
-  fileprivate var needleMessage: String {
-    switch self {
-    case .truncated: "is truncated."
-    case .invalidTag: "contains an invalid tag."
-    case .overflowingVarint: "contains an overflowing varint."
-    case .fieldTooLarge: "contains a field that is too large."
-    case .invalidUTF8: "contains invalid UTF-8."
-    case .unsupportedWireType(let wire): "contains unsupported wire type \(wire)."
-    }
   }
 }
 

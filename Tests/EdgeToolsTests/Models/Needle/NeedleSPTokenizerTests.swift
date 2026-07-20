@@ -43,7 +43,7 @@ struct `NeedleSPTokenizer tests` {
     let error = #expect(throws: NeedleSPTokenizerError.self) {
       _ = try NeedleSPTokenizer(modelURL: .temporaryDirectory)
     }
-    expectNoDifference(error?.message.lowercased().contains("file not found"), true)
+    expectNoDifference(error?.code, .missingModelFile)
   }
 
   @Test
@@ -202,7 +202,7 @@ struct `NeedleSPTokenizer tests` {
     let error = #expect(throws: NeedleSPTokenizerError.self) {
       _ = try NeedleSPTokenizer(data: Data([0x00, 0x01, 0x02, 0x03]))
     }
-    expectNoDifference(error?.message.isEmpty, false)
+    expectNoDifference(error?.code, .invalidProtobuf)
   }
 
   @Test

@@ -1188,6 +1188,4 @@ extension EdgeToolsGenerationSchema.ValueType {
     let allTypes = [Self.integer, .string, .boolean, .array, .object, .number, .null]
     return allTypes.filter { self.contains($0) }
   }
-
-  // pi-lens-ignore: file_length
 }

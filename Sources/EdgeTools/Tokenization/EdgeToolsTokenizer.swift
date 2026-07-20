@@ -90,7 +90,7 @@ package func loadEdgeToolsTokenizer(
     }
   #endif
 
-  throw EdgeToolsTokenizerLoadingError.noCompatibleTokenizer(
+  throw EdgeToolsError.noCompatibleTokenizer(
     in: directoryPath,
     hasSentencePieceModel: hasSentencePieceModel,
     hasTransformersTokenizer: hasTransformersTokenizer,
@@ -106,56 +106,6 @@ package func loadEdgeToolsTokenizer(
   }
 #endif
 
-public struct EdgeToolsTokenizerLoadingError: Hashable, Sendable, Error {
-  public let message: String
-
-  public static func noCompatibleTokenizer(
-    in directoryPath: FilePath,
-    hasSentencePieceModel: Bool,
-    hasTransformersTokenizer: Bool,
-    failures: [String] = []
-  ) -> Self {
-    var details = [String]()
-
-    if hasSentencePieceModel {
-      details.append("tokenizer.model is not a supported SentencePiece BPE model.")
-    } else {
-      details.append("tokenizer.model was not found.")
-    }
-
-    #if Transformers
-      if hasTransformersTokenizer {
-        details.append("tokenizer.json is not a supported Transformers tokenizer.")
-      } else {
-        details.append("tokenizer.json was not found.")
-      }
-    #else
-      if hasTransformersTokenizer {
-        details.append(
-          "tokenizer.json exists, but the Transformers trait is not enabled. Enable Transformers to load it."
-        )
-      } else {
-        details.append(
-          "The Transformers trait is not enabled; enable it to search for tokenizer.json."
-        )
-      }
-    #endif
-
-    details.append(contentsOf: failures)
-    return Self(
-      message:
-        "No compatible tokenizer was found in \(directoryPath). \(details.joined(separator: " "))"
-    )
-  }
-
-  public static func unsupportedTransformersTokenizer(at tokenizerPath: FilePath) -> Self {
-    Self(
-      message:
-        "swift-transformers created an unsupported tokenizer type from \(tokenizerPath)."
-    )
-  }
-}
-
 #if Transformers
   private func loadTransformersTokenizer(
     from directoryPath: FilePath,
@@ -164,7 +114,10 @@ public struct EdgeToolsTokenizerLoadingError: Hashable, Sendable, Error {
     let directoryURL = URL(fileURLWithPath: directoryPath.string, isDirectory: true)
     let tokenizer = try await AutoTokenizer.from(modelFolder: directoryURL)
     guard let tokenizer = tokenizer as? PreTrainedTokenizer else {
-      throw EdgeToolsTokenizerLoadingError.unsupportedTransformersTokenizer(at: tokenizerPath)
+      throw EdgeToolsError(
+        code: .unsupportedTransformersTokenizer,
+        message: "swift-transformers created an unsupported tokenizer type from \(tokenizerPath)."
+      )
     }
     let backendJSON = try loadHuggingFaceBackendJSON(from: tokenizerPath)
     return EdgeToolsPreTrainedTokenizer(

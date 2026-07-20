@@ -213,7 +213,7 @@
         user: String(repeating: "token ", count: 2_000)
       )
 
-      let error = await #expect(throws: NeedleModelError.self) {
+      let error = await #expect(throws: EdgeToolsError.self) {
         let generationTask = try self.engine.generate(
           prompt: prompt,
           parameters: .default,
@@ -221,7 +221,7 @@
         )
         _ = try await generationTask.value
       }
-      expectNoDifference(error?.message.contains("context length"), true)
+      expectNoDifference(error?.code, .contextLengthExceeded)
     }
 
     @Test

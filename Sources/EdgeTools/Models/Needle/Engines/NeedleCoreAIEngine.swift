@@ -67,7 +67,7 @@
           let keyDescriptor = descriptor.arrayDescriptor(for: TensorName.updatedKeyCache),
           let valueDescriptor = descriptor.arrayDescriptor(for: TensorName.updatedValueCache)
         else {
-          throw NeedleCoreAIEngineError.missingModelOutputs
+          throw EdgeToolsError.missingModelOutputs
         }
         self.key = NDArray(descriptor: keyDescriptor)
         self.value = NDArray(descriptor: valueDescriptor)
@@ -109,7 +109,7 @@
       )
       let tokenizer = try await loadEdgeToolsTokenizer(from: modelDirectoryURL)
       guard let tokenizer = tokenizer as? any EdgeToolsXGRTokenizer else {
-        throw NeedleCoreAIEngineError.unsupportedTokenizer
+        throw EdgeToolsError.unsupportedTokenizer
       }
       try await self.init(
         encoderModel: encoderModel,
@@ -126,7 +126,9 @@
       configuration: NeedleModelConfiguration
     ) throws {
       let grammarEngine = try XGRCompiler(
-        tokenizerInfo: try tokenizer.tokenizerInfo(modelVocabularySize: configuration.vocabularySize)
+        tokenizerInfo: try tokenizer.tokenizerInfo(
+          modelVocabularySize: configuration.vocabularySize
+        )
       )
       self.state = Lock(
         State(
@@ -249,7 +251,7 @@
         generatedTokens.append(token)
         nextDecoderTokenId = tokenId
         guard matcher.accept(tokenId: token.id) else {
-          throw NeedleCoreAIEngineError.grammarRejectedToken(token: token)
+          throw EdgeToolsError.grammarRejectedToken(token: token)
         }
         let rawToolCall = parser.accept(token: token)
         channel.emit(token: token)
@@ -287,7 +289,7 @@
     ) async throws -> (EncoderOutputs, EdgeToolsPrefillMetrics) {
       let promptTokens = try self.tokenizer.encode(text: prompt.formatted(tools: tools))
       guard promptTokens.count <= configuration.encoderMaxLength else {
-        throw NeedleModelError.contextLengthExceeded(
+        throw EdgeToolsError.contextLengthExceeded(
           tokens: promptTokens.count,
           maximum: configuration.encoderMaxLength
         )
@@ -322,7 +324,7 @@
         let encoderProjectedK = outputs.remove(TensorName.encoderProjectedK)?.ndArray,
         let encoderProjectedV = outputs.remove(TensorName.encoderProjectedV)?.ndArray
       else {
-        throw NeedleCoreAIEngineError.missingModelOutputs
+        throw EdgeToolsError.missingModelOutputs
       }
       return EncoderOutputs(
         crossAttentionMask: crossAttentionMask,
@@ -341,7 +343,7 @@
         let projectedKDescriptor = descriptor.arrayDescriptor(for: TensorName.encoderProjectedK),
         let projectedVDescriptor = descriptor.arrayDescriptor(for: TensorName.encoderProjectedV)
       else {
-        throw NeedleCoreAIEngineError.missingModelOutputs
+        throw EdgeToolsError.missingModelOutputs
       }
 
       let crossShape = [1, 1, 1, self.configuration.encoderMaxLength]
@@ -377,7 +379,7 @@
         let encoderProjectedKNDArray = try await encoderProjectedK.ndArray,
         let encoderProjectedVNDArray = try await encoderProjectedV.ndArray
       else {
-        throw NeedleCoreAIEngineError.missingModelOutputs
+        throw EdgeToolsError.missingModelOutputs
       }
       return EncoderOutputs(
         crossAttentionMask: crossAttentionMaskNDArray,
@@ -396,7 +398,10 @@
         let view = Span<UInt16>(viewing: logits.rawView().bytes)
         scalars = (0..<vocabularySize).map { Float(bfloat16Bits: view[offset + $0]) }
       default:
-        throw NeedleCoreAIEngineError.unsupportedLogitsScalarType(logits.scalarType)
+        throw EdgeToolsCoreAIError(
+          code: .unsupportedLogitsScalarType,
+          message: "Unsupported logits scalar type: \(logits.scalarType)."
+        )
       }
       return NDArray(scalars: scalars, shape: [1, scalars.count])
     }
@@ -405,7 +410,7 @@
       from directory: URL
     ) throws -> NeedleModelConfiguration {
       guard let config = try NeedleModelConfiguration.decode(in: directory) else {
-        throw NeedleCoreAIEngineError.failedToLoadConfiguration
+        throw EdgeToolsError.failedToLoadConfiguration
       }
       return config
     }
@@ -415,7 +420,10 @@
       from model: AIModel
     ) throws -> InferenceFunction {
       guard let function = try model.loadFunction(named: name) else {
-        throw NeedleCoreAIEngineError.failedToLoadFunction(name: name)
+        throw EdgeToolsCoreAIError(
+          code: .failedToLoadFunction,
+          message: "Could not load CoreAI function named \(name)."
+        )
       }
       return function
     }
@@ -506,7 +514,7 @@
         let updatedKey = outputs.remove(TensorName.updatedKeyCache)?.ndArray,
         let updatedValue = outputs.remove(TensorName.updatedValueCache)?.ndArray
       else {
-        throw NeedleCoreAIEngineError.missingModelOutputs
+        throw EdgeToolsError.missingModelOutputs
       }
       cache.key = updatedKey
       cache.value = updatedValue
@@ -553,7 +561,7 @@
         let key = try await outputs[TensorName.updatedKeyCache]?.ndArray,
         let value = try await outputs[TensorName.updatedValueCache]?.ndArray
       else {
-        throw NeedleCoreAIEngineError.missingModelOutputs
+        throw EdgeToolsError.missingModelOutputs
       }
       cache.key = key
       cache.value = value
@@ -561,43 +569,34 @@
     }
   }
 
-  // MARK: - NeedleCoreAIEngineError
+  // MARK: - EdgeToolsCoreAIError
 
   @available(anyAppleOS 27.0, *)
-  public struct NeedleCoreAIEngineError: Hashable, Error {
-    public let message: String
+  public struct EdgeToolsCoreAIError: Hashable, Sendable, Error {
+    public struct Code: RawRepresentable, Hashable, Sendable {
+      public let rawValue: String
 
-    public static let failedToLoadConfiguration = Self(
-      message: "Could not load model configuration."
-    )
+      public init(rawValue: String) {
+        self.rawValue = rawValue
+      }
 
-    public static let unsupportedTokenizer = Self(
-      message: "The model does not support the provided tokenizer."
-    )
-
-    public static func failedToLoadFunction(name: String) -> Self {
-      Self(message: "Could not load CoreAI function named \(name).")
-    }
-
-    public static func grammarRejectedToken(token: EdgeToolsToken) -> Self {
-      Self(
-        message:
-          "Token (ID=\(token.id), VALUE=\(token.stringValue)) was rejected by the grammar matcher."
+      public static let failedToLoadFunction = Self(rawValue: "failed-to-load-function")
+      public static let missingModelStateDescriptors = Self(
+        rawValue: "missing-model-state-descriptors"
+      )
+      public static let unsupportedLogitsScalarType = Self(
+        rawValue: "unsupported-logits-scalar-type"
       )
     }
 
+    public let code: Code
+    public let message: String
 
-    public static let missingModelOutputs = Self(
-      message: "CoreAI model did not return expected outputs."
-    )
-
-    public static let missingModelStateDescriptors = Self(
-      message: "CoreAI model did not return expected state descriptors."
-    )
-
-    public static func unsupportedLogitsScalarType(_ scalarType: NDArray.ScalarType) -> Self {
-      Self(message: "Unsupported logits scalar type: \(scalarType).")
+    public init(code: Code, message: String) {
+      self.code = code
+      self.message = message
     }
+
   }
 
   // MARK: - Helpers
@@ -606,7 +605,10 @@
   extension NDArray {
     fileprivate init(descriptor: InferenceValue.Descriptor) throws {
       guard case .ndArray(let descriptor) = descriptor else {
-        throw NeedleCoreAIEngineError.missingModelStateDescriptors
+        throw EdgeToolsCoreAIError(
+          code: .missingModelStateDescriptors,
+          message: "CoreAI model did not return expected state descriptors."
+        )
       }
       self.init(descriptor: descriptor)
     }

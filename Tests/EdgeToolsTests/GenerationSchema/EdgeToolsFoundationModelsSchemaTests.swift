@@ -32,9 +32,10 @@
       @Test
       @available(iOS 26.0, macOS 26.0, watchOS 27.0, tvOS 26.0, visionOS 26.0, *)
       func `Rejects Nonfinite Numbers`() {
-        #expect(throws: EdgeToolsFMConversionError.self) {
+        let error = #expect(throws: EdgeToolsFMError.self) {
           try GeneratedContent(edgeToolsValue: .number(.infinity))
         }
+        expectNoDifference(error?.code, .nonFiniteNumber)
       }
     }
 
@@ -171,7 +172,7 @@
             #expect(json.contains(fragment))
           }
         } else {
-          #expect(throws: EdgeToolsFMConversionError.self) {
+          #expect(throws: EdgeToolsFMError.self) {
             try DynamicGenerationSchema(
               edgeToolsGenerationSchema: testCase.schema,
               name: testCase.name

@@ -2,7 +2,7 @@ import OrderedCollections
 import yyjson
 
 package func decodeEdgeToolsJSON(_ bytes: [UInt8]) throws -> EdgeToolsValue {
-  guard !bytes.isEmpty else { throw EdgeToolsJSONDecodingError.emptyInput }
+  guard !bytes.isEmpty else { throw EdgeToolsError.emptyJSONInput }
 
   var bytes = bytes
   var error = yyjson_read_err()
@@ -16,15 +16,16 @@ package func decodeEdgeToolsJSON(_ bytes: [UInt8]) throws -> EdgeToolsValue {
     )
   }
   guard let document else {
-    throw EdgeToolsJSONDecodingError(
-      message: error.msg.map(String.init(cString:)) ?? "Invalid JSON.",
-      byteOffset: error.pos
+    throw EdgeToolsError(
+      code: .invalidJSON,
+      message:
+        "\(error.msg.map(String.init(cString:)) ?? "Invalid JSON.") (byte offset \(error.pos))."
     )
   }
   defer { yyjson_doc_free(document) }
 
   guard let root = yyjson_doc_get_root(document) else {
-    throw EdgeToolsJSONDecodingError.emptyInput
+    throw EdgeToolsError.emptyJSONInput
   }
   return try edgeToolsValue(from: root)
 }
@@ -36,7 +37,10 @@ private func edgeToolsValue(from value: UnsafeMutablePointer<yyjson_val>) throws
     return .boolean(yyjson_get_bool(value))
   } else if yyjson_is_sint(value) {
     guard let integer = Int(exactly: yyjson_get_sint(value)) else {
-      throw EdgeToolsJSONDecodingError.integerOutOfRange
+      throw EdgeToolsError(
+        code: .jsonIntegerOutOfRange,
+        message: "JSON integer is outside the supported range."
+      )
     }
     return .integer(integer)
   } else if yyjson_is_uint(value) {
@@ -45,7 +49,9 @@ private func edgeToolsValue(from value: UnsafeMutablePointer<yyjson_val>) throws
       ?? .number(Double(integer))
   } else if yyjson_is_real(value) {
     let number = yyjson_get_real(value)
-    guard number.isFinite else { throw EdgeToolsJSONDecodingError.nonFiniteNumber }
+    guard number.isFinite else {
+      throw EdgeToolsError(code: .nonFiniteJSONNumber, message: "JSON number is not finite.")
+    }
     return .number(number)
   } else if yyjson_is_str(value) {
     return .string(edgeToolsString(from: value))
@@ -54,7 +60,7 @@ private func edgeToolsValue(from value: UnsafeMutablePointer<yyjson_val>) throws
   } else if yyjson_is_obj(value) {
     return try edgeToolsObject(from: value)
   } else {
-    throw EdgeToolsJSONDecodingError.invalidValue
+    throw EdgeToolsError.invalidJSONValue
   }
 }
 
@@ -63,7 +69,7 @@ private func edgeToolsArray(
 ) throws -> EdgeToolsValue {
   var iterator = yyjson_arr_iter()
   guard yyjson_arr_iter_init(value, &iterator) else {
-    throw EdgeToolsJSONDecodingError.invalidValue
+    throw EdgeToolsError.invalidJSONValue
   }
   var values = [EdgeToolsValue]()
   values.reserveCapacity(Int(yyjson_arr_size(value)))
@@ -78,13 +84,13 @@ private func edgeToolsObject(
 ) throws -> EdgeToolsValue {
   var iterator = yyjson_obj_iter()
   guard yyjson_obj_iter_init(value, &iterator) else {
-    throw EdgeToolsJSONDecodingError.invalidValue
+    throw EdgeToolsError.invalidJSONValue
   }
   var object = OrderedDictionary<String, EdgeToolsValue>()
   object.reserveCapacity(Int(yyjson_obj_size(value)))
   while let key = yyjson_obj_iter_next(&iterator) {
     guard let child = yyjson_obj_iter_get_val(key) else {
-      throw EdgeToolsJSONDecodingError.invalidValue
+      throw EdgeToolsError.invalidJSONValue
     }
     object[edgeToolsString(from: key)] = try edgeToolsValue(from: child)
   }
@@ -96,22 +102,4 @@ private func edgeToolsString(from value: UnsafeMutablePointer<yyjson_val>) -> St
   guard let characters = yyjson_get_str(value) else { return "" }
   let bytes = UnsafeRawPointer(characters).assumingMemoryBound(to: UInt8.self)
   return String(decoding: UnsafeBufferPointer(start: bytes, count: count), as: UTF8.self)
-}
-
-package struct EdgeToolsJSONDecodingError: Hashable, Sendable, Error {
-  package let message: String
-  package let byteOffset: Int
-
-  package init(message: String, byteOffset: Int) {
-    self.message = message
-    self.byteOffset = byteOffset
-  }
-
-  package static let emptyInput = Self(message: "Expected JSON input.", byteOffset: 0)
-  package static let integerOutOfRange = Self(
-    message: "JSON integer is outside the supported range.",
-    byteOffset: 0
-  )
-  package static let nonFiniteNumber = Self(message: "JSON number is not finite.", byteOffset: 0)
-  package static let invalidValue = Self(message: "Invalid JSON value.", byteOffset: 0)
 }

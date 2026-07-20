@@ -10,9 +10,10 @@ struct `EdgeToolsTokenizer Loading tests` {
     let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
 
-    let error = await #expect(throws: EdgeToolsTokenizerLoadingError.self) {
+    let error = await #expect(throws: EdgeToolsError.self) {
       _ = try await loadEdgeToolsTokenizer(from: directory)
     }
+    expectNoDifference(error?.code, .noCompatibleTokenizer)
     expectNoDifference(error?.message.contains("tokenizer.model"), true)
     expectNoDifference(error?.message.contains("tokenizer.json"), true)
   }

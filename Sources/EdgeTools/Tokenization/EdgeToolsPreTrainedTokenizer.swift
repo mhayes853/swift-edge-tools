@@ -47,7 +47,9 @@ import SystemPackage
         let vocabularySize = modelVocabularySize ?? vocabulary.count
         guard vocabulary.count <= vocabularySize else {
           throw XGRError(
-            message: "The model vocabulary size (\(vocabularySize)) is smaller than the tokenizer vocabulary (\(vocabulary.count))."
+            code: .incompatibleTokenizerVocabulary,
+            message:
+              "The model vocabulary size (\(vocabularySize)) is smaller than the tokenizer vocabulary (\(vocabulary.count))."
           )
         }
         return try XGRTokenizerInfo.huggingFace(
@@ -109,7 +111,7 @@ private struct HuggingFaceBackendJSONScanner {
         guard let value else { return nil }
         let bytes = self.buffer[value]
         guard let jsonValue = String(bytes: bytes, encoding: .utf8) else {
-          throw HuggingFaceBackendJSONError.invalidJSON
+          throw EdgeToolsError.invalidHuggingFaceBackendJSON
         }
         return "\"\(key)\":\(jsonValue)"
       }
@@ -125,12 +127,12 @@ private struct HuggingFaceBackendJSONScanner {
       if byte == .jsonQuote, !escaped { return start..<self.index }
       escaped = byte == .jsonEscape && !escaped
     }
-    throw HuggingFaceBackendJSONError.invalidJSON
+    throw EdgeToolsError.invalidHuggingFaceBackendJSON
   }
 
   private mutating func valueRange() throws -> Range<Int> {
     let start = self.index
-    guard self.index < self.buffer.count else { throw HuggingFaceBackendJSONError.invalidJSON }
+    guard self.index < self.buffer.count else { throw EdgeToolsError.invalidHuggingFaceBackendJSON }
 
     switch self.buffer[self.index] {
     case .jsonQuote: _ = try self.stringRange()
@@ -145,7 +147,7 @@ private struct HuggingFaceBackendJSONScanner {
 
     let end = self.buffer[start..<self.index].lastIndex(where: { !$0.isASCIIWhitespace })
       .map { $0 + 1 }
-    guard let end, end > start else { throw HuggingFaceBackendJSONError.invalidJSON }
+    guard let end, end > start else { throw EdgeToolsError.invalidHuggingFaceBackendJSON }
     return start..<end
   }
 
@@ -163,12 +165,12 @@ private struct HuggingFaceBackendJSONScanner {
       case .jsonOpenObject: endings.append(.jsonCloseObject)
       case .jsonOpenArray: endings.append(.jsonCloseArray)
       case .jsonCloseObject, .jsonCloseArray:
-        guard endings.popLast() == byte else { throw HuggingFaceBackendJSONError.invalidJSON }
+        guard endings.popLast() == byte else { throw EdgeToolsError.invalidHuggingFaceBackendJSON }
         if endings.isEmpty { return }
       default: break
       }
     }
-    throw HuggingFaceBackendJSONError.invalidJSON
+    throw EdgeToolsError.invalidHuggingFaceBackendJSON
   }
 
   private mutating func skipWhitespace() {
@@ -178,7 +180,7 @@ private struct HuggingFaceBackendJSONScanner {
   }
 
   private mutating func consume(_ byte: UInt8) throws {
-    guard self.consumeIfPresent(byte) else { throw HuggingFaceBackendJSONError.invalidJSON }
+    guard self.consumeIfPresent(byte) else { throw EdgeToolsError.invalidHuggingFaceBackendJSON }
   }
 
   private mutating func consumeIfPresent(_ byte: UInt8) -> Bool {
@@ -187,10 +189,4 @@ private struct HuggingFaceBackendJSONScanner {
     return true
   }
 
-}
-
-package struct HuggingFaceBackendJSONError: Hashable, Sendable, Error {
-  package let message: String
-
-  package static let invalidJSON = Self(message: "Invalid Hugging Face tokenizer JSON.")
 }

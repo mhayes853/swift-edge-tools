@@ -24,29 +24,63 @@
   // MARK: - XGRError
 
   public struct XGRError: Error, Hashable, Sendable {
+    public struct Code: RawRepresentable, Hashable, Sendable {
+      public let rawValue: String
+
+      public init(rawValue: String) {
+        self.rawValue = rawValue
+      }
+
+      public static let invalidTokenizerInfo = Self(rawValue: "invalid-tokenizer-info")
+      public static let invalidHuggingFaceMetadata = Self(rawValue: "invalid-hugging-face-metadata")
+      public static let invalidJSONSchemaConfiguration = Self(
+        rawValue: "invalid-json-schema-configuration"
+      )
+      public static let invalidCompilerConfiguration = Self(
+        rawValue: "invalid-compiler-configuration"
+      )
+      public static let invalidMatcherConfiguration = Self(
+        rawValue: "invalid-matcher-configuration"
+      )
+      public static let invalidRepetitionRange = Self(rawValue: "invalid-repetition-range")
+      public static let invalidToolInvocationRange = Self(rawValue: "invalid-tool-invocation-range")
+      public static let emptyToolCollection = Self(rawValue: "empty-tool-collection")
+      public static let unsupportedToolSchema = Self(rawValue: "unsupported-tool-schema")
+      public static let incompatibleTokenizerVocabulary = Self(
+        rawValue: "incompatible-tokenizer-vocabulary"
+      )
+      public static let invalidNeedleTokenizer = Self(rawValue: "invalid-needle-tokenizer")
+      public static let xgrammarFailure = Self(rawValue: "xgrammar-failure")
+    }
+
+    public let code: Code
     public let message: String
 
-    public init(message: String) {
+    public init(code: Code, message: String) {
+      self.code = code
       self.message = message
     }
 
-    public static let invalidTokenizerInfo = Self(
-      message: "Invalid XGrammar tokenizer information."
-    )
-    public static let invalidHuggingFaceMetadata = Self(
+    static let invalidHuggingFaceMetadata = Self(
+      code: .invalidHuggingFaceMetadata,
       message: "Invalid Hugging Face tokenizer metadata."
     )
-    public static let invalidJSONSchemaConfiguration = Self(
-      message: "Invalid XGrammar JSON Schema configuration."
+    static let invalidRepetitionRange = Self(
+      code: .invalidRepetitionRange,
+      message: "Invalid XGrammar repetition range."
     )
-    public static let invalidCompilerConfiguration = Self(
-      message: "Invalid XGrammar compiler configuration."
+    static let invalidToolInvocationRange = Self(
+      code: .invalidToolInvocationRange,
+      message: "Tool invocation ranges cannot have a negative lower bound."
     )
-    public static let invalidMatcherConfiguration = Self(
-      message: "Invalid XGrammar matcher configuration."
+    static let unsupportedToolSchema = Self(
+      code: .unsupportedToolSchema,
+      message: "The tool definition has an unsupported schema."
     )
-    public static let invalidRepetitionRange = Self(message: "Invalid XGrammar repetition range.")
-    public static let emptyGrammarCollection = Self(message: "Expected at least one grammar.")
+
+    static func xgrammarFailure(message: String) -> Self {
+      Self(code: .xgrammarFailure, message: message)
+    }
   }
 
   // MARK: - XGRTokenizerInfo
@@ -62,13 +96,28 @@
       addPrefixSpace: Bool = false
     ) throws {
       guard vocabularySize.map({ $0 >= 0 }) ?? true else {
-        throw XGRError.invalidTokenizerInfo
+        throw XGRError(
+          code: .invalidTokenizerInfo,
+          message: "Invalid XGrammar tokenizer information."
+        )
       }
       let vocabularySize = try vocabularySize.map {
-        try xgrammarInt32($0, error: .invalidTokenizerInfo)
+        try xgrammarInt32(
+          $0,
+          error: XGRError(
+            code: .invalidTokenizerInfo,
+            message: "Invalid XGrammar tokenizer information."
+          )
+        )
       }
       let stopTokenIDs = try stopTokenIDs.map {
-        try xgrammarInt32($0, error: .invalidTokenizerInfo)
+        try xgrammarInt32(
+          $0,
+          error: XGRError(
+            code: .invalidTokenizerInfo,
+            message: "Invalid XGrammar tokenizer information."
+          )
+        )
       }
       self.handle = try withCopiedCStringPointerBuffer(encodedVocabulary) { vocabulary in
         try stopTokenIDs.withUnsafeBufferPointer { stopTokenIDs in
@@ -220,12 +269,29 @@
     ) throws {
       guard configuration.indent.map({ $0 >= 0 }) ?? true,
         configuration.maximumWhitespaceCount.map({ $0 >= 0 }) ?? true
-      else { throw XGRError.invalidJSONSchemaConfiguration }
+      else {
+        throw XGRError(
+          code: .invalidJSONSchemaConfiguration,
+          message: "Invalid XGrammar JSON Schema configuration."
+        )
+      }
       let indent = try configuration.indent.map {
-        try xgrammarInt32($0, error: .invalidJSONSchemaConfiguration)
+        try xgrammarInt32(
+          $0,
+          error: XGRError(
+            code: .invalidJSONSchemaConfiguration,
+            message: "Invalid XGrammar JSON Schema configuration."
+          )
+        )
       }
       let maximumWhitespaceCount = try configuration.maximumWhitespaceCount.map {
-        try xgrammarInt32($0, error: .invalidJSONSchemaConfiguration)
+        try xgrammarInt32(
+          $0,
+          error: XGRError(
+            code: .invalidJSONSchemaConfiguration,
+            message: "Invalid XGrammar JSON Schema configuration."
+          )
+        )
       }
       self.handle = try jsonSchema.withCString { schema in
         if let separators = configuration.separators {
@@ -372,9 +438,17 @@
     ) throws {
       let maxThreads = try xgrammarInt32(
         maxThreads,
-        error: .invalidCompilerConfiguration
+        error: XGRError(
+          code: .invalidCompilerConfiguration,
+          message: "Invalid XGrammar compiler configuration."
+        )
       )
-      guard maxThreads > 0 else { throw XGRError.invalidCompilerConfiguration }
+      guard maxThreads > 0 else {
+        throw XGRError(
+          code: .invalidCompilerConfiguration,
+          message: "Invalid XGrammar compiler configuration."
+        )
+      }
       self.handle = try xgrammarRequiredHandle(
         xgrammar_compiler_init(
           tokenizerInfo.handle,
@@ -427,10 +501,19 @@
     ) throws {
       let maxRollbackTokens = try xgrammarInt32(
         maxRollbackTokens,
-        error: .invalidMatcherConfiguration
+        error: XGRError(
+          code: .invalidMatcherConfiguration,
+          message: "Invalid XGrammar matcher configuration."
+        )
       )
       let overrideStopTokenIDs = try overrideStopTokenIDs.map {
-        try xgrammarInt32($0, error: .invalidMatcherConfiguration)
+        try xgrammarInt32(
+          $0,
+          error: XGRError(
+            code: .invalidMatcherConfiguration,
+            message: "Invalid XGrammar matcher configuration."
+          )
+        )
       }
 
       self.handle = try overrideStopTokenIDs.withUnsafeBufferPointer {
@@ -497,7 +580,7 @@
 
   func xgrammarRequiredHandle<Handle>(_ handle: Handle?) throws -> Handle {
     guard let handle else {
-      throw XGRError(message: String(cString: xgrammar_last_error_message()))
+      throw XGRError.xgrammarFailure(message: String(cString: xgrammar_last_error_message()))
     }
     return handle
   }
@@ -512,7 +595,7 @@
   ) throws -> String {
     let capacity = body(nil, 0)
     guard capacity > 0 else {
-      throw XGRError(message: String(cString: xgrammar_last_error_message()))
+      throw XGRError.xgrammarFailure(message: String(cString: xgrammar_last_error_message()))
     }
     return xgrammarString(body, capacity: capacity)
   }

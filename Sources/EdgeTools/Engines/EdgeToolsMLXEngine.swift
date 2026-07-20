@@ -65,7 +65,7 @@
       in: directoryURL
     )
     guard let configuration, let baseConfiguration else {
-      throw EdgeToolsMLXEngineError.failedToLoadConfiguration
+      throw EdgeToolsError.failedToLoadConfiguration
     }
 
     let model = try model(configuration)
@@ -191,7 +191,7 @@
     ) async throws {
       let tokenizer = try await loadEdgeToolsTokenizer(from: directoryURL)
       guard let tokenizer = tokenizer as? any EdgeToolsXGRTokenizer else {
-        throw EdgeToolsMLXEngineError.unsupportedTokenizer
+        throw EdgeToolsError.unsupportedTokenizer
       }
       try self.init(
         loadingFrom: directoryURL,
@@ -314,7 +314,7 @@
         let token = EdgeToolsToken(id: tokenID, stringValue: tokenString)
         generatedTokens.append(token)
         guard matcher.accept(tokenId: token.id) else {
-          throw EdgeToolsMLXEngineError.grammarRejectedToken(token: token)
+          throw EdgeToolsError.grammarRejectedToken(token: token)
         }
         let rawToolCall = parser.accept(token: token)
         channel.emit(token: token)
@@ -431,7 +431,9 @@
       case .logits(let output):
         return output
       case .tokens(let tokens):
-        guard tokens.tokens.size > 0 else { throw EdgeToolsMLXEngineError.emptyInput }
+        guard tokens.tokens.size > 0 else {
+          throw EdgeToolsMLXError(code: .emptyInput, message: "Model received empty input.")
+        }
         return model(
           tokens[text: .newAxis],
           cache: cache.isEmpty ? nil : cache,
@@ -505,26 +507,27 @@
     }
   }
 
-  // MARK: - EdgeToolsMLXEngineError
+  // MARK: - EdgeToolsMLXError
 
-  public struct EdgeToolsMLXEngineError: Hashable, Error {
+  public struct EdgeToolsMLXError: Hashable, Sendable, Error {
+    public struct Code: RawRepresentable, Hashable, Sendable {
+      public let rawValue: String
+
+      public init(rawValue: String) {
+        self.rawValue = rawValue
+      }
+
+      public static let emptyInput = Self(rawValue: "empty-input")
+    }
+
+    public let code: Code
     public let message: String
 
-    public static let emptyInput = Self(message: "Model received empty input.")
-    public static let failedToLoadConfiguration = Self(
-      message: "Could not load model configuration."
-    )
-    public static let failedToLoadWeights = Self(message: "Could not load model weights.")
-    public static let unsupportedTokenizer = Self(
-      message: "The model does not support the provided tokenizer."
-    )
-
-    public static func grammarRejectedToken(token: EdgeToolsToken) -> Self {
-      Self(
-        message:
-          "Token (ID=\(token.id), VALUE=\(token.stringValue)) was rejected by the grammar matcher."
-      )
+    public init(code: Code, message: String) {
+      self.code = code
+      self.message = message
     }
+
   }
 #endif
 
@@ -538,7 +541,7 @@
       using tokenizer: any EdgeToolsXGRTokenizer
     ) throws -> sending LMInput {
       guard let tokenizer = tokenizer as? EdgeToolsPreTrainedTokenizer else {
-        throw EdgeToolsMLXEngineError.unsupportedTokenizer
+        throw EdgeToolsError.unsupportedTokenizer
       }
       let preTrainedTokenizer = tokenizer.tokenizer
       let tokenIDs = try preTrainedTokenizer.applyChatTemplate(

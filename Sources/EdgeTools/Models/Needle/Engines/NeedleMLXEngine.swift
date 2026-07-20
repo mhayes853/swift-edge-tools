@@ -57,7 +57,7 @@
       windowSize: Int?
     ) throws -> PrepareResult {
       guard input.text.tokens.size <= self.configuration.encoderMaxLength else {
-        throw NeedleModelError.contextLengthExceeded(
+        throw EdgeToolsError.contextLengthExceeded(
           tokens: input.text.tokens.size,
           maximum: self.configuration.encoderMaxLength
         )

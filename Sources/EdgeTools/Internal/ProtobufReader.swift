@@ -8,72 +8,86 @@ struct ProtobufReader {
     self.offset == self.bytes.count
   }
 
-  mutating func readTag() throws(ProtobufReaderError) -> (field: Int, wire: Int) {
+  mutating func readTag() throws(NeedleSPTokenizerError) -> (field: Int, wire: Int) {
     let rawTag = try self.readVarint()
     let field = Int(rawTag >> 3)
     let wire = Int(rawTag & 0x07)
-    guard field > 0 else { throw ProtobufReaderError.invalidTag }
+    guard field > 0 else {
+      throw NeedleSPTokenizerError.invalidProtobuf(message: "contains an invalid tag.")
+    }
     return (field, wire)
   }
 
-  mutating func readVarint() throws(ProtobufReaderError) -> UInt64 {
+  mutating func readVarint() throws(NeedleSPTokenizerError) -> UInt64 {
     var value: UInt64 = 0
     for index in 0..<10 {
-      guard self.offset < self.bytes.count else { throw ProtobufReaderError.truncated }
+      guard self.offset < self.bytes.count else {
+        throw NeedleSPTokenizerError.invalidProtobuf(message: "is truncated.")
+      }
       let byte = self.bytes[self.offset]
       self.offset += 1
       if index == 9 && byte > 1 {
-        throw ProtobufReaderError.overflowingVarint
+        throw NeedleSPTokenizerError.invalidProtobuf(message: "contains an overflowing varint.")
       }
       value |= UInt64(byte & 0x7F) << UInt64(index * 7)
       if byte & 0x80 == 0 { return value }
     }
-    throw ProtobufReaderError.overflowingVarint
+    throw NeedleSPTokenizerError.invalidProtobuf(message: "contains an overflowing varint.")
   }
 
-  mutating func readFixed32() throws(ProtobufReaderError) -> UInt32 {
+  mutating func readFixed32() throws(NeedleSPTokenizerError) -> UInt32 {
     let bytes = try self.read(count: 4)
-    return bytes.enumerated().reduce(0) { result, element in
-      result | UInt32(element.element) << UInt32(element.offset * 8)
-    }
+    return bytes.enumerated()
+      .reduce(0) { result, element in
+        result | UInt32(element.element) << UInt32(element.offset * 8)
+      }
   }
 
-  mutating func readLengthDelimited() throws(ProtobufReaderError) -> [UInt8] {
+  mutating func readLengthDelimited() throws(NeedleSPTokenizerError) -> [UInt8] {
     let length = try self.readVarint()
-    guard length <= UInt64(Int.max) else { throw ProtobufReaderError.fieldTooLarge }
+    guard length <= UInt64(Int.max) else {
+      throw NeedleSPTokenizerError.invalidProtobuf(message: "contains a field that is too large.")
+    }
     return try self.read(count: Int(length))
   }
 
-  mutating func readString() throws(ProtobufReaderError) -> String {
+  mutating func readString() throws(NeedleSPTokenizerError) -> String {
     let bytes = try self.readLengthDelimited()
     let string = String(decoding: bytes, as: UTF8.self)
-    guard string.utf8.elementsEqual(bytes) else { throw ProtobufReaderError.invalidUTF8 }
+    guard string.utf8.elementsEqual(bytes) else {
+      throw NeedleSPTokenizerError.invalidProtobuf(message: "contains invalid UTF-8.")
+    }
     return string
   }
 
-  mutating func skip(wire: Int) throws(ProtobufReaderError) {
+  mutating func skip(wire: Int) throws(NeedleSPTokenizerError) {
     switch wire {
     case 0: _ = try self.readVarint()
     case 1: try self.skip(count: 8)
     case 2:
       let length = try self.readVarint()
-      guard length <= UInt64(Int.max) else { throw ProtobufReaderError.fieldTooLarge }
+      guard length <= UInt64(Int.max) else {
+        throw NeedleSPTokenizerError.invalidProtobuf(message: "contains a field that is too large.")
+      }
       try self.skip(count: Int(length))
     case 5: try self.skip(count: 4)
-    default: throw ProtobufReaderError.unsupportedWireType(wire)
+    default:
+      throw NeedleSPTokenizerError.invalidProtobuf(
+        message: "contains unsupported wire type \(wire)."
+      )
     }
   }
 
-  private mutating func skip(count: Int) throws(ProtobufReaderError) {
+  private mutating func skip(count: Int) throws(NeedleSPTokenizerError) {
     guard count >= 0, count <= self.bytes.count - self.offset else {
-      throw ProtobufReaderError.truncated
+      throw NeedleSPTokenizerError.invalidProtobuf(message: "is truncated.")
     }
     self.offset += count
   }
 
-  private mutating func read(count: Int) throws(ProtobufReaderError) -> [UInt8] {
+  private mutating func read(count: Int) throws(NeedleSPTokenizerError) -> [UInt8] {
     guard count >= 0, count <= self.bytes.count - self.offset else {
-      throw ProtobufReaderError.truncated
+      throw NeedleSPTokenizerError.invalidProtobuf(message: "is truncated.")
     }
     defer { self.offset += count }
     return Array(self.bytes[self.offset..<(self.offset + count)])
@@ -136,15 +150,4 @@ struct ProtobufMessage {
     }
     return values
   }
-}
-
-// MARK: - ProtobufReaderError
-
-enum ProtobufReaderError: Hashable, Sendable, Error {
-  case invalidTag
-  case truncated
-  case overflowingVarint
-  case fieldTooLarge
-  case invalidUTF8
-  case unsupportedWireType(Int)
 }

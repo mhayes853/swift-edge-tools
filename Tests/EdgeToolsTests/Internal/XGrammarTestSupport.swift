@@ -11,7 +11,10 @@
     tokenizer: some EdgeToolsXGRTokenizer
   ) throws -> EdgeToolsToken.ID {
     guard let eosToken = tokenizer.eosTokenId else {
-      throw XGRError(message: "The test tokenizer must provide an EOS token.")
+      throw XGRError(
+        code: .invalidNeedleTokenizer,
+        message: "The test tokenizer must provide an EOS token."
+      )
     }
     return eosToken
   }
@@ -29,6 +32,7 @@
     let vocabulary = tokenizer.convertIdsToTokens(Array(0..<8192))
     guard let eosToken = tokenizer.eosTokenId, vocabulary.allSatisfy({ $0 != nil }) else {
       throw XGRError(
+        code: .invalidNeedleTokenizer,
         message: "The test tokenizer must provide an EOS token and full vocabulary."
       )
     }

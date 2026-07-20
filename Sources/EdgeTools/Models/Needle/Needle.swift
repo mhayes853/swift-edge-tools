@@ -75,16 +75,6 @@ extension NeedleModelConfiguration: Codable {
   }
 #endif
 
-// MARK: - NeedleModelError
-
-public struct NeedleModelError: Hashable, Error {
-  public let message: String
-
-  public static func contextLengthExceeded(tokens: Int, maximum: Int) -> Self {
-    Self(message: "Prompt token count (\(tokens)) exceeds the model context length (\(maximum)).")
-  }
-}
-
 // MARK: - NeedlePrompt
 
 public struct NeedlePrompt: Sendable {
@@ -112,7 +102,7 @@ extension NeedlePrompt {
 
   public func tokenized(
     tools: [EdgeToolDefinition],
-      using tokenizer: some EdgeToolsXGRTokenizer
+    using tokenizer: some EdgeToolsXGRTokenizer
   ) throws -> [EdgeToolsToken] {
     let tokenIds = tokenizer.encode(text: try self.formatted(tools: tools))
     let tokens = tokenizer.convertIdsToTokens(tokenIds)
@@ -191,6 +181,7 @@ public struct NeedleToolCallParser: EdgeToolCallParser, Sendable {
     ) throws -> XGRTokenizerInfo {
       guard let eosTokenID, vocabulary.allSatisfy({ $0 != nil }) else {
         throw XGRError(
+          code: .invalidNeedleTokenizer,
           message: "Needle requires a tokenizer with an EOS token and full vocabulary."
         )
       }
@@ -224,7 +215,7 @@ public struct NeedleToolCallParser: EdgeToolCallParser, Sendable {
       tools: [EdgeToolDefinition],
       range: GrammarToolCallRange
     ) throws -> XGRGrammar {
-      guard range.lowerBound >= 0 else { throw NeedleXGRError.invalidToolInvocationRange }
+      guard range.lowerBound >= 0 else { throw XGRError.invalidToolInvocationRange }
       guard let firstTool = tools.first else { return try XGRGrammar(literal: "") }
 
       var call = try XGRGrammar.needleCall(firstTool)
@@ -250,12 +241,6 @@ public struct NeedleToolCallParser: EdgeToolCallParser, Sendable {
       let withArguments = try argumentsPrefix.concatenate(arguments)
       return try withArguments.concatenate(XGRGrammar(literal: "}"))
     }
-  }
-
-  // MARK: - Error
-
-  public enum NeedleXGRError: Error, Hashable, Sendable {
-    case invalidToolInvocationRange
   }
 
   // MARK: - Helpers

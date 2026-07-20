@@ -15,15 +15,15 @@
         if let separator = line.range(of: "::=") {
           let name = line[..<separator.lowerBound].trimmingWhitespace
           let body = line[separator.upperBound...].trimmingWhitespace
-          guard !name.isEmpty else { throw ToolCallXGRError.unsupportedSchema }
+          guard !name.isEmpty else { throw XGRError.unsupportedToolSchema }
           rules.append(Rule(name: name, body: body))
         } else if !line.trimmingWhitespace.isEmpty {
-          guard !rules.isEmpty else { throw ToolCallXGRError.unsupportedSchema }
+          guard !rules.isEmpty else { throw XGRError.unsupportedToolSchema }
           rules[rules.count - 1].body += "\n" + line
         }
       }
       guard rules.contains(where: { $0.name == "root" }) else {
-        throw ToolCallXGRError.unsupportedSchema
+        throw XGRError.unsupportedToolSchema
       }
       self.rules = rules
     }
@@ -199,9 +199,14 @@
       range: GrammarToolCallRange,
       call: (EdgeToolDefinition) throws -> XGRGrammar
     ) throws -> XGRGrammar {
-      guard range.lowerBound >= 0 else { throw ToolCallXGRError.invalidToolInvocationRange }
+      guard range.lowerBound >= 0 else { throw XGRError.invalidToolInvocationRange }
       guard let firstTool = tools.first else {
-        guard range.lowerBound == 0 else { throw ToolCallXGRError.emptyToolCollection }
+        guard range.lowerBound == 0 else {
+          throw XGRError(
+            code: .emptyToolCollection,
+            message: "A nonzero tool invocation range requires at least one tool."
+          )
+        }
         return try XGRGrammar(literal: "")
       }
 
@@ -217,7 +222,7 @@
       separator: String,
       range: GrammarToolCallRange
     ) throws -> XGRGrammar {
-      guard range.lowerBound >= 0 else { throw ToolCallXGRError.invalidToolInvocationRange }
+      guard range.lowerBound >= 0 else { throw XGRError.invalidToolInvocationRange }
       let separatedCall = try XGRGrammar(literal: separator).concatenate(call)
 
       switch range {
@@ -236,7 +241,7 @@
           maximum: bounds.upperBound
         )
       case .unbounded(let minimum):
-        guard minimum >= 0 else { throw ToolCallXGRError.invalidToolInvocationRange }
+        guard minimum >= 0 else { throw XGRError.invalidToolInvocationRange }
         let tail = try separatedCall.repeated(Swift.max(0, minimum - 1)...)
         let nonempty = try call.concatenate(tail)
         return minimum == 0 ? try nonempty.optional() : nonempty
@@ -250,7 +255,7 @@
       maximum: Int
     ) throws -> XGRGrammar {
       guard minimum >= 0, maximum >= minimum else {
-        throw ToolCallXGRError.invalidToolInvocationRange
+        throw XGRError.invalidToolInvocationRange
       }
       guard maximum > 0 else { return try XGRGrammar(literal: "") }
       let tail = try separatedCall.repeated(Swift.max(0, minimum - 1)...(maximum - 1))
@@ -259,11 +264,6 @@
     }
   }
 
-  public enum ToolCallXGRError: Error, Hashable, Sendable {
-    case invalidToolInvocationRange
-    case emptyToolCollection
-    case unsupportedSchema
-  }
 #endif
 
 // MARK: - Matcher Pool

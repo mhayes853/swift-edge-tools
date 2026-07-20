@@ -345,11 +345,12 @@ struct NeedleConsolidatedTests {
         @Test
         func `Negative Minimum Tool Calls Throws Error`() throws {
           let engine = try self.makeEngine()
-          #expect(throws: NeedleXGRError.invalidToolInvocationRange) {
+          let error = #expect(throws: XGRError.self) {
             _ = try engine.makeMatcher(
               try XGRGrammar.needle(tools: [.getWeather], range: .unbounded(minimum: -1))
             )
           }
+          expectNoDifference(error?.code, .invalidToolInvocationRange)
         }
       }
     }

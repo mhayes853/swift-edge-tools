@@ -87,7 +87,7 @@
     ) async throws {
       let tokenizer = try await loadEdgeToolsTokenizer(from: modelDirectoryURL)
       guard let tokenizer = tokenizer as? any EdgeToolsXGRTokenizer else {
-        throw NeedleCoreMLEngineError.unsupportedTokenizer
+        throw EdgeToolsError.unsupportedTokenizer
       }
 
       var configuration = try Self.decodeConfiguration(from: modelDirectoryURL)
@@ -118,7 +118,9 @@
       configuration: NeedleModelConfiguration
     ) throws {
       let grammarEngine = try XGRCompiler(
-        tokenizerInfo: try tokenizer.tokenizerInfo(modelVocabularySize: configuration.vocabularySize)
+        tokenizerInfo: try tokenizer.tokenizerInfo(
+          modelVocabularySize: configuration.vocabularySize
+        )
       )
       self.state = Lock(
         State(
@@ -232,7 +234,7 @@
         generatedTokens.append(token)
         nextDecoderTokenId = tokenId
         guard matcher.accept(tokenId: token.id) else {
-          throw NeedleCoreMLEngineError.grammarRejectedToken(token: token)
+          throw EdgeToolsError.grammarRejectedToken(token: token)
         }
         let rawToolCall = parser.accept(token: token)
         channel.emit(token: token)
@@ -269,7 +271,7 @@
     ) async throws -> (EncoderOutputs, EdgeToolsPrefillMetrics) {
       let promptTokens = try self.tokenizer.encode(text: prompt.formatted(tools: tools))
       guard promptTokens.count <= configuration.encoderMaxLength else {
-        throw NeedleModelError.contextLengthExceeded(
+        throw EdgeToolsError.contextLengthExceeded(
           tokens: promptTokens.count,
           maximum: configuration.encoderMaxLength
         )
@@ -298,7 +300,7 @@
         let encoderProjectedK = outputs.removeValue(forKey: TensorName.encoderProjectedK),
         let encoderProjectedV = outputs.removeValue(forKey: TensorName.encoderProjectedV)
       else {
-        throw NeedleCoreMLEngineError.missingModelOutputs
+        throw EdgeToolsError.missingModelOutputs
       }
       return EncoderOutputs(
         crossAttentionMask: crossAttentionMask,
@@ -332,7 +334,7 @@
         let updatedKey = outputs[TensorName.updatedKeyCache],
         let updatedValue = outputs[TensorName.updatedValueCache]
       else {
-        throw NeedleCoreMLEngineError.missingModelOutputs
+        throw EdgeToolsError.missingModelOutputs
       }
       cache = DecoderCache(key: updatedKey, value: updatedValue)
       return logits
@@ -348,7 +350,7 @@
       from directory: URL
     ) throws -> NeedleModelConfiguration {
       guard let config = try NeedleModelConfiguration.decode(in: directory) else {
-        throw NeedleCoreMLEngineError.failedToLoadConfiguration
+        throw EdgeToolsError.failedToLoadConfiguration
       }
       return config
     }
@@ -368,7 +370,12 @@
       }
 
       #if os(watchOS)
-        throw NeedleCoreMLEngineError.missingAOTModel(name: name, platform: Self.coreMLPlatform)
+        throw EdgeToolsCoreMLError(
+          code: .missingAOTModel,
+          message:
+            "Could not find a precompiled CoreML model at compiled/\(Self.coreMLPlatform)/\(name).mlmodelc. "
+            + "watchOS requires models exported with --compile-platform \(Self.coreMLPlatform)."
+        )
       #else
         let packageURL = directory.appending(path: "\(name).mlpackage")
         let compiledURL = directory.appending(path: "\(name).mlmodelc")
@@ -429,39 +436,28 @@
     }
   }
 
-  // MARK: - Error
+  // MARK: - EdgeToolsCoreMLError
 
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-  public struct NeedleCoreMLEngineError: Hashable, Error {
+  public struct EdgeToolsCoreMLError: Hashable, Sendable, Error {
+    public struct Code: RawRepresentable, Hashable, Sendable {
+      public let rawValue: String
+
+      public init(rawValue: String) {
+        self.rawValue = rawValue
+      }
+
+      public static let missingAOTModel = Self(rawValue: "missing-aot-model")
+    }
+
+    public let code: Code
     public let message: String
 
-    public static let failedToLoadConfiguration = Self(
-      message: "Could not load model configuration."
-    )
-
-    public static let unsupportedTokenizer = Self(
-      message: "The model does not support the provided tokenizer."
-    )
-
-    public static func grammarRejectedToken(token: EdgeToolsToken) -> Self {
-      Self(
-        message:
-          "Token (ID=\(token.id), VALUE=\(token.stringValue)) was rejected by the grammar matcher."
-      )
+    public init(code: Code, message: String) {
+      self.code = code
+      self.message = message
     }
 
-
-    public static let missingModelOutputs = Self(
-      message: "CoreML model did not return expected outputs."
-    )
-
-    public static func missingAOTModel(name: String, platform: String) -> Self {
-      Self(
-        message:
-          "Could not find a precompiled CoreML model at compiled/\(platform)/\(name).mlmodelc. "
-          + "watchOS requires models exported with --compile-platform \(platform)."
-      )
-    }
   }
 
   // MARK: - Helpers
