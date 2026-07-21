@@ -45,13 +45,13 @@ private enum NeedleTestModelExport {
     process.standardOutput = outputPipe
     process.standardError = outputPipe
     try process.run()
+    let output = String(
+      data: outputPipe.fileHandleForReading.readDataToEndOfFile(),
+      encoding: .utf8
+    ) ?? ""
     process.waitUntilExit()
 
     guard process.terminationStatus == 0 else {
-      let output = String(
-        decoding: outputPipe.fileHandleForReading.readDataToEndOfFile(),
-        as: UTF8.self
-      )
       throw errorMessage(output)
     }
     guard expectedFilesExist(outputDirectory) else {

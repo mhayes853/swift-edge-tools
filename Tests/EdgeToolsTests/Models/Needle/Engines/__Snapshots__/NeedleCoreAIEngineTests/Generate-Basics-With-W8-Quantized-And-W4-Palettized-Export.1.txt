@@ -1,10 +1,10 @@
 ▿ EdgeToolsEngineGeneration
   ▿ decodeMetrics: EdgeToolsDecodeMetrics
-    ▿ duration: 0.634091166 seconds
-      - _low: 634091166000000000
+    ▿ duration: 0.618802083 seconds
+      - _low: 618802083000000000
       - _high: 0
-    ▿ durationToFirstToken: 0.109173042 seconds
-      - _low: 109173042000000000
+    ▿ durationToFirstToken: 0.093407833 seconds
+      - _low: 93407833000000000
       - _high: 0
     - tokens: 46
   ▿ metadata: 2 key/value pairs
@@ -63,8 +63,8 @@
         - 0.70578504
         - 1.0
   ▿ prefillMetrics: EdgeToolsPrefillMetrics
-    ▿ duration: 0.068885292 seconds
-      - _low: 68885292000000000
+    ▿ duration: 0.053814542 seconds
+      - _low: 53814542000000000
       - _high: 0
     - tokens: 150
   - response: "<tool_call> [{\"name\":\"send_email\",\"arguments\":{\"address\":\"henderyanal@gmail.com\",\"subject\":\"Adventure\",\"body\":\"Hi, could you please go on an adventure?\"}}]"
