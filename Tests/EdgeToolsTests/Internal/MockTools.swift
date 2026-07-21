@@ -17,17 +17,18 @@ struct EchoTool: EdgeTool {
 struct ThrowingTool: EdgeTool {
   typealias Input = String
   typealias Output = String
+  typealias Failure = ToolError
 
   let name: String
   let description = "Always throws."
-  let error: any Error
+  let error: ToolError
 
-  init(name: String = "throwing", error: any Error) {
+  init(name: String = "throwing", error: ToolError) {
     self.name = name
     self.error = error
   }
 
-  func invoke(input: String) async throws -> sending String {
+  func invoke(input: String) async throws(ToolError) -> sending String {
     throw self.error
   }
 }
@@ -56,19 +57,24 @@ struct DelayedCountingTool: EdgeTool {
 struct CountingThrowingTool: EdgeTool {
   typealias Input = String
   typealias Output = String
+  typealias Failure = ToolError
 
   let name = "countingThrowing"
   let description = "Counts invocations and always throws."
   let duration: Duration
-  let error: any Error
+  let error: ToolError
   let counter = AtomicCounter()
 
   var invokeCount: Int { self.counter.value }
 
-  func invoke(input: String) async throws -> sending String {
+  func invoke(input: String) async throws(ToolError) -> sending String {
     self.counter.increment()
     if self.duration > .zero {
-      try await Task.sleep(for: self.duration)
+      do {
+        try await Task.sleep(for: self.duration)
+      } catch {
+        throw self.error
+      }
     }
     throw self.error
   }
@@ -90,7 +96,7 @@ struct CancellableTool: EdgeTool {
 
 // MARK: - Errors
 
-struct ToolError: Error, Equatable {
+struct ToolError: Error, Equatable, Sendable {
   let message: String
 }
 
@@ -134,7 +140,7 @@ extension EdgeToolCallStatus {
 
   var result: Result<Output, any Error>? {
     switch self {
-    case .finished(let result): result
+    case .finished(let result): result.mapError { $0 as any Error }
     default: nil
     }
   }

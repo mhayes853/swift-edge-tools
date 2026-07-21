@@ -26,13 +26,14 @@ public struct EdgeRawToolCall: Hashable, Sendable, Codable {
 public protocol EdgeTool<Input, Output>: Sendable {
   associatedtype Input: ConvertibleFromEdgeToolsValue & Sendable
   associatedtype Output: Sendable
+  associatedtype Failure: Error & Sendable = any Error & Sendable
 
   var name: String { get }
   var description: String { get }
   var arguments: EdgeToolsGenerationSchema { get }
   var includesSchemaInInstructions: Bool { get }
 
-  func invoke(input: Input) async throws -> Output
+  func invoke(input: Input) async throws(Failure) -> Output
 }
 
 extension EdgeTool where Input: EdgeToolsGenerable {
@@ -129,18 +130,17 @@ private func makeEdgeToolCallID(using generator: inout some RandomNumberGenerato
 public final class EdgeToolCall<Tool: EdgeTool>: Sendable, Observable, Identifiable {
   private enum Status {
     case idle
-    case running(Task<Tool.Output?, any Error>)
-    case finished(Result<Tool.Output, any Error>)
+    case running(Task<Result<Tool.Output, Tool.Failure>, Never>)
+    case finished(Result<Tool.Output, Tool.Failure>)
   }
 
   private enum InvokeAction {
-    case awaitTask(Task<Tool.Output?, any Error>)
-    case returnResult(Result<Tool.Output, any Error>)
+    case awaitTask(Task<Result<Tool.Output, Tool.Failure>, Never>)
+    case returnResult(Result<Tool.Output, Tool.Failure>)
   }
 
   private struct State {
     var status = Status.idle
-    var task: Task<Void, any Error>?
   }
 
   private let state: Lock<State>
@@ -151,7 +151,7 @@ public final class EdgeToolCall<Tool: EdgeTool>: Sendable, Observable, Identifia
   public let id: EdgeToolCallID
   public let tool: Tool
 
-  public var status: EdgeToolCallStatus<Tool.Output> {
+  public var status: EdgeToolCallStatus<Tool.Output, Tool.Failure> {
     self.registrar.access(self, keyPath: \.status)
     return self.state.withLock {
       switch $0.status {
@@ -163,11 +163,17 @@ public final class EdgeToolCall<Tool: EdgeTool>: Sendable, Observable, Identifia
   }
 
   public var output: Tool.Output {
-    get async throws {
+    get async throws(Tool.Failure) {
       let action: InvokeAction = self.state.withLock { state in
         switch state.status {
         case .idle:
-          let task = Task { [weak self] in try await self?.run() }
+          let task: Task<Result<Tool.Output, Tool.Failure>, Never> = Task {
+            do {
+              return .success(try await self.run())
+            } catch {
+              return .failure(error as! Tool.Failure)
+            }
+          }
           self.registrar.withMutation(of: self, keyPath: \.status) {
             state.status = .running(task)
           }
@@ -179,12 +185,9 @@ public final class EdgeToolCall<Tool: EdgeTool>: Sendable, Observable, Identifia
         }
       }
 
-      switch action {
-      case .awaitTask(let task):
-        guard let output = try await task.cancellableValue else { throw CancellationError() }
-        return output
-      case .returnResult(let result):
-        return try result.get()
+      switch await self.result(for: action) {
+      case .success(let output): return output
+      case .failure(let failure): throw failure
       }
     }
   }
@@ -210,7 +213,19 @@ public final class EdgeToolCall<Tool: EdgeTool>: Sendable, Observable, Identifia
     }
   }
 
-  private func run() async throws -> Tool.Output {
+  private func result(for action: InvokeAction) async -> Result<Tool.Output, Tool.Failure> {
+    switch action {
+    case .awaitTask(let task):
+      await withTaskCancellationHandler {
+        await task.value
+      } onCancel: {
+        task.cancel()
+      }
+    case .returnResult(let result): result
+    }
+  }
+
+  private func run() async throws(Tool.Failure) -> Tool.Output {
     do {
       let output = try await self.tool.invoke(input: self.input)
       self.registrar.withMutation(of: self, keyPath: \.status) {
@@ -241,7 +256,7 @@ public final class AnyEdgeToolCall: Sendable, Observable, Identifiable {
     self.base.erasedInput
   }
 
-  public var status: EdgeToolCallStatus<any Sendable> {
+  public var status: EdgeToolCallStatus<any Sendable, any Error> {
     self.base.erasedStatus
   }
 
@@ -269,7 +284,7 @@ private protocol _AnyEdgeToolCall: Sendable {
   var erasedTool: any EdgeTool { get }
   var erasedRawValue: EdgeRawToolCall { get }
   var erasedInput: any ConvertibleFromEdgeToolsValue & Sendable { get }
-  var erasedStatus: EdgeToolCallStatus<any Sendable> { get }
+  var erasedStatus: EdgeToolCallStatus<any Sendable, any Error> { get }
   var erasedOutput: any Sendable { get async throws }
 }
 
@@ -282,8 +297,8 @@ extension EdgeToolCall: _AnyEdgeToolCall {
     self.input
   }
 
-  var erasedStatus: EdgeToolCallStatus<any Sendable> {
-    self.status.map { $0 }
+  var erasedStatus: EdgeToolCallStatus<any Sendable, any Error> {
+    self.status.erasingOutputAndFailure()
   }
 
   var erasedOutput: any Sendable {
@@ -293,15 +308,15 @@ extension EdgeToolCall: _AnyEdgeToolCall {
 
 // MARK: - EdgeToolCallStatus
 
-public enum EdgeToolCallStatus<Output> {
+public enum EdgeToolCallStatus<Output, Failure: Error> {
   case idle
   case running
-  case finished(Result<Output, any Error>)
+  case finished(Result<Output, Failure>)
 
   @inlinable
-  public func map<T, E: Error>(
-    _ body: (Output) throws(E) -> T
-  ) throws(E) -> EdgeToolCallStatus<T> {
+  public func map<T>(
+    _ body: (Output) throws(Failure) -> T
+  ) throws(Failure) -> EdgeToolCallStatus<T, Failure> {
     switch self {
     case .idle: .idle
     case .running: .running
@@ -311,9 +326,9 @@ public enum EdgeToolCallStatus<Output> {
   }
 
   @inlinable
-  public func flatMap<T, E: Error>(
-    _ body: (Output) throws(E) -> EdgeToolCallStatus<T>
-  ) throws(E) -> EdgeToolCallStatus<T> {
+  public func flatMap<T>(
+    _ body: (Output) throws(Failure) -> EdgeToolCallStatus<T, Failure>
+  ) throws(Failure) -> EdgeToolCallStatus<T, Failure> {
     switch self {
     case .idle: .idle
     case .running: .running
@@ -321,9 +336,21 @@ public enum EdgeToolCallStatus<Output> {
     case .finished(.failure(let error)): .finished(.failure(error))
     }
   }
+
 }
 
-extension EdgeToolCallStatus: Sendable where Output: Sendable {}
+extension EdgeToolCallStatus where Output: Sendable {
+  fileprivate func erasingOutputAndFailure() -> EdgeToolCallStatus<any Sendable, any Error> {
+    switch self {
+    case .idle: .idle
+    case .running: .running
+    case .finished(.success(let output)): .finished(.success(output))
+    case .finished(.failure(let error)): .finished(.failure(error))
+    }
+  }
+}
+
+extension EdgeToolCallStatus: Sendable where Output: Sendable, Failure: Sendable {}
 
 // MARK: - EdgeToolCalls
 

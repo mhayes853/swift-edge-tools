@@ -5,7 +5,7 @@ import Observation
 import Testing
 
 @Suite
-struct EdgeToolsToolsConsolidatedTests {
+struct `EdgeToolsTools tests` {
   @Suite
   struct `EdgeToolCall tests` {
     @Test
