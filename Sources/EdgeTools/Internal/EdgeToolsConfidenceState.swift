@@ -31,13 +31,7 @@ struct EdgeToolsConfidenceState {
 // MARK: - MLX
 
 #if MLX && canImport(MLX)
-  extension EdgeToolsConfidenceState {
-    mutating func addMLX(logits: MLXArray) {
-      self.add(confidence: tokenConfidenceMLX(logits: logits))
-    }
-  }
-
-  private func tokenConfidenceMLX(logits: MLXArray) -> Float {
+  func tokenConfidenceMLX(logits: MLXArray) -> Float {
     let top2 = top(logits.flattened(), k: 2)
     let margin = clip(top2[1] - top2[0], min: -60.0, max: 60.0)
     return (1.0 / (1.0 + exp(-margin))).item(Float.self)
@@ -48,14 +42,7 @@ struct EdgeToolsConfidenceState {
 
 #if CoreML && canImport(CoreML)
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-  extension EdgeToolsConfidenceState {
-    mutating func addCoreML(logits: MLTensor) async {
-      self.add(confidence: await tokenConfidenceCoreML(logits: logits))
-    }
-  }
-
-  @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-  private func tokenConfidenceCoreML(logits: MLTensor) async -> Float {
+  func tokenConfidenceCoreML(logits: MLTensor) async -> Float {
     let values = Array((await logits.cast(to: Float.self).shapedArray(of: Float.self)).scalars)
       .sorted(by: >)
     let top1 = values.first ?? -.infinity
@@ -69,14 +56,7 @@ struct EdgeToolsConfidenceState {
 
 #if swift(>=6.4) && CoreAI && canImport(CoreAI)
   @available(anyAppleOS 27.0, *)
-  extension EdgeToolsConfidenceState {
-    mutating func addCoreAI(logits: NDArray) throws {
-      self.add(confidence: try tokenConfidenceCoreAI(logits: logits))
-    }
-  }
-
-  @available(anyAppleOS 27.0, *)
-  private func tokenConfidenceCoreAI(logits: NDArray) throws -> Float {
+  func tokenConfidenceCoreAI(logits: NDArray) throws -> Float {
     let view = logits.view(as: Float.self)
     let vocabularySize = view.shape[1]
 

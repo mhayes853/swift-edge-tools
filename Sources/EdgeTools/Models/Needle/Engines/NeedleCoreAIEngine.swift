@@ -241,22 +241,19 @@
 
       var cache = try DecoderCache(descriptor: self.decoderFunction.descriptor)
       var nextDecoderTokenId = configuration.decoderStartTokenId
-      var detokenizer = StreamingDetokenizer()
-      var parser = NeedleToolCallParser()
-      var generatedTokens = [EdgeToolsToken]()
-      var confidence = EdgeToolsConfidenceState()
-      var durationToFirstToken: Duration?
-
-      while !matcher.isTerminated
-        && !isStopped.load(ordering: .relaxed)
-        && detokenizer.tokenIds.count < (parameters.maxTokens ?? .max)
-        && generatedTokens.last?.id != self.tokenizer.eosTokenId
-      {
-        try Task.checkCancellation()
-        let inputIds = NDArray(tokenIds: [nextDecoderTokenId])
+      var loop = EdgeToolsGenerationLoop<NeedleToolCallParser>(
+        matcher: consume matcher,
+        tokenizer: self.tokenizer,
+        channel: channel,
+        isStopped: isStopped,
+        maximumTokenCount: parameters.maxTokens,
+        generateStart: generateStart
+      )
+      while let bitmask = try loop.nextBitmask() {
+        let inputIDs = NDArray(tokenIds: [nextDecoderTokenId])
         let decoderLogits = try await self.decode(
-          inputIds: inputIds,
-          cachePosition: generatedTokens.count,
+          inputIds: inputIDs,
+          cachePosition: loop.generatedTokenCount,
           encoderOutputs: encoderOutputs,
           cache: &cache,
           stream: stream
@@ -264,44 +261,15 @@
         var logits = try self.stepLogits(from: decoderLogits)
         let processedLogits = try await processor?.process(logits: &logits) ?? logits
         var maskedLogits = processedLogits
-        applyBitmaskCoreAI(logits: &maskedLogits, mask: matcher.bitmask())
-        try confidence.addCoreAI(logits: maskedLogits)
-
-        let tokenId = try await sampler.sample(logits: maskedLogits)
-        durationToFirstToken = durationToFirstToken ?? generateStart.duration(to: self.clock.now)
-
-        let tokenString = detokenizer.decode(tokenId: tokenId, using: self.tokenizer)
-        let token = EdgeToolsToken(id: tokenId, stringValue: tokenString)
-        generatedTokens.append(token)
-        nextDecoderTokenId = tokenId
-        guard matcher.accept(tokenId: token.id) else {
-          throw EdgeToolsError.grammarRejectedToken(token: token)
-        }
-        let rawToolCall = parser.accept(token: token)
-        channel.emit(token: token)
-        if let rawToolCall {
-          channel.emit(toolCall: rawToolCall)
-        }
+        applyBitmaskCoreAI(logits: &maskedLogits, mask: bitmask)
+        let confidence = try tokenConfidenceCoreAI(logits: maskedLogits)
+        let tokenID = try await sampler.sample(logits: maskedLogits)
+        let token = try loop.accept(tokenID: tokenID, confidence: confidence)
+        nextDecoderTokenId = tokenID
         processor?.didSample(token: token)
       }
 
-      let finalDurationToFirstToken = durationToFirstToken ?? .zero
-      var metadata = EdgeToolsMetadata()
-      metadata.generationConfidence = confidence.mean
-      metadata.perTokenConfidences = confidence.perTokenConfidences
-      let response = self.tokenizer.decode(tokens: detokenizer.tokenIds)
-      return EdgeToolsEngineGeneration(
-        prefillMetrics: prefillMetrics,
-        decodeMetrics: EdgeToolsDecodeMetrics(
-          tokens: generatedTokens.count,
-          duration: generateStart.duration(to: self.clock.now) - finalDurationToFirstToken,
-          durationToFirstToken: finalDurationToFirstToken
-        ),
-        wasStopped: isStopped.load(ordering: .relaxed),
-        tokens: generatedTokens,
-        response: response,
-        metadata: metadata
-      )
+      return loop.finish(prefillMetrics: prefillMetrics)
     }
 
     private func prefill(

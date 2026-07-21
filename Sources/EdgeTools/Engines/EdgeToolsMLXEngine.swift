@@ -303,40 +303,25 @@
       var output = preparation.output
       var cache = preparation.cache
       try Task.checkCancellation()
-      var durationToFirstToken: Duration?
 
-      var detokenizer = StreamingDetokenizer()
-      var parser = Model.ToolCallParser()
-      var generatedTokens = [EdgeToolsToken]()
-      var confidence = EdgeToolsConfidenceState()
-      while !matcher.isTerminated
-        && !isStopped.load(ordering: .relaxed)
-        && detokenizer.tokenIds.count < (parameters.maxTokens ?? .max)
-        && generatedTokens.last?.id != self.tokenizer.eosTokenId
-      {
-        try Task.checkCancellation()
+      var loop = EdgeToolsGenerationLoop<Model.ToolCallParser>(
+        matcher: consume matcher,
+        tokenizer: self.tokenizer,
+        channel: channel,
+        isStopped: isStopped,
+        maximumTokenCount: parameters.maxTokens,
+        generateStart: generateStart
+      )
+      while let bitmask = try loop.nextBitmask() {
         let processedLogits = processor?.process(logits: output.logits) ?? output.logits
         let logits = applyBitmaskMLX(
           logits: processedLogits[0..., -1, 0...],
-          mask: matcher.bitmask()
+          mask: bitmask
         )
-        confidence.addMLX(logits: logits)
-
+        let confidence = tokenConfidenceMLX(logits: logits)
         let sampledToken = sampler.sample(logits: logits)
         let tokenID = sampledToken.item(EdgeToolsToken.ID.self)
-
-        durationToFirstToken = durationToFirstToken ?? generateStart.duration(to: self.clock.now)
-        let tokenString = detokenizer.decode(tokenId: tokenID, using: self.tokenizer)
-        let token = EdgeToolsToken(id: tokenID, stringValue: tokenString)
-        generatedTokens.append(token)
-        guard matcher.accept(tokenId: token.id) else {
-          throw EdgeToolsError.grammarRejectedToken(token: token)
-        }
-        let rawToolCall = parser.accept(token: token)
-        channel.emit(token: token)
-        if let rawToolCall {
-          channel.emit(toolCall: rawToolCall)
-        }
+        _ = try loop.accept(tokenID: tokenID, confidence: confidence)
         processor?.didSample(token: sampledToken)
 
         maybeQuantizeKVCache(
@@ -353,7 +338,6 @@
         )
       }
 
-      let finalDurationToFirstToken = durationToFirstToken ?? .zero
       let postDecodeSnapshot = Memory.synchronizedSnapshot(
         synchronize: parameters.synchronizeStreamForMemorySnapshots
       )
@@ -361,21 +345,7 @@
       metadata.mlxEngineGenerationStartMemorySnapshot = generationStartSnapshot
       metadata.mlxEnginePostPrefillMemorySnapshot = preparation.snapshot
       metadata.mlxEnginePostDecodeMemorySnapshot = postDecodeSnapshot
-      metadata.generationConfidence = confidence.mean
-      metadata.perTokenConfidences = confidence.perTokenConfidences
-      let response = self.tokenizer.decode(tokens: detokenizer.tokenIds)
-      return EdgeToolsEngineGeneration(
-        prefillMetrics: preparation.metrics,
-        decodeMetrics: EdgeToolsDecodeMetrics(
-          tokens: generatedTokens.count,
-          duration: generateStart.duration(to: self.clock.now) - finalDurationToFirstToken,
-          durationToFirstToken: finalDurationToFirstToken
-        ),
-        wasStopped: isStopped.load(ordering: .relaxed),
-        tokens: generatedTokens,
-        response: response,
-        metadata: metadata
-      )
+      return loop.finish(prefillMetrics: preparation.metrics, metadata: metadata)
     }
 
     private func prepareForGeneration(
