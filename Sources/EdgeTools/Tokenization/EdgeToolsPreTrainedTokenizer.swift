@@ -1,4 +1,10 @@
-import SystemPackage
+#if System
+  import SystemPackage
+#endif
+
+#if Foundation
+  import Foundation
+#endif
 
 #if Transformers
   import Tokenizers
@@ -65,9 +71,19 @@ import SystemPackage
 
 // MARK: - HF Backend JSON
 
-package func loadHuggingFaceBackendJSON(from tokenizerPath: FilePath) throws -> String {
-  try withFileBytes(at: tokenizerPath) { try huggingFaceBackendJSON(from: $0) }
-}
+#if System
+  package func loadHuggingFaceBackendJSON(from tokenizerPath: FilePath) throws -> String {
+    try withFileBytes(at: tokenizerPath) { try huggingFaceBackendJSON(from: $0) }
+  }
+#endif
+
+#if Foundation
+  package func loadHuggingFaceBackendJSON(from tokenizerURL: URL) throws -> String {
+    try Data(contentsOf: tokenizerURL).withUnsafeBytes { buffer in
+      try huggingFaceBackendJSON(from: buffer.bindMemory(to: UInt8.self))
+    }
+  }
+#endif
 
 package func huggingFaceBackendJSON(from bytes: UnsafeBufferPointer<UInt8>) throws -> String {
   var scanner = HuggingFaceBackendJSONScanner(buffer: bytes)

@@ -1,3 +1,7 @@
+#if System
+  import SystemPackage
+#endif
+
 #if MLX && canImport(MLX)
   import MLX
   import MLXNN
@@ -199,6 +203,18 @@
         model: model
       )
     }
+
+    #if System
+      public convenience init(
+        from directoryPath: FilePath,
+        model: (Model.ModelConfiguration) throws -> Model
+      ) async throws {
+        try await self.init(
+          from: URL(filePath: directoryPath.string, directoryHint: .isDirectory),
+          model: model
+        )
+      }
+    #endif
 
     public func tokenize(
       prompt: Model.Prompt,

@@ -1,3 +1,7 @@
+#if System
+  import SystemPackage
+#endif
+
 #if CoreML && canImport(CoreML)
   import Atomics
   @preconcurrency import CoreML
@@ -110,6 +114,22 @@
         configuration: configuration
       )
     }
+
+    #if System
+      public convenience init(
+        modelDirectoryPath: FilePath,
+        modelConfiguration: MLModelConfiguration,
+        editModelConfiguration: (inout MLModelConfiguration) -> Void = { _ in },
+        editConfiguration: (inout NeedleModelConfiguration) -> Void = { _ in }
+      ) async throws {
+        try await self.init(
+          modelDirectoryURL: URL(filePath: modelDirectoryPath.string, directoryHint: .isDirectory),
+          modelConfiguration: modelConfiguration,
+          editModelConfiguration: editModelConfiguration,
+          editConfiguration: editConfiguration
+        )
+      }
+    #endif
 
     public init(
       encoderModel: sending MLModel,

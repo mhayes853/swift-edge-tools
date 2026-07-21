@@ -1,6 +1,4 @@
 #if Foundation
-  import SystemPackage
-
   import Foundation
 
   package func decodeModelConfiguration<Configuration: Decodable>(
@@ -8,14 +6,13 @@
     in directoryURL: URL,
     decoder: JSONDecoder = JSONDecoder()
   ) throws -> Configuration? {
-    let directoryPath = FilePath(directoryURL.path())
-    let configurationPaths = [
-      directoryPath.appending("configuration.json"),
-      directoryPath.appending("config.json")
+    let configurationURLs = [
+      directoryURL.appending(path: "configuration.json"),
+      directoryURL.appending(path: "config.json")
     ]
-    guard let configurationPath = configurationPaths.first(where: fileExists(at:)) else {
+    guard let configurationURL = configurationURLs.first(where: fileExists(at:)) else {
       return nil
     }
-    return try decoder.decode(Configuration.self, from: Data(try readFile(at: configurationPath)))
+    return try decoder.decode(Configuration.self, from: Data(contentsOf: configurationURL))
   }
 #endif

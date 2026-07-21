@@ -1,3 +1,7 @@
+#if System
+  import SystemPackage
+#endif
+
 #if swift(>=6.4) && CoreAI && canImport(CoreAI)
   import CoreAI
   import Foundation
@@ -118,6 +122,26 @@
         configuration: configuration
       )
     }
+
+    #if System
+      public convenience init(
+        modelDirectoryPath: FilePath,
+        editConfiguration: (inout NeedleModelConfiguration) -> Void = { _ in },
+        specializationOptions: SpecializationOptions = SpecializationOptions(
+          preferredComputeUnitKind: .neuralEngine
+        ),
+        modelCache: AIModelCache = .default,
+        cachePolicy: AIModelCache.Policy = .default
+      ) async throws {
+        try await self.init(
+          modelDirectoryURL: URL(filePath: modelDirectoryPath.string, directoryHint: .isDirectory),
+          editConfiguration: editConfiguration,
+          specializationOptions: specializationOptions,
+          modelCache: modelCache,
+          cachePolicy: cachePolicy
+        )
+      }
+    #endif
 
     public init(
       encoderModel: AIModel,

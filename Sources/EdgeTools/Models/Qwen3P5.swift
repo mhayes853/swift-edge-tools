@@ -1,5 +1,9 @@
 import OrderedCollections
 
+#if System
+  import SystemPackage
+#endif
+
 #if MLX && Transformers && canImport(MLX)
   import Foundation
   import MLXLLM
@@ -26,6 +30,12 @@ import OrderedCollections
     public convenience init(from directoryURL: URL) async throws {
       try await self.init(from: directoryURL, model: Qwen35Model.init)
     }
+
+    #if System
+      public convenience init(from directoryPath: FilePath) async throws {
+        try await self.init(from: directoryPath, model: Qwen35Model.init)
+      }
+    #endif
   }
 #endif
 

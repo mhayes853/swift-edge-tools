@@ -1,5 +1,3 @@
-import SystemPackage
-
 // MARK: - EdgeToolsError
 
 public struct EdgeToolsError: Error, Hashable, Sendable {
@@ -40,7 +38,7 @@ public struct EdgeToolsError: Error, Hashable, Sendable {
 
 extension EdgeToolsError {
   static func noCompatibleTokenizer(
-    in directoryPath: FilePath,
+    in directory: String,
     hasSentencePieceModel: Bool,
     hasTransformersTokenizer: Bool,
     failures: [String] = []
@@ -75,7 +73,7 @@ extension EdgeToolsError {
     return Self(
       code: .noCompatibleTokenizer,
       message:
-        "No compatible tokenizer was found in \(directoryPath). \(details.joined(separator: " "))"
+        "No compatible tokenizer was found in \(directory). \(details.joined(separator: " "))"
     )
   }
 

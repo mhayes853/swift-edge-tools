@@ -1,3 +1,7 @@
+#if System
+  import SystemPackage
+#endif
+
 #if MLX && canImport(MLX)
   import Foundation
   import MLX
@@ -189,6 +193,15 @@
         model: { NeedleMLXModel(configuration: $0) }
       )
     }
+
+    #if System
+      public convenience init(from directoryPath: FilePath) async throws {
+        try await self.init(
+          from: directoryPath,
+          model: { NeedleMLXModel(configuration: $0) }
+        )
+      }
+    #endif
   }
 
   // MARK: - SimpleAttentionNetwork

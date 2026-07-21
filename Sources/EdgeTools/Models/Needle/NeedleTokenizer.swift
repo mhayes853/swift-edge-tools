@@ -1,5 +1,8 @@
 import HeapModule
-import SystemPackage
+
+#if System
+  import SystemPackage
+#endif
 
 #if Foundation
   import Foundation
@@ -245,17 +248,19 @@ extension NeedleSPTokenizer: EdgeToolsTokenizer {}
   }
 #endif
 
-extension NeedleSPTokenizer {
-  public init(modelPath: FilePath) throws {
-    do {
-      try self.init(data: readFile(at: modelPath))
-    } catch let error as NeedleSPTokenizerError {
-      throw error
-    } catch {
-      throw NeedleSPTokenizerError.missingModelFile(at: modelPath.string)
+#if System
+  extension NeedleSPTokenizer {
+    public init(modelPath: FilePath) throws {
+      do {
+        try self.init(data: readFile(at: modelPath))
+      } catch let error as NeedleSPTokenizerError {
+        throw error
+      } catch {
+        throw NeedleSPTokenizerError.missingModelFile(at: modelPath.string)
+      }
     }
   }
-}
+#endif
 
 #if Foundation
   extension NeedleSPTokenizer {
@@ -263,7 +268,13 @@ extension NeedleSPTokenizer {
       guard modelURL.isFileURL, !modelURL.hasDirectoryPath else {
         throw NeedleSPTokenizerError.missingModelFile(at: modelURL.path())
       }
-      try self.init(modelPath: FilePath(modelURL.path()))
+      do {
+        try self.init(data: Data(contentsOf: modelURL))
+      } catch let error as NeedleSPTokenizerError {
+        throw error
+      } catch {
+        throw NeedleSPTokenizerError.missingModelFile(at: modelURL.path())
+      }
     }
   }
 #endif

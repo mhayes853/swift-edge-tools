@@ -6,17 +6,20 @@ A Swift runtime for local model tool calling, with built-in support for
 ## Package Traits
 
 `Foundation` is enabled by default and provides conveniences such as `URL`-based model
-loading and Foundation `Codable` integrations. Generic runtime code uses swift-system for
-file I/O and yyjson for JSON reading, so Foundation can be removed for constrained targets:
+loading and Foundation `Codable` integrations. When `Foundation` is enabled, model and
+tokenizer loading use Foundation's file I/O facilities.
+
+The opt-in `System` trait supplies `SystemPackage.FilePath` overloads and Foundation-free
+file I/O for constrained targets:
 
 ```sh
-swift build --disable-default-traits
+swift build --disable-default-traits --traits System --traits XGrammar
 ```
 
 The `MLX`, `CoreML`, `CoreAI`, `Transformers`, and `FoundationModels` traits enable
-`Foundation` automatically. Foundation-free consumers can use `SystemPackage.FilePath`
-with the tokenizer and model-loading APIs. Individual conveniences can be restored without
-the engine traits:
+`Foundation` automatically. Their `FilePath` engine-loading overloads are available when
+`System` is also enabled, but the engines themselves still require Foundation. Individual
+Foundation conveniences can be restored without engine traits:
 
 ```sh
 swift build --disable-default-traits --traits Foundation

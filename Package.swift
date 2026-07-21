@@ -18,6 +18,7 @@ let package = Package(
   ],
   traits: [
     .trait(name: "Foundation", description: "Foundation-specific conveniences."),
+    .trait(name: "System", description: "swift-system FilePath-based file I/O."),
     .trait(name: "Atomics", description: "Atomic engine generation coordination."),
     .trait(name: "XGrammar", description: "XGrammar-powered structured generation."),
     .trait(
@@ -82,7 +83,7 @@ let package = Package(
         .product(name: "HeapModule", package: "swift-collections"),
         .product(name: "OrderedCollections", package: "swift-collections"),
         .product(name: "Atomics", package: "swift-atomics", condition: .when(traits: ["Atomics"])),
-        .product(name: "SystemPackage", package: "swift-system"),
+        .product(name: "SystemPackage", package: "swift-system", condition: .when(traits: ["System"])),
         .product(name: "MLX", package: "mlx-swift", condition: .when(traits: ["MLX"])),
         .product(name: "MLXNN", package: "mlx-swift", condition: .when(traits: ["MLX"])),
         .product(name: "MLXLLM", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),
