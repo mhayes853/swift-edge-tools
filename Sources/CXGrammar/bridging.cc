@@ -317,6 +317,13 @@ xgrammar_grammar_t xgrammar_grammar_init_regex(const char* regex) {
     });
 }
 
+xgrammar_grammar_t xgrammar_grammar_init_lark(const char* lark) {
+    return with_error_handling([&] {
+        if (!lark) throw std::invalid_argument("Expected a Lark grammar.");
+        return new XGrammarGrammarHandle{xgrammar::Grammar::FromLark(lark)};
+    });
+}
+
 xgrammar_grammar_t xgrammar_grammar_init_structural_tag(const char* structural_tag_json) {
     return with_error_handling([&] {
         if (!structural_tag_json) throw std::invalid_argument("Expected a structural tag.");

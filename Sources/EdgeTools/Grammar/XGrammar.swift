@@ -253,6 +253,12 @@
       }
     }
 
+    public init(lark: String) throws {
+      self.handle = try lark.withCString {
+        try xgrammarRequiredHandle(xgrammar_grammar_init_lark($0))
+      }
+    }
+
     public init(structuralTagJSON: String) throws {
       self.handle = try structuralTagJSON.withCString {
         try xgrammarRequiredHandle(xgrammar_grammar_init_structural_tag($0))

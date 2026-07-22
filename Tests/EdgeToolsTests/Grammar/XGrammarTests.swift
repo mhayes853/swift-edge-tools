@@ -4,7 +4,7 @@
   import Testing
 
   @Suite
-  struct XGrammarConsolidatedTests {
+  struct `XGrammar tests` {
     @Suite
     struct `XGRMatcher tests`: ~Copyable {
       private let engine: XGRCompiler
@@ -195,6 +195,24 @@
 
         let serializedJSON = try tokenizerInfo.serializedJSON()
         expectNoDifference(try restoredTokenizerInfo.serializedJSON(), serializedJSON)
+      }
+
+      @Test
+      func `Lark Grammar Matches Its Start Rule`() throws {
+        let tokenizerInfo = try XGRTokenizerInfo(
+          encodedVocabulary: ["a", "b", ""],
+          vocabularyType: .raw,
+          stopTokenIDs: [2]
+        )
+        let grammar = try XGRGrammar(lark: "start: \"a\" | \"b\"")
+        let compiler = try XGRCompiler(tokenizerInfo: tokenizerInfo)
+        let matcher = try XGRMatcher(
+          compiledGrammar: try compiler.compile(grammar),
+          terminateWithoutStopToken: true
+        )
+
+        expectNoDifference(matcher.accept(string: "a"), true)
+        expectNoDifference(matcher.isTerminated, true)
       }
 
       @Test

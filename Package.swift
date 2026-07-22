@@ -115,6 +115,7 @@ let package = Package(
         "xgrammar/cpp/grammar_printer.cc",
         "xgrammar/cpp/json_schema_converter.cc",
         "xgrammar/cpp/json_schema_converter_ext.cc",
+        "xgrammar/cpp/lark_converter.cc",
         "xgrammar/cpp/regex_converter.cc",
         "xgrammar/cpp/structural_tag.cc",
         "xgrammar/cpp/testing.cc",
