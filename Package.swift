@@ -46,6 +46,20 @@ let package = Package(
       description: "CoreML engine support.",
       enabledTraits: ["XGrammar", "Foundation", "Atomics"]
     ),
+    .trait(
+      name: "ONNXCore",
+      description: """
+      Needle ONNX engine and runtime-provider protocols.
+
+      (Only enable this trait if you want to use your own ONNX build. Otherwise, enable `ONNX` directly.)
+      """,
+      enabledTraits: ["XGrammar", "Foundation", "Atomics"]
+    ),
+    .trait(
+      name: "ONNX",
+      description: "Vendored ONNX Runtime support.",
+      enabledTraits: ["ONNXCore", "Transformers"]
+    ),
     .default(
       enabledTraits: [
         "Foundation", "XGrammar", "MLX", "FoundationModels", "CoreAI", "CoreML"
@@ -89,12 +103,38 @@ let package = Package(
         .product(name: "MLXLLM", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),
         .product(name: "MLXLMCommon", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),
         .target(name: "CXGrammar", condition: .when(traits: ["XGrammar"])),
+        .target(
+          name: "COnnxRuntime",
+          condition: .when(platforms: [.macOS, .iOS], traits: ["ONNX"])
+        ),
         .product(
           name: "Tokenizers",
           package: "swift-transformers",
           condition: .when(traits: ["Transformers"])
         )
       ],
+      linkerSettings: [
+        .linkedFramework(
+          "CoreML",
+          .when(platforms: [.macOS, .iOS], traits: ["ONNX"])
+        )
+      ]
+    ),
+    .target(
+      name: "COnnxRuntime",
+      dependencies: [
+        .target(
+          name: "onnxruntime",
+          condition: .when(platforms: [.macOS, .iOS], traits: ["ONNX"])
+        )
+      ],
+      exclude: ["LICENSE"],
+      publicHeadersPath: "include"
+    ),
+    .binaryTarget(
+      name: "onnxruntime",
+      url: "https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.27.0.zip",
+      checksum: "8c74edd600eafc3055de9e8f7a9602afee44ed516913cb5e132bca02cc34622c"
     ),
     .target(
       name: "CXGrammar",
@@ -154,6 +194,10 @@ let package = Package(
       name: "EdgeToolsTests",
       dependencies: [
         "EdgeTools",
+        .target(
+          name: "COnnxRuntime",
+          condition: .when(platforms: [.macOS, .iOS], traits: ["ONNX"])
+        ),
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
         .product(name: "CustomDump", package: "swift-custom-dump"),
         .product(

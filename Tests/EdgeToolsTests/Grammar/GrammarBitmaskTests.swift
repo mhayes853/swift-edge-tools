@@ -94,6 +94,19 @@ struct GrammarBitmaskConsolidatedTests {
         }
       #endif
 
+      #if ONNXCore
+        @Test
+        func `ONNX Filters Masked Tokens`() {
+          let mask = Self.mask()
+          var logits = (0..<64).map(Float.init)
+          applyONNXBitmask(logits: &logits, mask: mask)
+          let filtered = logits.indices
+            .filter { logits[$0] == -.infinity }
+
+          expectNoDifference(filtered, Self.expectedIndices)
+        }
+      #endif
+
       #if swift(>=6.4) && CoreAI && canImport(CoreAI)
         @Test
         @available(anyAppleOS 27.0, *)

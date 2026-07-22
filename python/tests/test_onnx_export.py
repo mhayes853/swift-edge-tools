@@ -2,6 +2,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import onnx  # type: ignore[import-not-found]
@@ -82,9 +83,12 @@ class ONNXExportTests(unittest.TestCase):
             )
 
             self.assertEqual(result, 0)
+            exported_configuration = json.loads(
+                (output_directory / "configuration.json").read_text()
+            )
             self.assertEqual(
-                (output_directory / "configuration.json").read_text(),
-                configuration_contents,
+                exported_configuration,
+                {**configuration_data, "dtype": "float32"},
             )
             self.assertEqual(
                 (output_directory / "tokenizer.json").read_text(),
@@ -152,9 +156,14 @@ class ONNXExportTests(unittest.TestCase):
                 [output.name for output in decoder_session.get_outputs()],
                 ["logits", "updated_key_cache", "updated_value_cache"],
             )
-            self.assertTrue(all(np.isfinite(value).all() for value in decoder_outputs))
+            self.assertTrue(
+                all(
+                    np.isfinite(cast(np.ndarray, value)).all()
+                    for value in decoder_outputs
+                )
+            )
 
-    def test_export_uses_custom_compressor_for_both_models(self) -> None:
+    def test_export_defaults_to_float32_for_portable_runtime_execution(self) -> None:
         with (
             tempfile.TemporaryDirectory() as source_name,
             tempfile.TemporaryDirectory() as output_name,
@@ -192,14 +201,21 @@ class ONNXExportTests(unittest.TestCase):
 
             self.assertEqual(compressor.components, ["encoder", "decoder"])
             self.assertEqual(result, output_directory.resolve())
+            exported_configuration = json.loads(
+                (result / "configuration.json").read_text()
+            )
+            self.assertEqual(exported_configuration["dtype"], "float32")
+            self.assertEqual(exported_configuration["torch_dtype"], "float32")
+
             encoder_model = onnx.load(result / "encoder.onnx")
             decoder_model = onnx.load(result / "decoder.onnx")
             onnx.checker.check_model(encoder_model)
             onnx.checker.check_model(decoder_model)
-            self.assertTrue(
+            self.assertFalse(
                 any(
                     initializer.data_type == onnx.TensorProto.BFLOAT16
-                    for initializer in encoder_model.graph.initializer
+                    for model in (encoder_model, decoder_model)
+                    for initializer in model.graph.initializer
                 )
             )
 

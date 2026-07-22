@@ -1,2 +1,5 @@
 Sources/CXGrammar/include/dlpack/** linguist-vendored
 Sources/CXGrammar/include/picojson/** linguist-vendored
+Sources/COnnxRuntime/include/coreml_provider_factory.h linguist-vendored
+Sources/COnnxRuntime/include/onnxruntime_c_api.h linguist-vendored
+Sources/COnnxRuntime/include/onnxruntime_ep_c_api.h linguist-vendored

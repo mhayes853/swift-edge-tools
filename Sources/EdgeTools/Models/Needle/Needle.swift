@@ -41,6 +41,47 @@ public struct NeedleModelConfiguration: Hashable, Sendable {
   }
 }
 
+extension NeedleModelConfiguration {
+  public init(
+    vocabularySize: Int = 8192,
+    dimensions: Int = 512,
+    hiddenDimensions: Int = 512,
+    attentionHeads: Int = 8,
+    kvHeads: Int = 4,
+    encoderLayers: Int = 12,
+    decoderLayers: Int = 8,
+    hiddenLayers: Int = 8,
+    ropeTheta: Float = 10000.0,
+    rmsNormEps: Float = 1e-6,
+    padTokenId: EdgeToolsToken.ID = 0,
+    decoderStartTokenId: EdgeToolsToken.ID = 1,
+    tieWordEmbeddings: Bool = true,
+    maxSeqLen: Int? = nil,
+    maxPositionEmbeddings: Int? = nil,
+    dtype: String = "bfloat16"
+  ) {
+    self.init(
+      vocabularySize: vocabularySize,
+      dimensions: dimensions,
+      hiddenDimensions: hiddenDimensions,
+      attentionHeads: attentionHeads,
+      kvHeads: kvHeads,
+      encoderLayers: encoderLayers,
+      decoderLayers: decoderLayers,
+      hiddenLayers: hiddenLayers,
+      ropeTheta: ropeTheta,
+      rmsNormEps: rmsNormEps,
+      padTokenId: padTokenId,
+      decoderStartTokenId: decoderStartTokenId,
+      tieWordEmbeddings: tieWordEmbeddings,
+      maxSeqLen: maxSeqLen,
+      maxPositionEmbeddings: maxPositionEmbeddings,
+      dtypeValue: dtype,
+      torchDTypeValue: nil
+    )
+  }
+}
+
 // MARK: - Codable
 
 extension NeedleModelConfiguration: Codable {

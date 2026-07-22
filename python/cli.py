@@ -19,7 +19,6 @@ from coreai_opt.palettization import (
     PalettizationSpec,
 )
 from coreai_opt.quantization import QuantizerConfig
-
 from needle.coreai_export import export_needle_coreai
 from needle.coreml_export import (
     CoreMLComputeUnits,
@@ -64,6 +63,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", required=True)
     parser.add_argument("--backend", default="CoreAI")
     parser.add_argument("--onnx-quantization", choices=("int4", "int8"))
+    parser.add_argument(
+        "--onnx-dtype",
+        choices=("float32", "float16", "bfloat16"),
+        default="float32",
+    )
     parser.add_argument(
         "--compute-units",
         choices=_COMPUTE_UNITS,
@@ -329,6 +333,7 @@ def _export_for_backend(
     *,
     compressor: NeedleCompressor | None = None,
     onnx_compressor: ONNXCompressor | None = None,
+    onnx_dtype: str = "float32",
     model_metadata: AIModelAssetMetadata | None = None,
     compute_units: CoreMLComputeUnits = CoreMLComputeUnits.ALL,
     compile_platforms: Sequence[str] = (),
@@ -355,6 +360,7 @@ def _export_for_backend(
             source,
             output,
             compressor=onnx_compressor,
+            dtype=onnx_dtype,
         )
 
 
@@ -396,6 +402,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
             parsed.output,
             compressor=compressor,
             onnx_compressor=onnx_compressor,
+            onnx_dtype=parsed.onnx_dtype,
             model_metadata=model_metadata,
             compute_units=compute_units,
             compile_platforms=parsed.compile_platforms,

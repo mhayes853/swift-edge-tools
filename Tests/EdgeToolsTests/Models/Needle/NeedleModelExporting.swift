@@ -45,10 +45,11 @@ private enum NeedleTestModelExport {
     process.standardOutput = outputPipe
     process.standardError = outputPipe
     try process.run()
-    let output = String(
-      data: outputPipe.fileHandleForReading.readDataToEndOfFile(),
-      encoding: .utf8
-    ) ?? ""
+    let output =
+      String(
+        data: outputPipe.fileHandleForReading.readDataToEndOfFile(),
+        encoding: .utf8
+      ) ?? ""
     process.waitUntilExit()
 
     guard process.terminationStatus == 0 else {
@@ -266,6 +267,54 @@ private enum NeedleTestModelExport {
   }
 
   struct CoreMLModelExportError: Hashable, Error {
+    let message: String
+  }
+#endif
+
+#if ONNX && canImport(COnnxRuntime)
+  func exportNeedleONNX(
+    outputDirectoryName: String = "onnx-export-v1-float32",
+    quantization: String? = nil
+  ) async throws -> URL {
+    var arguments = ["--onnx-dtype", "float32"]
+    arguments += quantization.map { ["--onnx-quantization", $0] } ?? []
+    return try await NeedleTestModelExport.export(
+      backend: "onnx",
+      outputDirectoryName: outputDirectoryName,
+      arguments: arguments,
+      expectedFilesExist: SelfONNXExport.filesExist(in:),
+      errorMessage: { ONNXModelExportError(message: $0) }
+    )
+  }
+
+  func makeNeedleONNXEngine(
+    executionProvider: NeedleONNXEngine.ExecutionProvider = .cpu,
+    quantization: String? = nil
+  ) async throws -> NeedleONNXEngine {
+    let quantizationSuffix = quantization.map { "-\($0)" } ?? ""
+    let directory = try await exportNeedleONNX(
+      outputDirectoryName: "onnx-export-v1-float32\(quantizationSuffix)",
+      quantization: quantization
+    )
+    return try await NeedleONNXEngine(
+      modelDirectoryURL: directory,
+      runtimeConfiguration: NeedleONNXEngine.RuntimeConfiguration(
+        executionProvider: executionProvider
+      )
+    )
+  }
+
+  private enum SelfONNXExport {
+    static func filesExist(in directory: URL) -> Bool {
+      let fileManager = FileManager.default
+      return NeedleTestModelExport.hasTokenizer(in: directory)
+        && fileManager.fileExists(atPath: directory.appending(path: "configuration.json").path())
+        && fileManager.fileExists(atPath: directory.appending(path: "encoder.onnx").path())
+        && fileManager.fileExists(atPath: directory.appending(path: "decoder.onnx").path())
+    }
+  }
+
+  struct ONNXModelExportError: Hashable, Error {
     let message: String
   }
 #endif

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import tempfile
+from dataclasses import replace
 from pathlib import Path
 
 import torch
@@ -16,6 +18,7 @@ def export_needle_onnx(
     output_directory: str | Path,
     *,
     compressor: ONNXCompressor | None = None,
+    dtype: str = "float32",
     opset_version: int = 21,
     external_data: bool = True,
 ) -> Path:
@@ -23,21 +26,40 @@ def export_needle_onnx(
         source,
         output_directory,
     )
+    export_configuration = replace(configuration, dtype=dtype)
     needle = export_helpers.load_needle_model(
-        configuration,
+        export_configuration,
         source_files.weights_path,
         use_native_sdpa=True,
     )
     convert_needle_onnx_models(
         needle,
-        configuration,
+        export_configuration,
         output_directory,
         compressor=compressor,
         opset_version=opset_version,
         external_data=external_data,
     )
     export_helpers.copy_bundle_resources(source_files, output_directory)
+    _write_exported_configuration_dtype(output_directory, dtype=dtype)
     return output_directory
+
+
+def _write_exported_configuration_dtype(
+    output_directory: Path,
+    *,
+    dtype: str,
+) -> None:
+    configuration_path = output_directory / "configuration.json"
+    try:
+        configuration = json.loads(configuration_path.read_text())
+        configuration["dtype"] = dtype
+        configuration["torch_dtype"] = dtype
+        configuration_path.write_text(json.dumps(configuration))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(
+            f"Failed to update exported configuration {configuration_path}: {error}"
+        ) from error
 
 
 def convert_needle_onnx_models(

@@ -1,3 +1,7 @@
+#if ONNXCore
+  import Foundation
+#endif
+
 #if MLX && canImport(MLX)
   import MLX
 #endif
@@ -27,6 +31,25 @@ struct EdgeToolsConfidenceState {
     self.totalSum += confidence
   }
 }
+
+// MARK: - ONNX
+
+#if ONNXCore
+  func tokenConfidenceONNX(logits: [Float]) -> Float {
+    var top1 = -Float.infinity
+    var top2 = -Float.infinity
+    for value in logits {
+      if value > top1 {
+        top2 = top1
+        top1 = value
+      } else if value > top2 {
+        top2 = value
+      }
+    }
+    let margin = Swift.min(Swift.max(top1 - top2, -60), 60)
+    return 1 / (1 + exp(-margin))
+  }
+#endif
 
 // MARK: - MLX
 
