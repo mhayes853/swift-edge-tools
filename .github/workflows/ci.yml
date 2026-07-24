@@ -10,6 +10,9 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 env:
   EXPERIMENTAL_TESTS: "1"
 
@@ -54,17 +57,20 @@ jobs:
         run: python3 -m unittest
         working-directory: python
 
-  # linux:
-  #   name: Linux
-  #   runs-on: ubuntu-latest
-  #   timeout-minutes: 10
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #       with:
-  #         submodules: recursive
-  #     - name: "Test Swift Package on Linux"
-  #       run: >
-  #         swift test --disable-experimental-prebuilts --traits XGrammar
+  linux-onnx:
+    name: Linux ONNX
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+        with:
+          lfs: true
+          persist-credentials: false
+          submodules: recursive
+      - name: Build ONNXCore without an ONNX Runtime library
+        run: bin/test-linux.sh --traits ONNXCore --build-only
+      - name: Test vendored, injected, and Swift System ONNX Runtime APIs
+        run: bin/test-linux.sh --traits ONNX,System
 
   # android:
   #   name: Android

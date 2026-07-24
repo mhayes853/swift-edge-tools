@@ -2,13 +2,31 @@
 
 ## Implementation Status
 
-The Apple implementation and proof gate are complete, including CPU and CoreML execution, Float32/INT4/INT8 models, `ONNXCore` custom backends, and macOS/iOS validation. The requested 1.27.1 Apple archive was not published, so the binary target currently pins Microsoft's official ONNX Runtime 1.27.0 archive. Upgrade the binary target and vendored C headers together when a 1.27.1-compatible artifact is available.
+The Apple implementation and proof gate are complete, including CPU and CoreML
+execution, Float32/INT4/INT8 models, `ONNXCore` custom backends, and macOS/iOS
+validation. The requested 1.27.1 Apple archive was not published, so the binary
+target currently pins Microsoft's official ONNX Runtime 1.27.0 archive. Upgrade
+the binary target and vendored C headers together when a 1.27.1-compatible
+artifact is available.
 
-The initial implementation will prove a concrete ONNX Runtime engine on Apple platforms before extracting any runtime abstraction. All Needle-specific ONNX Swift code will remain in a single file:
+The generic C runtime implementation now lives in:
+
+```text
+Sources/EdgeTools/ONNX/CONNXRuntime.swift
+```
+
+It accepts an injected `OrtApi` function table as an `OpaquePointer` under
+`ONNXCore`. The `ONNX` trait adds a convenience initializer that resolves the
+same table from the vendored runtime. Session creation uses a standard-library
+`String` path and provides conditional `URL` and `SystemPackage.FilePath`
+conveniences. Needle-specific model behavior remains in:
 
 ```text
 Sources/EdgeTools/Models/Needle/Engines/NeedleONNXEngine.swift
 ```
+
+The implementation phases below are retained as historical context for the
+original proof.
 
 ## Phase 1: Prepare the export
 
@@ -16,7 +34,8 @@ Make ONNX export reliably Float32:
 
 - Add explicit Float32 export configuration.
 - Ensure `configuration.json` records Float32.
-- Verify unquantized, INT4, and INT8 models with ONNX Runtime's CPU Execution Provider.
+- Verify unquantized, INT4, and INT8 models with ONNX Runtime's CPU Execution
+  Provider.
 - Preserve external-data support.
 - Keep the `MatMulNBits` contrib operators required by quantized exports.
 
@@ -38,7 +57,8 @@ Include these slices:
 - iOS Simulator arm64.
 - iOS Simulator x86_64.
 
-Reference the official archive directly from the SwiftPM binary target and pin its checksum.
+Reference the official archive directly from the SwiftPM binary target and pin
+its checksum.
 
 ## Phase 3: Add traits without abstraction
 
@@ -52,7 +72,8 @@ During the proof phase:
 - `NeedleONNXEngine` temporarily requires `ONNX`.
 - No ONNX provider protocols exist.
 - The implementation calls ONNX Runtime directly.
-- `ONNXCore` receives the engine only after the proof gate and protocol extraction.
+- `ONNXCore` receives the engine only after the proof gate and protocol
+  extraction.
 
 Neither trait is enabled by default.
 
@@ -89,9 +110,12 @@ CoreML mode appends the CoreML EP before session creation, with options such as:
 - `RequireStaticInputShapes = 1`.
 - `EnableOnSubgraphs = 1`.
 
-ORT's CPU EP remains available as fallback for unsupported graph nodes. `.coreML(.cpuAndGPU)` makes GPU execution eligible, but Core ML still chooses the actual hardware for individual operations.
+ORT's CPU EP remains available as fallback for unsupported graph nodes.
+`.coreML(.cpuAndGPU)` makes GPU execution eligible, but Core ML still chooses
+the actual hardware for individual operations.
 
-Start with `.cpu` as the default. Consider an accelerated default only after correctness and performance are measured.
+Start with `.cpu` as the default. Consider an accelerated default only after
+correctness and performance are measured.
 
 ## Phase 5: First end-to-end CPU test
 
@@ -101,7 +125,8 @@ Create:
 Tests/EdgeToolsTests/Models/Needle/Engines/NeedleONNXEngineTests.swift
 ```
 
-Add only `Generate Basics With CPU Execution Provider` first. It should use the real Float32 Needle export and assert:
+Add only `Generate Basics With CPU Execution Provider` first. It should use the
+real Float32 Needle export and assert:
 
 - Generation completes.
 - It was not stopped.
@@ -123,7 +148,9 @@ Assert:
 - Response matches the separately verified CoreML response.
 - Token counts and confidence values are valid.
 
-If practical, use ONNX Runtime graph-assignment diagnostics to confirm CoreML receives at least one subgraph. This proves CoreML participation, though not the exact hardware used for every Core ML operation.
+If practical, use ONNX Runtime graph-assignment diagnostics to confirm CoreML
+receives at least one subgraph. This proves CoreML participation, though not the
+exact hardware used for every Core ML operation.
 
 ## Phase 7: Grow the real test suite vertically
 
@@ -145,14 +172,16 @@ Add one failing test and make it pass before adding the next.
 5. `Generate Through EdgeToolsSession`.
 6. `Generate Throws When Prompt Exceeds Context Length`.
 
-Use CPU for the main behavior suite. Give CoreML dedicated basic, sequential, concurrent, and cancellation coverage as needed.
+Use CPU for the main behavior suite. Give CoreML dedicated basic, sequential,
+concurrent, and cancellation coverage as needed.
 
 ### Quantization
 
 1. `Generate Basics With INT4 Export`.
 2. `Generate Basics With INT8 Export`.
 
-Run quantized tests with CPU initially. Add accelerated variants only if CoreML accepts meaningful portions of those graphs.
+Run quantized tests with CPU initially. Add accelerated variants only if CoreML
+accepts meaningful portions of those graphs.
 
 Avoid snapshots containing exact timings or complete confidence arrays.
 
@@ -167,7 +196,9 @@ After happy paths work, add these one at a time:
 5. `Runtime Error Preserves ONNX Status And Message`.
 6. `Initialization Throws When Core ML Provider Cannot Be Registered`.
 
-Explicit CoreML selection should throw if provider registration fails. Unsupported graph nodes falling back to CPU after successful registration are expected.
+Explicit CoreML selection should throw if provider registration fails.
+Unsupported graph nodes falling back to CPU after successful registration are
+expected.
 
 ## Phase 9: Proof gate
 
@@ -187,9 +218,12 @@ Do not design protocols until all of these pass:
 
 ## Phase 10: Test-drive the abstraction
 
-Only after the proof gate, add `Generate Using Custom ONNX Backend`. It should supply a backend without importing ONNX Runtime and initially fail because no abstraction exists.
+Only after the proof gate, add `Generate Using Custom ONNX Backend`. It should
+supply a backend without importing ONNX Runtime and initially fail because no
+abstraction exists.
 
-Extract the smallest protocol demonstrated by the concrete implementation. The expected shape is:
+Extract the smallest protocol demonstrated by the concrete implementation. The
+expected shape is:
 
 ```swift
 public protocol NeedleONNXBackend: Sendable {
@@ -208,7 +242,8 @@ public protocol NeedleONNXGeneration: Sendable {
 }
 ```
 
-Execution-provider selection remains part of the concrete ONNX Runtime backend, not the abstract protocol.
+Execution-provider selection remains part of the concrete ONNX Runtime backend,
+not the abstract protocol.
 
 After extraction:
 
@@ -227,18 +262,20 @@ bin/build_onnxruntime_artifactbundles.py
 
 The script pins ONNX Runtime 1.27.0 at commit
 `8f0278c77bf44b0cc83c098c6c722b92a36ac4b5`. It builds one host-compatible
-variant at a time, consolidates ONNX Runtime's component archives, and explicitly
-builds static dependencies such as RE2 that the default build omits. It generates
+variant at a time, consolidates ONNX Runtime's component archives, and
+explicitly builds static dependencies such as RE2 that the default build omits.
+It generates
 and verifies deterministic artifact manifests and ZIPs.
 
 The native WebGPU bundle uses Dawn's Vulkan backend without WebAssembly or NNAPI
 support. Its matrix is:
 
 - Linux x86_64 and ARM64.
-- Android ARM64 and x86_64, built for API 28 and declared compatible through API 36.
+- Android ARM64 and x86_64, built for API 28 and declared compatible through API
+  36.
 
-Build Linux variants in architecture-matched Docker containers and Android variants with the
-local NDK, then assemble them with:
+Build Linux variants in architecture-matched Docker containers and Android
+variants with the local NDK, then assemble them with:
 
 ```console
 python3 \

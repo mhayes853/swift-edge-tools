@@ -111,7 +111,7 @@ let package = Package(
           name: "COnnxRuntime",
           condition: .when(
             platforms: [.macOS, .iOS, .linux, .android],
-            traits: ["ONNX"]
+            traits: ["ONNXCore"]
           )
         ),
         .product(

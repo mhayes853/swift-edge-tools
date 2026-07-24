@@ -2,7 +2,7 @@
   import Atomics
   import Foundation
 
-  #if ONNX && canImport(COnnxRuntime)
+  #if canImport(COnnxRuntime)
     import COnnxRuntime
   #endif
 
@@ -283,37 +283,73 @@
     }
   }
 
-  #if ONNX && canImport(COnnxRuntime)
-    public final class NeedleONNXRuntimeBackend: NeedleONNXBackend {
+  #if canImport(COnnxRuntime)
+    public final class NeedleCONNXRuntimeBackend: NeedleONNXBackend {
       public let configuration: NeedleModelConfiguration
 
-      private let runtime: ONNXRuntime
-      private let encoderSession: ONNXRuntimeSession
-      private let decoderSession: ONNXRuntimeSession
+      private let runtime: CONNXRuntime
+      private let encoderSession: CONNXRuntimeSession
+      private let decoderSession: CONNXRuntimeSession
 
-      public init(
+      public convenience init(
+        api: OpaquePointer,
         modelDirectoryURL: URL,
         runtimeConfiguration: NeedleONNXEngine.RuntimeConfiguration =
           NeedleONNXEngine.RuntimeConfiguration(),
         configuration: NeedleModelConfiguration
       ) throws {
-        let runtime = try ONNXRuntime(configuration: runtimeConfiguration)
-        self.configuration = configuration
-        self.runtime = runtime
-        self.encoderSession = try runtime.session(
+        try self.init(
+          runtime: CONNXRuntime(api: api),
+          modelDirectoryURL: modelDirectoryURL,
+          runtimeConfiguration: runtimeConfiguration,
+          configuration: configuration
+        )
+      }
+
+      #if ONNX
+        public convenience init(
+          modelDirectoryURL: URL,
+          runtimeConfiguration: NeedleONNXEngine.RuntimeConfiguration =
+            NeedleONNXEngine.RuntimeConfiguration(),
+          configuration: NeedleModelConfiguration
+        ) throws {
+          try self.init(
+            runtime: CONNXRuntime(),
+            modelDirectoryURL: modelDirectoryURL,
+            runtimeConfiguration: runtimeConfiguration,
+            configuration: configuration
+          )
+        }
+      #endif
+
+      public init(
+        runtime: CONNXRuntime,
+        modelDirectoryURL: URL,
+        runtimeConfiguration: NeedleONNXEngine.RuntimeConfiguration =
+          NeedleONNXEngine.RuntimeConfiguration(),
+        configuration: NeedleModelConfiguration
+      ) throws {
+        let sessionConfiguration = CONNXRuntime.SessionConfiguration(
+          executionProviders: runtimeConfiguration.executionProvider.runtimeExecutionProviders
+        )
+        let encoderSession = try runtime.session(
           modelURL: modelDirectoryURL.appending(path: "encoder.onnx"),
-          configuration: runtimeConfiguration,
-          expectedInputNames: [TensorName.inputIDs],
-          expectedOutputNames: [
+          configuration: sessionConfiguration
+        )
+        try encoderSession.validateSignature(
+          inputNames: [TensorName.inputIDs],
+          outputNames: [
             TensorName.crossAttentionMask,
             TensorName.encoderProjectedK,
             TensorName.encoderProjectedV
           ]
         )
-        self.decoderSession = try runtime.session(
+        let decoderSession = try runtime.session(
           modelURL: modelDirectoryURL.appending(path: "decoder.onnx"),
-          configuration: runtimeConfiguration,
-          expectedInputNames: [
+          configuration: sessionConfiguration
+        )
+        try decoderSession.validateSignature(
+          inputNames: [
             TensorName.inputIDs,
             TensorName.cachePosition,
             TensorName.selfAttentionMask,
@@ -323,12 +359,16 @@
             TensorName.keyCache,
             TensorName.valueCache
           ],
-          expectedOutputNames: [
+          outputNames: [
             TensorName.logits,
             TensorName.updatedKeyCache,
             TensorName.updatedValueCache
           ]
         )
+        self.configuration = configuration
+        self.runtime = runtime
+        self.encoderSession = encoderSession
+        self.decoderSession = decoderSession
       }
 
       public func prefill(
@@ -341,12 +381,12 @@
             count: self.configuration.encoderMaxLength - paddedTokens.count
           )
         )
-        let inputIDs = try self.runtime.int64Tensor(
-          paddedTokens,
+        let inputIDs = try self.runtime.tensor(
+          values: paddedTokens,
           shape: [1, self.configuration.encoderMaxLength]
         )
         var outputs = try self.encoderSession.run(
-          inputs: [(TensorName.inputIDs, inputIDs)],
+          inputs: [TensorName.inputIDs: inputIDs],
           outputNames: [
             TensorName.crossAttentionMask,
             TensorName.encoderProjectedK,
@@ -360,11 +400,11 @@
         else {
           throw EdgeToolsError.missingModelOutputs
         }
-        return try NeedleONNXRuntimeGeneration(
+        return try NeedleCONNXRuntimeGeneration(
           runtime: self.runtime,
           decoderSession: self.decoderSession,
           configuration: self.configuration,
-          encoderOutputs: NeedleONNXRuntimeGeneration.EncoderOutputs(
+          encoderOutputs: NeedleCONNXRuntimeGeneration.EncoderOutputs(
             crossAttentionMask: crossAttentionMask,
             encoderProjectedK: encoderProjectedK,
             encoderProjectedV: encoderProjectedV
@@ -373,31 +413,34 @@
       }
     }
 
-    private final class NeedleONNXRuntimeGeneration: NeedleONNXGeneration {
+    public typealias NeedleONNXRuntimeBackend = NeedleCONNXRuntimeBackend
+    public typealias EdgeToolsONNXRuntimeError = CONNXRuntimeError
+
+    private final class NeedleCONNXRuntimeGeneration: NeedleONNXGeneration {
       struct EncoderOutputs: Sendable {
-        let crossAttentionMask: ONNXRuntimeTensor
-        let encoderProjectedK: ONNXRuntimeTensor
-        let encoderProjectedV: ONNXRuntimeTensor
+        let crossAttentionMask: CONNXRuntimeTensor
+        let encoderProjectedK: CONNXRuntimeTensor
+        let encoderProjectedV: CONNXRuntimeTensor
       }
 
       private struct Cache: Sendable {
-        var key: ONNXRuntimeTensor
-        var value: ONNXRuntimeTensor
+        var key: CONNXRuntimeTensor
+        var value: CONNXRuntimeTensor
       }
 
       private struct State: ~Copyable {
         var cache: Cache
       }
 
-      private let runtime: ONNXRuntime
-      private let decoderSession: ONNXRuntimeSession
+      private let runtime: CONNXRuntime
+      private let decoderSession: CONNXRuntimeSession
       private let configuration: NeedleModelConfiguration
       private let encoderOutputs: EncoderOutputs
       private let state: Lock<State>
 
       init(
-        runtime: ONNXRuntime,
-        decoderSession: ONNXRuntimeSession,
+        runtime: CONNXRuntime,
+        decoderSession: CONNXRuntimeSession,
         configuration: NeedleModelConfiguration,
         encoderOutputs: EncoderOutputs
       ) throws {
@@ -414,8 +457,8 @@
         self.state = Lock(
           State(
             cache: Cache(
-              key: try runtime.floatTensor(repeating: 0, shape: cacheShape),
-              value: try runtime.floatTensor(repeating: 0, shape: cacheShape)
+              key: try runtime.tensor(repeating: 0, shape: cacheShape),
+              value: try runtime.tensor(repeating: 0, shape: cacheShape)
             )
           )
         )
@@ -426,14 +469,13 @@
         position: Int
       ) async throws -> [Float] {
         try self.state.withLock { state in
-          let inputIDs = try self.runtime.int64Tensor([Int64(tokenID)], shape: [1, 1])
-          let position = try Int32(exactly: position)
-            .unwrapONNXInteger(
-              name: TensorName.cachePosition
-            )
-          let cachePosition = try self.runtime.int32Tensor([position], shape: [1])
-          let selfAttentionMask = try self.runtime.floatTensor(
-            Self.selfAttentionMask(
+          let inputIDs = try self.runtime.tensor(values: [Int64(tokenID)], shape: [1, 1])
+          let position = try Int32(exactly: position).unwrapONNXInteger(
+            name: TensorName.cachePosition
+          )
+          let cachePosition = try self.runtime.tensor(values: [position], shape: [1])
+          let selfAttentionMask = try self.runtime.tensor(
+            values: Self.selfAttentionMask(
               step: Int(position),
               maxLength: self.configuration.encoderMaxLength
             ),
@@ -441,14 +483,14 @@
           )
           var outputs = try self.decoderSession.run(
             inputs: [
-              (TensorName.inputIDs, inputIDs),
-              (TensorName.cachePosition, cachePosition),
-              (TensorName.selfAttentionMask, selfAttentionMask),
-              (TensorName.crossAttentionMask, self.encoderOutputs.crossAttentionMask),
-              (TensorName.encoderProjectedK, self.encoderOutputs.encoderProjectedK),
-              (TensorName.encoderProjectedV, self.encoderOutputs.encoderProjectedV),
-              (TensorName.keyCache, state.cache.key),
-              (TensorName.valueCache, state.cache.value)
+              TensorName.inputIDs: inputIDs,
+              TensorName.cachePosition: cachePosition,
+              TensorName.selfAttentionMask: selfAttentionMask,
+              TensorName.crossAttentionMask: self.encoderOutputs.crossAttentionMask,
+              TensorName.encoderProjectedK: self.encoderOutputs.encoderProjectedK,
+              TensorName.encoderProjectedV: self.encoderOutputs.encoderProjectedV,
+              TensorName.keyCache: state.cache.key,
+              TensorName.valueCache: state.cache.value
             ],
             outputNames: [
               TensorName.logits,
@@ -477,467 +519,27 @@
         return values
       }
     }
-
-    public struct EdgeToolsONNXRuntimeError: Hashable, Sendable, Error {
-      public struct Code: RawRepresentable, Hashable, Sendable {
-        public let rawValue: Int
-
-        public init(rawValue: Int) {
-          self.rawValue = rawValue
-        }
-      }
-
-      public let code: Code
-      public let message: String
-
-      public init(code: Code, message: String) {
-        self.code = code
-        self.message = message
-      }
-    }
-
-    private final class ONNXRuntime: @unchecked Sendable {
-      let api: UnsafePointer<OrtApi>
-      let environment: OpaquePointer
-      let allocator: UnsafeMutablePointer<OrtAllocator>
-
-      init(configuration: NeedleONNXEngine.RuntimeConfiguration) throws {
-        guard
-          let apiBase = OrtGetApiBase(),
-          let api = apiBase.pointee.GetApi(UInt32(ORT_API_VERSION))
-        else {
-          throw EdgeToolsONNXRuntimeError(
-            code: EdgeToolsONNXRuntimeError.Code(rawValue: -1),
-            message: "ONNX Runtime does not support API version \(ORT_API_VERSION)."
-          )
-        }
-        self.api = api
-
-        var environment: OpaquePointer?
-        try Self.check(
-          api: api,
-          status: api.pointee.CreateEnv(
-            ORT_LOGGING_LEVEL_WARNING,
-            "swift-edge-tools",
-            &environment
-          )
-        )
-        guard let environment else {
-          throw EdgeToolsONNXRuntimeError(
-            code: EdgeToolsONNXRuntimeError.Code(rawValue: -1),
-            message: "ONNX Runtime did not create an environment."
-          )
-        }
-        self.environment = environment
-
-        var allocator: UnsafeMutablePointer<OrtAllocator>?
-        do {
-          try Self.check(
-            api: api,
-            status: api.pointee.GetAllocatorWithDefaultOptions(&allocator)
-          )
-          guard let allocator else {
-            throw EdgeToolsONNXRuntimeError(
-              code: EdgeToolsONNXRuntimeError.Code(rawValue: -1),
-              message: "ONNX Runtime did not provide its default allocator."
-            )
-          }
-          self.allocator = allocator
-        } catch {
-          api.pointee.ReleaseEnv(environment)
-          throw error
-        }
-      }
-
-      deinit {
-        self.api.pointee.ReleaseEnv(self.environment)
-      }
-
-      func session(
-        modelURL: URL,
-        configuration: NeedleONNXEngine.RuntimeConfiguration,
-        expectedInputNames: [String],
-        expectedOutputNames: [String]
-      ) throws -> ONNXRuntimeSession {
-        var options: OpaquePointer?
-        try Self.check(api: self.api, status: self.api.pointee.CreateSessionOptions(&options))
-        guard let options else {
-          throw EdgeToolsONNXRuntimeError(
-            code: EdgeToolsONNXRuntimeError.Code(rawValue: -1),
-            message: "ONNX Runtime did not create session options."
-          )
-        }
-        defer { self.api.pointee.ReleaseSessionOptions(options) }
-
-        try Self.check(
-          api: self.api,
-          status: self.api.pointee.SetSessionGraphOptimizationLevel(options, ORT_ENABLE_ALL)
-        )
-        switch configuration.executionProvider {
-        case .cpu:
-          break
-        case .coreML(let computeUnits):
-          try self.appendCoreML(to: options, computeUnits: computeUnits)
-        case .webGPU:
-          try self.appendExecutionProvider(name: "WebGPU", to: options)
-        }
-
-        var session: OpaquePointer?
-        try modelURL.path()
-          .withCString { path in
-            try Self.check(
-              api: self.api,
-              status: self.api.pointee.CreateSession(
-                self.environment,
-                path,
-                options,
-                &session
-              )
-            )
-          }
-        guard let session else {
-          throw EdgeToolsONNXRuntimeError(
-            code: EdgeToolsONNXRuntimeError.Code(rawValue: -1),
-            message: "ONNX Runtime did not create a session for \(modelURL.path())."
-          )
-        }
-        let runtimeSession = ONNXRuntimeSession(
-          runtime: self,
-          session: session
-        )
-        try runtimeSession.validateSignature(
-          inputNames: expectedInputNames,
-          outputNames: expectedOutputNames
-        )
-        return runtimeSession
-      }
-
-      func int64Tensor(_ values: [Int64], shape: [Int]) throws -> ONNXRuntimeTensor {
-        try self.tensor(
-          values: values,
-          shape: shape,
-          elementType: ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64
-        )
-      }
-
-      func int32Tensor(_ values: [Int32], shape: [Int]) throws -> ONNXRuntimeTensor {
-        try self.tensor(
-          values: values,
-          shape: shape,
-          elementType: ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32
-        )
-      }
-
-      func floatTensor(_ values: [Float], shape: [Int]) throws -> ONNXRuntimeTensor {
-        try self.tensor(
-          values: values,
-          shape: shape,
-          elementType: ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT
-        )
-      }
-
-      func floatTensor(repeating value: Float, shape: [Int]) throws -> ONNXRuntimeTensor {
-        let count = shape.reduce(1, *)
-        return try self.floatTensor([Float](repeating: value, count: count), shape: shape)
-      }
-
-      private func tensor<Element>(
-        values: [Element],
-        shape: [Int],
-        elementType: ONNXTensorElementDataType
-      ) throws -> ONNXRuntimeTensor {
-        let dimensions = shape.map(Int64.init)
-        let expectedCount = shape.reduce(1, *)
-        guard values.count == expectedCount else {
-          throw EdgeToolsONNXRuntimeError(
-            code: EdgeToolsONNXRuntimeError.Code(rawValue: -1),
-            message: "Tensor shape \(shape) requires \(expectedCount) values, got \(values.count)."
-          )
-        }
-
-        var tensor: OpaquePointer?
-        try dimensions.withUnsafeBufferPointer { dimensions in
-          try Self.check(
-            api: self.api,
-            status: self.api.pointee.CreateTensorAsOrtValue(
-              self.allocator,
-              dimensions.baseAddress,
-              dimensions.count,
-              elementType,
-              &tensor
-            )
-          )
-        }
-        guard let tensor else {
-          throw EdgeToolsONNXRuntimeError(
-            code: EdgeToolsONNXRuntimeError.Code(rawValue: -1),
-            message: "ONNX Runtime did not create a tensor."
-          )
-        }
-
-        do {
-          var bytes: UnsafeMutableRawPointer?
-          try Self.check(
-            api: self.api,
-            status: self.api.pointee.GetTensorMutableData(tensor, &bytes)
-          )
-          guard let bytes else {
-            throw EdgeToolsONNXRuntimeError(
-              code: EdgeToolsONNXRuntimeError.Code(rawValue: -1),
-              message: "ONNX Runtime tensor did not provide mutable storage."
-            )
-          }
-          values.withUnsafeBufferPointer { source in
-            guard let sourceAddress = source.baseAddress else { return }
-            bytes.copyMemory(
-              from: sourceAddress,
-              byteCount: values.count * MemoryLayout<Element>.stride
-            )
-          }
-          return ONNXRuntimeTensor(api: self.api, tensor: tensor)
-        } catch {
-          self.api.pointee.ReleaseValue(tensor)
-          throw error
-        }
-      }
-
-      private func appendCoreML(
-        to options: OpaquePointer,
-        computeUnits: NeedleONNXEngine.CoreMLComputeUnits
-      ) throws {
-        try self.appendExecutionProvider(
-          name: "CoreML",
-          options: [
-            ("MLComputeUnits", computeUnits.rawValue),
-            ("ModelFormat", "MLProgram"),
-            ("RequireStaticInputShapes", "1"),
-            ("EnableOnSubgraphs", "1")
-          ],
-          to: options
-        )
-      }
-
-      private func appendExecutionProvider(
-        name: String,
-        options: [(String, String)] = [],
-        to sessionOptions: OpaquePointer
-      ) throws {
-        let keys = options.map(\.0)
-        let values = options.map(\.1)
-        try withCopiedCStringPointerBuffer(keys) { keyPointers in
-          try withCopiedCStringPointerBuffer(values) { valuePointers in
-            try name.withCString { providerName in
-              try Self.check(
-                api: self.api,
-                status: self.api.pointee.SessionOptionsAppendExecutionProvider(
-                  sessionOptions,
-                  providerName,
-                  keyPointers.baseAddress,
-                  valuePointers.baseAddress,
-                  keyPointers.count
-                )
-              )
-            }
-          }
-        }
-      }
-
-      static func check(api: UnsafePointer<OrtApi>, status: OpaquePointer?) throws {
-        guard let status else { return }
-        defer { api.pointee.ReleaseStatus(status) }
-        let code = api.pointee.GetErrorCode(status)
-        let message =
-          api.pointee.GetErrorMessage(status).map(String.init(cString:))
-          ?? "Unknown ONNX Runtime error."
-        throw EdgeToolsONNXRuntimeError(
-          code: EdgeToolsONNXRuntimeError.Code(rawValue: Int(code.rawValue)),
-          message: message
-        )
-      }
-    }
-
-    // Safe because ONNX Runtime environments and sessions support concurrent inference, and this
-    // wrapper never mutates or replaces the session pointer after initialization.
-    private final class ONNXRuntimeSession: @unchecked Sendable {
-      private let runtime: ONNXRuntime
-      private let session: OpaquePointer
-
-      private var api: UnsafePointer<OrtApi> { self.runtime.api }
-      private var allocator: UnsafeMutablePointer<OrtAllocator> { self.runtime.allocator }
-
-      init(runtime: ONNXRuntime, session: OpaquePointer) {
-        self.runtime = runtime
-        self.session = session
-      }
-
-      deinit {
-        self.api.pointee.ReleaseSession(self.session)
-      }
-
-      func validateSignature(
-        inputNames expectedInputNames: [String],
-        outputNames expectedOutputNames: [String]
-      ) throws {
-        let inputNames = try self.names(
-          count: self.api.pointee.SessionGetInputCount,
-          name: self.api.pointee.SessionGetInputName
-        )
-        let outputNames = try self.names(
-          count: self.api.pointee.SessionGetOutputCount,
-          name: self.api.pointee.SessionGetOutputName
-        )
-        guard inputNames == expectedInputNames, outputNames == expectedOutputNames else {
-          throw EdgeToolsONNXRuntimeError(
-            code: EdgeToolsONNXRuntimeError.Code(rawValue: -1),
-            message:
-              "Invalid ONNX model signature. Expected inputs \(expectedInputNames) and outputs \(expectedOutputNames), got inputs \(inputNames) and outputs \(outputNames)."
-          )
-        }
-      }
-
-      func run(
-        inputs: [(String, ONNXRuntimeTensor)],
-        outputNames: [String]
-      ) throws -> [String: ONNXRuntimeTensor] {
-        let inputValues = inputs.map { Optional($0.1.tensor) }
-        var outputValues = [OpaquePointer?](repeating: nil, count: outputNames.count)
-        try withCopiedCStringPointerBuffer(inputs.map(\.0)) { inputNamePointers in
-          try withCopiedCStringPointerBuffer(outputNames) { outputNamePointers in
-            try inputValues.withUnsafeBufferPointer { inputValues in
-              try outputValues.withUnsafeMutableBufferPointer { outputValues in
-                try ONNXRuntime.check(
-                  api: self.api,
-                  status: self.api.pointee.Run(
-                    self.session,
-                    nil,
-                    inputNamePointers.baseAddress,
-                    inputValues.baseAddress,
-                    inputValues.count,
-                    outputNamePointers.baseAddress,
-                    outputNamePointers.count,
-                    outputValues.baseAddress
-                  )
-                )
-              }
-            }
-          }
-        }
-
-        return try Dictionary(
-          uniqueKeysWithValues: zip(outputNames, outputValues)
-            .map { name, pointer in
-              guard let pointer else {
-                throw EdgeToolsONNXRuntimeError(
-                  code: EdgeToolsONNXRuntimeError.Code(rawValue: -1),
-                  message: "ONNX Runtime did not return output \(name)."
-                )
-              }
-              return (name, ONNXRuntimeTensor(api: self.api, tensor: pointer))
-            }
-        )
-      }
-
-      private func names(
-        count getCount: (OpaquePointer?, UnsafeMutablePointer<Int>?) -> OpaquePointer?,
-        name getName: (
-          OpaquePointer?,
-          Int,
-          UnsafeMutablePointer<OrtAllocator>?,
-          UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
-        ) -> OpaquePointer?
-      ) throws -> [String] {
-        var count = 0
-        try ONNXRuntime.check(api: self.api, status: getCount(self.session, &count))
-        return try (0..<count)
-          .map { index in
-            var name: UnsafeMutablePointer<CChar>?
-            try ONNXRuntime.check(
-              api: self.api,
-              status: getName(self.session, index, self.allocator, &name)
-            )
-            guard let name else {
-              throw EdgeToolsONNXRuntimeError(
-                code: EdgeToolsONNXRuntimeError.Code(rawValue: -1),
-                message: "ONNX Runtime did not return a model input or output name."
-              )
-            }
-            defer { self.allocator.pointee.Free(self.allocator, name) }
-            return String(cString: name)
-          }
-      }
-    }
-
-    // Safe because tensor storage is fully initialized before publication and this wrapper only
-    // provides immutable reads. Every generated tensor has independent ONNX Runtime-owned storage.
-    private final class ONNXRuntimeTensor: @unchecked Sendable {
-      private let api: UnsafePointer<OrtApi>
-      fileprivate let tensor: OpaquePointer
-
-      init(api: UnsafePointer<OrtApi>, tensor: OpaquePointer) {
-        self.api = api
-        self.tensor = tensor
-      }
-
-      deinit {
-        self.api.pointee.ReleaseValue(self.tensor)
-      }
-
-      func floatValues(count: Int) throws -> [Float] {
-        var shapeInfo: OpaquePointer?
-        try ONNXRuntime.check(
-          api: self.api,
-          status: self.api.pointee.GetTensorTypeAndShape(self.tensor, &shapeInfo)
-        )
-        guard let shapeInfo else {
-          throw EdgeToolsONNXRuntimeError(
-            code: EdgeToolsONNXRuntimeError.Code(rawValue: -1),
-            message: "ONNX Runtime did not return tensor type and shape information."
-          )
-        }
-        defer { self.api.pointee.ReleaseTensorTypeAndShapeInfo(shapeInfo) }
-
-        var elementType = ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED
-        try ONNXRuntime.check(
-          api: self.api,
-          status: self.api.pointee.GetTensorElementType(shapeInfo, &elementType)
-        )
-        var elementCount = 0
-        try ONNXRuntime.check(
-          api: self.api,
-          status: self.api.pointee.GetTensorShapeElementCount(shapeInfo, &elementCount)
-        )
-        guard elementType == ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, elementCount == count else {
-          throw EdgeToolsONNXRuntimeError(
-            code: EdgeToolsONNXRuntimeError.Code(rawValue: -1),
-            message:
-              "Expected a Float32 tensor with \(count) values, got element type \(elementType.rawValue) with \(elementCount) values."
-          )
-        }
-
-        var bytes: UnsafeMutableRawPointer?
-        try ONNXRuntime.check(
-          api: self.api,
-          status: self.api.pointee.GetTensorMutableData(self.tensor, &bytes)
-        )
-        guard let bytes else {
-          throw EdgeToolsONNXRuntimeError(
-            code: EdgeToolsONNXRuntimeError.Code(rawValue: -1),
-            message: "ONNX Runtime tensor did not provide Float32 storage."
-          )
-        }
-        return Array(
-          UnsafeBufferPointer(start: bytes.assumingMemoryBound(to: Float.self), count: count)
-        )
-      }
-    }
   #endif
 
-  #if ONNX && canImport(COnnxRuntime)
+  #if canImport(COnnxRuntime)
+    extension NeedleONNXEngine.ExecutionProvider {
+      fileprivate var runtimeExecutionProviders: [CONNXRuntime.ExecutionProvider] {
+        switch self {
+        case .cpu:
+          []
+        case .coreML(let computeUnits):
+          [.coreML(computeUnits: computeUnits.rawValue)]
+        case .webGPU:
+          [.webGPU]
+        }
+      }
+    }
+
     extension Optional where Wrapped: FixedWidthInteger {
       fileprivate func unwrapONNXInteger(name: String) throws -> Wrapped {
         guard let value = self else {
           throw EdgeToolsONNXRuntimeError(
-            code: EdgeToolsONNXRuntimeError.Code(rawValue: -1),
+            code: .integerConversionFailure,
             message: "Value for \(name) cannot be represented by the ONNX model's integer type."
           )
         }
@@ -959,5 +561,4 @@
       static let logits = "logits"
     }
   #endif
-// pi-lens-ignore: file_length
 #endif

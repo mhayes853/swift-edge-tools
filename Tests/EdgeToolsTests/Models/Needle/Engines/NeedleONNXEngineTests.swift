@@ -416,7 +416,8 @@
         let error = await #expect(throws: EdgeToolsONNXRuntimeError.self) {
           _ = try await NeedleONNXEngine(modelDirectoryURL: directory)
         }
-        #expect(error?.message.contains("signature") == true)
+        expectNoDifference(error?.code, .invalidModelSignature)
+        expectNoDifference(error?.message.contains("signature"), true)
       }
 
       @Test
@@ -432,8 +433,9 @@
         let error = await #expect(throws: EdgeToolsONNXRuntimeError.self) {
           _ = try await NeedleONNXEngine(modelDirectoryURL: directory)
         }
-        #expect(error?.code.rawValue != -1)
-        #expect(error?.message.isEmpty == false)
+        expectNoDifference(error?.code, .onnxRuntime)
+        expectNoDifference(error?.onnxRuntimeCode != nil, true)
+        expectNoDifference(error?.message.isEmpty, false)
       }
 
       @Test
