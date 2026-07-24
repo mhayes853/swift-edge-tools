@@ -49,10 +49,10 @@ let package = Package(
     .trait(
       name: "ONNXCore",
       description: """
-      Needle ONNX engine and runtime-provider protocols.
+        Needle ONNX engine and runtime-provider protocols.
 
-      (Only enable this trait if you want to use your own ONNX build. Otherwise, enable `ONNX` directly.)
-      """,
+        (Only enable this trait if you want to use your own ONNX build. Otherwise, enable `ONNX` directly.)
+        """,
       enabledTraits: ["XGrammar", "Foundation", "Atomics"]
     ),
     .trait(
@@ -97,7 +97,11 @@ let package = Package(
         .product(name: "HeapModule", package: "swift-collections"),
         .product(name: "OrderedCollections", package: "swift-collections"),
         .product(name: "Atomics", package: "swift-atomics", condition: .when(traits: ["Atomics"])),
-        .product(name: "SystemPackage", package: "swift-system", condition: .when(traits: ["System"])),
+        .product(
+          name: "SystemPackage",
+          package: "swift-system",
+          condition: .when(traits: ["System"])
+        ),
         .product(name: "MLX", package: "mlx-swift", condition: .when(traits: ["MLX"])),
         .product(name: "MLXNN", package: "mlx-swift", condition: .when(traits: ["MLX"])),
         .product(name: "MLXLLM", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),
@@ -105,7 +109,10 @@ let package = Package(
         .target(name: "CXGrammar", condition: .when(traits: ["XGrammar"])),
         .target(
           name: "COnnxRuntime",
-          condition: .when(platforms: [.macOS, .iOS], traits: ["ONNX"])
+          condition: .when(
+            platforms: [.macOS, .iOS, .linux, .android],
+            traits: ["ONNX"]
+          )
         ),
         .product(
           name: "Tokenizers",
@@ -126,6 +133,10 @@ let package = Package(
         .target(
           name: "onnxruntime",
           condition: .when(platforms: [.macOS, .iOS], traits: ["ONNX"])
+        ),
+        .target(
+          name: "onnxruntimeNonApple",
+          condition: .when(platforms: [.linux, .android], traits: ["ONNX"])
         )
       ],
       exclude: ["LICENSE"],
@@ -135,6 +146,10 @@ let package = Package(
       name: "onnxruntime",
       url: "https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.27.0.zip",
       checksum: "8c74edd600eafc3055de9e8f7a9602afee44ed516913cb5e132bca02cc34622c"
+    ),
+    .binaryTarget(
+      name: "onnxruntimeNonApple",
+      path: "bin/onnxruntime-webgpu-1.27.0.artifactbundle.zip"
     ),
     .target(
       name: "CXGrammar",
@@ -196,7 +211,10 @@ let package = Package(
         "EdgeTools",
         .target(
           name: "COnnxRuntime",
-          condition: .when(platforms: [.macOS, .iOS], traits: ["ONNX"])
+          condition: .when(
+            platforms: [.macOS, .iOS, .linux, .android],
+            traits: ["ONNX"]
+          )
         ),
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
         .product(name: "CustomDump", package: "swift-custom-dump"),

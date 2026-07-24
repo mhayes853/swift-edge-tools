@@ -60,7 +60,10 @@ package struct Lock<Value: ~Copyable>: ~Copyable {
       defer { self.lock.unlock() }
       return try body(self.value.pointee)
     #else
-      try self.lock.withLock { try body($0) }
+      try self.lock.withLock {
+        (value: inout sending Value) throws(E) -> sending Result in
+        try body(value)
+      }
     #endif
   }
 }

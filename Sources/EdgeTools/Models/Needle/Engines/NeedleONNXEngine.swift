@@ -35,6 +35,7 @@
     public enum ExecutionProvider: Hashable, Sendable {
       case cpu
       case coreML(computeUnits: CoreMLComputeUnits)
+      case webGPU
     }
 
     public enum CoreMLComputeUnits: String, Hashable, Sendable {
@@ -296,7 +297,7 @@
           NeedleONNXEngine.RuntimeConfiguration(),
         configuration: NeedleModelConfiguration
       ) throws {
-        let runtime = try ONNXRuntime()
+        let runtime = try ONNXRuntime(configuration: runtimeConfiguration)
         self.configuration = configuration
         self.runtime = runtime
         self.encoderSession = try runtime.session(
@@ -500,7 +501,7 @@
       let environment: OpaquePointer
       let allocator: UnsafeMutablePointer<OrtAllocator>
 
-      init() throws {
+      init(configuration: NeedleONNXEngine.RuntimeConfiguration) throws {
         guard
           let apiBase = OrtGetApiBase(),
           let api = apiBase.pointee.GetApi(UInt32(ORT_API_VERSION))
@@ -530,18 +531,22 @@
         self.environment = environment
 
         var allocator: UnsafeMutablePointer<OrtAllocator>?
-        try Self.check(
-          api: api,
-          status: api.pointee.GetAllocatorWithDefaultOptions(&allocator)
-        )
-        guard let allocator else {
-          api.pointee.ReleaseEnv(environment)
-          throw EdgeToolsONNXRuntimeError(
-            code: EdgeToolsONNXRuntimeError.Code(rawValue: -1),
-            message: "ONNX Runtime did not provide its default allocator."
+        do {
+          try Self.check(
+            api: api,
+            status: api.pointee.GetAllocatorWithDefaultOptions(&allocator)
           )
+          guard let allocator else {
+            throw EdgeToolsONNXRuntimeError(
+              code: EdgeToolsONNXRuntimeError.Code(rawValue: -1),
+              message: "ONNX Runtime did not provide its default allocator."
+            )
+          }
+          self.allocator = allocator
+        } catch {
+          api.pointee.ReleaseEnv(environment)
+          throw error
         }
-        self.allocator = allocator
       }
 
       deinit {
@@ -568,8 +573,13 @@
           api: self.api,
           status: self.api.pointee.SetSessionGraphOptimizationLevel(options, ORT_ENABLE_ALL)
         )
-        if case .coreML(let computeUnits) = configuration.executionProvider {
+        switch configuration.executionProvider {
+        case .cpu:
+          break
+        case .coreML(let computeUnits):
           try self.appendCoreML(to: options, computeUnits: computeUnits)
+        case .webGPU:
+          try self.appendExecutionProvider(name: "WebGPU", to: options)
         }
 
         var session: OpaquePointer?
@@ -592,8 +602,7 @@
           )
         }
         let runtimeSession = ONNXRuntimeSession(
-          api: self.api,
-          allocator: self.allocator,
+          runtime: self,
           session: session
         )
         try runtimeSession.validateSignature(
@@ -696,28 +705,39 @@
         to options: OpaquePointer,
         computeUnits: NeedleONNXEngine.CoreMLComputeUnits
       ) throws {
-        let keys = [
-          "MLComputeUnits",
-          "ModelFormat",
-          "RequireStaticInputShapes",
-          "EnableOnSubgraphs"
-        ]
-        let values = [computeUnits.rawValue, "MLProgram", "1", "1"]
+        try self.appendExecutionProvider(
+          name: "CoreML",
+          options: [
+            ("MLComputeUnits", computeUnits.rawValue),
+            ("ModelFormat", "MLProgram"),
+            ("RequireStaticInputShapes", "1"),
+            ("EnableOnSubgraphs", "1")
+          ],
+          to: options
+        )
+      }
+
+      private func appendExecutionProvider(
+        name: String,
+        options: [(String, String)] = [],
+        to sessionOptions: OpaquePointer
+      ) throws {
+        let keys = options.map(\.0)
+        let values = options.map(\.1)
         try withCopiedCStringPointerBuffer(keys) { keyPointers in
           try withCopiedCStringPointerBuffer(values) { valuePointers in
-            try "CoreML"
-              .withCString { providerName in
-                try Self.check(
-                  api: self.api,
-                  status: self.api.pointee.SessionOptionsAppendExecutionProvider(
-                    options,
-                    providerName,
-                    keyPointers.baseAddress,
-                    valuePointers.baseAddress,
-                    keyPointers.count
-                  )
+            try name.withCString { providerName in
+              try Self.check(
+                api: self.api,
+                status: self.api.pointee.SessionOptionsAppendExecutionProvider(
+                  sessionOptions,
+                  providerName,
+                  keyPointers.baseAddress,
+                  valuePointers.baseAddress,
+                  keyPointers.count
                 )
-              }
+              )
+            }
           }
         }
       }
@@ -739,17 +759,14 @@
     // Safe because ONNX Runtime environments and sessions support concurrent inference, and this
     // wrapper never mutates or replaces the session pointer after initialization.
     private final class ONNXRuntimeSession: @unchecked Sendable {
-      private let api: UnsafePointer<OrtApi>
-      private let allocator: UnsafeMutablePointer<OrtAllocator>
+      private let runtime: ONNXRuntime
       private let session: OpaquePointer
 
-      init(
-        api: UnsafePointer<OrtApi>,
-        allocator: UnsafeMutablePointer<OrtAllocator>,
-        session: OpaquePointer
-      ) {
-        self.api = api
-        self.allocator = allocator
+      private var api: UnsafePointer<OrtApi> { self.runtime.api }
+      private var allocator: UnsafeMutablePointer<OrtAllocator> { self.runtime.allocator }
+
+      init(runtime: ONNXRuntime, session: OpaquePointer) {
+        self.runtime = runtime
         self.session = session
       }
 
@@ -942,4 +959,5 @@
       static let logits = "logits"
     }
   #endif
+// pi-lens-ignore: file_length
 #endif

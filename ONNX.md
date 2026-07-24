@@ -217,9 +217,66 @@ After extraction:
 - The complete real CPU/CoreML suite passes unchanged.
 - All Needle-specific ONNX implementation remains in `NeedleONNXEngine.swift`.
 
+## Non-Apple static artifact bundles
+
+Build tooling lives at:
+
+```text
+bin/build_onnxruntime_artifactbundles.py
+```
+
+The script pins ONNX Runtime 1.27.0 at commit
+`8f0278c77bf44b0cc83c098c6c722b92a36ac4b5`. It builds one host-compatible
+variant at a time, consolidates ONNX Runtime's component archives, and explicitly
+builds static dependencies such as RE2 that the default build omits. It generates
+and verifies deterministic artifact manifests and ZIPs.
+
+The native WebGPU bundle uses Dawn's Vulkan backend without WebAssembly or NNAPI
+support. Its matrix is:
+
+- Linux x86_64 and ARM64.
+- Android ARM64 and x86_64, built for API 28 and declared compatible through API 36.
+
+Build Linux variants in architecture-matched Docker containers and Android variants with the
+local NDK, then assemble them with:
+
+```console
+python3 \
+  bin/build_onnxruntime_artifactbundles.py \
+  container-build \
+  --variant linux-x86_64
+python3 \
+  bin/build_onnxruntime_artifactbundles.py \
+  container-build \
+  --variant linux-aarch64
+python3 \
+  bin/build_onnxruntime_artifactbundles.py \
+  build \
+  --variant android-arm64 \
+  --android-sdk "$ANDROID_HOME" \
+  --android-ndk "$ANDROID_NDK_HOME"
+python3 \
+  bin/build_onnxruntime_artifactbundles.py \
+  build \
+  --variant android-x86_64 \
+  --android-sdk "$ANDROID_HOME" \
+  --android-ndk "$ANDROID_NDK_HOME"
+python3 bin/build_onnxruntime_artifactbundles.py assemble
+```
+
+The completed deterministic archive is checked in through Git LFS at:
+
+```text
+bin/onnxruntime-webgpu-1.27.0.artifactbundle.zip
+```
+
+Its SwiftPM checksum is
+`536f66970b7c9d44125763e8f8eba8af3d625f3f48bead531e38792258593eaa`.
+The bundle's four variants have been verified as static archives, and both Linux
+variants have successfully linked into Swift executables.
+
 ## Deferred work
 
-- Linux, Windows, and Android static-library artifact bundles.
 - Reduced-operator builds.
 - WASI and other WebAssembly targets.
 - Dynamic library loading.

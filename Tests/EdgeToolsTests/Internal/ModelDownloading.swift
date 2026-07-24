@@ -42,11 +42,14 @@ import Foundation
 
 extension URL {
   static let swiftEdgeToolsTestsDirectory = {
-    #if os(macOS)
+    #if os(macOS) || os(Linux)
       URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         .appendingPathComponent(".swift-needle-tests")
-    #else
+    #elseif canImport(Darwin)
       URL.documentsDirectory
+        .appendingPathComponent(".swift-needle-tests")
+    #else
+      FileManager.default.temporaryDirectory
         .appendingPathComponent(".swift-needle-tests")
     #endif
   }()

@@ -165,7 +165,7 @@ private func validateBitmaskCoverage(mask: GrammarBitmask, vocabularySize: Int) 
   }
 #endif
 
-@inline(always)
+@inline(__always)
 private func applyBitmaskSIMDRow(
   logits: UnsafeMutablePointer<Float>,
   vocabularySize: Int,
@@ -185,7 +185,7 @@ private func applyBitmaskSIMDRow(
   }
 }
 
-@inline(always)
+@inline(__always)
 private func bitmaskValue(maskBytes: UnsafeBufferPointer<UInt8>, index: Int) -> Float {
   let tableIndex = Int(maskBytes[index >> 3]) * 8 + (index & 7)
   return bitmaskTable[tableIndex]

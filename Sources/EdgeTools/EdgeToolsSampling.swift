@@ -20,7 +20,7 @@ public protocol EdgeToolsSampler<Logits> {
 
 // MARK: - Argmax
 
-@inline(always)
+@inline(__always)
 func argmaxContiguous(_ values: UnsafeBufferPointer<Float>) -> Int {
   #if canImport(Accelerate)
     argmaxVDSP(values)
@@ -30,7 +30,7 @@ func argmaxContiguous(_ values: UnsafeBufferPointer<Float>) -> Int {
 }
 
 #if canImport(Accelerate)
-  @inline(always)
+  @inline(__always)
   func argmaxVDSP(_ values: UnsafeBufferPointer<Float>) -> Int {
     guard !values.isEmpty else { return 0 }
     var maximum = Float.zero
@@ -40,7 +40,7 @@ func argmaxContiguous(_ values: UnsafeBufferPointer<Float>) -> Int {
   }
 #endif
 
-@inline(always)
+@inline(__always)
 func argmaxSIMD(_ values: UnsafeBufferPointer<Float>) -> Int {
   guard !values.isEmpty else { return 0 }
   let width = SIMD8<Float>.scalarCount
@@ -74,7 +74,7 @@ func argmaxSIMD(_ values: UnsafeBufferPointer<Float>) -> Int {
   )
 }
 
-@inline(always)
+@inline(__always)
 private func updateArgmaxSIMD(
   _ values: UnsafeBufferPointer<Float>,
   at index: Int,
@@ -99,7 +99,7 @@ private func updateArgmaxSIMD(
   bestIndices.replace(with: candidateIndices, where: replacementMask)
 }
 
-@inline(always)
+@inline(__always)
 private func reduceArgmaxSIMD(
   values: SIMD8<Float>,
   indices: SIMD8<Int32>,
@@ -116,7 +116,7 @@ private func reduceArgmaxSIMD(
   }
 }
 
-@inline(always)
+@inline(__always)
 func argmaxScalar(
   count: Int,
   from initialIndex: Int = 0,
