@@ -12,6 +12,18 @@
   @Suite
   struct `CONNXRuntime tests` {
     @Test
+    func `Run Model Through Execution Protocols`() async throws {
+      let runtime = try CONNXRuntime()
+      let values = try await Self.executeAdd(
+        runtime: runtime,
+        model: try Self.modelURL().path(),
+        configuration: CONNXRuntime.SessionConfiguration()
+      )
+
+      expectNoDifference(values, [5, 7, 9])
+    }
+
+    @Test
     func `Run Model Using Vendored ONNX Runtime`() throws {
       let runtime = try CONNXRuntime()
       let session = try runtime.session(modelURL: try Self.modelURL())
@@ -49,10 +61,10 @@
       let session = try runtime.session(modelURL: try Self.modelURL())
       let tensor = try runtime.tensor(values: [Float(1), 2, 3], shape: [1, 3])
 
-      expectNoDifference(try session.inputNames, ["x", "y"])
-      expectNoDifference(try session.outputNames, ["sum"])
-      expectNoDifference(try tensor.elementType, .float)
-      expectNoDifference(try tensor.shape, [1, 3])
+      expectNoDifference(session.inputNames, ["x", "y"])
+      expectNoDifference(session.outputNames, ["sum"])
+      expectNoDifference(tensor.dtype, .float)
+      expectNoDifference(tensor.shape, [1, 3])
     }
 
     @Test
@@ -84,6 +96,22 @@
         try tensor.floatValues()
       }
       expectNoDifference(error?.code, .unexpectedTensorElementType)
+    }
+
+    private static func executeAdd<Runtime: EdgeToolsONNXRuntime>(
+      runtime: Runtime,
+      model: Runtime.ModelSource,
+      configuration: Runtime.SessionConfiguration
+    ) async throws -> [Float] {
+      let session = try await runtime.session(model: model, configuration: configuration)
+      let firstInput = try runtime.tensor(values: [Float(1), 2, 3], shape: [3])
+      let secondInput = try runtime.tensor(values: [Float(4), 5, 6], shape: [3])
+      let outputs = try await session.run(
+        inputs: ["x": firstInput, "y": secondInput],
+        outputNames: ["sum"]
+      )
+      let output = try #require(outputs["sum"])
+      return try await output.floatValues()
     }
 
     private static func modelURL() throws -> URL {
