@@ -44,10 +44,9 @@
 
   // MARK: - CONNXRuntime
 
-  // Safe because the API table and environment pointers are immutable after initialization, and
-  // ONNX Runtime environments support concurrent session creation and inference.
   public final class CONNXRuntime: @unchecked Sendable {
-    /// The ONNX Runtime C API version expected by this package's bundled headers.
+    // Safe because the API table and environment pointers are immutable after initialization, and
+    // ONNX Runtime environments support concurrent session creation and inference.
     public static let apiVersion = UInt32(ORT_API_VERSION)
 
     let api: UnsafePointer<OrtApi>
@@ -381,8 +380,9 @@
 
   // MARK: - CONNXRuntimeSession
 
-  // ONNX Runtime sessions support concurrent inference, and the pointer is immutable after init.
   public final class CONNXRuntimeSession: @unchecked Sendable {
+    // ONNX Runtime sessions support concurrent inference, and the pointer is immutable after init,
+    // so this is safe.
     private let runtime: CONNXRuntime
     private let session: OpaquePointer
 
@@ -532,8 +532,9 @@
 
   // MARK: - CONNXRuntimeTensor
 
-  // Tensor storage is initialized before publication and only immutable reads are exposed.
   public final class CONNXRuntimeTensor: @unchecked Sendable {
+    // Tensor storage is initialized before publication and only immutable reads are exposed, so
+    // this is safe.
     public typealias DType = EdgeToolsONNXDType
 
     fileprivate let runtime: CONNXRuntime

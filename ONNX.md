@@ -216,41 +216,32 @@ Do not design protocols until all of these pass:
 - macOS execution.
 - iOS device and simulator linking.
 
-## Phase 10: Test-drive the abstraction
+## Phase 10: Generic ONNX execution and engine
 
-Only after the proof gate, add `Generate Using Custom ONNX Backend`. It should
-supply a backend without importing ONNX Runtime and initially fail because no
-abstraction exists.
+The abstraction separates the runtime, model, and engine:
 
-Extract the smallest protocol demonstrated by the concrete implementation. The
-expected shape is:
+- `EdgeToolsONNXRuntime` creates sessions and tensors.
+- `EdgeToolsONNXModel` owns model-specific sessions and generation state.
+- `EdgeToolsONNXEngine` owns tokenization, grammar matching, sampling, and metrics.
+- Concrete model loading remains outside the model protocol.
+
+A model's `prepare` operation returns its initial logits and arbitrary generation
+state. Subsequent `decode` calls receive sampled token IDs and update that state.
+Models with a conventional prefill phase can conform to
+`EdgeToolsPrefillableONNXModel`, whose default `prepare` implementation delegates
+to `prefill`.
+
+Needle stores its encoder and decoder sessions in `NeedleONNXModel`, while its
+per-generation state stores encoder outputs, decoder caches, and decoder position.
+Its decoder-start token remains a Needle configuration detail rather than part of
+the generic protocol.
+
+Execution-provider selection and directory-based session loading remain concrete
+Needle C ONNX Runtime conveniences. The public initializer follows the MLX shape:
 
 ```swift
-public protocol NeedleONNXBackend: Sendable {
-  var configuration: NeedleModelConfiguration { get }
-
-  func prefill(
-    tokenIDs: [EdgeToolsToken.ID]
-  ) async throws -> any NeedleONNXGeneration
-}
-
-public protocol NeedleONNXGeneration: Sendable {
-  func decode(
-    tokenID: EdgeToolsToken.ID,
-    position: Int
-  ) async throws -> [Float]
-}
+let engine = try await NeedleONNXEngine(from: modelDirectoryURL)
 ```
-
-Execution-provider selection remains part of the concrete ONNX Runtime backend,
-not the abstract protocol.
-
-After extraction:
-
-- `NeedleONNXEngine` moves under `ONNXCore`.
-- Concrete ONNX Runtime support remains under `ONNX`.
-- The complete real CPU/CoreML suite passes unchanged.
-- All Needle-specific ONNX implementation remains in `NeedleONNXEngine.swift`.
 
 ## Non-Apple static artifact bundles
 
