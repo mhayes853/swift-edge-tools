@@ -6,31 +6,25 @@ extension String {
     var wordStart = self.startIndex
     var searchRange = wordStart..<self.endIndex
 
-    while let upperCaseRange = self[searchRange]
-      .rangeOfCharacter(from: .uppercaseLetters, options: [])
-    {
-      let untilUpperCase = wordStart..<upperCaseRange.lowerBound
-      words.append(untilUpperCase)
+    while let upperCaseIndex = self[searchRange].firstIndex(where: \.isUppercase) {
+      words.append(wordStart..<upperCaseIndex)
 
-      searchRange = upperCaseRange.lowerBound..<searchRange.upperBound
-      guard
-        let lowerCaseRange = self[searchRange]
-          .rangeOfCharacter(from: .lowercaseLetters, options: [])
-      else {
+      searchRange = upperCaseIndex..<searchRange.upperBound
+      guard let lowerCaseIndex = self[searchRange].firstIndex(where: \.isLowercase) else {
         wordStart = searchRange.lowerBound
         break
       }
 
-      let nextCharacterAfterCapital = self.index(after: upperCaseRange.lowerBound)
-      if lowerCaseRange.lowerBound == nextCharacterAfterCapital {
-        wordStart = upperCaseRange.lowerBound
+      let nextCharacterAfterCapital = self.index(after: upperCaseIndex)
+      if lowerCaseIndex == nextCharacterAfterCapital {
+        wordStart = upperCaseIndex
       } else {
-        let beforeLowerIndex = self.index(before: lowerCaseRange.lowerBound)
-        words.append(upperCaseRange.lowerBound..<beforeLowerIndex)
+        let beforeLowerIndex = self.index(before: lowerCaseIndex)
+        words.append(upperCaseIndex..<beforeLowerIndex)
 
         wordStart = beforeLowerIndex
       }
-      searchRange = lowerCaseRange.upperBound..<searchRange.upperBound
+      searchRange = self.index(after: lowerCaseIndex)..<searchRange.upperBound
     }
     words.append(wordStart..<searchRange.upperBound)
     let snakeCased = words.map { self[$0].lowercased() }.joined(separator: "_")

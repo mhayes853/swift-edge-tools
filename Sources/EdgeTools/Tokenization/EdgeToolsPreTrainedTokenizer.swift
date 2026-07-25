@@ -126,7 +126,8 @@ private struct HuggingFaceBackendJSONScanner {
       .compactMap { key, value in
         guard let value else { return nil }
         let bytes = self.buffer[value]
-        guard let jsonValue = String(bytes: bytes, encoding: .utf8) else {
+        let jsonValue = String(decoding: bytes, as: UTF8.self)
+        guard jsonValue.utf8.elementsEqual(bytes) else {
           throw EdgeToolsError.invalidHuggingFaceBackendJSON
         }
         return "\"\(key)\":\(jsonValue)"
@@ -204,5 +205,4 @@ private struct HuggingFaceBackendJSONScanner {
     self.index += 1
     return true
   }
-
 }

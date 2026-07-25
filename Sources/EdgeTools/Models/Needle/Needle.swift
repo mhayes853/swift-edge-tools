@@ -141,17 +141,19 @@ extension NeedlePrompt {
     return "\(self.system)\(separator)\(self.user)<tools>\(toolsSchema)"
   }
 
-  public func tokenized(
-    tools: [EdgeToolDefinition],
-    using tokenizer: some EdgeToolsXGRTokenizer
-  ) throws -> [EdgeToolsToken] {
-    let tokenIds = tokenizer.encode(text: try self.formatted(tools: tools))
-    let tokens = tokenizer.convertIdsToTokens(tokenIds)
-    return zip(tokenIds, tokens)
-      .compactMap { (tokenId, token) in
-        token.map { EdgeToolsToken(id: tokenId, stringValue: $0) }
-      }
-  }
+  #if XGrammar
+    public func tokenized(
+      tools: [EdgeToolDefinition],
+      using tokenizer: some EdgeToolsXGRTokenizer
+    ) throws -> [EdgeToolsToken] {
+      let tokenIds = tokenizer.encode(text: try self.formatted(tools: tools))
+      let tokens = tokenizer.convertIdsToTokens(tokenIds)
+      return zip(tokenIds, tokens)
+        .compactMap { (tokenId, token) in
+          token.map { EdgeToolsToken(id: tokenId, stringValue: $0) }
+        }
+    }
+  #endif
 }
 
 // MARK: - EdgeToolDefinition

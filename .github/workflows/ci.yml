@@ -112,11 +112,11 @@ jobs:
           checksum="394040ecd5260e68bb02f6c20aeede733"
           checksum+="b9b90702c2204e178f3e42413edad2a"
           swift sdk install "$sdk_url" --checksum "$checksum"
-      - name: Build Foundation-Free EdgeTools
+      - name: Build Foundation-Free EdgeTools With System And Atomics
         run: >
           swift build --swift-sdk swift-6.2.3-RELEASE_wasm
           --target EdgeTools --disable-default-traits
-          --disable-experimental-prebuilts
+          --traits System,Atomics --disable-experimental-prebuilts
 
   # windows:
   #   name: Windows

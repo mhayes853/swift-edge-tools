@@ -61,10 +61,9 @@ public struct QwenXMLToolCallParser: EdgeToolCallParser, Sendable {
   }
 
   private static func parse(_ payload: String) -> EdgeRawToolCall? {
-    guard let functionStart = payload.range(of: "<function=") else { return nil }
+    guard let functionStart = payload[...].firstRange(of: "<function=") else { return nil }
     guard let nameEnd = payload[functionStart.upperBound...].firstIndex(of: ">") else { return nil }
-    guard let functionEnd = payload.range(of: "</function>", range: nameEnd..<payload.endIndex)
-    else { return nil }
+    guard let functionEnd = payload[nameEnd...].firstRange(of: "</function>") else { return nil }
 
     let name = payload[functionStart.upperBound..<nameEnd].trimmingWhitespace
     guard !name.isEmpty else { return nil }
@@ -81,14 +80,11 @@ public struct QwenXMLToolCallParser: EdgeToolCallParser, Sendable {
     var arguments = OrderedDictionary<String, EdgeToolsValue>()
     var searchStart = body.startIndex
 
-    while let parameterStart = body.range(of: "<parameter=", range: searchStart..<body.endIndex) {
+    while let parameterStart = body[searchStart...].firstRange(of: "<parameter=") {
       guard let nameEnd = body[parameterStart.upperBound...].firstIndex(of: ">") else { return nil }
       let valueStart = body.index(after: nameEnd)
       guard
-        let parameterEnd = body.range(
-          of: "</parameter>",
-          range: valueStart..<body.endIndex
-        )
+        let parameterEnd = body[valueStart...].firstRange(of: "</parameter>")
       else { return nil }
 
       let name = body[parameterStart.upperBound..<nameEnd].trimmingWhitespace
