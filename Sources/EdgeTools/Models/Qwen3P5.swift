@@ -102,7 +102,8 @@ public struct QwenXMLToolCallParser: EdgeToolCallParser, Sendable {
     case "False": return false
     case "None": return nil
     default:
-      return (try? decodeEdgeToolsJSON(Array(source.utf8))) ?? .string(source)
+      return (try? EdgeToolsJSONDecoder().decode(EdgeToolsValue.self, from: Array(source.utf8)))
+        ?? .string(source)
     }
   }
 }

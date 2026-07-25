@@ -175,7 +175,11 @@
       stopTokenIDs: [Int] = []
     ) throws -> XGRTokenizerInfo {
       let metadata = try Self.metadata(huggingFaceBackendJSON: backendJSON)
-      guard case .object(let decodedMetadata) = try decodeEdgeToolsJSON(Array(metadata.utf8)),
+      guard
+        case .object(let decodedMetadata) = try EdgeToolsJSONDecoder().decode(
+          EdgeToolsValue.self,
+          from: Array(metadata.utf8)
+        ),
         case .integer(let vocabularyTypeValue) = decodedMetadata["vocab_type"],
         case .boolean(let addPrefixSpace) = decodedMetadata["add_prefix_space"]
       else { throw XGRError.invalidHuggingFaceMetadata }

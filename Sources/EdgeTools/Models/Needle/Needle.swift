@@ -190,7 +190,7 @@ public struct NeedleToolCallParser: EdgeToolCallParser, Sendable {
   public mutating func accept(token: EdgeToolsToken) -> EdgeRawToolCall? {
     self.list.append(token)
     while let objectData = self.list.nextItem(findRange: { $0.firstCompleteJSONObjectRange() }) {
-      if let value = try? decodeEdgeToolsJSON(objectData),
+      if let value = try? EdgeToolsJSONDecoder().decode(EdgeToolsValue.self, from: objectData),
         let call = EdgeRawToolCall(jsonValue: value)
       {
         return call

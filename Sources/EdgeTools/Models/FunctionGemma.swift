@@ -113,7 +113,8 @@ private struct FunctionGemmaCallReader: ToolCallValueReader {
     guard self.cursor.consume(Self.stringMarker) else { return nil }
     guard let value = self.cursor.read(until: Self.stringMarker) else { return nil }
     guard self.cursor.consume(Self.stringMarker) else { return nil }
-    return (try? decodeEdgeToolsJSON(Array(value.utf8))) ?? .string(value)
+    return (try? EdgeToolsJSONDecoder().decode(EdgeToolsValue.self, from: Array(value.utf8)))
+      ?? .string(value)
   }
 
   private mutating func readBareValue() -> String {
