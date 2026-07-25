@@ -17,10 +17,18 @@
       let values = try await Self.executeAdd(
         runtime: runtime,
         model: try Self.modelURL().path(),
-        configuration: CONNXRuntime.SessionConfiguration()
+        configuration: CONNXRuntime.Configuration()
       )
 
       expectNoDifference(values, [5, 7, 9])
+    }
+
+    @Test
+    func `Use Runtime Configuration For Session Defaults`() throws {
+      let runtime = try CONNXRuntime(configuration: CONNXRuntime.Configuration())
+      let session = try runtime.session(modelURL: try Self.modelURL())
+
+      expectNoDifference(session.inputNames, ["x", "y"])
     }
 
     @Test

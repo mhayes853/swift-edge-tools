@@ -9,7 +9,7 @@
   struct `NeedleONNXEngine tests` {
     @Test
     func `Generate Basics With CPU Execution Provider`() async throws {
-      let engine = try await makeNeedleONNXEngine(executionProvider: .cpu)
+      let engine = try await makeNeedleONNXEngine()
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
         tools: NeedlePrompt.sendAdventureEmailDefinitions,
@@ -27,7 +27,7 @@
 
     @Test
     func `Sequential Generations With CPU`() async throws {
-      let engine = try await makeNeedleONNXEngine(executionProvider: .cpu)
+      let engine = try await makeNeedleONNXEngine()
       let firstTask = try engine.generate(
         prompt: .sendAdventureEmail,
         tools: NeedlePrompt.sendAdventureEmailDefinitions,
@@ -51,7 +51,7 @@
 
     @Test
     func `Concurrent Generations With CPU`() async throws {
-      let engine = try await makeNeedleONNXEngine(executionProvider: .cpu)
+      let engine = try await makeNeedleONNXEngine()
       let firstTask = try engine.generate(
         prompt: .sendAdventureEmail,
         tools: NeedlePrompt.sendAdventureEmailDefinitions,
@@ -75,7 +75,9 @@
     @Test
     func `Generate Basics With Core ML CPU And GPU`() async throws {
       let engine = try await makeNeedleONNXEngine(
-        executionProvider: .coreML(computeUnits: .cpuAndGPU)
+        runtimeConfiguration: .init(
+          executionProviders: [.coreML(computeUnits: .cpuAndGPU)]
+        )
       )
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
@@ -95,7 +97,9 @@
     @Test
     func `Sequential Generations With Core ML`() async throws {
       let engine = try await makeNeedleONNXEngine(
-        executionProvider: .coreML(computeUnits: .cpuAndGPU)
+        runtimeConfiguration: .init(
+          executionProviders: [.coreML(computeUnits: .cpuAndGPU)]
+        )
       )
       let firstTask = try engine.generate(
         prompt: .sendAdventureEmail,
@@ -121,7 +125,9 @@
     @Test
     func `Concurrent Generations With Core ML`() async throws {
       let engine = try await makeNeedleONNXEngine(
-        executionProvider: .coreML(computeUnits: .cpuAndGPU)
+        runtimeConfiguration: .init(
+          executionProviders: [.coreML(computeUnits: .cpuAndGPU)]
+        )
       )
       let firstTask = try engine.generate(
         prompt: .sendAdventureEmail,
@@ -145,7 +151,7 @@
 
     @Test
     func `Generate Invokes Custom Logit Processor`() async throws {
-      let engine = try await makeNeedleONNXEngine(executionProvider: .cpu)
+      let engine = try await makeNeedleONNXEngine()
       let processor = CountingONNXLogitsProcessor()
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
@@ -162,7 +168,7 @@
 
     @Test
     func `Generate Stops And Returns Stopped Generation`() async throws {
-      let engine = try await makeNeedleONNXEngine(executionProvider: .cpu)
+      let engine = try await makeNeedleONNXEngine()
       let generationTaskBox = Lock<NeedleONNXEngine.GenerationTask?>(nil)
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
@@ -182,7 +188,7 @@
 
     @Test
     func `Generate Cancels And Throws Cancellation Error`() async throws {
-      let engine = try await makeNeedleONNXEngine(executionProvider: .cpu)
+      let engine = try await makeNeedleONNXEngine()
       let task = Task {
         let generationTask = try engine.generate(
           prompt: .sendAdventureEmail,
@@ -201,7 +207,7 @@
 
     @Test
     func `Generate Through EdgeToolsSession`() async throws {
-      let engine = try await makeNeedleONNXEngine(executionProvider: .cpu)
+      let engine = try await makeNeedleONNXEngine()
       let session = EdgeToolsSession(engine: engine)
       let generation = try await session.generate(
         prompt: .sendAdventureEmail,
@@ -222,7 +228,7 @@
 
     @Test
     func `Generate Throws When Prompt Exceeds Context Length`() async throws {
-      let engine = try await makeNeedleONNXEngine(executionProvider: .cpu)
+      let engine = try await makeNeedleONNXEngine()
       let prompt = NeedlePrompt(system: "", user: String(repeating: "token ", count: 2_000))
 
       let error = await #expect(throws: EdgeToolsError.self) {
@@ -239,7 +245,6 @@
     @Test
     func `Generate Basics With INT4 Export`() async throws {
       let engine = try await makeNeedleONNXEngine(
-        executionProvider: .cpu,
         quantization: "int4"
       )
       let generationTask = try engine.generate(
@@ -265,7 +270,6 @@
     @Test
     func `Generate Basics With INT8 Export`() async throws {
       let engine = try await makeNeedleONNXEngine(
-        executionProvider: .cpu,
         quantization: "int8"
       )
       let generationTask = try engine.generate(
@@ -328,26 +332,6 @@
     }
 
     @Test
-    func `Initialization Throws For Invalid Model Signature`() async throws {
-      let source = try await exportNeedleONNX()
-      let directory = try temporaryONNXBundleCopy(
-        from: source,
-        excluding: ["encoder.onnx", "encoder.onnx.data"]
-      )
-      defer { try? FileManager.default.removeItem(at: directory) }
-      try FileManager.default.createSymbolicLink(
-        at: directory.appending(path: "encoder.onnx"),
-        withDestinationURL: source.appending(path: "decoder.onnx")
-      )
-
-      let error = await #expect(throws: EdgeToolsONNXRuntimeError.self) {
-        _ = try await NeedleONNXEngine(from: directory)
-      }
-      expectNoDifference(error?.code, .invalidModelSignature)
-      expectNoDifference(error?.message.contains("signature"), true)
-    }
-
-    @Test
     func `Runtime Error Preserves ONNX Status And Message`() async throws {
       let source = try await exportNeedleONNX()
       let directory = try temporaryONNXBundleCopy(
@@ -367,7 +351,7 @@
 
     @Test
     func `Generate Streamed Response Matches Final Response`() async throws {
-      let engine = try await makeNeedleONNXEngine(executionProvider: .cpu)
+      let engine = try await makeNeedleONNXEngine()
       let streamedTokens = Lock([EdgeToolsToken]())
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,

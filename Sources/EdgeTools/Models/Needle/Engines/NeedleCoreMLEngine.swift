@@ -282,11 +282,11 @@
     }
 
     private func runEncoder(inputIds: MLTensor) async throws -> EncoderOutputs {
-      var outputs = try await self.encoderModel.prediction(from: [TensorName.inputIds: inputIds])
+      var outputs = try await self.encoderModel.prediction(from: [NeedleExportTensorName.inputIDs: inputIds])
       guard
-        let crossAttentionMask = outputs.removeValue(forKey: TensorName.crossAttentionMask),
-        let encoderProjectedK = outputs.removeValue(forKey: TensorName.encoderProjectedK),
-        let encoderProjectedV = outputs.removeValue(forKey: TensorName.encoderProjectedV)
+        let crossAttentionMask = outputs.removeValue(forKey: NeedleExportTensorName.crossAttentionMask),
+        let encoderProjectedK = outputs.removeValue(forKey: NeedleExportTensorName.encoderProjectedK),
+        let encoderProjectedV = outputs.removeValue(forKey: NeedleExportTensorName.encoderProjectedV)
       else {
         throw EdgeToolsError.missingModelOutputs
       }
@@ -304,23 +304,23 @@
       cache: inout DecoderCache
     ) async throws -> MLTensor {
       let inputs = [
-        TensorName.inputIds: inputIds,
-        TensorName.cachePosition: MLTensor(shape: [1], scalars: [Int32(cachePosition)]),
-        TensorName.selfAttentionMask: Self.selfAttentionMask(
+        NeedleExportTensorName.inputIDs: inputIds,
+        NeedleExportTensorName.cachePosition: MLTensor(shape: [1], scalars: [Int32(cachePosition)]),
+        NeedleExportTensorName.selfAttentionMask: Self.selfAttentionMask(
           step: cachePosition,
           maxLength: self.configuration.encoderMaxLength
         ),
-        TensorName.crossAttentionMask: encoderOutputs.crossAttentionMask,
-        TensorName.encoderProjectedK: encoderOutputs.encoderProjectedK,
-        TensorName.encoderProjectedV: encoderOutputs.encoderProjectedV,
-        TensorName.keyCache: cache.key,
-        TensorName.valueCache: cache.value
+        NeedleExportTensorName.crossAttentionMask: encoderOutputs.crossAttentionMask,
+        NeedleExportTensorName.encoderProjectedK: encoderOutputs.encoderProjectedK,
+        NeedleExportTensorName.encoderProjectedV: encoderOutputs.encoderProjectedV,
+        NeedleExportTensorName.keyCache: cache.key,
+        NeedleExportTensorName.valueCache: cache.value
       ]
       let outputs = try await self.decoderModel.prediction(from: inputs)
       guard
-        let logits = outputs[TensorName.logits],
-        let updatedKey = outputs[TensorName.updatedKeyCache],
-        let updatedValue = outputs[TensorName.updatedValueCache]
+        let logits = outputs[NeedleExportTensorName.logits],
+        let updatedKey = outputs[NeedleExportTensorName.updatedKeyCache],
+        let updatedValue = outputs[NeedleExportTensorName.updatedValueCache]
       else {
         throw EdgeToolsError.missingModelOutputs
       }
@@ -485,17 +485,4 @@
     static let decoder = "decoder"
   }
 
-  private enum TensorName {
-    static let inputIds = "input_ids"
-    static let cachePosition = "cache_position"
-    static let selfAttentionMask = "self_attention_mask"
-    static let crossAttentionMask = "cross_attention_mask"
-    static let encoderProjectedK = "encoder_projected_k"
-    static let encoderProjectedV = "encoder_projected_v"
-    static let keyCache = "key_cache"
-    static let valueCache = "value_cache"
-    static let updatedKeyCache = "updated_key_cache"
-    static let updatedValueCache = "updated_value_cache"
-    static let logits = "logits"
-  }
 #endif

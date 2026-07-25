@@ -68,8 +68,8 @@
 
       init(descriptor: InferenceFunctionDescriptor) throws {
         guard
-          let keyDescriptor = descriptor.arrayDescriptor(for: TensorName.updatedKeyCache),
-          let valueDescriptor = descriptor.arrayDescriptor(for: TensorName.updatedValueCache)
+          let keyDescriptor = descriptor.arrayDescriptor(for: NeedleExportTensorName.updatedKeyCache),
+          let valueDescriptor = descriptor.arrayDescriptor(for: NeedleExportTensorName.updatedValueCache)
         else {
           throw EdgeToolsError.missingModelOutputs
         }
@@ -310,11 +310,11 @@
       if let stream {
         return try await self.runEncoderOnStream(inputIds: inputIds, stream: stream)
       }
-      var outputs = try await self.encoderFunction.run(inputs: [TensorName.inputIds: inputIds])
+      var outputs = try await self.encoderFunction.run(inputs: [NeedleExportTensorName.inputIDs: inputIds])
       guard
-        let crossAttentionMask = outputs.remove(TensorName.crossAttentionMask)?.ndArray,
-        let encoderProjectedK = outputs.remove(TensorName.encoderProjectedK)?.ndArray,
-        let encoderProjectedV = outputs.remove(TensorName.encoderProjectedV)?.ndArray
+        let crossAttentionMask = outputs.remove(NeedleExportTensorName.crossAttentionMask)?.ndArray,
+        let encoderProjectedK = outputs.remove(NeedleExportTensorName.encoderProjectedK)?.ndArray,
+        let encoderProjectedV = outputs.remove(NeedleExportTensorName.encoderProjectedV)?.ndArray
       else {
         throw EdgeToolsError.missingModelOutputs
       }
@@ -331,9 +331,9 @@
     ) async throws -> EncoderOutputs {
       let descriptor = self.encoderFunction.descriptor
       guard
-        let crossMaskDescriptor = descriptor.arrayDescriptor(for: TensorName.crossAttentionMask),
-        let projectedKDescriptor = descriptor.arrayDescriptor(for: TensorName.encoderProjectedK),
-        let projectedVDescriptor = descriptor.arrayDescriptor(for: TensorName.encoderProjectedV)
+        let crossMaskDescriptor = descriptor.arrayDescriptor(for: NeedleExportTensorName.crossAttentionMask),
+        let projectedKDescriptor = descriptor.arrayDescriptor(for: NeedleExportTensorName.encoderProjectedK),
+        let projectedVDescriptor = descriptor.arrayDescriptor(for: NeedleExportTensorName.encoderProjectedV)
       else {
         throw EdgeToolsError.missingModelOutputs
       }
@@ -358,11 +358,11 @@
       )
 
       var outputViews = InferenceFunction.AsyncMutableViews()
-      outputViews.insert(&crossAttentionMask, for: TensorName.crossAttentionMask)
-      outputViews.insert(&encoderProjectedK, for: TensorName.encoderProjectedK)
-      outputViews.insert(&encoderProjectedV, for: TensorName.encoderProjectedV)
+      outputViews.insert(&crossAttentionMask, for: NeedleExportTensorName.crossAttentionMask)
+      outputViews.insert(&encoderProjectedK, for: NeedleExportTensorName.encoderProjectedK)
+      outputViews.insert(&encoderProjectedV, for: NeedleExportTensorName.encoderProjectedV)
 
-      let inputValues = [TensorName.inputIds: InferenceFunction.AsyncValue(inputIds)]
+      let inputValues = [NeedleExportTensorName.inputIDs: InferenceFunction.AsyncValue(inputIds)]
       _ = try self.encoderFunction.encode(inputs: inputValues, outputViews: outputViews, to: stream)
       await stream.currentWorkCompleted()
 
@@ -488,23 +488,23 @@
       }
       var outputs = try await self.decoderFunction.run(
         inputs: [
-          TensorName.inputIds: inputIds,
-          TensorName.cachePosition: NDArray(scalars: [Int32(cachePosition)], shape: [1]),
-          TensorName.selfAttentionMask: Self.selfAttentionMask(
+          NeedleExportTensorName.inputIDs: inputIds,
+          NeedleExportTensorName.cachePosition: NDArray(scalars: [Int32(cachePosition)], shape: [1]),
+          NeedleExportTensorName.selfAttentionMask: Self.selfAttentionMask(
             step: cachePosition,
             maxLength: self.configuration.encoderMaxLength
           ),
-          TensorName.crossAttentionMask: encoderOutputs.crossAttentionMask,
-          TensorName.encoderProjectedK: encoderOutputs.encoderProjectedK,
-          TensorName.encoderProjectedV: encoderOutputs.encoderProjectedV,
-          TensorName.keyCache: cache.key,
-          TensorName.valueCache: cache.value
+          NeedleExportTensorName.crossAttentionMask: encoderOutputs.crossAttentionMask,
+          NeedleExportTensorName.encoderProjectedK: encoderOutputs.encoderProjectedK,
+          NeedleExportTensorName.encoderProjectedV: encoderOutputs.encoderProjectedV,
+          NeedleExportTensorName.keyCache: cache.key,
+          NeedleExportTensorName.valueCache: cache.value
         ]
       )
       guard
-        let logits = outputs.remove(TensorName.logits)?.ndArray,
-        let updatedKey = outputs.remove(TensorName.updatedKeyCache)?.ndArray,
-        let updatedValue = outputs.remove(TensorName.updatedValueCache)?.ndArray
+        let logits = outputs.remove(NeedleExportTensorName.logits)?.ndArray,
+        let updatedKey = outputs.remove(NeedleExportTensorName.updatedKeyCache)?.ndArray,
+        let updatedValue = outputs.remove(NeedleExportTensorName.updatedValueCache)?.ndArray
       else {
         throw EdgeToolsError.missingModelOutputs
       }
@@ -522,36 +522,36 @@
     ) async throws -> NDArray {
       let outputs = try self.decoderFunction.encode(
         inputs: [
-          TensorName.inputIds: InferenceFunction.AsyncValue(inputIds),
-          TensorName.cachePosition: InferenceFunction.AsyncValue(
+          NeedleExportTensorName.inputIDs: InferenceFunction.AsyncValue(inputIds),
+          NeedleExportTensorName.cachePosition: InferenceFunction.AsyncValue(
             NDArray(scalars: [Int32(cachePosition)], shape: [1])
           ),
-          TensorName.selfAttentionMask: InferenceFunction.AsyncValue(
+          NeedleExportTensorName.selfAttentionMask: InferenceFunction.AsyncValue(
             Self.selfAttentionMask(
               step: cachePosition,
               maxLength: self.configuration.encoderMaxLength
             )
           ),
-          TensorName.crossAttentionMask: InferenceFunction.AsyncValue(
+          NeedleExportTensorName.crossAttentionMask: InferenceFunction.AsyncValue(
             encoderOutputs.crossAttentionMask
           ),
-          TensorName.encoderProjectedK: InferenceFunction.AsyncValue(
+          NeedleExportTensorName.encoderProjectedK: InferenceFunction.AsyncValue(
             encoderOutputs.encoderProjectedK
           ),
-          TensorName.encoderProjectedV: InferenceFunction.AsyncValue(
+          NeedleExportTensorName.encoderProjectedV: InferenceFunction.AsyncValue(
             encoderOutputs.encoderProjectedV
           ),
-          TensorName.keyCache: InferenceFunction.AsyncValue(cache.key),
-          TensorName.valueCache: InferenceFunction.AsyncValue(cache.value)
+          NeedleExportTensorName.keyCache: InferenceFunction.AsyncValue(cache.key),
+          NeedleExportTensorName.valueCache: InferenceFunction.AsyncValue(cache.value)
         ],
         to: stream
       )
       await stream.currentWorkCompleted()
 
       guard
-        let logits = try await outputs[TensorName.logits]?.ndArray,
-        let key = try await outputs[TensorName.updatedKeyCache]?.ndArray,
-        let value = try await outputs[TensorName.updatedValueCache]?.ndArray
+        let logits = try await outputs[NeedleExportTensorName.logits]?.ndArray,
+        let key = try await outputs[NeedleExportTensorName.updatedKeyCache]?.ndArray,
+        let value = try await outputs[NeedleExportTensorName.updatedValueCache]?.ndArray
       else {
         throw EdgeToolsError.missingModelOutputs
       }
@@ -656,17 +656,4 @@
     static let main = "main"
   }
 
-  private enum TensorName {
-    static let inputIds = "input_ids"
-    static let cachePosition = "cache_position"
-    static let selfAttentionMask = "self_attention_mask"
-    static let crossAttentionMask = "cross_attention_mask"
-    static let encoderProjectedK = "encoder_projected_k"
-    static let encoderProjectedV = "encoder_projected_v"
-    static let keyCache = "key_cache"
-    static let valueCache = "value_cache"
-    static let updatedKeyCache = "updated_key_cache"
-    static let updatedValueCache = "updated_value_cache"
-    static let logits = "logits"
-  }
 #endif

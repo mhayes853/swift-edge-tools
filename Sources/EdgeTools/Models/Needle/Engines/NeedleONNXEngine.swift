@@ -18,21 +18,14 @@
     public typealias Prompt = NeedlePrompt
     public typealias ToolCallParser = NeedleToolCallParser
 
-    struct Sessions: Sendable {
-      let encoder: Runtime.Session
-      let decoder: Runtime.Session
-    }
-
-    private struct EncoderOutputs: Sendable {
+    fileprivate struct EncoderOutputs: Sendable {
       let crossAttentionMask: Runtime.Tensor
       let encoderProjectedK: Runtime.Tensor
       let encoderProjectedV: Runtime.Tensor
     }
 
     public struct GenerationState: Sendable {
-      let crossAttentionMask: Runtime.Tensor
-      let encoderProjectedK: Runtime.Tensor
-      let encoderProjectedV: Runtime.Tensor
+      fileprivate let encoderOutputs: EncoderOutputs
       var keyCache: Runtime.Tensor
       var valueCache: Runtime.Tensor
       var position: Int
@@ -41,7 +34,8 @@
     public var vocabularySize: Int { self.configuration.vocabularySize }
 
     let configuration: NeedleModelConfiguration
-    let sessions: Sessions
+    let encoderSession: Runtime.Session
+    let decoderSession: Runtime.Session
 
     public init(
       configuration: NeedleModelConfiguration,
@@ -49,7 +43,8 @@
       decoderSession: Runtime.Session
     ) {
       self.configuration = configuration
-      self.sessions = Sessions(encoder: encoderSession, decoder: decoderSession)
+      self.encoderSession = encoderSession
+      self.decoderSession = decoderSession
     }
 
     public func grammar(
@@ -102,7 +97,7 @@
       let inputIDs = try runtime.tensor(values: [Int64(tokenID)], shape: [1, 1])
       let position = try Int32(exactly: state.position)
         .unwrapONNXInteger(
-          name: TensorName.cachePosition
+          name: NeedleExportTensorName.cachePosition
         )
       let cachePosition = try runtime.tensor(values: [position], shape: [1])
       let selfAttentionMask = try runtime.tensor(
@@ -112,27 +107,27 @@
         ),
         shape: [1, 1, 1, self.configuration.encoderMaxLength]
       )
-      var outputs = try await self.sessions.decoder.run(
+      var outputs = try await self.decoderSession.run(
         inputs: [
-          TensorName.inputIDs: inputIDs,
-          TensorName.cachePosition: cachePosition,
-          TensorName.selfAttentionMask: selfAttentionMask,
-          TensorName.crossAttentionMask: state.crossAttentionMask,
-          TensorName.encoderProjectedK: state.encoderProjectedK,
-          TensorName.encoderProjectedV: state.encoderProjectedV,
-          TensorName.keyCache: state.keyCache,
-          TensorName.valueCache: state.valueCache
+          NeedleExportTensorName.inputIDs: inputIDs,
+          NeedleExportTensorName.cachePosition: cachePosition,
+          NeedleExportTensorName.selfAttentionMask: selfAttentionMask,
+          NeedleExportTensorName.crossAttentionMask: state.encoderOutputs.crossAttentionMask,
+          NeedleExportTensorName.encoderProjectedK: state.encoderOutputs.encoderProjectedK,
+          NeedleExportTensorName.encoderProjectedV: state.encoderOutputs.encoderProjectedV,
+          NeedleExportTensorName.keyCache: state.keyCache,
+          NeedleExportTensorName.valueCache: state.valueCache
         ],
         outputNames: [
-          TensorName.logits,
-          TensorName.updatedKeyCache,
-          TensorName.updatedValueCache
+          NeedleExportTensorName.logits,
+          NeedleExportTensorName.updatedKeyCache,
+          NeedleExportTensorName.updatedValueCache
         ]
       )
       guard
-        let logits = outputs.removeValue(forKey: TensorName.logits),
-        let updatedKey = outputs.removeValue(forKey: TensorName.updatedKeyCache),
-        let updatedValue = outputs.removeValue(forKey: TensorName.updatedValueCache)
+        let logits = outputs.removeValue(forKey: NeedleExportTensorName.logits),
+        let updatedKey = outputs.removeValue(forKey: NeedleExportTensorName.updatedKeyCache),
+        let updatedValue = outputs.removeValue(forKey: NeedleExportTensorName.updatedValueCache)
       else {
         throw EdgeToolsError.missingModelOutputs
       }
@@ -157,18 +152,18 @@
         values: paddedTokens,
         shape: [1, self.configuration.encoderMaxLength]
       )
-      var outputs = try await self.sessions.encoder.run(
-        inputs: [TensorName.inputIDs: inputIDs],
+      var outputs = try await self.encoderSession.run(
+        inputs: [NeedleExportTensorName.inputIDs: inputIDs],
         outputNames: [
-          TensorName.crossAttentionMask,
-          TensorName.encoderProjectedK,
-          TensorName.encoderProjectedV
+          NeedleExportTensorName.crossAttentionMask,
+          NeedleExportTensorName.encoderProjectedK,
+          NeedleExportTensorName.encoderProjectedV
         ]
       )
       guard
-        let crossAttentionMask = outputs.removeValue(forKey: TensorName.crossAttentionMask),
-        let encoderProjectedK = outputs.removeValue(forKey: TensorName.encoderProjectedK),
-        let encoderProjectedV = outputs.removeValue(forKey: TensorName.encoderProjectedV)
+        let crossAttentionMask = outputs.removeValue(forKey: NeedleExportTensorName.crossAttentionMask),
+        let encoderProjectedK = outputs.removeValue(forKey: NeedleExportTensorName.encoderProjectedK),
+        let encoderProjectedV = outputs.removeValue(forKey: NeedleExportTensorName.encoderProjectedV)
       else {
         throw EdgeToolsError.missingModelOutputs
       }
@@ -191,9 +186,7 @@
       ]
       let cacheValueCount = cacheShape.reduce(1, *)
       return GenerationState(
-        crossAttentionMask: encoderOutputs.crossAttentionMask,
-        encoderProjectedK: encoderOutputs.encoderProjectedK,
-        encoderProjectedV: encoderOutputs.encoderProjectedV,
+        encoderOutputs: encoderOutputs,
         keyCache: try runtime.tensor(
           values: [Float](repeating: 0, count: cacheValueCount),
           shape: cacheShape
@@ -212,22 +205,6 @@
     }
   }
 
-  // MARK: - Tensor Names
-
-  private enum TensorName {
-    static let cachePosition = "cache_position"
-    static let crossAttentionMask = "cross_attention_mask"
-    static let encoderProjectedK = "encoder_projected_k"
-    static let encoderProjectedV = "encoder_projected_v"
-    static let inputIDs = "input_ids"
-    static let keyCache = "key_cache"
-    static let logits = "logits"
-    static let selfAttentionMask = "self_attention_mask"
-    static let updatedKeyCache = "updated_key_cache"
-    static let updatedValueCache = "updated_value_cache"
-    static let valueCache = "value_cache"
-  }
-
   // MARK: - C ONNX Runtime Loading
 
   #if canImport(COnnxRuntime)
@@ -235,70 +212,18 @@
       EdgeToolsONNXEngine<CONNXRuntime, NeedleONNXModel<CONNXRuntime>>
     public typealias EdgeToolsONNXRuntimeError = CONNXRuntimeError
 
-    public struct NeedleONNXRuntimeConfiguration: Hashable, Sendable {
-      public var executionProvider: NeedleONNXExecutionProvider
-
-      public init(executionProvider: NeedleONNXExecutionProvider = .cpu) {
-        self.executionProvider = executionProvider
-      }
-    }
-
-    public enum NeedleONNXExecutionProvider: Hashable, Sendable {
-      case cpu
-      case coreML(computeUnits: NeedleONNXCoreMLComputeUnits)
-      case webGPU
-    }
-
-    public enum NeedleONNXCoreMLComputeUnits: String, Hashable, Sendable {
-      case all = "ALL"
-      case cpuAndGPU = "CPUAndGPU"
-      case cpuAndNeuralEngine = "CPUAndNeuralEngine"
-      case cpuOnly = "CPUOnly"
-    }
-
     #if Foundation
       extension NeedleONNXModel where Runtime == CONNXRuntime {
         init(
           from directoryURL: URL,
           configuration: NeedleModelConfiguration,
-          using runtime: CONNXRuntime,
-          runtimeConfiguration: NeedleONNXRuntimeConfiguration
+          using runtime: CONNXRuntime
         ) throws {
-          let sessionConfiguration = CONNXRuntime.SessionConfiguration(
-            executionProviders: runtimeConfiguration.executionProvider.runtimeExecutionProviders
-          )
           let encoderSession = try runtime.session(
-            modelURL: directoryURL.appending(path: "encoder.onnx"),
-            configuration: sessionConfiguration
-          )
-          try encoderSession.validateSignature(
-            inputNames: [TensorName.inputIDs],
-            outputNames: [
-              TensorName.crossAttentionMask,
-              TensorName.encoderProjectedK,
-              TensorName.encoderProjectedV
-            ]
+            modelURL: directoryURL.appending(path: "encoder.onnx")
           )
           let decoderSession = try runtime.session(
-            modelURL: directoryURL.appending(path: "decoder.onnx"),
-            configuration: sessionConfiguration
-          )
-          try decoderSession.validateSignature(
-            inputNames: [
-              TensorName.inputIDs,
-              TensorName.cachePosition,
-              TensorName.selfAttentionMask,
-              TensorName.crossAttentionMask,
-              TensorName.encoderProjectedK,
-              TensorName.encoderProjectedV,
-              TensorName.keyCache,
-              TensorName.valueCache
-            ],
-            outputNames: [
-              TensorName.logits,
-              TensorName.updatedKeyCache,
-              TensorName.updatedValueCache
-            ]
+            modelURL: directoryURL.appending(path: "decoder.onnx")
           )
           self.init(
             configuration: configuration,
@@ -310,31 +235,37 @@
 
       extension EdgeToolsONNXEngine
       where Runtime == CONNXRuntime, Model == NeedleONNXModel<CONNXRuntime> {
+        public convenience init(
+          from directoryURL: URL,
+          runtime: sending CONNXRuntime
+        ) async throws {
+          try await self.init(
+            from: directoryURL,
+            runtime: runtime,
+            model: { directoryURL, configuration, runtime in
+              try NeedleONNXModel(
+                from: directoryURL,
+                configuration: configuration,
+                using: runtime
+              )
+            }
+          )
+        }
+
         #if ONNX
           public convenience init(
             from directoryURL: URL,
-            runtimeConfiguration: NeedleONNXRuntimeConfiguration = NeedleONNXRuntimeConfiguration()
+            runtimeConfiguration: CONNXRuntime.Configuration = CONNXRuntime.Configuration()
           ) async throws {
-            let runtime = try CONNXRuntime()
-            try await self.init(
-              from: directoryURL,
-              runtime: runtime,
-              model: { directoryURL, configuration, runtime in
-                try NeedleONNXModel(
-                  from: directoryURL,
-                  configuration: configuration,
-                  using: runtime,
-                  runtimeConfiguration: runtimeConfiguration
-                )
-              }
-            )
+            let runtime = try CONNXRuntime(configuration: runtimeConfiguration)
+            try await self.init(from: directoryURL, runtime: runtime)
           }
         #endif
 
         #if System && ONNX
           public convenience init(
             from directoryPath: FilePath,
-            runtimeConfiguration: NeedleONNXRuntimeConfiguration = NeedleONNXRuntimeConfiguration()
+            runtimeConfiguration: CONNXRuntime.Configuration = CONNXRuntime.Configuration()
           ) async throws {
             try await self.init(
               from: URL(filePath: directoryPath.string, directoryHint: .isDirectory),
@@ -346,37 +277,13 @@
         public convenience init(
           api: OpaquePointer,
           from directoryURL: URL,
-          runtimeConfiguration: NeedleONNXRuntimeConfiguration = NeedleONNXRuntimeConfiguration()
+          runtimeConfiguration: CONNXRuntime.Configuration = CONNXRuntime.Configuration()
         ) async throws {
-          let runtime = try CONNXRuntime(api: api)
-          try await self.init(
-            from: directoryURL,
-            runtime: runtime,
-            model: { directoryURL, configuration, runtime in
-              try NeedleONNXModel(
-                from: directoryURL,
-                configuration: configuration,
-                using: runtime,
-                runtimeConfiguration: runtimeConfiguration
-              )
-            }
-          )
+          let runtime = try CONNXRuntime(api: api, configuration: runtimeConfiguration)
+          try await self.init(from: directoryURL, runtime: runtime)
         }
       }
     #endif
-
-    extension NeedleONNXExecutionProvider {
-      fileprivate var runtimeExecutionProviders: [CONNXRuntime.ExecutionProvider] {
-        switch self {
-        case .cpu:
-          []
-        case .coreML(let computeUnits):
-          [.coreML(computeUnits: computeUnits.rawValue)]
-        case .webGPU:
-          [.webGPU]
-        }
-      }
-    }
   #endif
 
   // MARK: - Helpers
