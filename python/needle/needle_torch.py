@@ -105,15 +105,15 @@ class NeedleDecoder(nn.Module):
         key_cache: torch.Tensor,
         value_cache: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        hidden_state, updated_key_cache, updated_value_cache = self.model.decode(
-            input_ids,
-            cache_position=cache_position,
-            self_mask=self_attention_mask,
-            cross_mask=cross_attention_mask,
-            encoder_projected_k=encoder_projected_k,
-            encoder_projected_v=encoder_projected_v,
-            key_cache=key_cache,
-            value_cache=value_cache,
+        hidden_state, updated_key_cache, updated_value_cache = self.model.decoder(
+            self.model.embed_tokens(input_ids) * self.model.embed_scale,
+            cache_position,
+            self_attention_mask,
+            cross_attention_mask,
+            encoder_projected_k,
+            encoder_projected_v,
+            key_cache,
+            value_cache,
         )
         logits = _project_logits(
             hidden_state,
@@ -187,29 +187,6 @@ class _NeedleSimpleAttentionNetwork(nn.Module):
     def encode(self, x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         return self.encoder(self.embed_tokens(x) * self.embed_scale, mask=mask)
 
-    def decode(
-        self,
-        x: torch.Tensor,
-        cache_position: torch.Tensor,
-        self_mask: torch.Tensor,
-        cross_mask: torch.Tensor,
-        encoder_projected_k: torch.Tensor,
-        encoder_projected_v: torch.Tensor,
-        key_cache: torch.Tensor,
-        value_cache: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        x = self.embed_tokens(x) * self.embed_scale
-        return self.decoder(
-            x,
-            cache_position=cache_position,
-            self_mask=self_mask,
-            cross_mask=cross_mask,
-            encoder_projected_k=encoder_projected_k,
-            encoder_projected_v=encoder_projected_v,
-            key_cache=key_cache,
-            value_cache=value_cache,
-        )
-
     def project_encoder_kv(
         self,
         encoder_output: torch.Tensor,
@@ -272,20 +249,18 @@ class _NeedleDecoder(nn.Module):
             dtype=x.dtype,
         )
 
-        updated_keys = [torch.empty(0, device=x.device, dtype=x.dtype)]
-        updated_values = [torch.empty(0, device=x.device, dtype=x.dtype)]
-        updated_keys.clear()
-        updated_values.clear()
+        updated_keys = []
+        updated_values = []
         for index, layer in enumerate(self.layers):
             x, updated_key, updated_value = layer(
-                x=x,
-                self_mask=self_mask,
-                cross_mask=cross_mask,
-                encoder_projected_k=encoder_projected_k[index],
-                encoder_projected_v=encoder_projected_v[index],
-                rope=rope,
-                layer_key_cache=key_cache[index],
-                layer_value_cache=value_cache[index],
+                x,
+                self_mask,
+                cross_mask,
+                encoder_projected_k[index],
+                encoder_projected_v[index],
+                rope,
+                key_cache[index],
+                value_cache[index],
             )
             updated_keys.append(updated_key)
             updated_values.append(updated_value)
