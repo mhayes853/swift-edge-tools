@@ -1,0 +1,539 @@
+diff --git a/cpp/grammar_compiler.cc b/cpp/grammar_compiler.cc
+index 5cf140d..e3b23a7 100644
+--- a/cpp/grammar_compiler.cc
++++ b/cpp/grammar_compiler.cc
+@@ -1001,7 +1001,11 @@ class GrammarCompilerSub {
+       std::optional<RuleLevelCache> rule_level_cache
+   )
+       : tokenizer_info_(tokenizer_info),
++#if XGRAMMAR_ENABLE_THREADING
+         max_threads_(max_threads),
++#else
++        max_threads_(1),
++#endif
+         rule_level_cache_(rule_level_cache) {}
+ 
+   CompiledGrammar CompileBuiltinJSONGrammar();
+@@ -1066,15 +1070,14 @@ CompiledGrammar GrammarCompilerSub::MultiThreadCompileGrammar(Grammar grammar_un
+   // 2. All byte strings (with element_in_string=0, 1, 2, ...)
+   // since other positions will be expanded to the above positions
+ 
+-  // TODO(Charlie): Figure out how to support ThreadPool and std::mutex in WebAssembly.
+-  // Only declare ThreadPool and mutex if max_threads > 1, so when max_threads = 1, we do
+-  // not need ThreadPool or std::mutex, which throws error in runtime in WebAssembly.
++#if XGRAMMAR_ENABLE_THREADING
+   std::optional<ThreadPool> thread_pool;
+   std::optional<std::mutex> adaptive_token_mask_cache_mutex;
+   if (max_threads_ > 1) {
+     thread_pool.emplace(max_threads_);
+     adaptive_token_mask_cache_mutex.emplace();
+   }
++#endif
+ 
+   auto add_adaptive_token_mask = [&](const ParserState& state, bool is_root_rule) {
+     auto grammar_matcher = GrammarMatcherForTokenMaskCache(
+@@ -1086,16 +1089,20 @@ CompiledGrammar GrammarCompilerSub::MultiThreadCompileGrammar(Grammar grammar_un
+         false
+     );
+     auto cur_adaptive_token_mask_cache = grammar_matcher.GetAdaptiveTokenMask(is_root_rule);
++#if XGRAMMAR_ENABLE_THREADING
+     if (max_threads_ > 1) {
+       std::lock_guard<std::mutex> lock(adaptive_token_mask_cache_mutex.value());
+       compiled_grammar_impl->adaptive_token_mask_cache[state] = cur_adaptive_token_mask_cache;
+     } else {
+       compiled_grammar_impl->adaptive_token_mask_cache[state] = cur_adaptive_token_mask_cache;
+     }
++#else
++    compiled_grammar_impl->adaptive_token_mask_cache[state] = cur_adaptive_token_mask_cache;
++#endif
+   };
+ 
+   auto add_task_adaptive_token_mask = [&](const ParserState& state, bool is_root_rule) {
+-    // Execute depending on whether we use thread_pool
++#if XGRAMMAR_ENABLE_THREADING
+     if (max_threads_ > 1) {
+       thread_pool->Execute([add_adaptive_token_mask, state, is_root_rule]() {
+         add_adaptive_token_mask(state, is_root_rule);
+@@ -1103,6 +1110,9 @@ CompiledGrammar GrammarCompilerSub::MultiThreadCompileGrammar(Grammar grammar_un
+     } else {
+       add_adaptive_token_mask(state, is_root_rule);
+     }
++#else
++    add_adaptive_token_mask(state, is_root_rule);
++#endif
+   };
+ 
+   auto root_rule_id = compiled_grammar_impl->grammar->GetRootRuleId();
+@@ -1125,9 +1135,11 @@ CompiledGrammar GrammarCompilerSub::MultiThreadCompileGrammar(Grammar grammar_un
+     }
+   }
+ 
++#if XGRAMMAR_ENABLE_THREADING
+   if (max_threads_ > 1) {
+     thread_pool->Join();
+   }
++#endif
+ 
+   return CompiledGrammar(compiled_grammar_impl);
+ }
+diff --git a/cpp/grammar_functor.cc b/cpp/grammar_functor.cc
+index 49911d8..41c4135 100644
+--- a/cpp/grammar_functor.cc
++++ b/cpp/grammar_functor.cc
+@@ -12,7 +12,6 @@
+ #include <cstdint>
+ #include <map>
+ #include <memory>
+-#include <mutex>
+ #include <queue>
+ #include <set>
+ #include <stack>
+@@ -28,8 +27,13 @@
+ #include "support/container.h"
+ #include "support/encoding.h"
+ #include "support/logging.h"
++#include "support/threading.h"
+ #include "xgrammar/grammar.h"
+ 
++#if XGRAMMAR_ENABLE_THREADING
++#include <mutex>
++#endif
++
+ namespace xgrammar {
+ 
+ using GrammarExpr = Grammar::Impl::GrammarExpr;
+@@ -2609,7 +2613,9 @@ class RuleLevelCache::Impl {
+   static constexpr size_t kNumShards = 16;
+ 
+   struct Shard {
++#if XGRAMMAR_ENABLE_THREADING
+     std::mutex mutex;
++#endif
+     int64_t current_cache_memory_size = 0;
+     // The cache map: (fsm_hash, node_id, ...) -> index in cache_list
+     List<NodeType> cache_list;
+@@ -2672,7 +2678,9 @@ std::optional<AdaptiveTokenMask> RuleLevelCache::Impl::GetCache(
+   // Find in the cache.
+   NodeKey key = std::make_tuple(fsm_hash, fsm_new_node_id, state_cnt, edge_cnt);
+   Shard& shard = GetShard(key);
++#if XGRAMMAR_ENABLE_THREADING
+   std::lock_guard<std::mutex> lock(shard.mutex);
++#endif
+   auto it = shard.cache.find(key);
+   if (it == shard.cache.end()) {
+     return std::nullopt;
+@@ -2704,7 +2712,9 @@ bool RuleLevelCache::Impl::AddCache(
+   NodeKey key = std::make_tuple(fsm_hash, fsm_new_node_id, state_cnt, edge_cnt);
+   Shard& shard = GetShard(key);
+   const size_t shard_max_size = ShardMaxSize();
++#if XGRAMMAR_ENABLE_THREADING
+   std::lock_guard<std::mutex> lock(shard.mutex);
++#endif
+   if (shard_max_size != kUnlimitedSize && MemorySize(token_mask) > shard_max_size) {
+     // The token mask is too large to be cached.
+     return false;
+@@ -2743,7 +2753,9 @@ RuleLevelCache::RuleLevelCache(size_t max_cache_memory_size)
+ 
+ void RuleLevelCache::Impl::ClearCache() {
+   for (auto& shard : shards_) {
++#if XGRAMMAR_ENABLE_THREADING
+     std::lock_guard<std::mutex> lock(shard.mutex);
++#endif
+     shard.cache_list.Clear();
+     shard.cache.clear();
+     shard.current_cache_memory_size = 0;
+diff --git a/cpp/grammar_matcher.cc b/cpp/grammar_matcher.cc
+index d68479f..973b784 100644
+--- a/cpp/grammar_matcher.cc
++++ b/cpp/grammar_matcher.cc
+@@ -13,7 +13,6 @@
+ #include <chrono>
+ #include <cstdint>
+ #include <optional>
+-#include <thread>
+ #include <utility>
+ #include <variant>
+ #include <vector>
+@@ -26,6 +25,7 @@
+ #include "support/int_set.h"
+ #include "support/logging.h"
+ #include "support/thread_pool.h"
++#include "support/threading.h"
+ #include "testing.h"
+ 
+ namespace xgrammar {
+@@ -537,6 +537,7 @@ class GrammarMatcher::Impl : public EarleyParser {
+ class BatchGrammarMatcher::Impl {
+  public:
+   Impl(std::variant<std::string, int32_t> max_threads) {
++#if XGRAMMAR_ENABLE_THREADING
+     if (std::holds_alternative<int32_t>(max_threads)) {
+       int32_t num_threads = std::get<int32_t>(max_threads);
+       XGRAMMAR_CHECK(num_threads >= 1)
+@@ -556,6 +557,15 @@ class BatchGrammarMatcher::Impl {
+       XGRAMMAR_CHECK(str == "auto");
+       max_threads_ = std::thread::hardware_concurrency() / 2;
+     }
++#else
++    if (std::holds_alternative<int32_t>(max_threads)) {
++      XGRAMMAR_CHECK(std::get<int32_t>(max_threads) >= 1)
++          << "The num_threads should be at least 1";
++    } else {
++      XGRAMMAR_CHECK(std::get<std::string>(max_threads) == "auto");
++    }
++    max_threads_ = 1;
++#endif
+   }
+ 
+   void BatchFillNextTokenBitmask(
+diff --git a/cpp/support/thread_pool.h b/cpp/support/thread_pool.h
+index 0e7064b..1bfd7e6 100644
+--- a/cpp/support/thread_pool.h
++++ b/cpp/support/thread_pool.h
+@@ -6,19 +6,27 @@
+ #ifndef XGRAMMAR_SUPPORT_THREAD_POOL_H_
+ #define XGRAMMAR_SUPPORT_THREAD_POOL_H_
+ 
+-#include <condition_variable>
+ #include <functional>
++#include <type_traits>
++#include <utility>
++
++#include "threading.h"
++
++#if XGRAMMAR_ENABLE_THREADING
++#include <condition_variable>
+ #include <future>
+ #include <mutex>
+ #include <queue>
+ #include <thread>
+-#include <type_traits>
+ #include <vector>
+ 
+ #include "logging.h"
++#endif
+ 
+ namespace xgrammar {
+ 
++#if XGRAMMAR_ENABLE_THREADING
++
+ /*!
+  * \brief A thread pool implementation for parallel task execution.
+  *
+@@ -68,8 +76,8 @@ class ThreadPool {
+    * \note Tasks are executed in FIFO order but may complete in any order.
+    */
+   template <class F, class... Args>
+-  auto Submit(F&& f, Args&&... args) -> std::shared_future<std::invoke_result_t<F, Args...>> {
+-    using return_type = std::invoke_result_t<F, Args...>;
++  auto Submit(F&& f, Args&&... args) {
++    using return_type = decltype(std::forward<F>(f)(std::forward<Args>(args)...));
+ 
+     // Package the task with its arguments into a shared pointer
+     auto task = std::make_shared<std::packaged_task<return_type()>>(
+@@ -198,6 +206,35 @@ inline void ParallelFor(int low, int high, int num_threads, std::function<void(i
+   pool.Join();
+ }
+ 
++#else
++
++/*! \brief A synchronous task executor for platforms without threading support. */
++class ThreadPool {
++ public:
++  explicit ThreadPool(size_t) {}
++
++  template <class F, class... Args>
++  auto Submit(F&& f, Args&&... args) {
++    return std::forward<F>(f)(std::forward<Args>(args)...);
++  }
++
++  template <class F, class... Args>
++  void Execute(F&& f, Args&&... args) {
++    std::forward<F>(f)(std::forward<Args>(args)...);
++  }
++
++  void Wait() {}
++  void Join() {}
++};
++
++inline void ParallelFor(int low, int high, int, std::function<void(int)> f) {
++  for (int i = low; i < high; ++i) {
++    f(i);
++  }
++}
++
++#endif
++
+ }  // namespace xgrammar
+ 
+ #endif  // XGRAMMAR_SUPPORT_THREAD_POOL_H_
+diff --git a/cpp/support/thread_safe_cache.h b/cpp/support/thread_safe_cache.h
+index 28859db..5f1b6aa 100644
+--- a/cpp/support/thread_safe_cache.h
++++ b/cpp/support/thread_safe_cache.h
+@@ -6,18 +6,22 @@
+ #ifndef XGRAMMAR_SUPPORT_THREAD_SAFE_CACHE_H_
+ #define XGRAMMAR_SUPPORT_THREAD_SAFE_CACHE_H_
+ 
+-#include <atomic>
+-#include <chrono>  // IWYU pragma: keep
+ #include <cstddef>
+ #include <functional>
+-#include <future>
+-#include <mutex>
+ #include <optional>
+-#include <shared_mutex>
+ #include <unordered_map>
+ #include <utility>
+ 
+ #include "container.h"
++#include "threading.h"
++
++#if XGRAMMAR_ENABLE_THREADING
++#include <atomic>
++#include <chrono>  // IWYU pragma: keep
++#include <future>
++#include <mutex>
++#include <shared_mutex>
++#endif
+ 
+ namespace xgrammar {
+ 
+@@ -52,6 +56,7 @@ class ThreadSafeCache<Value> {
+    * \return The cached or newly computed value
+    */
+   Value Get() {
++#if XGRAMMAR_ENABLE_THREADING
+     // First try reading from cache with shared lock
+     {
+       std::shared_lock<std::shared_mutex> cache_lock(cache_mutex_);
+@@ -67,6 +72,11 @@ class ThreadSafeCache<Value> {
+     if (cache_.has_value()) {
+       return cache_.value();
+     }
++#else
++    if (cache_.has_value()) {
++      return cache_.value();
++    }
++#endif
+ 
+     Value value = compute_();
+     XGRAMMAR_DCHECK(!cache_.has_value());
+@@ -79,7 +89,9 @@ class ThreadSafeCache<Value> {
+    * This function removes the cached value, so the next call to Get() will recompute it.
+    */
+   void Clear() {
++#if XGRAMMAR_ENABLE_THREADING
+     std::unique_lock<std::shared_mutex> cache_lock(cache_mutex_);
++#endif
+     cache_.reset();
+   }
+ 
+@@ -88,8 +100,10 @@ class ThreadSafeCache<Value> {
+   std::optional<Value> cache_;
+   /*! \brief Function used to compute the value when not cached */
+   std::function<Value()> compute_;
++#if XGRAMMAR_ENABLE_THREADING
+   /*! \brief Reader-writer lock protecting access to cache_ */
+   std::shared_mutex cache_mutex_;
++#endif
+ };
+ 
+ /*!
+@@ -118,6 +132,7 @@ class ThreadSafeCache<Key, Value> {
+    * \return The cached or newly computed value of the key
+    */
+   Value Get(const Key& key) {
++#if XGRAMMAR_ENABLE_THREADING
+     // Why we need this:
+     // - When adding new elements to a unordered_map, the map may be rehashed,
+     // - which means all the iterators may be invalidated.
+@@ -153,6 +168,9 @@ class ThreadSafeCache<Key, Value> {
+       // We should not hold lock here, since this function may be blocking.
+       return entry.get(compute_, key);
+     }
++#else
++    return cache_[key].get(compute_, key);
++#endif
+   }
+ 
+   /*!
+@@ -161,12 +179,15 @@ class ThreadSafeCache<Key, Value> {
+    * them.
+    */
+   void Clear() {
++#if XGRAMMAR_ENABLE_THREADING
+     auto erase_lock = std::unique_lock(erase_mutex_);
++#endif
+     cache_.clear();
+   }
+ 
+  private:
+   struct Entry {
++#if XGRAMMAR_ENABLE_THREADING
+     Value value;
+     std::once_flag flag;
+     const Value& get(const std::function<Value(const Key&)>& f, const Key& key) {
+@@ -174,16 +195,27 @@ class ThreadSafeCache<Key, Value> {
+       std::call_once(flag, [&] { value = f(key); });
+       return value;
+     }
++#else
++    std::optional<Value> value;
++    const Value& get(const std::function<Value(const Key&)>& f, const Key& key) {
++      if (!value.has_value()) {
++        value = f(key);
++      }
++      return value.value();
++    }
++#endif
+   };
+ 
+   /*! \brief The cache mapping keys to computed values */
+   std::unordered_map<Key, Entry> cache_;
+   /*! \brief The function used to compute values for uncached keys */
+   std::function<Value(const Key&)> compute_;
++#if XGRAMMAR_ENABLE_THREADING
+   /*! \brief Reader-writer lock protecting access to cache_ */
+   std::shared_mutex cache_mutex_;
+   /*! \brief Mutex protecting removing elements */
+   std::shared_mutex erase_mutex_;
++#endif
+ };
+ 
+ namespace details {
+@@ -268,6 +300,12 @@ class ThreadSafeLRUCache {
+     std::size_t size;
+   };
+ 
++#if XGRAMMAR_ENABLE_THREADING
++  using CachedValue = std::shared_future<SizedValue>;
++#else
++  using CachedValue = std::optional<SizedValue>;
++#endif
++
+  public:
+   inline static constexpr std::size_t kUnlimitedSize = static_cast<std::size_t>(-1);
+ 
+@@ -282,11 +320,16 @@ class ThreadSafeLRUCache {
+   std::size_t MemorySize() const { return current_size_; }
+ 
+   Value Get(const Key& key) {
++#if XGRAMMAR_ENABLE_THREADING
+     auto future = GetFuture(key);
+     return future.get().value;
++#else
++    return GetSynchronous(key);
++#endif
+   }
+ 
+   void Clear() {
++#if XGRAMMAR_ENABLE_THREADING
+     // Remove all the ready entries.
+     const auto lock_map = std::lock_guard{map_mutex_};
+     if (this->max_size_ == kUnlimitedSize)
+@@ -304,9 +347,24 @@ class ThreadSafeLRUCache {
+             return true;
+           }
+       );
++#else
++    if (this->max_size_ == kUnlimitedSize) {
++      cache_.GetMap().clear();
++      current_size_ = 0;
++    } else {
++      cache_.LRUEvict(
++          [] { return true; },
++          [&](const CachedValue& value) {
++            current_size_ -= value.value().size;
++            return true;
++          }
++      );
++    }
++#endif
+   }
+ 
+  private:
++#if XGRAMMAR_ENABLE_THREADING
+   std::shared_future<SizedValue> GetFuture(const Key& key) {
+     if (this->max_size_ == kUnlimitedSize) return GetFutureUnlimited(key);
+     auto& map = cache_.GetMap();
+@@ -388,15 +446,55 @@ class ThreadSafeLRUCache {
+     task();
+     return future;
+   }
++#else
++  Value GetSynchronous(const Key& key) {
++    auto& map = cache_.GetMap();
++    auto cached = map.find(key);
++    if (cached != map.end()) {
++      if (this->max_size_ == kUnlimitedSize) {
++        return cached->second.value.value().value;
++      }
++      return cache_.LRUVisit(*cached).value().value;
++    }
++
++    auto value = computer_(key);
++    auto sized_value = SizedValue{value, size_estimator_(value)};
++    if (max_size_ == 0 || (max_size_ != kUnlimitedSize && sized_value.size > max_size_)) {
++      return value;
++    }
++
++    current_size_ += sized_value.size;
++    auto [entry, inserted] = map.try_emplace(key);
++    XGRAMMAR_DCHECK(inserted);
++    auto cached_value = CachedValue{std::move(sized_value)};
++    if (this->max_size_ == kUnlimitedSize) {
++      entry->second.value = std::move(cached_value);
++    } else {
++      cache_.LRUInit(*entry, cached_value);
++      cache_.LRUEvict(
++          [&] { return current_size_ > max_size_; },
++          [&](const CachedValue& evicted) {
++            current_size_ -= evicted.value().size;
++            return true;
++          }
++      );
++    }
++    return value;
++  }
++#endif
+ 
+  private:
+   const std::size_t max_size_;
+   const Computer computer_;
+   const SizeEstimator size_estimator_;
+-  details::LRUCacheImpl<Key, std::shared_future<SizedValue>> cache_;
++  details::LRUCacheImpl<Key, CachedValue> cache_;
++#if XGRAMMAR_ENABLE_THREADING
+   std::atomic_size_t current_size_{0};
+   std::shared_mutex map_mutex_;
+   std::mutex lru_mutex_;
++#else
++  std::size_t current_size_ = 0;
++#endif
+ };
+ 
+ }  // namespace xgrammar
+diff --git a/cpp/support/threading.h b/cpp/support/threading.h
+new file mode 100644
+index 0000000..16dfe6d
+--- /dev/null
++++ b/cpp/support/threading.h
+@@ -0,0 +1,17 @@
++/*!
++ * Copyright (c) 2026 by Contributors
++ * \file xgrammar/support/threading.h
++ * \brief Threading configuration.
++ */
++#ifndef XGRAMMAR_SUPPORT_THREADING_H_
++#define XGRAMMAR_SUPPORT_THREADING_H_
++
++#ifndef XGRAMMAR_ENABLE_THREADING
++#if defined(__wasi__) && !defined(_REENTRANT)
++#define XGRAMMAR_ENABLE_THREADING 0
++#else
++#define XGRAMMAR_ENABLE_THREADING 1
++#endif
++#endif
++
++#endif  // XGRAMMAR_SUPPORT_THREADING_H_

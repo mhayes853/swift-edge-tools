@@ -1,4 +1,4 @@
-// swift-tools-version: 6.2
+// swift-tools-version: 6.3;(experimentalCGen)
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import CompilerPluginSupport
@@ -163,9 +163,6 @@ let package = Package(
         "xgrammar/cpp/fsm_builder.cc",
         "xgrammar/cpp/grammar.cc",
         "xgrammar/cpp/grammar_builder.cc",
-        "xgrammar/cpp/grammar_compiler.cc",
-        "xgrammar/cpp/grammar_functor.cc",
-        "xgrammar/cpp/grammar_matcher.cc",
         "xgrammar/cpp/grammar_parser.cc",
         "xgrammar/cpp/grammar_printer.cc",
         "xgrammar/cpp/json_schema_converter.cc",
@@ -183,11 +180,17 @@ let package = Package(
         .headerSearchPath("."),
         .headerSearchPath("xgrammar/include"),
         .headerSearchPath("xgrammar/cpp"),
+        .headerSearchPath("xgrammar/cpp/support"),
         .headerSearchPath("xgrammar/3rdparty/dlpack/include"),
         .headerSearchPath("xgrammar/3rdparty/picojson"),
         .define("XGRAMMAR_ENABLE_LOG_DEBUG", to: "0"),
         .define("XGRAMMAR_ENABLE_CPPTRACE", to: "0")
-      ]
+      ],
+      plugins: [.plugin(name: "PatchPlugin")]
+    ),
+    .plugin(
+      name: "PatchPlugin",
+      capability: .buildTool()
     ),
     .macro(
       name: "EdgeToolsMacros",

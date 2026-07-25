@@ -140,7 +140,7 @@
       }
     }
 
-    @Suite
+    @Suite(.serialized)
     struct `Memory usage tests`: ~Copyable {
       private let engine: XGRCompiler
       private let tokenizer: NeedleSPTokenizer
@@ -162,6 +162,12 @@
       func `Compiled Grammar Reports Non-Zero Memory Size`() throws {
         let compiledGrammar = try self.engine.compile(try genericGrammar())
         expectNoDifference(compiledGrammar.memorySizeBytes > 0, true)
+      }
+
+      @Test
+      func `Cache Reports Memory After Compiling`() throws {
+        _ = try self.engine.compile(try genericGrammar())
+        expectNoDifference(self.engine.cacheSizeBytes > 0, true)
       }
 
       @Test

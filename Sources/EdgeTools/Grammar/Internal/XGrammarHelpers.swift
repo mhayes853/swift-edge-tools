@@ -12,7 +12,7 @@
     init(_ source: String) throws {
       var rules = [Rule]()
       for line in source.split(separator: "\n", omittingEmptySubsequences: false) {
-        if let separator = line.range(of: "::=") {
+        if let separator = line.firstRange(of: "::=") {
           let name = line[..<separator.lowerBound].trimmingWhitespace
           let body = line[separator.upperBound...].trimmingWhitespace
           guard !name.isEmpty else { throw XGRError.unsupportedToolSchema }

@@ -4,7 +4,7 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
 
-image="${SWIFT_DOCKER_IMAGE:-swift:6.2.3-jammy}"
+image="${SWIFT_DOCKER_IMAGE:-swift:6.3.2-jammy}"
 traits="${SWIFT_TRAITS:-ONNX}"
 filter="${SWIFT_TEST_FILTER:-CONNXRuntime tests}"
 cache_volume="${SWIFT_DOCKER_CACHE_VOLUME:-swift-edge-tools-linux-build}"
@@ -24,7 +24,7 @@ Options:
   --filter FILTER           Test filter or suite pattern (default: CONNXRuntime tests).
   --all-tests               Run all tests instead of applying a filter.
   --default-traits          Keep the package's default traits enabled.
-  --image IMAGE             Docker image (default: swift:6.2.3-jammy).
+  --image IMAGE             Docker image (default: swift:6.3.2-jammy).
   --cache-volume NAME       Docker build-cache volume.
   --no-cache-volume         Do not persist the Docker build cache.
   -h, --help                Show this help.
