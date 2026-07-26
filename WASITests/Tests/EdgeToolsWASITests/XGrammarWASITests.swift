@@ -26,6 +26,20 @@ struct `XGrammar WASI tests` {
   }
 
   @Test
+  func `Invalid Serialized Grammar Throws`() {
+    #expect(throws: XGRError.self) {
+      _ = try XGRGrammar(serializedJSON: "not json")
+    }
+  }
+
+  @Test
+  func `Invalid Structural Tag Throws`() {
+    #expect(throws: XGRError.self) {
+      _ = try XGRGrammar(structuralTagJSON: "not json")
+    }
+  }
+
+  @Test
   func `Compiles And Matches Arithmetic Operators`() throws {
     let grammar = try XGRGrammar(
       lark: """

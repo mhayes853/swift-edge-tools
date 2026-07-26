@@ -220,7 +220,7 @@ index 0000000..f234813
 +#ifndef XGRAMMAR_SUPPORT_NO_EXCEPTIONS_H_
 +#define XGRAMMAR_SUPPORT_NO_EXCEPTIONS_H_
 +
-+#if defined(__wasi__)
++#if defined(XGRAMMAR_CXX_EXCEPTIONS_ENABLED) && !XGRAMMAR_CXX_EXCEPTIONS_ENABLED
 +#ifdef __cpp_exceptions
 +#pragma clang diagnostic push
 +#pragma clang diagnostic ignored "-Wbuiltin-macro-redefined"

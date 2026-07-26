@@ -1,4 +1,12 @@
-#if defined(__wasi__)
+#ifndef XGRAMMAR_CXX_EXCEPTIONS_ENABLED
+#if defined(__cpp_exceptions)
+#define XGRAMMAR_CXX_EXCEPTIONS_ENABLED 1
+#else
+#define XGRAMMAR_CXX_EXCEPTIONS_ENABLED 0
+#endif
+#endif
+
+#if !XGRAMMAR_CXX_EXCEPTIONS_ENABLED && defined(__cpp_exceptions)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wbuiltin-macro-redefined"
 #undef __cpp_exceptions
@@ -27,53 +35,35 @@
 
 namespace {
 
-#if defined(__wasi__)
 thread_local char last_error[4096] = {};
-#else
-thread_local std::string last_error;
-#endif
+
+void clear_error() {
+    last_error[0] = '\0';
+}
 
 void set_error_message(const std::string& message) {
-#if defined(__wasi__)
     std::snprintf(last_error, sizeof(last_error), "%s", message.c_str());
-#else
-    last_error = message;
-#endif
 }
 
-void set_error(const std::exception& error) {
-    set_error_message(error.what());
-}
-
-[[noreturn]] void raise_invalid_argument(const std::string& message) {
-#if defined(__wasi__)
+template <typename Result>
+Result fail(const std::string& message, Result failure = {}) {
     set_error_message(message);
-    std::abort();
-#else
-    throw std::invalid_argument(message);
-#endif
-}
-
-[[noreturn]] void raise_runtime_error(const std::string& message) {
-#if defined(__wasi__)
-    set_error_message(message);
-    std::abort();
-#else
-    throw std::runtime_error(message);
-#endif
+    return failure;
 }
 
 template <typename Body>
-auto with_error_handling(Body&& body) -> std::invoke_result_t<Body> {
-#if defined(__wasi__)
-    return body();
-#else
+auto invoke(Body&& body) -> std::invoke_result_t<Body> {
+    clear_error();
+#if XGRAMMAR_CXX_EXCEPTIONS_ENABLED
     try {
         return body();
     } catch (const std::exception& error) {
-        set_error(error);
-        return std::invoke_result_t<Body>{};
+        return fail<std::invoke_result_t<Body>>(error.what());
+    } catch (...) {
+        return fail<std::invoke_result_t<Body>>("Unknown XGrammar error.");
     }
+#else
+    return body();
 #endif
 }
 
@@ -101,13 +91,14 @@ struct XGrammarGrammarHandle {
 };
 
 template <typename Value, typename Error>
-Value value_or_throw(std::variant<Value, Error> result) {
-    if (const auto* value = std::get_if<Value>(&result)) {
-        return *value;
+std::optional<Value> value_or_error(std::variant<Value, Error> result) {
+    if (auto* value = std::get_if<Value>(&result)) {
+        return std::move(*value);
     }
-    const auto& error = std::get<Error>(result);
-    std::visit([](const auto& value) { raise_runtime_error(value.what()); }, error);
-    std::abort();
+    const auto* error = std::get_if<Error>(&result);
+    if (!error) return fail<std::optional<Value>>("Unknown XGrammar result.");
+    std::visit([](const auto& value) { set_error_message(value.what()); }, *error);
+    return std::nullopt;
 }
 
 size_t write_string(const std::string& string, char* buffer, size_t buffer_capacity) {
@@ -118,7 +109,7 @@ size_t write_string(const std::string& string, char* buffer, size_t buffer_capac
     return required_capacity;
 }
 
-xgrammar::VocabType vocab_type(xgrammar_vocab_type_t type) {
+std::optional<xgrammar::VocabType> vocab_type(xgrammar_vocab_type_t type) {
     switch (type) {
     case xgrammar_vocab_type_raw:
         return xgrammar::VocabType::RAW;
@@ -127,7 +118,8 @@ xgrammar::VocabType vocab_type(xgrammar_vocab_type_t type) {
     case xgrammar_vocab_type_byte_level:
         return xgrammar::VocabType::BYTE_LEVEL;
     }
-    raise_invalid_argument("Unknown XGrammar vocabulary type.");
+    set_error_message("Unknown XGrammar vocabulary type.");
+    return std::nullopt;
 }
 
 picojson::value grammar_format(const xgrammar::Grammar& grammar) {
@@ -137,35 +129,27 @@ picojson::value grammar_format(const xgrammar::Grammar& grammar) {
     return picojson::value(format);
 }
 
-xgrammar::Grammar grammar_from_structural_tag_json(const std::string& structural_tag_json) {
-    const auto result = xgrammar::Grammar::FromStructuralTag(structural_tag_json);
-    if (const auto* grammar = std::get_if<xgrammar::Grammar>(&result)) {
-        return *grammar;
-    }
-
-    const auto& structural_tag_error = std::get<xgrammar::StructuralTagError>(result);
-    std::visit(
-        [](const auto& error) { raise_runtime_error(error.what()); },
-        structural_tag_error
-    );
-    raise_runtime_error("Unknown structural tag error.");
+std::optional<xgrammar::Grammar> grammar_from_structural_tag_json(
+    const std::string& structural_tag_json
+) {
+    return value_or_error(xgrammar::Grammar::FromStructuralTag(structural_tag_json));
 }
 
-xgrammar::Grammar grammar_from_structural_tag(const picojson::object& format) {
+std::optional<xgrammar::Grammar> grammar_from_structural_tag(const picojson::object& format) {
     picojson::object structural_tag;
     structural_tag["type"] = picojson::value("structural_tag");
     structural_tag["format"] = picojson::value(format);
     return grammar_from_structural_tag_json(picojson::value(structural_tag).serialize());
 }
 
-xgrammar::Grammar optional_grammar(const xgrammar::Grammar& grammar) {
+std::optional<xgrammar::Grammar> optional_grammar(const xgrammar::Grammar& grammar) {
     picojson::object tag;
     tag["type"] = picojson::value("optional");
     tag["content"] = grammar_format(grammar);
     return grammar_from_structural_tag(tag);
 }
 
-xgrammar::Grammar repeated_grammar(
+std::optional<xgrammar::Grammar> repeated_grammar(
     const xgrammar::Grammar& grammar,
     int32_t minimum,
     int32_t maximum
@@ -178,18 +162,20 @@ xgrammar::Grammar repeated_grammar(
     return grammar_from_structural_tag(tag);
 }
 
-std::vector<xgrammar::Grammar> grammar_vector(
+std::optional<std::vector<xgrammar::Grammar>> grammar_vector(
     const xgrammar_grammar_t* grammars,
     size_t grammar_count
 ) {
     if (!grammars || grammar_count == 0) {
-        raise_invalid_argument("Expected at least one grammar.");
+        set_error_message("Expected at least one grammar.");
+        return std::nullopt;
     }
     std::vector<xgrammar::Grammar> result;
     result.reserve(grammar_count);
     for (size_t index = 0; index < grammar_count; ++index) {
         if (!grammars[index]) {
-            raise_invalid_argument("Expected a non-null grammar.");
+            set_error_message("Expected a non-null grammar.");
+            return std::nullopt;
         }
         const auto handle = static_cast<XGrammarGrammarHandle*>(grammars[index]);
         result.push_back(handle->grammar);
@@ -199,7 +185,7 @@ std::vector<xgrammar::Grammar> grammar_vector(
 
 }  // namespace
 
-#if defined(__wasi__)
+#if XGRAMMAR_LOG_CUSTOMIZE
 namespace xgrammar {
 
 [[noreturn]] void LogFatalImpl(
@@ -226,11 +212,7 @@ void LogMessageImpl(
 extern "C" {
 
 const char* xgrammar_last_error_message(void) {
-#if defined(__wasi__)
     return last_error;
-#else
-    return last_error.c_str();
-#endif
 }
 
 xgrammar_tokenizer_info_t xgrammar_tokenizer_info_init(
@@ -242,10 +224,12 @@ xgrammar_tokenizer_info_t xgrammar_tokenizer_info_init(
     size_t stop_token_id_count,
     int add_prefix_space
 ) {
-    return with_error_handling([&] {
+    return invoke([&] {
         if (!encoded_vocab || vocab_size < kXGrammarUnlimited || (stop_token_id_count > 0 && !stop_token_ids)) {
-            raise_invalid_argument("Invalid tokenizer information.");
+            return fail<XGrammarTokenizerInfoHandle*>("Invalid tokenizer information.");
         }
+        const auto resolved_vocab_type = vocab_type(type);
+        if (!resolved_vocab_type) return static_cast<XGrammarTokenizerInfoHandle*>(nullptr);
         const std::vector<std::string> vocabulary(encoded_vocab, encoded_vocab + encoded_vocab_count);
         const auto optional_vocab_size = vocab_size == kXGrammarUnlimited
             ? std::optional<int>{} : std::optional<int>{vocab_size};
@@ -253,7 +237,11 @@ xgrammar_tokenizer_info_t xgrammar_tokenizer_info_init(
             ? std::optional<std::vector<int32_t>>{}
             : std::optional<std::vector<int32_t>>{std::vector<int32_t>(stop_token_ids, stop_token_ids + stop_token_id_count)};
         return new XGrammarTokenizerInfoHandle{xgrammar::TokenizerInfo(
-            vocabulary, vocab_type(type), optional_vocab_size, optional_stop_token_ids, add_prefix_space != 0
+            vocabulary,
+            *resolved_vocab_type,
+            optional_vocab_size,
+            optional_stop_token_ids,
+            add_prefix_space != 0
         )};
     });
 }
@@ -263,8 +251,10 @@ xgrammar_tokenizer_info_t xgrammar_tokenizer_info_from_vocab_and_metadata(
     size_t encoded_vocab_count,
     const char* metadata
 ) {
-    return with_error_handling([&] {
-        if (!encoded_vocab || !metadata) raise_invalid_argument("Expected vocabulary and metadata.");
+    return invoke([&] {
+        if (!encoded_vocab || !metadata) {
+            return fail<XGrammarTokenizerInfoHandle*>("Expected vocabulary and metadata.");
+        }
         return new XGrammarTokenizerInfoHandle{xgrammar::TokenizerInfo::FromVocabAndMetadata(
             std::vector<std::string>(encoded_vocab, encoded_vocab + encoded_vocab_count), metadata
         )};
@@ -276,8 +266,8 @@ size_t xgrammar_tokenizer_info_detect_metadata_from_hf(
     char* buffer,
     size_t buffer_capacity
 ) {
-    return with_error_handling([&] {
-        if (!backend_json) raise_invalid_argument("Expected Hugging Face backend JSON.");
+    return invoke([&] {
+        if (!backend_json) return fail<size_t>("Expected Hugging Face backend JSON.");
         return write_string(xgrammar::TokenizerInfo::DetectMetadataFromHF(backend_json), buffer, buffer_capacity);
     });
 }
@@ -287,16 +277,20 @@ size_t xgrammar_tokenizer_info_serialize_json(
     char* buffer,
     size_t buffer_capacity
 ) {
-    return with_error_handling([&] {
-        if (!tokenizer_info) raise_invalid_argument("Expected tokenizer information.");
+    return invoke([&] {
+        if (!tokenizer_info) return fail<size_t>("Expected tokenizer information.");
         return write_string(static_cast<XGrammarTokenizerInfoHandle*>(tokenizer_info)->tokenizer_info.SerializeJSON(), buffer, buffer_capacity);
     });
 }
 
 xgrammar_tokenizer_info_t xgrammar_tokenizer_info_deserialize_json(const char* json) {
-    return with_error_handling([&] {
-        if (!json) raise_invalid_argument("Expected tokenizer information JSON.");
-        return new XGrammarTokenizerInfoHandle{value_or_throw(xgrammar::TokenizerInfo::DeserializeJSON(json))};
+    return invoke([&] {
+        if (!json) {
+            return fail<XGrammarTokenizerInfoHandle*>("Expected tokenizer information JSON.");
+        }
+        auto tokenizer_info = value_or_error(xgrammar::TokenizerInfo::DeserializeJSON(json));
+        if (!tokenizer_info) return static_cast<XGrammarTokenizerInfoHandle*>(nullptr);
+        return new XGrammarTokenizerInfoHandle{std::move(*tokenizer_info)};
     });
 }
 
@@ -310,8 +304,10 @@ xgrammar_compiler_t xgrammar_compiler_init(
     int cache_enabled,
     int64_t max_memory_bytes
 ) {
-    return with_error_handling([&] {
-        if (!tokenizer_info || max_threads <= 0) raise_invalid_argument("Invalid compiler configuration.");
+    return invoke([&] {
+        if (!tokenizer_info || max_threads <= 0) {
+            return fail<XGrammarCompilerHandle*>("Invalid compiler configuration.");
+        }
         const auto info = static_cast<XGrammarTokenizerInfoHandle*>(tokenizer_info)->tokenizer_info;
         return new XGrammarCompilerHandle{info, xgrammar::GrammarCompiler(info, max_threads, cache_enabled != 0, max_memory_bytes)};
     });
@@ -337,8 +333,8 @@ xgrammar_grammar_t xgrammar_grammar_init_ebnf(
     const char* ebnf,
     const char* root_rule_name
 ) {
-    return with_error_handling([&] {
-        if (!ebnf) raise_invalid_argument("Expected EBNF.");
+    return invoke([&] {
+        if (!ebnf) return fail<XGrammarGrammarHandle*>("Expected EBNF.");
         return new XGrammarGrammarHandle{
             xgrammar::Grammar::FromEBNF(ebnf, root_rule_name ? root_rule_name : "root")
         };
@@ -355,8 +351,8 @@ xgrammar_grammar_t xgrammar_grammar_init_json_schema(
     int32_t max_whitespace_count,
     int any_order
 ) {
-    return with_error_handling([&] {
-        if (!json_schema) raise_invalid_argument("Expected a JSON Schema.");
+    return invoke([&] {
+        if (!json_schema) return fail<XGrammarGrammarHandle*>("Expected a JSON Schema.");
         const std::optional<int> optional_indent = indent == kXGrammarUnlimited
             ? std::nullopt
             : std::optional<int>(indent);
@@ -382,48 +378,54 @@ xgrammar_grammar_t xgrammar_grammar_init_json_schema(
 }
 
 xgrammar_grammar_t xgrammar_grammar_init_regex(const char* regex) {
-    return with_error_handling([&] {
-        if (!regex) raise_invalid_argument("Expected a regular expression.");
+    return invoke([&] {
+        if (!regex) return fail<XGrammarGrammarHandle*>("Expected a regular expression.");
         return new XGrammarGrammarHandle{xgrammar::Grammar::FromRegex(regex)};
     });
 }
 
 xgrammar_grammar_t xgrammar_grammar_init_lark(const char* lark) {
-    return with_error_handling([&] {
-        if (!lark) raise_invalid_argument("Expected a Lark grammar.");
+    return invoke([&] {
+        if (!lark) return fail<XGrammarGrammarHandle*>("Expected a Lark grammar.");
         return new XGrammarGrammarHandle{xgrammar::Grammar::FromLark(lark)};
     });
 }
 
 xgrammar_grammar_t xgrammar_grammar_init_structural_tag(const char* structural_tag_json) {
-    return with_error_handling([&] {
-        if (!structural_tag_json) raise_invalid_argument("Expected a structural tag.");
-        return new XGrammarGrammarHandle{grammar_from_structural_tag_json(structural_tag_json)};
+    return invoke([&] {
+        if (!structural_tag_json) {
+            return fail<XGrammarGrammarHandle*>("Expected a structural tag.");
+        }
+        auto grammar = grammar_from_structural_tag_json(structural_tag_json);
+        if (!grammar) return static_cast<XGrammarGrammarHandle*>(nullptr);
+        return new XGrammarGrammarHandle{std::move(*grammar)};
     });
 }
 
 xgrammar_grammar_t xgrammar_grammar_builtin_json(void) {
-    return with_error_handling([&] { return new XGrammarGrammarHandle{xgrammar::Grammar::BuiltinJSONGrammar()}; });
+    return invoke([&] { return new XGrammarGrammarHandle{xgrammar::Grammar::BuiltinJSONGrammar()}; });
 }
 
 size_t xgrammar_grammar_ebnf(xgrammar_grammar_t grammar, char* buffer, size_t buffer_capacity) {
-    return with_error_handling([&] {
-        if (!grammar) raise_invalid_argument("Expected a grammar.");
+    return invoke([&] {
+        if (!grammar) return fail<size_t>("Expected a grammar.");
         return write_string(static_cast<XGrammarGrammarHandle*>(grammar)->grammar.ToString(), buffer, buffer_capacity);
     });
 }
 
 size_t xgrammar_grammar_serialize_json(xgrammar_grammar_t grammar, char* buffer, size_t buffer_capacity) {
-    return with_error_handling([&] {
-        if (!grammar) raise_invalid_argument("Expected a grammar.");
+    return invoke([&] {
+        if (!grammar) return fail<size_t>("Expected a grammar.");
         return write_string(static_cast<XGrammarGrammarHandle*>(grammar)->grammar.SerializeJSON(), buffer, buffer_capacity);
     });
 }
 
 xgrammar_grammar_t xgrammar_grammar_deserialize_json(const char* json) {
-    return with_error_handling([&] {
-        if (!json) raise_invalid_argument("Expected grammar JSON.");
-        return new XGrammarGrammarHandle{value_or_throw(xgrammar::Grammar::DeserializeJSON(json))};
+    return invoke([&] {
+        if (!json) return fail<XGrammarGrammarHandle*>("Expected grammar JSON.");
+        auto grammar = value_or_error(xgrammar::Grammar::DeserializeJSON(json));
+        if (!grammar) return static_cast<XGrammarGrammarHandle*>(nullptr);
+        return new XGrammarGrammarHandle{std::move(*grammar)};
     });
 }
 
@@ -431,8 +433,10 @@ xgrammar_grammar_t xgrammar_grammar_concatenate(
     const xgrammar_grammar_t* grammars,
     size_t grammar_count
 ) {
-    return with_error_handling([&] {
-        return new XGrammarGrammarHandle{xgrammar::Grammar::Concat(grammar_vector(grammars, grammar_count))};
+    return invoke([&] {
+        auto grammar_values = grammar_vector(grammars, grammar_count);
+        if (!grammar_values) return static_cast<XGrammarGrammarHandle*>(nullptr);
+        return new XGrammarGrammarHandle{xgrammar::Grammar::Concat(*grammar_values)};
     });
 }
 
@@ -440,16 +444,20 @@ xgrammar_grammar_t xgrammar_grammar_union(
     const xgrammar_grammar_t* grammars,
     size_t grammar_count
 ) {
-    return with_error_handling([&] {
-        return new XGrammarGrammarHandle{xgrammar::Grammar::Union(grammar_vector(grammars, grammar_count))};
+    return invoke([&] {
+        auto grammar_values = grammar_vector(grammars, grammar_count);
+        if (!grammar_values) return static_cast<XGrammarGrammarHandle*>(nullptr);
+        return new XGrammarGrammarHandle{xgrammar::Grammar::Union(*grammar_values)};
     });
 }
 
 xgrammar_grammar_t xgrammar_grammar_optional(xgrammar_grammar_t grammar) {
-    return with_error_handling([&] {
-        if (!grammar) raise_invalid_argument("Expected a grammar.");
+    return invoke([&] {
+        if (!grammar) return fail<XGrammarGrammarHandle*>("Expected a grammar.");
         const auto handle = static_cast<XGrammarGrammarHandle*>(grammar);
-        return new XGrammarGrammarHandle{optional_grammar(handle->grammar)};
+        auto result = optional_grammar(handle->grammar);
+        if (!result) return static_cast<XGrammarGrammarHandle*>(nullptr);
+        return new XGrammarGrammarHandle{std::move(*result)};
     });
 }
 
@@ -458,13 +466,15 @@ xgrammar_grammar_t xgrammar_grammar_repeat(
     int32_t minimum,
     int32_t maximum
 ) {
-    return with_error_handling([&] {
-        if (!grammar) raise_invalid_argument("Expected a grammar.");
+    return invoke([&] {
+        if (!grammar) return fail<XGrammarGrammarHandle*>("Expected a grammar.");
         if (minimum < 0 || (maximum != kXGrammarUnlimited && maximum < minimum)) {
-            raise_invalid_argument("Invalid grammar repetition range.");
+            return fail<XGrammarGrammarHandle*>("Invalid grammar repetition range.");
         }
         const auto handle = static_cast<XGrammarGrammarHandle*>(grammar);
-        return new XGrammarGrammarHandle{repeated_grammar(handle->grammar, minimum, maximum)};
+        auto result = repeated_grammar(handle->grammar, minimum, maximum);
+        if (!result) return static_cast<XGrammarGrammarHandle*>(nullptr);
+        return new XGrammarGrammarHandle{std::move(*result)};
     });
 }
 
@@ -476,8 +486,10 @@ void xgrammar_grammar_destroy(xgrammar_grammar_t grammar) {
 xgrammar_compiled_grammar_t xgrammar_compiler_compile_grammar(
     xgrammar_compiler_t compiler, xgrammar_grammar_t grammar
 ) {
-    return with_error_handling([&] {
-        if (!compiler || !grammar) raise_invalid_argument("Expected a compiler and grammar.");
+    return invoke([&] {
+        if (!compiler || !grammar) {
+            return fail<XGrammarCompiledGrammarHandle*>("Expected a compiler and grammar.");
+        }
         const auto compiler_handle = static_cast<XGrammarCompilerHandle*>(compiler);
         const auto grammar_handle = static_cast<XGrammarGrammarHandle*>(grammar);
         return new XGrammarCompiledGrammarHandle{compiler_handle->compiler.CompileGrammar(grammar_handle->grammar)};
@@ -485,15 +497,19 @@ xgrammar_compiled_grammar_t xgrammar_compiler_compile_grammar(
 }
 
 xgrammar_grammar_t xgrammar_compiled_grammar_grammar(xgrammar_compiled_grammar_t compiled_grammar) {
-    return with_error_handling([&] {
-        if (!compiled_grammar) raise_invalid_argument("Expected a compiled grammar.");
+    return invoke([&] {
+        if (!compiled_grammar) {
+            return fail<XGrammarGrammarHandle*>("Expected a compiled grammar.");
+        }
         return new XGrammarGrammarHandle{static_cast<XGrammarCompiledGrammarHandle*>(compiled_grammar)->compiled_grammar.GetGrammar()};
     });
 }
 
 xgrammar_tokenizer_info_t xgrammar_compiled_grammar_tokenizer_info(xgrammar_compiled_grammar_t compiled_grammar) {
-    return with_error_handling([&] {
-        if (!compiled_grammar) raise_invalid_argument("Expected a compiled grammar.");
+    return invoke([&] {
+        if (!compiled_grammar) {
+            return fail<XGrammarTokenizerInfoHandle*>("Expected a compiled grammar.");
+        }
         return new XGrammarTokenizerInfoHandle{static_cast<XGrammarCompiledGrammarHandle*>(compiled_grammar)->compiled_grammar.GetTokenizerInfo()};
     });
 }
@@ -509,8 +525,8 @@ size_t xgrammar_compiled_grammar_serialize_json(
     char* buffer,
     size_t buffer_capacity
 ) {
-    return with_error_handling([&] {
-        if (!compiled_grammar) raise_invalid_argument("Expected a compiled grammar.");
+    return invoke([&] {
+        if (!compiled_grammar) return fail<size_t>("Expected a compiled grammar.");
         return write_string(static_cast<XGrammarCompiledGrammarHandle*>(compiled_grammar)->compiled_grammar.SerializeJSON(), buffer, buffer_capacity);
     });
 }
@@ -519,10 +535,18 @@ xgrammar_compiled_grammar_t xgrammar_compiled_grammar_deserialize_json(
     const char* json,
     xgrammar_tokenizer_info_t tokenizer_info
 ) {
-    return with_error_handling([&] {
-        if (!json || !tokenizer_info) raise_invalid_argument("Expected compiled grammar JSON and tokenizer information.");
+    return invoke([&] {
+        if (!json || !tokenizer_info) {
+            return fail<XGrammarCompiledGrammarHandle*>(
+                "Expected compiled grammar JSON and tokenizer information."
+            );
+        }
         const auto info = static_cast<XGrammarTokenizerInfoHandle*>(tokenizer_info)->tokenizer_info;
-        return new XGrammarCompiledGrammarHandle{value_or_throw(xgrammar::CompiledGrammar::DeserializeJSON(json, info))};
+        auto compiled_grammar = value_or_error(
+            xgrammar::CompiledGrammar::DeserializeJSON(json, info)
+        );
+        if (!compiled_grammar) return static_cast<XGrammarCompiledGrammarHandle*>(nullptr);
+        return new XGrammarCompiledGrammarHandle{std::move(*compiled_grammar)};
     });
 }
 
@@ -537,9 +561,9 @@ xgrammar_matcher_t xgrammar_matcher_init(
     int terminate_without_stop_token,
     int32_t max_rollback_tokens
 ) {
-    return with_error_handling([&] {
+    return invoke([&] {
         if (!compiled_grammar || (override_stop_token_id_count > 0 && !override_stop_token_ids)) {
-            raise_invalid_argument("Invalid matcher configuration.");
+            return fail<XGrammarMatcherHandle*>("Invalid matcher configuration.");
         }
         const auto compiled = static_cast<XGrammarCompiledGrammarHandle*>(compiled_grammar)->compiled_grammar;
         const auto stop_tokens = override_stop_token_id_count == 0

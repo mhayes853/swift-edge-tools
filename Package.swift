@@ -166,6 +166,11 @@ let package = Package(
         .define("XGRAMMAR_ENABLE_LOG_DEBUG", to: "0"),
         .define("XGRAMMAR_ENABLE_CPPTRACE", to: "0"),
         .define(
+          "XGRAMMAR_CXX_EXCEPTIONS_ENABLED",
+          to: "0",
+          .when(platforms: [.wasi])
+        ),
+        .define(
           "PICOJSON_DISABLE_EXCEPTION",
           to: "1",
           .when(platforms: [.wasi])
