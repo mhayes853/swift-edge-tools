@@ -118,7 +118,7 @@ jobs:
           --disable-default-traits --traits Foundation,XGrammar,System,Atomics
           --disable-experimental-prebuilts --target EdgeToolsTests
       - name: Test Foundation-Free EdgeTools With XGrammar, System, And Atomics
-        working-directory: WASITests
+        working-directory: swift/WASITests
         run: >
           swift test --swift-sdk swift-6.3.2-RELEASE_wasm
           --disable-xctest --disable-experimental-prebuilts

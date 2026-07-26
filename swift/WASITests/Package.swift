@@ -6,7 +6,7 @@ let package = Package(
   name: "EdgeToolsWASITests",
   dependencies: [
     .package(
-      path: "..",
+      path: "../..",
       traits: ["XGrammar", "System", "Atomics"]
     )
   ],
