@@ -20,6 +20,7 @@ let package = Package(
     .trait(name: "Foundation", description: "Foundation-specific conveniences."),
     .trait(name: "System", description: "swift-system FilePath-based file I/O."),
     .trait(name: "Atomics", description: "Atomic engine generation coordination."),
+    .trait(name: "JS", description: "JavaScriptKit interoperability."),
     .trait(name: "XGrammar", description: "XGrammar-powered structured generation."),
     .trait(
       name: "Transformers",
@@ -53,7 +54,7 @@ let package = Package(
 
         (Only enable this trait if you want to use your own ONNX build. Otherwise, enable `ONNX` directly.)
         """,
-      enabledTraits: ["XGrammar", "Foundation", "Atomics"]
+      enabledTraits: ["XGrammar", "Atomics"]
     ),
     .trait(
       name: "ONNX",
@@ -86,7 +87,8 @@ let package = Package(
     ),
     .package(url: "https://github.com/apple/swift-collections", from: "1.2.1"),
     .package(url: "https://github.com/apple/swift-atomics", from: "1.3.0"),
-    .package(url: "https://github.com/apple/swift-system", from: "1.7.4")
+    .package(url: "https://github.com/apple/swift-system", from: "1.7.4"),
+    .package(url: "https://github.com/swiftwasm/JavaScriptKit", exact: "0.56.1")
   ],
   targets: [
     .target(
@@ -101,6 +103,21 @@ let package = Package(
           name: "SystemPackage",
           package: "swift-system",
           condition: .when(traits: ["System"])
+        ),
+        .product(
+          name: "JavaScriptKit",
+          package: "JavaScriptKit",
+          condition: .when(traits: ["JS"])
+        ),
+        .product(
+          name: "JavaScriptEventLoop",
+          package: "JavaScriptKit",
+          condition: .when(traits: ["JS"])
+        ),
+        .product(
+          name: "JavaScriptBigIntSupport",
+          package: "JavaScriptKit",
+          condition: .when(traits: ["JS"])
         ),
         .product(name: "MLX", package: "mlx-swift", condition: .when(traits: ["MLX"])),
         .product(name: "MLXNN", package: "mlx-swift", condition: .when(traits: ["MLX"])),

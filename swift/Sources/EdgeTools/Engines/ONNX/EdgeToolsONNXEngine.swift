@@ -1,14 +1,17 @@
 #if ONNXCore
   import Atomics
-  import Foundation
 
-  #if System
+  #if Foundation
+    import Foundation
+  #endif
+
+  #if Foundation && System
     import SystemPackage
   #endif
 
   // MARK: - EdgeToolsONNXModelPreparation
 
-  public struct EdgeToolsONNXModelPreparation<State: Sendable>: Sendable {
+  public struct EdgeToolsONNXModelPreparation<State> {
     public var logits: [Float]
     public var state: State
 
@@ -20,12 +23,12 @@
 
   // MARK: - EdgeToolsONNXModel
 
-  public protocol EdgeToolsONNXModel<Runtime>: Sendable {
+  public protocol EdgeToolsONNXModel<Runtime>: SendableMetatype {
     associatedtype Runtime: EdgeToolsONNXRuntime
     associatedtype ModelConfiguration: Decodable & Sendable
     associatedtype Prompt: Sendable
     associatedtype ToolCallParser: EdgeToolCallParser
-    associatedtype GenerationState: Sendable
+    associatedtype GenerationState
 
     var vocabularySize: Int { get }
 
@@ -44,12 +47,12 @@
       using tokenizer: any EdgeToolsXGRTokenizer
     ) throws -> [EdgeToolsToken.ID]
 
-    func prepare(
+    nonisolated(nonsending) func prepare(
       tokenIDs: [EdgeToolsToken.ID],
       using runtime: Runtime
     ) async throws -> EdgeToolsONNXModelPreparation<GenerationState>
 
-    func decode(
+    nonisolated(nonsending) func decode(
       tokenID: EdgeToolsToken.ID,
       state: inout GenerationState,
       using runtime: Runtime
@@ -69,7 +72,7 @@
   // MARK: - EdgeToolsPrefillableONNXModel
 
   public protocol EdgeToolsPrefillableONNXModel: EdgeToolsONNXModel {
-    func prefill(
+    nonisolated(nonsending) func prefill(
       tokenIDs: [EdgeToolsToken.ID],
       using runtime: Runtime
     ) async throws -> EdgeToolsONNXModelPreparation<GenerationState>
@@ -84,9 +87,21 @@
     }
   }
 
+  // MARK: - EdgeToolsONNXEngineComponents
+
+  package struct EdgeToolsONNXEngineComponents<Runtime, Model> {
+    package let runtime: Runtime
+    package let model: Model
+
+    package init(runtime: Runtime, model: Model) {
+      self.runtime = runtime
+      self.model = model
+    }
+  }
+
   // MARK: - EdgeToolsONNXEngine
 
-  public final class EdgeToolsONNXEngine<
+  public actor EdgeToolsONNXEngine<
     Runtime: EdgeToolsONNXRuntime,
     Model: EdgeToolsONNXModel<Runtime>
   >: EdgeToolsEngine {
@@ -126,12 +141,8 @@
       }
     }
 
-    private struct State: ~Copyable {
-      let grammarCompiler: XGRCompiler
-      let matcherPool: XGRToolCallMatcherPool
-    }
-
-    private let state: Lock<State>
+    private let grammarCompiler: XGRCompiler
+    private let matcherPool: XGRToolCallMatcherPool
     private let runtime: Runtime
     private let model: Model
     private let tokenizer: any EdgeToolsXGRTokenizer
@@ -142,41 +153,46 @@
       model: sending Model,
       tokenizer: sending any EdgeToolsXGRTokenizer
     ) throws {
-      self.state = try Lock {
-        let grammarCompiler = try model.grammarCompiler(using: tokenizer)
-        return State(
-          grammarCompiler: consume grammarCompiler,
-          matcherPool: XGRToolCallMatcherPool(makeGrammar: model.grammar)
-        )
-      }
-      self.runtime = runtime
-      self.model = model
+      let components = EdgeToolsONNXEngineComponents(runtime: runtime, model: model)
+      try self.init(components: components, tokenizer: tokenizer)
+    }
+
+    package init(
+      components: sending EdgeToolsONNXEngineComponents<Runtime, Model>,
+      tokenizer: sending any EdgeToolsXGRTokenizer
+    ) throws {
+      self.grammarCompiler = try components.model.grammarCompiler(using: tokenizer)
+      self.matcherPool = XGRToolCallMatcherPool(makeGrammar: components.model.grammar)
+      self.runtime = components.runtime
+      self.model = components.model
       self.tokenizer = tokenizer
     }
 
-    public convenience init(
-      from directoryURL: URL,
-      runtime: sending Runtime,
-      model: (URL, Model.ModelConfiguration, Runtime) async throws -> sending Model
-    ) async throws {
-      let tokenizer = try await loadEdgeToolsTokenizer(from: directoryURL)
-      guard let tokenizer = tokenizer as? any EdgeToolsXGRTokenizer else {
-        throw EdgeToolsError.unsupportedTokenizer
+    #if Foundation
+      public init(
+        from directoryURL: URL,
+        runtime: sending Runtime,
+        model: (URL, Model.ModelConfiguration, Runtime) async throws -> sending Model
+      ) async throws {
+        let tokenizer = try await loadEdgeToolsTokenizer(from: directoryURL)
+        guard let tokenizer = tokenizer as? any EdgeToolsXGRTokenizer else {
+          throw EdgeToolsError.unsupportedTokenizer
+        }
+        guard
+          let configuration = try decodeModelConfiguration(
+            Model.ModelConfiguration.self,
+            in: directoryURL
+          )
+        else {
+          throw EdgeToolsError.failedToLoadConfiguration
+        }
+        let model = try await model(directoryURL, configuration, runtime)
+        try self.init(runtime: runtime, model: model, tokenizer: tokenizer)
       }
-      guard
-        let configuration = try decodeModelConfiguration(
-          Model.ModelConfiguration.self,
-          in: directoryURL
-        )
-      else {
-        throw EdgeToolsError.failedToLoadConfiguration
-      }
-      let model = try await model(directoryURL, configuration, runtime)
-      try self.init(runtime: runtime, model: model, tokenizer: tokenizer)
-    }
+    #endif
 
-    #if System
-      public convenience init(
+    #if Foundation && System
+      public init(
         from directoryPath: FilePath,
         runtime: sending Runtime,
         model: (URL, Model.ModelConfiguration, Runtime) async throws -> sending Model
@@ -199,19 +215,18 @@
         using: self.tokenizer
       )
       let tokens = self.tokenizer.convertIdsToTokens(tokenIDs)
-      return zip(tokenIDs, tokens).compactMap { tokenID, token in
-        token.map { EdgeToolsToken(id: tokenID, stringValue: $0) }
-      }
+      return zip(tokenIDs, tokens)
+        .compactMap { tokenID, token in
+          token.map { EdgeToolsToken(id: tokenID, stringValue: $0) }
+        }
     }
 
     public func clearCaches() {
-      self.state.withLock {
-        $0.matcherPool.clear()
-        $0.grammarCompiler.clearCache()
-      }
+      self.matcherPool.clear()
+      self.grammarCompiler.clearCache()
     }
 
-    public func generate(
+    public nonisolated func generate(
       prompt: Model.Prompt,
       tools: [EdgeToolDefinition] = [],
       parameters: GenerateParameters,
@@ -219,21 +234,11 @@
     ) throws -> some EdgeToolsEngineGenerationTask {
       let isStopped = ManagedAtomic(false)
       let task = Task {
-        let matcher = try self.state.withLock { state in
-          let matcher = try state.matcherPool.matcher(
-            tools: tools,
-            range: parameters.toolCallRange,
-            compilingWith: state.grammarCompiler
-          )
-          matcher.reset()
-          return matcher
-        }
-        return try await self.generate(
+        try await self.generate(
           prompt: prompt,
           tools: tools,
           parameters: parameters,
           channel: channel,
-          matcher: matcher,
           isStopped: isStopped
         )
       }
@@ -245,13 +250,17 @@
       tools: [EdgeToolDefinition],
       parameters: GenerateParameters,
       channel: EdgeToolsGenerationChannel,
-      matcher: consuming XGRMatcher,
       isStopped: ManagedAtomic<Bool>
     ) async throws -> EdgeToolsEngineGeneration {
       try Task.checkCancellation()
       guard !isStopped.load(ordering: .relaxed) else { return .empty }
 
-      let matcher = consume matcher
+      let matcher = try self.matcherPool.matcher(
+        tools: tools,
+        range: parameters.toolCallRange,
+        compilingWith: self.grammarCompiler
+      )
+      matcher.reset()
       let sampler = parameters.sampler
       var processor = parameters.processor
       let generateStart = self.clock.now
@@ -301,7 +310,9 @@
       prompt: Model.Prompt,
       tools: [EdgeToolDefinition],
       processor: inout (any EdgeToolsLogitsProcessor<[EdgeToolsToken.ID], [Float]>)?
-    ) async throws -> (EdgeToolsONNXModelPreparation<Model.GenerationState>, EdgeToolsPrefillMetrics) {
+    ) async throws -> (
+      EdgeToolsONNXModelPreparation<Model.GenerationState>, EdgeToolsPrefillMetrics
+    ) {
       let tokenIDs = try self.model.process(
         prompt: prompt,
         tools: tools,

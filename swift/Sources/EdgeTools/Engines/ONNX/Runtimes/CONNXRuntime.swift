@@ -19,6 +19,8 @@
         self.rawValue = rawValue
       }
 
+      public static let invalidGraphOptimizationLevel =
+        Self(rawValue: "invalid-graph-optimization-level")
       public static let invalidTensorShape = Self(rawValue: "invalid-tensor-shape")
       public static let invalidTensorValueCount = Self(rawValue: "invalid-tensor-value-count")
       public static let onnxRuntime = Self(rawValue: "onnx-runtime")
@@ -122,9 +124,12 @@
 
       try Self.check(
         api: self.api,
-        status: self.api.pointee.SetSessionGraphOptimizationLevel(options, ORT_ENABLE_ALL)
+        status: self.api.pointee.SetSessionGraphOptimizationLevel(
+          options,
+          try Self.graphOptimizationLevel(configuration.graphOptimizationLevel)
+        )
       )
-      for provider in configuration.executionProviders {
+      for provider in configuration.executionProviders where provider.name.lowercased() != "cpu" {
         try self.append(provider: provider, to: options)
       }
 
@@ -241,9 +246,10 @@
     ) throws {
       let keys = provider.options.map(\.name)
       let values = provider.options.map(\.value)
+      let name = Self.executionProviderName(provider.name)
       try withCopiedCStringPointerBuffer(keys) { keyPointers in
         try withCopiedCStringPointerBuffer(values) { valuePointers in
-          try provider.name.withCString { providerName in
+          try name.withCString { providerName in
             try Self.check(
               api: self.api,
               status: self.api.pointee.SessionOptionsAppendExecutionProvider(
@@ -256,6 +262,33 @@
             )
           }
         }
+      }
+    }
+
+    private static func executionProviderName(_ name: String) -> String {
+      switch name.lowercased() {
+      case "webgpu": "WebGPU"
+      case "coreml": "CoreML"
+      case "cuda": "CUDA"
+      case "dml": "DML"
+      default: name
+      }
+    }
+
+    private static func graphOptimizationLevel(
+      _ level: EdgeToolsONNXGraphOptimizationLevel
+    ) throws -> GraphOptimizationLevel {
+      switch level {
+      case .disabled: ORT_DISABLE_ALL
+      case .basic: ORT_ENABLE_BASIC
+      case .extended: ORT_ENABLE_EXTENDED
+      case .layout: ORT_ENABLE_LAYOUT
+      case .all: ORT_ENABLE_ALL
+      default:
+        throw CONNXRuntimeError(
+          code: .invalidGraphOptimizationLevel,
+          message: "Unsupported graph optimization level: \(level.rawValue)."
+        )
       }
     }
 
@@ -288,30 +321,24 @@
 
     public struct Configuration: Hashable, Sendable {
       public var logIdentifier: String
+      public var graphOptimizationLevel: EdgeToolsONNXGraphOptimizationLevel
       public var executionProviders: [ExecutionProvider]
 
       public init(
         logIdentifier: String = "swift-edge-tools",
+        graphOptimizationLevel: EdgeToolsONNXGraphOptimizationLevel = .all,
         executionProviders: [ExecutionProvider] = []
       ) {
         self.logIdentifier = logIdentifier
+        self.graphOptimizationLevel = graphOptimizationLevel
         self.executionProviders = executionProviders
       }
     }
 
-    // MARK: - ExecutionProviderOption
+    public typealias ExecutionProvider = EdgeToolsONNXExecutionProvider
+    public typealias ExecutionProviderOption = EdgeToolsONNXExecutionProvider.Option
 
-    public struct ExecutionProviderOption: Hashable, Sendable {
-      public var name: String
-      public var value: String
-
-      public init(name: String, value: String) {
-        self.name = name
-        self.value = value
-      }
-    }
-
-    // MARK: - ExecutionProvider
+    // MARK: - CoreML
 
     public struct CoreMLComputeUnits: RawRepresentable, Hashable, Sendable {
       public let rawValue: String
@@ -326,39 +353,30 @@
       public static let cpuOnly = Self(rawValue: "CPUOnly")
     }
 
-    public struct ExecutionProvider: Hashable, Sendable {
-      public var name: String
-      public var options: [ExecutionProviderOption]
+  }
 
-      public init(name: String, options: [ExecutionProviderOption] = []) {
-        self.name = name
-        self.options = options
-      }
-
-      public static var webGPU: Self { Self(name: "WebGPU") }
-
-      public static func coreML(
-        computeUnits: CoreMLComputeUnits,
-        modelFormat: String = "MLProgram",
-        requireStaticInputShapes: Bool = true,
-        enableOnSubgraphs: Bool = true
-      ) -> Self {
-        Self(
-          name: "CoreML",
-          options: [
-            ExecutionProviderOption(name: "MLComputeUnits", value: computeUnits.rawValue),
-            ExecutionProviderOption(name: "ModelFormat", value: modelFormat),
-            ExecutionProviderOption(
-              name: "RequireStaticInputShapes",
-              value: requireStaticInputShapes ? "1" : "0"
-            ),
-            ExecutionProviderOption(
-              name: "EnableOnSubgraphs",
-              value: enableOnSubgraphs ? "1" : "0"
-            )
-          ]
-        )
-      }
+  extension EdgeToolsONNXExecutionProvider {
+    public static func coreML(
+      computeUnits: CONNXRuntime.CoreMLComputeUnits,
+      modelFormat: String = "MLProgram",
+      requireStaticInputShapes: Bool = true,
+      enableOnSubgraphs: Bool = true
+    ) -> Self {
+      Self(
+        name: "coreml",
+        options: [
+          Option(name: "MLComputeUnits", value: computeUnits.rawValue),
+          Option(name: "ModelFormat", value: modelFormat),
+          Option(
+            name: "RequireStaticInputShapes",
+            value: requireStaticInputShapes ? "1" : "0"
+          ),
+          Option(
+            name: "EnableOnSubgraphs",
+            value: enableOnSubgraphs ? "1" : "0"
+          )
+        ]
+      )
     }
   }
 
@@ -391,7 +409,9 @@
       self.api.pointee.ReleaseSession(self.session)
     }
 
-    fileprivate static func make(runtime: CONNXRuntime, session: OpaquePointer) throws -> CONNXRuntimeSession {
+    fileprivate static func make(runtime: CONNXRuntime, session: OpaquePointer) throws
+      -> CONNXRuntimeSession
+    {
       do {
         let inputNames = try Self.names(
           runtime: runtime,
@@ -464,18 +484,19 @@
       }
 
       return Dictionary(
-        uniqueKeysWithValues: zip(outputNames, zip(outputPointers, metadata)).map { pair in
-          let (tensor, metadata) = pair.1
-          return (
-            pair.0,
-            CONNXRuntimeTensor(
-              runtime: self.runtime,
-              tensor: tensor,
-              dtype: metadata.dtype,
-              shape: metadata.shape
+        uniqueKeysWithValues: zip(outputNames, zip(outputPointers, metadata))
+          .map { pair in
+            let (tensor, metadata) = pair.1
+            return (
+              pair.0,
+              CONNXRuntimeTensor(
+                runtime: self.runtime,
+                tensor: tensor,
+                dtype: metadata.dtype,
+                shape: metadata.shape
+              )
             )
-          )
-        }
+          }
       )
     }
 
@@ -492,13 +513,14 @@
     ) throws -> [String] {
       var count = 0
       try CONNXRuntime.check(api: runtime.api, status: getCount(session, &count))
-      return try (0..<count).map { index in
-        let name: UnsafeMutablePointer<CChar> = try CONNXRuntime.output(api: runtime.api) {
-          getName(session, index, runtime.allocator, $0)
+      return try (0..<count)
+        .map { index in
+          let name: UnsafeMutablePointer<CChar> = try CONNXRuntime.output(api: runtime.api) {
+            getName(session, index, runtime.allocator, $0)
+          }
+          defer { runtime.allocator.pointee.Free(runtime.allocator, name) }
+          return String(cString: name)
         }
-        defer { runtime.allocator.pointee.Free(runtime.allocator, name) }
-        return String(cString: name)
-      }
     }
   }
 
@@ -585,7 +607,8 @@
       guard self.dtype == expectedDType else {
         throw CONNXRuntimeError(
           code: .unexpectedTensorElementType,
-          message: "Expected tensor element type \(expectedDType.rawValue), got \(self.dtype.rawValue)."
+          message:
+            "Expected tensor element type \(expectedDType.rawValue), got \(self.dtype.rawValue)."
         )
       }
 

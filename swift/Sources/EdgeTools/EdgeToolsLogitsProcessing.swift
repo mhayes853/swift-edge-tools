@@ -6,7 +6,7 @@ public protocol EdgeToolsLogitsProcessor<Prompt, Logits> {
 
   mutating func prompt(_ prompt: Prompt)
 
-  func process(logits: inout Logits) async throws -> Logits
+  nonisolated(nonsending) func process(logits: inout Logits) async throws -> Logits
 
   mutating func didSample(token: EdgeToolsToken)
 }

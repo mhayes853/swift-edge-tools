@@ -18,13 +18,13 @@
     public typealias Prompt = NeedlePrompt
     public typealias ToolCallParser = NeedleToolCallParser
 
-    fileprivate struct EncoderOutputs: Sendable {
+    fileprivate struct EncoderOutputs {
       let crossAttentionMask: Runtime.Tensor
       let encoderProjectedK: Runtime.Tensor
       let encoderProjectedV: Runtime.Tensor
     }
 
-    public struct GenerationState: Sendable {
+    public struct GenerationState {
       fileprivate let encoderOutputs: EncoderOutputs
       var keyCache: Runtime.Tensor
       var valueCache: Runtime.Tensor
@@ -137,7 +137,7 @@
       return try await logits.floatValues()
     }
 
-    private func encoderOutputs(
+    private nonisolated(nonsending) func encoderOutputs(
       tokenIDs: [EdgeToolsToken.ID],
       using runtime: Runtime
     ) async throws -> EncoderOutputs {
@@ -161,9 +161,15 @@
         ]
       )
       guard
-        let crossAttentionMask = outputs.removeValue(forKey: NeedleExportTensorName.crossAttentionMask),
-        let encoderProjectedK = outputs.removeValue(forKey: NeedleExportTensorName.encoderProjectedK),
-        let encoderProjectedV = outputs.removeValue(forKey: NeedleExportTensorName.encoderProjectedV)
+        let crossAttentionMask = outputs.removeValue(
+          forKey: NeedleExportTensorName.crossAttentionMask
+        ),
+        let encoderProjectedK = outputs.removeValue(
+          forKey: NeedleExportTensorName.encoderProjectedK
+        ),
+        let encoderProjectedV = outputs.removeValue(
+          forKey: NeedleExportTensorName.encoderProjectedV
+        )
       else {
         throw EdgeToolsError.missingModelOutputs
       }
@@ -235,7 +241,7 @@
 
       extension EdgeToolsONNXEngine
       where Runtime == CONNXRuntime, Model == NeedleONNXModel<CONNXRuntime> {
-        public convenience init(
+        public init(
           from directoryURL: URL,
           runtime: sending CONNXRuntime
         ) async throws {
@@ -253,7 +259,7 @@
         }
 
         #if ONNX
-          public convenience init(
+          public init(
             from directoryURL: URL,
             runtimeConfiguration: CONNXRuntime.Configuration = CONNXRuntime.Configuration()
           ) async throws {
@@ -263,7 +269,7 @@
         #endif
 
         #if System && ONNX
-          public convenience init(
+          public init(
             from directoryPath: FilePath,
             runtimeConfiguration: CONNXRuntime.Configuration = CONNXRuntime.Configuration()
           ) async throws {
@@ -274,7 +280,7 @@
           }
         #endif
 
-        public convenience init(
+        public init(
           api: OpaquePointer,
           from directoryURL: URL,
           runtimeConfiguration: CONNXRuntime.Configuration = CONNXRuntime.Configuration()

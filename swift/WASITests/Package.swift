@@ -7,15 +7,24 @@ let package = Package(
   dependencies: [
     .package(
       path: "../..",
-      traits: ["XGrammar", "System", "Atomics"]
+      traits: ["XGrammar", "System", "Atomics", "ONNXCore", "JS"]
+    ),
+    .package(
+      url: "https://github.com/swiftwasm/JavaScriptKit",
+      exact: "0.56.1"
     )
   ],
   targets: [
     .testTarget(
       name: "EdgeToolsWASITests",
       dependencies: [
-        .product(name: "EdgeTools", package: "swift-edge-tools")
-      ]
+        .product(name: "EdgeTools", package: "swift-edge-tools"),
+        .product(name: "JavaScriptKit", package: "JavaScriptKit"),
+        .product(name: "JavaScriptEventLoop", package: "JavaScriptKit"),
+        .product(name: "JavaScriptEventLoopTestSupport", package: "JavaScriptKit"),
+        .product(name: "JavaScriptBigIntSupport", package: "JavaScriptKit")
+      ],
+      exclude: ["Fixtures"]
     )
   ]
 )
