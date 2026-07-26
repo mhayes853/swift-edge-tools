@@ -1,7 +1,10 @@
 import CustomDump
 import EdgeTools
-import SnapshotTesting
 import Testing
+
+#if !os(WASI)
+  import SnapshotTesting
+#endif
 
 @Suite
 struct `Qwen3 tests` {
@@ -18,7 +21,7 @@ struct `Qwen3 tests` {
     }
   }
 
-  #if MLX && XGrammar && canImport(MLX)
+  #if MLX && XGrammar && canImport(MLX) && !os(WASI)
     @Suite(.serialized, .enabledIfXcode())
     struct `Qwen3 MLX engine tests` {
       @Test

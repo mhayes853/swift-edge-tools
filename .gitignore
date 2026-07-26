@@ -19,3 +19,5 @@ __pycache__/
 python/build
 .mypy_cache
 .ruff_cache
+
+.build

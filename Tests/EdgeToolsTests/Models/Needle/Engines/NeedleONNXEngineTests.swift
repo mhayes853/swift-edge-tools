@@ -1,4 +1,4 @@
-#if ONNX && canImport(COnnxRuntime)
+#if ONNX && canImport(COnnxRuntime) && !os(WASI)
   import CustomDump
   import EdgeTools
   import Foundation

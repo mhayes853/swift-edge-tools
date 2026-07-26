@@ -41,79 +41,102 @@ final class MockEngine: EdgeToolsPrefillableEngine, Sendable {
     case finish
   }
 
-  // NB: @unchecked Sendable is safe because all mutable state is guarded by condition.
-  private final class GenerationStorage: @unchecked Sendable {
-    private let condition = NSCondition()
-    private var queue = [Event?]()
-    private var isStopped = false
+  private final class GenerationStorage: Sendable {
+    private struct State {
+      var queue: [Event?]
+      var continuation: CheckedContinuation<Event?, Never>?
+      var isStopped = false
+    }
+
+    private enum NextEvent {
+      case suspended
+      case value(Event?)
+    }
+
+    private let state: Lock<State>
 
     init(events: [Event?] = []) {
-      self.queue = events
+      self.state = Lock(State(queue: events))
     }
 
     func push(_ event: Event?) {
-      self.condition.lock()
-      self.queue.append(event)
-      self.condition.signal()
-      self.condition.unlock()
+      let continuation: CheckedContinuation<Event?, Never>? = self.state.withLock { state in
+        guard let continuation = state.continuation else {
+          state.queue.append(event)
+          return nil
+        }
+        state.continuation = nil
+        return continuation
+      }
+      continuation?.resume(returning: event)
     }
 
     func stop() {
-      self.condition.lock()
-      self.isStopped = true
-      self.condition.broadcast()
-      self.condition.unlock()
+      let continuation: CheckedContinuation<Event?, Never>? = self.state.withLock { state in
+        state.isStopped = true
+        let continuation = state.continuation
+        state.continuation = nil
+        return continuation
+      }
+      continuation?.resume(returning: .stop)
     }
 
-    func nextEvent() -> Event? {
-      self.condition.lock()
-      defer { self.condition.unlock() }
-
-      while self.queue.isEmpty, !self.isStopped {
-        self.condition.wait()
+    func nextEvent() async -> Event? {
+      await withCheckedContinuation { continuation in
+        let nextEvent = self.state.withLock { state in
+          if state.isStopped {
+            return NextEvent.value(.stop)
+          } else if !state.queue.isEmpty {
+            return NextEvent.value(state.queue.removeFirst())
+          } else {
+            state.continuation = continuation
+            return NextEvent.suspended
+          }
+        }
+        if case .value(let event) = nextEvent {
+          continuation.resume(returning: event)
+        }
       }
-
-      guard !self.isStopped else { return .stop }
-      return self.queue.removeFirst()
     }
   }
 
-  // NB: @unchecked Sendable is safe because all mutable state is guarded by condition.
-  private final class Storage: @unchecked Sendable {
-    private let condition = NSCondition()
-    private var activeGenerations = [Int: GenerationStorage]()
-    private var order = [Int]()
-    private var nextID = 0
-    private var queuedScripts = [[Event?]]()
+  private final class Storage: Sendable {
+    private struct State {
+      var activeGenerations = [Int: GenerationStorage]()
+      var order = [Int]()
+      var nextID = 0
+      var queuedScripts: [[Event?]]
+    }
+
+    private let state: Lock<State>
 
     init(queuedScripts: [[Event?]] = []) {
-      self.queuedScripts = queuedScripts
+      self.state = Lock(State(queuedScripts: queuedScripts))
     }
 
     func makeGeneration() -> (Int, GenerationStorage) {
-      self.condition.lock()
-      defer { self.condition.unlock() }
-
-      let id = self.nextID
-      self.nextID += 1
-      let script = self.queuedScripts.isEmpty ? [] : self.queuedScripts.removeFirst()
-      let generation = GenerationStorage(events: script)
-      self.activeGenerations[id] = generation
-      self.order.append(id)
-      return (id, generation)
+      self.state.withLock { state in
+        let id = state.nextID
+        state.nextID += 1
+        let script = state.queuedScripts.isEmpty ? [] : state.queuedScripts.removeFirst()
+        let generation = GenerationStorage(events: script)
+        state.activeGenerations[id] = generation
+        state.order.append(id)
+        return (id, generation)
+      }
     }
 
     func finishGeneration(id: Int) {
-      self.condition.lock()
-      self.activeGenerations.removeValue(forKey: id)
-      self.order.removeAll { $0 == id }
-      self.condition.unlock()
+      self.state.withLock { state in
+        state.activeGenerations.removeValue(forKey: id)
+        state.order.removeAll { $0 == id }
+      }
     }
 
     func push(_ event: Event?) {
-      self.condition.lock()
-      let generation = self.order.first.flatMap { self.activeGenerations[$0] }
-      self.condition.unlock()
+      let generation = self.state.withLock { state in
+        state.order.first.flatMap { state.activeGenerations[$0] }
+      }
       generation?.push(event)
     }
   }
@@ -216,7 +239,7 @@ final class MockEngine: EdgeToolsPrefillableEngine, Sendable {
       var thrownError: (any Error)?
 
       try await withTaskCancellationHandler {
-        while let event = generationStorage.nextEvent() {
+        while let event = await generationStorage.nextEvent() {
           try Task.checkCancellation()
           switch event {
           case .token(let token):

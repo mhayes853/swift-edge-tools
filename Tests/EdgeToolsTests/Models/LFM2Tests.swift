@@ -1,7 +1,10 @@
 import CustomDump
 import EdgeTools
-import SnapshotTesting
 import Testing
+
+#if !os(WASI)
+  import SnapshotTesting
+#endif
 
 @Suite
 struct `LFM2 tests` {
@@ -18,7 +21,7 @@ struct `LFM2 tests` {
     }
   }
 
-  #if MLX && XGrammar && canImport(MLX)
+  #if MLX && XGrammar && canImport(MLX) && !os(WASI)
     @Suite(.serialized, .enabledIfXcode())
     struct `LFM2 MLX engine tests` {
       @Test
@@ -39,7 +42,7 @@ struct `LFM2 tests` {
       private let eosToken: EdgeToolsToken.ID
 
       init() throws {
-        let tokenizer = try makeTestTokenizer()
+        let tokenizer = try testTokenizer()
         let compiler = try makeGenericXGRCompiler(tokenizer: tokenizer)
         let eosToken = try requiredTestEOSToken(tokenizer: tokenizer)
         self.tokenizer = tokenizer

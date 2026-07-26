@@ -1,7 +1,16 @@
+#if defined(__wasi__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wbuiltin-macro-redefined"
+#undef __cpp_exceptions
+#pragma clang diagnostic pop
+#endif
+
 #include "include/bridging.h"
 
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <exception>
 #include <optional>
@@ -18,20 +27,54 @@
 
 namespace {
 
+#if defined(__wasi__)
+thread_local char last_error[4096] = {};
+#else
 thread_local std::string last_error;
+#endif
+
+void set_error_message(const std::string& message) {
+#if defined(__wasi__)
+    std::snprintf(last_error, sizeof(last_error), "%s", message.c_str());
+#else
+    last_error = message;
+#endif
+}
 
 void set_error(const std::exception& error) {
-    last_error = error.what();
+    set_error_message(error.what());
+}
+
+[[noreturn]] void raise_invalid_argument(const std::string& message) {
+#if defined(__wasi__)
+    set_error_message(message);
+    std::abort();
+#else
+    throw std::invalid_argument(message);
+#endif
+}
+
+[[noreturn]] void raise_runtime_error(const std::string& message) {
+#if defined(__wasi__)
+    set_error_message(message);
+    std::abort();
+#else
+    throw std::runtime_error(message);
+#endif
 }
 
 template <typename Body>
 auto with_error_handling(Body&& body) -> std::invoke_result_t<Body> {
+#if defined(__wasi__)
+    return body();
+#else
     try {
         return body();
     } catch (const std::exception& error) {
         set_error(error);
         return std::invoke_result_t<Body>{};
     }
+#endif
 }
 
 struct XGrammarTokenizerInfoHandle {
@@ -63,7 +106,7 @@ Value value_or_throw(std::variant<Value, Error> result) {
         return *value;
     }
     const auto& error = std::get<Error>(result);
-    std::visit([](const auto& value) { throw std::runtime_error(value.what()); }, error);
+    std::visit([](const auto& value) { raise_runtime_error(value.what()); }, error);
     std::abort();
 }
 
@@ -84,7 +127,7 @@ xgrammar::VocabType vocab_type(xgrammar_vocab_type_t type) {
     case xgrammar_vocab_type_byte_level:
         return xgrammar::VocabType::BYTE_LEVEL;
     }
-    throw std::invalid_argument("Unknown XGrammar vocabulary type.");
+    raise_invalid_argument("Unknown XGrammar vocabulary type.");
 }
 
 picojson::value grammar_format(const xgrammar::Grammar& grammar) {
@@ -102,10 +145,10 @@ xgrammar::Grammar grammar_from_structural_tag_json(const std::string& structural
 
     const auto& structural_tag_error = std::get<xgrammar::StructuralTagError>(result);
     std::visit(
-        [](const auto& error) { throw std::runtime_error(error.what()); },
+        [](const auto& error) { raise_runtime_error(error.what()); },
         structural_tag_error
     );
-    throw std::runtime_error("Unknown structural tag error.");
+    raise_runtime_error("Unknown structural tag error.");
 }
 
 xgrammar::Grammar grammar_from_structural_tag(const picojson::object& format) {
@@ -140,13 +183,13 @@ std::vector<xgrammar::Grammar> grammar_vector(
     size_t grammar_count
 ) {
     if (!grammars || grammar_count == 0) {
-        throw std::invalid_argument("Expected at least one grammar.");
+        raise_invalid_argument("Expected at least one grammar.");
     }
     std::vector<xgrammar::Grammar> result;
     result.reserve(grammar_count);
     for (size_t index = 0; index < grammar_count; ++index) {
         if (!grammars[index]) {
-            throw std::invalid_argument("Expected a non-null grammar.");
+            raise_invalid_argument("Expected a non-null grammar.");
         }
         const auto handle = static_cast<XGrammarGrammarHandle*>(grammars[index]);
         result.push_back(handle->grammar);
@@ -156,10 +199,38 @@ std::vector<xgrammar::Grammar> grammar_vector(
 
 }  // namespace
 
+#if defined(__wasi__)
+namespace xgrammar {
+
+[[noreturn]] void LogFatalImpl(
+    const std::string& file,
+    int lineno,
+    const std::string& message
+) {
+    std::fprintf(stderr, "%s:%d: %s\n", file.c_str(), lineno, message.c_str());
+    std::abort();
+}
+
+void LogMessageImpl(
+    const std::string& file,
+    int lineno,
+    int,
+    const std::string& message
+) {
+    std::fprintf(stderr, "%s:%d: %s\n", file.c_str(), lineno, message.c_str());
+}
+
+}  // namespace xgrammar
+#endif
+
 extern "C" {
 
 const char* xgrammar_last_error_message(void) {
+#if defined(__wasi__)
+    return last_error;
+#else
     return last_error.c_str();
+#endif
 }
 
 xgrammar_tokenizer_info_t xgrammar_tokenizer_info_init(
@@ -173,7 +244,7 @@ xgrammar_tokenizer_info_t xgrammar_tokenizer_info_init(
 ) {
     return with_error_handling([&] {
         if (!encoded_vocab || vocab_size < kXGrammarUnlimited || (stop_token_id_count > 0 && !stop_token_ids)) {
-            throw std::invalid_argument("Invalid tokenizer information.");
+            raise_invalid_argument("Invalid tokenizer information.");
         }
         const std::vector<std::string> vocabulary(encoded_vocab, encoded_vocab + encoded_vocab_count);
         const auto optional_vocab_size = vocab_size == kXGrammarUnlimited
@@ -193,7 +264,7 @@ xgrammar_tokenizer_info_t xgrammar_tokenizer_info_from_vocab_and_metadata(
     const char* metadata
 ) {
     return with_error_handling([&] {
-        if (!encoded_vocab || !metadata) throw std::invalid_argument("Expected vocabulary and metadata.");
+        if (!encoded_vocab || !metadata) raise_invalid_argument("Expected vocabulary and metadata.");
         return new XGrammarTokenizerInfoHandle{xgrammar::TokenizerInfo::FromVocabAndMetadata(
             std::vector<std::string>(encoded_vocab, encoded_vocab + encoded_vocab_count), metadata
         )};
@@ -206,7 +277,7 @@ size_t xgrammar_tokenizer_info_detect_metadata_from_hf(
     size_t buffer_capacity
 ) {
     return with_error_handling([&] {
-        if (!backend_json) throw std::invalid_argument("Expected Hugging Face backend JSON.");
+        if (!backend_json) raise_invalid_argument("Expected Hugging Face backend JSON.");
         return write_string(xgrammar::TokenizerInfo::DetectMetadataFromHF(backend_json), buffer, buffer_capacity);
     });
 }
@@ -217,14 +288,14 @@ size_t xgrammar_tokenizer_info_serialize_json(
     size_t buffer_capacity
 ) {
     return with_error_handling([&] {
-        if (!tokenizer_info) throw std::invalid_argument("Expected tokenizer information.");
+        if (!tokenizer_info) raise_invalid_argument("Expected tokenizer information.");
         return write_string(static_cast<XGrammarTokenizerInfoHandle*>(tokenizer_info)->tokenizer_info.SerializeJSON(), buffer, buffer_capacity);
     });
 }
 
 xgrammar_tokenizer_info_t xgrammar_tokenizer_info_deserialize_json(const char* json) {
     return with_error_handling([&] {
-        if (!json) throw std::invalid_argument("Expected tokenizer information JSON.");
+        if (!json) raise_invalid_argument("Expected tokenizer information JSON.");
         return new XGrammarTokenizerInfoHandle{value_or_throw(xgrammar::TokenizerInfo::DeserializeJSON(json))};
     });
 }
@@ -240,7 +311,7 @@ xgrammar_compiler_t xgrammar_compiler_init(
     int64_t max_memory_bytes
 ) {
     return with_error_handling([&] {
-        if (!tokenizer_info || max_threads <= 0) throw std::invalid_argument("Invalid compiler configuration.");
+        if (!tokenizer_info || max_threads <= 0) raise_invalid_argument("Invalid compiler configuration.");
         const auto info = static_cast<XGrammarTokenizerInfoHandle*>(tokenizer_info)->tokenizer_info;
         return new XGrammarCompilerHandle{info, xgrammar::GrammarCompiler(info, max_threads, cache_enabled != 0, max_memory_bytes)};
     });
@@ -267,7 +338,7 @@ xgrammar_grammar_t xgrammar_grammar_init_ebnf(
     const char* root_rule_name
 ) {
     return with_error_handling([&] {
-        if (!ebnf) throw std::invalid_argument("Expected EBNF.");
+        if (!ebnf) raise_invalid_argument("Expected EBNF.");
         return new XGrammarGrammarHandle{
             xgrammar::Grammar::FromEBNF(ebnf, root_rule_name ? root_rule_name : "root")
         };
@@ -285,7 +356,7 @@ xgrammar_grammar_t xgrammar_grammar_init_json_schema(
     int any_order
 ) {
     return with_error_handling([&] {
-        if (!json_schema) throw std::invalid_argument("Expected a JSON Schema.");
+        if (!json_schema) raise_invalid_argument("Expected a JSON Schema.");
         const std::optional<int> optional_indent = indent == kXGrammarUnlimited
             ? std::nullopt
             : std::optional<int>(indent);
@@ -312,21 +383,21 @@ xgrammar_grammar_t xgrammar_grammar_init_json_schema(
 
 xgrammar_grammar_t xgrammar_grammar_init_regex(const char* regex) {
     return with_error_handling([&] {
-        if (!regex) throw std::invalid_argument("Expected a regular expression.");
+        if (!regex) raise_invalid_argument("Expected a regular expression.");
         return new XGrammarGrammarHandle{xgrammar::Grammar::FromRegex(regex)};
     });
 }
 
 xgrammar_grammar_t xgrammar_grammar_init_lark(const char* lark) {
     return with_error_handling([&] {
-        if (!lark) throw std::invalid_argument("Expected a Lark grammar.");
+        if (!lark) raise_invalid_argument("Expected a Lark grammar.");
         return new XGrammarGrammarHandle{xgrammar::Grammar::FromLark(lark)};
     });
 }
 
 xgrammar_grammar_t xgrammar_grammar_init_structural_tag(const char* structural_tag_json) {
     return with_error_handling([&] {
-        if (!structural_tag_json) throw std::invalid_argument("Expected a structural tag.");
+        if (!structural_tag_json) raise_invalid_argument("Expected a structural tag.");
         return new XGrammarGrammarHandle{grammar_from_structural_tag_json(structural_tag_json)};
     });
 }
@@ -337,21 +408,21 @@ xgrammar_grammar_t xgrammar_grammar_builtin_json(void) {
 
 size_t xgrammar_grammar_ebnf(xgrammar_grammar_t grammar, char* buffer, size_t buffer_capacity) {
     return with_error_handling([&] {
-        if (!grammar) throw std::invalid_argument("Expected a grammar.");
+        if (!grammar) raise_invalid_argument("Expected a grammar.");
         return write_string(static_cast<XGrammarGrammarHandle*>(grammar)->grammar.ToString(), buffer, buffer_capacity);
     });
 }
 
 size_t xgrammar_grammar_serialize_json(xgrammar_grammar_t grammar, char* buffer, size_t buffer_capacity) {
     return with_error_handling([&] {
-        if (!grammar) throw std::invalid_argument("Expected a grammar.");
+        if (!grammar) raise_invalid_argument("Expected a grammar.");
         return write_string(static_cast<XGrammarGrammarHandle*>(grammar)->grammar.SerializeJSON(), buffer, buffer_capacity);
     });
 }
 
 xgrammar_grammar_t xgrammar_grammar_deserialize_json(const char* json) {
     return with_error_handling([&] {
-        if (!json) throw std::invalid_argument("Expected grammar JSON.");
+        if (!json) raise_invalid_argument("Expected grammar JSON.");
         return new XGrammarGrammarHandle{value_or_throw(xgrammar::Grammar::DeserializeJSON(json))};
     });
 }
@@ -376,7 +447,7 @@ xgrammar_grammar_t xgrammar_grammar_union(
 
 xgrammar_grammar_t xgrammar_grammar_optional(xgrammar_grammar_t grammar) {
     return with_error_handling([&] {
-        if (!grammar) throw std::invalid_argument("Expected a grammar.");
+        if (!grammar) raise_invalid_argument("Expected a grammar.");
         const auto handle = static_cast<XGrammarGrammarHandle*>(grammar);
         return new XGrammarGrammarHandle{optional_grammar(handle->grammar)};
     });
@@ -388,9 +459,9 @@ xgrammar_grammar_t xgrammar_grammar_repeat(
     int32_t maximum
 ) {
     return with_error_handling([&] {
-        if (!grammar) throw std::invalid_argument("Expected a grammar.");
+        if (!grammar) raise_invalid_argument("Expected a grammar.");
         if (minimum < 0 || (maximum != kXGrammarUnlimited && maximum < minimum)) {
-            throw std::invalid_argument("Invalid grammar repetition range.");
+            raise_invalid_argument("Invalid grammar repetition range.");
         }
         const auto handle = static_cast<XGrammarGrammarHandle*>(grammar);
         return new XGrammarGrammarHandle{repeated_grammar(handle->grammar, minimum, maximum)};
@@ -406,7 +477,7 @@ xgrammar_compiled_grammar_t xgrammar_compiler_compile_grammar(
     xgrammar_compiler_t compiler, xgrammar_grammar_t grammar
 ) {
     return with_error_handling([&] {
-        if (!compiler || !grammar) throw std::invalid_argument("Expected a compiler and grammar.");
+        if (!compiler || !grammar) raise_invalid_argument("Expected a compiler and grammar.");
         const auto compiler_handle = static_cast<XGrammarCompilerHandle*>(compiler);
         const auto grammar_handle = static_cast<XGrammarGrammarHandle*>(grammar);
         return new XGrammarCompiledGrammarHandle{compiler_handle->compiler.CompileGrammar(grammar_handle->grammar)};
@@ -415,14 +486,14 @@ xgrammar_compiled_grammar_t xgrammar_compiler_compile_grammar(
 
 xgrammar_grammar_t xgrammar_compiled_grammar_grammar(xgrammar_compiled_grammar_t compiled_grammar) {
     return with_error_handling([&] {
-        if (!compiled_grammar) throw std::invalid_argument("Expected a compiled grammar.");
+        if (!compiled_grammar) raise_invalid_argument("Expected a compiled grammar.");
         return new XGrammarGrammarHandle{static_cast<XGrammarCompiledGrammarHandle*>(compiled_grammar)->compiled_grammar.GetGrammar()};
     });
 }
 
 xgrammar_tokenizer_info_t xgrammar_compiled_grammar_tokenizer_info(xgrammar_compiled_grammar_t compiled_grammar) {
     return with_error_handling([&] {
-        if (!compiled_grammar) throw std::invalid_argument("Expected a compiled grammar.");
+        if (!compiled_grammar) raise_invalid_argument("Expected a compiled grammar.");
         return new XGrammarTokenizerInfoHandle{static_cast<XGrammarCompiledGrammarHandle*>(compiled_grammar)->compiled_grammar.GetTokenizerInfo()};
     });
 }
@@ -439,7 +510,7 @@ size_t xgrammar_compiled_grammar_serialize_json(
     size_t buffer_capacity
 ) {
     return with_error_handling([&] {
-        if (!compiled_grammar) throw std::invalid_argument("Expected a compiled grammar.");
+        if (!compiled_grammar) raise_invalid_argument("Expected a compiled grammar.");
         return write_string(static_cast<XGrammarCompiledGrammarHandle*>(compiled_grammar)->compiled_grammar.SerializeJSON(), buffer, buffer_capacity);
     });
 }
@@ -449,7 +520,7 @@ xgrammar_compiled_grammar_t xgrammar_compiled_grammar_deserialize_json(
     xgrammar_tokenizer_info_t tokenizer_info
 ) {
     return with_error_handling([&] {
-        if (!json || !tokenizer_info) throw std::invalid_argument("Expected compiled grammar JSON and tokenizer information.");
+        if (!json || !tokenizer_info) raise_invalid_argument("Expected compiled grammar JSON and tokenizer information.");
         const auto info = static_cast<XGrammarTokenizerInfoHandle*>(tokenizer_info)->tokenizer_info;
         return new XGrammarCompiledGrammarHandle{value_or_throw(xgrammar::CompiledGrammar::DeserializeJSON(json, info))};
     });
@@ -468,7 +539,7 @@ xgrammar_matcher_t xgrammar_matcher_init(
 ) {
     return with_error_handling([&] {
         if (!compiled_grammar || (override_stop_token_id_count > 0 && !override_stop_token_ids)) {
-            throw std::invalid_argument("Invalid matcher configuration.");
+            raise_invalid_argument("Invalid matcher configuration.");
         }
         const auto compiled = static_cast<XGrammarCompiledGrammarHandle*>(compiled_grammar)->compiled_grammar;
         const auto stop_tokens = override_stop_token_id_count == 0

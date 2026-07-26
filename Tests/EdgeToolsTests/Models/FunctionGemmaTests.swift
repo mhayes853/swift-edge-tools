@@ -1,11 +1,14 @@
 import CustomDump
 import EdgeTools
-import SnapshotTesting
 import Testing
+
+#if !os(WASI)
+  import SnapshotTesting
+#endif
 
 @Suite
 struct `FunctionGemma tests` {
-  #if MLX && XGrammar && canImport(MLX)
+  #if MLX && XGrammar && canImport(MLX) && !os(WASI)
     @Suite(.serialized, .enabledIfXcode())
     struct `FunctionGemma MLX engine tests` {
       @Test

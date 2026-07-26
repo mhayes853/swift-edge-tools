@@ -12,7 +12,7 @@
       private let eosToken: EdgeToolsToken.ID
 
       init() throws {
-        let tokenizer = try makeTestTokenizer()
+        let tokenizer = try testTokenizer()
         let eosToken = try requiredTestEOSToken(tokenizer: tokenizer)
         let engine = try makeGenericXGRCompiler(tokenizer: tokenizer)
         self.tokenizer = tokenizer
@@ -146,7 +146,7 @@
       private let tokenizer: NeedleSPTokenizer
 
       init() throws {
-        let tokenizer = try makeTestTokenizer()
+        let tokenizer = try testTokenizer()
         let engine = try makeGenericXGRCompiler(tokenizer: tokenizer)
         self.tokenizer = tokenizer
         self.engine = engine

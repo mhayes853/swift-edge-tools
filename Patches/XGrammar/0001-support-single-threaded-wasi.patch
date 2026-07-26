@@ -187,7 +187,7 @@ index d68479f..973b784 100644
  
    void BatchFillNextTokenBitmask(
 diff --git a/cpp/support/thread_pool.h b/cpp/support/thread_pool.h
-index 0e7064b..1bfd7e6 100644
+index 0e7064b..3400205 100644
 --- a/cpp/support/thread_pool.h
 +++ b/cpp/support/thread_pool.h
 @@ -6,19 +6,27 @@
@@ -231,7 +231,7 @@ index 0e7064b..1bfd7e6 100644
  
      // Package the task with its arguments into a shared pointer
      auto task = std::make_shared<std::packaged_task<return_type()>>(
-@@ -198,6 +206,35 @@ inline void ParallelFor(int low, int high, int num_threads, std::function<void(i
+@@ -198,6 +206,23 @@ inline void ParallelFor(int low, int high, int num_threads, std::function<void(i
    pool.Join();
  }
  
@@ -242,25 +242,13 @@ index 0e7064b..1bfd7e6 100644
 + public:
 +  explicit ThreadPool(size_t) {}
 +
-+  template <class F, class... Args>
-+  auto Submit(F&& f, Args&&... args) {
-+    return std::forward<F>(f)(std::forward<Args>(args)...);
++  template <class F>
++  void Execute(F&& f) {
++    std::forward<F>(f)();
 +  }
 +
-+  template <class F, class... Args>
-+  void Execute(F&& f, Args&&... args) {
-+    std::forward<F>(f)(std::forward<Args>(args)...);
-+  }
-+
-+  void Wait() {}
 +  void Join() {}
 +};
-+
-+inline void ParallelFor(int low, int high, int, std::function<void(int)> f) {
-+  for (int i = low; i < high; ++i) {
-+    f(i);
-+  }
-+}
 +
 +#endif
 +

@@ -3,8 +3,21 @@
   import EdgeTools
   import Testing
 
-  func makeTestTokenizer() throws -> NeedleSPTokenizer {
-    try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+  #if System
+    import SystemPackage
+  #endif
+
+  func testTokenizer() throws -> NeedleSPTokenizer {
+    #if Foundation
+      try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+    #elseif System
+      try NeedleSPTokenizer(modelPath: .testTokenizerModel)
+    #else
+      throw XGRError(
+        code: .invalidNeedleTokenizer,
+        message: "Test tokenizer loading requires the Foundation or System trait."
+      )
+    #endif
   }
 
   func requiredTestEOSToken(

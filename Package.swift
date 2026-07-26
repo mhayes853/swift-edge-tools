@@ -69,7 +69,7 @@ let package = Package(
   dependencies: [
     .package(url: "https://github.com/ml-explore/mlx-swift-lm", from: "3.31.3"),
     .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.18.7"),
-    .package(url: "https://github.com/pointfreeco/swift-custom-dump", from: "1.3.3"),
+    .package(url: "https://github.com/pointfreeco/swift-custom-dump", from: "1.6.1"),
     .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.31.3"),
     .package(url: "https://github.com/pointfreeco/swift-macro-testing", from: "0.6.5"),
     .package(url: "https://github.com/swiftlang/swift-syntax", "600.0.0"..<"603.0.0"),
@@ -154,27 +154,7 @@ let package = Package(
     .target(
       name: "CXGrammar",
       path: "Sources/CXGrammar",
-      sources: [
-        "bridging.cc",
-        "xgrammar/cpp/compiled_grammar.cc",
-        "xgrammar/cpp/config.cc",
-        "xgrammar/cpp/earley_parser.cc",
-        "xgrammar/cpp/fsm.cc",
-        "xgrammar/cpp/fsm_builder.cc",
-        "xgrammar/cpp/grammar.cc",
-        "xgrammar/cpp/grammar_builder.cc",
-        "xgrammar/cpp/grammar_parser.cc",
-        "xgrammar/cpp/grammar_printer.cc",
-        "xgrammar/cpp/json_schema_converter.cc",
-        "xgrammar/cpp/json_schema_converter_ext.cc",
-        "xgrammar/cpp/lark_converter.cc",
-        "xgrammar/cpp/regex_converter.cc",
-        "xgrammar/cpp/structural_tag.cc",
-        "xgrammar/cpp/testing.cc",
-        "xgrammar/cpp/tokenizer_info.cc",
-        "xgrammar/cpp/support/logging.cc",
-        "xgrammar/cpp/support/recursion_guard.cc"
-      ],
+      sources: ["bridging.cc"],
       publicHeadersPath: "include",
       cxxSettings: [
         .headerSearchPath("."),
@@ -184,7 +164,17 @@ let package = Package(
         .headerSearchPath("xgrammar/3rdparty/dlpack/include"),
         .headerSearchPath("xgrammar/3rdparty/picojson"),
         .define("XGRAMMAR_ENABLE_LOG_DEBUG", to: "0"),
-        .define("XGRAMMAR_ENABLE_CPPTRACE", to: "0")
+        .define("XGRAMMAR_ENABLE_CPPTRACE", to: "0"),
+        .define(
+          "PICOJSON_DISABLE_EXCEPTION",
+          to: "1",
+          .when(platforms: [.wasi])
+        ),
+        .define(
+          "XGRAMMAR_LOG_CUSTOMIZE",
+          to: "1",
+          .when(platforms: [.wasi])
+        )
       ],
       plugins: [.plugin(name: "PatchPlugin")]
     ),
@@ -221,6 +211,11 @@ let package = Package(
         ),
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
         .product(name: "CustomDump", package: "swift-custom-dump"),
+        .product(
+          name: "SystemPackage",
+          package: "swift-system",
+          condition: .when(traits: ["System"])
+        ),
         .product(
           name: "Hub",
           package: "swift-transformers",

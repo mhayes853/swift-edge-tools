@@ -1,4 +1,4 @@
-#if CoreML && canImport(CoreML)
+#if CoreML && canImport(CoreML) && !os(WASI)
   import CoreML
   import CustomDump
   import EdgeTools

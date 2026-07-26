@@ -10,7 +10,7 @@
     private let eosToken: EdgeToolsToken.ID
 
     init() throws {
-      let tokenizer = try makeTestTokenizer()
+      let tokenizer = try testTokenizer()
       let compiler = try makeGenericXGRCompiler(tokenizer: tokenizer)
       let eosToken = try requiredTestEOSToken(tokenizer: tokenizer)
       self.tokenizer = tokenizer

@@ -112,11 +112,16 @@ jobs:
           checksum="a61f0584c93283589f8b2f42db05c1f9"
           checksum+="a182b506c2957271402992655591dd7c"
           swift sdk install "$sdk_url" --checksum "$checksum"
-      - name: Build Foundation-Free EdgeTools With XGrammar, System, And Atomics
+      - name: Build Main Test Suite For WebAssembly
         run: >
           swift build --swift-sdk swift-6.3.2-RELEASE_wasm
-          --target EdgeTools --disable-default-traits
-          --traits XGrammar,System,Atomics --disable-experimental-prebuilts
+          --disable-default-traits --traits Foundation,XGrammar,System,Atomics
+          --disable-experimental-prebuilts --target EdgeToolsTests
+      - name: Test Foundation-Free EdgeTools With XGrammar, System, And Atomics
+        working-directory: WASITests
+        run: >
+          swift test --swift-sdk swift-6.3.2-RELEASE_wasm
+          --disable-xctest --disable-experimental-prebuilts
 
   # windows:
   #   name: Windows

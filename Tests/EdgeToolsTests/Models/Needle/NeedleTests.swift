@@ -4,8 +4,7 @@ import Foundation
 import Testing
 
 @Suite
-// pi-lens-ignore: type_body_length
-struct NeedleConsolidatedTests {
+struct `Needle tests` {
   @Suite
   struct `NeedlePrompt tests` {
     @Test
@@ -165,7 +164,7 @@ struct NeedleConsolidatedTests {
         private let eosToken: EdgeToolsToken.ID
 
         init() throws {
-          let tokenizer = try makeTestTokenizer()
+          let tokenizer = try testTokenizer()
           let eosToken = try requiredTestEOSToken(tokenizer: tokenizer)
           self.tokenizer = tokenizer
           self.eosToken = eosToken
@@ -364,7 +363,7 @@ struct NeedleConsolidatedTests {
       private let eosToken: EdgeToolsToken.ID
 
       init() throws {
-        let tokenizer = try makeTestTokenizer()
+        let tokenizer = try testTokenizer()
         let eosToken = try requiredTestEOSToken(tokenizer: tokenizer)
         let engine = try requiredNeedleCompiler(tokenizer: tokenizer)
         self.tokenizer = tokenizer

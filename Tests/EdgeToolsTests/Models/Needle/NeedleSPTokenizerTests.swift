@@ -1,8 +1,11 @@
 import CustomDump
 import EdgeTools
 import Foundation
-import SnapshotTesting
 import Testing
+
+#if !os(WASI)
+  import SnapshotTesting
+#endif
 
 @Suite
 struct `NeedleSPTokenizer tests` {
@@ -62,12 +65,14 @@ struct `NeedleSPTokenizer tests` {
     expectNoDifference(string, expectedString)
   }
 
-  @Test
-  func `Encode Snapshot`() throws {
-    let tokenizer = try NeedleSPTokenizer(modelURL: self.modelURL)
-    let tokens = tokenizer.encode(text: "This is a test")
-    assertSnapshot(of: tokens, as: .dump)
-  }
+  #if !os(WASI)
+    @Test
+    func `Encode Snapshot`() throws {
+      let tokenizer = try NeedleSPTokenizer(modelURL: self.modelURL)
+      let tokens = tokenizer.encode(text: "This is a test")
+      assertSnapshot(of: tokens, as: .dump)
+    }
+  #endif
 
   @Test
   func `Encoding Uses Byte Fallback Tokens For Unknown Scalars`() throws {
@@ -89,27 +94,29 @@ struct `NeedleSPTokenizer tests` {
     expectNoDifference(tokenizer.decode(tokens: [201]), "�")
   }
 
-  @Test
-  func `Encodes Long Needle Prompt Snapshot`() throws {
-    let tokenizer = try NeedleSPTokenizer(modelURL: self.modelURL)
-    let tokens = tokenizer.encode(text: try self.longPrompt())
-    let pieces = tokenizer.convertIdsToTokens(tokens)
-    let annotatedTokens = zip(tokens, pieces)
-      .map { token, piece in "\(token)\t\(String(reflecting: piece ?? ""))" }
-      .joined(separator: "\n")
+  #if !os(WASI)
+    @Test
+    func `Encodes Long Needle Prompt Snapshot`() throws {
+      let tokenizer = try NeedleSPTokenizer(modelURL: self.modelURL)
+      let tokens = tokenizer.encode(text: try self.longPrompt())
+      let pieces = tokenizer.convertIdsToTokens(tokens)
+      let annotatedTokens = zip(tokens, pieces)
+        .map { token, piece in "\(token)\t\(String(reflecting: piece ?? ""))" }
+        .joined(separator: "\n")
 
-    assertSnapshot(of: annotatedTokens, as: .lines)
-  }
+      assertSnapshot(of: annotatedTokens, as: .lines)
+    }
 
-  @Test
-  func `Decodes Long Needle Prompt Snapshot`() throws {
-    let tokenizer = try NeedleSPTokenizer(modelURL: self.modelURL)
-    let prompt = try self.longPrompt()
-    let decoded = tokenizer.decode(tokens: tokenizer.encode(text: prompt))
+    @Test
+    func `Decodes Long Needle Prompt Snapshot`() throws {
+      let tokenizer = try NeedleSPTokenizer(modelURL: self.modelURL)
+      let prompt = try self.longPrompt()
+      let decoded = tokenizer.decode(tokens: tokenizer.encode(text: prompt))
 
-    assertSnapshot(of: decoded, as: .lines)
-    expectNoDifference(decoded, prompt)
-  }
+      assertSnapshot(of: decoded, as: .lines)
+      expectNoDifference(decoded, prompt)
+    }
+  #endif
 
   @Test(
     arguments: [

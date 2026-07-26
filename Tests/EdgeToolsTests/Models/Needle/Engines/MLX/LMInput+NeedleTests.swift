@@ -1,4 +1,4 @@
-#if MLX && canImport(MLX)
+#if MLX && canImport(MLX) && !os(WASI)
   import CustomDump
   import Foundation
   import MLX

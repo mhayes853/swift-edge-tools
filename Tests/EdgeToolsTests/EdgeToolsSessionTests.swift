@@ -30,7 +30,7 @@ struct `EdgeToolsSession tests` {
 
   @Test
   func `Final Generation Returns Successfully When No Errors Occur`() async throws {
-    let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+    let tokenizer = try testTokenizer()
     let tokens = "Hello, world!".tokenize(using: tokenizer)
     let engine = MockEngine(script: tokens.map { .token($0) } + [.finish])
     let session = EdgeToolsSession(engine: engine)
@@ -45,7 +45,7 @@ struct `EdgeToolsSession tests` {
 
   @Test
   func `Generate Returns Successfully With Parsed Tool Call`() async throws {
-    let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+    let tokenizer = try testTokenizer()
     let rawToolCall = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
     let toolTokens = rawToolCall.tokenize(using: tokenizer)
     let engine = MockEngine(script: toolTokens.map { .token($0) } + [.finish])
@@ -67,7 +67,7 @@ struct `EdgeToolsSession tests` {
 
   @Test
   func `Generate Raw Tool Calls Works With Definitions`() async throws {
-    let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+    let tokenizer = try testTokenizer()
     let rawToolCall = #"<tool_call> [{"name":"unknown","arguments":{"value":1}}]"#
     let toolTokens = rawToolCall.tokenize(using: tokenizer)
     let engine = MockEngine(script: toolTokens.map { .token($0) } + [.finish])
@@ -86,7 +86,7 @@ struct `EdgeToolsSession tests` {
 
   @Test
   func `Raw Tool Calls Stream In Order`() async throws {
-    let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+    let tokenizer = try testTokenizer()
     let rawToolCalls =
       #"<tool_call> [{"name":"first","arguments":{}},{"name":"second","arguments":{}}]"#
     let tokens = rawToolCalls.tokenize(using: tokenizer)
@@ -105,7 +105,7 @@ struct `EdgeToolsSession tests` {
 
   @Test
   func `Raw Tool Calls Are Observable`() async throws {
-    let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+    let tokenizer = try testTokenizer()
     let rawToolCall = #"<tool_call> [{"name":"weather","arguments":{}}]"#
     let tokens = rawToolCall.tokenize(using: tokenizer)
     let engine = MockEngine(script: tokens.map { .token($0) } + [.finish])
@@ -125,7 +125,7 @@ struct `EdgeToolsSession tests` {
 
   @Test
   func `Raw Generation Result Is Observable`() async throws {
-    let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+    let tokenizer = try testTokenizer()
     let tokens = "hi".tokenize(using: tokenizer)
     let engine = MockEngine(script: tokens.map { .token($0) } + [.finish])
     let session = EdgeToolsSession(engine: engine)
@@ -144,7 +144,7 @@ struct `EdgeToolsSession tests` {
 
   @Test
   func `Generate Throws When Engine Errors`() async throws {
-    let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+    let tokenizer = try testTokenizer()
     let tokens = "hi".tokenize(using: tokenizer)
     let error = ToolError(message: "boom")
     let engine = MockEngine(script: tokens.map { .token($0) } + [.error(error)])
@@ -157,7 +157,7 @@ struct `EdgeToolsSession tests` {
 
   @Test
   func `Generate Propagates Task Cancellation`() async throws {
-    let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+    let tokenizer = try testTokenizer()
     let firstToken = "a a".tokenize(using: tokenizer).first!
     let engine = MockEngine.live()
     engine.push(.token(firstToken))
@@ -179,7 +179,7 @@ struct `EdgeToolsSession tests` {
 
   @Test
   func `Final Generation Throws When Engine Errors`() async throws {
-    let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+    let tokenizer = try testTokenizer()
     let tokens = "hi".tokenize(using: tokenizer)
     let error = ToolError(message: "boom")
     let engine = MockEngine(script: tokens.map { .token($0) } + [.error(error)])
@@ -198,7 +198,7 @@ struct `EdgeToolsSession tests` {
 
   @Test
   func `Tools Stream Incrementally In Order As Mock Engine Emits Them`() async throws {
-    let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+    let tokenizer = try testTokenizer()
     let rawToolCalls =
       #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#
     let toolTokens = rawToolCalls.tokenize(using: tokenizer)
@@ -225,7 +225,7 @@ struct `EdgeToolsSession tests` {
 
   @Test
   func `Raw Tokens Are Buffered And Streamed Through The Tokens Sequence`() async throws {
-    let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+    let tokenizer = try testTokenizer()
     let tokens = "abc".tokenize(using: tokenizer)
     let engine = MockEngine(script: tokens.map { .token($0) } + [.finish])
     let session = EdgeToolsSession(engine: engine)
@@ -242,7 +242,7 @@ struct `EdgeToolsSession tests` {
 
   @Test
   func `Stopping Stops Generation Within The Engine`() async throws {
-    let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+    let tokenizer = try testTokenizer()
     let firstToken = "a a".tokenize(using: tokenizer).first!
     let secondToken = "b b".tokenize(using: tokenizer).first!
     let engine = MockEngine.live()
@@ -302,7 +302,7 @@ struct `EdgeToolsSession tests` {
 
   @Test
   func `Tools Are Parsed Incremental Without Waiting For Model Stop`() async throws {
-    let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+    let tokenizer = try testTokenizer()
     let rawToolCall = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
     let toolTokens = rawToolCall.tokenize(using: tokenizer)
     let trailing = "trailing".tokenize(using: tokenizer)
@@ -324,7 +324,7 @@ struct `EdgeToolsSession tests` {
 
   @Test
   func `Task Cancellation Propagates When Awaiting Final Generation`() async throws {
-    let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+    let tokenizer = try testTokenizer()
     let firstToken = "a a".tokenize(using: tokenizer).first!
     let engine = MockEngine.live()
     engine.push(.token(firstToken))
@@ -348,7 +348,7 @@ struct `EdgeToolsSession tests` {
 
   @Test
   func `Status Is Observable`() async throws {
-    let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+    let tokenizer = try testTokenizer()
     let tokens = "hi".tokenize(using: tokenizer)
     let engine = MockEngine(script: tokens.map { .token($0) } + [.finish])
     let session = EdgeToolsSession(engine: engine)
@@ -368,7 +368,7 @@ struct `EdgeToolsSession tests` {
 
   @Test
   func `Tool Calls Are Observable On Stream`() async throws {
-    let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+    let tokenizer = try testTokenizer()
     let rawToolCall = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
     let toolTokens = rawToolCall.tokenize(using: tokenizer)
     let engine = MockEngine(script: toolTokens.map { .token($0) } + [.finish])
@@ -389,7 +389,7 @@ struct `EdgeToolsSession tests` {
 
   @Test
   func `Active Streams Are Observable`() async throws {
-    let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+    let tokenizer = try testTokenizer()
     let tokens = "hi".tokenize(using: tokenizer)
     let engine = MockEngine(script: tokens.map { .token($0) } + [.finish])
     let session = EdgeToolsSession(engine: engine)
@@ -409,7 +409,7 @@ struct `EdgeToolsSession tests` {
 
   @Test
   func `Tool Call Parsed When Tool Name Differs From Snake Cased`() async throws {
-    let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+    let tokenizer = try testTokenizer()
     let rawToolCall =
       #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
     let toolTokens = rawToolCall.tokenize(using: tokenizer)
@@ -470,7 +470,7 @@ struct `EdgeToolsSession status tests` {
 
   @Test
   func `Status Is Generating While Engine Streams Tokens`() async throws {
-    let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+    let tokenizer = try testTokenizer()
     let firstToken = "a a".tokenize(using: tokenizer).first!
     let engine = MockEngine.live()
     engine.push(.token(firstToken))
@@ -488,7 +488,7 @@ struct `EdgeToolsSession status tests` {
 
   @Test
   func `Status Is Finished With Success When Engine Responds Successfully`() async throws {
-    let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+    let tokenizer = try testTokenizer()
     let tokens = "hi".tokenize(using: tokenizer)
     let engine = MockEngine(script: tokens.map { .token($0) } + [.finish])
     let session = EdgeToolsSession(engine: engine)
@@ -508,7 +508,7 @@ struct `EdgeToolsSession status tests` {
 
   @Test
   func `Status Is Finished With Failure When Engine Errors`() async throws {
-    let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+    let tokenizer = try testTokenizer()
     let tokens = "hi".tokenize(using: tokenizer)
     let error = ToolError(message: "boom")
     let engine = MockEngine(script: tokens.map { .token($0) } + [.error(error)])
@@ -529,7 +529,7 @@ struct `EdgeToolsSession status tests` {
 
   @Test
   func `Emitted Tools Are Idle When Should Invoke Tools Is False`() async throws {
-    let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+    let tokenizer = try testTokenizer()
     let rawToolCall = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
     let toolTokens = rawToolCall.tokenize(using: tokenizer)
     let engine = MockEngine(script: toolTokens.map { .token($0) } + [.finish])
@@ -552,7 +552,7 @@ struct `EdgeToolsSession status tests` {
 
   @Test
   func `Emitted Tools Are Idle Or Running When Should Invoke Tools Is True`() async throws {
-    let tokenizer = try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+    let tokenizer = try testTokenizer()
     let rawToolCall = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
     let toolTokens = rawToolCall.tokenize(using: tokenizer)
     let engine = MockEngine(script: toolTokens.map { .token($0) } + [.finish])
