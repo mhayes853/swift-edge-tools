@@ -9,7 +9,6 @@
   func completeWeatherTurn<Model: EdgeToolsLanguageModel>(
     using engine: EdgeToolsMLXEngine<Model>
   ) async throws -> EdgeToolsLLMPrompt where Model.Prompt == EdgeToolsLLMPrompt {
-    let session = EdgeToolsSession(engine: engine)
     var transcript = EdgeToolsLLMPrompt.weatherTest
     let parameters = EdgeToolsMLXEngine<Model>
       .GenerateParameters(
@@ -17,11 +16,13 @@
         maxTokens: 256
       )
 
-    let toolGeneration = try await session.generateRaw(
+    let toolGenerationTask = try engine.generate(
       prompt: transcript,
       tools: [.weatherTest],
-      parameters: parameters
+      parameters: parameters,
+      channel: EdgeToolsGenerationChannel()
     )
+    let toolGeneration = try await toolGenerationTask.value
     guard !toolGeneration.toolCalls.isEmpty else {
       throw MLXGenerationTestError.missingToolCall
     }
@@ -37,11 +38,13 @@
       )
     )
 
-    let responseGeneration = try await session.generateRaw(
+    let responseGenerationTask = try engine.generate(
       prompt: transcript,
       tools: [.finalResponseTest],
-      parameters: parameters
+      parameters: parameters,
+      channel: EdgeToolsGenerationChannel()
     )
+    let responseGeneration = try await responseGenerationTask.value
     guard
       let call = responseGeneration.toolCalls.first,
       case .object(let arguments) = call.arguments,

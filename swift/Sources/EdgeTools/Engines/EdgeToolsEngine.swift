@@ -61,6 +61,7 @@ public struct EdgeToolsEngineGeneration: Sendable {
   public var wasStopped: Bool
   public var tokens: [EdgeToolsToken]
   public var response: String
+  public var toolCalls: [EdgeRawToolCall]
   public var metadata: EdgeToolsMetadata
 
   public init(
@@ -69,6 +70,7 @@ public struct EdgeToolsEngineGeneration: Sendable {
     wasStopped: Bool,
     tokens: [EdgeToolsToken],
     response: String,
+    toolCalls: [EdgeRawToolCall] = [],
     metadata: EdgeToolsMetadata = [:]
   ) {
     self.prefillMetrics = prefillMetrics
@@ -76,6 +78,7 @@ public struct EdgeToolsEngineGeneration: Sendable {
     self.wasStopped = wasStopped
     self.tokens = tokens
     self.response = response
+    self.toolCalls = toolCalls
     self.metadata = metadata
   }
 }
@@ -95,6 +98,7 @@ extension EdgeToolsEngineGeneration {
       && self.wasStopped
       && self.tokens.isEmpty
       && self.response.isEmpty
+      && self.toolCalls.isEmpty
       && self.metadata.isEmpty
   }
 }

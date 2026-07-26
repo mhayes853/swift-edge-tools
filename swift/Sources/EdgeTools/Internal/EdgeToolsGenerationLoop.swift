@@ -13,6 +13,7 @@
     private var detokenizer = StreamingDetokenizer()
     private var parser = Parser()
     private var generatedTokens = [EdgeToolsToken]()
+    private var toolCalls = [EdgeRawToolCall]()
     private var confidence = EdgeToolsConfidenceState()
     private var durationToFirstToken: Duration?
 
@@ -64,6 +65,7 @@
       let rawToolCall = self.parser.accept(token: token)
       self.channel.emit(token: token)
       if let rawToolCall {
+        self.toolCalls.append(rawToolCall)
         self.channel.emit(toolCall: rawToolCall)
       }
       return token
@@ -90,6 +92,7 @@
         wasStopped: self.isStopped.load(ordering: .relaxed),
         tokens: self.generatedTokens,
         response: response,
+        toolCalls: self.toolCalls,
         metadata: metadata
       )
     }

@@ -208,11 +208,11 @@
     @Test
     func `Generate Through EdgeToolsSession`() async throws {
       let engine = try await makeNeedleONNXEngine()
-      let session = EdgeToolsSession(engine: engine)
-      let generation = try await session.generate(
-        prompt: .sendAdventureEmail,
+      let session = EdgeToolsSession(
+        engine: engine,
         tools: NeedlePrompt.sendAdventureEmailTools
       )
+      let generation = try await session.generate(prompt: .sendAdventureEmail)
 
       expectNoDifference(generation.engineGeneration.wasStopped, false)
       withKnownIssue {

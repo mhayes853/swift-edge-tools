@@ -143,6 +143,7 @@ final class MockEngine: EdgeToolsPrefillableEngine, Sendable {
 
   private let storage: Storage
   private let _generateCallCount = Lock(0)
+  private let _generationTools = Lock([[EdgeToolDefinition]]())
   private let tokenizeHandler: (@Sendable (NeedlePrompt, [EdgeToolDefinition]) -> [EdgeToolsToken])?
   private let _prefillHandler =
     Lock<(@Sendable (NeedlePrompt, [EdgeToolDefinition]) throws -> EdgeToolsEnginePrefill)?>(nil)
@@ -161,6 +162,10 @@ final class MockEngine: EdgeToolsPrefillableEngine, Sendable {
 
   var generateCallCount: Int {
     self._generateCallCount.withLock { $0 }
+  }
+
+  var generationTools: [[EdgeToolDefinition]] {
+    self._generationTools.withLock { $0 }
   }
 
   init() {
@@ -224,6 +229,7 @@ final class MockEngine: EdgeToolsPrefillableEngine, Sendable {
     channel: EdgeToolsGenerationChannel
   ) throws -> GenerationTask {
     self._generateCallCount.withLock { $0 += 1 }
+    self._generationTools.withLock { $0.append(tools) }
     let (id, generationStorage) = self.storage.makeGeneration()
     let onStart = self._onGenerateStart.withLock { $0 }
     let onEnd = self._onGenerateEnd.withLock { $0 }
@@ -235,6 +241,7 @@ final class MockEngine: EdgeToolsPrefillableEngine, Sendable {
         self.storage.finishGeneration(id: id)
       }
       var emittedTokens = [EdgeToolsToken]()
+      var toolCalls = [EdgeRawToolCall]()
       var wasStopped = false
       var thrownError: (any Error)?
 
@@ -246,6 +253,7 @@ final class MockEngine: EdgeToolsPrefillableEngine, Sendable {
             let rawToolCall = parser.accept(token: token)
             channel.emit(token: token)
             if let rawToolCall {
+              toolCalls.append(rawToolCall)
               channel.emit(toolCall: rawToolCall)
             }
             emittedTokens.append(token)
@@ -273,7 +281,8 @@ final class MockEngine: EdgeToolsPrefillableEngine, Sendable {
         ),
         wasStopped: wasStopped,
         tokens: emittedTokens,
-        response: response
+        response: response,
+        toolCalls: toolCalls
       )
     }
     return GenerationTask(task: task) {

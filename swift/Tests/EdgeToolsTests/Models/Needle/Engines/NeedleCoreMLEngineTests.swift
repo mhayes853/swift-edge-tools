@@ -234,11 +234,11 @@
     @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
     func `Generate Through EdgeToolsSession`() async throws {
       let engine = try await makeNeedleCoreMLEngine()
-      let session = EdgeToolsSession(engine: engine)
-      let generation = try await session.generate(
-        prompt: .sendAdventureEmail,
+      let session = EdgeToolsSession(
+        engine: engine,
         tools: NeedlePrompt.sendAdventureEmailTools
       )
+      let generation = try await session.generate(prompt: .sendAdventureEmail)
 
       expectNoDifference(generation.engineGeneration.wasStopped, false)
       withKnownIssue {

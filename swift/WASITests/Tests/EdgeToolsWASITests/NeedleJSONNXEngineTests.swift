@@ -44,7 +44,7 @@ struct `Needle JSONNX engine tests` {
         ]
       )
     )
-    let session = EdgeToolsSession(engine: engine)
+    let session = EdgeToolsSession(engine: engine, tools: [SendEmailTool()])
     let parameters = NeedleJSONNXEngine.GenerateParameters(
       toolCallRange: .exact(1),
       maxTokens: 96
@@ -54,7 +54,6 @@ struct `Needle JSONNX engine tests` {
         system: "",
         user: "Send an email to Henry asking him to go on an adventure."
       ),
-      tools: [SendEmailTool()],
       parameters: parameters,
       shouldInvokeTools: { _ in false }
     )
