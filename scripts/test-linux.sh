@@ -14,7 +14,7 @@ extra_arguments=()
 
 usage() {
 	cat <<'EOF'
-Usage: bin/test-linux.sh [options] [-- <additional swift arguments>]
+Usage: scripts/test-linux.sh [options] [-- <additional swift arguments>]  
 
 Run a Swift build or test inside a Linux Docker container.
 
@@ -34,10 +34,10 @@ Environment overrides:
   SWIFT_TEST_FILTER, DOCKER_PLATFORM
 
 Examples:
-  bin/test-linux.sh
-  bin/test-linux.sh --traits ONNXCore --build-only
-  bin/test-linux.sh --traits ONNX --filter 'CONNXRuntime tests|NeedleONNXEngine core tests'
-  bin/test-linux.sh --traits ONNX --all-tests -- --configuration release
+  scripts/test-linux.sh
+  scripts/test-linux.sh --traits ONNXCore --build-only
+  scripts/test-linux.sh --traits ONNX --filter 'CONNXRuntime tests|NeedleONNXEngine core tests'
+  scripts/test-linux.sh --traits ONNX --all-tests -- --configuration release
 EOF
 }
 

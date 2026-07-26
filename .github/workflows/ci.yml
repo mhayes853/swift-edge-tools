@@ -68,10 +68,10 @@ jobs:
           persist-credentials: false
           submodules: recursive
       - name: Build ONNXCore without an ONNX Runtime library
-        run: bin/test-linux.sh --traits ONNXCore --build-only
+        run: scripts/test-linux.sh --traits ONNXCore --build-only
       - name: Test generic, vendored, and Swift System ONNX Runtime APIs
         run: >
-          bin/test-linux.sh --traits ONNX,System
+          scripts/test-linux.sh --traits ONNX,System
           --filter 'CONNXRuntime tests|EdgeToolsONNXRuntime tests'
 
   # android:

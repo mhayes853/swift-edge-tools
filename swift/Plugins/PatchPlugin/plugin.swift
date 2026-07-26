@@ -7,11 +7,11 @@ struct PatchPlugin: BuildToolPlugin {
     let packageDirectory = context.package.directoryURL
     let sourceRoot = target.directoryURL.appendingPathComponent("xgrammar")
     let patches = [
-      "Patches/XGrammar/0001-support-single-threaded-wasi.patch",
-      "Patches/XGrammar/0002-support-wasi-without-cxx-exceptions.patch"
+      "patches/XGrammar/0001-support-single-threaded-wasi.patch",
+      "patches/XGrammar/0002-support-wasi-without-cxx-exceptions.patch"
     ]
     .map { packageDirectory.appendingPathComponent($0) }
-    let script = packageDirectory.appendingPathComponent("Scripts/prepare-patched-sources.sh")
+    let script = packageDirectory.appendingPathComponent("scripts/prepare-patched-sources.sh")
     let outputRoot = context.pluginWorkDirectoryURL.appendingPathComponent("patched")
     let sourcePaths = [
       "cpp/compiled_grammar.cc",
