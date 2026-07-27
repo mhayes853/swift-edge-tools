@@ -79,7 +79,10 @@
       var metadata = metadata
       metadata.generationConfidence = self.confidence.mean
       metadata.perTokenConfidences = self.confidence.perTokenConfidences
-      let response = self.tokenizer.decode(tokens: self.detokenizer.tokenIds)
+      let responseTokenIds = self.tokenizer.eosTokenId.map { eosTokenId in
+        self.detokenizer.tokenIds.filter { $0 != eosTokenId }
+      } ?? self.detokenizer.tokenIds
+      let response = self.tokenizer.decode(tokens: responseTokenIds)
       let decodeDuration =
         self.generateStart.duration(to: self.clock.now) - finalDurationToFirstToken
       return EdgeToolsEngineGeneration(

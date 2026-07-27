@@ -65,7 +65,7 @@
     ▿ Message
       - audio: Optional<Array<Asset>>.none
       ▿ content: Optional<String>
-        - some: "Based on the weather data, Paris is currently experiencing **sunny** weather with a temperature of **21 degrees Celsius**.<|im_end|>"
+        - some: "Based on the weather data, Paris is currently experiencing **sunny** weather with a temperature of **21 degrees Celsius**."
       - images: Optional<Array<Asset>>.none
       ▿ role: Role
         - rawValue: "assistant"
