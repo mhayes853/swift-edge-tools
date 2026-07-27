@@ -27,6 +27,21 @@ struct `JSONNXRuntime tests` {
   }
 
   @Test
+  func `Reject Duplicate Output Names`() async throws {
+    let runtime = try Self.runtime()
+    let session = try await runtime.session(
+      model: JSONNXRuntime.ModelSource.javaScriptFile(try Self.addModel()),
+      configuration: JSONNXRuntime.Configuration()
+    )
+
+    let error = await #expect(throws: JSONNXRuntimeError.self) {
+      _ = try await session.run(inputs: [:], outputNames: ["sum", "sum"])
+    }
+
+    #expect(error?.code == .duplicateOutputName)
+  }
+
+  @Test
   func `Create And Read Integer Tensors`() async throws {
     let runtime = try Self.runtime()
     let int32Tensor = try runtime.tensor(values: [Int32(1), 2, 3], shape: [3])

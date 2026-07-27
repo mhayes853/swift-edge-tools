@@ -1,10 +1,10 @@
 ▿ EdgeToolsEngineGeneration
   ▿ decodeMetrics: EdgeToolsDecodeMetrics
-    ▿ duration: 1.286591625 seconds
-      - _low: 1286591625000000000
+    ▿ duration: 1.252081709 seconds
+      - _low: 1252081709000000000
       - _high: 0
-    ▿ durationToFirstToken: 5.897608792 seconds
-      - _low: 5897608792000000000
+    ▿ durationToFirstToken: 0.111415875 seconds
+      - _low: 111415875000000000
       - _high: 0
     - tokens: 84
   ▿ metadata: 2 key/value pairs
@@ -101,8 +101,8 @@
         - 0.7233095
         - 1.0
   ▿ prefillMetrics: EdgeToolsPrefillMetrics
-    ▿ duration: 4.786073624999999 seconds
-      - _low: 4786073625000000000
+    ▿ duration: 0.070300875 seconds
+      - _low: 70300875000000000
       - _high: 0
     - tokens: 150
   - response: "<tool_call> [{\"name\":\"send_email\",\"arguments\":{\"address\":\"henderry@gmail.com\",\"subject\":\"Hello\",\"body\":\"Could you please go on an adventure?[{\"}},{\"name\":\"send_email\",\"arguments\":{\"address\":\"adventure@gmail.com\",\"subject\":\"Hello\",\"body\":\"I am writing to go on an adventure.\"}}]"
@@ -359,4 +359,37 @@
     ▿ EdgeToolsToken
       - id: 1
       - stringValue: ""
+  ▿ toolCalls: 2 elements
+    ▿ EdgeRawToolCall
+      ▿ arguments: EdgeToolsValue
+        ▿ object: 3 key/value pairs
+          ▿ (2 elements)
+            - key: "address"
+            ▿ value: EdgeToolsValue
+              - string: "henderry@gmail.com"
+          ▿ (2 elements)
+            - key: "body"
+            ▿ value: EdgeToolsValue
+              - string: "Could you please go on an adventure?[{"
+          ▿ (2 elements)
+            - key: "subject"
+            ▿ value: EdgeToolsValue
+              - string: "Hello"
+      - name: "send_email"
+    ▿ EdgeRawToolCall
+      ▿ arguments: EdgeToolsValue
+        ▿ object: 3 key/value pairs
+          ▿ (2 elements)
+            - key: "address"
+            ▿ value: EdgeToolsValue
+              - string: "adventure@gmail.com"
+          ▿ (2 elements)
+            - key: "body"
+            ▿ value: EdgeToolsValue
+              - string: "I am writing to go on an adventure."
+          ▿ (2 elements)
+            - key: "subject"
+            ▿ value: EdgeToolsValue
+              - string: "Hello"
+      - name: "send_email"
   - wasStopped: false

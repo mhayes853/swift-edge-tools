@@ -1,10 +1,10 @@
 ▿ EdgeToolsEngineGeneration
   ▿ decodeMetrics: EdgeToolsDecodeMetrics
-    ▿ duration: 0.646726833 seconds
-      - _low: 646726833000000000
+    ▿ duration: 0.651535667 seconds
+      - _low: 651535667000000000
       - _high: 0
-    ▿ durationToFirstToken: 5.26328825 seconds
-      - _low: 5263288250000000000
+    ▿ durationToFirstToken: 0.109747208 seconds
+      - _low: 109747208000000000
       - _high: 0
     - tokens: 46
   ▿ metadata: 2 key/value pairs
@@ -63,8 +63,8 @@
         - 0.70578504
         - 1.0
   ▿ prefillMetrics: EdgeToolsPrefillMetrics
-    ▿ duration: 4.222294833 seconds
-      - _low: 4222294833000000000
+    ▿ duration: 0.069551709 seconds
+      - _low: 69551709000000000
       - _high: 0
     - tokens: 150
   - response: "<tool_call> [{\"name\":\"send_email\",\"arguments\":{\"address\":\"henderyanal@gmail.com\",\"subject\":\"Adventure\",\"body\":\"Hi, could you please go on an adventure?\"}}]"
@@ -207,4 +207,21 @@
     ▿ EdgeToolsToken
       - id: 1
       - stringValue: ""
+  ▿ toolCalls: 1 element
+    ▿ EdgeRawToolCall
+      ▿ arguments: EdgeToolsValue
+        ▿ object: 3 key/value pairs
+          ▿ (2 elements)
+            - key: "address"
+            ▿ value: EdgeToolsValue
+              - string: "henderyanal@gmail.com"
+          ▿ (2 elements)
+            - key: "body"
+            ▿ value: EdgeToolsValue
+              - string: "Hi, could you please go on an adventure?"
+          ▿ (2 elements)
+            - key: "subject"
+            ▿ value: EdgeToolsValue
+              - string: "Adventure"
+      - name: "send_email"
   - wasStopped: false

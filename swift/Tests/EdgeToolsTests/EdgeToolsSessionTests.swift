@@ -235,6 +235,30 @@ struct `EdgeToolsSession tests` {
   }
 
   @Test
+  func `Token Sequence Retains Its Completed Stream While Replaying Tokens`() async throws {
+    let tokenizer = try testTokenizer()
+    let tokens = "abc".tokenize(using: tokenizer)
+    let engine = MockEngine(script: tokens.map { .token($0) } + [.finish])
+    let session = EdgeToolsSession(engine: engine)
+    let streamedTokens = try await self.tokensFromCompletedStream(session: session)
+
+    var collected = [EdgeToolsToken]()
+    for try await token in streamedTokens {
+      collected.append(token)
+    }
+
+    expectNoDifference(collected, tokens)
+  }
+
+  private func tokensFromCompletedStream(
+    session: EdgeToolsSession<MockEngine>
+  ) async throws -> EdgeToolsSessionTokens {
+    let stream = session.stream(prompt: .test(user: "hi"))
+    _ = try await stream.finalGeneration
+    return stream.tokens
+  }
+
+  @Test
   func `Stopping Stops Generation Within The Engine`() async throws {
     let tokenizer = try testTokenizer()
     let firstToken = "a a".tokenize(using: tokenizer).first!

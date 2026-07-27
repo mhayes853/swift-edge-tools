@@ -122,6 +122,17 @@ struct `EdgeToolsEncoding tests` {
   }
 
   @Test
+  func `Macro Generated Encoding Decodes Escaped Key Overrides`() throws {
+    let value = try EscapedGuideKey(edgeToolsValue: ["line\nbreak": "blob"])
+
+    guard case .object(let object) = value.edgeToolsValue else {
+      Issue.record("Expected object value.")
+      return
+    }
+    expectNoDifference(Array(object.keys), ["line\nbreak"])
+  }
+
+  @Test
   func `Macro Generated Encoding Honors Key Overrides`() throws {
     let value: EdgeToolsValue = [
       "name": "Blob",
@@ -222,6 +233,10 @@ struct `EdgeToolsGenerable initialization tests` {
   func `Initializes Decimal`() throws {
     expectNoDifference(try Decimal(edgeToolsValue: 1.5), Decimal(1.5))
     expectNoDifference(try Decimal(edgeToolsValue: 1), Decimal(1))
+    expectNoDifference(
+      try Decimal(edgeToolsValue: "12345.67890123456789"),
+      Decimal(string: "12345.67890123456789")
+    )
   }
 
   @Test
@@ -445,6 +460,16 @@ struct `Schema composition tests` {
   }
 
   @Test
+  func `Empty Half Open Length Range Uses Its Lower Bound`() {
+    let schema = EdgeToolsGenerationSchema.lengthRange(3..<3)
+
+    expectNoDifference(
+      schema,
+      EdgeToolsGenerationSchema(.minLength(3), .maxLength(3))
+    )
+  }
+
+  @Test
   func `Array And Object Helpers Compose`() {
     let schema = EdgeToolsGenerationSchema(
       .type(.array),
@@ -522,6 +547,13 @@ private struct MacroEncodingUser: Equatable {
 private struct MacroEncodingAddress: Equatable {
   var city: String
 }
+
+@EdgeToolsGenerable
+private struct EscapedGuideKey: Equatable {
+  @EdgeToolsGuide(key: "line\nbreak")
+  var value: String
+}
+
 @EdgeToolsGenerable
 private struct MacroUser: Equatable {
   var name: String

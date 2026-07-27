@@ -1,5 +1,6 @@
 import Foundation
 import SwiftDiagnostics
+import SwiftParser
 import SwiftSyntax
 import SwiftSyntaxBuilder
 import SwiftSyntaxMacros
@@ -191,7 +192,7 @@ extension EdgeToolsGenerableMacro {
     context: some MacroExpansionContext
   ) -> [StoredProperty] {
     variableDecl.bindings.compactMap { binding in
-      guard binding.accessorBlock == nil else { return nil }
+      guard Self.isStoredProperty(binding) else { return nil }
       guard let identifierPattern = binding.pattern.as(IdentifierPatternSyntax.self) else {
         return nil
       }
@@ -464,6 +465,21 @@ extension EdgeToolsGenerableMacro {
       .first
   }
 
+  private static func isStoredProperty(_ binding: PatternBindingSyntax) -> Bool {
+    guard let accessorBlock = binding.accessorBlock else { return true }
+    switch accessorBlock.accessors {
+    case .accessors(let accessors):
+      return accessors.allSatisfy { accessor in
+        switch accessor.accessorSpecifier.tokenKind {
+        case .keyword(.willSet), .keyword(.didSet): true
+        default: false
+        }
+      }
+    case .getter:
+      return false
+    }
+  }
+
   private static func isOptionalTypeName(_ typeName: String) -> Bool {
     typeName.hasSuffix("?") || typeName.hasPrefix("Optional<")
       || typeName.hasPrefix("Swift.Optional<")
@@ -487,9 +503,7 @@ extension EdgeToolsGenerableMacro {
   }
 
   private static func stringLiteralValue(from expression: ExprSyntax) -> String? {
-    let text = expression.trimmedDescription
-    guard text.count >= 2, text.first == "\"", text.last == "\"" else { return nil }
-    return String(text.dropFirst().dropLast())
+    expression.as(StringLiteralExprSyntax.self)?.representedLiteralValue
   }
 }
 

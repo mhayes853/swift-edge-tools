@@ -15,6 +15,7 @@
 
       public static let invalidGraphOptimizationLevel =
         Self(rawValue: "invalid-graph-optimization-level")
+      public static let duplicateOutputName = Self(rawValue: "duplicate-output-name")
       public static let invalidJavaScriptValue = Self(rawValue: "invalid-javascript-value")
       public static let invalidRuntimeObject = Self(rawValue: "invalid-runtime-object")
       public static let invalidTensorShape = Self(rawValue: "invalid-tensor-shape")
@@ -341,6 +342,12 @@
       inputs: [String: JSONNXTensor],
       outputNames: [String]
     ) async throws -> [String: JSONNXTensor] {
+      guard Set(outputNames).count == outputNames.count else {
+        throw JSONNXRuntimeError(
+          code: .duplicateOutputName,
+          message: "Output names must be unique."
+        )
+      }
       let feeds = JSObject()
       for (name, tensor) in inputs {
         feeds[name] = tensor.javaScriptObject.jsValue

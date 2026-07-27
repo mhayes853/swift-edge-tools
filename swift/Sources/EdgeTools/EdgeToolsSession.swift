@@ -141,7 +141,7 @@ public final class EdgeToolsSessionStream: Sendable, Observable, Identifiable, A
   }
 
   public var tokens: EdgeToolsSessionTokens {
-    EdgeToolsSessionTokens(makeIterator: { [weak self] in self!.makeTokenIterator() })
+    EdgeToolsSessionTokens(makeIterator: { self.makeTokenIterator() })
   }
 
   public var toolCalls: EdgeToolCallCollection {

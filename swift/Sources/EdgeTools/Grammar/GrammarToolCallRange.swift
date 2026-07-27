@@ -12,11 +12,19 @@ public enum GrammarToolCallRange: Hashable, Sendable {
   }
 
   public static func bounded(_ range: PartialRangeUpTo<Int>) -> Self {
-    .bounded(0..<range.upperBound)
+    Self.bounded(lowerBound: 0, exclusiveUpperBound: range.upperBound)
   }
 
   public static func bounded(_ range: Range<Int>) -> Self {
-    .bounded(range.lowerBound...(range.upperBound - 1))
+    Self.bounded(lowerBound: range.lowerBound, exclusiveUpperBound: range.upperBound)
+  }
+
+  private static func bounded(lowerBound: Int, exclusiveUpperBound: Int) -> Self {
+    if lowerBound < exclusiveUpperBound {
+      .bounded(lowerBound...(exclusiveUpperBound - 1))
+    } else {
+      .exact(Swift.min(lowerBound, exclusiveUpperBound))
+    }
   }
 
   public var lowerBound: Int {

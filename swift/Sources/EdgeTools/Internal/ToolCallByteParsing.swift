@@ -90,6 +90,33 @@ extension Array where Element == UInt8 {
     return nil
   }
 
+  func firstRange(
+    of needle: [UInt8],
+    outsideRegionOpenedBy opener: [UInt8],
+    closedBy closer: [UInt8],
+    orAbortedBy aborter: [UInt8]
+  ) -> Range<Int>? {
+    var index = 0
+    var isInsideRegion = false
+    while index < self.count {
+      if isInsideRegion, self[index...].starts(with: closer) {
+        isInsideRegion = false
+        index += closer.count
+      } else if isInsideRegion, self[index...].starts(with: aborter) {
+        isInsideRegion = false
+        index += aborter.count
+      } else if !isInsideRegion, self[index...].starts(with: opener) {
+        isInsideRegion = true
+        index += opener.count
+      } else if !isInsideRegion, self[index...].starts(with: needle) {
+        return index..<(index + needle.count)
+      } else {
+        index += 1
+      }
+    }
+    return nil
+  }
+
   mutating func removeLeadingASCIIWhitespaceAndCommas() {
     while let first = self.first {
       guard first == UInt8(ascii: ",") || first.isASCIIWhitespace else { return }
@@ -195,6 +222,22 @@ struct IncrementalToolCallBlock: Hashable, Sendable {
   mutating func nextPayload(outside marker: [UInt8]) -> [UInt8]? {
     let closer = self.closer
     return self.nextPayload { $0.firstRange(of: closer, outside: marker) }
+  }
+
+  mutating func nextPayload(
+    outsideRegionOpenedBy opener: [UInt8],
+    closedBy regionCloser: [UInt8],
+    orAbortedBy regionAborter: [UInt8]
+  ) -> [UInt8]? {
+    let closer = self.closer
+    return self.nextPayload {
+      $0.firstRange(
+        of: closer,
+        outsideRegionOpenedBy: opener,
+        closedBy: regionCloser,
+        orAbortedBy: regionAborter
+      )
+    }
   }
 
   private mutating func nextPayload(findCloser: ([UInt8]) -> Range<Int>?) -> [UInt8]? {

@@ -1,10 +1,6 @@
 #if XGrammar
   import CXGrammar
-#endif
 
-// MARK: - Public XGrammar API
-
-#if XGrammar
   // MARK: - XGRVocabularyType
 
   public enum XGRVocabularyType: Hashable, Sendable {

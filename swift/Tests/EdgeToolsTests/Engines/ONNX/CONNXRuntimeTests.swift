@@ -64,6 +64,23 @@
     #endif
 
     @Test
+    func `Reject Duplicate Output Names`() throws {
+      let runtime = try CONNXRuntime()
+      let session = try runtime.session(modelURL: try Self.modelURL())
+      let firstInput = try runtime.tensor(values: [Float(2), 4, 8], shape: [3])
+      let secondInput = try runtime.tensor(values: [Float(1), 3, 5], shape: [3])
+
+      let error = #expect(throws: CONNXRuntimeError.self) {
+        try session.run(
+          inputs: ["x": firstInput, "y": secondInput],
+          outputNames: ["sum", "sum"]
+        )
+      }
+
+      expectNoDifference(error?.code, .duplicateOutputName)
+    }
+
+    @Test
     func `Expose Session And Tensor Metadata`() throws {
       let runtime = try CONNXRuntime()
       let session = try runtime.session(modelURL: try Self.modelURL())

@@ -186,6 +186,11 @@ extension UInt128: EdgeToolsGenerable {}
         self = Decimal(number)
       case .integer(let integer):
         self = Decimal(integer)
+      case .string(let string):
+        guard let decimal = Decimal(string: string, locale: Locale(identifier: "en_US_POSIX")) else {
+          throw EdgeToolsValueTypeError(expected: .number, received: .string)
+        }
+        self = decimal
       default:
         throw EdgeToolsValueTypeError(expected: .number, received: edgeToolsValue.type)
       }

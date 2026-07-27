@@ -312,11 +312,12 @@
         maximumTokenCount: parameters.maxTokens,
         generateStart: generateStart
       )
-      while let bitmask = try loop.nextBitmask() {
+      var bitmask = try loop.nextBitmask()
+      while let currentBitmask = bitmask {
         let processedLogits = processor?.process(logits: output.logits) ?? output.logits
         let logits = applyBitmaskMLX(
           logits: processedLogits[0..., -1, 0...],
-          mask: bitmask
+          mask: currentBitmask
         )
         let confidence = tokenConfidenceMLX(logits: logits)
         let sampledToken = sampler.sample(logits: logits)
@@ -324,6 +325,8 @@
         _ = try loop.accept(tokenID: tokenID, confidence: confidence)
         processor?.didSample(token: sampledToken)
 
+        bitmask = try loop.nextBitmask()
+        guard bitmask != nil else { break }
         maybeQuantizeKVCache(
           cache: &cache,
           kvBits: parameters.kvCacheQuantizationBits,

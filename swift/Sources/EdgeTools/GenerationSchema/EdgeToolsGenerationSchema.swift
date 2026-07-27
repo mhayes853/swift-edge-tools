@@ -439,7 +439,8 @@ extension EdgeToolsGenerationSchema {
   }
 
   public static func lengthRange(_ range: Range<Int>) -> Self {
-    Self(.minLength(range.lowerBound), .maxLength(range.upperBound - 1))
+    let maximum = range.isEmpty ? range.lowerBound : range.upperBound - 1
+    return Self(.minLength(range.lowerBound), .maxLength(maximum))
   }
 
   public static func multipleOf(_ value: Int) -> Self {

@@ -42,22 +42,31 @@ import OrderedCollections
 // MARK: - Qwen3P5 Tool Call Parsing
 
 public struct QwenXMLToolCallParser: EdgeToolCallParser, Sendable {
-  private var block = IncrementalToolCallBlock(
-    opener: "<tool_call>",
-    closer: "</tool_call>"
-  )
+  private static let parameterOpener = Array("<parameter=".utf8)
+  private static let parameterCloser = Array("</parameter>".utf8)
+  private static let functionCloser = Array("</function>".utf8)
+
+  private var block = IncrementalToolCallBlock(opener: "<tool_call>", closer: "</tool_call>")
 
   public init() {}
 
   public mutating func accept(token: EdgeToolsToken) -> EdgeRawToolCall? {
     self.block.append(token)
-    while let payloadData = self.block.nextPayload(respectingJSONStringBoundaries: false) {
+    while let payloadData = self.nextBlockPayload() {
       let payload = String(decoding: payloadData, as: UTF8.self)
       if let call = Self.parse(payload) {
         return call
       }
     }
     return nil
+  }
+
+  private mutating func nextBlockPayload() -> [UInt8]? {
+    self.block.nextPayload(
+      outsideRegionOpenedBy: Self.parameterOpener,
+      closedBy: Self.parameterCloser,
+      orAbortedBy: Self.functionCloser
+    )
   }
 
   private static func parse(_ payload: String) -> EdgeRawToolCall? {

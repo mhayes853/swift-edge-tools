@@ -92,6 +92,52 @@ extension BaseTestSuite {
     }
 
     @Test
+    func `Includes Stored Properties With Observers`() {
+      assertMacro {
+        """
+        @EdgeToolsGenerable
+        struct Person {
+          var name: String {
+            didSet {}
+          }
+        }
+        """
+      } expansion: {
+        """
+        struct Person {
+          var name: String {
+            didSet {}
+          }
+
+          static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
+            EdgeToolsGenerationSchema(
+              .type(.object),
+                    .properties([
+                          "name": String.edgeToolsGenerationSchema
+                        ]),
+                    .required(["name"])
+            )
+          }
+
+          init(edgeToolsValue: EdgeToolsValue) throws {
+            let object = try _edgeToolsRequireObjectValue(edgeToolsValue)
+            self.name = try String(edgeToolsValue: _edgeToolsValue(object, forKey: "name"))
+          }
+
+          var edgeToolsValue: EdgeToolsValue {
+            _edgeToolsBuildObjectValue(
+              (key: "name", value: self.name.edgeToolsValue)
+            )
+          }
+        }
+
+        extension Person: EdgeToolsGenerable {
+        }
+        """
+      }
+    }
+
+    @Test
     func `Uses Inferred Optional Schema`() {
       assertMacro {
         """

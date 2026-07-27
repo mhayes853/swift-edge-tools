@@ -1,11 +1,11 @@
 ▿ EdgeToolsSessionGeneration
   ▿ engineGeneration: EdgeToolsEngineGeneration
     ▿ decodeMetrics: EdgeToolsDecodeMetrics
-      ▿ duration: 0.624867791 seconds
-        - _low: 624867791000000000
+      ▿ duration: 0.744133 seconds
+        - _low: 744133000000000000
         - _high: 0
-      ▿ durationToFirstToken: 0.08536 seconds
-        - _low: 85360000000000000
+      ▿ durationToFirstToken: 0.087862209 seconds
+        - _low: 87862209000000000
         - _high: 0
       - tokens: 46
     ▿ metadata: 2 key/value pairs
@@ -64,8 +64,8 @@
           - 0.9953544
           - 1.0
     ▿ prefillMetrics: EdgeToolsPrefillMetrics
-      ▿ duration: 0.058193667 seconds
-        - _low: 58193667000000000
+      ▿ duration: 0.062788125 seconds
+        - _low: 62788125000000000
         - _high: 0
       - tokens: 150
     - response: "<tool_call> [{\"name\":\"send_email\",\"arguments\":{\"address\":\"henderry@gmail.com\",\"subject\":\"Hello\",\"body\":\"Could you please go on an adventure?[\"}}]"
@@ -208,13 +208,30 @@
       ▿ EdgeToolsToken
         - id: 1
         - stringValue: ""
+    ▿ toolCalls: 1 element
+      ▿ EdgeRawToolCall
+        ▿ arguments: EdgeToolsValue
+          ▿ object: 3 key/value pairs
+            ▿ (2 elements)
+              - key: "address"
+              ▿ value: EdgeToolsValue
+                - string: "henderry@gmail.com"
+            ▿ (2 elements)
+              - key: "body"
+              ▿ value: EdgeToolsValue
+                - string: "Could you please go on an adventure?["
+            ▿ (2 elements)
+              - key: "subject"
+              ▿ value: EdgeToolsValue
+                - string: "Hello"
+        - name: "send_email"
     - wasStopped: false
   ▿ toolCalls: EdgeToolCallCollection
     ▿ elements: 1 element
       ▿ AnyEdgeToolCall
         ▿ base: EdgeToolCall<SendEmailTool>
           ▿ id: EdgeToolCallID
-            - rawValue: "1D91BD08-DA44-45C9-B902-9CD9029767C3"
+            - rawValue: "35704930-940E-4FE0-A695-4932102AA2FE"
           ▿ input: Input
             - address: "henderry@gmail.com"
             - body: "Could you please go on an adventure?["

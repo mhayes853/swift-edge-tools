@@ -10,16 +10,14 @@ struct StreamingDetokenizer {
   ) -> String {
     self.tokenIds.append(tokenId)
     let decodedResponse = tokenizer.decode(tokens: self.tokenIds)
-    guard decodedResponse.hasPrefix(self.streamedResponse) else {
+    let streamedBytes = self.streamedResponse.utf8
+    let decodedBytes = decodedResponse.utf8
+    guard decodedBytes.starts(with: streamedBytes) else {
       self.streamedResponse = decodedResponse
       return decodedResponse
     }
 
-    let startIndex = decodedResponse.index(
-      decodedResponse.startIndex,
-      offsetBy: self.streamedResponse.count
-    )
-    let tokenString = String(decodedResponse[startIndex...])
+    let tokenString = String(decoding: decodedBytes.dropFirst(streamedBytes.count), as: UTF8.self)
     guard !tokenString.hasSuffix(Self.replacementCharacter) else { return "" }
     self.streamedResponse = decodedResponse
     return tokenString

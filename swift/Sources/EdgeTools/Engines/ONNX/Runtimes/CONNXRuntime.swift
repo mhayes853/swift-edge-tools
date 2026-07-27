@@ -21,6 +21,7 @@
 
       public static let invalidGraphOptimizationLevel =
         Self(rawValue: "invalid-graph-optimization-level")
+      public static let duplicateOutputName = Self(rawValue: "duplicate-output-name")
       public static let invalidTensorShape = Self(rawValue: "invalid-tensor-shape")
       public static let invalidTensorValueCount = Self(rawValue: "invalid-tensor-value-count")
       public static let onnxRuntime = Self(rawValue: "onnx-runtime")
@@ -441,6 +442,12 @@
       inputs: [String: CONNXRuntimeTensor],
       outputNames: [String]
     ) throws -> [String: CONNXRuntimeTensor] {
+      guard Set(outputNames).count == outputNames.count else {
+        throw CONNXRuntimeError(
+          code: .duplicateOutputName,
+          message: "Output names must be unique."
+        )
+      }
       let inputPairs = Array(inputs)
       let inputNames = inputPairs.map(\.key)
       let inputValues = inputPairs.map { Optional($0.value.tensor) }
