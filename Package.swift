@@ -262,5 +262,5 @@ let package = Package(
     )
   ],
   swiftLanguageModes: [.v6],
-  cxxLanguageStandard: .cxx20
+  cxxLanguageStandard: .cxx17
 )
