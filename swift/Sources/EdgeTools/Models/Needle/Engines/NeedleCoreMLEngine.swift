@@ -168,7 +168,11 @@
         let toolsGrammar = try parameters.constraint.toolCallRange.map {
           try XGRGrammar.needle(tools: tools, range: $0)
         } ?? .universal
-        let grammar = try parameters.constraint.grammar(using: toolsGrammar)
+        let tokenizerInfo = self.state.withLock { $0.grammarEngine.tokenizerInfo }
+        let grammar = try parameters.constraint.grammar(
+          using: toolsGrammar,
+          tokenizerInfo: tokenizerInfo
+        )
         let matcher = try self.state.withLock { state in
           let matcher = try state.matcherPool.matcher(
             grammar: grammar,

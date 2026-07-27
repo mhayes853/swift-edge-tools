@@ -146,23 +146,41 @@
       func `Explicit Grammar Is Returned Unchanged`() throws {
         let toolsGrammar = try XGRGrammar.literal("tool")
         let expectedGrammar = try XGRGrammar.literal("response")
+        let tokenizerInfo = try XGRTokenizerInfo(
+          encodedVocabulary: ["tool", "response"],
+          vocabularyType: .raw
+        )
         let constraint = XGRGenerationConstraint.grammar(expectedGrammar)
 
-        let grammar = try constraint.grammar(using: toolsGrammar)
+        let grammar = try constraint.grammar(
+          using: toolsGrammar,
+          tokenizerInfo: tokenizerInfo
+        )
 
         expectNoDifference(grammar.ebnf, expectedGrammar.ebnf)
       }
 
       @Test
-      func `Tools Transform Receives The Model Grammar`() throws {
+      func `Tools Transform Receives The Model Grammar And Tokenizer Info`() throws {
         let toolsGrammar = try XGRGrammar.literal("tool")
-        let constraint = XGRGenerationConstraint.tools { toolsGrammar in
-          let responseGrammar = try XGRGrammar.literal("response")
+        let tokenizerInfo = try XGRTokenizerInfo(
+          encodedVocabulary: ["tool", "<|response|>", ""],
+          vocabularyType: .raw,
+          stopTokenIDs: [2]
+        )
+        let constraint = XGRGenerationConstraint.tools { toolsGrammar, tokenizerInfo in
+          let responseGrammar = try XGRGrammar.lark(
+            "start: <|response|>",
+            tokenizerInfo: tokenizerInfo
+          )
           return try toolsGrammar.union(responseGrammar)
         }
 
-        let grammar = try constraint.grammar(using: toolsGrammar)
-        let compiler = try makeGenericXGRCompiler(tokenizer: testTokenizer())
+        let grammar = try constraint.grammar(
+          using: toolsGrammar,
+          tokenizerInfo: tokenizerInfo
+        )
+        let compiler = try XGRCompiler(tokenizerInfo: tokenizerInfo)
         let matcher = try compiler.makeMatcher(grammar)
 
         expectNoDifference(matcher.accept(string: "tool"), true)
@@ -173,7 +191,10 @@
         let tokenizer = try testTokenizer()
         let compiler = try makeGenericXGRCompiler(tokenizer: tokenizer)
         let matcher = try compiler.makeMatcher(
-          try XGRGenerationConstraint.unconstrained.grammar(using: .universal)
+          try XGRGenerationConstraint.unconstrained.grammar(
+            using: .universal,
+            tokenizerInfo: compiler.tokenizerInfo
+          )
         )
 
         expectNoDifference(matcher.accept(string: "Free form text."), true)
@@ -250,7 +271,10 @@
           vocabularyType: .raw,
           stopTokenIDs: [2]
         )
-        let grammar = try XGRGrammar.lark("start: \"a\" | \"b\"")
+        let grammar = try XGRGrammar.lark(
+          "start: \"a\" | \"b\"",
+          tokenizerInfo: tokenizerInfo
+        )
         let compiler = try XGRCompiler(tokenizerInfo: tokenizerInfo)
         let matcher = try XGRMatcher(
           compiledGrammar: try compiler.compile(grammar),
@@ -258,6 +282,76 @@
         )
 
         expectNoDifference(matcher.accept(string: "a"), true)
+        expectNoDifference(matcher.isTerminated, true)
+      }
+
+      @Test
+      func `Lark Grammar Resolves Named Special Tokens`() throws {
+        let tokenizerInfo = try XGRTokenizerInfo(
+          encodedVocabulary: ["<|tool|>", ""],
+          vocabularyType: .raw,
+          stopTokenIDs: [1]
+        )
+        let grammar = try XGRGrammar.lark(
+          "start: <|tool|>",
+          tokenizerInfo: tokenizerInfo
+        )
+        let compiler = try XGRCompiler(tokenizerInfo: tokenizerInfo)
+        let matcher = try XGRMatcher(
+          compiledGrammar: try compiler.compile(grammar),
+          terminateWithoutStopToken: true
+        )
+
+        expectNoDifference(matcher.accept(tokenId: 0), true)
+        expectNoDifference(matcher.isTerminated, true)
+      }
+
+      @Test
+      func `Lark Grammar Resolves Named Grammar Sources And Objects`() throws {
+        let tokenizerInfo = try XGRTokenizerInfo(
+          encodedVocabulary: ["[", "x", "]", ""],
+          vocabularyType: .raw,
+          stopTokenIDs: [3]
+        )
+        let item = try XGRGrammar.lark("start: \"x\"", tokenizerInfo: tokenizerInfo)
+        let grammar = try XGRGrammar.lark(
+          "start: \"[\" @item \"]\" @unused",
+          tokenizerInfo: tokenizerInfo,
+          namedGrammars: [
+            XGRNamedGrammar(name: "item", definition: .grammar(item)),
+            XGRNamedGrammar(name: "unused", definition: .lark("start: \"unused\""))
+          ]
+        )
+        let compiler = try XGRCompiler(tokenizerInfo: tokenizerInfo)
+        let matcher = try XGRMatcher(
+          compiledGrammar: try compiler.compile(grammar),
+          terminateWithoutStopToken: true
+        )
+
+        expectNoDifference(matcher.accept(string: "[x]unused"), true)
+        expectNoDifference(matcher.isTerminated, true)
+      }
+
+      @Test
+      func `Structural Tag Resolves Token References`() throws {
+        let tokenizerInfo = try XGRTokenizerInfo(
+          encodedVocabulary: ["<tool>", "hello", "<end>", ""],
+          vocabularyType: .raw,
+          stopTokenIDs: [3]
+        )
+        let grammar = try XGRGrammar.structuralTagJSON(
+          #"{"type":"structural_tag","format":{"type":"tag","begin":{"type":"token","token":"<tool>"},"content":{"type":"const_string","value":"hello"},"end":{"type":"token","token":"<end>"}}}"#,
+          tokenizerInfo: tokenizerInfo
+        )
+        let compiler = try XGRCompiler(tokenizerInfo: tokenizerInfo)
+        let matcher = try XGRMatcher(
+          compiledGrammar: try compiler.compile(grammar),
+          terminateWithoutStopToken: true
+        )
+
+        expectNoDifference(matcher.accept(tokenId: 0), true)
+        expectNoDifference(matcher.accept(tokenId: 1), true)
+        expectNoDifference(matcher.accept(tokenId: 2), true)
         expectNoDifference(matcher.isTerminated, true)
       }
 

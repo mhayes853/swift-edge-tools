@@ -81,7 +81,12 @@
 
   // MARK: - XGRTokenizerInfo
 
-  public struct XGRTokenizerInfo: ~Copyable {
+  /// Immutable tokenizer metadata used by XGrammar grammar construction and compilation.
+  ///
+  /// The native tokenizer info is immutable after initialization, so sharing this reference across
+  /// threads is safe. The unchecked conformance is required because the C handle's thread safety
+  /// cannot be expressed to the Swift compiler.
+  public final class XGRTokenizerInfo: @unchecked Sendable {
     public let handle: xgrammar_tokenizer_info_t
 
     public init(
@@ -259,16 +264,66 @@
       return Self(handle: handle)
     }
 
-    public static func lark(_ lark: String) throws -> XGRGrammar {
-      let handle = try lark.withCString {
-        try xgrammarRequiredHandle(xgrammar_grammar_init_lark($0))
+    public static func lark(
+      _ lark: String,
+      tokenizerInfo: XGRTokenizerInfo? = nil,
+      namedGrammars: [XGRNamedGrammar] = []
+    ) throws -> XGRGrammar {
+      let names = namedGrammars.map(\.name)
+      let sources = namedGrammars.map { namedGrammar in
+        if case .lark(let source) = namedGrammar.definition { source }
+        else { "" }
+      }
+      let descriptors = namedGrammars.map { namedGrammar in
+        switch namedGrammar.definition {
+        case .grammar(let grammar):
+          xgrammar_named_grammar_t(
+            name: nil,
+            kind: xgrammar_named_grammar_handle,
+            lark_source: nil,
+            grammar: grammar.handle
+          )
+        case .lark:
+          xgrammar_named_grammar_t(
+            name: nil,
+            kind: xgrammar_named_grammar_lark,
+            lark_source: nil,
+            grammar: nil
+          )
+        }
+      }
+      let handle = try withCopiedCStringPointerBuffer(names) { names in
+        try withCopiedCStringPointerBuffer(sources) { sources in
+          var descriptors = descriptors
+          for index in descriptors.indices {
+            descriptors[index].name = names[index]
+            descriptors[index].lark_source = sources[index]
+          }
+          return try descriptors.withUnsafeBufferPointer { descriptors in
+            try lark.withCString {
+              try xgrammarRequiredHandle(
+                xgrammar_grammar_init_lark(
+                  $0,
+                  tokenizerInfo?.handle,
+                  descriptors.baseAddress,
+                  descriptors.count
+                )
+              )
+            }
+          }
+        }
       }
       return Self(handle: handle)
     }
 
-    public static func structuralTagJSON(_ structuralTagJSON: String) throws -> XGRGrammar {
+    public static func structuralTagJSON(
+      _ structuralTagJSON: String,
+      tokenizerInfo: XGRTokenizerInfo? = nil
+    ) throws -> XGRGrammar {
       let handle = try structuralTagJSON.withCString {
-        try xgrammarRequiredHandle(xgrammar_grammar_init_structural_tag($0))
+        try xgrammarRequiredHandle(
+          xgrammar_grammar_init_structural_tag($0, tokenizerInfo?.handle)
+        )
       }
       return Self(handle: handle)
     }
@@ -423,6 +478,23 @@
     }
   }
 
+  // MARK: - XGRNamedGrammar
+
+  public struct XGRNamedGrammar: Sendable {
+    public enum Definition: Sendable {
+      case grammar(XGRGrammar)
+      case lark(String)
+    }
+
+    public let name: String
+    public let definition: Definition
+
+    public init(name: String, definition: Definition) {
+      self.name = name
+      self.definition = definition
+    }
+  }
+
   // MARK: - XGRGenerationConstraint
 
   /// Selects the grammar used to constrain an engine generation.
@@ -437,7 +509,7 @@
     /// Uses the engine's model-specific tool-call grammar.
     case tools(
       range: GrammarToolCallRange = .unbounded(minimum: 0),
-      grammar: (@Sendable (XGRGrammar) throws -> XGRGrammar)? = nil
+      grammar: (@Sendable (XGRGrammar, XGRTokenizerInfo) throws -> XGRGrammar)? = nil
     )
 
     /// The default tool-call constraint.
@@ -453,14 +525,17 @@
     }
 
     /// Resolves this constraint using an engine's model-specific tool-call grammar.
-    public func grammar(using toolsGrammar: XGRGrammar) throws -> XGRGrammar {
+    public func grammar(
+      using toolsGrammar: XGRGrammar,
+      tokenizerInfo: XGRTokenizerInfo
+    ) throws -> XGRGrammar {
       switch self {
       case .unconstrained:
         .universal
       case .grammar(let grammar):
         grammar
       case .tools(_, let transform):
-        try transform?(toolsGrammar) ?? toolsGrammar
+        try transform?(toolsGrammar, tokenizerInfo) ?? toolsGrammar
       }
     }
   }
@@ -505,9 +580,10 @@
 
   public struct XGRCompiler: ~Copyable {
     public let handle: xgrammar_compiler_t
+    public let tokenizerInfo: XGRTokenizerInfo
 
     public init(
-      tokenizerInfo: borrowing XGRTokenizerInfo,
+      tokenizerInfo: XGRTokenizerInfo,
       maxThreads: Int = 8,
       cacheEnabled: Bool = true,
       maxMemoryBytes: Int64 = -1
@@ -533,10 +609,12 @@
           maxMemoryBytes
         )
       )
+      self.tokenizerInfo = tokenizerInfo
     }
 
-    public init(handle: consuming xgrammar_compiler_t) {
+    public init(handle: consuming xgrammar_compiler_t, tokenizerInfo: XGRTokenizerInfo) {
       self.handle = consume handle
+      self.tokenizerInfo = tokenizerInfo
     }
 
     deinit { xgrammar_compiler_destroy(self.handle) }

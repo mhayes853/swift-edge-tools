@@ -246,7 +246,10 @@
       let toolsGrammar = try parameters.constraint.toolCallRange.map {
         try self.model.grammar(tools: tools, range: $0)
       } ?? .universal
-      let grammar = try parameters.constraint.grammar(using: toolsGrammar)
+      let grammar = try parameters.constraint.grammar(
+        using: toolsGrammar,
+        tokenizerInfo: self.grammarCompiler.tokenizerInfo
+      )
       let matcher = try self.matcherPool.matcher(
         grammar: grammar,
         compilingWith: self.grammarCompiler

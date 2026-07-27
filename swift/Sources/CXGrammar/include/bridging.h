@@ -22,6 +22,18 @@ typedef void* xgrammar_compiled_grammar_t;
 typedef void* xgrammar_matcher_t;
 typedef void* xgrammar_grammar_t;
 
+typedef enum {
+  xgrammar_named_grammar_lark = 0,
+  xgrammar_named_grammar_handle = 1,
+} xgrammar_named_grammar_kind_t;
+
+typedef struct {
+  const char* name;
+  xgrammar_named_grammar_kind_t kind;
+  const char* lark_source;
+  xgrammar_grammar_t grammar;
+} xgrammar_named_grammar_t;
+
 const char* xgrammar_last_error_message(void);
 
 xgrammar_tokenizer_info_t xgrammar_tokenizer_info_init(
@@ -74,8 +86,16 @@ xgrammar_grammar_t xgrammar_grammar_init_json_schema(
     int any_order
 );
 xgrammar_grammar_t xgrammar_grammar_init_regex(const char* regex);
-xgrammar_grammar_t xgrammar_grammar_init_lark(const char* lark);
-xgrammar_grammar_t xgrammar_grammar_init_structural_tag(const char* structural_tag_json);
+xgrammar_grammar_t xgrammar_grammar_init_lark(
+    const char* lark,
+    xgrammar_tokenizer_info_t tokenizer_info,
+    const xgrammar_named_grammar_t* named_grammars,
+    size_t named_grammar_count
+);
+xgrammar_grammar_t xgrammar_grammar_init_structural_tag(
+    const char* structural_tag_json,
+    xgrammar_tokenizer_info_t tokenizer_info
+);
 xgrammar_grammar_t xgrammar_grammar_builtin_json(void);
 size_t xgrammar_grammar_ebnf(xgrammar_grammar_t grammar, char* buffer, size_t buffer_capacity);
 size_t xgrammar_grammar_serialize_json(xgrammar_grammar_t grammar, char* buffer, size_t buffer_capacity);

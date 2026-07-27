@@ -384,21 +384,73 @@ xgrammar_grammar_t xgrammar_grammar_init_regex(const char* regex) {
     });
 }
 
-xgrammar_grammar_t xgrammar_grammar_init_lark(const char* lark) {
+xgrammar_grammar_t xgrammar_grammar_init_lark(
+    const char* lark,
+    xgrammar_tokenizer_info_t tokenizer_info,
+    const xgrammar_named_grammar_t* named_grammar_descriptors,
+    size_t named_grammar_count
+) {
     return invoke([&] {
         if (!lark) return fail<XGrammarGrammarHandle*>("Expected a Lark grammar.");
-        return new XGrammarGrammarHandle{xgrammar::Grammar::FromLark(lark)};
+        if (named_grammar_count > 0 && !named_grammar_descriptors) {
+            return fail<XGrammarGrammarHandle*>("Expected named grammar data.");
+        }
+
+        std::vector<xgrammar::NamedGrammar> named_grammars;
+        named_grammars.reserve(named_grammar_count);
+        for (size_t index = 0; index < named_grammar_count; ++index) {
+            const auto& descriptor = named_grammar_descriptors[index];
+            if (!descriptor.name) {
+                return fail<XGrammarGrammarHandle*>("Expected a named grammar name.");
+            }
+            xgrammar::NamedGrammar named_grammar{"", std::string()};
+            named_grammar.name = descriptor.name;
+            switch (descriptor.kind) {
+            case xgrammar_named_grammar_handle:
+                if (!descriptor.grammar) {
+                    return fail<XGrammarGrammarHandle*>("Expected a named grammar handle.");
+                }
+                named_grammar.grammar =
+                    static_cast<XGrammarGrammarHandle*>(descriptor.grammar)->grammar;
+                break;
+            case xgrammar_named_grammar_lark:
+                if (!descriptor.lark_source) {
+                    return fail<XGrammarGrammarHandle*>("Expected a named Lark grammar.");
+                }
+                named_grammar.grammar = descriptor.lark_source;
+                break;
+            default:
+                return fail<XGrammarGrammarHandle*>("Unknown named grammar kind.");
+            }
+            named_grammars.push_back(named_grammar);
+        }
+
+        const std::optional<xgrammar::TokenizerInfo> tokenizer = tokenizer_info
+            ? std::optional<xgrammar::TokenizerInfo>(
+                  static_cast<XGrammarTokenizerInfoHandle*>(tokenizer_info)->tokenizer_info)
+            : std::nullopt;
+        return new XGrammarGrammarHandle{
+            xgrammar::Grammar::FromLark(lark, tokenizer, named_grammars)
+        };
     });
 }
 
-xgrammar_grammar_t xgrammar_grammar_init_structural_tag(const char* structural_tag_json) {
+xgrammar_grammar_t xgrammar_grammar_init_structural_tag(
+    const char* structural_tag_json,
+    xgrammar_tokenizer_info_t tokenizer_info
+) {
     return invoke([&] {
         if (!structural_tag_json) {
             return fail<XGrammarGrammarHandle*>("Expected a structural tag.");
         }
-        auto grammar = grammar_from_structural_tag_json(structural_tag_json);
-        if (!grammar) return static_cast<XGrammarGrammarHandle*>(nullptr);
-        return new XGrammarGrammarHandle{std::move(*grammar)};
+        const std::optional<xgrammar::TokenizerInfo> tokenizer = tokenizer_info
+            ? std::optional<xgrammar::TokenizerInfo>(
+                  static_cast<XGrammarTokenizerInfoHandle*>(tokenizer_info)->tokenizer_info)
+            : std::nullopt;
+        auto grammar = xgrammar::Grammar::FromStructuralTag(structural_tag_json, tokenizer);
+        auto value = value_or_error(grammar);
+        if (!value) return static_cast<XGrammarGrammarHandle*>(nullptr);
+        return new XGrammarGrammarHandle{*value};
     });
 }
 
