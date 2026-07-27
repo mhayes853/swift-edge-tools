@@ -122,7 +122,7 @@
         self._processor()
       }
 
-      public var toolCallRange: GrammarToolCallRange
+      public var constraint: XGRGenerationConstraint
       public var maxTokens: Int?
 
       public init(
@@ -131,12 +131,12 @@
         processor:
           @autoclosure @escaping @Sendable () ->
           (any EdgeToolsLogitsProcessor<[EdgeToolsToken.ID], [Float]>)? = nil,
-        toolCallRange: GrammarToolCallRange = .unbounded(minimum: 0),
+        constraint: XGRGenerationConstraint = .tools,
         maxTokens: Int? = 1024
       ) {
         self._sampler = sampler
         self._processor = processor
-        self.toolCallRange = toolCallRange
+        self.constraint = constraint
         self.maxTokens = maxTokens
       }
     }
@@ -162,7 +162,7 @@
       tokenizer: sending any EdgeToolsXGRTokenizer
     ) throws {
       self.grammarCompiler = try components.model.grammarCompiler(using: tokenizer)
-      self.matcherPool = XGRToolCallMatcherPool(makeGrammar: components.model.grammar)
+      self.matcherPool = XGRToolCallMatcherPool()
       self.runtime = components.runtime
       self.model = components.model
       self.tokenizer = tokenizer
@@ -255,9 +255,12 @@
       try Task.checkCancellation()
       guard !isStopped.load(ordering: .relaxed) else { return .empty }
 
+      let toolsGrammar = try parameters.constraint.toolCallRange.map {
+        try self.model.grammar(tools: tools, range: $0)
+      } ?? .universal
+      let grammar = try parameters.constraint.grammar(using: toolsGrammar)
       let matcher = try self.matcherPool.matcher(
-        tools: tools,
-        range: parameters.toolCallRange,
+        grammar: grammar,
         compilingWith: self.grammarCompiler
       )
       matcher.reset()

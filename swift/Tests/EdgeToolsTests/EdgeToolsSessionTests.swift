@@ -4,7 +4,7 @@ import Foundation
 import Observation
 import Testing
 
-@Suite
+@Suite(.serialized)
 struct `EdgeToolsSession tests` {
   @Test
   func `Tokenize Forwards Prompt To The Engine`() async throws {
@@ -41,40 +41,6 @@ struct `EdgeToolsSession tests` {
     session.tools = [EchoTool()]
 
     didChange.withLock { expectNoDifference($0, true) }
-  }
-
-  @Test
-  func `Active Generation Uses Tools Snapshot`() async throws {
-    let tokenizer = try testTokenizer()
-    let rawToolCall = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
-    let toolTokens = rawToolCall.tokenize(using: tokenizer)
-    let engine = MockEngine.live()
-    let didStart = Lock(false)
-    engine.onGenerateStart = { didStart.withLock { $0 = true } }
-    let weatherTool = WeatherTool()
-    let session = EdgeToolsSession(engine: engine, tools: [weatherTool])
-
-    let stream = session.stream(prompt: .test(user: "weather?"))
-    while !didStart.withLock({ $0 }) { await Task.yield() }
-    session.tools = [EchoTool()]
-    for token in toolTokens { engine.push(.token(token)) }
-    engine.push(.finish)
-    engine.push(nil)
-
-    let generation = try await stream.finalGeneration
-    let nextStream = session.stream(prompt: .test(user: "echo"))
-    while engine.generateCallCount < 2 { await Task.yield() }
-    engine.push(.finish)
-    engine.push(nil)
-    _ = try await nextStream.finalGeneration
-
-    expectNoDifference(
-      engine.generationTools,
-      [[weatherTool.definition], [EchoTool().definition]]
-    )
-    expectNoDifference(generation.toolCalls.count, 1)
-    expectNoDifference(generation.toolCalls[0].tool.name, weatherTool.name)
-    expectNoDifference(session.tools.map(\.name), ["echo"])
   }
 
   @Test
@@ -161,7 +127,7 @@ struct `EdgeToolsSession tests` {
       try await session.generate(prompt: .test(user: "hi"))
     }
 
-    await Task.yield()
+    while engine.generateCallCount == 0 { await Task.yield() }
     task.cancel()
     engine.push(.finish)
     engine.push(nil)
@@ -443,10 +409,69 @@ struct `EdgeToolsSession tests` {
     expectNoDifference(args.location, "Seoul")
   }
 
-}
 
-@Suite
-struct `EdgeToolsSession status tests` {
+  @Test
+  func `Active Generation Uses Tools Snapshot`() async throws {
+    let tokenizer = try testTokenizer()
+    let rawToolCall = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
+    let toolTokens = rawToolCall.tokenize(using: tokenizer)
+    let engine = MockEngine.live()
+    let didStart = Lock(false)
+    engine.onGenerateStart = { didStart.withLock { $0 = true } }
+    let weatherTool = WeatherTool()
+    let session = EdgeToolsSession(engine: engine, tools: [weatherTool])
+
+    let stream = session.stream(prompt: .test(user: "weather?"))
+    while !didStart.withLock({ $0 }) { await Task.yield() }
+    session.tools = [EchoTool()]
+    for token in toolTokens { engine.push(.token(token)) }
+    engine.push(.finish)
+    engine.push(nil)
+
+    let generation = try await stream.finalGeneration
+    let nextStream = session.stream(prompt: .test(user: "echo"))
+    while engine.generateCallCount < 2 { await Task.yield() }
+    engine.push(.finish)
+    engine.push(nil)
+    _ = try await nextStream.finalGeneration
+
+    expectNoDifference(
+      engine.generationTools,
+      [[weatherTool.definition], [EchoTool().definition]]
+    )
+    expectNoDifference(generation.toolCalls.count, 1)
+    expectNoDifference(generation.toolCalls[0].tool.name, weatherTool.name)
+    expectNoDifference(session.tools.map(\.name), ["echo"])
+  }
+
+  @Test
+  func `Generation Decodes Its Response`() async throws {
+    let response = #"{"name":"Ada"}"#
+    let engine = MockEngine(
+      script: [.token(EdgeToolsToken(id: 0, stringValue: response)), .finish]
+    )
+    let session = EdgeToolsSession(engine: engine)
+
+    let generation = try await session.generate(prompt: .test(user: "hi"))
+    let value = try generation.decoded(as: EdgeToolsValue.self)
+
+    expectNoDifference(value, ["name": "Ada"])
+  }
+
+  @Test
+  func `Stream Decodes Its Final Response`() async throws {
+    let response = #"{"name":"Ada"}"#
+    let engine = MockEngine(
+      script: [.token(EdgeToolsToken(id: 0, stringValue: response)), .finish]
+    )
+    let session = EdgeToolsSession(engine: engine)
+
+    let stream = session.stream(prompt: .test(user: "hi"))
+    let value = try await stream.decodedResponse(as: EdgeToolsValue.self)
+
+    expectNoDifference(value, ["name": "Ada"])
+  }
+
   @Test
   func `Active Streams Track Concurrent Streams And Remove On Finish`() async throws {
     let engine = MockEngine.live()
@@ -583,6 +608,43 @@ struct `EdgeToolsSession status tests` {
     expectNoDifference(isIdleOrRunning, true)
   }
 
+  #if os(macOS) || os(linux) || os(windows)
+    @Test
+    func `Stream With Duplicate Tool Names Causes Precondition Failure`() async {
+      await #expect(processExitsWith: .failure) {
+        let session = EdgeToolsSession(
+          engine: MockEngine(),
+          tools: [CamelCaseWeatherTool(), GetWeatherTool()]
+        )
+        _ = session.stream(prompt: .test(user: "hi"))
+      }
+    }
+  #endif
+
+  @Test
+  func `Duplicate Tool Name Error`() throws {
+    let message = try #require(
+      duplicateToolNameError(["getWeather", "GetWeather", "get_weather"])
+    )
+    expectNoDifference(message.contains("'getWeather'"), true)
+    expectNoDifference(message.contains("'GetWeather'"), true)
+    expectNoDifference(message.contains("'get_weather'"), true)
+    expectNoDifference(message.contains("normalize to 'get_weather'"), true)
+  }
+
+  @Test
+  func `No Error For Unique Names`() {
+    let message = duplicateToolNameError(["getWeather", "planTrip"])
+    expectNoDifference(message, nil)
+  }
+
+  @Test
+  func `Duplicate Tool Name Error Detects Identical Names`() throws {
+    let message = try #require(duplicateToolNameError(["get_weather", "get_weather"]))
+
+    expectNoDifference(message.contains("'get_weather'"), true)
+    expectNoDifference(message.contains("normalize to 'get_weather'"), true)
+  }
 }
 
 extension NeedlePrompt {
@@ -678,47 +740,4 @@ private struct GETWEATHERTOOL: EdgeTool {
   let description = ""
 
   func invoke(input: String) async throws -> sending String { "" }
-}
-
-// MARK: - Duplicate Tool Name Precondition
-
-@Suite
-struct `Duplicate Tool Name Precondition tests` {
-  #if os(macOS) || os(linux) || os(windows)
-    @Test
-    func `Stream With Duplicate Tool Names Causes Precondition Failure`() async {
-      await #expect(processExitsWith: .failure) {
-        let session = EdgeToolsSession(
-          engine: MockEngine(),
-          tools: [CamelCaseWeatherTool(), GetWeatherTool()]
-        )
-        _ = session.stream(prompt: .test(user: "hi"))
-      }
-    }
-  #endif
-
-  @Test
-  func `Duplicate Tool Name Error`() throws {
-    let message = try #require(
-      duplicateToolNameError(["getWeather", "GetWeather", "get_weather"])
-    )
-    #expect(message.contains("'getWeather'"))
-    #expect(message.contains("'GetWeather'"))
-    #expect(message.contains("'get_weather'"))
-    #expect(message.contains("normalize to 'get_weather'"))
-  }
-
-  @Test
-  func `No Error For Unique Names`() {
-    let message = duplicateToolNameError(["getWeather", "planTrip"])
-    #expect(message == nil)
-  }
-
-  @Test
-  func `Duplicate Tool Name Error Detects Identical Names`() throws {
-    let message = try #require(duplicateToolNameError(["get_weather", "get_weather"]))
-
-    #expect(message.contains("'get_weather'"))
-    #expect(message.contains("normalize to 'get_weather'"))
-  }
 }

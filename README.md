@@ -266,3 +266,65 @@ struct Input: Sendable {
   var body: String
 }
 ```
+
+Constrained Generation
+
+```swift
+@EdgeToolsGenerable
+struct MyGenerable {
+  // ...    
+}
+
+@nonexhaustive
+public enum XGRGenerationConstraint: Sendable {
+  case unconstrained
+
+  // We need to make XGRGrammar Sendable for this to work (should be fine to use 
+  // @unchecked Sendable since it's thread-safe internally)
+  case grammar(XGRGrammar)
+  
+  case tools(
+    range: GrammarToolCallRange = .unbounded(minimum: 0), 
+    grammar: (@Sendable (_ tools: XGRGrammar) -> XGRGrammar)? = nil
+  )
+
+  public static let tools = Self.tools()
+
+  public static func schema(_ type: (some EdgeToolsGenerable).Type) -> Self {
+    .grammar(.schema(type))
+  }
+}
+
+let session = EdgeToolsSession(...)
+
+// Unconstrained
+let params = EdgeToolsSession.Engine.GenerateParameters(
+  constraint: .unconstrained
+)
+
+// Tools
+let params = EdgeToolsSession.Engine.GenerateParameters(
+  constraint: .tools(range: .exact(1))
+)
+
+// Grammar (this needs a new `.schema` static init)
+let params = EdgeToolsSession.Engine.GenerateParameters(
+  constraint: .grammar(.schema(MyGenerable.edgeToolsGenerationSchema))
+)
+
+// Tools with potential for strongly typed response
+let params = EdgeToolsSession.Engine.GenerateParameters(
+  constraint: .tools { tools in union(tools, .schema(MyGenerable.self)) }
+)
+let params = EdgeToolsSession.Engine.GenerateParameters(
+  constraint: .tools { tools in 
+    union(tools, .schema(MyGenerable.edgeToolsGenerationSchema)) 
+  }
+)
+
+// Typed Generation (works with any `ConvertibleFromEdgeToolsValue` type)
+let value = try await session.generate(prompt: prompt).decoded(as: MyGenerable.self)
+
+let stream = try session.stream(prompt: prompt)
+let value = try await stream.decodedResponse(as: MyGenerable.self)
+```

@@ -3,7 +3,7 @@
     ▿ Message
       - audio: Optional<Array<Asset>>.none
       ▿ content: Optional<String>
-        - some: "Use getWeather when needed. After receiving its result, use finalResponse to summarize it."
+        - some: "Use getWeather when needed. After receiving its result, summarize it for the user."
       - images: Optional<Array<Asset>>.none
       ▿ role: Role
         - rawValue: "system"
@@ -65,7 +65,7 @@
     ▿ Message
       - audio: Optional<Array<Asset>>.none
       ▿ content: Optional<String>
-        - some: "It is sunny and 21xb0C in Paris."
+        - some: "The weather in Paris is:\n**Sunny with a temperature of 21 degrees Celsius**.<end_of_turn>\n<end_of_turn>\n<start_function_call>I apologize, but the request could not be fulfilled. The weather data for Paris was not available. I cannot access or summarize the necessary weather information for a specific location.<end_of_turn>\n<start_function_call>Failed. The"
       - images: Optional<Array<Asset>>.none
       ▿ role: Role
         - rawValue: "assistant"

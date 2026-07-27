@@ -202,7 +202,11 @@
 
   // MARK: - XGRGrammar
 
-  public struct XGRGrammar: ~Copyable {
+  /// An immutable XGrammar grammar.
+  ///
+  /// `@unchecked Sendable` is safe because XGrammar grammar handles are immutable after
+  /// construction; this reference type owns and destroys its handle exactly once.
+  public final class XGRGrammar: @unchecked Sendable {
     public struct JSONSchemaConfiguration: Hashable, Sendable {
       public struct Separators: Hashable, Sendable {
         public var comma: String
@@ -239,40 +243,44 @@
 
     public let handle: xgrammar_grammar_t
 
-    public init(ebnf: String, rootRuleName: String = "root") throws {
-      self.handle = try ebnf.withCString { ebnf in
+    public static func ebnf(_ ebnf: String, rootRuleName: String = "root") throws -> XGRGrammar {
+      let handle = try ebnf.withCString { ebnf in
         try rootRuleName.withCString {
           try xgrammarRequiredHandle(xgrammar_grammar_init_ebnf(ebnf, $0))
         }
       }
+      return Self(handle: handle)
     }
 
-    public init(regex: String) throws {
-      self.handle = try regex.withCString {
+    public static func regex(_ regex: String) throws -> XGRGrammar {
+      let handle = try regex.withCString {
         try xgrammarRequiredHandle(xgrammar_grammar_init_regex($0))
       }
+      return Self(handle: handle)
     }
 
-    public init(lark: String) throws {
-      self.handle = try lark.withCString {
+    public static func lark(_ lark: String) throws -> XGRGrammar {
+      let handle = try lark.withCString {
         try xgrammarRequiredHandle(xgrammar_grammar_init_lark($0))
       }
+      return Self(handle: handle)
     }
 
-    public init(structuralTagJSON: String) throws {
-      self.handle = try structuralTagJSON.withCString {
+    public static func structuralTagJSON(_ structuralTagJSON: String) throws -> XGRGrammar {
+      let handle = try structuralTagJSON.withCString {
         try xgrammarRequiredHandle(xgrammar_grammar_init_structural_tag($0))
       }
+      return Self(handle: handle)
     }
 
-    public init(literal: String) throws {
-      try self.init(ebnf: "root ::= \"\(Self.escapeEBNFLiteral(literal))\"")
+    public static func literal(_ literal: String) throws -> XGRGrammar {
+      try Self.ebnf("root ::= \"\(Self.escapeEBNFLiteral(literal))\"")
     }
 
-    public init(
-      jsonSchema: String,
+    public static func jsonSchema(
+      _ jsonSchema: String,
       configuration: JSONSchemaConfiguration = JSONSchemaConfiguration()
-    ) throws {
+    ) throws -> XGRGrammar {
       guard configuration.indent.map({ $0 >= 0 }) ?? true,
         configuration.maximumWhitespaceCount.map({ $0 >= 0 }) ?? true
       else {
@@ -299,7 +307,7 @@
           )
         )
       }
-      self.handle = try jsonSchema.withCString { schema in
+      let handle = try jsonSchema.withCString { schema in
         if let separators = configuration.separators {
           return try separators.comma.withCString { comma in
             try separators.colon.withCString { colon in
@@ -331,12 +339,32 @@
           )
         )
       }
+      return Self(handle: handle)
     }
 
-    public init(serializedJSON: String) throws {
-      self.handle = try serializedJSON.withCString {
+    public static func schema(_ schema: EdgeToolsGenerationSchema) -> XGRGrammar {
+      guard let grammar = try? Self.jsonSchema(schema.orderedKeyEncoded()) else {
+        preconditionFailure("EdgeTools generation schemas must produce a valid XGrammar grammar.")
+      }
+      return grammar
+    }
+
+    public static func schema(_ type: (some EdgeToolsGenerable).Type) -> XGRGrammar {
+      Self.schema(type.edgeToolsGenerationSchema)
+    }
+
+    public static var universal: XGRGrammar {
+      guard let grammar = try? Self.structuralTagJSON(#"{"type":"structural_tag","format":{"type":"any_text"}}"#) else {
+        preconditionFailure("XGrammar must support the any_text structural tag.")
+      }
+      return grammar
+    }
+
+    public static func serializedJSON(_ serializedJSON: String) throws -> XGRGrammar {
+      let handle = try serializedJSON.withCString {
         try xgrammarRequiredHandle(xgrammar_grammar_deserialize_json($0))
       }
+      return Self(handle: handle)
     }
 
     public init(handle: consuming xgrammar_grammar_t) {
@@ -392,6 +420,47 @@
 
     public borrowing func repeated(_ range: PartialRangeFrom<Int>) throws -> XGRGrammar {
       try repeatGrammar(self, range)
+    }
+  }
+
+  // MARK: - XGRGenerationConstraint
+
+  /// Selects the grammar used to constrain an engine generation.
+  public enum XGRGenerationConstraint: Sendable {
+    /// Allows arbitrary text output.
+    case unconstrained
+
+    /// Uses the supplied grammar directly.
+    case grammar(XGRGrammar)
+
+    /// Uses the engine's model-specific tool-call grammar.
+    case tools(
+      range: GrammarToolCallRange = .unbounded(minimum: 0),
+      grammar: (@Sendable (XGRGrammar) throws -> XGRGrammar)? = nil
+    )
+
+    /// The default tool-call constraint.
+    public static let tools = Self.tools()
+
+    /// Constrains output to a value described by an EdgeTools generation schema.
+    public static func schema(_ type: (some EdgeToolsGenerable).Type) -> Self {
+      .grammar(.schema(type))
+    }
+
+    public var toolCallRange: GrammarToolCallRange? {
+      if case .tools(let range, _) = self { range } else { nil }
+    }
+
+    /// Resolves this constraint using an engine's model-specific tool-call grammar.
+    public func grammar(using toolsGrammar: XGRGrammar) throws -> XGRGrammar {
+      switch self {
+      case .unconstrained:
+        .universal
+      case .grammar(let grammar):
+        grammar
+      case .tools(_, let transform):
+        try transform?(toolsGrammar) ?? toolsGrammar
+      }
     }
   }
 

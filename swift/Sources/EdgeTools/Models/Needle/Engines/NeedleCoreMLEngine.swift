@@ -25,7 +25,7 @@
         self._processor()
       }
 
-      public var toolCallRange: GrammarToolCallRange
+      public var constraint: XGRGenerationConstraint
       public var maxTokens: Int?
 
       public init(
@@ -34,12 +34,12 @@
         processor:
           @autoclosure @escaping @Sendable () -> (any EdgeToolsLogitsProcessor<MLTensor, MLTensor>)? =
           nil,
-        toolCallRange: GrammarToolCallRange = .unbounded(minimum: 0),
+        constraint: XGRGenerationConstraint = .tools,
         maxTokens: Int? = 1024
       ) {
         self._sampler = sampler
         self._processor = processor
-        self.toolCallRange = toolCallRange
+        self.constraint = constraint
         self.maxTokens = maxTokens
       }
     }
@@ -145,7 +145,7 @@
       self.state = Lock(
         State(
           grammarEngine: consume grammarEngine,
-          matcherPool: XGRToolCallMatcherPool.needle()
+          matcherPool: XGRToolCallMatcherPool()
         )
       )
       self.configuration = configuration
@@ -176,10 +176,13 @@
     ) throws -> some EdgeToolsEngineGenerationTask {
       let isStopped = ManagedAtomic(false)
       let task = Task {
+        let toolsGrammar = try parameters.constraint.toolCallRange.map {
+          try XGRGrammar.needle(tools: tools, range: $0)
+        } ?? .universal
+        let grammar = try parameters.constraint.grammar(using: toolsGrammar)
         let matcher = try self.state.withLock { state in
           let matcher = try state.matcherPool.matcher(
-            tools: tools,
-            range: parameters.toolCallRange,
+            grammar: grammar,
             compilingWith: state.grammarEngine
           )
           matcher.reset()

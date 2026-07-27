@@ -169,8 +169,8 @@
   extension XGRGrammar {
     static func strictJSONArguments(for tool: EdgeToolDefinition) -> XGRGrammar {
       guard
-        let grammar = try? XGRGrammar(
-          jsonSchema: tool.arguments.orderedKeyEncoded(),
+        let grammar = try? XGRGrammar.jsonSchema(
+          tool.arguments.orderedKeyEncoded(),
           configuration: JSONSchemaConfiguration(
             anyWhitespace: false,
             separators: .init(comma: ",", colon: ":"),
@@ -187,7 +187,7 @@
       let schema = tool.arguments.orderedKeyEncoded()
       let structuralTag =
         #"{"type":"structural_tag","format":{"type":"json_schema","json_schema":\#(schema),"style":"qwen_xml","any_order":false}}"#
-      guard let grammar = try? XGRGrammar(structuralTagJSON: structuralTag) else {
+      guard let grammar = try? XGRGrammar.structuralTagJSON(structuralTag) else {
         preconditionFailure("Edge tool arguments must produce a valid Qwen XML structural tag.")
       }
       return grammar
@@ -207,7 +207,7 @@
             message: "A nonzero tool invocation range requires at least one tool."
           )
         }
-        return try XGRGrammar(literal: "")
+        return try XGRGrammar.literal("")
       }
 
       var grammar = try call(firstTool)
@@ -223,7 +223,7 @@
       range: GrammarToolCallRange
     ) throws -> XGRGrammar {
       guard range.lowerBound >= 0 else { throw XGRError.invalidToolInvocationRange }
-      let separatedCall = try XGRGrammar(literal: separator).concatenate(call)
+      let separatedCall = try XGRGrammar.literal(separator).concatenate(call)
 
       switch range {
       case .exact(let count):
@@ -257,7 +257,7 @@
       guard minimum >= 0, maximum >= minimum else {
         throw XGRError.invalidToolInvocationRange
       }
-      guard maximum > 0 else { return try XGRGrammar(literal: "") }
+      guard maximum > 0 else { return try XGRGrammar.literal("") }
       let tail = try separatedCall.repeated(Swift.max(0, minimum - 1)...(maximum - 1))
       let nonempty = try call.concatenate(tail)
       return minimum == 0 ? try nonempty.optional() : nonempty
@@ -270,10 +270,6 @@
 
 #if XGrammar
   final class XGRToolCallMatcherPool {
-    typealias NormalizeTools = ([EdgeToolDefinition]) -> [EdgeToolDefinition]
-    typealias MakeGrammar =
-      ([EdgeToolDefinition], GrammarToolCallRange) throws -> XGRGrammar
-
     private final class CachedMatcher {
       private let matcher: XGRMatcher
 
@@ -286,38 +282,23 @@
       }
     }
 
-    private struct Key: Hashable, Sendable {
-      let tools: [EdgeToolDefinition]
-      let range: GrammarToolCallRange
-    }
-
     private let maxCount: Int
-    private let normalizeTools: NormalizeTools
-    private let makeGrammar: MakeGrammar
-    private var entries = [Key: CachedMatcher]()
-    private var order = [Key]()
+    private var entries = [String: CachedMatcher]()
+    private var order = [String]()
 
-    init(
-      maxCount: Int = 8,
-      normalizeTools: @escaping NormalizeTools = { $0 },
-      makeGrammar: @escaping MakeGrammar
-    ) {
+    init(maxCount: Int = 8) {
       self.maxCount = maxCount
-      self.normalizeTools = normalizeTools
-      self.makeGrammar = makeGrammar
     }
 
     func matcher(
-      tools: some Sequence<EdgeToolDefinition>,
-      range: GrammarToolCallRange,
+      grammar: borrowing XGRGrammar,
       compilingWith compiler: borrowing XGRCompiler
     ) throws -> XGRMatcher {
-      let key = Key(tools: self.normalizeTools(Array(tools)), range: range)
+      let key = grammar.ebnf
       if let cached = self.entries[key] {
         self.touch(key)
         return cached.fork()
       }
-      let grammar = try self.makeGrammar(key.tools, key.range)
       let compiledGrammar = try compiler.compile(grammar)
       let matcher = try XGRMatcher(compiledGrammar: compiledGrammar)
       return self.insert(key, matcher: consume matcher)
@@ -328,13 +309,13 @@
       self.order.removeAll()
     }
 
-    private func touch(_ key: Key) {
+    private func touch(_ key: String) {
       self.order.removeAll { $0 == key }
       self.order.append(key)
     }
 
     private func insert(
-      _ key: Key,
+      _ key: String,
       matcher: consuming XGRMatcher
     ) -> XGRMatcher {
       let cached = CachedMatcher(consume matcher)

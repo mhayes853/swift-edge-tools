@@ -149,10 +149,10 @@ public typealias Qwen3P6ToolCallParser = QwenXMLToolCallParser
 
     private static func qwenXMLCall(_ tool: EdgeToolDefinition) throws -> XGRGrammar {
       let arguments = Self.qwenXMLArguments(for: tool)
-      let prefix = try XGRGrammar(literal: "<tool_call><function=\(tool.name)>")
+      let prefix = try XGRGrammar.literal("<tool_call><function=\(tool.name)>")
       let withArguments = try prefix.concatenate(arguments)
       return try withArguments.concatenate(
-        XGRGrammar(literal: "</function></tool_call>")
+        XGRGrammar.literal("</function></tool_call>")
       )
     }
   }

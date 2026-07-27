@@ -76,6 +76,16 @@ public struct EdgeToolsSessionGeneration: Sendable {
   public var response: String {
     self.engineGeneration.response
   }
+
+  public func decoded<Response: ConvertibleFromEdgeToolsValue>(
+    as type: Response.Type
+  ) throws -> Response {
+    let value = try EdgeToolsJSONDecoder().decode(
+      EdgeToolsValue.self,
+      from: Array(self.response.utf8)
+    )
+    return try Response(edgeToolsValue: value)
+  }
 }
 
 // MARK: - Tokens
@@ -243,6 +253,13 @@ extension EdgeToolsSessionStream {
       return stop
     }
     stop?()
+  }
+
+  public func decodedResponse<Response: ConvertibleFromEdgeToolsValue>(
+    as type: Response.Type
+  ) async throws -> Response {
+    let generation = try await self.finalGeneration
+    return try generation.decoded(as: type)
   }
 }
 

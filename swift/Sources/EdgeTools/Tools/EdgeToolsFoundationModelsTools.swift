@@ -57,6 +57,7 @@
 
   @available(iOS 26.0, macOS 26.0, watchOS 27.0, tvOS 26.0, visionOS 26.0, *)
   extension EdgeToolsFMToolInput: Hashable where Arguments: Hashable {}
+
   // MARK: - FMEdgeTool
 
   @available(iOS 26.0, macOS 26.0, watchOS 27.0, tvOS 26.0, visionOS 26.0, *)

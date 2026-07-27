@@ -140,6 +140,46 @@
       }
     }
 
+    @Suite
+    struct `Constraint tests` {
+      @Test
+      func `Explicit Grammar Is Returned Unchanged`() throws {
+        let toolsGrammar = try XGRGrammar.literal("tool")
+        let expectedGrammar = try XGRGrammar.literal("response")
+        let constraint = XGRGenerationConstraint.grammar(expectedGrammar)
+
+        let grammar = try constraint.grammar(using: toolsGrammar)
+
+        expectNoDifference(grammar.ebnf, expectedGrammar.ebnf)
+      }
+
+      @Test
+      func `Tools Transform Receives The Model Grammar`() throws {
+        let toolsGrammar = try XGRGrammar.literal("tool")
+        let constraint = XGRGenerationConstraint.tools { toolsGrammar in
+          let responseGrammar = try XGRGrammar.literal("response")
+          return try toolsGrammar.union(responseGrammar)
+        }
+
+        let grammar = try constraint.grammar(using: toolsGrammar)
+        let compiler = try makeGenericXGRCompiler(tokenizer: testTokenizer())
+        let matcher = try compiler.makeMatcher(grammar)
+
+        expectNoDifference(matcher.accept(string: "tool"), true)
+      }
+
+      @Test
+      func `Unconstrained Uses Universal Grammar`() throws {
+        let tokenizer = try testTokenizer()
+        let compiler = try makeGenericXGRCompiler(tokenizer: tokenizer)
+        let matcher = try compiler.makeMatcher(
+          try XGRGenerationConstraint.unconstrained.grammar(using: .universal)
+        )
+
+        expectNoDifference(matcher.accept(string: "Free form text."), true)
+      }
+    }
+
     @Suite(.serialized)
     struct `Memory usage tests`: ~Copyable {
       private let engine: XGRCompiler
@@ -180,7 +220,7 @@
 
       @Test
       func `Larger Grammar Has Larger Compiled Grammar`() throws {
-        let smallerGrammar = try self.engine.compile(try XGRGrammar(literal: "a"))
+        let smallerGrammar = try self.engine.compile(try XGRGrammar.literal("a"))
         let largerGrammar = try self.engine.compile(try genericGrammar())
         expectNoDifference(largerGrammar.memorySizeBytes > smallerGrammar.memorySizeBytes, true)
       }
@@ -210,7 +250,7 @@
           vocabularyType: .raw,
           stopTokenIDs: [2]
         )
-        let grammar = try XGRGrammar(lark: "start: \"a\" | \"b\"")
+        let grammar = try XGRGrammar.lark("start: \"a\" | \"b\"")
         let compiler = try XGRCompiler(tokenizerInfo: tokenizerInfo)
         let matcher = try XGRMatcher(
           compiledGrammar: try compiler.compile(grammar),
@@ -228,8 +268,8 @@
           vocabularyType: .raw,
           stopTokenIDs: [1]
         )
-        let grammar = try XGRGrammar(literal: "a")
-        let restoredGrammar = try XGRGrammar(serializedJSON: grammar.serializedJSON())
+        let grammar = try XGRGrammar.literal("a")
+        let restoredGrammar = try XGRGrammar.serializedJSON(grammar.serializedJSON())
         let ebnf = grammar.ebnf
         expectNoDifference(restoredGrammar.ebnf, ebnf)
 
@@ -269,6 +309,6 @@
     #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
 
   private func genericGrammar() throws -> XGRGrammar {
-    try XGRGrammar(literal: genericGrammarText)
+    try XGRGrammar.literal(genericGrammarText)
   }
 #endif

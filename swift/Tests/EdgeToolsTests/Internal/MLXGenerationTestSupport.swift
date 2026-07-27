@@ -10,16 +10,21 @@
     using engine: EdgeToolsMLXEngine<Model>
   ) async throws -> EdgeToolsLLMPrompt where Model.Prompt == EdgeToolsLLMPrompt {
     var transcript = EdgeToolsLLMPrompt.weatherTest
-    let parameters = EdgeToolsMLXEngine<Model>
+    let toolParameters = EdgeToolsMLXEngine<Model>
       .GenerateParameters(
-        toolCallRange: .exact(1),
+        constraint: .tools(range: .exact(1)),
         maxTokens: 256
+      )
+    let responseParameters = EdgeToolsMLXEngine<Model>
+      .GenerateParameters(
+        constraint: .unconstrained,
+        maxTokens: 64
       )
 
     let toolGenerationTask = try engine.generate(
       prompt: transcript,
       tools: [.weatherTest],
-      parameters: parameters,
+      parameters: toolParameters,
       channel: EdgeToolsGenerationChannel()
     )
     let toolGeneration = try await toolGenerationTask.value
@@ -40,18 +45,13 @@
 
     let responseGenerationTask = try engine.generate(
       prompt: transcript,
-      tools: [.finalResponseTest],
-      parameters: parameters,
+      tools: [],
+      parameters: responseParameters,
       channel: EdgeToolsGenerationChannel()
     )
     let responseGeneration = try await responseGenerationTask.value
-    guard
-      let call = responseGeneration.toolCalls.first,
-      case .object(let arguments) = call.arguments,
-      case .string(let response)? = arguments["response"]
-    else {
-      throw MLXGenerationTestError.missingFinalResponse
-    }
+    let response = responseGeneration.response
+    guard !response.isEmpty else { throw MLXGenerationTestError.missingFinalResponse }
     transcript.messages.append(.assistant(response))
     return transcript
   }
@@ -59,7 +59,7 @@
   extension EdgeToolsLLMPrompt {
     static let weatherTest = Self(messages: [
       .system(
-        "Use getWeather when needed. After receiving its result, use finalResponse to summarize it."
+        "Use getWeather when needed. After receiving its result, summarize it for the user."
       ),
       .user("What is the weather in Paris?")
     ])
@@ -82,20 +82,5 @@
       )
     )
 
-    fileprivate static let finalResponseTest = Self(
-      name: "finalResponse",
-      description: "Summarizes the tool result for the user.",
-      arguments: EdgeToolsGenerationSchema(
-        .type(.object),
-        .properties([
-          "response": EdgeToolsGenerationSchema(
-            .string,
-            .enum(["It is sunny and 21°C in Paris."])
-          )
-        ]),
-        .required(["response"]),
-        .additionalProperties(false)
-      )
-    )
   }
 #endif

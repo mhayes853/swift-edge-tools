@@ -3,7 +3,7 @@
     ▿ Message
       - audio: Optional<Array<Asset>>.none
       ▿ content: Optional<String>
-        - some: "Use getWeather when needed. After receiving its result, use finalResponse to summarize it."
+        - some: "Use getWeather when needed. After receiving its result, summarize it for the user."
       - images: Optional<Array<Asset>>.none
       ▿ role: Role
         - rawValue: "system"
@@ -65,7 +65,7 @@
     ▿ Message
       - audio: Optional<Array<Asset>>.none
       ▿ content: Optional<String>
-        - some: "It is sunny and 21ଌ in Paris."
+        - some: "Based on the weather data, Paris is currently experiencing **sunny** weather with a temperature of **21 degrees Celsius**.<|im_end|>"
       - images: Optional<Array<Asset>>.none
       ▿ role: Role
         - rawValue: "assistant"

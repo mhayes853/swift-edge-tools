@@ -249,9 +249,9 @@ public struct NeedleToolCallParser: EdgeToolCallParser, Sendable {
         tools: tools.map { $0.needleNormalized() },
         range: range
       )
-      let prefix = try XGRGrammar(literal: "<tool_call> [")
+      let prefix = try XGRGrammar.literal("<tool_call> [")
       let prefixedCalls = try prefix.concatenate(calls)
-      return try prefixedCalls.concatenate(XGRGrammar(literal: "]"))
+      return try prefixedCalls.concatenate(XGRGrammar.literal("]"))
     }
 
     private static func needleCalls(
@@ -259,7 +259,7 @@ public struct NeedleToolCallParser: EdgeToolCallParser, Sendable {
       range: GrammarToolCallRange
     ) throws -> XGRGrammar {
       guard range.lowerBound >= 0 else { throw XGRError.invalidToolInvocationRange }
-      guard let firstTool = tools.first else { return try XGRGrammar(literal: "") }
+      guard let firstTool = tools.first else { return try XGRGrammar.literal("") }
 
       var call = try XGRGrammar.needleCall(firstTool)
       for tool in tools.dropFirst() {
@@ -270,31 +270,19 @@ public struct NeedleToolCallParser: EdgeToolCallParser, Sendable {
 
     private static func needleCall(_ tool: EdgeToolDefinition) throws -> XGRGrammar {
       let schema = tool.arguments.orderedKeyEncoded()
-      let arguments = try XGRGrammar(
-        jsonSchema: schema,
+      let arguments = try XGRGrammar.jsonSchema(
+        schema,
         configuration: JSONSchemaConfiguration(
           anyWhitespace: false,
           separators: .init(comma: ",", colon: ":"),
           isStrict: true
         )
       )
-      let namePrefix = try XGRGrammar(literal: "{\"name\":\"")
-      let named = try namePrefix.concatenate(XGRGrammar(literal: tool.name))
-      let argumentsPrefix = try named.concatenate(XGRGrammar(literal: "\",\"arguments\":"))
+      let namePrefix = try XGRGrammar.literal("{\"name\":\"")
+      let named = try namePrefix.concatenate(XGRGrammar.literal(tool.name))
+      let argumentsPrefix = try named.concatenate(XGRGrammar.literal("\",\"arguments\":"))
       let withArguments = try argumentsPrefix.concatenate(arguments)
-      return try withArguments.concatenate(XGRGrammar(literal: "}"))
-    }
-  }
-
-  // MARK: - Helpers
-
-  extension XGRToolCallMatcherPool {
-    static func needle(maxCount: Int = 8) -> XGRToolCallMatcherPool {
-      XGRToolCallMatcherPool(
-        maxCount: maxCount,
-        normalizeTools: { $0.map { $0.needleNormalized() } },
-        makeGrammar: { try XGRGrammar.needle(tools: $0, range: $1) }
-      )
+      return try withArguments.concatenate(XGRGrammar.literal("}"))
     }
   }
 #endif

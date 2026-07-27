@@ -106,7 +106,7 @@
         self._processor()
       }
 
-      public var toolCallRange: GrammarToolCallRange
+      public var constraint: XGRGenerationConstraint
       public var maxTokens: Int?
       public var kvCacheQuantizationBits: Int?
       public var kvCacheQuantizationGroupSize: Int
@@ -115,7 +115,7 @@
       public init(
         sampler: @autoclosure @escaping @Sendable () -> any LogitSampler = ArgMaxSampler(),
         processor: @autoclosure @escaping @Sendable () -> (any LogitProcessor)? = nil,
-        toolCallRange: GrammarToolCallRange = .unbounded(minimum: 0),
+        constraint: XGRGenerationConstraint = .tools,
         maxTokens: Int? = 1024,
         kvCacheQuantizationBits: Int? = nil,
         kvCacheQuantizationGroupSize: Int = 64,
@@ -123,7 +123,7 @@
       ) {
         self._sampler = sampler
         self._processor = processor
-        self.toolCallRange = toolCallRange
+        self.constraint = constraint
         self.maxTokens = maxTokens
         self.kvCacheQuantizationBits = kvCacheQuantizationBits
         self.kvCacheQuantizationGroupSize = kvCacheQuantizationGroupSize
@@ -164,7 +164,7 @@
         return State(
           grammarEngine: consume grammarEngine,
           model: model,
-          matcherPool: XGRToolCallMatcherPool(makeGrammar: model.grammar),
+          matcherPool: XGRToolCallMatcherPool(),
           cachedPrefill: nil
         )
       }
@@ -182,7 +182,7 @@
         return State(
           grammarEngine: consume grammarEngine,
           model: model,
-          matcherPool: XGRToolCallMatcherPool(makeGrammar: model.grammar),
+          matcherPool: XGRToolCallMatcherPool(),
           cachedPrefill: nil
         )
       }
@@ -276,9 +276,12 @@
       try Task.checkCancellation()
       guard !isStopped.load(ordering: .relaxed) else { return .empty }
 
+      let toolsGrammar = try parameters.constraint.toolCallRange.map {
+        try state.model.grammar(tools: tools, range: $0)
+      } ?? .universal
+      let grammar = try parameters.constraint.grammar(using: toolsGrammar)
       let matcher = try state.matcherPool.matcher(
-        tools: tools,
-        range: parameters.toolCallRange,
+        grammar: grammar,
         compilingWith: state.grammarEngine
       )
       matcher.reset()

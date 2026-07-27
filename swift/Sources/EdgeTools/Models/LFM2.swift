@@ -310,14 +310,14 @@ private struct PythonCallReader: ToolCallValueReader {
       let calls = try Self.toolCalls(tools: Array(tools), separator: ",", range: range) {
         try Self.pythonCall($0)
       }
-      let prefix = try XGRGrammar(literal: "<|tool_call_start|>[")
+      let prefix = try XGRGrammar.literal("<|tool_call_start|>[")
       let withCalls = try prefix.concatenate(calls)
       let grammar = try withCalls.concatenate(
-        XGRGrammar(literal: "]<|tool_call_end|>")
+        XGRGrammar.literal("]<|tool_call_end|>")
       )
       var document = try XGREBNFDocument(grammar.ebnf)
       document.removeDuplicateRules()
-      return try XGRGrammar(ebnf: document.source)
+      return try XGRGrammar.ebnf(document.source)
     }
 
     private static func pythonCall(_ tool: EdgeToolDefinition) throws -> XGRGrammar {
@@ -342,10 +342,10 @@ private struct PythonCallReader: ToolCallValueReader {
         return value
       }
 
-      let arguments = try XGRGrammar(ebnf: document.source)
-      let prefix = try XGRGrammar(literal: "\(tool.name)(")
+      let arguments = try XGRGrammar.ebnf(document.source)
+      let prefix = try XGRGrammar.literal("\(tool.name)(")
       let withArguments = try prefix.concatenate(arguments)
-      return try withArguments.concatenate(XGRGrammar(literal: ")"))
+      return try withArguments.concatenate(XGRGrammar.literal(")"))
     }
 
     private static func isLFMTopLevelArgumentRule(_ name: String) -> Bool {

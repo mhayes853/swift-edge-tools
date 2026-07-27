@@ -174,13 +174,11 @@ private struct FunctionGemmaCallReader: ToolCallValueReader {
         return value
       }
 
-      let arguments = try XGRGrammar(ebnf: document.source)
-      let prefix = try XGRGrammar(
-        literal: "<start_function_call>call:\(tool.name){"
-      )
+      let arguments = try XGRGrammar.ebnf(document.source)
+      let prefix = try XGRGrammar.literal("<start_function_call>call:\(tool.name){")
       let withArguments = try prefix.concatenate(arguments)
       return try withArguments.concatenate(
-        XGRGrammar(literal: "}<end_function_call>")
+        XGRGrammar.literal("}<end_function_call>")
       )
     }
 

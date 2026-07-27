@@ -50,14 +50,7 @@
         while let token = self.convertIdToToken(vocabulary.count) {
           vocabulary.append(token)
         }
-        let vocabularySize = modelVocabularySize ?? vocabulary.count
-        guard vocabulary.count <= vocabularySize else {
-          throw XGRError(
-            code: .incompatibleTokenizerVocabulary,
-            message:
-              "The model vocabulary size (\(vocabularySize)) is smaller than the tokenizer vocabulary (\(vocabulary.count))."
-          )
-        }
+        let vocabularySize = max(modelVocabularySize ?? 0, vocabulary.count)
         return try XGRTokenizerInfo.huggingFace(
           encodedVocabulary: vocabulary,
           backendJSON: self.backendJSON,
