@@ -426,6 +426,7 @@
   // MARK: - XGRGenerationConstraint
 
   /// Selects the grammar used to constrain an engine generation.
+  @nonexhaustive
   public enum XGRGenerationConstraint: Sendable {
     /// Allows arbitrary text output.
     case unconstrained

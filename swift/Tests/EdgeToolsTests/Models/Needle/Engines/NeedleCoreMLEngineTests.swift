@@ -292,22 +292,30 @@
   }
 
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-  final class CountingCoreMLLogitsProcessor: EdgeToolsLogitsProcessor, @unchecked Sendable {
-    var promptCalls = 0
-    var processCalls = 0
-    var didSampleCalls = 0
+  final class CountingCoreMLLogitsProcessor: EdgeToolsLogitsProcessor, Sendable {
+    private struct Counts: Hashable, Sendable {
+      var prompt = 0
+      var process = 0
+      var didSample = 0
+    }
+
+    private let counts = Lock(Counts())
+
+    var promptCalls: Int { self.counts.withLock { $0.prompt } }
+    var processCalls: Int { self.counts.withLock { $0.process } }
+    var didSampleCalls: Int { self.counts.withLock { $0.didSample } }
 
     func prompt(_ prompt: MLTensor) {
-      self.promptCalls += 1
+      self.counts.withLock { $0.prompt += 1 }
     }
 
     func process(logits: inout MLTensor) async throws -> MLTensor {
-      self.processCalls += 1
+      self.counts.withLock { $0.process += 1 }
       return logits
     }
 
     func didSample(token: EdgeToolsToken) {
-      self.didSampleCalls += 1
+      self.counts.withLock { $0.didSample += 1 }
     }
   }
 #endif

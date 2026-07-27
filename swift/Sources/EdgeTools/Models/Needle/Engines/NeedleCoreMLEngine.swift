@@ -14,31 +14,20 @@
     public struct GenerateParameters: EdgeToolsEngineGenerateParameters {
       public static var `default`: Self { Self() }
 
-      private var _sampler: @Sendable () -> any EdgeToolsSampler<MLTensor>
-      private var _processor: @Sendable () -> (any EdgeToolsLogitsProcessor<MLTensor, MLTensor>)?
-
-      public var sampler: any EdgeToolsSampler<MLTensor> {
-        self._sampler()
-      }
-
-      public var processor: (any EdgeToolsLogitsProcessor<MLTensor, MLTensor>)? {
-        self._processor()
-      }
+      public var sampler: any EdgeToolsSampler<MLTensor>
+      public var processor: (any EdgeToolsLogitsProcessor<MLTensor, MLTensor>)?
 
       public var constraint: XGRGenerationConstraint
       public var maxTokens: Int?
 
       public init(
-        sampler: @autoclosure @escaping @Sendable () -> any EdgeToolsSampler<MLTensor> =
-          CoreMLArgmaxSampler(),
-        processor:
-          @autoclosure @escaping @Sendable () -> (any EdgeToolsLogitsProcessor<MLTensor, MLTensor>)? =
-          nil,
+        sampler: any EdgeToolsSampler<MLTensor> = CoreMLArgmaxSampler(),
+        processor: (any EdgeToolsLogitsProcessor<MLTensor, MLTensor>)? = nil,
         constraint: XGRGenerationConstraint = .tools,
         maxTokens: Int? = 1024
       ) {
-        self._sampler = sampler
-        self._processor = processor
+        self.sampler = sampler
+        self.processor = processor
         self.constraint = constraint
         self.maxTokens = maxTokens
       }

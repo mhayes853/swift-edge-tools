@@ -12,7 +12,7 @@
 
 // MARK: - EdgeToolsSampler
 
-public protocol EdgeToolsSampler<Logits> {
+public protocol EdgeToolsSampler<Logits>: Sendable {
   associatedtype Logits
 
   func sample(logits: Logits) async throws -> EdgeToolsToken.ID
@@ -84,16 +84,16 @@ private func updateArgmaxSIMD(
   let pointer = UnsafeRawPointer(values.baseAddress!.advanced(by: index))
   let candidates = pointer.loadUnaligned(as: SIMD8<Float>.self)
   let replacementMask = candidates .> bestValues
-  let firstIndex = Int32(index)
+  let i = Int32(index)
   let candidateIndices = SIMD8<Int32>(
-    firstIndex,
-    firstIndex + 1,
-    firstIndex + 2,
-    firstIndex + 3,
-    firstIndex + 4,
-    firstIndex + 5,
-    firstIndex + 6,
-    firstIndex + 7
+    i,
+    i + 1,
+    i + 2,
+    i + 3,
+    i + 4,
+    i + 5,
+    i + 6,
+    i + 7
   )
   bestValues.replace(with: candidates, where: replacementMask)
   bestIndices.replace(with: candidateIndices, where: replacementMask)
@@ -139,7 +139,7 @@ func argmaxScalar(
 // MARK: - ONNX
 
 #if ONNXCore
-  public struct ONNXArgmaxSampler: EdgeToolsSampler, Hashable, Sendable {
+  public struct ONNXArgmaxSampler: EdgeToolsSampler {
     public init() {}
 
     public func sample(logits: [Float]) -> EdgeToolsToken.ID {

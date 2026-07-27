@@ -14,17 +14,9 @@
     public struct GenerateParameters: EdgeToolsEngineGenerateParameters {
       public static var `default`: Self { Self() }
 
-      private var _sampler: @Sendable () -> any EdgeToolsSampler<NDArray>
-      private var _processor: @Sendable () -> (any EdgeToolsLogitsProcessor<NDArray, NDArray>)?
+      public var sampler: any EdgeToolsSampler<NDArray>
+      public var processor: (any EdgeToolsLogitsProcessor<NDArray, NDArray>)?
       private var _computeStream: @Sendable () -> ComputeStream?
-
-      public var sampler: any EdgeToolsSampler<NDArray> {
-        self._sampler()
-      }
-
-      public var processor: (any EdgeToolsLogitsProcessor<NDArray, NDArray>)? {
-        self._processor()
-      }
 
       public var computeStream: ComputeStream? {
         self._computeStream()
@@ -34,17 +26,14 @@
       public var maxTokens: Int?
 
       public init(
-        sampler: @autoclosure @escaping @Sendable () -> any EdgeToolsSampler<NDArray> =
-          CoreAIArgmaxSampler(),
-        processor:
-          @autoclosure @escaping @Sendable () -> (any EdgeToolsLogitsProcessor<NDArray, NDArray>)? =
-          nil,
+        sampler: any EdgeToolsSampler<NDArray> = CoreAIArgmaxSampler(),
+        processor: (any EdgeToolsLogitsProcessor<NDArray, NDArray>)? = nil,
         computeStream: @autoclosure @escaping @Sendable () -> ComputeStream? = nil,
         constraint: XGRGenerationConstraint = .tools,
         maxTokens: Int? = 1024
       ) {
-        self._sampler = sampler
-        self._processor = processor
+        self.sampler = sampler
+        self.processor = processor
         self._computeStream = computeStream
         self.constraint = constraint
         self.maxTokens = maxTokens

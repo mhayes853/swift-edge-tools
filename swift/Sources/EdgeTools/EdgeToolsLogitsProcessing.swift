@@ -1,12 +1,12 @@
 // MARK: - EdgeToolsLogitsProcessor
 
-public protocol EdgeToolsLogitsProcessor<Prompt, Logits> {
+public protocol EdgeToolsLogitsProcessor<Prompt, Logits>: Sendable {
   associatedtype Prompt
   associatedtype Logits
 
-  mutating func prompt(_ prompt: Prompt)
+  func prompt(_ prompt: Prompt)
 
   nonisolated(nonsending) func process(logits: inout Logits) async throws -> Logits
 
-  mutating func didSample(token: EdgeToolsToken)
+  func didSample(token: EdgeToolsToken)
 }

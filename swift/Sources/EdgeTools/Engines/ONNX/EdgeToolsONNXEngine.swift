@@ -110,32 +110,20 @@
     public struct GenerateParameters: EdgeToolsEngineGenerateParameters {
       public static var `default`: Self { Self() }
 
-      private var _sampler: @Sendable () -> any EdgeToolsSampler<[Float]>
-      private var _processor:
-        @Sendable () -> (any EdgeToolsLogitsProcessor<[EdgeToolsToken.ID], [Float]>)?
-
-      public var sampler: any EdgeToolsSampler<[Float]> {
-        self._sampler()
-      }
-
-      public var processor: (any EdgeToolsLogitsProcessor<[EdgeToolsToken.ID], [Float]>)? {
-        self._processor()
-      }
+      public var sampler: any EdgeToolsSampler<[Float]>
+      public var processor: (any EdgeToolsLogitsProcessor<[EdgeToolsToken.ID], [Float]>)?
 
       public var constraint: XGRGenerationConstraint
       public var maxTokens: Int?
 
       public init(
-        sampler: @autoclosure @escaping @Sendable () -> any EdgeToolsSampler<[Float]> =
-          ONNXArgmaxSampler(),
-        processor:
-          @autoclosure @escaping @Sendable () ->
-          (any EdgeToolsLogitsProcessor<[EdgeToolsToken.ID], [Float]>)? = nil,
+        sampler: any EdgeToolsSampler<[Float]> = ONNXArgmaxSampler(),
+        processor: (any EdgeToolsLogitsProcessor<[EdgeToolsToken.ID], [Float]>)? = nil,
         constraint: XGRGenerationConstraint = .tools,
         maxTokens: Int? = 1024
       ) {
-        self._sampler = sampler
-        self._processor = processor
+        self.sampler = sampler
+        self.processor = processor
         self.constraint = constraint
         self.maxTokens = maxTokens
       }
