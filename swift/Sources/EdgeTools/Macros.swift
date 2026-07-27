@@ -23,7 +23,7 @@ public macro EdgeToolsGuide(
 ) = #externalMacro(module: "EdgeToolsMacros", type: "EdgeToolsGuideMacro")
 
 @inlinable
-@inline(__always)
+@inline(always)
 public func _edgeToolsRequireObjectValue(
   _ value: EdgeToolsValue
 ) throws -> OrderedDictionary<String, EdgeToolsValue> {
@@ -34,7 +34,7 @@ public func _edgeToolsRequireObjectValue(
 }
 
 @inlinable
-@inline(__always)
+@inline(always)
 public func _edgeToolsValue(
   _ object: OrderedDictionary<String, EdgeToolsValue>,
   forKey key: String
@@ -43,7 +43,7 @@ public func _edgeToolsValue(
 }
 
 @inlinable
-@inline(__always)
+@inline(always)
 public func _edgeToolsBuildObjectValue(
   _ entries: (key: String, value: EdgeToolsValue?)...
 ) -> EdgeToolsValue {

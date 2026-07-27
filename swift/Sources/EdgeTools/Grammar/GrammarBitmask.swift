@@ -17,13 +17,13 @@ public struct GrammarBitmask: Hashable, Sendable {
   public var storage: [UInt8]
 
   @inlinable
-  @inline(__always)
+  @inline(always)
   public init(storage: [UInt8]) {
     self.storage = storage
   }
 
   @inlinable
-  @inline(__always)
+  @inline(always)
   public init(bitCount: Int, repeating value: Bool = false) {
     precondition(bitCount.isMultiple(of: 8), "Grammar bit count must be a multiple of 8.")
     self.storage = [UInt8](repeating: value ? .max : .zero, count: bitCount / 8)
@@ -41,7 +41,7 @@ extension GrammarBitmask: MutableCollection {
   public var endIndex: Int { self.storage.endIndex * 8 }
 
   @inlinable
-  @inline(__always)
+  @inline(always)
   public subscript(position: Index) -> Bool {
     get { (self.storage[position / 8] & (1 << (position % 8))).boolValue }
     set {
@@ -165,7 +165,7 @@ private func validateBitmaskCoverage(mask: GrammarBitmask, vocabularySize: Int) 
   }
 #endif
 
-@inline(__always)
+@inline(always)
 private func applyBitmaskSIMDRow(
   logits: UnsafeMutablePointer<Float>,
   vocabularySize: Int,
@@ -185,7 +185,7 @@ private func applyBitmaskSIMDRow(
   }
 }
 
-@inline(__always)
+@inline(always)
 private func bitmaskValue(maskBytes: UnsafeBufferPointer<UInt8>, index: Int) -> Float {
   let tableIndex = Int(maskBytes[index >> 3]) * 8 + (index & 7)
   return bitmaskTable[tableIndex]
