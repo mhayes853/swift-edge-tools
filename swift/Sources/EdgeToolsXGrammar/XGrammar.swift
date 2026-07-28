@@ -5,8 +5,13 @@ import CXGrammar
 /// An XGrammar vocabulary type.
 @nonexhaustive
 public enum XGRVocabularyType: RawRepresentable, Hashable, Sendable {
+  /// Raw vocabulary tokens.
   case raw
+
+  /// Vocabulary tokens that use byte fallback encoding.
   case byteFallback
+
+  /// Byte-level vocabulary tokens.
   case byteLevel
 
   public init?(rawValue: xgrammar_vocab_type_t) {
@@ -333,24 +338,7 @@ public final class XGRGrammar: @unchecked Sendable {
     let sources = namedGrammars.map { namedGrammar in
       if case .lark(let source) = namedGrammar.grammar { source } else { "" }
     }
-    let descriptors = namedGrammars.map { namedGrammar in
-      switch namedGrammar.grammar {
-      case .grammar(let grammar):
-        xgrammar_named_grammar_t(
-          name: nil,
-          kind: xgrammar_named_grammar_handle,
-          lark_source: nil,
-          grammar: grammar.handle
-        )
-      case .lark:
-        xgrammar_named_grammar_t(
-          name: nil,
-          kind: xgrammar_named_grammar_lark,
-          lark_source: nil,
-          grammar: nil
-        )
-      }
-    }
+    let descriptors = namedGrammars.map(\.rawValue)
     let handle = try withCopiedCStringPointerBuffer(names) { names in
       try withCopiedCStringPointerBuffer(sources) { sources in
         var descriptors = descriptors
@@ -578,7 +566,7 @@ public final class XGRGrammar: @unchecked Sendable {
 // MARK: - XGRNamedGrammar
 
 /// A names grammar type for use in ``XGRGrammar/lark(_:tokenizerInfo:namedGrammars:)``.
-public struct XGRNamedGrammar: Sendable {
+public struct XGRNamedGrammar: RawRepresentable, Sendable {
   /// The actual grammar representation.
   public enum Grammar: Sendable {
     /// Uses an already-created grammar.
@@ -602,6 +590,48 @@ public struct XGRNamedGrammar: Sendable {
   public init(name: String, grammar: Grammar) {
     self.name = name
     self.grammar = grammar
+  }
+
+  public var rawValue: xgrammar_named_grammar_t {
+    switch self.grammar {
+    case .grammar(let grammar):
+      xgrammar_named_grammar_t(
+        name: nil,
+        kind: xgrammar_named_grammar_handle,
+        lark_source: nil,
+        grammar: grammar.handle
+      )
+    case .lark:
+      xgrammar_named_grammar_t(
+        name: nil,
+        kind: xgrammar_named_grammar_lark,
+        lark_source: nil,
+        grammar: nil
+      )
+    }
+  }
+
+  public init?(rawValue: xgrammar_named_grammar_t) {
+    guard let name = rawValue.name else { return nil }
+
+    let grammar: Grammar
+    switch rawValue.kind {
+    case xgrammar_named_grammar_handle:
+      guard
+        let handle = rawValue.grammar,
+        let serializedJSON = try? xgrammarString({
+          xgrammar_grammar_serialize_json(handle, $0, $1)
+        }),
+        let grammarValue = try? XGRGrammar.serializedJSON(serializedJSON)
+      else { return nil }
+      grammar = .grammar(grammarValue)
+    case xgrammar_named_grammar_lark:
+      guard let source = rawValue.lark_source else { return nil }
+      grammar = .lark(String(cString: source))
+    default: return nil
+    }
+
+    self.init(name: String(cString: name), grammar: grammar)
   }
 }
 
