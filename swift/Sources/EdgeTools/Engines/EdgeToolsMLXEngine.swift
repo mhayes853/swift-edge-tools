@@ -561,22 +561,29 @@
 
   extension EdgeToolsLLMPrompt.Message {
     package func mlxMessage() throws -> MLXLMCommon.Message {
-      var message: MLXLMCommon.Message = ["role": self.role.rawValue]
-      if let content {
-        message["content"] = content
-      }
-      if let toolResponse {
+      switch self {
+      case let .system(content):
+        return ["role": "system", "content": content]
+      case let .user(content, images: _, audio: _):
+        return ["role": "user", "content": content]
+      case let .assistant(content, toolCalls: toolCalls):
+        var message: MLXLMCommon.Message = ["role": "assistant"]
+        if let content {
+          message["content"] = content
+        }
+        if !toolCalls.isEmpty {
+          message["tool_calls"] = toolCalls.map(\.mlxToolCall)
+        }
+        return message
+      case let .tool(name: name, response: response):
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-        message["content"] = String(decoding: try encoder.encode(toolResponse), as: UTF8.self)
+        return [
+          "role": "tool",
+          "content": String(decoding: try encoder.encode(response), as: UTF8.self),
+          "name": name
+        ]
       }
-      if let toolName {
-        message["name"] = toolName
-      }
-      if let toolCalls, !toolCalls.isEmpty {
-        message["tool_calls"] = toolCalls.map(\.mlxToolCall)
-      }
-      return message
     }
   }
 
