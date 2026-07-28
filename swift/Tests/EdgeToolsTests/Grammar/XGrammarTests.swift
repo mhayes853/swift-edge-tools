@@ -41,7 +41,7 @@
       func `Rollback Allows Accepting Alternative Branch`() throws {
         let matcher = try self.engine.makeMatcher(try genericGrammar())
 
-        let firstBitmask = matcher.bitmask()
+        let firstBitmask = matcher.grammarBitmask()
         let firstAllowedIndex = firstBitmask.storage
           .enumerated()
           .flatMap { word in (0..<32).map { (word.offset, $0) } }
@@ -114,7 +114,7 @@
       func `Bitmask Disallows Eos Before Completion`() throws {
         let matcher = try self.engine.makeMatcher(try genericGrammar())
 
-        let bitmask = matcher.bitmask()
+        let bitmask = matcher.grammarBitmask()
         expectNoDifference(bitmask[self.eosToken], false)
       }
 
@@ -128,14 +128,14 @@
         }
         expectNoDifference(matcher.isCompleted, true)
 
-        let bitmask = matcher.bitmask()
+        let bitmask = matcher.grammarBitmask()
         expectNoDifference(bitmask[self.eosToken], true)
       }
 
       @Test
       func `Bitmask Has Expected Size`() throws {
         let matcher = try self.engine.makeMatcher(try genericGrammar())
-        let bitmask = matcher.bitmask()
+        let bitmask = matcher.grammarBitmask()
         expectNoDifference(bitmask.count, 8192)
       }
     }
@@ -265,6 +265,32 @@
       }
 
       @Test
+      func `Grammar Composition Operators Match Their Combinators`() throws {
+        let tokenizerInfo = try XGRTokenizerInfo(
+          encodedVocabulary: ["a", "b", ""],
+          vocabularyType: .raw,
+          stopTokenIDs: [2]
+        )
+        let aGrammar = try XGRGrammar.ebnf("root ::= \"a\"")
+        let bGrammar = try XGRGrammar.ebnf("root ::= \"b\"")
+        let compiler = try XGRCompiler(tokenizerInfo: tokenizerInfo)
+
+        let concatenatedMatcher = try XGRMatcher(
+          compiledGrammar: try compiler.compile(try aGrammar + bGrammar),
+          terminateWithoutStopToken: true
+        )
+        expectNoDifference(concatenatedMatcher.accept(string: "ab"), true)
+        expectNoDifference(concatenatedMatcher.isTerminated, true)
+
+        let unionedMatcher = try XGRMatcher(
+          compiledGrammar: try compiler.compile(try aGrammar || bGrammar),
+          terminateWithoutStopToken: true
+        )
+        expectNoDifference(unionedMatcher.accept(string: "a"), true)
+        expectNoDifference(unionedMatcher.isTerminated, true)
+      }
+
+      @Test
       func `Lark Grammar Matches Its Start Rule`() throws {
         let tokenizerInfo = try XGRTokenizerInfo(
           encodedVocabulary: ["a", "b", ""],
@@ -318,8 +344,8 @@
           "start: \"[\" @item \"]\" @unused",
           tokenizerInfo: tokenizerInfo,
           namedGrammars: [
-            XGRNamedGrammar(name: "item", definition: .grammar(item)),
-            XGRNamedGrammar(name: "unused", definition: .lark("start: \"unused\""))
+            XGRNamedGrammar(name: "item", grammar: .grammar(item)),
+            XGRNamedGrammar(name: "unused", grammar: .lark("start: \"unused\""))
           ]
         )
         let compiler = try XGRCompiler(tokenizerInfo: tokenizerInfo)

@@ -4,12 +4,7 @@ import Testing
 
 @Suite(.serialized)
 struct `Needle JSONNX engine tests` {
-  @Test(
-    .enabled(
-      if: JSObject.global["edgeToolsNeedleFixture"].object != nil,
-      "Requires a trained Needle ONNX fixture."
-    )
-  )
+  @Test
   func `Generates Real Tool Call`() async throws {
     let fixture = try #require(JSObject.global["edgeToolsNeedleFixture"].object)
     let namespace = try #require(JSObject.global["edgeToolsONNXRuntime"].object)
@@ -46,7 +41,7 @@ struct `Needle JSONNX engine tests` {
     )
     let session = EdgeToolsSession(engine: engine, tools: [SendEmailTool()])
     let parameters = NeedleJSONNXEngine.GenerateParameters(
-      toolCallRange: .exact(1),
+      constraint: .tools(range: .exact(1)),
       maxTokens: 96
     )
     let generation = try await session.generate(

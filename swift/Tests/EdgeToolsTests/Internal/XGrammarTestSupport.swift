@@ -14,7 +14,7 @@
       try NeedleSPTokenizer(modelPath: .testTokenizerModel)
     #else
       throw XGRError(
-        code: .invalidNeedleTokenizer,
+        code: EdgeToolsXGRError.invalidNeedleTokenizer,
         message: "Test tokenizer loading requires the Foundation or System trait."
       )
     #endif
@@ -25,7 +25,7 @@
   ) throws -> EdgeToolsToken.ID {
     guard let eosToken = tokenizer.eosTokenId else {
       throw XGRError(
-        code: .invalidNeedleTokenizer,
+        code: EdgeToolsXGRError.invalidNeedleTokenizer,
         message: "The test tokenizer must provide an EOS token."
       )
     }
@@ -45,7 +45,7 @@
     let vocabulary = tokenizer.convertIdsToTokens(Array(0..<8192))
     guard let eosToken = tokenizer.eosTokenId, vocabulary.allSatisfy({ $0 != nil }) else {
       throw XGRError(
-        code: .invalidNeedleTokenizer,
+        code: EdgeToolsXGRError.invalidNeedleTokenizer,
         message: "The test tokenizer must provide an EOS token and full vocabulary."
       )
     }

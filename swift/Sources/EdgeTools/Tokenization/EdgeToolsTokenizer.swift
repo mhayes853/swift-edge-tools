@@ -1,3 +1,7 @@
+#if XGrammar
+  import EdgeToolsXGrammar
+#endif
+
 #if System
   import SystemPackage
 #endif

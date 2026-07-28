@@ -12,12 +12,10 @@ struct `XGrammar WASI tests` {
 
   @Test
   func `Parses Supported Grammar Formats`() throws {
-    let ebnf = try XGRGrammar(ebnf: "root ::= \"edge\"")
-    let regex = try XGRGrammar(regex: "edge(tools)?")
-    let lark = try XGRGrammar(lark: "start: \"edge\"")
-    let jsonSchema = try XGRGrammar(
-      jsonSchema: #"{"type":"object","properties":{"value":{"type":"integer"}}}"#
-    )
+    let ebnf = try XGRGrammar.ebnf("root ::= \"edge\"")
+    let regex = try XGRGrammar.regex("edge(tools)?")
+    let lark = try XGRGrammar.lark("start: \"edge\"")
+    let jsonSchema = try XGRGrammar.jsonSchema(#"{"type":"object","properties":{"value":{"type":"integer"}}}"#)
 
     #expect(ebnf.ebnf.contains("edge"))
     #expect(regex.ebnf.contains("root"))
@@ -28,21 +26,21 @@ struct `XGrammar WASI tests` {
   @Test
   func `Invalid Serialized Grammar Throws`() {
     #expect(throws: XGRError.self) {
-      _ = try XGRGrammar(serializedJSON: "not json")
+      _ = try XGRGrammar.serializedJSON("not json")
     }
   }
 
   @Test
   func `Invalid Structural Tag Throws`() {
     #expect(throws: XGRError.self) {
-      _ = try XGRGrammar(structuralTagJSON: "not json")
+      _ = try XGRGrammar.structuralTagJSON("not json")
     }
   }
 
   @Test
   func `Compiles And Matches Arithmetic Operators`() throws {
-    let grammar = try XGRGrammar(
-      lark: """
+    let grammar = try XGRGrammar.lark(
+      """
         %import common.WS_INLINE
         %import common.NUMBER
         %ignore WS_INLINE
@@ -69,8 +67,8 @@ struct `XGrammar WASI tests` {
 
   @Test
   func `Compiles Query Grammar With Logical And Comparison Operators`() throws {
-    let grammar = try XGRGrammar(
-      ebnf: #"""
+    let grammar = try XGRGrammar.ebnf(
+      #"""
         root ::= "SELECT" ws fields ws "FROM" ws identifier (ws "WHERE" ws predicate)?
         fields ::= "*" | identifier (ws "," ws identifier)*
         predicate ::= identifier ws comparison ws value (ws logical ws identifier ws comparison ws value)*
@@ -91,8 +89,8 @@ struct `XGrammar WASI tests` {
 
   @Test
   func `Compiles Nested Command JSON Schema`() throws {
-    let grammar = try XGRGrammar(
-      jsonSchema: #"""
+    let grammar = try XGRGrammar.jsonSchema(
+      #"""
         {
           "type": "object",
           "required": ["command", "payload"],

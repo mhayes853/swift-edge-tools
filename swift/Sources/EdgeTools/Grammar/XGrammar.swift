@@ -1,174 +1,46 @@
 #if XGrammar
-  import CXGrammar
+  import EdgeToolsXGrammar
 
-  // MARK: - XGRVocabularyType
+  /// EdgeTools-specific XGrammar error codes.
+  public struct EdgeToolsXGRError {
+    /// An invalid ``GrammarToolCallRange`` for generation.
+    public static let invalidToolInvocationRange = XGRError.Code(
+      rawValue: "invalid-tool-invocation-range"
+    )
 
-  public enum XGRVocabularyType: Hashable, Sendable {
-    case raw
-    case byteFallback
-    case byteLevel
+    /// An empty tool collection for generation.
+    public static let emptyToolCollection = XGRError.Code(rawValue: "empty-tool-collection")
 
-    public var rawValue: xgrammar_vocab_type_t {
-      switch self {
-      case .raw: xgrammar_vocab_type_raw
-      case .byteFallback: xgrammar_vocab_type_byte_fallback
-      case .byteLevel: xgrammar_vocab_type_byte_level
-      }
-    }
+    /// An unsupported tool schema for generation.
+    public static let unsupportedToolSchema = XGRError.Code(rawValue: "unsupported-tool-schema")
+
+    /// An incompatible tokenizer vocabulary for generation.
+    public static let incompatibleTokenizerVocabulary = XGRError.Code(
+      rawValue: "incompatible-tokenizer-vocabulary"
+    )
+
+    /// An invalid Needle tokenizer for generation.
+    public static let invalidNeedleTokenizer = XGRError.Code(rawValue: "invalid-needle-tokenizer")
   }
 
-  // MARK: - XGRError
-
-  public struct XGRError: Error, Hashable, Sendable {
-    public struct Code: RawRepresentable, Hashable, Sendable {
-      public let rawValue: String
-
-      public init(rawValue: String) {
-        self.rawValue = rawValue
-      }
-
-      public static let invalidTokenizerInfo = Self(rawValue: "invalid-tokenizer-info")
-      public static let invalidHuggingFaceMetadata = Self(rawValue: "invalid-hugging-face-metadata")
-      public static let invalidJSONSchemaConfiguration = Self(
-        rawValue: "invalid-json-schema-configuration"
-      )
-      public static let invalidCompilerConfiguration = Self(
-        rawValue: "invalid-compiler-configuration"
-      )
-      public static let invalidMatcherConfiguration = Self(
-        rawValue: "invalid-matcher-configuration"
-      )
-      public static let invalidRepetitionRange = Self(rawValue: "invalid-repetition-range")
-      public static let invalidToolInvocationRange = Self(rawValue: "invalid-tool-invocation-range")
-      public static let emptyToolCollection = Self(rawValue: "empty-tool-collection")
-      public static let unsupportedToolSchema = Self(rawValue: "unsupported-tool-schema")
-      public static let incompatibleTokenizerVocabulary = Self(
-        rawValue: "incompatible-tokenizer-vocabulary"
-      )
-      public static let invalidNeedleTokenizer = Self(rawValue: "invalid-needle-tokenizer")
-      public static let xgrammarFailure = Self(rawValue: "xgrammar-failure")
-    }
-
-    public let code: Code
-    public let message: String
-
-    public init(code: Code, message: String) {
-      self.code = code
-      self.message = message
-    }
-
+  extension XGRError {
     static let invalidHuggingFaceMetadata = Self(
       code: .invalidHuggingFaceMetadata,
       message: "Invalid Hugging Face tokenizer metadata."
     )
-    static let invalidRepetitionRange = Self(
-      code: .invalidRepetitionRange,
-      message: "Invalid XGrammar repetition range."
-    )
     static let invalidToolInvocationRange = Self(
-      code: .invalidToolInvocationRange,
+      code: EdgeToolsXGRError.invalidToolInvocationRange,
       message: "Tool invocation ranges cannot have a negative lower bound."
     )
     static let unsupportedToolSchema = Self(
-      code: .unsupportedToolSchema,
+      code: EdgeToolsXGRError.unsupportedToolSchema,
       message: "The tool definition has an unsupported schema."
     )
-
-    static func xgrammarFailure(message: String) -> Self {
-      Self(code: .xgrammarFailure, message: message)
-    }
   }
 
-  // MARK: - XGRTokenizerInfo
+  // MARK: - Tokenizer Info
 
-  /// Immutable tokenizer metadata used by XGrammar grammar construction and compilation.
-  ///
-  /// The native tokenizer info is immutable after initialization, so sharing this reference across
-  /// threads is safe. The unchecked conformance is required because the C handle's thread safety
-  /// cannot be expressed to the Swift compiler.
-  public final class XGRTokenizerInfo: @unchecked Sendable {
-    public let handle: xgrammar_tokenizer_info_t
-
-    public init(
-      encodedVocabulary: [String],
-      vocabularyType: XGRVocabularyType,
-      vocabularySize: Int? = nil,
-      stopTokenIDs: [Int] = [],
-      addPrefixSpace: Bool = false
-    ) throws {
-      guard vocabularySize.map({ $0 >= 0 }) ?? true else {
-        throw XGRError(
-          code: .invalidTokenizerInfo,
-          message: "Invalid XGrammar tokenizer information."
-        )
-      }
-      let vocabularySize = try vocabularySize.map {
-        try xgrammarInt32(
-          $0,
-          error: XGRError(
-            code: .invalidTokenizerInfo,
-            message: "Invalid XGrammar tokenizer information."
-          )
-        )
-      }
-      let stopTokenIDs = try stopTokenIDs.map {
-        try xgrammarInt32(
-          $0,
-          error: XGRError(
-            code: .invalidTokenizerInfo,
-            message: "Invalid XGrammar tokenizer information."
-          )
-        )
-      }
-      self.handle = try withCopiedCStringPointerBuffer(encodedVocabulary) { vocabulary in
-        try stopTokenIDs.withUnsafeBufferPointer { stopTokenIDs in
-          try xgrammarRequiredHandle(
-            xgrammar_tokenizer_info_init(
-              vocabulary.baseAddress,
-              vocabulary.count,
-              vocabularyType.rawValue,
-              vocabularySize ?? -1,
-              stopTokenIDs.baseAddress,
-              stopTokenIDs.count,
-              addPrefixSpace.intValue(as: Int32.self)
-            )
-          )
-        }
-      }
-    }
-
-    public init(encodedVocabulary: [String], metadata: String) throws {
-      self.handle = try withCopiedCStringPointerBuffer(encodedVocabulary) { vocabulary in
-        try metadata.withCString {
-          try xgrammarRequiredHandle(
-            xgrammar_tokenizer_info_from_vocab_and_metadata(
-              vocabulary.baseAddress,
-              vocabulary.count,
-              $0
-            )
-          )
-        }
-      }
-    }
-
-    public init(serializedJSON: String) throws {
-      self.handle = try serializedJSON.withCString {
-        try xgrammarRequiredHandle(xgrammar_tokenizer_info_deserialize_json($0))
-      }
-    }
-
-    public init(handle: consuming xgrammar_tokenizer_info_t) {
-      self.handle = consume handle
-    }
-
-    deinit { xgrammar_tokenizer_info_destroy(self.handle) }
-
-    public static func metadata(huggingFaceBackendJSON: String) throws -> String {
-      try huggingFaceBackendJSON.withCString { backendJSON in
-        try xgrammarString { xgrammar_tokenizer_info_detect_metadata_from_hf(backendJSON, $0, $1) }
-      }
-    }
-
+  extension XGRTokenizerInfo {
     public static func huggingFace(
       encodedVocabulary: [String],
       backendJSON: String,
@@ -177,10 +49,11 @@
     ) throws -> XGRTokenizerInfo {
       let metadata = try Self.metadata(huggingFaceBackendJSON: backendJSON)
       guard
-        case .object(let decodedMetadata) = try EdgeToolsJSONDecoder().decode(
-          EdgeToolsValue.self,
-          from: Array(metadata.utf8)
-        ),
+        case .object(let decodedMetadata) = try EdgeToolsJSONDecoder()
+          .decode(
+            EdgeToolsValue.self,
+            from: Array(metadata.utf8)
+          ),
         case .integer(let vocabularyTypeValue) = decodedMetadata["vocab_type"],
         case .boolean(let addPrefixSpace) = decodedMetadata["add_prefix_space"]
       else { throw XGRError.invalidHuggingFaceMetadata }
@@ -199,202 +72,27 @@
         addPrefixSpace: addPrefixSpace
       )
     }
+  }
 
-    public func serializedJSON() throws -> String {
-      try xgrammarString { xgrammar_tokenizer_info_serialize_json(self.handle, $0, $1) }
+  // MARK: - Matcher
+
+  extension XGRMatcher {
+    public func grammarBitmask() -> GrammarBitmask {
+      let words = self.bitmask()
+      let storage = words.withUnsafeBytes { Array($0) }
+      return GrammarBitmask(storage: storage)
     }
   }
 
-  // MARK: - XGRGrammar
+  // MARK: - Grammar
 
-  /// An immutable XGrammar grammar.
-  ///
-  /// `@unchecked Sendable` is safe because XGrammar grammar handles are immutable after
-  /// construction; this reference type owns and destroys its handle exactly once.
-  public final class XGRGrammar: @unchecked Sendable {
-    public struct JSONSchemaConfiguration: Hashable, Sendable {
-      public struct Separators: Hashable, Sendable {
-        public var comma: String
-        public var colon: String
-        public init(comma: String, colon: String) {
-          self.comma = comma
-          self.colon = colon
-        }
-      }
-
-      public var anyWhitespace: Bool
-      public var indent: Int?
-      public var separators: Separators?
-      public var isStrict: Bool
-      public var maximumWhitespaceCount: Int?
-      public var anyOrder: Bool
-
-      public init(
-        anyWhitespace: Bool = true,
-        indent: Int? = nil,
-        separators: Separators? = nil,
-        isStrict: Bool = true,
-        maximumWhitespaceCount: Int? = nil,
-        anyOrder: Bool = false
-      ) {
-        self.anyWhitespace = anyWhitespace
-        self.indent = indent
-        self.separators = separators
-        self.isStrict = isStrict
-        self.maximumWhitespaceCount = maximumWhitespaceCount
-        self.anyOrder = anyOrder
-      }
-    }
-
-    public let handle: xgrammar_grammar_t
-
-    public static func ebnf(_ ebnf: String, rootRuleName: String = "root") throws -> XGRGrammar {
-      let handle = try ebnf.withCString { ebnf in
-        try rootRuleName.withCString {
-          try xgrammarRequiredHandle(xgrammar_grammar_init_ebnf(ebnf, $0))
-        }
-      }
-      return Self(handle: handle)
-    }
-
-    public static func regex(_ regex: String) throws -> XGRGrammar {
-      let handle = try regex.withCString {
-        try xgrammarRequiredHandle(xgrammar_grammar_init_regex($0))
-      }
-      return Self(handle: handle)
-    }
-
-    public static func lark(
-      _ lark: String,
-      tokenizerInfo: XGRTokenizerInfo? = nil,
-      namedGrammars: [XGRNamedGrammar] = []
-    ) throws -> XGRGrammar {
-      let names = namedGrammars.map(\.name)
-      let sources = namedGrammars.map { namedGrammar in
-        if case .lark(let source) = namedGrammar.definition { source }
-        else { "" }
-      }
-      let descriptors = namedGrammars.map { namedGrammar in
-        switch namedGrammar.definition {
-        case .grammar(let grammar):
-          xgrammar_named_grammar_t(
-            name: nil,
-            kind: xgrammar_named_grammar_handle,
-            lark_source: nil,
-            grammar: grammar.handle
-          )
-        case .lark:
-          xgrammar_named_grammar_t(
-            name: nil,
-            kind: xgrammar_named_grammar_lark,
-            lark_source: nil,
-            grammar: nil
-          )
-        }
-      }
-      let handle = try withCopiedCStringPointerBuffer(names) { names in
-        try withCopiedCStringPointerBuffer(sources) { sources in
-          var descriptors = descriptors
-          for index in descriptors.indices {
-            descriptors[index].name = names[index]
-            descriptors[index].lark_source = sources[index]
-          }
-          return try descriptors.withUnsafeBufferPointer { descriptors in
-            try lark.withCString {
-              try xgrammarRequiredHandle(
-                xgrammar_grammar_init_lark(
-                  $0,
-                  tokenizerInfo?.handle,
-                  descriptors.baseAddress,
-                  descriptors.count
-                )
-              )
-            }
-          }
-        }
-      }
-      return Self(handle: handle)
-    }
-
-    public static func structuralTagJSON(
-      _ structuralTagJSON: String,
-      tokenizerInfo: XGRTokenizerInfo? = nil
-    ) throws -> XGRGrammar {
-      let handle = try structuralTagJSON.withCString {
-        try xgrammarRequiredHandle(
-          xgrammar_grammar_init_structural_tag($0, tokenizerInfo?.handle)
-        )
-      }
-      return Self(handle: handle)
-    }
-
+  extension XGRGrammar {
     public static func literal(_ literal: String) throws -> XGRGrammar {
-      try Self.ebnf("root ::= \"\(Self.escapeEBNFLiteral(literal))\"")
-    }
-
-    public static func jsonSchema(
-      _ jsonSchema: String,
-      configuration: JSONSchemaConfiguration = JSONSchemaConfiguration()
-    ) throws -> XGRGrammar {
-      guard configuration.indent.map({ $0 >= 0 }) ?? true,
-        configuration.maximumWhitespaceCount.map({ $0 >= 0 }) ?? true
-      else {
-        throw XGRError(
-          code: .invalidJSONSchemaConfiguration,
-          message: "Invalid XGrammar JSON Schema configuration."
-        )
+      let escapedLiteral = literal.reduce(into: "") { result, character in
+        if character == "\\" || character == "\"" { result.append("\\") }
+        result.append(character)
       }
-      let indent = try configuration.indent.map {
-        try xgrammarInt32(
-          $0,
-          error: XGRError(
-            code: .invalidJSONSchemaConfiguration,
-            message: "Invalid XGrammar JSON Schema configuration."
-          )
-        )
-      }
-      let maximumWhitespaceCount = try configuration.maximumWhitespaceCount.map {
-        try xgrammarInt32(
-          $0,
-          error: XGRError(
-            code: .invalidJSONSchemaConfiguration,
-            message: "Invalid XGrammar JSON Schema configuration."
-          )
-        )
-      }
-      let handle = try jsonSchema.withCString { schema in
-        if let separators = configuration.separators {
-          return try separators.comma.withCString { comma in
-            try separators.colon.withCString { colon in
-              try xgrammarRequiredHandle(
-                xgrammar_grammar_init_json_schema(
-                  schema,
-                  configuration.anyWhitespace.intValue(as: Int32.self),
-                  indent ?? -1,
-                  comma,
-                  colon,
-                  configuration.isStrict.intValue(as: Int32.self),
-                  maximumWhitespaceCount ?? -1,
-                  configuration.anyOrder.intValue(as: Int32.self)
-                )
-              )
-            }
-          }
-        }
-        return try xgrammarRequiredHandle(
-          xgrammar_grammar_init_json_schema(
-            schema,
-            configuration.anyWhitespace.intValue(as: Int32.self),
-            indent ?? -1,
-            nil,
-            nil,
-            configuration.isStrict.intValue(as: Int32.self),
-            maximumWhitespaceCount ?? -1,
-            configuration.anyOrder.intValue(as: Int32.self)
-          )
-        )
-      }
-      return Self(handle: handle)
+      return try Self.ebnf("root ::= \"\(escapedLiteral)\"")
     }
 
     public static func schema(_ schema: EdgeToolsGenerationSchema) -> XGRGrammar {
@@ -409,89 +107,14 @@
     }
 
     public static var universal: XGRGrammar {
-      guard let grammar = try? Self.structuralTagJSON(#"{"type":"structural_tag","format":{"type":"any_text"}}"#) else {
+      guard
+        let grammar = try? Self.structuralTagJSON(
+          #"{"type":"structural_tag","format":{"type":"any_text"}}"#
+        )
+      else {
         preconditionFailure("XGrammar must support the any_text structural tag.")
       }
       return grammar
-    }
-
-    public static func serializedJSON(_ serializedJSON: String) throws -> XGRGrammar {
-      let handle = try serializedJSON.withCString {
-        try xgrammarRequiredHandle(xgrammar_grammar_deserialize_json($0))
-      }
-      return Self(handle: handle)
-    }
-
-    public init(handle: consuming xgrammar_grammar_t) {
-      self.handle = consume handle
-    }
-
-    deinit { xgrammar_grammar_destroy(self.handle) }
-
-    public static func builtinJSONGrammar() -> XGRGrammar {
-      XGRGrammar(handle: xgrammar_grammar_builtin_json()!)
-    }
-
-    public var ebnf: String {
-      let capacity = xgrammar_grammar_ebnf(self.handle, nil, 0)
-      return xgrammarString(
-        { xgrammar_grammar_ebnf(self.handle, $0, $1) },
-        capacity: capacity
-      )
-    }
-
-    public func serializedJSON() throws -> String {
-      try xgrammarString { xgrammar_grammar_serialize_json(self.handle, $0, $1) }
-    }
-
-    private static func escapeEBNFLiteral(_ literal: String) -> String {
-      literal.reduce(into: "") { result, character in
-        if character == "\\" || character == "\"" { result.append("\\") }
-        result.append(character)
-      }
-    }
-
-    public borrowing func concatenate(
-      _ grammar: borrowing XGRGrammar
-    ) throws -> XGRGrammar {
-      try EdgeTools.concatenate(self, grammar)
-    }
-
-    public borrowing func union(_ grammar: borrowing XGRGrammar) throws -> XGRGrammar {
-      try EdgeTools.union(self, grammar)
-    }
-
-    public borrowing func optional() throws -> XGRGrammar {
-      try XGRGrammar(handle: xgrammarRequiredHandle(xgrammar_grammar_optional(self.handle)))
-    }
-
-    public borrowing func repeated(exactly count: Int) throws -> XGRGrammar {
-      try repeatGrammar(self, exactly: count)
-    }
-
-    public borrowing func repeated(_ range: ClosedRange<Int>) throws -> XGRGrammar {
-      try repeatGrammar(self, range)
-    }
-
-    public borrowing func repeated(_ range: PartialRangeFrom<Int>) throws -> XGRGrammar {
-      try repeatGrammar(self, range)
-    }
-  }
-
-  // MARK: - XGRNamedGrammar
-
-  public struct XGRNamedGrammar: Sendable {
-    public enum Definition: Sendable {
-      case grammar(XGRGrammar)
-      case lark(String)
-    }
-
-    public let name: String
-    public let definition: Definition
-
-    public init(name: String, definition: Definition) {
-      self.name = name
-      self.definition = definition
     }
   }
 
@@ -521,7 +144,10 @@
     }
 
     public var toolCallRange: GrammarToolCallRange? {
-      if case .tools(let range, _) = self { range } else { nil }
+      switch self {
+      case .tools(let range, _): range
+      default: nil
+      }
     }
 
     /// Resolves this constraint using an engine's model-specific tool-call grammar.
@@ -540,284 +166,326 @@
     }
   }
 
-  // MARK: - XGRCompiledGrammar
+  // MARK: - EBNF
 
-  public struct XGRCompiledGrammar: ~Copyable {
-    public let handle: xgrammar_compiled_grammar_t
-
-    public init(handle: consuming xgrammar_compiled_grammar_t) {
-      self.handle = consume handle
+  struct XGREBNFDocument: Hashable, Sendable {
+    struct Rule: Hashable, Sendable {
+      let name: String
+      var body: String
     }
 
-    public init(serializedJSON: String, tokenizerInfo: borrowing XGRTokenizerInfo) throws {
-      self.handle = try serializedJSON.withCString {
-        try xgrammarRequiredHandle(
-          xgrammar_compiled_grammar_deserialize_json($0, tokenizerInfo.handle)
-        )
+    var rules: [Rule]
+
+    init(_ source: String) throws {
+      var rules = [Rule]()
+      for line in source.split(separator: "\n", omittingEmptySubsequences: false) {
+        if let separator = line.firstRange(of: "::=") {
+          let name = line[..<separator.lowerBound].trimmingWhitespace
+          let body = line[separator.upperBound...].trimmingWhitespace
+          guard !name.isEmpty else { throw XGRError.unsupportedToolSchema }
+          rules.append(Rule(name: name, body: body))
+        } else if !line.trimmingWhitespace.isEmpty {
+          guard !rules.isEmpty else { throw XGRError.unsupportedToolSchema }
+          rules[rules.count - 1].body += "\n" + line
+        }
+      }
+      guard rules.contains(where: { $0.name == "root" }) else {
+        throw XGRError.unsupportedToolSchema
+      }
+      self.rules = rules
+    }
+
+    var source: String {
+      self.rules.map { "\($0.name) ::= \($0.body)" }.joined(separator: "\n")
+    }
+
+    mutating func removeDuplicateRules() {
+      while true {
+        let orderedRules = self.rules.sorted { lhs, _ in lhs.name == "root" }
+        var canonicalNames = [String: String]()
+        var aliases = [String: String]()
+        var uniqueRules = [Rule]()
+
+        for rule in orderedRules {
+          if let canonicalName = canonicalNames[rule.body] {
+            aliases[rule.name] = canonicalName
+          } else {
+            canonicalNames[rule.body] = rule.name
+            uniqueRules.append(rule)
+          }
+        }
+        guard !aliases.isEmpty else { return }
+        for index in uniqueRules.indices {
+          uniqueRules[index].body = Self.replacingRuleReferences(
+            in: uniqueRules[index].body,
+            aliases: aliases
+          )
+        }
+        self.rules = uniqueRules
       }
     }
 
-    deinit { xgrammar_compiled_grammar_destroy(self.handle) }
-
-    public var grammar: XGRGrammar {
-      XGRGrammar(handle: xgrammar_compiled_grammar_grammar(self.handle)!)
-    }
-
-    public var tokenizerInfo: XGRTokenizerInfo {
-      XGRTokenizerInfo(handle: xgrammar_compiled_grammar_tokenizer_info(self.handle)!)
-    }
-
-    public var memorySizeBytes: Int64 {
-      xgrammar_compiled_grammar_memory_size_bytes(self.handle)
-    }
-
-    public func serializedJSON() throws -> String {
-      try xgrammarString { xgrammar_compiled_grammar_serialize_json(self.handle, $0, $1) }
-    }
-  }
-
-  // MARK: - XGRCompiler
-
-  public struct XGRCompiler: ~Copyable {
-    public let handle: xgrammar_compiler_t
-    public let tokenizerInfo: XGRTokenizerInfo
-
-    public init(
-      tokenizerInfo: XGRTokenizerInfo,
-      maxThreads: Int = 8,
-      cacheEnabled: Bool = true,
-      maxMemoryBytes: Int64 = -1
+    mutating func mapLiterals(
+      _ transform: (_ ruleName: String, _ value: String, _ suffix: Substring) -> String
     ) throws {
-      let maxThreads = try xgrammarInt32(
-        maxThreads,
-        error: XGRError(
-          code: .invalidCompilerConfiguration,
-          message: "Invalid XGrammar compiler configuration."
-        )
-      )
-      guard maxThreads > 0 else {
-        throw XGRError(
-          code: .invalidCompilerConfiguration,
-          message: "Invalid XGrammar compiler configuration."
-        )
+      for index in self.rules.indices {
+        let rule = self.rules[index]
+        self.rules[index].body = try Self.mapLiterals(in: rule.body) { value, suffix in
+          transform(rule.name, value, suffix)
+        }
       }
-      self.handle = try xgrammarRequiredHandle(
-        xgrammar_compiler_init(
-          tokenizerInfo.handle,
-          maxThreads,
-          cacheEnabled.intValue(as: Int32.self),
-          maxMemoryBytes
-        )
-      )
-      self.tokenizerInfo = tokenizerInfo
     }
 
-    public init(handle: consuming xgrammar_compiler_t, tokenizerInfo: XGRTokenizerInfo) {
-      self.handle = consume handle
-      self.tokenizerInfo = tokenizerInfo
+    private static func mapLiterals(
+      in source: String,
+      _ transform: (_ value: String, _ suffix: Substring) -> String
+    ) throws -> String {
+      var output = ""
+      var outputStart = source.startIndex
+
+      for match in source.matches(of: literalRegex) {
+        let literalRange = match.output.1.startIndex..<match.output.1.endIndex
+        output.append(contentsOf: source[outputStart..<literalRange.lowerBound])
+        let encodedValue = source[literalRange].dropFirst().dropLast()
+        let value = Self.decodeLiteral(encodedValue)
+        let transformed = transform(value, source[literalRange.upperBound...])
+        output.append("\"")
+        output.append(contentsOf: Self.escapeLiteral(transformed))
+        output.append("\"")
+        outputStart = literalRange.upperBound
+      }
+      output.append(contentsOf: source[outputStart...])
+      return output
     }
 
-    deinit { xgrammar_compiler_destroy(self.handle) }
-
-    public var cacheSizeBytes: Int64 {
-      xgrammar_compiler_cache_size_bytes(self.handle)
+    private static func replacingRuleReferences(
+      in source: String,
+      aliases: [String: String]
+    ) -> String {
+      let literalRanges = source.matches(of: literalRegex)
+        .map { $0.output.1.startIndex..<$0.output.1.endIndex }
+      var output = ""
+      var outputStart = source.startIndex
+      for match in source.matches(of: ruleReferenceRegex) {
+        let range = match.range
+        let isInsideLiteral = literalRanges.contains {
+          $0.lowerBound <= range.lowerBound && range.upperBound <= $0.upperBound
+        }
+        guard !isInsideLiteral, let replacement = aliases[String(source[range])] else { continue }
+        output.append(contentsOf: source[outputStart..<range.lowerBound])
+        output.append(replacement)
+        outputStart = range.upperBound
+      }
+      output.append(contentsOf: source[outputStart...])
+      return output
     }
 
-    public var cacheLimitBytes: Int64 {
-      xgrammar_compiler_cache_limit_bytes(self.handle)
+    private static func decodeLiteral(_ literal: Substring) -> String {
+      var result = ""
+      var isEscaping = false
+      for character in literal {
+        if isEscaping {
+          switch character {
+          case "n": result.append("\n")
+          case "r": result.append("\r")
+          case "t": result.append("\t")
+          default: result.append(character)
+          }
+          isEscaping = false
+        } else if character == "\\" {
+          isEscaping = true
+        } else {
+          result.append(character)
+        }
+      }
+      return result
     }
 
-    public func clearCache() {
-      xgrammar_compiler_clear_cache(self.handle)
-    }
-
-    public borrowing func compile(
-      _ grammar: borrowing XGRGrammar
-    ) throws -> XGRCompiledGrammar {
-      try XGRCompiledGrammar(
-        handle: xgrammarRequiredHandle(
-          xgrammar_compiler_compile_grammar(self.handle, grammar.handle)
-        )
-      )
+    private static func escapeLiteral(_ literal: String) -> String {
+      literal.reduce(into: "") { result, character in
+        switch character {
+        case "\\", "\"":
+          result.append("\\")
+          result.append(character)
+        case "\n": result.append(contentsOf: "\\n")
+        case "\r": result.append(contentsOf: "\\r")
+        case "\t": result.append(contentsOf: "\\t")
+        default: result.append(character)
+        }
+      }
     }
   }
 
-  // MARK: - XGRMatcher
+  extension Substring {
+    var hasToolCallContinuationReference: Bool {
+      self.contains(toolCallContinuationReferenceRegex)
+    }
+  }
 
-  public struct XGRMatcher: ~Copyable {
-    public let handle: xgrammar_matcher_t
+  nonisolated(unsafe) private let literalRegex = /(?:^|[^\\])(\"(?:\\.|[^\"\\])*\")/
 
-    public init(
-      compiledGrammar: borrowing XGRCompiledGrammar,
-      overrideStopTokenIDs: [Int] = [],
-      terminateWithoutStopToken: Bool = false,
-      maxRollbackTokens: Int = -1
-    ) throws {
-      let maxRollbackTokens = try xgrammarInt32(
-        maxRollbackTokens,
-        error: XGRError(
-          code: .invalidMatcherConfiguration,
-          message: "Invalid XGrammar matcher configuration."
-        )
-      )
-      let overrideStopTokenIDs = try overrideStopTokenIDs.map {
-        try xgrammarInt32(
-          $0,
-          error: XGRError(
-            code: .invalidMatcherConfiguration,
-            message: "Invalid XGrammar matcher configuration."
+  nonisolated(unsafe) private let toolCallContinuationReferenceRegex =
+    /\b(?:root(?:_[A-Za-z0-9]+)*|xml_object(?:_[A-Za-z0-9]+)*)\b/
+
+  nonisolated(unsafe) private let ruleReferenceRegex = /\b[A-Za-z_][A-Za-z0-9_]*\b/
+
+  // MARK: - Tool Call Building
+
+  extension XGRGrammar {
+    static func strictJSONArguments(for tool: EdgeToolDefinition) -> XGRGrammar {
+      guard
+        let grammar = try? XGRGrammar.jsonSchema(
+          tool.arguments.orderedKeyEncoded(),
+          configuration: JSONSchemaConfiguration(
+            anyWhitespace: false,
+            separators: .init(comma: ",", colon: ":"),
+            isStrict: true
           )
         )
+      else {
+        preconditionFailure("Edge tool arguments must produce a valid JSON Schema.")
       }
+      return grammar
+    }
 
-      self.handle = try overrideStopTokenIDs.withUnsafeBufferPointer {
-        try xgrammarRequiredHandle(
-          xgrammar_matcher_init(
-            compiledGrammar.handle,
-            $0.baseAddress,
-            $0.count,
-            terminateWithoutStopToken.intValue(as: Int32.self),
-            maxRollbackTokens
+    static func qwenXMLArguments(for tool: EdgeToolDefinition) -> XGRGrammar {
+      let schema = tool.arguments.orderedKeyEncoded()
+      let structuralTag =
+        #"{"type":"structural_tag","format":{"type":"json_schema","json_schema":\#(schema),"style":"qwen_xml","any_order":false}}"#
+      guard let grammar = try? XGRGrammar.structuralTagJSON(structuralTag) else {
+        preconditionFailure("Edge tool arguments must produce a valid Qwen XML structural tag.")
+      }
+      return grammar
+    }
+
+    static func toolCalls(
+      tools: [EdgeToolDefinition],
+      separator: String,
+      range: GrammarToolCallRange,
+      call: (EdgeToolDefinition) throws -> XGRGrammar
+    ) throws -> XGRGrammar {
+      guard range.lowerBound >= 0 else { throw XGRError.invalidToolInvocationRange }
+      guard let firstTool = tools.first else {
+        guard range.lowerBound == 0 else {
+          throw XGRError(
+            code: EdgeToolsXGRError.emptyToolCollection,
+            message: "A nonzero tool invocation range requires at least one tool."
           )
+        }
+        return try XGRGrammar.literal("")
+      }
+
+      var grammar = try call(firstTool)
+      for tool in tools.dropFirst() {
+        grammar = try grammar.union(call(tool))
+      }
+      return try Self.repeatingToolCall(grammar, separator: separator, range: range)
+    }
+
+    static func repeatingToolCall(
+      _ call: borrowing XGRGrammar,
+      separator: String,
+      range: GrammarToolCallRange
+    ) throws -> XGRGrammar {
+      guard range.lowerBound >= 0 else { throw XGRError.invalidToolInvocationRange }
+      let separatedCall = try XGRGrammar.literal(separator).concatenate(call)
+
+      switch range {
+      case .exact(let count):
+        return try Self.boundedToolCalls(
+          call,
+          separatedCall: separatedCall,
+          minimum: count,
+          maximum: count
         )
+      case .bounded(let bounds):
+        return try Self.boundedToolCalls(
+          call,
+          separatedCall: separatedCall,
+          minimum: bounds.lowerBound,
+          maximum: bounds.upperBound
+        )
+      case .unbounded(let minimum):
+        guard minimum >= 0 else { throw XGRError.invalidToolInvocationRange }
+        let tail = try separatedCall.repeated(Swift.max(0, minimum - 1)...)
+        let nonempty = try call.concatenate(tail)
+        return minimum == 0 ? try nonempty.optional() : nonempty
       }
     }
 
-    public init(handle: consuming xgrammar_matcher_t) {
-      self.handle = consume handle
+    private static func boundedToolCalls(
+      _ call: borrowing XGRGrammar,
+      separatedCall: borrowing XGRGrammar,
+      minimum: Int,
+      maximum: Int
+    ) throws -> XGRGrammar {
+      guard minimum >= 0, maximum >= minimum else { throw XGRError.invalidToolInvocationRange }
+      guard maximum > 0 else { return try XGRGrammar.literal("") }
+      let tail = try separatedCall.repeated(Swift.max(0, minimum - 1)...(maximum - 1))
+      let nonempty = try call.concatenate(tail)
+      return minimum == 0 ? try nonempty.optional() : nonempty
     }
+  }
 
-    deinit {
-      xgrammar_matcher_destroy(self.handle)
-    }
+  // MARK: - Matcher Pool
 
-    public var isCompleted: Bool {
-      xgrammar_matcher_is_completed(self.handle).boolValue
-    }
+  final class XGRToolCallMatcherPool {
+    private final class CachedMatcher {
+      private let matcher: XGRMatcher
 
-    public var isTerminated: Bool {
-      xgrammar_matcher_is_terminated(self.handle).boolValue
-    }
-
-    public func bitmask() -> GrammarBitmask {
-      var bitmask = GrammarBitmask(bitCount: Int(xgrammar_matcher_bit_count(self.handle)))
-      _ = bitmask.storage.withUnsafeMutableBytes {
-        xgrammar_matcher_bitmask(self.handle, $0.bindMemory(to: Int32.self).baseAddress)
+      init(_ matcher: consuming XGRMatcher) {
+        self.matcher = consume matcher
       }
-      return bitmask
+
+      func fork() -> XGRMatcher {
+        self.matcher.fork()
+      }
     }
 
-    @discardableResult
-    public func accept(tokenId: Int) -> Bool {
-      xgrammar_matcher_accept_token(self.handle, Int32(tokenId)).boolValue
+    private let maxCount: Int
+    private var entries = [String: CachedMatcher]()
+    private var order = [String]()
+
+    init(maxCount: Int = 8) {
+      self.maxCount = maxCount
     }
 
-    @discardableResult
-    public func accept(string: String) -> Bool {
-      string.withCString { xgrammar_matcher_accept_string(self.handle, $0).boolValue }
+    func matcher(
+      grammar: borrowing XGRGrammar,
+      compilingWith compiler: borrowing XGRCompiler
+    ) throws -> XGRMatcher {
+      let key = grammar.ebnf
+      if let cached = self.entries[key] {
+        self.touch(key)
+        return cached.fork()
+      }
+      let compiledGrammar = try compiler.compile(grammar)
+      let matcher = try XGRMatcher(compiledGrammar: compiledGrammar)
+      return self.insert(key, matcher: consume matcher)
     }
 
-    public func rollback(_ tokenCount: Int = 1) {
-      xgrammar_matcher_rollback(self.handle, Int32(tokenCount))
+    func clear() {
+      self.entries.removeAll()
+      self.order.removeAll()
     }
 
-    public func reset() {
-      xgrammar_matcher_reset(self.handle)
+    private func touch(_ key: String) {
+      self.order.removeAll { $0 == key }
+      self.order.append(key)
     }
 
-    public borrowing func fork() -> XGRMatcher {
-      XGRMatcher(handle: xgrammar_matcher_fork(self.handle)!)
+    private func insert(
+      _ key: String,
+      matcher: consuming XGRMatcher
+    ) -> XGRMatcher {
+      let cached = CachedMatcher(consume matcher)
+      if self.entries.count >= self.maxCount, let leastRecentlyUsed = self.order.first {
+        self.entries.removeValue(forKey: leastRecentlyUsed)
+        self.order.removeFirst()
+      }
+      self.entries[key] = cached
+      self.order.append(key)
+      return cached.fork()
     }
-  }
-
-  // MARK: - Helpers
-
-  func xgrammarRequiredHandle<Handle>(_ handle: Handle?) throws -> Handle {
-    guard let handle else {
-      throw XGRError.xgrammarFailure(message: String(cString: xgrammar_last_error_message()))
-    }
-    return handle
-  }
-
-  func xgrammarInt32(_ value: Int, error: XGRError) throws -> Int32 {
-    guard let value = Int32(exactly: value) else { throw error }
-    return value
-  }
-
-  private func xgrammarString(
-    _ body: (UnsafeMutablePointer<CChar>?, Int) -> Int
-  ) throws -> String {
-    let capacity = body(nil, 0)
-    guard capacity > 0 else {
-      throw XGRError.xgrammarFailure(message: String(cString: xgrammar_last_error_message()))
-    }
-    return xgrammarString(body, capacity: capacity)
-  }
-
-  private func xgrammarString(
-    _ body: (UnsafeMutablePointer<CChar>?, Int) -> Int,
-    capacity: Int
-  ) -> String {
-    var buffer = [CChar](repeating: 0, count: capacity)
-    _ = buffer.withUnsafeMutableBufferPointer { body($0.baseAddress, $0.count) }
-    return buffer.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
-  }
-#endif
-
-// MARK: - Grammar Combinators
-
-#if XGrammar
-  public func concatenate(
-    _ lhs: borrowing XGRGrammar,
-    _ rhs: borrowing XGRGrammar
-  ) throws -> XGRGrammar {
-    let handles: [xgrammar_grammar_t?] = [lhs.handle, rhs.handle]
-    let handle = try handles.withUnsafeBufferPointer {
-      try xgrammarRequiredHandle(xgrammar_grammar_concatenate($0.baseAddress, $0.count))
-    }
-    return XGRGrammar(handle: handle)
-  }
-
-  public func union(
-    _ lhs: borrowing XGRGrammar,
-    _ rhs: borrowing XGRGrammar
-  ) throws -> XGRGrammar {
-    let handles: [xgrammar_grammar_t?] = [lhs.handle, rhs.handle]
-    let handle = try handles.withUnsafeBufferPointer {
-      try xgrammarRequiredHandle(xgrammar_grammar_union($0.baseAddress, $0.count))
-    }
-    return XGRGrammar(handle: handle)
-  }
-
-  public func repeatGrammar(
-    _ grammar: borrowing XGRGrammar,
-    exactly count: Int
-  ) throws -> XGRGrammar {
-    try repeatGrammar(grammar, count...count)
-  }
-
-  public func repeatGrammar(
-    _ grammar: borrowing XGRGrammar,
-    _ range: ClosedRange<Int>
-  ) throws -> XGRGrammar {
-    guard range.lowerBound >= 0 else { throw XGRError.invalidRepetitionRange }
-    let lowerBound = try xgrammarInt32(range.lowerBound, error: .invalidRepetitionRange)
-    let upperBound = try xgrammarInt32(range.upperBound, error: .invalidRepetitionRange)
-    let handle = try xgrammarRequiredHandle(
-      xgrammar_grammar_repeat(grammar.handle, lowerBound, upperBound)
-    )
-    return XGRGrammar(handle: handle)
-  }
-
-  public func repeatGrammar(
-    _ grammar: borrowing XGRGrammar,
-    _ range: PartialRangeFrom<Int>
-  ) throws -> XGRGrammar {
-    guard range.lowerBound >= 0 else { throw XGRError.invalidRepetitionRange }
-    let lowerBound = try xgrammarInt32(range.lowerBound, error: .invalidRepetitionRange)
-    let handle = try xgrammarRequiredHandle(
-      xgrammar_grammar_repeat(grammar.handle, lowerBound, -1)
-    )
-    return XGRGrammar(handle: handle)
   }
 #endif

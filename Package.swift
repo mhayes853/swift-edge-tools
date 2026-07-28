@@ -14,7 +14,8 @@ let package = Package(
     .visionOS(.v1)
   ],
   products: [
-    .library(name: "EdgeTools", targets: ["EdgeTools"])
+    .library(name: "EdgeTools", targets: ["EdgeTools"]),
+    .library(name: "EdgeToolsXGrammar", targets: ["EdgeToolsXGrammar"])
   ],
   traits: [
     .trait(name: "Foundation", description: "Foundation-specific conveniences."),
@@ -123,7 +124,7 @@ let package = Package(
         .product(name: "MLXNN", package: "mlx-swift", condition: .when(traits: ["MLX"])),
         .product(name: "MLXLLM", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),
         .product(name: "MLXLMCommon", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),
-        .target(name: "CXGrammar", condition: .when(traits: ["XGrammar"])),
+        .target(name: "EdgeToolsXGrammar", condition: .when(traits: ["XGrammar"])),
         .target(
           name: "COnnxRuntime",
           condition: .when(
@@ -144,6 +145,11 @@ let package = Package(
           .when(platforms: [.macOS, .iOS], traits: ["ONNX"])
         )
       ]
+    ),
+    .target(
+      name: "EdgeToolsXGrammar",
+      dependencies: ["CXGrammar"],
+      path: "swift/Sources/EdgeToolsXGrammar"
     ),
     .target(
       name: "COnnxRuntime",

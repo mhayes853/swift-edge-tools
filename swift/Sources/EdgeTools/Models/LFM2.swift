@@ -1,3 +1,7 @@
+#if XGrammar
+  import EdgeToolsXGrammar
+#endif
+
 import OrderedCollections
 
 #if System

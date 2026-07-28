@@ -1,3 +1,7 @@
+#if XGrammar
+  import EdgeToolsXGrammar
+#endif
+
 #if MLX && canImport(MLX)
   import MLX
   import MLXLMCommon
@@ -54,14 +58,6 @@ extension GrammarBitmask: MutableCollection {
 
 extension GrammarBitmask: RandomAccessCollection {}
 
-@_transparent
-private func validateBitmaskCoverage(mask: GrammarBitmask, vocabularySize: Int) {
-  precondition(
-    mask.count >= vocabularySize,
-    "Grammar bitmask (\(mask.count) tokens) does not cover the model vocabulary (\(vocabularySize) tokens)."
-  )
-}
-
 // MARK: - MLX
 
 #if MLX && canImport(MLX)
@@ -81,7 +77,7 @@ private func validateBitmaskCoverage(mask: GrammarBitmask, vocabularySize: Int) 
 
     public func process(logits: MLXArray) -> MLXArray {
       guard !self.matcher.isTerminated else { return logits }
-      return applyBitmaskMLX(logits: logits, mask: self.matcher.bitmask())
+      return applyBitmaskMLX(logits: logits, mask: self.matcher.grammarBitmask())
     }
   }
 
@@ -206,4 +202,14 @@ let bitmaskSIMDTable = bitmaskTable.withUnsafeBufferPointer { table in
       UnsafeRawPointer(table.baseAddress!.advanced(by: byte * 8))
         .loadUnaligned(as: SIMD8<Float>.self)
     }
+}
+
+// MARK: - Validation
+
+@_transparent
+private func validateBitmaskCoverage(mask: GrammarBitmask, vocabularySize: Int) {
+  precondition(
+    mask.count >= vocabularySize,
+    "Grammar bitmask (\(mask.count) tokens) does not cover the model vocabulary (\(vocabularySize) tokens)."
+  )
 }

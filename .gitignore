@@ -10,6 +10,7 @@ DerivedData/
 .netrc
 /.swift-needle-tests/
 .swift-version
+.swift-needle-tests
 
 __pycache__/
 *.pyc

@@ -1,3 +1,7 @@
+#if XGrammar
+  import EdgeToolsXGrammar
+#endif
+
 #if XGrammar && Atomics
   import Atomics
 
@@ -44,7 +48,7 @@
         self.generatedTokens.last?.id != self.tokenizer.eosTokenId
       else { return nil }
       try Task.checkCancellation()
-      return self.matcher.bitmask()
+      return self.matcher.grammarBitmask()
     }
 
     mutating func accept(

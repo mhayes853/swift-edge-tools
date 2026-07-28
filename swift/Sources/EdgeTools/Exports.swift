@@ -1,3 +1,3 @@
 #if XGrammar
-  @_exported import CXGrammar
+  @_exported import EdgeToolsXGrammar
 #endif

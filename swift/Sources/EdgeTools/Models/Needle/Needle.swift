@@ -1,3 +1,7 @@
+#if XGrammar
+  import EdgeToolsXGrammar
+#endif
+
 #if Foundation
   import Foundation
 #endif
@@ -224,7 +228,7 @@ public struct NeedleToolCallParser: EdgeToolCallParser, Sendable {
     ) throws -> XGRTokenizerInfo {
       guard let eosTokenID, vocabulary.allSatisfy({ $0 != nil }) else {
         throw XGRError(
-          code: .invalidNeedleTokenizer,
+          code: EdgeToolsXGRError.invalidNeedleTokenizer,
           message: "Needle requires a tokenizer with an EOS token and full vocabulary."
         )
       }

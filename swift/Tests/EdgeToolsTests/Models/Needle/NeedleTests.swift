@@ -155,9 +155,11 @@ struct `Needle tests` {
 
   }
 
-  #if XGrammar
-    @Suite
-    struct `NeedleXGRCompiler tests`: ~Copyable {
+}
+
+#if XGrammar
+  @Suite
+  struct `NeedleXGRCompiler tests`: ~Copyable {
       @Suite
       struct `Range tests`: ~Copyable {
         private let tokenizer: NeedleSPTokenizer
@@ -349,7 +351,7 @@ struct `Needle tests` {
               try XGRGrammar.needle(tools: [.getWeather], range: .unbounded(minimum: -1))
             )
           }
-          expectNoDifference(error?.code, .invalidToolInvocationRange)
+          expectNoDifference(error?.code, EdgeToolsXGRError.invalidToolInvocationRange)
         }
       }
     }
@@ -550,8 +552,7 @@ struct `Needle tests` {
         )
       }
     }
-  #endif
-}
+#endif
 
 #if XGrammar
   // MARK: - Helpers
