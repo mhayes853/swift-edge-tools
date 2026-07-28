@@ -2,7 +2,7 @@ import OrderedCollections
 import yyjson
 
 #if Foundation
-  import Foundation
+  internal import _EdgeToolsFoundation
 #endif
 
 #if canImport(CoreGraphics)

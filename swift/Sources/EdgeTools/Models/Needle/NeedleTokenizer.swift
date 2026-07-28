@@ -9,7 +9,7 @@ import HeapModule
 #endif
 
 #if Foundation
-  import Foundation
+  public import _EdgeToolsFoundation
 #endif
 
 // MARK: - NeedleSPTokenizer

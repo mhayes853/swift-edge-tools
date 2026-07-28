@@ -94,6 +94,10 @@ let package = Package(
       name: "EdgeTools",
       dependencies: [
         "EdgeToolsMacros",
+        .target(
+          name: "_EdgeToolsFoundation",
+          condition: .when(traits: ["Foundation"])
+        ),
         .product(name: "yyjson", package: "yyjson"),
         .product(name: "HeapModule", package: "swift-collections"),
         .product(name: "OrderedCollections", package: "swift-collections"),
@@ -138,6 +142,10 @@ let package = Package(
           .when(platforms: [.macOS, .iOS], traits: ["ONNX"])
         )
       ]
+    ),
+    .target(
+      name: "_EdgeToolsFoundation",
+      path: "swift/Sources/_EdgeToolsFoundation"
     ),
     .target(
       name: "EdgeToolsXGrammar",

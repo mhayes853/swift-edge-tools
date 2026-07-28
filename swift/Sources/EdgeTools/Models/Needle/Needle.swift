@@ -3,7 +3,7 @@
 #endif
 
 #if Foundation
-  import Foundation
+  internal import _EdgeToolsFoundation
 #endif
 
 // MARK: - NeedleModelConfiguration

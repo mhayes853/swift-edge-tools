@@ -8,7 +8,7 @@
 
 #if swift(>=6.4) && CoreAI && canImport(CoreAI)
   import CoreAI
-  import Foundation
+  public import _EdgeToolsFoundation
   import Atomics
 
   @available(anyAppleOS 27.0, *)

@@ -1,5 +1,5 @@
 #if FoundationModels && canImport(FoundationModels)
-  import Foundation
+  internal import _EdgeToolsFoundation
   import FoundationModels
 
   // MARK: - EdgeToolsFMTool

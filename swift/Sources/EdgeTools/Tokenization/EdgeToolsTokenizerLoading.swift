@@ -3,7 +3,7 @@
 #endif
 
 #if Foundation
-  import Foundation
+  package import _EdgeToolsFoundation
 #endif
 
 #if Transformers

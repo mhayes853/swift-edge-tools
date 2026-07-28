@@ -1,7 +1,7 @@
 import OrderedCollections
 
 #if Foundation
-  import Foundation
+  public import _EdgeToolsFoundation
 #endif
 
 #if canImport(CoreGraphics)

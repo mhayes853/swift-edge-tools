@@ -18,7 +18,7 @@
 #endif
 
 #if Foundation
-  import Foundation
+  package import _EdgeToolsFoundation
 
   package func decodeModelConfiguration<Configuration: Decodable>(
     _ configuration: Configuration.Type,

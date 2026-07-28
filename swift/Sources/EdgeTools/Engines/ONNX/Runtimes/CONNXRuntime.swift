@@ -2,7 +2,7 @@
   import COnnxRuntime
 
   #if Foundation
-    import Foundation
+    public import _EdgeToolsFoundation
   #endif
 
   #if System

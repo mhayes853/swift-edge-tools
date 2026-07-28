@@ -76,7 +76,7 @@
 #endif
 
 #if Foundation
-  import Foundation
+  package import _EdgeToolsFoundation
 
   package func readFile(at url: URL) throws -> [UInt8] {
     try [UInt8](Data(contentsOf: url))

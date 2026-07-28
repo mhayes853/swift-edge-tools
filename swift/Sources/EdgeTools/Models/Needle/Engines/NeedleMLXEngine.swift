@@ -7,7 +7,7 @@
 #endif
 
 #if MLX && canImport(MLX)
-  import Foundation
+  public import _EdgeToolsFoundation
   import MLX
   import MLXLLM
   import MLXLMCommon

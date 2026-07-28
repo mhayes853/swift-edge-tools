@@ -11,7 +11,7 @@
   import MLXNN
   import MLXLLM
   import MLXLMCommon
-  import Foundation
+  public import _EdgeToolsFoundation
   import Atomics
 #endif
 
