@@ -19,7 +19,6 @@ let package = Package(
   ],
   traits: [
     .trait(name: "Foundation", description: "Foundation-specific conveniences."),
-    .trait(name: "System", description: "swift-system FilePath-based file I/O."),
     .trait(name: "Atomics", description: "Atomic engine generation coordination."),
     .trait(name: "JS", description: "JavaScriptKit interoperability."),
     .trait(name: "XGrammar", description: "XGrammar-powered structured generation."),
@@ -88,7 +87,6 @@ let package = Package(
     ),
     .package(url: "https://github.com/apple/swift-collections", from: "1.2.1"),
     .package(url: "https://github.com/apple/swift-atomics", from: "1.3.0"),
-    .package(url: "https://github.com/apple/swift-system", from: "1.7.4"),
     .package(url: "https://github.com/swiftwasm/JavaScriptKit", exact: "0.56.1")
   ],
   targets: [
@@ -100,11 +98,6 @@ let package = Package(
         .product(name: "HeapModule", package: "swift-collections"),
         .product(name: "OrderedCollections", package: "swift-collections"),
         .product(name: "Atomics", package: "swift-atomics", condition: .when(traits: ["Atomics"])),
-        .product(
-          name: "SystemPackage",
-          package: "swift-system",
-          condition: .when(traits: ["System"])
-        ),
         .product(
           name: "JavaScriptKit",
           package: "JavaScriptKit",
@@ -245,11 +238,6 @@ let package = Package(
         ),
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
         .product(name: "CustomDump", package: "swift-custom-dump"),
-        .product(
-          name: "SystemPackage",
-          package: "swift-system",
-          condition: .when(traits: ["System"])
-        ),
         .product(
           name: "Hub",
           package: "swift-transformers",
