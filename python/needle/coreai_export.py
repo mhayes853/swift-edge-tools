@@ -14,6 +14,53 @@ from . import Needle, NeedleModelConfiguation
 from .needle_compression import NeedleCompressor
 
 
+class _CoreAIEncoder(torch.nn.Module):
+    def __init__(self, encoder: torch.nn.Module) -> None:
+        super().__init__()
+        self.encoder = encoder
+
+    def forward(
+        self, input_ids: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        cross_attention_mask, encoder_projected_k, encoder_projected_v = self.encoder(
+            input_ids
+        )
+        return (
+            cross_attention_mask.to(dtype=torch.float16),
+            encoder_projected_k.to(dtype=torch.float16),
+            encoder_projected_v.to(dtype=torch.float16),
+        )
+
+
+class _CoreAIDecoder(torch.nn.Module):
+    def __init__(self, decoder: torch.nn.Module, *, dtype: torch.dtype) -> None:
+        super().__init__()
+        self.decoder = decoder
+        self.dtype = dtype
+
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        cache_position: torch.Tensor,
+        self_attention_mask: torch.Tensor,
+        cross_attention_mask: torch.Tensor,
+        encoder_projected_k: torch.Tensor,
+        encoder_projected_v: torch.Tensor,
+        key_cache: torch.Tensor,
+        value_cache: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        return self.decoder(
+            input_ids,
+            cache_position,
+            self_attention_mask.to(dtype=self.dtype),
+            cross_attention_mask.to(dtype=self.dtype),
+            encoder_projected_k.to(dtype=self.dtype),
+            encoder_projected_v.to(dtype=self.dtype),
+            key_cache,
+            value_cache,
+        )
+
+
 def export_needle_coreai(
     source: str,
     output_directory: str | Path,
@@ -61,6 +108,7 @@ def convert_needle_coreai_programs(
     *,
     compressor: NeedleCompressor | None = None,
 ) -> tuple[AIProgram, AIProgram]:
+    model_dtype = next(needle.parameters()).dtype
     encoder_spec = export_helpers.encoder_export_spec(configuration)
     encoder_sample = (
         export_helpers.sample_encoder_input(
@@ -68,15 +116,21 @@ def convert_needle_coreai_programs(
             configuration.encoder_max_length,
         ),
     )
-    decoder_sample = (
-        *export_helpers.sample_decoder_inputs(needle, configuration),
-        *export_helpers.empty_decoder_caches(configuration, dtype=torch.float32),
-    )
     encoder_module = export_helpers.prepare_module_for_export(
-        needle.encoder,
+        _CoreAIEncoder(needle.encoder),
         encoder_sample,
         compressor=compressor,
         dynamic_shapes=encoder_spec.dynamic_shapes,
+    )
+
+    with torch.no_grad():
+        encoder_outputs = encoder_module(*encoder_sample)
+    decoder_sample = (
+        *export_helpers.sample_decoder_inputs_from_encoder_outputs(
+            configuration,
+            encoder_outputs,
+        ),
+        *export_helpers.empty_decoder_caches(configuration, dtype=torch.float32),
     )
 
     encoder_program = (
@@ -97,7 +151,7 @@ def convert_needle_coreai_programs(
 
     decoder_spec = export_helpers.decoder_export_spec(configuration)
     decoder_module = export_helpers.prepare_module_for_export(
-        needle.decoder,
+        _CoreAIDecoder(needle.decoder, dtype=model_dtype),
         decoder_sample,
         compressor=compressor,
         dynamic_shapes=decoder_spec.dynamic_shapes,

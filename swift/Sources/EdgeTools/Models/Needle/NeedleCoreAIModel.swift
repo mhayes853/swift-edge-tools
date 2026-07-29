@@ -482,12 +482,12 @@
   @available(anyAppleOS 27.0, *)
   extension NeedleCoreAIModel {
     private static func selfAttentionMask(step: Int, maxLength: Int) -> NDArray {
-      var mask = NDArray(shape: [1, 1, 1, maxLength], scalarType: .bfloat16)
+      var mask = NDArray(shape: [1, 1, 1, maxLength], scalarType: .float16)
       let allowedStart = max(0, maxLength - step - 1)
       var rawView = mask.mutableRawView()
       var values = MutableSpan<UInt16>(mutableBytes: rawView.mutableBytes)
       for index in 0..<maxLength {
-        values[index] = index >= allowedStart ? 0 : 0xC77F
+        values[index] = index >= allowedStart ? 0 : Float16(-65500).bitPattern
       }
       return mask
     }

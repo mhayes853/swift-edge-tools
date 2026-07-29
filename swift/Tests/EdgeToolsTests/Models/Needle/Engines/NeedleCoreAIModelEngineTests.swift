@@ -191,7 +191,7 @@
       }
     }
 
-    @Test(.disabled("TODO - Apple seems to have broken something here in the latest beta."))
+    @Test
     @available(anyAppleOS 27.0, *)
     func `Generate Basics With AOT Compiled Export`() async throws {
       let compilePlatform: String = {
