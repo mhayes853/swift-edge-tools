@@ -112,29 +112,6 @@
     ) async throws -> EdgeToolsEnginePrefill
   }
 
-  // MARK: - EdgeToolsModelGenerationGate
-
-  private actor EdgeToolsModelGenerationGate {
-    private var isAcquired = false
-    private var waiters = [UnsafeContinuation<Void, Never>]()
-
-    func acquire() async {
-      guard self.isAcquired else {
-        self.isAcquired = true
-        return
-      }
-      await withUnsafeContinuation { self.waiters.append($0) }
-    }
-
-    func release() {
-      guard !self.waiters.isEmpty else {
-        self.isAcquired = false
-        return
-      }
-      self.waiters.removeFirst().resume()
-    }
-  }
-
   // MARK: - EdgeToolsModelEngine
 
   public actor EdgeToolsModelEngine<Model: EdgeToolsModel>: EdgeToolsEngine {
@@ -166,11 +143,7 @@
       prompt: Model.Prompt,
       tools: [EdgeToolDefinition] = []
     ) async throws -> [EdgeToolsToken] {
-      let input = try self.model.input(
-        prompt: prompt,
-        tools: tools,
-        tokenizer: self.tokenizer
-      )
+      let input = try self.model.input(prompt: prompt, tools: tools, tokenizer: self.tokenizer)
       let tokenIds = self.model.tokenIds(in: input)
       let tokens = self.tokenizer.convertIdsToTokens(tokenIds)
       return zip(tokenIds, tokens)
@@ -187,66 +160,47 @@
     public nonisolated func generate(
       prompt: Model.Prompt,
       tools: [EdgeToolDefinition] = [],
-      parameters: Model.GenerateParameters,
+      parameters: sending Model.GenerateParameters,
       channel: EdgeToolsGenerationChannel
     ) throws -> some EdgeToolsEngineGenerationTask {
       let isStopped = ManagedAtomic(false)
+
+      // NB: Compiler region isolation checker limitation, this is safe because params are not
+      // accessed after being sent to generate.
+      nonisolated(unsafe) let parameters = parameters
       let task = Task {
-        try await self.runGeneration(
-          prompt: prompt,
-          tools: tools,
-          parameters: parameters,
-          channel: channel,
-          isStopped: isStopped
-        )
+        await self.generationGate.acquire()
+        do {
+          let generation = try await self.generate(
+            prompt: prompt,
+            tools: tools,
+            parameters: parameters,
+            channel: channel,
+            isStopped: isStopped
+          )
+          await self.generationGate.release()
+          return generation
+        } catch {
+          await self.generationGate.release()
+          throw error
+        }
       }
       return AtomicGenerationTask(task: task, isStopped: isStopped)
     }
 
-    private func runGeneration(
+    private func generate(
       prompt: Model.Prompt,
       tools: [EdgeToolDefinition],
-      parameters: Model.GenerateParameters,
-      channel: EdgeToolsGenerationChannel,
-      isStopped: ManagedAtomic<Bool>
-    ) async throws -> EdgeToolsEngineGeneration {
-      await self.generationGate.acquire()
-      do {
-        let generation = try await self.runGenerationWithoutGate(
-          prompt: prompt,
-          tools: tools,
-          parameters: parameters,
-          channel: channel,
-          isStopped: isStopped
-        )
-        await self.generationGate.release()
-        return generation
-      } catch {
-        await self.generationGate.release()
-        throw error
-      }
-    }
-
-    private func runGenerationWithoutGate(
-      prompt: Model.Prompt,
-      tools: [EdgeToolDefinition],
-      parameters: Model.GenerateParameters,
+      parameters: sending Model.GenerateParameters,
       channel: EdgeToolsGenerationChannel,
       isStopped: ManagedAtomic<Bool>
     ) async throws -> EdgeToolsEngineGeneration {
       try Task.checkCancellation()
       guard !isStopped.load(ordering: .relaxed) else { return .empty }
 
-      let matcher = try self.matcher(
-        tools: tools,
-        constraint: parameters.constraint
-      )
+      let matcher = try self.matcher(tools: tools, constraint: parameters.constraint)
       let generateStart = self.clock.now
-      let input = try self.model.input(
-        prompt: prompt,
-        tools: tools,
-        tokenizer: self.tokenizer
-      )
+      let input = try self.model.input(prompt: prompt, tools: tools, tokenizer: self.tokenizer)
       var preparation = try await self.model.prepare(
         input: input,
         parameters: parameters,
@@ -343,15 +297,9 @@
       tools: [EdgeToolDefinition],
       constraint: EdgeToolsXGRGenerationConstraint
     ) throws -> XGRMatcher {
-      let toolsGrammar =
-        try self.toolCallRange(for: constraint)
-        .map {
-          try self.model.grammar(tools: tools, range: $0)
-        } ?? .universal
-      let grammar = try self.grammar(
-        for: constraint,
-        toolsGrammar: toolsGrammar
-      )
+      let toolsGrammar = try self.toolCallRange(for: constraint)
+        .map { try self.model.grammar(tools: tools, range: $0) } ?? .universal
+      let grammar = try self.grammar(for: constraint, toolsGrammar: toolsGrammar)
       let matcher = try self.matcherPool.matcher(
         grammar: grammar,
         compilingWith: self.grammarCompiler
@@ -404,6 +352,29 @@
         await self.generationGate.release()
         throw error
       }
+    }
+  }
+
+  // MARK: - EdgeToolsModelGenerationGate
+
+  private actor EdgeToolsModelGenerationGate {
+    private var isAcquired = false
+    private var waiters = [UnsafeContinuation<Void, Never>]()
+
+    func acquire() async {
+      guard self.isAcquired else {
+        self.isAcquired = true
+        return
+      }
+      await withUnsafeContinuation { self.waiters.append($0) }
+    }
+
+    func release() {
+      guard !self.waiters.isEmpty else {
+        self.isAcquired = false
+        return
+      }
+      self.waiters.removeFirst().resume()
     }
   }
 #endif

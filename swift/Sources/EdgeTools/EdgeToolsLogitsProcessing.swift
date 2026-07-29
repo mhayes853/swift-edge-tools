@@ -1,6 +1,6 @@
 // MARK: - EdgeToolsLogitsProcessor
 
-public protocol EdgeToolsLogitsProcessor<Prompt, Logits>: Sendable {
+public protocol EdgeToolsLogitsProcessor<Prompt, Logits> {
   associatedtype Prompt
   associatedtype Logits
 

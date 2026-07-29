@@ -77,12 +77,8 @@
   public struct EdgeToolsMLXGenerateParameters: EdgeToolsModelEngineGenerateParameters {
     public static var `default`: Self { Self() }
 
-    private var makeSampler: @Sendable () -> any LogitSampler
-    private var makeProcessor: @Sendable () -> (any LogitProcessor)?
-
-    public var sampler: any LogitSampler { self.makeSampler() }
-    public var processor: (any LogitProcessor)? { self.makeProcessor() }
-
+    public var sampler: any LogitSampler
+    public var processor: (any LogitProcessor)?
     public var constraint: EdgeToolsXGRGenerationConstraint
     public var maxTokens: Int?
     public var kvCacheQuantizationBits: Int?
@@ -91,8 +87,8 @@
     public var synchronizeStreamForMemorySnapshots: Bool
 
     public init(
-      sampler: @autoclosure @escaping @Sendable () -> any LogitSampler = ArgMaxSampler(),
-      processor: @autoclosure @escaping @Sendable () -> (any LogitProcessor)? = nil,
+      sampler: any LogitSampler = ArgMaxSampler(),
+      processor: (any LogitProcessor)? = nil,
       constraint: EdgeToolsXGRGenerationConstraint = .tools,
       maxTokens: Int? = 1024,
       kvCacheQuantizationBits: Int? = nil,
@@ -100,8 +96,8 @@
       quantizedKVStart: Int = 0,
       synchronizeStreamForMemorySnapshots: Bool = true
     ) {
-      self.makeSampler = sampler
-      self.makeProcessor = processor
+      self.sampler = sampler
+      self.processor = processor
       self.constraint = constraint
       self.maxTokens = maxTokens
       self.kvCacheQuantizationBits = kvCacheQuantizationBits
@@ -182,11 +178,7 @@
       let start = clock.now
       var processor = parameters.processor
       processor?.prompt(input.text.tokens)
-      let prepared = try self.preparedOutput(
-        input: input,
-        tokenIds: tokenIds,
-        assets: assets
-      )
+      let prepared = try self.preparedOutput(input: input, tokenIds: tokenIds, assets: assets)
       let metrics = EdgeToolsPrefillMetrics(
         tokens: prepared.tokenCount,
         duration: start.duration(to: clock.now)
@@ -244,10 +236,7 @@
       return EdgeToolsModelSample(tokenId: tokenId, confidence: confidence)
     }
 
-    public func didAccept(
-      token: EdgeToolsToken,
-      state: inout EdgeToolsMLXGenerationState
-    ) {
+    public func didAccept(token: EdgeToolsToken, state: inout EdgeToolsMLXGenerationState) {
       state.processor?.didSample(token: MLXArray([token.id]))
     }
 
@@ -319,10 +308,7 @@
       return (output, cache, suffixCount)
     }
 
-    private func edgeToolsPrepare(
-      input: LMInput,
-      cache: [any KVCache]
-    ) throws -> LMOutput {
+    private func edgeToolsPrepare(input: LMInput, cache: [any KVCache]) throws -> LMOutput {
       switch try self.prepare(input, cache: cache, windowSize: nil) {
       case .logits(let output):
         return output
@@ -330,11 +316,7 @@
         guard tokens.tokens.size > 0 else {
           throw EdgeToolsMLXError(code: .emptyInput, message: "Model received empty input.")
         }
-        return self(
-          tokens[text: .newAxis],
-          cache: cache.isEmpty ? nil : cache,
-          state: nil
-        )
+        return self(tokens[text: .newAxis], cache: cache.isEmpty ? nil : cache, state: nil)
       }
     }
 
@@ -357,15 +339,8 @@
       guard let tokenizer = tokenizer as? any EdgeToolsXGRTokenizer else {
         throw EdgeToolsError.unsupportedTokenizer
       }
-      let model = try Model.loadEdgeToolsLanguageModel(
-        from: directoryURL,
-        model: makeModel
-      )
-      try self.init(
-        model: model,
-        assets: EdgeToolsMLXModelAssets(),
-        tokenizer: tokenizer
-      )
+      let model = try Model.loadEdgeToolsLanguageModel(from: directoryURL, model: makeModel)
+      try self.init(model: model, assets: EdgeToolsMLXModelAssets(), tokenizer: tokenizer)
     }
   }
 

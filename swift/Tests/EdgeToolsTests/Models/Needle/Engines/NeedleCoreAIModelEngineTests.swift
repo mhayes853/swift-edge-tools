@@ -101,7 +101,7 @@
       expectNoDifference(streamedResponse, finalResponse)
     }
 
-    @Test(.disabled("TODO - Investigate Metal Crash Issue"))
+    @Test
     @available(anyAppleOS 27.0, *)
     func `Generate With Compute Stream`() async throws {
       let engine = try await makeNeedleCoreAIModelEngine()

@@ -12,10 +12,10 @@
 
 // MARK: - EdgeToolsSampler
 
-public protocol EdgeToolsSampler<Logits>: Sendable {
+public protocol EdgeToolsSampler<Logits> {
   associatedtype Logits
 
-  func sample(logits: Logits) async throws -> EdgeToolsToken.ID
+  nonisolated(nonsending) func sample(logits: Logits) async throws -> EdgeToolsToken.ID
 }
 
 // MARK: - Argmax

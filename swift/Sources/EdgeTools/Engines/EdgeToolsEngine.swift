@@ -10,7 +10,7 @@ public protocol EdgeToolsEngine: Sendable {
   func generate(
     prompt: Prompt,
     tools: [EdgeToolDefinition],
-    parameters: GenerateParameters,
+    parameters: sending GenerateParameters,
     channel: EdgeToolsGenerationChannel
   ) throws -> GenerationTask
 }
@@ -41,7 +41,7 @@ public struct EdgeToolsEnginePrefill: Sendable {
 
 // MARK: - EdgeToolsEngineGenerateParemeters
 
-public protocol EdgeToolsEngineGenerateParameters: Sendable {
+public protocol EdgeToolsEngineGenerateParameters {
   static var `default`: Self { get }
 }
 

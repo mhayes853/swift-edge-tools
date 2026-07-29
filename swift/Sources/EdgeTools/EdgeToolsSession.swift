@@ -139,8 +139,6 @@ public final class EdgeToolsSessionStream: Sendable, Observable, Identifiable, A
   private let registrar = ObservationRegistrar()
   private let toolsByName: [String: any EdgeTool]
   private let shouldInvokeTools: @Sendable (AnyEdgeToolCall) -> Bool
-  private let startGeneration:
-    @Sendable (EdgeToolsSessionStream) -> Task<EdgeToolsSessionGeneration, any Error>
 
   public var isGenerating: Bool {
     self.result == nil
@@ -180,38 +178,40 @@ public final class EdgeToolsSessionStream: Sendable, Observable, Identifiable, A
     }
   }
 
-  fileprivate init<Engine: EdgeToolsEngine>(
-    session: EdgeToolsSession<Engine>,
-    prompt: Engine.Prompt,
+  fileprivate init(
     tools: [any EdgeTool],
-    parameters: Engine.GenerateParameters,
     shouldInvokeTools: @escaping @Sendable (AnyEdgeToolCall) -> Bool
   ) {
-    let toolDefinitions = tools.map(\.definition)
     self.toolsByName = Dictionary(uniqueKeysWithValues: tools.map { ($0.name.snakeCased(), $0) })
     self.shouldInvokeTools = shouldInvokeTools
-    self.startGeneration = { stream in
-      Task {
-        try await stream.runGeneration(
-          session: session,
-          prompt: prompt,
-          toolDefinitions: toolDefinitions,
-          parameters: parameters
-        )
-      }
-    }
   }
 }
 
 extension EdgeToolsSessionStream {
-  fileprivate func start() {
+  fileprivate func start<Engine: EdgeToolsEngine>(
+    session: EdgeToolsSession<Engine>,
+    prompt: Engine.Prompt,
+    toolDefinitions: [EdgeToolDefinition],
+    parameters: sending Engine.GenerateParameters
+  ) {
     let shouldStart = self.state.withLock { state in
       guard !state.hasStarted else { return false }
       state.hasStarted = true
       return true
     }
     guard shouldStart else { return }
-    let task = self.startGeneration(self)
+    
+    // NB: Compiler region isolation checker limitation, this is safe because params are not
+    // accessed after being sent to generate.
+    nonisolated(unsafe) let parameters = parameters
+    let task = Task {
+      try await self.runGeneration(
+        session: session,
+        prompt: prompt,
+        toolDefinitions: toolDefinitions,
+        parameters: parameters
+      )
+    }
     self.state.withLock { $0.task = task }
   }
 
@@ -292,7 +292,7 @@ extension EdgeToolsSessionStream {
     session: EdgeToolsSession<Engine>,
     prompt: Engine.Prompt,
     toolDefinitions: [EdgeToolDefinition],
-    parameters: Engine.GenerateParameters
+    parameters: sending Engine.GenerateParameters
   ) async throws -> EdgeToolsSessionGeneration {
     let wasStopped = self.state.withLock { $0.wasStoppedBeforeGeneration }
     if wasStopped {
@@ -400,33 +400,32 @@ extension EdgeToolsSessionStream {
 extension EdgeToolsSession {
   public func stream(
     prompt: Engine.Prompt,
-    parameters: Engine.GenerateParameters = .default,
+    parameters: sending Engine.GenerateParameters = .default,
     shouldInvokeTools: @escaping @Sendable (AnyEdgeToolCall) -> Bool = { _ in true }
   ) -> EdgeToolsSessionStream {
     let tools = self.tools
     if let message = duplicateToolNameError(tools.map(\.name)) {
       assertionFailure(message)
     }
-    let stream = EdgeToolsSessionStream(
-      session: self,
-      prompt: prompt,
-      tools: tools,
-      parameters: parameters,
-      shouldInvokeTools: shouldInvokeTools
-    )
+    let stream = EdgeToolsSessionStream(tools: tools, shouldInvokeTools: shouldInvokeTools)
     self.registerActiveStream(stream)
     stream.setOnFinish { [weak self, weak stream] in
       guard let self, let stream else { return }
       self.removeActiveStream(stream)
     }
-    stream.start()
+    stream.start(
+      session: self,
+      prompt: prompt,
+      toolDefinitions: tools.map(\.definition),
+      parameters: parameters
+    )
     return stream
   }
 
   @concurrent
   public func generate(
     prompt: Engine.Prompt,
-    parameters: Engine.GenerateParameters = .default,
+    parameters: sending Engine.GenerateParameters = .default,
     shouldInvokeTools: @escaping @Sendable (AnyEdgeToolCall) -> Bool = { _ in true }
   ) async throws -> EdgeToolsSessionGeneration {
     try await self.stream(

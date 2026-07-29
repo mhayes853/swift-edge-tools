@@ -12,22 +12,18 @@
     public var constraint: EdgeToolsXGRGenerationConstraint
     public var maxTokens: Int?
 
-    fileprivate var makeComputeStream: @Sendable () -> sending ComputeStream?
-
-    public var computeStream: ComputeStream? {
-      self.makeComputeStream()
-    }
+    public var computeStream: ComputeStream?
 
     public init(
       sampler: any EdgeToolsSampler<NDArray> = CoreAIArgmaxSampler(),
       processor: (any EdgeToolsLogitsProcessor<NDArray, NDArray>)? = nil,
-      computeStream: @autoclosure @escaping @Sendable () -> sending ComputeStream? = nil,
+      computeStream: ComputeStream? = nil,
       constraint: EdgeToolsXGRGenerationConstraint = .tools,
       maxTokens: Int? = 1024
     ) {
       self.sampler = sampler
       self.processor = processor
-      self.makeComputeStream = computeStream
+      self.computeStream = computeStream
       self.constraint = constraint
       self.maxTokens = maxTokens
     }
@@ -41,11 +37,8 @@
 
     private let sampler: any EdgeToolsSampler<NDArray>
     private var processor: (any EdgeToolsLogitsProcessor<NDArray, NDArray>)?
-    private var makeComputeStream: @Sendable () -> sending ComputeStream?
 
-    public var computeStream: ComputeStream? {
-      self.newComputeStream()
-    }
+    public var computeStream: ComputeStream?
 
     public init(
       modelState: ModelState,
@@ -54,11 +47,7 @@
       self.modelState = modelState
       self.sampler = parameters.sampler
       self.processor = parameters.processor
-      self.makeComputeStream = parameters.makeComputeStream
-    }
-
-    func newComputeStream() -> sending ComputeStream? {
-      self.makeComputeStream()
+      self.computeStream = parameters.computeStream
     }
 
     public nonisolated(nonsending) func sample(
