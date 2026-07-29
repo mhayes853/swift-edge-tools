@@ -43,17 +43,12 @@ func argmaxContiguous(_ values: UnsafeBufferPointer<Float>) -> Int {
 @inline(always)
 func argmaxSIMD(_ values: UnsafeBufferPointer<Float>) -> Int {
   guard !values.isEmpty else { return 0 }
-  let width = SIMD8<Float>.scalarCount
-  var bestValues = SIMD8<Float>(repeating: -.infinity)
-  var bestIndices = SIMD8<Int32>(repeating: 0)
+  let width = SIMD16<Float>.scalarCount
+  var bestValues = SIMD16<Float>(repeating: -.infinity)
+  var bestIndices = SIMD16<Int32>(repeating: 0)
   var index = 0
   while index + width <= values.count {
-    updateArgmaxSIMD(
-      values,
-      at: index,
-      bestValues: &bestValues,
-      bestIndices: &bestIndices
-    )
+    updateArgmaxSIMD(values, at: index, bestValues: &bestValues, bestIndices: &bestIndices)
     index += width
   }
 
@@ -74,39 +69,30 @@ func argmaxSIMD(_ values: UnsafeBufferPointer<Float>) -> Int {
   )
 }
 
+private let argmaxLaneOffsets = SIMD16<Int32>(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
+
 @inline(always)
 private func updateArgmaxSIMD(
   _ values: UnsafeBufferPointer<Float>,
   at index: Int,
-  bestValues: inout SIMD8<Float>,
-  bestIndices: inout SIMD8<Int32>
+  bestValues: inout SIMD16<Float>,
+  bestIndices: inout SIMD16<Int32>
 ) {
   let pointer = UnsafeRawPointer(values.baseAddress!.advanced(by: index))
-  let candidates = pointer.loadUnaligned(as: SIMD8<Float>.self)
+  let candidates = pointer.loadUnaligned(as: SIMD16<Float>.self)
   let replacementMask = candidates .> bestValues
-  let i = Int32(index)
-  let candidateIndices = SIMD8<Int32>(
-    i,
-    i + 1,
-    i + 2,
-    i + 3,
-    i + 4,
-    i + 5,
-    i + 6,
-    i + 7
-  )
   bestValues.replace(with: candidates, where: replacementMask)
-  bestIndices.replace(with: candidateIndices, where: replacementMask)
+  bestIndices.replace(with: argmaxLaneOffsets &+ Int32(index), where: replacementMask)
 }
 
 @inline(always)
 private func reduceArgmaxSIMD(
-  values: SIMD8<Float>,
-  indices: SIMD8<Int32>,
+  values: SIMD16<Float>,
+  indices: SIMD16<Int32>,
   bestValue: inout Float,
   bestIndex: inout Int
 ) {
-  for lane in 0..<SIMD8<Float>.scalarCount {
+  for lane in 0..<SIMD16<Float>.scalarCount {
     let value = values[lane]
     let index = Int(indices[lane])
     if value > bestValue || (value == bestValue && index < bestIndex) {
