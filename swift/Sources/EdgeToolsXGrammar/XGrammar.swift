@@ -114,7 +114,7 @@ public struct XGRError: Error, Hashable, Sendable {
 /// Immutable tokenizer metadata used by XGrammar grammar construction and compilation.
 public final class XGRTokenizerInfo: @unchecked Sendable {
   /// The underlying pointer.
-  public let handle: xgrammar_tokenizer_info_t
+  fileprivate let handle: xgrammar_tokenizer_info_t
 
   /// Creates tokenizer info.
   ///
@@ -212,6 +212,19 @@ public final class XGRTokenizerInfo: @unchecked Sendable {
   public func serializedJSON() throws -> String {
     try xgrammarString { xgrammar_tokenizer_info_serialize_json(self.handle, $0, $1) }
   }
+
+  /// Calls `body` with the underlying tokenizer info pointer.
+  ///
+  /// The pointer is only valid for the duration of `body`.
+  ///
+  /// - Parameters:
+  ///   - body: A closure that uses the pointer.
+  /// - Returns: The result of `body`.
+  public func withUnsafePointer<R>(
+    _ body: (xgrammar_tokenizer_info_t) throws -> R
+  ) rethrows -> R {
+    try body(self.handle)
+  }
 }
 
 // MARK: - XGRGrammar
@@ -295,7 +308,7 @@ public final class XGRGrammar: @unchecked Sendable {
   }
 
   /// The underlying grammar pointer.
-  public let handle: xgrammar_grammar_t
+  fileprivate let handle: xgrammar_grammar_t
 
   /// Constructs a gramamr from EBNF syntax.
   ///
@@ -483,13 +496,42 @@ public final class XGRGrammar: @unchecked Sendable {
     try xgrammarString { xgrammar_grammar_serialize_json(self.handle, $0, $1) }
   }
 
+  /// Calls `body` with the underlying grammar pointer.
+  ///
+  /// The pointer is only valid for the duration of `body`.
+  ///
+  /// - Parameters:
+  ///   - body: A closure that uses the pointer.
+  /// - Returns: The result of `body`.
+  public func withUnsafePointer<R>(_ body: (xgrammar_grammar_t) throws -> R) rethrows -> R {
+    try body(self.handle)
+  }
+
   /// Produces a concatenated grammar with this grammar and another grammar.
   ///
   /// - Parameters:
   ///   - grammar: The other grammar.
   /// - Returns: An ``XGRGrammar``.
-  public borrowing func concatenate(_ grammar: borrowing XGRGrammar) throws -> XGRGrammar {
+  public func concatenate(_ grammar: XGRGrammar) throws -> XGRGrammar {
     try EdgeToolsXGrammar.concatenate(self, grammar)
+  }
+
+  /// Produces a concatenated grammar with this grammar and other grammars.
+  ///
+  /// - Parameters:
+  ///   - grammars: The other grammars, matched in order after this grammar.
+  /// - Returns: An ``XGRGrammar``.
+  public func concatenate(_ grammars: XGRGrammar...) throws -> XGRGrammar {
+    try self.concatenate(grammars)
+  }
+
+  /// Produces a concatenated grammar with this grammar and other grammars.
+  ///
+  /// - Parameters:
+  ///   - grammars: The other grammars, matched in order after this grammar.
+  /// - Returns: An ``XGRGrammar``.
+  public func concatenate(_ grammars: some Sequence<XGRGrammar>) throws -> XGRGrammar {
+    try concatenatedGrammar(handles: [self.handle] + grammars.map(\.handle))
   }
 
   /// Produces a unioned grammar with this grammar and another grammar.
@@ -497,8 +539,26 @@ public final class XGRGrammar: @unchecked Sendable {
   /// - Parameters:
   ///   - grammar: The other grammar.
   /// - Returns: An ``XGRGrammar``.
-  public borrowing func union(_ grammar: borrowing XGRGrammar) throws -> XGRGrammar {
+  public func union(_ grammar: XGRGrammar) throws -> XGRGrammar {
     try EdgeToolsXGrammar.union(self, grammar)
+  }
+
+  /// Produces a unioned grammar with this grammar and other grammars.
+  ///
+  /// - Parameters:
+  ///   - grammars: The other accepted alternatives.
+  /// - Returns: An ``XGRGrammar``.
+  public func union(_ grammars: XGRGrammar...) throws -> XGRGrammar {
+    try self.union(grammars)
+  }
+
+  /// Produces a unioned grammar with this grammar and other grammars.
+  ///
+  /// - Parameters:
+  ///   - grammars: The other accepted alternatives.
+  /// - Returns: An ``XGRGrammar``.
+  public func union(_ grammars: some Sequence<XGRGrammar>) throws -> XGRGrammar {
+    try unionedGrammar(handles: [self.handle] + grammars.map(\.handle))
   }
 
   /// Concatenates two grammars.
@@ -510,10 +570,7 @@ public final class XGRGrammar: @unchecked Sendable {
   ///   - lhs: The grammar that matches first.
   ///   - rhs: The grammar that matches after ``lhs``.
   /// - Returns: A grammar representing the concatenation.
-  public static func + (
-    lhs: borrowing XGRGrammar,
-    rhs: borrowing XGRGrammar
-  ) throws -> XGRGrammar {
+  public static func + (lhs: XGRGrammar, rhs: XGRGrammar) throws -> XGRGrammar {
     try EdgeToolsXGrammar.concatenate(lhs, rhs)
   }
 
@@ -523,24 +580,21 @@ public final class XGRGrammar: @unchecked Sendable {
   ///   - lhs: One accepted alternative.
   ///   - rhs: The other accepted alternative.
   /// - Returns: A grammar representing the union of both alternatives.
-  public static func || (
-    lhs: borrowing XGRGrammar,
-    rhs: borrowing XGRGrammar
-  ) throws -> XGRGrammar {
+  public static func || (lhs: XGRGrammar, rhs: XGRGrammar) throws -> XGRGrammar {
     try EdgeToolsXGrammar.union(lhs, rhs)
   }
 
   /// Optionalizes this grammar
   ///
   /// - Returns: An ``XGRGrammar``.
-  public borrowing func optional() throws -> XGRGrammar {
+  public func optional() throws -> XGRGrammar {
     try XGRGrammar(handle: require(xgrammar_grammar_optional(self.handle)))
   }
 
   /// Repeats this grammar exactly `count` times.
   ///
   /// - Returns: An ``XGRGrammar``.
-  public borrowing func repeated(exactly count: Int) throws -> XGRGrammar {
+  public func repeated(exactly count: Int) throws -> XGRGrammar {
     try repeatGrammar(self, exactly: count)
   }
 
@@ -549,7 +603,7 @@ public final class XGRGrammar: @unchecked Sendable {
   /// - Parameters:
   ///   - range: The repetition range.
   /// - Returns: An ``XGRGrammar``.
-  public borrowing func repeated(_ range: ClosedRange<Int>) throws -> XGRGrammar {
+  public func repeated(_ range: ClosedRange<Int>) throws -> XGRGrammar {
     try repeatGrammar(self, range)
   }
 
@@ -558,7 +612,7 @@ public final class XGRGrammar: @unchecked Sendable {
   /// - Parameters:
   ///   - range: The repetition range.
   /// - Returns: An ``XGRGrammar``.
-  public borrowing func repeated(_ range: PartialRangeFrom<Int>) throws -> XGRGrammar {
+  public func repeated(_ range: PartialRangeFrom<Int>) throws -> XGRGrammar {
     try repeatGrammar(self, range)
   }
 }
@@ -661,7 +715,7 @@ public struct XGRCompiledGrammar: ~Copyable, @unchecked Sendable {
   /// - Parameters:
   ///   - serializedJSON: The serialized compiled-grammar JSON string.
   ///   - tokenizerInfo: The tokenizer metadata associated with the compiled grammar.
-  public init(serializedJSON: String, tokenizerInfo: borrowing XGRTokenizerInfo) throws {
+  public init(serializedJSON: String, tokenizerInfo: XGRTokenizerInfo) throws {
     self.handle = try serializedJSON.withCString {
       try require(xgrammar_compiled_grammar_deserialize_json($0, tokenizerInfo.handle))
     }
@@ -764,9 +818,7 @@ public struct XGRCompiler: ~Copyable {
   /// - Parameters:
   ///   - grammar: The grammar to preprocess.
   /// - Returns: A compiled grammar ready to create an ``XGRMatcher``.
-  public borrowing func compile(
-    _ grammar: borrowing XGRGrammar
-  ) throws -> XGRCompiledGrammar {
+  public borrowing func compile(_ grammar: XGRGrammar) throws -> XGRCompiledGrammar {
     let handle = try require(xgrammar_compiler_compile_grammar(self.handle, grammar.handle))
     return XGRCompiledGrammar(handle: handle)
   }
@@ -910,15 +962,32 @@ public struct XGRMatcher: ~Copyable {
 ///   - lhs: The grammar that matches first.
 ///   - rhs: The grammar that matches after ``lhs``.
 /// - Returns: A grammar representing the concatenation.
-public func concatenate(
-  _ lhs: borrowing XGRGrammar,
-  _ rhs: borrowing XGRGrammar
-) throws -> XGRGrammar {
-  let handles: [xgrammar_grammar_t?] = [lhs.handle, rhs.handle]
-  let handle = try handles.withUnsafeBufferPointer {
-    try require(xgrammar_grammar_concatenate($0.baseAddress, $0.count))
-  }
-  return XGRGrammar(handle: handle)
+public func concatenate(_ lhs: XGRGrammar, _ rhs: XGRGrammar) throws -> XGRGrammar {
+  try concatenatedGrammar(handles: [lhs.handle, rhs.handle])
+}
+
+/// Concatenates a sequence of grammars.
+///
+/// The resulting grammar accepts an input only when it matches each grammar in ``grammars``, in
+/// order.
+///
+/// - Parameters:
+///   - grammars: The grammars to concatenate, in matching order.
+/// - Returns: A grammar representing the concatenation.
+public func concatenate(_ grammars: XGRGrammar...) throws -> XGRGrammar {
+  try concatenate(grammars)
+}
+
+/// Concatenates a sequence of grammars.
+///
+/// The resulting grammar accepts an input only when it matches each grammar in ``grammars``, in
+/// order.
+///
+/// - Parameters:
+///   - grammars: The grammars to concatenate, in matching order.
+/// - Returns: A grammar representing the concatenation.
+public func concatenate(_ grammars: some Sequence<XGRGrammar>) throws -> XGRGrammar {
+  try concatenatedGrammar(handles: grammars.map(\.handle))
 }
 
 /// Creates a grammar accepting either of two grammars.
@@ -927,11 +996,36 @@ public func concatenate(
 ///   - lhs: One accepted alternative.
 ///   - rhs: The other accepted alternative.
 /// - Returns: A grammar representing the union of both alternatives.
-public func union(
-  _ lhs: borrowing XGRGrammar,
-  _ rhs: borrowing XGRGrammar
-) throws -> XGRGrammar {
-  let handles: [xgrammar_grammar_t?] = [lhs.handle, rhs.handle]
+public func union(_ lhs: XGRGrammar, _ rhs: XGRGrammar) throws -> XGRGrammar {
+  try unionedGrammar(handles: [lhs.handle, rhs.handle])
+}
+
+/// Creates a grammar accepting any of a sequence of grammars.
+///
+/// - Parameters:
+///   - grammars: The accepted alternatives.
+/// - Returns: A grammar representing the union of all alternatives.
+public func union(_ grammars: XGRGrammar...) throws -> XGRGrammar {
+  try union(grammars)
+}
+
+/// Creates a grammar accepting any of a sequence of grammars.
+///
+/// - Parameters:
+///   - grammars: The accepted alternatives.
+/// - Returns: A grammar representing the union of all alternatives.
+public func union(_ grammars: some Sequence<XGRGrammar>) throws -> XGRGrammar {
+  try unionedGrammar(handles: grammars.map(\.handle))
+}
+
+private func concatenatedGrammar(handles: [xgrammar_grammar_t?]) throws -> XGRGrammar {
+  let handle = try handles.withUnsafeBufferPointer {
+    try require(xgrammar_grammar_concatenate($0.baseAddress, $0.count))
+  }
+  return XGRGrammar(handle: handle)
+}
+
+private func unionedGrammar(handles: [xgrammar_grammar_t?]) throws -> XGRGrammar {
   let handle = try handles.withUnsafeBufferPointer {
     try require(xgrammar_grammar_union($0.baseAddress, $0.count))
   }
@@ -946,10 +1040,7 @@ public func union(
 ///   - grammar: The grammar to repeat.
 ///   - count: The exact number of repetitions. It must not be negative.
 /// - Returns: A grammar representing the repeated input.
-public func repeatGrammar(
-  _ grammar: borrowing XGRGrammar,
-  exactly count: Int
-) throws -> XGRGrammar {
+public func repeatGrammar(_ grammar: XGRGrammar, exactly count: Int) throws -> XGRGrammar {
   try repeatGrammar(grammar, count...count)
 }
 
@@ -961,10 +1052,7 @@ public func repeatGrammar(
 ///   - grammar: The grammar to repeat.
 ///   - range: The inclusive range of permitted repetition counts.
 /// - Returns: A grammar representing the bounded repetition.
-public func repeatGrammar(
-  _ grammar: borrowing XGRGrammar,
-  _ range: ClosedRange<Int>
-) throws -> XGRGrammar {
+public func repeatGrammar(_ grammar: XGRGrammar, _ range: ClosedRange<Int>) throws -> XGRGrammar {
   guard range.lowerBound >= 0 else { throw XGRError.invalidRepetitionRange }
   let lowerBound = try Int32(range.lowerBound, error: .invalidRepetitionRange)
   let upperBound = try Int32(range.upperBound, error: .invalidRepetitionRange)
@@ -981,7 +1069,7 @@ public func repeatGrammar(
 ///   - range: The lower bound of the unbounded repetition range.
 /// - Returns: A grammar representing the unbounded repetition.
 public func repeatGrammar(
-  _ grammar: borrowing XGRGrammar,
+  _ grammar: XGRGrammar,
   _ range: PartialRangeFrom<Int>
 ) throws -> XGRGrammar {
   guard range.lowerBound >= 0 else { throw XGRError.invalidRepetitionRange }

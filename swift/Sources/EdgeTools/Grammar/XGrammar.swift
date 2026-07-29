@@ -361,7 +361,7 @@
     }
 
     static func repeatingToolCall(
-      _ call: borrowing XGRGrammar,
+      _ call: XGRGrammar,
       separator: String,
       range: GrammarToolCallRange
     ) throws -> XGRGrammar {
@@ -392,8 +392,8 @@
     }
 
     private static func boundedToolCalls(
-      _ call: borrowing XGRGrammar,
-      separatedCall: borrowing XGRGrammar,
+      _ call: XGRGrammar,
+      separatedCall: XGRGrammar,
       minimum: Int,
       maximum: Int
     ) throws -> XGRGrammar {
@@ -429,7 +429,7 @@
     }
 
     func matcher(
-      grammar: borrowing XGRGrammar,
+      grammar: XGRGrammar,
       compilingWith compiler: borrowing XGRCompiler
     ) throws -> XGRMatcher {
       let key = grammar.ebnf
