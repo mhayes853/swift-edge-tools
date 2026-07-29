@@ -136,6 +136,10 @@ let package = Package(
         )
       ],
       path: "swift/Sources/EdgeTools",
+      swiftSettings: [
+        .enableExperimentalFeature("Lifetimes"),
+        .enableExperimentalFeature("AddressableTypes")
+      ],
       linkerSettings: [
         .linkedFramework(
           "CoreML",

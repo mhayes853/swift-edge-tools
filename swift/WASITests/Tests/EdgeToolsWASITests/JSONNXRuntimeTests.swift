@@ -8,7 +8,7 @@ struct `JSONNXRuntime tests` {
   func `Run Model Through JavaScript Runtime`() async throws {
     let runtime = try Self.runtime()
     let session = try await runtime.session(
-      model: JSONNXRuntime.ModelSource.javaScriptFile(try Self.addModel()),
+      model: JSONNXRuntime.ModelSource.object(try Self.addModel()),
       configuration: JSONNXRuntime.Configuration()
     )
     let firstInput = try runtime.tensor(values: [Float(1), 2, 3], shape: [3])
@@ -23,18 +23,25 @@ struct `JSONNXRuntime tests` {
     #expect(session.outputNames == ["sum"])
     #expect(output.dtype == .float)
     #expect(output.shape == [3])
-    #expect(try await output.floatValues() == [5, 7, 9])
+    let view = try await output.view(as: Float.self)
+    #expect(view.count == 3)
+    #expect(view[0] == 5)
+    #expect(view[1] == 7)
+    #expect(view[2] == 9)
+    _ = runtime.object
+    _ = session.object
+    _ = output.object
   }
 
   @Test
   func `Reject Duplicate Output Names`() async throws {
     let runtime = try Self.runtime()
     let session = try await runtime.session(
-      model: JSONNXRuntime.ModelSource.javaScriptFile(try Self.addModel()),
+      model: JSONNXRuntime.ModelSource.object(try Self.addModel()),
       configuration: JSONNXRuntime.Configuration()
     )
 
-    let error = await #expect(throws: JSONNXRuntimeError.self) {
+    let error = await #expect(throws: EdgeToolsONNXRuntimeError.self) {
       _ = try await session.run(inputs: [:], outputNames: ["sum", "sum"])
     }
 
@@ -44,11 +51,12 @@ struct `JSONNXRuntime tests` {
   @Test
   func `Create And Read Integer Tensors`() async throws {
     let runtime = try Self.runtime()
-    let int32Tensor = try runtime.tensor(values: [Int32(1), 2, 3], shape: [3])
+    let int32Values = (1...3).lazy.map(Int32.init)
+    let int32Tensor = try runtime.tensor(values: int32Values, shape: [3])
     let int64Tensor = try runtime.tensor(values: [Int64(4), 5, 6], shape: [3])
 
-    #expect(try await int32Tensor.int32Values() == [1, 2, 3])
-    #expect(try await int64Tensor.int64Values() == [4, 5, 6])
+    #expect(try await int32Tensor.array(as: Int32.self) == [1, 2, 3])
+    #expect(try await int64Tensor.array(as: Int64.self) == [4, 5, 6])
   }
 
   @Test
@@ -61,28 +69,26 @@ struct `JSONNXRuntime tests` {
   }
 
   @Test
-  func `Translate Rejected JavaScript Promise`() async throws {
+  func `Propagate Rejected JS Promise`() async throws {
     let namespace = try #require(JSObject.global["edgeToolsRejectedONNXRuntime"].object)
     let runtime = try JSONNXRuntime(onnxRuntime: namespace)
 
-    let error = await #expect(throws: JSONNXRuntimeError.self) {
+    let error = await #expect(throws: JSException.self) {
       _ = try await runtime.session(
         model: JSONNXRuntime.ModelSource.bytes([0]),
         configuration: JSONNXRuntime.Configuration()
       )
     }
 
-    #expect(error?.code == .javaScriptException)
-    #expect(error?.message == "The test session was rejected.")
-    #expect(error?.operation == "InferenceSession.create")
-    #expect(error?.javaScriptStack != nil)
+    #expect(error?.thrownValue.object?["message"].string == "The test session was rejected.")
+    #expect(error?.thrownValue.object?["stack"].string != nil)
   }
 
   @Test
   func `Reject Tensor Values That Do Not Match Shape`() throws {
     let runtime = try Self.runtime()
 
-    let error = #expect(throws: JSONNXRuntimeError.self) {
+    let error = #expect(throws: EdgeToolsONNXRuntimeError.self) {
       try runtime.tensor(values: [Float(1), 2], shape: [3])
     }
     #expect(error?.code == .invalidTensorValueCount)
@@ -93,8 +99,9 @@ struct `JSONNXRuntime tests` {
     let runtime = try Self.runtime()
     let tensor = try runtime.tensor(values: [Int64(1), 2, 3], shape: [3])
 
-    let error = await #expect(throws: JSONNXRuntimeError.self) {
-      try await tensor.floatValues()
+    let error = await #expect(throws: EdgeToolsONNXRuntimeError.self) {
+      let view = try await tensor.view(as: Float.self)
+      _ = view.count
     }
     #expect(error?.code == .unexpectedTensorElementType)
   }

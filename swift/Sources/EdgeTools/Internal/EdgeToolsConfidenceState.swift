@@ -53,22 +53,22 @@ package func top2SIMD(_ values: UnsafeBufferPointer<Float>) -> (top1: Float, top
   while index + width <= values.count {
     let pointer = UnsafeRawPointer(values.baseAddress!.advanced(by: index))
     let candidates = pointer.loadUnaligned(as: SIMD16<Float>.self)
-    laneTop2 = _top2SIMDMax(laneTop2, _top2SIMDMin(laneTop1, candidates))
-    laneTop1 = _top2SIMDMax(laneTop1, candidates)
+    laneTop2 = top2SIMDMax(laneTop2, top2SIMDMin(laneTop1, candidates))
+    laneTop1 = top2SIMDMax(laneTop1, candidates)
     index += width
   }
 
   var top1 = -Float.infinity
   var top2 = -Float.infinity
   for lane in 0..<width {
-    _updateTop2(top1: &top1, top2: &top2, with: laneTop1[lane])
-    _updateTop2(top1: &top1, top2: &top2, with: laneTop2[lane])
+    updateTop2(top1: &top1, top2: &top2, with: laneTop1[lane])
+    updateTop2(top1: &top1, top2: &top2, with: laneTop2[lane])
   }
-  return _top2Scalar(count: values.count, from: index, top1: top1, top2: top2) { values[$0] }
+  return top2Scalar(count: values.count, from: index, top1: top1, top2: top2) { values[$0] }
 }
 
 @inline(always)
-package func _top2SIMDMax(_ lhs: SIMD16<Float>, _ rhs: SIMD16<Float>) -> SIMD16<Float> {
+package func top2SIMDMax(_ lhs: SIMD16<Float>, _ rhs: SIMD16<Float>) -> SIMD16<Float> {
   #if canImport(simd)
     simd_max(lhs, rhs)
   #else
@@ -77,7 +77,7 @@ package func _top2SIMDMax(_ lhs: SIMD16<Float>, _ rhs: SIMD16<Float>) -> SIMD16<
 }
 
 @inline(always)
-package func _top2SIMDMin(_ lhs: SIMD16<Float>, _ rhs: SIMD16<Float>) -> SIMD16<Float> {
+package func top2SIMDMin(_ lhs: SIMD16<Float>, _ rhs: SIMD16<Float>) -> SIMD16<Float> {
   #if canImport(simd)
     simd_min(lhs, rhs)
   #else
@@ -86,7 +86,7 @@ package func _top2SIMDMin(_ lhs: SIMD16<Float>, _ rhs: SIMD16<Float>) -> SIMD16<
 }
 
 @inline(always)
-package func _top2Scalar(
+package func top2Scalar(
   count: Int,
   from initialIndex: Int = 0,
   top1 initialTop1: Float = -.infinity,
@@ -96,13 +96,13 @@ package func _top2Scalar(
   var top1 = initialTop1
   var top2 = initialTop2
   for index in initialIndex..<count {
-    _updateTop2(top1: &top1, top2: &top2, with: valueAt(index))
+    updateTop2(top1: &top1, top2: &top2, with: valueAt(index))
   }
   return (top1, top2)
 }
 
 @inline(always)
-package func _updateTop2(top1: inout Float, top2: inout Float, with value: Float) {
+package func updateTop2(top1: inout Float, top2: inout Float, with value: Float) {
   if value > top1 {
     top2 = top1
     top1 = value
@@ -128,7 +128,7 @@ func tokenConfidence(unorderedPair values: some Collection<Float>) -> Float {
 // MARK: - ONNX
 
 #if ONNXCore
-  func tokenConfidenceONNX(logits: [Float]) -> Float {
+  func tokenConfidenceONNX(logits: borrowing EdgeToolsONNXTensorView<Float>) -> Float {
     let top = logits.withUnsafeBufferPointer { top2SIMD($0) }
     return tokenConfidence(top1: top.top1, top2: top.top2)
   }
@@ -171,7 +171,7 @@ func tokenConfidence(unorderedPair values: some Collection<Float>) -> Float {
           top2SIMD(UnsafeBufferPointer(start: pointer, count: vocabularySize))
         }
       } else {
-        _top2Scalar(count: vocabularySize) { view[scalarAt: [0, $0]] }
+        top2Scalar(count: vocabularySize) { view[scalarAt: [0, $0]] }
       }
     return tokenConfidence(top1: top.top1, top2: top.top2)
   }

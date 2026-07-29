@@ -16,32 +16,24 @@ struct `Needle JSONNX model engine tests` {
       onnxRuntime: namespace,
       configuration: NeedleModelConfiguration(dtype: "float32"),
       tokenizer: tokenizer,
-      encoderModel: JSONNXRuntime.ModelSource.javaScriptFile(
+      encoderModel: JSONNXRuntime.ModelSource.object(
         try Self.file(named: "encoder.onnx", in: fixture)
       ),
-      decoderModel: JSONNXRuntime.ModelSource.javaScriptFile(
+      decoderModel: JSONNXRuntime.ModelSource.object(
         try Self.file(named: "decoder.onnx", in: fixture)
       ),
-      encoderConfiguration: JSONNXRuntime.Configuration(
-        externalData: [
-          JSONNXRuntime.ExternalDataFile(
-            path: "encoder.onnx.data",
-            data: JSONNXRuntime.ModelSource.javaScriptFile(encoderData)
-          )
-        ]
+      encoderConfiguration: Self.configuration(
+        externalDataPath: "encoder.onnx.data",
+        data: encoderData
       ),
-      decoderConfiguration: JSONNXRuntime.Configuration(
-        externalData: [
-          JSONNXRuntime.ExternalDataFile(
-            path: "decoder.onnx.data",
-            data: JSONNXRuntime.ModelSource.javaScriptFile(decoderData)
-          )
-        ]
+      decoderConfiguration: Self.configuration(
+        externalDataPath: "decoder.onnx.data",
+        data: decoderData
       )
     )
     let session = EdgeToolsSession(engine: engine, tools: [SendEmailTool()])
     let parameters = NeedleJSONNXModelEngine.GenerateParameters(
-      constraint: .tools(range: .exact(1)),
+      constraint: .toolsWithGrammar(range: .exact(1)),
       maxTokens: 96
     )
     let generation = try await session.generate(
@@ -67,6 +59,18 @@ struct `Needle JSONNX model engine tests` {
       generation.response
         == generation.engineGeneration.tokens.map(\.stringValue).joined()
     )
+  }
+
+  private static func configuration(
+    externalDataPath path: String,
+    data: JSObject
+  ) -> JSONNXRuntime.Configuration {
+    let file = JSObject()
+    file["path"] = .string(path)
+    file["data"] = data.jsValue
+    let configuration = JSONNXRuntime.Configuration()
+    configuration["externalData"] = [file.jsValue].jsValue
+    return configuration
   }
 
   private static func file(named name: String, in fixture: JSObject) throws -> JSObject {

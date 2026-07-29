@@ -1,5 +1,4 @@
 #if ONNXCore && JS
-  import JavaScriptBigIntSupport
   import JavaScriptEventLoop
   import JavaScriptKit
 
@@ -13,306 +12,153 @@
         self.rawValue = rawValue
       }
 
-      public static let invalidGraphOptimizationLevel =
-        Self(rawValue: "invalid-graph-optimization-level")
-      public static let duplicateOutputName = Self(rawValue: "duplicate-output-name")
-      public static let invalidJavaScriptValue = Self(rawValue: "invalid-javascript-value")
+      public static let invalidJSValue = Self(rawValue: "invalid-js-value")
       public static let invalidRuntimeObject = Self(rawValue: "invalid-runtime-object")
-      public static let invalidTensorShape = Self(rawValue: "invalid-tensor-shape")
-      public static let invalidTensorValueCount = Self(rawValue: "invalid-tensor-value-count")
-      public static let javaScriptException = Self(rawValue: "javascript-exception")
-      public static let tensorElementCountOverflow =
-        Self(rawValue: "tensor-element-count-overflow")
-      public static let unexpectedTensorElementType =
-        Self(rawValue: "unexpected-tensor-element-type")
     }
 
     public let code: Code
     public let message: String
-    public let operation: String?
-    public let javaScriptStack: String?
 
-    public init(
-      code: Code,
-      message: String,
-      operation: String? = nil,
-      javaScriptStack: String? = nil
-    ) {
+    public init(code: Code, message: String) {
       self.code = code
       self.message = message
-      self.operation = operation
-      self.javaScriptStack = javaScriptStack
     }
   }
 
   // MARK: - JSONNXRuntime
 
   public final class JSONNXRuntime {
+    public typealias Configuration = JSObject
+
+    @nonexhaustive
+    public enum ModelSource {
+      case location(String)
+      case bytes([UInt8])
+      case object(JSObject)
+    }
+
+    public let object: JSObject
+
     private let inferenceSession: JSObject
     private let tensorConstructor: JSObject
 
-    public init(onnxRuntime: JSObject) throws {
-      let namespace = Self.namespace(from: onnxRuntime)
+    public init(object: JSObject) throws {
+      let object = object["default"].object ?? object
       guard
-        let inferenceSession = namespace["InferenceSession"].object,
+        let inferenceSession = object["InferenceSession"].object,
         inferenceSession["create"].object != nil,
-        let tensorConstructor = namespace["Tensor"].object
+        let tensorConstructor = object["Tensor"].object
       else {
         throw JSONNXRuntimeError(
           code: .invalidRuntimeObject,
-          message: "The JavaScript object must expose InferenceSession.create and Tensor."
+          message: "The JS object must expose InferenceSession.create and Tensor."
         )
       }
+      self.object = object
       self.inferenceSession = inferenceSession
       self.tensorConstructor = tensorConstructor
     }
 
-    public func tensor(values: [Float], shape: [Int]) throws -> JSONNXTensor {
-      try self.tensor(
-        values: values,
-        shape: shape,
-        dtype: .float,
-        javaScriptType: "float32"
-      )
+    public convenience init(onnxRuntime: JSObject) throws {
+      try self.init(object: onnxRuntime)
     }
 
-    public func tensor(values: [Int32], shape: [Int]) throws -> JSONNXTensor {
-      try self.tensor(
-        values: values,
-        shape: shape,
-        dtype: .int32,
-        javaScriptType: "int32"
+    public func tensor<Values: Sequence>(
+      values: Values,
+      shape: [Int]
+    ) throws -> JSONNXTensor where Values.Element: EdgeToolsONNXElement {
+      let values = ContiguousArray(values)
+      try edgeToolsONNXValidateValueCount(values.count, shape: shape)
+      let dtype = Values.Element.onnxDType
+      let bytes = values.withUnsafeBytes {
+        JSUint8Array(buffer: $0.bindMemory(to: UInt8.self)).jsObject
+      }
+      guard let buffer = bytes["buffer"].object else {
+        throw JSONNXRuntimeError(
+          code: .invalidJSValue,
+          message: "A JS typed array must expose an ArrayBuffer."
+        )
+      }
+      let object = try self.tensorConstructor.throws.new(
+        try Self.jsType(for: dtype),
+        try Self.jsTypedArrayConstructor(for: dtype).new(buffer),
+        shape
       )
-    }
-
-    public func tensor(values: [Int64], shape: [Int]) throws -> JSONNXTensor {
-      try self.tensor(
-        values: values,
-        shape: shape,
-        dtype: .int64,
-        javaScriptType: "int64"
-      )
+      return JSONNXTensor(object: object, dtype: dtype, shape: shape)
     }
 
     nonisolated(nonsending) public func session(
       model: ModelSource,
-      configuration: Configuration
+      configuration: JSObject
     ) async throws -> JSONNXSession {
-      let modelValue = Self.javaScriptValue(for: model)
-      let options = Self.javaScriptOptions(for: configuration)
-      do {
-        guard let create = self.inferenceSession["create"].object else {
-          throw JSONNXRuntimeError(
-            code: .invalidRuntimeObject,
-            message:
-              "The JavaScript ONNX Runtime namespace no longer exposes InferenceSession.create."
-          )
-        }
-        let promiseValue = try create.throws(
-          this: self.inferenceSession,
-          modelValue,
-          options
-        )
-        let session = try await Self.promiseObject(
-          promiseValue,
-          operation: "InferenceSession.create"
-        )
-        return try JSONNXSession(session: session)
-      } catch let error as JSONNXRuntimeError {
-        throw error
-      } catch let error as JSException {
-        throw Self.runtimeError(error, operation: "InferenceSession.create")
-      }
-    }
-
-    private func tensor<Element: TypedArrayElement>(
-      values: [Element],
-      shape: [Int],
-      dtype: EdgeToolsONNXDType,
-      javaScriptType: String
-    ) throws -> JSONNXTensor where Element.Element == Element {
-      let expectedCount = try Self.elementCount(for: shape)
-      guard values.count == expectedCount else {
+      guard let create = self.inferenceSession["create"].object else {
         throw JSONNXRuntimeError(
-          code: .invalidTensorValueCount,
-          message: "Tensor shape \(shape) requires \(expectedCount) values, got \(values.count)."
+          code: .invalidRuntimeObject,
+          message: "The JS runtime no longer exposes InferenceSession.create."
         )
       }
-
-      do {
-        let values = JSTypedArray<Element>(values)
-        let tensor = try self.tensorConstructor.throws.new(
-          javaScriptType,
-          values.jsObject,
-          shape
-        )
-        return JSONNXTensor(tensor: tensor, dtype: dtype, shape: shape)
-      } catch let error as JSException {
-        throw Self.runtimeError(error, operation: "Tensor")
-      }
+      let value = try create.throws(
+        this: self.inferenceSession,
+        Self.jsValue(for: model),
+        configuration
+      )
+      return try JSONNXSession(object: try await Self.promiseObject(value))
     }
 
-    private static func namespace(from object: JSObject) -> JSObject {
-      if object["InferenceSession"].object != nil, object["Tensor"].object != nil {
-        object
-      } else {
-        object["default"].object ?? object
-      }
-    }
-
-    private static func javaScriptValue(for source: ModelSource) -> JSValue {
-      switch source {
-      case .location(let location): .string(location)
-      case .bytes(let bytes): .object(JSUint8Array(bytes).jsObject)
-      case .javaScriptFile(let object): .object(object)
-      }
-    }
-
-    private static func javaScriptOptions(for configuration: Configuration) -> JSObject {
-      let options = JSObject()
-      if let level = configuration.graphOptimizationLevel {
-        options["graphOptimizationLevel"] = .string(level.rawValue)
-      }
-      if !configuration.executionProviders.isEmpty {
-        options["executionProviders"] =
-          configuration.executionProviders
-          .map { provider in
-            guard !provider.options.isEmpty else {
-              return JSValue.string(Self.executionProviderName(provider.name))
-            }
-            let object = JSObject()
-            object["name"] = .string(Self.executionProviderName(provider.name))
-            for option in provider.options {
-              object[option.name] = .string(option.value)
-            }
-            return .object(object)
-          }
-          .jsValue
-      }
-      if !configuration.externalData.isEmpty {
-        options["externalData"] =
-          configuration.externalData
-          .map { file in
-            let object = JSObject()
-            object["path"] = .string(file.path)
-            object["data"] = Self.javaScriptValue(for: file.data)
-            return object.jsValue
-          }
-          .jsValue
-      }
-      return options
-    }
-
-    private static func executionProviderName(_ name: String) -> String {
-      switch name.lowercased() {
-      case "webgpu": "webgpu"
-      case "coreml": "coreml"
-      case "cuda": "cuda"
-      case "dml": "dml"
-      default: name
-      }
-    }
-
-    fileprivate static func elementCount(for shape: [Int]) throws -> Int {
-      try shape.reduce(1) { count, dimension in
-        guard dimension >= 0 else {
-          throw JSONNXRuntimeError(
-            code: .invalidTensorShape,
-            message: "Tensor dimensions must not be negative: \(shape)."
-          )
-        }
-        let result = count.multipliedReportingOverflow(by: dimension)
-        guard !result.overflow else {
-          throw JSONNXRuntimeError(
-            code: .tensorElementCountOverflow,
-            message: "Tensor shape has too many elements: \(shape)."
-          )
-        }
-        return result.partialValue
-      }
-    }
-
-    fileprivate nonisolated(nonsending) static func promiseObject(
-      _ value: JSValue,
-      operation: String
+    nonisolated(nonsending) static func promiseObject(
+      _ value: JSValue
     ) async throws -> JSObject {
       guard let promise = value.object else {
         throw JSONNXRuntimeError(
-          code: .invalidJavaScriptValue,
-          message: "\(operation) did not return a Promise.",
-          operation: operation
+          code: .invalidJSValue,
+          message: "The JS operation did not return a Promise."
         )
       }
-      do {
-        let result = try await JSPromise(unsafelyWrapping: promise).value(isolation: #isolation)
-        guard let object = result.object else {
-          throw JSONNXRuntimeError(
-            code: .invalidJavaScriptValue,
-            message: "\(operation) did not resolve to an object.",
-            operation: operation
-          )
-        }
-        return object
-      } catch let error as JSONNXRuntimeError {
-        throw error
-      } catch let error as JSException {
-        throw Self.runtimeError(error, operation: operation)
+      let value = try await JSPromise(unsafelyWrapping: promise).value(isolation: #isolation)
+      guard let object = value.object else {
+        throw JSONNXRuntimeError(
+          code: .invalidJSValue,
+          message: "The JS Promise did not resolve to an object."
+        )
       }
+      return object
     }
 
-    fileprivate static func runtimeError(
-      _ error: JSException,
-      operation: String
-    ) -> JSONNXRuntimeError {
-      let object = error.thrownValue.object
-      let message =
-        object?["message"].string ?? error.thrownValue.string
-        ?? "JavaScript operation failed."
-      return JSONNXRuntimeError(
-        code: .javaScriptException,
-        message: message,
-        operation: operation,
-        javaScriptStack: object?["stack"].string
-      )
-    }
-  }
-
-  extension JSONNXRuntime {
-    // MARK: - ModelSource
-
-    public enum ModelSource {
-      case location(String)
-      case bytes([UInt8])
-      case javaScriptFile(JSObject)
-    }
-
-    // MARK: - ExternalDataFile
-
-    public struct ExternalDataFile {
-      public var path: String
-      public var data: ModelSource
-
-      public init(path: String, data: ModelSource) {
-        self.path = path
-        self.data = data
+    static func jsType(for dtype: EdgeToolsONNXDType) throws -> String {
+      guard let name = dtype.name else {
+        throw EdgeToolsONNXRuntimeError(
+          code: .unexpectedTensorElementType,
+          message: "ONNX tensor element type \(dtype.rawValue) has no JS representation."
+        )
       }
+      return name
     }
 
-    // MARK: - Configuration
+    static func jsTypedArrayConstructor(for dtype: EdgeToolsONNXDType) throws -> JSObject {
+      let name: String
+      switch dtype {
+      case .bool: name = "Uint8Array"
+      case .float16: name = "Uint16Array"
+      case .int64: name = "BigInt64Array"
+      case .uint64: name = "BigUint64Array"
+      default:
+        let type = try Self.jsType(for: dtype)
+        name = type.prefix(1).uppercased() + type.dropFirst() + "Array"
+      }
+      guard let constructor = JSObject.global[name].object else {
+        throw EdgeToolsONNXRuntimeError(
+          code: .unexpectedTensorElementType,
+          message: "JS does not provide \(name)."
+        )
+      }
+      return constructor
+    }
 
-    public struct Configuration {
-      public var graphOptimizationLevel: EdgeToolsONNXGraphOptimizationLevel?
-      public var executionProviders: [EdgeToolsONNXExecutionProvider]
-      public var externalData: [ExternalDataFile]
-
-      public init(
-        graphOptimizationLevel: EdgeToolsONNXGraphOptimizationLevel? = nil,
-        executionProviders: [EdgeToolsONNXExecutionProvider] = [],
-        externalData: [ExternalDataFile] = []
-      ) {
-        self.graphOptimizationLevel = graphOptimizationLevel
-        self.executionProviders = executionProviders
-        self.externalData = externalData
+    private static func jsValue(for source: ModelSource) -> JSValue {
+      switch source {
+      case .location(let location): .string(location)
+      case .bytes(let bytes): .object(JSUint8Array(bytes).jsObject)
+      case .object(let object): .object(object)
       }
     }
   }
@@ -320,83 +166,60 @@
   // MARK: - JSONNXSession
 
   public final class JSONNXSession {
-    private let session: JSObject
-
+    public let object: JSObject
     public let inputNames: [String]
     public let outputNames: [String]
 
-    fileprivate init(session: JSObject) throws {
-      self.inputNames = try Self.names(session["inputNames"], property: "inputNames")
-      self.outputNames = try Self.names(session["outputNames"], property: "outputNames")
-      self.session = session
+    init(object: JSObject) throws {
+      self.object = object
+      self.inputNames = try Self.names(object["inputNames"])
+      self.outputNames = try Self.names(object["outputNames"])
     }
 
     deinit {
-      guard let release = self.session["release"].object else { return }
-      guard let value = try? release.throws(this: self.session) else { return }
-      guard let promise = value.object else { return }
-      JSPromise(unsafelyWrapping: promise).catch { _ in .undefined }
+      guard let release = self.object["release"].object else { return }
+      guard let value = try? release.throws(this: self.object).object else { return }
+      JSPromise(unsafelyWrapping: value).catch { _ in .undefined }
     }
 
     nonisolated(nonsending) public func run(
       inputs: [String: JSONNXTensor],
       outputNames: [String]
     ) async throws -> [String: JSONNXTensor] {
-      guard Set(outputNames).count == outputNames.count else {
-        throw JSONNXRuntimeError(
-          code: .duplicateOutputName,
-          message: "Output names must be unique."
-        )
-      }
+      try edgeToolsONNXValidateOutputNames(outputNames)
       let feeds = JSObject()
       for (name, tensor) in inputs {
-        feeds[name] = tensor.javaScriptObject.jsValue
+        feeds[name] = tensor.object.jsValue
       }
-
-      do {
-        guard let run = self.session["run"].object else {
-          throw JSONNXRuntimeError(
-            code: .invalidJavaScriptValue,
-            message: "The JavaScript session does not expose run()."
-          )
-        }
-        let promiseValue = try run.throws(this: self.session, feeds, outputNames)
-        let outputs = try await JSONNXRuntime.promiseObject(
-          promiseValue,
-          operation: "InferenceSession.run"
+      guard let run = self.object["run"].object else {
+        throw JSONNXRuntimeError(
+          code: .invalidJSValue,
+          message: "The JS session does not expose run()."
         )
-        return try Dictionary(
-          uniqueKeysWithValues: outputNames.map { name in
-            guard let tensor = outputs[name].object else {
-              throw JSONNXRuntimeError(
-                code: .invalidJavaScriptValue,
-                message: "InferenceSession.run did not return output \(name).",
-                operation: "InferenceSession.run"
-              )
-            }
-            return (name, try JSONNXTensor(tensor: tensor))
+      }
+      let outputs = try await JSONNXRuntime.promiseObject(
+        try run.throws(this: self.object, feeds, outputNames)
+      )
+      return try Dictionary(
+        uniqueKeysWithValues: outputNames.map { name in
+          guard let object = outputs[name].object else {
+            throw JSONNXRuntimeError(
+              code: .invalidJSValue,
+              message: "The JS session did not return output \(name)."
+            )
           }
-        )
-      } catch let error as JSONNXRuntimeError {
-        throw error
-      } catch let error as JSException {
-        throw JSONNXRuntime.runtimeError(error, operation: "InferenceSession.run")
-      }
+          return (name, try JSONNXTensor(object: object))
+        }
+      )
     }
 
-    private static func names(_ value: JSValue, property: String) throws -> [String] {
-      guard let array = value.array else {
-        throw JSONNXRuntimeError(
-          code: .invalidJavaScriptValue,
-          message: "The JavaScript session's \(property) property must be an array."
-        )
+    private static func names(_ value: JSValue) throws -> [String] {
+      guard let values = value.array else {
+        throw JSONNXRuntimeError(code: .invalidJSValue, message: "Expected an array of names.")
       }
-      return try array.map { value in
-        guard let name = value.string else {
-          throw JSONNXRuntimeError(
-            code: .invalidJavaScriptValue,
-            message: "The JavaScript session's \(property) property must contain strings."
-          )
+      return try values.map {
+        guard let name = $0.string else {
+          throw JSONNXRuntimeError(code: .invalidJSValue, message: "Expected a string name.")
         }
         return name
       }
@@ -406,119 +229,75 @@
   // MARK: - JSONNXTensor
 
   public final class JSONNXTensor {
-    public typealias DType = EdgeToolsONNXDType
-
-    fileprivate let javaScriptObject: JSObject
-
-    public let dtype: DType
+    public let object: JSObject
+    public let dtype: EdgeToolsONNXDType
     public let shape: [Int]
 
-    fileprivate init(tensor: JSObject, dtype: DType, shape: [Int]) {
-      self.javaScriptObject = tensor
+    init(object: JSObject, dtype: EdgeToolsONNXDType, shape: [Int]) {
+      self.object = object
       self.dtype = dtype
       self.shape = shape
     }
 
-    fileprivate convenience init(tensor: JSObject) throws {
-      guard let type = tensor["type"].string else {
-        throw JSONNXRuntimeError(
-          code: .invalidJavaScriptValue,
-          message: "A JavaScript ONNX tensor must expose a string type."
-        )
+    convenience init(object: JSObject) throws {
+      guard
+        let name = object["type"].string,
+        let dtype = EdgeToolsONNXDType(name: name),
+        let dimensions = object["dims"].array
+      else {
+        throw JSONNXRuntimeError(code: .invalidJSValue, message: "Invalid JS tensor metadata.")
       }
-      guard let dimensions = tensor["dims"].array else {
-        throw JSONNXRuntimeError(
-          code: .invalidJavaScriptValue,
-          message: "A JavaScript ONNX tensor must expose a dims array."
-        )
-      }
-      let shape = try dimensions.map { value in
-        guard let dimension = value.number, let dimension = Int(exactly: dimension) else {
-          throw JSONNXRuntimeError(
-            code: .invalidJavaScriptValue,
-            message: "A JavaScript ONNX tensor's dimensions must be integers."
-          )
+      let shape = try dimensions.map {
+        guard let value = $0.number, let dimension = Int(exactly: value) else {
+          throw JSONNXRuntimeError(code: .invalidJSValue, message: "Invalid tensor dimension.")
         }
         return dimension
       }
-      let dtype: DType
-      switch type {
-      case "float32": dtype = .float
-      case "int32": dtype = .int32
-      case "int64": dtype = .int64
-      default: dtype = .undefined
-      }
-      self.init(tensor: tensor, dtype: dtype, shape: shape)
+      self.init(object: object, dtype: dtype, shape: shape)
     }
 
     deinit {
-      guard let dispose = self.javaScriptObject["dispose"].object else { return }
-      _ = try? dispose.throws(this: self.javaScriptObject)
+      guard let dispose = self.object["dispose"].object else { return }
+      _ = try? dispose.throws(this: self.object)
     }
 
-    nonisolated(nonsending) public func floatValues() async throws -> [Float] {
-      try await self.values(
-        dtype: .float,
-        type: Float.self,
-        operation: "Tensor.getData<float32>"
-      )
-    }
-
-    nonisolated(nonsending) public func int32Values() async throws -> [Int32] {
-      try await self.values(
-        dtype: .int32,
-        type: Int32.self,
-        operation: "Tensor.getData<int32>"
-      )
-    }
-
-    nonisolated(nonsending) public func int64Values() async throws -> [Int64] {
-      try await self.values(
-        dtype: .int64,
-        type: Int64.self,
-        operation: "Tensor.getData<int64>"
-      )
-    }
-
-    private nonisolated(nonsending) func values<Element: TypedArrayElement>(
-      dtype: DType,
-      type: Element.Type,
-      operation: String
-    ) async throws -> [Element] where Element.Element == Element {
-      guard self.dtype == dtype else {
-        throw JSONNXRuntimeError(
+    nonisolated(nonsending) public func view<Element: EdgeToolsONNXElement>(
+      as type: Element.Type
+    ) async throws -> EdgeToolsONNXTensorView<Element> {
+      guard self.dtype == Element.onnxDType else {
+        throw EdgeToolsONNXRuntimeError(
           code: .unexpectedTensorElementType,
-          message: "Expected tensor element type \(dtype.rawValue), got \(self.dtype.rawValue)."
+          message: "Expected tensor element type \(Element.onnxDType.rawValue), got \(self.dtype.rawValue)."
         )
       }
-
-      do {
-        guard let getData = self.javaScriptObject["getData"].object else {
-          throw JSONNXRuntimeError(
-            code: .invalidJavaScriptValue,
-            message: "A JavaScript ONNX tensor must expose getData()."
-          )
-        }
-        let promiseValue = try getData.throws(this: self.javaScriptObject)
-        let object = try await JSONNXRuntime.promiseObject(promiseValue, operation: operation)
-        guard object.isInstanceOf(Element.typedArrayClass) else {
-          throw JSONNXRuntimeError(
-            code: .invalidJavaScriptValue,
-            message: "\(operation) returned an incompatible typed array.",
-            operation: operation
-          )
-        }
-        let values = JSTypedArray<Element>(unsafelyWrapping: object)
-        return values.withUnsafeBytes { Array($0) }
-      } catch let error as JSONNXRuntimeError {
-        throw error
-      } catch let error as JSException {
-        throw JSONNXRuntime.runtimeError(error, operation: operation)
+      guard let getData = self.object["getData"].object else {
+        throw JSONNXRuntimeError(code: .invalidJSValue, message: "The JS tensor has no getData().")
       }
+      let object = try await JSONNXRuntime.promiseObject(try getData.throws(this: self.object))
+      guard object.isInstanceOf(try JSONNXRuntime.jsTypedArrayConstructor(for: self.dtype)) else {
+        throw JSONNXRuntimeError(code: .invalidJSValue, message: "Unexpected JS typed array.")
+      }
+
+      let count = try edgeToolsONNXElementCount(for: self.shape)
+      let byteCount = count * MemoryLayout<Element>.stride
+      guard
+        let buffer = object["buffer"].object,
+        let byteOffset = object["byteOffset"].number,
+        object["byteLength"].number.map(Int.init) == byteCount
+      else {
+        throw JSONNXRuntimeError(code: .invalidJSValue, message: "Invalid JS tensor buffer.")
+      }
+      let baseAddress = count == 0 ? nil : UnsafeMutablePointer<Element>.allocate(capacity: count)
+      if let baseAddress {
+        let bytes = UInt8.typedArrayClass.new(buffer, byteOffset, byteCount)
+        JSTypedArray<UInt8>(unsafelyWrapping: bytes).copyMemory(
+          to: UnsafeMutableRawBufferPointer(start: baseAddress, count: byteCount)
+            .bindMemory(to: UInt8.self)
+        )
+      }
+      return EdgeToolsONNXTensorView(owning: baseAddress, count: count)
     }
   }
-
-  // MARK: - Protocol Conformances
 
   extension JSONNXTensor: EdgeToolsONNXTensor {}
 

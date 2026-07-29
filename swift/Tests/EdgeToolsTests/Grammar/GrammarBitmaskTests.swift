@@ -98,9 +98,9 @@ struct GrammarBitmaskConsolidatedTests {
         @Test
         func `ONNX Filters Masked Tokens`() {
           let mask = Self.mask()
-          var logits = (0..<64).map(Float.init)
+          var logits = EdgeToolsONNXTensorView(copying: (0..<64).map(Float.init))
           applyONNXBitmask(logits: &logits, mask: mask)
-          let filtered = logits.indices
+          let filtered = (0..<logits.count)
             .filter { logits[$0] == -.infinity }
 
           expectNoDifference(filtered, Self.expectedIndices)

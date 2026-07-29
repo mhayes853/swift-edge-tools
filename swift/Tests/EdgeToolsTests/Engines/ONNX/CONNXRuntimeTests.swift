@@ -28,7 +28,7 @@
     }
 
     @Test
-    func `Run Model Using Vendored ONNX Runtime`() throws {
+    func `Run Model Using Vendored ONNX Runtime`() async throws {
       let runtime = try CONNXRuntime()
       let session = try runtime.session(modelURL: try Self.modelURL())
       let firstInput = try runtime.tensor(values: [Float(2), 4, 8], shape: [3])
@@ -39,7 +39,9 @@
       )
 
       let sum = try #require(outputs["sum"])
-      expectNoDifference(try sum.floatValues(), [3, 7, 13])
+      let view = try await sum.view(as: Float.self)
+      expectNoDifference(view.count, 3)
+      expectNoDifference([view[0], view[1], view[2]], [3, 7, 13])
     }
 
     @Test
@@ -49,7 +51,7 @@
       let firstInput = try runtime.tensor(values: [Float(2), 4, 8], shape: [3])
       let secondInput = try runtime.tensor(values: [Float(1), 3, 5], shape: [3])
 
-      let error = #expect(throws: CONNXRuntimeError.self) {
+      let error = #expect(throws: EdgeToolsONNXRuntimeError.self) {
         try session.run(
           inputs: ["x": firstInput, "y": secondInput],
           outputNames: ["sum", "sum"]
@@ -69,35 +71,50 @@
       expectNoDifference(session.outputNames, ["sum"])
       expectNoDifference(tensor.dtype, .float)
       expectNoDifference(tensor.shape, [1, 3])
+      _ = runtime.api
+      _ = runtime.environment
+      _ = session.handle
+      _ = tensor.handle
     }
 
     @Test
-    func `Create And Read Integer Tensors`() throws {
+    func `Create And Read Integer Tensors`() async throws {
       let runtime = try CONNXRuntime()
-      let int32Tensor = try runtime.tensor(values: [Int32(1), 2, 3], shape: [3])
+      let int32Values = (1...3).lazy.map(Int32.init)
+      let int32Tensor = try runtime.tensor(values: int32Values, shape: [3])
       let int64Tensor = try runtime.tensor(values: [Int64(4), 5, 6], shape: [3])
+      let int32View = try await int32Tensor.view(as: Int32.self)
+      let int64View = try await int64Tensor.view(as: Int64.self)
+      var copiedView = EdgeToolsONNXTensorView<Int32>(copying: [7, 8, 9])
 
-      expectNoDifference(try int32Tensor.int32Values(), [1, 2, 3])
-      expectNoDifference(try int64Tensor.int64Values(), [4, 5, 6])
+      expectNoDifference([int32View[0], int32View[1], int32View[2]], [1, 2, 3])
+      expectNoDifference([int64View[0], int64View[1], int64View[2]], [4, 5, 6])
+      expectNoDifference([copiedView[0], copiedView[1], copiedView[2]], [7, 8, 9])
+      do {
+        var mutableSpan = copiedView.mutableSpan
+        mutableSpan[1] = 10
+      }
+      expectNoDifference(copiedView.span[1], 10)
     }
 
     @Test
     func `Reject Tensor Values That Do Not Match Shape`() throws {
       let runtime = try CONNXRuntime()
 
-      let error = #expect(throws: CONNXRuntimeError.self) {
+      let error = #expect(throws: EdgeToolsONNXRuntimeError.self) {
         try runtime.tensor(values: [Float(1), 2], shape: [3])
       }
       expectNoDifference(error?.code, .invalidTensorValueCount)
     }
 
     @Test
-    func `Reject Reading Tensor As Incorrect Element Type`() throws {
+    func `Reject Reading Tensor As Incorrect Element Type`() async throws {
       let runtime = try CONNXRuntime()
       let tensor = try runtime.tensor(values: [Int64(1), 2, 3], shape: [3])
 
-      let error = #expect(throws: CONNXRuntimeError.self) {
-        try tensor.floatValues()
+      let error = await #expect(throws: EdgeToolsONNXRuntimeError.self) {
+        let view = try await tensor.view(as: Float.self)
+        _ = view.count
       }
       expectNoDifference(error?.code, .unexpectedTensorElementType)
     }
@@ -115,7 +132,7 @@
         outputNames: ["sum"]
       )
       let output = try #require(outputs["sum"])
-      return try await output.floatValues()
+      return try await output.array(as: Float.self)
     }
 
     private static func modelURL() throws -> URL {

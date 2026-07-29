@@ -57,7 +57,8 @@ private func argmaxValues(count: Int, maximumAt index: Int) -> [Float] {
       ]
     )
     func `Samples Expected Token`(values: [Float], expectedToken: EdgeToolsToken.ID) {
-      let token = ONNXArgmaxSampler().sample(logits: values)
+      let view = EdgeToolsONNXTensorView(copying: values)
+      let token = ONNXArgmaxSampler().sample(logits: view)
 
       expectNoDifference(token, expectedToken)
     }
@@ -67,7 +68,8 @@ private func argmaxValues(count: Int, maximumAt index: Int) -> [Float] {
       var values = Array(repeating: Float(-1), count: 67)
       values[66] = 1
 
-      let token = ONNXArgmaxSampler().sample(logits: values)
+      let view = EdgeToolsONNXTensorView(copying: values)
+      let token = ONNXArgmaxSampler().sample(logits: view)
 
       expectNoDifference(token, 66)
     }

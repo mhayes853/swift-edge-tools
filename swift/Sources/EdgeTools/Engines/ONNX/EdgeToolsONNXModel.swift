@@ -8,14 +8,14 @@
   public struct EdgeToolsONNXGenerateParameters: EdgeToolsModelEngineGenerateParameters {
     public static var `default`: Self { Self() }
 
-    public var sampler: any EdgeToolsSampler<[Float]>
-    public var processor: (any EdgeToolsLogitsProcessor<[EdgeToolsToken.ID], [Float]>)?
+    public var sampler: any EdgeToolsONNXSampler
+    public var processor: (any EdgeToolsONNXLogitsProcessor)?
     public var constraint: EdgeToolsXGRGenerationConstraint
     public var maxTokens: Int?
 
     public init(
-      sampler: any EdgeToolsSampler<[Float]> = ONNXArgmaxSampler(),
-      processor: (any EdgeToolsLogitsProcessor<[EdgeToolsToken.ID], [Float]>)? = nil,
+      sampler: any EdgeToolsONNXSampler = ONNXArgmaxSampler(),
+      processor: (any EdgeToolsONNXLogitsProcessor)? = nil,
       constraint: EdgeToolsXGRGenerationConstraint = .tools,
       maxTokens: Int? = 1024
     ) {
@@ -30,8 +30,8 @@
 
   public struct EdgeToolsONNXGenerationState<ModelState> {
     var modelState: ModelState
-    let sampler: any EdgeToolsSampler<[Float]>
-    var processor: (any EdgeToolsLogitsProcessor<[EdgeToolsToken.ID], [Float]>)?
+    let sampler: any EdgeToolsONNXSampler
+    var processor: (any EdgeToolsONNXLogitsProcessor)?
   }
 
   // MARK: - EdgeToolsONNXError

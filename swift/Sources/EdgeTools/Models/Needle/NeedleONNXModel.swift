@@ -131,7 +131,7 @@
       state.keyCache = updatedKey
       state.valueCache = updatedValue
       state.position += 1
-      return try await logits.floatValues()
+      return try await logits.array(as: Float.self)
     }
 
     private nonisolated(nonsending) func encoderOutputs(
@@ -280,17 +280,15 @@
           message: "Expected \(self.vocabularySize) logits, got \(logits.count)."
         )
       }
-      logits = try await state.processor?.process(logits: &logits) ?? logits
-      applyONNXBitmask(logits: &logits, mask: bitmask)
-      let confidence = tokenConfidenceONNX(logits: logits)
-      let tokenId = try await state.sampler.sample(logits: logits)
+      var logitsView = EdgeToolsONNXTensorView(copying: logits)
+      try await state.processor?.process(logits: &logitsView)
+      applyONNXBitmask(logits: &logitsView, mask: bitmask)
+      let confidence = tokenConfidenceONNX(logits: logitsView)
+      let tokenId = try await state.sampler.sample(logits: logitsView)
       return EdgeToolsModelSample(tokenId: tokenId, confidence: confidence)
     }
 
-    public func didAccept(
-      token: EdgeToolsToken,
-      state: inout GenerationState
-    ) {
+    public func didAccept(token: EdgeToolsToken, state: inout GenerationState) {
       state.processor?.didSample(token: token)
     }
   }
@@ -314,9 +312,7 @@
           guard let tokenizer = tokenizer as? any EdgeToolsXGRTokenizer else {
             throw EdgeToolsError.unsupportedTokenizer
           }
-          guard
-            let configuration = try NeedleModelConfiguration.decode(in: directoryURL)
-          else {
+          guard let configuration = try NeedleModelConfiguration.decode(in: directoryURL) else {
             throw EdgeToolsError.failedToLoadConfiguration
           }
           let encoderSession = try runtime.session(

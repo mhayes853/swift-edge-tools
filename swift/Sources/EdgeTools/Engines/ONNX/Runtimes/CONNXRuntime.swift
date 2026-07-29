@@ -15,16 +15,9 @@
         self.rawValue = rawValue
       }
 
-      public static let invalidGraphOptimizationLevel =
-        Self(rawValue: "invalid-graph-optimization-level")
-      public static let duplicateOutputName = Self(rawValue: "duplicate-output-name")
-      public static let invalidTensorShape = Self(rawValue: "invalid-tensor-shape")
-      public static let invalidTensorValueCount = Self(rawValue: "invalid-tensor-value-count")
+      public static let incompatibleSessionOptions = Self(rawValue: "incompatible-session-options")
+      public static let invalidGraphOptimizationLevel = Self(rawValue: "invalid-graph-optimization-level")
       public static let onnxRuntime = Self(rawValue: "onnx-runtime")
-      public static let tensorElementCountOverflow =
-        Self(rawValue: "tensor-element-count-overflow")
-      public static let unexpectedTensorElementType =
-        Self(rawValue: "unexpected-tensor-element-type")
       public static let unsupportedAPIVersion = Self(rawValue: "unsupported-api-version")
     }
 
@@ -42,13 +35,13 @@
   // MARK: - CONNXRuntime
 
   public final class CONNXRuntime: @unchecked Sendable {
-    // Safe because the API table and environment pointers are immutable after initialization, and
-    // ONNX Runtime environments support concurrent session creation and inference.
-    fileprivate static let apiVersion = UInt32(ORT_API_VERSION)
+    // The API and environment pointers are immutable, and ONNX Runtime supports concurrent sessions.
+    private static let apiVersion = UInt32(ORT_API_VERSION)
 
-    fileprivate let api: UnsafePointer<OrtApi>
+    public let api: UnsafePointer<OrtApi>
+    public let environment: OpaquePointer
+
     fileprivate let allocator: UnsafeMutablePointer<OrtAllocator>
-    private let environment: OpaquePointer
     private let configuration: Configuration
 
     public init(api: OpaquePointer, configuration: Configuration = Configuration()) throws {
@@ -68,8 +61,8 @@
         throw error
       }
       self.api = api
-      self.allocator = allocator
       self.environment = environment
+      self.allocator = allocator
       self.configuration = configuration
     }
 
@@ -92,10 +85,42 @@
       self.api.pointee.ReleaseEnv(self.environment)
     }
 
+    public func check(_ status: OpaquePointer?) throws {
+      try Self.check(api: self.api, status: status)
+    }
+
+    public func sessionOptions() throws -> SessionOptions {
+      try self.sessionOptions(configuration: self.configuration)
+    }
+
+    public func sessionOptions(configuration: Configuration) throws -> SessionOptions {
+      let options = try SessionOptions(runtime: self)
+      try options.setGraphOptimizationLevel(configuration.graphOptimizationLevel)
+      try configuration.configureSessionOptions(options)
+      return options
+    }
+
     public func session(modelPath: String) throws -> CONNXRuntimeSession {
-      try modelPath.withCString {
-        try self.session(modelPath: $0, configuration: self.configuration)
+      let options = try self.sessionOptions()
+      return try self.session(modelPath: modelPath, options: options)
+    }
+
+    public func session(
+      modelPath: String,
+      options: borrowing SessionOptions
+    ) throws -> CONNXRuntimeSession {
+      guard options.runtime === self else {
+        throw CONNXRuntimeError(
+          code: .incompatibleSessionOptions,
+          message: "Session options must be created by the runtime creating the session."
+        )
       }
+      let handle: OpaquePointer = try modelPath.withCString { path in
+        try Self.output(api: self.api) {
+          self.api.pointee.CreateSession(self.environment, path, options.handle, $0)
+        }
+      }
+      return try CONNXRuntimeSession.make(runtime: self, handle: handle)
     }
 
     #if Foundation
@@ -104,165 +129,37 @@
       }
     #endif
 
-    private func session(
-      modelPath: UnsafePointer<CChar>,
-      configuration: Configuration
-    ) throws -> CONNXRuntimeSession {
-      let options: OpaquePointer = try Self.output(api: self.api) {
-        self.api.pointee.CreateSessionOptions($0)
-      }
-      defer { self.api.pointee.ReleaseSessionOptions(options) }
-
-      try Self.check(
-        api: self.api,
-        status: self.api.pointee.SetSessionGraphOptimizationLevel(
-          options,
-          try Self.graphOptimizationLevel(configuration.graphOptimizationLevel)
-        )
-      )
-      for provider in configuration.executionProviders where provider.name.lowercased() != "cpu" {
-        try self.append(provider: provider, to: options)
-      }
-
-      let session: OpaquePointer = try Self.output(api: self.api) {
-        self.api.pointee.CreateSession(self.environment, modelPath, options, $0)
-      }
-      return try CONNXRuntimeSession.make(runtime: self, session: session)
-    }
-
-    public func tensor(values: [Int64], shape: [Int]) throws -> CONNXRuntimeTensor {
-      try self.tensor(
-        values: values,
-        shape: shape,
-        elementType: ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64
-      )
-    }
-
-    public func tensor(values: [Int32], shape: [Int]) throws -> CONNXRuntimeTensor {
-      try self.tensor(
-        values: values,
-        shape: shape,
-        elementType: ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32
-      )
-    }
-
-    public func tensor(values: [Float], shape: [Int]) throws -> CONNXRuntimeTensor {
-      try self.tensor(
-        values: values,
-        shape: shape,
-        elementType: ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT
-      )
-    }
-
-    public func tensor(
-      repeating value: Float,
+    public func tensor<Values: Sequence>(
+      values: Values,
       shape: [Int]
-    ) throws -> CONNXRuntimeTensor {
-      try self.tensor(
-        values: [Float](repeating: value, count: try Self.elementCount(for: shape)),
-        shape: shape
-      )
-    }
-
-    private func tensor<Element>(
-      values: [Element],
-      shape: [Int],
-      elementType: ONNXTensorElementDataType
-    ) throws -> CONNXRuntimeTensor {
+    ) throws -> CONNXRuntimeTensor where Values.Element: EdgeToolsONNXElement {
+      let values = ContiguousArray(values)
+      try edgeToolsONNXValidateValueCount(values.count, shape: shape)
       let dimensions = shape.map(Int64.init)
-      let expectedCount = try Self.elementCount(for: shape)
-      guard values.count == expectedCount else {
-        throw CONNXRuntimeError(
-          code: .invalidTensorValueCount,
-          message: "Tensor shape \(shape) requires \(expectedCount) values, got \(values.count)."
-        )
-      }
-
-      let tensor: OpaquePointer = try dimensions.withUnsafeBufferPointer { dimensions in
+      let dtype = Values.Element.onnxDType
+      let handle: OpaquePointer = try dimensions.withUnsafeBufferPointer { dimensions in
         try Self.output(api: self.api) {
           self.api.pointee.CreateTensorAsOrtValue(
             self.allocator,
             dimensions.baseAddress,
             dimensions.count,
-            elementType,
+            ONNXTensorElementDataType(rawValue: UInt32(dtype.rawValue)),
             $0
           )
         }
       }
       do {
-        let bytes: UnsafeMutableRawPointer = try Self.output(api: self.api) {
-          self.api.pointee.GetTensorMutableData(tensor, $0)
+        let destination: UnsafeMutableRawPointer = try Self.output(api: self.api) {
+          self.api.pointee.GetTensorMutableData(handle, $0)
         }
-        values.withUnsafeBufferPointer { source in
-          guard let sourceAddress = source.baseAddress else { return }
-          bytes.copyMemory(
-            from: sourceAddress,
-            byteCount: values.count * MemoryLayout<Element>.stride
-          )
+        values.withUnsafeBytes {
+          guard let source = $0.baseAddress else { return }
+          destination.copyMemory(from: source, byteCount: $0.count)
         }
-        return CONNXRuntimeTensor(
-          runtime: self,
-          tensor: tensor,
-          dtype: CONNXRuntimeTensor.DType(rawValue: Int(elementType.rawValue)),
-          shape: shape
-        )
+        return CONNXRuntimeTensor(runtime: self, handle: handle, dtype: dtype, shape: shape)
       } catch {
-        self.api.pointee.ReleaseValue(tensor)
+        self.api.pointee.ReleaseValue(handle)
         throw error
-      }
-    }
-
-    fileprivate static func elementCount(for shape: [Int]) throws -> Int {
-      try shape.reduce(1) { count, dimension in
-        guard dimension >= 0 else {
-          throw CONNXRuntimeError(
-            code: .invalidTensorShape,
-            message: "Tensor dimensions must not be negative: \(shape)."
-          )
-        }
-        let result = count.multipliedReportingOverflow(by: dimension)
-        guard !result.overflow else {
-          throw CONNXRuntimeError(
-            code: .tensorElementCountOverflow,
-            message: "Tensor shape has too many elements: \(shape)."
-          )
-        }
-        return result.partialValue
-      }
-    }
-
-    private func append(
-      provider: ExecutionProvider,
-      to sessionOptions: OpaquePointer
-    ) throws {
-      let keys = provider.options.map(\.name)
-      let values = provider.options.map(\.value)
-      let name = Self.executionProviderName(provider.name)
-      try withCopiedCStringPointerBuffer(keys) { keyPointers in
-        try withCopiedCStringPointerBuffer(values) { valuePointers in
-          try name.withCString { providerName in
-            try Self.check(
-              api: self.api,
-              status: self.api.pointee.SessionOptionsAppendExecutionProvider(
-                sessionOptions,
-                providerName,
-                keyPointers.baseAddress,
-                valuePointers.baseAddress,
-                keyPointers.count
-              )
-            )
-          }
-        }
-      }
-    }
-
-    private static func executionProviderName(_ name: String) -> String {
-      switch name.lowercased() {
-      case "webgpu": "WebGPU"
-      case "coreml": "CoreML"
-      case "cuda": "CUDA"
-      case "dml": "DML"
-      default: name
       }
     }
 
@@ -283,7 +180,7 @@
       }
     }
 
-    fileprivate static func output<Value>(
+    static func output<Value>(
       api: UnsafePointer<OrtApi>,
       _ operation: (UnsafeMutablePointer<Value?>) -> OpaquePointer?
     ) throws -> Value {
@@ -292,12 +189,11 @@
       return value!
     }
 
-    fileprivate static func check(api: UnsafePointer<OrtApi>, status: OpaquePointer?) throws {
+    static func check(api: UnsafePointer<OrtApi>, status: OpaquePointer?) throws {
       guard let status else { return }
       defer { api.pointee.ReleaseStatus(status) }
       let code = api.pointee.GetErrorCode(status)
-      let message =
-        api.pointee.GetErrorMessage(status).map(String.init(cString:))
+      let message = api.pointee.GetErrorMessage(status).map(String.init(cString:))
         ?? "Unknown ONNX Runtime error."
       throw CONNXRuntimeError(
         code: .onnxRuntime,
@@ -308,77 +204,87 @@
   }
 
   extension CONNXRuntime {
-    // MARK: - Configuration
-
-    public struct Configuration: Hashable, Sendable {
+    public struct Configuration: Sendable {
       public var logIdentifier: String
       public var graphOptimizationLevel: EdgeToolsONNXGraphOptimizationLevel
-      public var executionProviders: [ExecutionProvider]
+      public var configureSessionOptions: @Sendable (borrowing SessionOptions) throws -> Void
 
       public init(
         logIdentifier: String = "swift-edge-tools",
         graphOptimizationLevel: EdgeToolsONNXGraphOptimizationLevel = .all,
-        executionProviders: [ExecutionProvider] = []
+        configureSessionOptions: @escaping @Sendable (borrowing SessionOptions) throws -> Void = { _ in }
       ) {
         self.logIdentifier = logIdentifier
         self.graphOptimizationLevel = graphOptimizationLevel
-        self.executionProviders = executionProviders
+        self.configureSessionOptions = configureSessionOptions
       }
     }
 
-    public typealias ExecutionProvider = EdgeToolsONNXExecutionProvider
-    public typealias ExecutionProviderOption = EdgeToolsONNXExecutionProvider.Option
+    public struct SessionOptions: ~Copyable {
+      let runtime: CONNXRuntime
+      public let api: UnsafePointer<OrtApi>
+      public let handle: OpaquePointer
 
-    // MARK: - CoreML
-
-    public struct CoreMLComputeUnits: RawRepresentable, Hashable, Sendable {
-      public let rawValue: String
-
-      public init(rawValue: String) {
-        self.rawValue = rawValue
+      init(runtime: CONNXRuntime) throws {
+        self.runtime = runtime
+        self.api = runtime.api
+        self.handle = try CONNXRuntime.output(api: runtime.api) {
+          runtime.api.pointee.CreateSessionOptions($0)
+        }
       }
 
-      public static let all = Self(rawValue: "ALL")
-      public static let cpuAndGPU = Self(rawValue: "CPUAndGPU")
-      public static let cpuAndNeuralEngine = Self(rawValue: "CPUAndNeuralEngine")
-      public static let cpuOnly = Self(rawValue: "CPUOnly")
-    }
+      deinit {
+        self.api.pointee.ReleaseSessionOptions(self.handle)
+      }
 
-  }
+      public borrowing func check(_ status: OpaquePointer?) throws {
+        try CONNXRuntime.check(api: self.api, status: status)
+      }
 
-  extension EdgeToolsONNXExecutionProvider {
-    public static func coreML(
-      computeUnits: CONNXRuntime.CoreMLComputeUnits,
-      modelFormat: String = "MLProgram",
-      requireStaticInputShapes: Bool = true,
-      enableOnSubgraphs: Bool = true
-    ) -> Self {
-      Self(
-        name: "coreml",
-        options: [
-          Option(name: "MLComputeUnits", value: computeUnits.rawValue),
-          Option(name: "ModelFormat", value: modelFormat),
-          Option(
-            name: "RequireStaticInputShapes",
-            value: requireStaticInputShapes ? "1" : "0"
-          ),
-          Option(
-            name: "EnableOnSubgraphs",
-            value: enableOnSubgraphs ? "1" : "0"
+      public borrowing func configure(
+        providerNamed name: String,
+        options: [String: String] = [:]
+      ) throws {
+        guard name.lowercased() != "cpu" else { return }
+        let keys = Array(options.keys)
+        let values = keys.map { options[$0]! }
+        try withCopiedCStringPointerBuffer(keys) { keys in
+          try withCopiedCStringPointerBuffer(values) { values in
+            try name.withCString {
+              try self.check(
+                self.api.pointee.SessionOptionsAppendExecutionProvider(
+                  self.handle,
+                  $0,
+                  keys.baseAddress,
+                  values.baseAddress,
+                  keys.count
+                )
+              )
+            }
+          }
+        }
+      }
+
+      borrowing func setGraphOptimizationLevel(
+        _ level: EdgeToolsONNXGraphOptimizationLevel
+      ) throws {
+        try self.check(
+          self.api.pointee.SetSessionGraphOptimizationLevel(
+            self.handle,
+            try CONNXRuntime.graphOptimizationLevel(level)
           )
-        ]
-      )
+        )
+      }
     }
   }
 
   // MARK: - CONNXRuntimeSession
 
   public final class CONNXRuntimeSession: @unchecked Sendable {
-    // ONNX Runtime sessions support concurrent inference, and the pointer is immutable after init,
-    // so this is safe.
+    // ONNX Runtime sessions support concurrent inference through an immutable handle.
     private let runtime: CONNXRuntime
-    private let session: OpaquePointer
 
+    public let handle: OpaquePointer
     public let inputNames: [String]
     public let outputNames: [String]
 
@@ -386,44 +292,40 @@
 
     private init(
       runtime: CONNXRuntime,
-      session: OpaquePointer,
+      handle: OpaquePointer,
       inputNames: [String],
       outputNames: [String]
     ) {
       self.runtime = runtime
-      self.session = session
+      self.handle = handle
       self.inputNames = inputNames
       self.outputNames = outputNames
     }
 
     deinit {
-      self.api.pointee.ReleaseSession(self.session)
+      self.api.pointee.ReleaseSession(self.handle)
     }
 
-    fileprivate static func make(runtime: CONNXRuntime, session: OpaquePointer) throws
-      -> CONNXRuntimeSession
-    {
+    static func make(runtime: CONNXRuntime, handle: OpaquePointer) throws -> CONNXRuntimeSession {
       do {
-        let inputNames = try Self.names(
-          runtime: runtime,
-          session: session,
-          count: runtime.api.pointee.SessionGetInputCount,
-          name: runtime.api.pointee.SessionGetInputName
-        )
-        let outputNames = try Self.names(
-          runtime: runtime,
-          session: session,
-          count: runtime.api.pointee.SessionGetOutputCount,
-          name: runtime.api.pointee.SessionGetOutputName
-        )
         return CONNXRuntimeSession(
           runtime: runtime,
-          session: session,
-          inputNames: inputNames,
-          outputNames: outputNames
+          handle: handle,
+          inputNames: try Self.names(
+            runtime: runtime,
+            handle: handle,
+            count: runtime.api.pointee.SessionGetInputCount,
+            name: runtime.api.pointee.SessionGetInputName
+          ),
+          outputNames: try Self.names(
+            runtime: runtime,
+            handle: handle,
+            count: runtime.api.pointee.SessionGetOutputCount,
+            name: runtime.api.pointee.SessionGetOutputName
+          )
         )
       } catch {
-        runtime.api.pointee.ReleaseSession(session)
+        runtime.api.pointee.ReleaseSession(handle)
         throw error
       }
     }
@@ -432,31 +334,26 @@
       inputs: [String: CONNXRuntimeTensor],
       outputNames: [String]
     ) throws -> [String: CONNXRuntimeTensor] {
-      guard Set(outputNames).count == outputNames.count else {
-        throw CONNXRuntimeError(
-          code: .duplicateOutputName,
-          message: "Output names must be unique."
-        )
-      }
-      let inputPairs = Array(inputs)
-      let inputNames = inputPairs.map(\.key)
-      let inputValues = inputPairs.map { Optional($0.value.tensor) }
+      try edgeToolsONNXValidateOutputNames(outputNames)
+      let inputs = Array(inputs)
+      let inputNames = inputs.map(\.key)
+      let inputValues = inputs.map { Optional($0.value.handle) }
       var outputValues = [OpaquePointer?](repeating: nil, count: outputNames.count)
       do {
-        try withCopiedCStringPointerBuffer(inputNames) { inputNamePointers in
-          try withCopiedCStringPointerBuffer(outputNames) { outputNamePointers in
+        try withCopiedCStringPointerBuffer(inputNames) { inputNames in
+          try withCopiedCStringPointerBuffer(outputNames) { outputNames in
             try inputValues.withUnsafeBufferPointer { inputValues in
               try outputValues.withUnsafeMutableBufferPointer { outputValues in
                 try CONNXRuntime.check(
                   api: self.api,
                   status: self.api.pointee.Run(
-                    self.session,
+                    self.handle,
                     nil,
-                    inputNamePointers.baseAddress,
+                    inputNames.baseAddress,
                     inputValues.baseAddress,
                     inputValues.count,
-                    outputNamePointers.baseAddress,
-                    outputNamePointers.count,
+                    outputNames.baseAddress,
+                    outputNames.count,
                     outputValues.baseAddress
                   )
                 )
@@ -469,171 +366,110 @@
         throw error
       }
 
-      let outputPointers = outputValues.map { $0! }
-      let metadata: [(dtype: CONNXRuntimeTensor.DType, shape: [Int])]
+      let handles = outputValues.map { $0! }
       do {
-        metadata = try outputPointers.map {
-          try CONNXRuntimeTensor.metadata(runtime: self.runtime, tensor: $0)
-        }
+        return try Dictionary(
+          uniqueKeysWithValues: zip(outputNames, handles).map { name, handle in
+            (name, try CONNXRuntimeTensor(runtime: self.runtime, handle: handle))
+          }
+        )
       } catch {
-        outputPointers.forEach { self.api.pointee.ReleaseValue($0) }
+        handles.forEach { self.api.pointee.ReleaseValue($0) }
         throw error
       }
-
-      return Dictionary(
-        uniqueKeysWithValues: zip(outputNames, zip(outputPointers, metadata))
-          .map { pair in
-            let (tensor, metadata) = pair.1
-            return (
-              pair.0,
-              CONNXRuntimeTensor(
-                runtime: self.runtime,
-                tensor: tensor,
-                dtype: metadata.dtype,
-                shape: metadata.shape
-              )
-            )
-          }
-      )
     }
 
     private static func names(
       runtime: CONNXRuntime,
-      session: OpaquePointer,
+      handle: OpaquePointer,
       count getCount: (OpaquePointer?, UnsafeMutablePointer<Int>?) -> OpaquePointer?,
       name getName: (
-        OpaquePointer?,
-        Int,
-        UnsafeMutablePointer<OrtAllocator>?,
+        OpaquePointer?, Int, UnsafeMutablePointer<OrtAllocator>?,
         UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
       ) -> OpaquePointer?
     ) throws -> [String] {
       var count = 0
-      try CONNXRuntime.check(api: runtime.api, status: getCount(session, &count))
-      return try (0..<count)
-        .map { index in
-          let name: UnsafeMutablePointer<CChar> = try CONNXRuntime.output(api: runtime.api) {
-            getName(session, index, runtime.allocator, $0)
-          }
-          defer { runtime.allocator.pointee.Free(runtime.allocator, name) }
-          return String(cString: name)
+      try runtime.check(getCount(handle, &count))
+      return try (0..<count).map { index in
+        let name: UnsafeMutablePointer<CChar> = try CONNXRuntime.output(api: runtime.api) {
+          getName(handle, index, runtime.allocator, $0)
         }
+        defer { runtime.allocator.pointee.Free(runtime.allocator, name) }
+        return String(cString: name)
+      }
     }
   }
 
   // MARK: - CONNXRuntimeTensor
 
   public final class CONNXRuntimeTensor: @unchecked Sendable {
-    // Tensor storage is initialized before publication and only immutable reads are exposed, so
-    // this is safe.
+    // The tensor is immutable after publication and its handle is safe for concurrent reads.
     public typealias DType = EdgeToolsONNXDType
 
-    fileprivate let runtime: CONNXRuntime
-    fileprivate let tensor: OpaquePointer
+    private let runtime: CONNXRuntime
 
+    public let handle: OpaquePointer
     public let dtype: DType
     public let shape: [Int]
 
-    fileprivate init(
-      runtime: CONNXRuntime,
-      tensor: OpaquePointer,
-      dtype: DType,
-      shape: [Int]
-    ) {
+    init(runtime: CONNXRuntime, handle: OpaquePointer, dtype: DType, shape: [Int]) {
       self.runtime = runtime
-      self.tensor = tensor
+      self.handle = handle
       self.dtype = dtype
       self.shape = shape
     }
 
+    convenience init(runtime: CONNXRuntime, handle: OpaquePointer) throws {
+      let metadata = try Self.metadata(runtime: runtime, handle: handle)
+      self.init(runtime: runtime, handle: handle, dtype: metadata.dtype, shape: metadata.shape)
+    }
+
     deinit {
-      self.runtime.api.pointee.ReleaseValue(self.tensor)
+      self.runtime.api.pointee.ReleaseValue(self.handle)
     }
 
-    fileprivate static func metadata(
-      runtime: CONNXRuntime,
-      tensor: OpaquePointer
-    ) throws -> (dtype: DType, shape: [Int]) {
-      try Self.withShapeInfo(runtime: runtime, tensor: tensor) { shapeInfo in
-        var elementType = ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED
-        try CONNXRuntime.check(
-          api: runtime.api,
-          status: runtime.api.pointee.GetTensorElementType(shapeInfo, &elementType)
-        )
-
-        var count = 0
-        try CONNXRuntime.check(
-          api: runtime.api,
-          status: runtime.api.pointee.GetDimensionsCount(shapeInfo, &count)
-        )
-        var dimensions = [Int64](repeating: 0, count: count)
-        try dimensions.withUnsafeMutableBufferPointer { dimensions in
-          try CONNXRuntime.check(
-            api: runtime.api,
-            status: runtime.api.pointee.GetDimensions(
-              shapeInfo,
-              dimensions.baseAddress,
-              dimensions.count
-            )
-          )
-        }
-        return (
-          DType(rawValue: Int(elementType.rawValue)),
-          dimensions.map(Int.init)
-        )
-      }
-    }
-
-    public func floatValues() throws -> [Float] {
-      try self.values(elementType: ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, valueType: Float.self)
-    }
-
-    public func int32Values() throws -> [Int32] {
-      try self.values(elementType: ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32, valueType: Int32.self)
-    }
-
-    public func int64Values() throws -> [Int64] {
-      try self.values(elementType: ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64, valueType: Int64.self)
-    }
-
-    private func values<Element>(
-      elementType expectedElementType: ONNXTensorElementDataType,
-      valueType: Element.Type
-    ) throws -> [Element] {
-      let expectedDType = DType(rawValue: Int(expectedElementType.rawValue))
-      guard self.dtype == expectedDType else {
-        throw CONNXRuntimeError(
+    nonisolated(nonsending) public func view<Element: EdgeToolsONNXElement>(
+      as type: Element.Type
+    ) async throws -> EdgeToolsONNXTensorView<Element> {
+      guard self.dtype == Element.onnxDType else {
+        throw EdgeToolsONNXRuntimeError(
           code: .unexpectedTensorElementType,
-          message:
-            "Expected tensor element type \(expectedDType.rawValue), got \(self.dtype.rawValue)."
+          message: "Expected tensor element type \(Element.onnxDType.rawValue), got \(self.dtype.rawValue)."
         )
       }
-
-      let bytes: UnsafeMutableRawPointer = try CONNXRuntime.output(api: self.runtime.api) {
-        self.runtime.api.pointee.GetTensorMutableData(self.tensor, $0)
-      }
-      return Array(
-        UnsafeBufferPointer(
-          start: bytes.assumingMemoryBound(to: Element.self),
-          count: try CONNXRuntime.elementCount(for: self.shape)
+      let count = try edgeToolsONNXElementCount(for: self.shape)
+      var data: UnsafeMutableRawPointer?
+      try self.runtime.check(self.runtime.api.pointee.GetTensorMutableData(self.handle, &data))
+      return EdgeToolsONNXTensorView(
+        copying: UnsafeBufferPointer(
+          start: count == 0 ? nil : data!.assumingMemoryBound(to: Element.self),
+          count: count
         )
       )
     }
 
-    private static func withShapeInfo<Result>(
+    private static func metadata(
       runtime: CONNXRuntime,
-      tensor: OpaquePointer,
-      _ body: (OpaquePointer) throws -> Result
-    ) throws -> Result {
-      let shapeInfo: OpaquePointer = try CONNXRuntime.output(api: runtime.api) {
-        runtime.api.pointee.GetTensorTypeAndShape(tensor, $0)
+      handle: OpaquePointer
+    ) throws -> (dtype: DType, shape: [Int]) {
+      let info: OpaquePointer = try CONNXRuntime.output(api: runtime.api) {
+        runtime.api.pointee.GetTensorTypeAndShape(handle, $0)
       }
-      defer { runtime.api.pointee.ReleaseTensorTypeAndShapeInfo(shapeInfo) }
-      return try body(shapeInfo)
+      defer { runtime.api.pointee.ReleaseTensorTypeAndShapeInfo(info) }
+      var elementType = ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED
+      try runtime.check(runtime.api.pointee.GetTensorElementType(info, &elementType))
+      var count = 0
+      try runtime.check(runtime.api.pointee.GetDimensionsCount(info, &count))
+      var dimensions = [Int64](repeating: 0, count: count)
+      try dimensions.withUnsafeMutableBufferPointer {
+        try runtime.check(runtime.api.pointee.GetDimensions(info, $0.baseAddress, $0.count))
+      }
+      return (
+        DType(rawValue: Int(elementType.rawValue)),
+        dimensions.map(Int.init)
+      )
     }
   }
-
-  // MARK: - Protocol Conformances
 
   extension CONNXRuntimeTensor: EdgeToolsONNXTensor {}
 
@@ -650,7 +486,8 @@
       model: String,
       configuration: Configuration
     ) throws -> CONNXRuntimeSession {
-      try self.session(modelPath: model, configuration: configuration)
+      let options = try self.sessionOptions(configuration: configuration)
+      return try self.session(modelPath: model, options: options)
     }
   }
 #endif

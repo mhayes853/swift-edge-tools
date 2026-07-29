@@ -146,7 +146,10 @@ extension GrammarBitmask: RandomAccessCollection {}
 // MARK: - ONNX
 
 #if ONNXCore
-  public func applyONNXBitmask(logits: inout [Float], mask: GrammarBitmask) {
+  public func applyONNXBitmask(
+    logits: inout EdgeToolsONNXTensorView<Float>,
+    mask: GrammarBitmask
+  ) {
     validateBitmaskCoverage(mask: mask, vocabularySize: logits.count)
     mask.storage.withUnsafeBufferPointer { maskBytes in
       logits.withUnsafeMutableBufferPointer { logits in

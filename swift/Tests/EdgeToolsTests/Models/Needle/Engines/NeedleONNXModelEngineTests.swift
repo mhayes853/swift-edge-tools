@@ -75,9 +75,7 @@
     @Test
     func `Generate Basics With Core ML CPU And GPU`() async throws {
       let engine = try await makeNeedleONNXModelEngine(
-        runtimeConfiguration: .init(
-          executionProviders: [.coreML(computeUnits: .cpuAndGPU)]
-        )
+        runtimeConfiguration: coreMLRuntimeConfiguration()
       )
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
@@ -97,9 +95,7 @@
     @Test
     func `Sequential Generations With Core ML`() async throws {
       let engine = try await makeNeedleONNXModelEngine(
-        runtimeConfiguration: .init(
-          executionProviders: [.coreML(computeUnits: .cpuAndGPU)]
-        )
+        runtimeConfiguration: coreMLRuntimeConfiguration()
       )
       let firstTask = try engine.generate(
         prompt: .sendAdventureEmail,
@@ -125,9 +121,7 @@
     @Test
     func `Concurrent Generations With Core ML`() async throws {
       let engine = try await makeNeedleONNXModelEngine(
-        runtimeConfiguration: .init(
-          executionProviders: [.coreML(computeUnits: .cpuAndGPU)]
-        )
+        runtimeConfiguration: coreMLRuntimeConfiguration()
       )
       let firstTask = try engine.generate(
         prompt: .sendAdventureEmail,
@@ -363,6 +357,20 @@
     }
   }
 
+  private func coreMLRuntimeConfiguration() -> CONNXRuntime.Configuration {
+    CONNXRuntime.Configuration { options in
+      try options.configure(
+        providerNamed: "CoreML",
+        options: [
+          "MLComputeUnits": "CPUAndGPU",
+          "ModelFormat": "MLProgram",
+          "RequireStaticInputShapes": "1",
+          "EnableOnSubgraphs": "1"
+        ]
+      )
+    }
+  }
+
   private func temporaryONNXBundleCopy(
     from source: URL,
     excluding excludedNames: Set<String>
@@ -385,7 +393,7 @@
     return destination
   }
 
-  private final class CountingONNXLogitsProcessor: EdgeToolsLogitsProcessor, Sendable {
+  private final class CountingONNXLogitsProcessor: EdgeToolsONNXLogitsProcessor, Sendable {
     private struct Counts: Hashable, Sendable {
       var prompt = 0
       var process = 0
@@ -402,9 +410,8 @@
       self.counts.withLock { $0.prompt += 1 }
     }
 
-    func process(logits: inout [Float]) -> [Float] {
+    func process(logits: inout EdgeToolsONNXTensorView<Float>) {
       self.counts.withLock { $0.process += 1 }
-      return logits
     }
 
     func didSample(token: EdgeToolsToken) {
