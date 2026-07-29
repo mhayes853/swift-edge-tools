@@ -121,26 +121,45 @@
   // MARK: - EdgeToolsXGRGenerationConstraint
 
   /// Selects the grammar used to constrain an engine generation.
-  @nonexhaustive
-  public enum EdgeToolsXGRGenerationConstraint: Sendable {
+  public struct EdgeToolsXGRGenerationConstraint: Sendable {
+    enum Kind: Sendable {
+      /// Allows arbitrary text output.
+      case unconstrained
+
+      /// Uses the supplied grammar directly.
+      case grammar(XGRGrammar)
+
+      /// Uses the engine's model-specific tool-call grammar.
+      case toolsWithGrammar(
+        range: GrammarToolCallRange = .unbounded(minimum: 0),
+        grammar: (@Sendable (XGRGrammar, XGRTokenizerInfo) throws -> XGRGrammar)? = nil
+      )
+    }
+
+    let kind: Kind
+
     /// Allows arbitrary text output.
-    case unconstrained
+    public static let unconstrained = Self(kind: .unconstrained)
 
     /// Uses the supplied grammar directly.
-    case grammar(XGRGrammar)
+    public static func grammar(_ grammar: XGRGrammar) -> Self {
+      Self(kind: .grammar(grammar))
+    }
 
     /// Uses the engine's model-specific tool-call grammar.
-    case toolsWithGrammar(
+    public static func toolsWithGrammar(
       range: GrammarToolCallRange = .unbounded(minimum: 0),
       grammar: (@Sendable (XGRGrammar, XGRTokenizerInfo) throws -> XGRGrammar)? = nil
-    )
+    ) -> Self {
+      Self(kind: .toolsWithGrammar(range: range, grammar: grammar))
+    }
 
     /// The default tool-call constraint.
     public static let tools = Self.toolsWithGrammar()
 
     /// Constrains output to a value described by an EdgeTools generation schema.
     public static func schema(_ type: (some EdgeToolsGenerable).Type) -> Self {
-      .grammar(.schema(type))
+      Self.grammar(.schema(type))
     }
   }
 

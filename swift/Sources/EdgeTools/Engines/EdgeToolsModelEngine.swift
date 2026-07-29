@@ -311,7 +311,7 @@
     private func toolCallRange(
       for constraint: EdgeToolsXGRGenerationConstraint
     ) -> GrammarToolCallRange? {
-      switch constraint {
+      switch constraint.kind {
       case .toolsWithGrammar(let range, _): range
       default: nil
       }
@@ -321,7 +321,7 @@
       for constraint: EdgeToolsXGRGenerationConstraint,
       toolsGrammar: XGRGrammar
     ) throws -> XGRGrammar {
-      switch constraint {
+      switch constraint.kind {
       case .unconstrained:
         .universal
       case .grammar(let grammar):
