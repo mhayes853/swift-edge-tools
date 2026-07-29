@@ -47,9 +47,9 @@ private enum NeedleTestModelExport {
     try process.run()
     let output =
       String(
-        data: outputPipe.fileHandleForReading.readDataToEndOfFile(),
-        encoding: .utf8
-      ) ?? ""
+        decoding: outputPipe.fileHandleForReading.readDataToEndOfFile(),
+        as: UTF8.self
+      )
     process.waitUntilExit()
 
     guard process.terminationStatus == 0 else {
@@ -118,11 +118,11 @@ private enum NeedleTestModelExport {
   }
 
   @available(anyAppleOS 27.0, *)
-  func makeNeedleCoreAIEngine(
+  func makeNeedleCoreAIModelEngine(
     quantizerPreset: String? = nil,
     palettizerBits: Int? = nil,
     compilePlatforms: [String] = []
-  ) async throws -> NeedleCoreAIEngine {
+  ) async throws -> NeedleCoreAIModelEngine {
     var arguments = quantizerPreset.map { ["--quantizer-preset", $0] } ?? []
     arguments += palettizerBits.map { ["--palettizer-n-bits", String($0)] } ?? []
     arguments += compilePlatforms.flatMap { ["--compile-platform", $0] }
@@ -134,7 +134,7 @@ private enum NeedleTestModelExport {
       ),
       arguments: arguments
     )
-    return try await NeedleCoreAIEngine(modelDirectoryURL: directory)
+    return try await NeedleCoreAIModelEngine(modelDirectoryURL: directory)
   }
 
   private enum SelfCoreAIExport {
@@ -199,11 +199,11 @@ private enum NeedleTestModelExport {
   }
 
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-  func makeNeedleCoreMLEngine(
+  func makeNeedleCoreMLModelEngine(
     quantizerPreset: String? = nil,
     palettizerBits: Int? = nil,
     compilePlatforms: [String] = []
-  ) async throws -> NeedleCoreMLEngine {
+  ) async throws -> NeedleCoreMLModelEngine {
     var arguments = quantizerPreset.map { ["--quantizer-preset", $0] } ?? []
     arguments += palettizerBits.map { ["--palettizer-n-bits", String($0)] } ?? []
     let directory = try await exportNeedleCoreML(
@@ -217,7 +217,7 @@ private enum NeedleTestModelExport {
     )
     let configuration = MLModelConfiguration()
     configuration.computeUnits = .cpuAndNeuralEngine
-    return try await NeedleCoreMLEngine(
+    return try await NeedleCoreMLModelEngine(
       modelDirectoryURL: directory,
       modelConfiguration: configuration
     )
@@ -288,16 +288,16 @@ private enum NeedleTestModelExport {
     )
   }
 
-  func makeNeedleONNXEngine(
+  func makeNeedleONNXModelEngine(
     runtimeConfiguration: CONNXRuntime.Configuration = CONNXRuntime.Configuration(),
     quantization: String? = nil
-  ) async throws -> NeedleONNXEngine {
+  ) async throws -> NeedleCONNXModelEngine {
     let quantizationSuffix = quantization.map { "-\($0)" } ?? ""
     let directory = try await exportNeedleONNX(
       outputDirectoryName: "onnx-export-v1-float32\(quantizationSuffix)",
       quantization: quantization
     )
-    return try await NeedleONNXEngine(
+    return try await NeedleCONNXModelEngine(
       from: directory,
       runtimeConfiguration: runtimeConfiguration
     )

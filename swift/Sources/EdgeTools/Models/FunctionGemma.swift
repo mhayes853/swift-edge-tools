@@ -2,17 +2,15 @@
   import EdgeToolsXGrammar
 #endif
 
-#if System
-  import SystemPackage
-#endif
-
 #if MLX && Transformers && canImport(MLX)
   public import _EdgeToolsFoundation
+  import MLX
   import MLXLLM
+  import MLXLMCommon
 
   // MARK: - FunctionGemma Model
 
-  extension MLXLLM.Gemma3TextModel: EdgeToolsLanguageModel {
+  extension MLXLLM.Gemma3TextModel: EdgeToolsMLXModel, EdgeToolsPrefillableModel {
     public typealias ModelConfiguration = MLXLLM.Gemma3TextConfiguration
     public typealias Prompt = EdgeToolsLLMPrompt
     public typealias ToolCallParser = FunctionGemmaToolCallParser
@@ -21,22 +19,19 @@
       tools: [EdgeToolDefinition],
       range: GrammarToolCallRange
     ) throws -> XGRGrammar {
-      try XGRGrammar.functionGemma(tools: tools, range: range)
+      try .functionGemma(tools: tools, range: range)
     }
   }
 
-  public typealias FunctionGemmaMLXEngine = EdgeToolsMLXEngine<MLXLLM.Gemma3TextModel>
+  public typealias FunctionGemmaMLXModel = MLXLLM.Gemma3TextModel
 
-  extension EdgeToolsMLXEngine where Model == MLXLLM.Gemma3TextModel {
-    public convenience init(from directoryURL: URL) async throws {
+  public typealias FunctionGemmaMLXModelEngine =
+    EdgeToolsModelEngine<MLXLLM.Gemma3TextModel>
+
+  extension EdgeToolsModelEngine where Model == MLXLLM.Gemma3TextModel {
+    public init(from directoryURL: URL) async throws {
       try await self.init(from: directoryURL, model: MLXLLM.Gemma3TextModel.init)
     }
-
-    #if System
-      public convenience init(from directoryPath: FilePath) async throws {
-        try await self.init(from: directoryPath, model: MLXLLM.Gemma3TextModel.init)
-      }
-    #endif
   }
 #endif
 
@@ -185,6 +180,5 @@ private struct FunctionGemmaCallReader: ToolCallValueReader {
         XGRGrammar.literal("}<end_function_call>")
       )
     }
-
   }
 #endif

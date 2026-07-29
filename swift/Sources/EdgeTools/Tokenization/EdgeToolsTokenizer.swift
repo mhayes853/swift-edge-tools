@@ -2,10 +2,6 @@
   import EdgeToolsXGrammar
 #endif
 
-#if System
-  import SystemPackage
-#endif
-
 #if Foundation
   internal import _EdgeToolsFoundation
 #endif

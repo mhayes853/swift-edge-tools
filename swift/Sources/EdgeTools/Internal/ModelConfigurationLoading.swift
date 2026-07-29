@@ -1,22 +1,3 @@
-#if System
-  import SystemPackage
-
-  package func decodeModelConfiguration<Configuration: Decodable>(
-    _ configuration: Configuration.Type,
-    in directoryPath: FilePath,
-    decoder: EdgeToolsJSONDecoder = EdgeToolsJSONDecoder()
-  ) throws -> Configuration? {
-    let configurationPaths = [
-      directoryPath.appending("configuration.json"),
-      directoryPath.appending("config.json")
-    ]
-    guard let configurationPath = configurationPaths.first(where: fileExists(at:)) else {
-      return nil
-    }
-    return try decoder.decode(Configuration.self, from: readFile(at: configurationPath))
-  }
-#endif
-
 #if Foundation
   package import _EdgeToolsFoundation
 
@@ -29,7 +10,11 @@
       directoryURL.appending(path: "configuration.json"),
       directoryURL.appending(path: "config.json")
     ]
-    guard let configurationURL = configurationURLs.first(where: fileExists(at:)) else {
+    guard
+      let configurationURL = configurationURLs.first(where: {
+        FileManager.default.fileExists(atPath: $0.path())
+      })
+    else {
       return nil
     }
     return try decoder.decode(Configuration.self, from: Data(contentsOf: configurationURL))

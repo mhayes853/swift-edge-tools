@@ -6,20 +6,22 @@
     case missingFinalResponse
   }
 
-  func completeWeatherTurn<Model: EdgeToolsLanguageModel>(
-    using engine: EdgeToolsMLXEngine<Model>
-  ) async throws -> EdgeToolsLLMPrompt where Model.Prompt == EdgeToolsLLMPrompt {
+  func completeWeatherTurn<Engine: EdgeToolsEngine>(
+    using engine: Engine
+  ) async throws -> EdgeToolsLLMPrompt
+  where
+    Engine.Prompt == EdgeToolsLLMPrompt,
+    Engine.GenerateParameters == EdgeToolsMLXGenerateParameters
+  {
     var transcript = EdgeToolsLLMPrompt.weatherTest
-    let toolParameters = EdgeToolsMLXEngine<Model>
-      .GenerateParameters(
-        constraint: .tools(range: .exact(1)),
-        maxTokens: 256
-      )
-    let responseParameters = EdgeToolsMLXEngine<Model>
-      .GenerateParameters(
-        constraint: .unconstrained,
-        maxTokens: 64
-      )
+    let toolParameters = EdgeToolsMLXGenerateParameters(
+      constraint: .toolsWithGrammar(range: .exact(1)),
+      maxTokens: 256
+    )
+    let responseParameters = EdgeToolsMLXGenerateParameters(
+      constraint: .unconstrained,
+      maxTokens: 64
+    )
 
     let toolGenerationTask = try engine.generate(
       prompt: transcript,

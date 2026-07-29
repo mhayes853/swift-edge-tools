@@ -1,20 +1,18 @@
+import OrderedCollections
+
 #if XGrammar
   import EdgeToolsXGrammar
 #endif
 
-import OrderedCollections
-
-#if System
-  import SystemPackage
-#endif
-
 #if MLX && Transformers && canImport(MLX)
   public import _EdgeToolsFoundation
+  import MLX
   import MLXLLM
+  import MLXLMCommon
 
   // MARK: - LFM2 Model
 
-  extension LFM2Model: EdgeToolsLanguageModel {
+  extension LFM2Model: EdgeToolsMLXModel, EdgeToolsPrefillableModel {
     public typealias ModelConfiguration = LFM2Configuration
     public typealias Prompt = EdgeToolsLLMPrompt
     public typealias ToolCallParser = LFM2ToolCallParser
@@ -23,23 +21,17 @@ import OrderedCollections
       tools: [EdgeToolDefinition],
       range: GrammarToolCallRange
     ) throws -> XGRGrammar {
-      try XGRGrammar.lfm2(tools: tools, range: range)
+      try .lfm2(tools: tools, range: range)
     }
   }
 
-  public typealias LFM2MLXEngine = EdgeToolsMLXEngine<LFM2Model>
-  public typealias LFM2P5MLXEngine = EdgeToolsMLXEngine<LFM2Model>
+  public typealias LFM2MLXModelEngine = EdgeToolsModelEngine<LFM2Model>
+  public typealias LFM2P5MLXModelEngine = EdgeToolsModelEngine<LFM2Model>
 
-  extension EdgeToolsMLXEngine where Model == LFM2Model {
-    public convenience init(from directoryURL: URL) async throws {
+  extension EdgeToolsModelEngine where Model == LFM2Model {
+    public init(from directoryURL: URL) async throws {
       try await self.init(from: directoryURL, model: LFM2Model.init)
     }
-
-    #if System
-      public convenience init(from directoryPath: FilePath) async throws {
-        try await self.init(from: directoryPath, model: LFM2Model.init)
-      }
-    #endif
   }
 #endif
 

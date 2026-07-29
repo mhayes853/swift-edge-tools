@@ -5,7 +5,7 @@ import Testing
 #if MLX && XGrammar && canImport(MLX) && !os(WASI)
   @Suite(.serialized, .enabledIfXcode())
   struct MLXConstrainedGenerationEngineTests {
-    private typealias Engine = EdgeToolsMLXEngine<NeedleMLXModel>
+    private typealias Engine = NeedleMLXModelEngine
 
     @Test
     func `Generate With Explicit Grammar Constraint`() async throws {
@@ -31,8 +31,8 @@ import Testing
   struct ONNXConstrainedGenerationEngineTests {
     @Test
     func `Generate With Explicit Grammar Constraint`() async throws {
-      let engine = try await makeNeedleONNXEngine()
-      let parameters = NeedleONNXEngine.GenerateParameters(
+      let engine = try await makeNeedleONNXModelEngine()
+      let parameters = EdgeToolsONNXGenerateParameters(
         constraint: .grammar(try .literal("OK"))
       )
       let generationTask = try engine.generate(
@@ -54,8 +54,8 @@ import Testing
     @Test
     @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
     func `Generate With Explicit Grammar Constraint`() async throws {
-      let engine = try await makeNeedleCoreMLEngine()
-      let parameters = NeedleCoreMLEngine.GenerateParameters(
+      let engine = try await makeNeedleCoreMLModelEngine()
+      let parameters = NeedleCoreMLModelEngine.GenerateParameters(
         constraint: .grammar(try .literal("OK"))
       )
       let generationTask = try engine.generate(
@@ -77,8 +77,8 @@ import Testing
     @Test
     @available(anyAppleOS 27.0, *)
     func `Generate With Explicit Grammar Constraint`() async throws {
-      let engine = try await makeNeedleCoreAIEngine()
-      let parameters = NeedleCoreAIEngine.GenerateParameters(
+      let engine = try await makeNeedleCoreAIModelEngine()
+      let parameters = NeedleCoreAIModelEngine.GenerateParameters(
         constraint: .grammar(try .literal("OK"))
       )
       let generationTask = try engine.generate(

@@ -2,17 +2,15 @@
   import EdgeToolsXGrammar
 #endif
 
-#if System
-  import SystemPackage
-#endif
-
 #if MLX && Transformers && canImport(MLX)
   public import _EdgeToolsFoundation
+  import MLX
   import MLXLLM
+  import MLXLMCommon
 
   // MARK: - Qwen3 Model
 
-  extension Qwen3Model: EdgeToolsLanguageModel {
+  extension Qwen3Model: EdgeToolsMLXModel, EdgeToolsPrefillableModel {
     public typealias ModelConfiguration = Qwen3Configuration
     public typealias Prompt = EdgeToolsLLMPrompt
     public typealias ToolCallParser = Qwen3ToolCallParser
@@ -21,22 +19,20 @@
       tools: [EdgeToolDefinition],
       range: GrammarToolCallRange
     ) throws -> XGRGrammar {
-      try XGRGrammar.qwen3(tools: tools, range: range)
+      try .qwen3(tools: tools, range: range)
     }
   }
 
-  public typealias Qwen3MLXEngine = EdgeToolsMLXEngine<Qwen3Model>
+  /// The shared model engine specialized for Qwen 3.
+  public typealias Qwen3MLXModelEngine = EdgeToolsModelEngine<Qwen3Model>
 
-  extension EdgeToolsMLXEngine where Model == Qwen3Model {
-    public convenience init(from directoryURL: URL) async throws {
+  // MARK: - Model Engine Loading
+
+  extension EdgeToolsModelEngine where Model == Qwen3Model {
+    /// Loads a Qwen 3 model engine from a model directory.
+    public init(from directoryURL: URL) async throws {
       try await self.init(from: directoryURL, model: Qwen3Model.init)
     }
-
-    #if System
-      public convenience init(from directoryPath: FilePath) async throws {
-        try await self.init(from: directoryPath, model: Qwen3Model.init)
-      }
-    #endif
   }
 #endif
 

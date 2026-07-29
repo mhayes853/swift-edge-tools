@@ -283,7 +283,9 @@ struct `EdgeToolsSession tests` {
 
     didChange.withLock { expectNoDifference($0, true) }
   }
+}
 
+extension `EdgeToolsSession tests` {
   @Test
   func `Tools Are Parsed Incremental Without Waiting For Model Stop`() async throws {
     let tokenizer = try testTokenizer()
@@ -408,7 +410,6 @@ struct `EdgeToolsSession tests` {
     let args = try #require(generation.toolCalls[0].input as? WeatherArgs)
     expectNoDifference(args.location, "Seoul")
   }
-
 
   @Test
   func `Active Generation Uses Tools Snapshot`() async throws {

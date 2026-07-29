@@ -1,20 +1,18 @@
+import OrderedCollections
+
 #if XGrammar
   import EdgeToolsXGrammar
 #endif
 
-import OrderedCollections
-
-#if System
-  import SystemPackage
-#endif
-
 #if MLX && Transformers && canImport(MLX)
   public import _EdgeToolsFoundation
+  import MLX
   import MLXLLM
+  import MLXLMCommon
 
   // MARK: - Qwen3P5 Model
 
-  extension Qwen35Model: EdgeToolsLanguageModel {
+  extension Qwen35Model: EdgeToolsMLXModel, EdgeToolsPrefillableModel {
     public typealias ModelConfiguration = Qwen35Configuration
     public typealias Prompt = EdgeToolsLLMPrompt
     public typealias ToolCallParser = Qwen3P5ToolCallParser
@@ -23,23 +21,17 @@ import OrderedCollections
       tools: [EdgeToolDefinition],
       range: GrammarToolCallRange
     ) throws -> XGRGrammar {
-      try XGRGrammar.qwen3P5(tools: tools, range: range)
+      try .qwen3P5(tools: tools, range: range)
     }
   }
 
-  public typealias Qwen35MLXEngine = EdgeToolsMLXEngine<Qwen35Model>
-  public typealias Qwen3P5MLXEngine = EdgeToolsMLXEngine<Qwen35Model>
+  public typealias Qwen35MLXModelEngine = EdgeToolsModelEngine<Qwen35Model>
+  public typealias Qwen3P5MLXModelEngine = EdgeToolsModelEngine<Qwen35Model>
 
-  extension EdgeToolsMLXEngine where Model == Qwen35Model {
-    public convenience init(from directoryURL: URL) async throws {
+  extension EdgeToolsModelEngine where Model == Qwen35Model {
+    public init(from directoryURL: URL) async throws {
       try await self.init(from: directoryURL, model: Qwen35Model.init)
     }
-
-    #if System
-      public convenience init(from directoryPath: FilePath) async throws {
-        try await self.init(from: directoryPath, model: Qwen35Model.init)
-      }
-    #endif
   }
 #endif
 

@@ -1,0 +1,422 @@
+▿ EdgeToolsEngineGeneration
+  ▿ decodeMetrics: EdgeToolsDecodeMetrics
+    ▿ duration: 1.438210625 seconds
+      - _low: 1438210625000000000
+      - _high: 0
+    ▿ durationToFirstToken: 0.03737025 seconds
+      - _low: 37370250000000000
+      - _high: 0
+    - tokens: 84
+  ▿ metadata: 5 key/value pairs
+    ▿ (2 elements)
+      ▿ key: EdgeToolsMetadataKey
+        - rawValue: "GenerationConfidence"
+      - value: 0.91247696
+    ▿ (2 elements)
+      ▿ key: EdgeToolsMetadataKey
+        - rawValue: "MLXEngineGenerationStartMemorySnapshot"
+      ▿ value: Peak:   109M         (115292874)
+Active: 109M         (114371734)
+Cache:  75M          (78725244)
+        - activeMemory: 114371734
+        - cacheMemory: 78725244
+        - peakMemory: 115292874
+    ▿ (2 elements)
+      ▿ key: EdgeToolsMetadataKey
+        - rawValue: "MLXEnginePostDecodeMemorySnapshot"
+      ▿ value: Peak:   144M         (151980398)
+Active: 115M         (121269654)
+Cache:  76M          (80505212)
+        - activeMemory: 121269654
+        - cacheMemory: 80505212
+        - peakMemory: 151980398
+    ▿ (2 elements)
+      ▿ key: EdgeToolsMetadataKey
+        - rawValue: "MLXEnginePostPrefillMemorySnapshot"
+      ▿ value: Peak:   128M         (134970370)
+Active: 115M         (120913594)
+Cache:  77M          (80857176)
+        - activeMemory: 120913594
+        - cacheMemory: 80857176
+        - peakMemory: 134970370
+    ▿ (2 elements)
+      ▿ key: EdgeToolsMetadataKey
+        - rawValue: "PerTokenConfidences"
+      ▿ value: 84 elements
+        - 1.0
+        - 0.96295685
+        - 0.9999988
+        - 1.0
+        - 0.99999976
+        - 1.0
+        - 0.99999976
+        - 0.9999405
+        - 0.9999877
+        - 1.0
+        - 0.9104233
+        - 0.99997115
+        - 0.586284
+        - 0.8205745
+        - 0.71104616
+        - 0.95888734
+        - 1.0
+        - 0.9999976
+        - 1.0
+        - 0.9999777
+        - 0.99999666
+        - 0.99999976
+        - 0.99820554
+        - 0.56515086
+        - 0.58482045
+        - 0.9886263
+        - 0.95629203
+        - 0.9999857
+        - 0.9995741
+        - 0.5828194
+        - 0.6947474
+        - 0.9949928
+        - 0.9949726
+        - 0.8007766
+        - 0.9672019
+        - 0.8827115
+        - 0.9950176
+        - 0.99985886
+        - 0.99990606
+        - 0.92614824
+        - 0.76598763
+        - 0.5035246
+        - 0.58472097
+        - 0.99784327
+        - 0.9999989
+        - 0.99999535
+        - 1.0
+        - 0.99999726
+        - 0.996496
+        - 0.99992275
+        - 0.9999994
+        - 0.9541691
+        - 0.99998283
+        - 0.55654174
+        - 0.9990495
+        - 0.9972703
+        - 0.92317444
+        - 0.9999999
+        - 0.9999895
+        - 1.0
+        - 0.99998856
+        - 0.99997926
+        - 0.9999999
+        - 0.99601114
+        - 0.6152229
+        - 0.8153359
+        - 0.9822871
+        - 0.9950956
+        - 0.9999809
+        - 0.99771994
+        - 0.5905982
+        - 0.5645524
+        - 0.7476894
+        - 0.9901945
+        - 0.9964579
+        - 0.99707603
+        - 0.81976813
+        - 0.82304114
+        - 0.8348148
+        - 0.9897544
+        - 0.9998826
+        - 0.9999064
+        - 0.7321682
+        - 1.0
+  ▿ prefillMetrics: EdgeToolsPrefillMetrics
+    ▿ duration: 0.030381958 seconds
+      - _low: 30381958000000000
+      - _high: 0
+    - tokens: 150
+  - response: "<tool_call> [{\"name\":\"send_email\",\"arguments\":{\"address\":\"henderry@gmail.com\",\"subject\":\"Hello\",\"body\":\"Could you please go on an adventure?[{\"}},{\"name\":\"send_email\",\"arguments\":{\"address\":\"adventure@gmail.com\",\"subject\":\"Hello\",\"body\":\"I am writing to go on an adventure.\"}}]"
+  ▿ tokens: 84 elements
+    ▿ EdgeToolsToken
+      - id: 4
+      - stringValue: "<tool_call>"
+    ▿ EdgeToolsToken
+      - id: 356
+      - stringValue: " [{\""
+    ▿ EdgeToolsToken
+      - id: 294
+      - stringValue: "name"
+    ▿ EdgeToolsToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ EdgeToolsToken
+      - id: 818
+      - stringValue: "send"
+    ▿ EdgeToolsToken
+      - id: 8062
+      - stringValue: "_"
+    ▿ EdgeToolsToken
+      - id: 820
+      - stringValue: "email"
+    ▿ EdgeToolsToken
+      - id: 265
+      - stringValue: "\",\""
+    ▿ EdgeToolsToken
+      - id: 393
+      - stringValue: "arguments"
+    ▿ EdgeToolsToken
+      - id: 282
+      - stringValue: "\":{\""
+    ▿ EdgeToolsToken
+      - id: 2876
+      - stringValue: "address"
+    ▿ EdgeToolsToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ EdgeToolsToken
+      - id: 280
+      - stringValue: "he"
+    ▿ EdgeToolsToken
+      - id: 1665
+      - stringValue: "nder"
+    ▿ EdgeToolsToken
+      - id: 1127
+      - stringValue: "ry"
+    ▿ EdgeToolsToken
+      - id: 8181
+      - stringValue: "@"
+    ▿ EdgeToolsToken
+      - id: 8057
+      - stringValue: "g"
+    ▿ EdgeToolsToken
+      - id: 497
+      - stringValue: "mail"
+    ▿ EdgeToolsToken
+      - id: 8063
+      - stringValue: "."
+    ▿ EdgeToolsToken
+      - id: 869
+      - stringValue: "com"
+    ▿ EdgeToolsToken
+      - id: 265
+      - stringValue: "\",\""
+    ▿ EdgeToolsToken
+      - id: 979
+      - stringValue: "subject"
+    ▿ EdgeToolsToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ EdgeToolsToken
+      - id: 8103
+      - stringValue: "H"
+    ▿ EdgeToolsToken
+      - id: 637
+      - stringValue: "el"
+    ▿ EdgeToolsToken
+      - id: 363
+      - stringValue: "lo"
+    ▿ EdgeToolsToken
+      - id: 265
+      - stringValue: "\",\""
+    ▿ EdgeToolsToken
+      - id: 1519
+      - stringValue: "body"
+    ▿ EdgeToolsToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ EdgeToolsToken
+      - id: 8076
+      - stringValue: "C"
+    ▿ EdgeToolsToken
+      - id: 837
+      - stringValue: "ould"
+    ▿ EdgeToolsToken
+      - id: 885
+      - stringValue: " you"
+    ▿ EdgeToolsToken
+      - id: 1105
+      - stringValue: " please"
+    ▿ EdgeToolsToken
+      - id: 3245
+      - stringValue: " go"
+    ▿ EdgeToolsToken
+      - id: 442
+      - stringValue: " on"
+    ▿ EdgeToolsToken
+      - id: 439
+      - stringValue: " an"
+    ▿ EdgeToolsToken
+      - id: 1746
+      - stringValue: " ad"
+    ▿ EdgeToolsToken
+      - id: 628
+      - stringValue: "vent"
+    ▿ EdgeToolsToken
+      - id: 491
+      - stringValue: "ure"
+    ▿ EdgeToolsToken
+      - id: 8105
+      - stringValue: "?"
+    ▿ EdgeToolsToken
+      - id: 8071
+      - stringValue: "["
+    ▿ EdgeToolsToken
+      - id: 271
+      - stringValue: "{\""
+    ▿ EdgeToolsToken
+      - id: 431
+      - stringValue: "}},{\""
+    ▿ EdgeToolsToken
+      - id: 294
+      - stringValue: "name"
+    ▿ EdgeToolsToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ EdgeToolsToken
+      - id: 818
+      - stringValue: "send"
+    ▿ EdgeToolsToken
+      - id: 8062
+      - stringValue: "_"
+    ▿ EdgeToolsToken
+      - id: 820
+      - stringValue: "email"
+    ▿ EdgeToolsToken
+      - id: 265
+      - stringValue: "\",\""
+    ▿ EdgeToolsToken
+      - id: 393
+      - stringValue: "arguments"
+    ▿ EdgeToolsToken
+      - id: 282
+      - stringValue: "\":{\""
+    ▿ EdgeToolsToken
+      - id: 2876
+      - stringValue: "address"
+    ▿ EdgeToolsToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ EdgeToolsToken
+      - id: 461
+      - stringValue: "ad"
+    ▿ EdgeToolsToken
+      - id: 628
+      - stringValue: "vent"
+    ▿ EdgeToolsToken
+      - id: 491
+      - stringValue: "ure"
+    ▿ EdgeToolsToken
+      - id: 8181
+      - stringValue: "@"
+    ▿ EdgeToolsToken
+      - id: 8057
+      - stringValue: "g"
+    ▿ EdgeToolsToken
+      - id: 497
+      - stringValue: "mail"
+    ▿ EdgeToolsToken
+      - id: 8063
+      - stringValue: "."
+    ▿ EdgeToolsToken
+      - id: 869
+      - stringValue: "com"
+    ▿ EdgeToolsToken
+      - id: 265
+      - stringValue: "\",\""
+    ▿ EdgeToolsToken
+      - id: 979
+      - stringValue: "subject"
+    ▿ EdgeToolsToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ EdgeToolsToken
+      - id: 8103
+      - stringValue: "H"
+    ▿ EdgeToolsToken
+      - id: 637
+      - stringValue: "el"
+    ▿ EdgeToolsToken
+      - id: 363
+      - stringValue: "lo"
+    ▿ EdgeToolsToken
+      - id: 265
+      - stringValue: "\",\""
+    ▿ EdgeToolsToken
+      - id: 1519
+      - stringValue: "body"
+    ▿ EdgeToolsToken
+      - id: 264
+      - stringValue: "\":\""
+    ▿ EdgeToolsToken
+      - id: 8084
+      - stringValue: "I"
+    ▿ EdgeToolsToken
+      - id: 647
+      - stringValue: " am"
+    ▿ EdgeToolsToken
+      - id: 365
+      - stringValue: " w"
+    ▿ EdgeToolsToken
+      - id: 269
+      - stringValue: "ri"
+    ▿ EdgeToolsToken
+      - id: 490
+      - stringValue: "ting"
+    ▿ EdgeToolsToken
+      - id: 314
+      - stringValue: " to"
+    ▿ EdgeToolsToken
+      - id: 3245
+      - stringValue: " go"
+    ▿ EdgeToolsToken
+      - id: 442
+      - stringValue: " on"
+    ▿ EdgeToolsToken
+      - id: 439
+      - stringValue: " an"
+    ▿ EdgeToolsToken
+      - id: 1746
+      - stringValue: " ad"
+    ▿ EdgeToolsToken
+      - id: 628
+      - stringValue: "vent"
+    ▿ EdgeToolsToken
+      - id: 491
+      - stringValue: "ure"
+    ▿ EdgeToolsToken
+      - id: 4369
+      - stringValue: ".\"}}]"
+    ▿ EdgeToolsToken
+      - id: 1
+      - stringValue: ""
+  ▿ toolCalls: 2 elements
+    ▿ EdgeRawToolCall
+      ▿ arguments: EdgeToolsValue
+        ▿ object: 3 key/value pairs
+          ▿ (2 elements)
+            - key: "address"
+            ▿ value: EdgeToolsValue
+              - string: "henderry@gmail.com"
+          ▿ (2 elements)
+            - key: "body"
+            ▿ value: EdgeToolsValue
+              - string: "Could you please go on an adventure?[{"
+          ▿ (2 elements)
+            - key: "subject"
+            ▿ value: EdgeToolsValue
+              - string: "Hello"
+      - name: "send_email"
+    ▿ EdgeRawToolCall
+      ▿ arguments: EdgeToolsValue
+        ▿ object: 3 key/value pairs
+          ▿ (2 elements)
+            - key: "address"
+            ▿ value: EdgeToolsValue
+              - string: "adventure@gmail.com"
+          ▿ (2 elements)
+            - key: "body"
+            ▿ value: EdgeToolsValue
+              - string: "I am writing to go on an adventure."
+          ▿ (2 elements)
+            - key: "subject"
+            ▿ value: EdgeToolsValue
+              - string: "Hello"
+      - name: "send_email"
+  - wasStopped: false

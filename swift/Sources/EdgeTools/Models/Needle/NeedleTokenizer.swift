@@ -4,10 +4,6 @@
 
 import HeapModule
 
-#if System
-  import SystemPackage
-#endif
-
 #if Foundation
   public import _EdgeToolsFoundation
 #endif
@@ -248,20 +244,6 @@ extension NeedleSPTokenizer: EdgeToolsTokenizer {}
     public func tokenizerInfo(modelVocabularySize: Int? = nil) throws -> XGRTokenizerInfo {
       let vocabularySize = modelVocabularySize ?? self.vocabularySize
       return try XGRTokenizerInfo.needle(tokenizer: self, vocabularySize: vocabularySize)
-    }
-  }
-#endif
-
-#if System
-  extension NeedleSPTokenizer {
-    public init(modelPath: FilePath) throws {
-      do {
-        try self.init(data: readFile(at: modelPath))
-      } catch let error as NeedleSPTokenizerError {
-        throw error
-      } catch {
-        throw NeedleSPTokenizerError.missingModelFile(at: modelPath.string)
-      }
     }
   }
 #endif

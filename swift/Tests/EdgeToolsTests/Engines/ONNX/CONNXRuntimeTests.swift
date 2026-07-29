@@ -5,10 +5,6 @@
   import Foundation
   import Testing
 
-  #if System
-    import SystemPackage
-  #endif
-
   @Suite
   struct `CONNXRuntime tests` {
     @Test
@@ -45,23 +41,6 @@
       let sum = try #require(outputs["sum"])
       expectNoDifference(try sum.floatValues(), [3, 7, 13])
     }
-
-    #if System
-      @Test
-      func `Run Model Using Swift System File Path`() throws {
-        let runtime = try CONNXRuntime()
-        let session = try runtime.session(modelPath: FilePath(try Self.modelURL().path()))
-        let firstInput = try runtime.tensor(values: [Float(3), 6, 9], shape: [3])
-        let secondInput = try runtime.tensor(values: [Float(2), 4, 8], shape: [3])
-        let outputs = try session.run(
-          inputs: ["x": firstInput, "y": secondInput],
-          outputNames: ["sum"]
-        )
-
-        let sum = try #require(outputs["sum"])
-        expectNoDifference(try sum.floatValues(), [5, 10, 17])
-      }
-    #endif
 
     @Test
     func `Reject Duplicate Output Names`() throws {

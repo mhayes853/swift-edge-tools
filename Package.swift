@@ -34,23 +34,23 @@ let package = Package(
     ),
     .trait(
       name: "MLX",
-      description: "MLX engine support.",
+      description: "MLX model support.",
       enabledTraits: ["XGrammar", "Transformers", "Foundation", "Atomics"]
     ),
     .trait(
       name: "CoreAI",
-      description: "CoreAI engine support (experimental).",
+      description: "CoreAI model support (experimental).",
       enabledTraits: ["XGrammar", "Foundation", "Atomics"]
     ),
     .trait(
       name: "CoreML",
-      description: "CoreML engine support.",
+      description: "CoreML model support.",
       enabledTraits: ["XGrammar", "Foundation", "Atomics"]
     ),
     .trait(
       name: "ONNXCore",
       description: """
-        Needle ONNX engine and runtime-provider protocols.
+        Needle ONNX model and runtime-provider protocols.
 
         (Only enable this trait if you want to use your own ONNX build. Otherwise, enable `ONNX` directly.)
         """,

@@ -9,17 +9,8 @@ A Swift runtime for local model tool calling, with built-in support for
 loading and Foundation `Codable` integrations. When `Foundation` is enabled, model and
 tokenizer loading use Foundation's file I/O facilities.
 
-The opt-in `System` trait supplies `SystemPackage.FilePath` overloads and Foundation-free
-file I/O for constrained targets:
-
-```sh
-swift build --disable-default-traits --traits System --traits XGrammar
-```
-
 The `MLX`, `CoreML`, `CoreAI`, `Transformers`, and `FoundationModels` traits enable
-`Foundation` automatically. Their `FilePath` engine-loading overloads are available when
-`System` is also enabled, but the engines themselves still require Foundation. Individual
-Foundation conveniences can be restored without engine traits:
+`Foundation` automatically. Foundation can also be enabled independently:
 
 ```sh
 swift build --disable-default-traits --traits Foundation

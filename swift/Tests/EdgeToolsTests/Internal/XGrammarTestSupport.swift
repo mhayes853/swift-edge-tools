@@ -3,19 +3,13 @@
   import EdgeTools
   import Testing
 
-  #if System
-    import SystemPackage
-  #endif
-
   func testTokenizer() throws -> NeedleSPTokenizer {
     #if Foundation
       try NeedleSPTokenizer(modelURL: .testTokenizerModel)
-    #elseif System
-      try NeedleSPTokenizer(modelPath: .testTokenizerModel)
     #else
       throw XGRError(
         code: EdgeToolsXGRError.invalidNeedleTokenizer,
-        message: "Test tokenizer loading requires the Foundation or System trait."
+        message: "Test tokenizer loading requires the Foundation trait."
       )
     #endif
   }

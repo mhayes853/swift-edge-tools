@@ -69,9 +69,9 @@ jobs:
           submodules: recursive
       - name: Build ONNXCore without an ONNX Runtime library
         run: scripts/test-linux.sh --traits ONNXCore --build-only
-      - name: Test generic, vendored, and Swift System ONNX Runtime APIs
+      - name: Test generic and vendored ONNX Runtime APIs
         run: >
-          scripts/test-linux.sh --traits ONNX,System
+          scripts/test-linux.sh --traits ONNX
           --filter 'CONNXRuntime tests|EdgeToolsONNXRuntime tests'
 
   # android:
@@ -115,13 +115,10 @@ jobs:
       - name: Build Main Test Suite For WebAssembly
         run: >
           swift build --swift-sdk swift-6.3.2-RELEASE_wasm
-          --disable-default-traits --traits Foundation,XGrammar,System,Atomics
+          --disable-default-traits --traits Foundation,XGrammar,Atomics
           --disable-experimental-prebuilts --target EdgeToolsTests
-      - name: Test Foundation-Free EdgeTools With XGrammar, System, And Atomics
-        working-directory: swift/WASITests
-        run: >
-          swift test --swift-sdk swift-6.3.2-RELEASE_wasm
-          --disable-xctest --disable-experimental-prebuilts
+      - name: Test Foundation-Free WebAssembly Suite
+        run: scripts/test-wasm.sh
 
   # windows:
   #   name: Windows

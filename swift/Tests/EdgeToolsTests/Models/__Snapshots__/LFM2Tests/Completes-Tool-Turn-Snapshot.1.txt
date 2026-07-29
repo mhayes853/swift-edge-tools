@@ -1,33 +1,16 @@
 ▿ EdgeToolsLLMPrompt
   ▿ messages: 5 elements
     ▿ Message
-      - audio: Optional<Array<Asset>>.none
-      ▿ content: Optional<String>
-        - some: "Use getWeather when needed. After receiving its result, summarize it for the user."
-      - images: Optional<Array<Asset>>.none
-      ▿ role: Role
-        - rawValue: "system"
-      - toolCalls: Optional<Array<EdgeRawToolCall>>.none
-      - toolName: Optional<String>.none
-      - toolResponse: Optional<EdgeToolsValue>.none
+      - system: "Use getWeather when needed. After receiving its result, summarize it for the user."
     ▿ Message
-      - audio: Optional<Array<Asset>>.none
-      ▿ content: Optional<String>
-        - some: "What is the weather in Paris?"
-      - images: Optional<Array<Asset>>.none
-      ▿ role: Role
-        - rawValue: "user"
-      - toolCalls: Optional<Array<EdgeRawToolCall>>.none
-      - toolName: Optional<String>.none
-      - toolResponse: Optional<EdgeToolsValue>.none
+      ▿ user: (3 elements)
+        - .0: "What is the weather in Paris?"
+        - images: 0 elements
+        - audio: 0 elements
     ▿ Message
-      - audio: Optional<Array<Asset>>.none
-      - content: Optional<String>.none
-      - images: Optional<Array<Asset>>.none
-      ▿ role: Role
-        - rawValue: "assistant"
-      ▿ toolCalls: Optional<Array<EdgeRawToolCall>>
-        ▿ some: 1 element
+      ▿ assistant: (2 elements)
+        - .0: Optional<String>.none
+        ▿ toolCalls: 1 element
           ▿ EdgeRawToolCall
             ▿ arguments: EdgeToolsValue
               ▿ object: 1 key/value pair
@@ -36,19 +19,10 @@
                   ▿ value: EdgeToolsValue
                     - string: "Paris"
             - name: "getWeather"
-      - toolName: Optional<String>.none
-      - toolResponse: Optional<EdgeToolsValue>.none
     ▿ Message
-      - audio: Optional<Array<Asset>>.none
-      - content: Optional<String>.none
-      - images: Optional<Array<Asset>>.none
-      ▿ role: Role
-        - rawValue: "tool"
-      - toolCalls: Optional<Array<EdgeRawToolCall>>.none
-      ▿ toolName: Optional<String>
-        - some: "getWeather"
-      ▿ toolResponse: Optional<EdgeToolsValue>
-        ▿ some: EdgeToolsValue
+      ▿ tool: (2 elements)
+        - name: "getWeather"
+        ▿ response: EdgeToolsValue
           ▿ object: 3 key/value pairs
             ▿ (2 elements)
               - key: "condition"
@@ -63,12 +37,7 @@
               ▿ value: EdgeToolsValue
                 - integer: 21
     ▿ Message
-      - audio: Optional<Array<Asset>>.none
-      ▿ content: Optional<String>
-        - some: "The current weather in Paris is **sunny** with a temperature of **21°C**. Let me know if you\'d like more details!"
-      - images: Optional<Array<Asset>>.none
-      ▿ role: Role
-        - rawValue: "assistant"
-      - toolCalls: Optional<Array<EdgeRawToolCall>>.none
-      - toolName: Optional<String>.none
-      - toolResponse: Optional<EdgeToolsValue>.none
+      ▿ assistant: (2 elements)
+        ▿ .0: Optional<String>
+          - some: "The current weather in Paris is **sunny** with a temperature of **21°C**. Let me know if you\'d like more details!"
+        - toolCalls: 0 elements

@@ -140,67 +140,6 @@
       }
     }
 
-    @Suite
-    struct `Constraint tests` {
-      @Test
-      func `Explicit Grammar Is Returned Unchanged`() throws {
-        let toolsGrammar = try XGRGrammar.literal("tool")
-        let expectedGrammar = try XGRGrammar.literal("response")
-        let tokenizerInfo = try XGRTokenizerInfo(
-          encodedVocabulary: ["tool", "response"],
-          vocabularyType: .raw
-        )
-        let constraint = XGRGenerationConstraint.grammar(expectedGrammar)
-
-        let grammar = try constraint.grammar(
-          using: toolsGrammar,
-          tokenizerInfo: tokenizerInfo
-        )
-
-        expectNoDifference(grammar.ebnf, expectedGrammar.ebnf)
-      }
-
-      @Test
-      func `Tools Transform Receives The Model Grammar And Tokenizer Info`() throws {
-        let toolsGrammar = try XGRGrammar.literal("tool")
-        let tokenizerInfo = try XGRTokenizerInfo(
-          encodedVocabulary: ["tool", "<|response|>", ""],
-          vocabularyType: .raw,
-          stopTokenIDs: [2]
-        )
-        let constraint = XGRGenerationConstraint.tools { toolsGrammar, tokenizerInfo in
-          let responseGrammar = try XGRGrammar.lark(
-            "start: <|response|>",
-            tokenizerInfo: tokenizerInfo
-          )
-          return try toolsGrammar.union(responseGrammar)
-        }
-
-        let grammar = try constraint.grammar(
-          using: toolsGrammar,
-          tokenizerInfo: tokenizerInfo
-        )
-        let compiler = try XGRCompiler(tokenizerInfo: tokenizerInfo)
-        let matcher = try compiler.makeMatcher(grammar)
-
-        expectNoDifference(matcher.accept(string: "tool"), true)
-      }
-
-      @Test
-      func `Unconstrained Uses Universal Grammar`() throws {
-        let tokenizer = try testTokenizer()
-        let compiler = try makeGenericXGRCompiler(tokenizer: tokenizer)
-        let matcher = try compiler.makeMatcher(
-          try XGRGenerationConstraint.unconstrained.grammar(
-            using: .universal,
-            tokenizerInfo: compiler.tokenizerInfo
-          )
-        )
-
-        expectNoDifference(matcher.accept(string: "Free form text."), true)
-      }
-    }
-
     @Suite(.serialized)
     struct `Memory usage tests`: ~Copyable {
       private let engine: XGRCompiler
@@ -420,7 +359,10 @@
         expectNoDifference(metadata.contains(#""vocab_type":1"#), true)
         expectNoDifference(metadata.contains(#""add_prefix_space":true"#), true)
         expectNoDifference(try tokenizerInfo.serializedJSON().isEmpty, false)
-        expectNoDifference(try paddedTokenizerInfo.serializedJSON().contains(#""vocab_size":8"#), true)
+        expectNoDifference(
+          try paddedTokenizerInfo.serializedJSON().contains(#""vocab_size":8"#),
+          true
+        )
       }
     }
   }

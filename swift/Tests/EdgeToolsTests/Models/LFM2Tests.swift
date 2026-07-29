@@ -23,10 +23,10 @@ struct `LFM2 tests` {
 
   #if MLX && XGrammar && canImport(MLX) && !os(WASI)
     @Suite(.serialized, .enabledIfXcode())
-    struct `LFM2 MLX engine tests` {
+    struct `LFM2 MLX model engine tests` {
       @Test
       func `Completes Tool Turn Snapshot`() async throws {
-        let engine = try await LFM2MLXEngine(from: downloadLFM2())
+        let engine = try await LFM2MLXModelEngine(from: downloadLFM2())
         let transcript = try await completeWeatherTurn(using: engine)
 
         withKnownIssue { assertSnapshot(of: transcript, as: .dump, record: .all) }

@@ -5,10 +5,6 @@
     public import _EdgeToolsFoundation
   #endif
 
-  #if System
-    import SystemPackage
-  #endif
-
   // MARK: - CONNXRuntimeError
 
   public struct CONNXRuntimeError: Hashable, Sendable, Error {
@@ -105,12 +101,6 @@
     #if Foundation
       public func session(modelURL: URL) throws -> CONNXRuntimeSession {
         try self.session(modelPath: modelURL.path())
-      }
-    #endif
-
-    #if System
-      public func session(modelPath: FilePath) throws -> CONNXRuntimeSession {
-        try self.session(modelPath: modelPath.string)
       }
     #endif
 

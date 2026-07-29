@@ -122,13 +122,31 @@ extension NeedleModelConfiguration: Codable {
 
 // MARK: - NeedlePrompt
 
-public struct NeedlePrompt: Sendable {
+public struct NeedlePrompt: Hashable, Sendable {
   public var system: String
   public var user: String
 
   public init(system: String, user: String) {
     self.system = system
     self.user = user
+  }
+}
+
+// MARK: - NeedleModelInput
+
+public struct NeedleModelInput: Hashable, Sendable {
+  public var prompt: NeedlePrompt
+  public var tools: [EdgeToolDefinition]
+  public var tokenIds: [EdgeToolsToken.ID]
+
+  public init(
+    prompt: NeedlePrompt,
+    tools: [EdgeToolDefinition],
+    tokenIds: [EdgeToolsToken.ID]
+  ) {
+    self.prompt = prompt
+    self.tools = tools
+    self.tokenIds = tokenIds
   }
 }
 

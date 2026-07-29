@@ -2,10 +2,6 @@
   import EdgeToolsXGrammar
 #endif
 
-#if System
-  import SystemPackage
-#endif
-
 #if Foundation
   package import _EdgeToolsFoundation
 #endif
@@ -67,12 +63,6 @@
 #endif
 
 // MARK: - HF Backend JSON
-
-#if System
-  package func loadHuggingFaceBackendJSON(from tokenizerPath: FilePath) throws -> String {
-    try withFileBytes(at: tokenizerPath) { try huggingFaceBackendJSON(from: $0) }
-  }
-#endif
 
 #if Foundation
   package func loadHuggingFaceBackendJSON(from tokenizerURL: URL) throws -> String {
