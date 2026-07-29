@@ -4,7 +4,7 @@
 
 #if swift(>=6.4) && CoreAI && canImport(CoreAI)
   import CoreAI
-  public import _EdgeToolsFoundation
+  import _EdgeToolsFoundation
 
   @available(anyAppleOS 27.0, *)
   public final class NeedleCoreAIModel: Sendable {

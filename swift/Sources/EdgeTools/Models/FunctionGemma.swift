@@ -3,7 +3,7 @@
 #endif
 
 #if MLX && Transformers && canImport(MLX)
-  public import _EdgeToolsFoundation
+  import _EdgeToolsFoundation
   import MLX
   import MLXLLM
   import MLXLMCommon

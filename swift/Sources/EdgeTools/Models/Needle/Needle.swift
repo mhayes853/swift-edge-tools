@@ -3,12 +3,12 @@
 #endif
 
 #if Foundation
-  internal import _EdgeToolsFoundation
+  import _EdgeToolsFoundation
 #endif
 
 // MARK: - NeedleModelConfiguration
 
-public struct NeedleModelConfiguration: Hashable, Sendable {
+public struct NeedleModelConfiguration: Hashable, Sendable, Codable {
   public var vocabularySize: Int = 8192
   public var dimensions: Int = 512
   public var hiddenDimensions: Int = 512
@@ -43,9 +43,7 @@ public struct NeedleModelConfiguration: Hashable, Sendable {
   public var encoderMaxLength: Int {
     self.maxSeqLen ?? self.maxPositionEmbeddings ?? 1024
   }
-}
 
-extension NeedleModelConfiguration {
   public init(
     vocabularySize: Int = 8192,
     dimensions: Int = 512,
@@ -64,31 +62,25 @@ extension NeedleModelConfiguration {
     maxPositionEmbeddings: Int? = nil,
     dtype: String = "bfloat16"
   ) {
-    self.init(
-      vocabularySize: vocabularySize,
-      dimensions: dimensions,
-      hiddenDimensions: hiddenDimensions,
-      attentionHeads: attentionHeads,
-      kvHeads: kvHeads,
-      encoderLayers: encoderLayers,
-      decoderLayers: decoderLayers,
-      hiddenLayers: hiddenLayers,
-      ropeTheta: ropeTheta,
-      rmsNormEps: rmsNormEps,
-      padTokenId: padTokenId,
-      decoderStartTokenId: decoderStartTokenId,
-      tieWordEmbeddings: tieWordEmbeddings,
-      maxSeqLen: maxSeqLen,
-      maxPositionEmbeddings: maxPositionEmbeddings,
-      dtypeValue: dtype,
-      torchDTypeValue: nil
-    )
+    self.vocabularySize = vocabularySize
+    self.dimensions = dimensions
+    self.hiddenDimensions = hiddenDimensions
+    self.attentionHeads = attentionHeads
+    self.kvHeads = kvHeads
+    self.encoderLayers = encoderLayers
+    self.decoderLayers = decoderLayers
+    self.hiddenLayers = hiddenLayers
+    self.ropeTheta = ropeTheta
+    self.rmsNormEps = rmsNormEps
+    self.padTokenId = padTokenId
+    self.decoderStartTokenId = decoderStartTokenId
+    self.tieWordEmbeddings = tieWordEmbeddings
+    self.maxSeqLen = maxSeqLen
+    self.maxPositionEmbeddings = maxPositionEmbeddings
+    self.dtypeValue = dtype
+    self.torchDTypeValue = nil
   }
-}
 
-// MARK: - Codable
-
-extension NeedleModelConfiguration: Codable {
   private enum CodingKeys: String, CodingKey {
     case vocabularySize = "vocab_size"
     case dimensions = "d_model"

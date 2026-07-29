@@ -3,7 +3,7 @@
 #endif
 
 #if Foundation
-  internal import _EdgeToolsFoundation
+  import _EdgeToolsFoundation
 #endif
 
 // MARK: - EdgeToolsTokenizer

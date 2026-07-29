@@ -4,7 +4,7 @@
 
 #if ONNXCore
   #if Foundation
-    public import _EdgeToolsFoundation
+    import _EdgeToolsFoundation
   #endif
 
   #if canImport(COnnxRuntime)

@@ -1,5 +1,5 @@
 #if FoundationModels && canImport(FoundationModels)
-  internal import _EdgeToolsFoundation
+  import _EdgeToolsFoundation
   import FoundationModels
   import OrderedCollections
 #endif

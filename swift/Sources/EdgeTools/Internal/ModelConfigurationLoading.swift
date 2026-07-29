@@ -1,5 +1,5 @@
 #if Foundation
-  package import _EdgeToolsFoundation
+  import _EdgeToolsFoundation
 
   package func decodeModelConfiguration<Configuration: Decodable>(
     _ configuration: Configuration.Type,

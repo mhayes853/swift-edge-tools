@@ -2,7 +2,7 @@
   import COnnxRuntime
 
   #if Foundation
-    public import _EdgeToolsFoundation
+    import _EdgeToolsFoundation
   #endif
 
   // MARK: - CONNXRuntimeError
