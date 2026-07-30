@@ -1,4 +1,4 @@
-#if ONNXCore && JS
+#if ONNXCore && JS && canImport(JavaScriptKit)
   import JavaScriptEventLoop
   import JavaScriptKit
 

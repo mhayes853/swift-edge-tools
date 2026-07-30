@@ -11,7 +11,7 @@
     import COnnxRuntime
   #endif
 
-  #if JS
+  #if JS && canImport(JavaScriptKit)
     import JavaScriptKit
   #endif
 
@@ -357,7 +357,7 @@
 
   // MARK: - JavaScript ONNX Runtime Loading
 
-  #if JS
+  #if JS && canImport(JavaScriptKit)
     public typealias NeedleJSONNXModelEngine =
       EdgeToolsModelEngine<NeedleONNXModel<JSONNXRuntime>>
 
