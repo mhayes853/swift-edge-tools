@@ -8,6 +8,27 @@
 
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
   public final class NeedleCoreMLModel {
+    public struct GenerateParameters: EdgeToolsModelEngineGenerateParameters {
+      public static var `default`: Self { Self() }
+
+      public var sampler: any EdgeToolsSampler<MLTensor>
+      public var processor: (any EdgeToolsLogitsProcessor<MLTensor, MLTensor>)?
+      public var constraint: EdgeToolsXGRGenerationConstraint
+      public var maxTokens: Int?
+
+      public init(
+        sampler: any EdgeToolsSampler<MLTensor> = CoreMLArgmaxSampler(),
+        processor: (any EdgeToolsLogitsProcessor<MLTensor, MLTensor>)? = nil,
+        constraint: EdgeToolsXGRGenerationConstraint = .tools,
+        maxTokens: Int? = 1024
+      ) {
+        self.sampler = sampler
+        self.processor = processor
+        self.constraint = constraint
+        self.maxTokens = maxTokens
+      }
+    }
+
     public typealias Prompt = NeedlePrompt
 
     fileprivate struct EncoderOutputs {
@@ -37,16 +58,19 @@
       }
     }
 
-    public struct ModelGenerationState {
-      fileprivate let encoderOutputs: EncoderOutputs
-      fileprivate var cache: DecoderCache
-      fileprivate var position: Int
+    private struct Generation {
+      let encoderOutputs: EncoderOutputs
+      var cache: DecoderCache
+      var position: Int
+      var logits: MLTensor
+      var pendingTokenId: EdgeToolsToken.ID?
     }
 
     private let configuration: NeedleModelConfiguration
     private let encoderModel: EncoderModelActor
     private let decoderModel: DecoderModelActor
     private let clock = ContinuousClock()
+    private var generation: Generation?
 
     public convenience init(
       modelDirectoryURL: URL,
@@ -150,10 +174,6 @@
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
   extension NeedleCoreMLModel: EdgeToolsModel {
     public typealias Input = NeedleModelInput
-    public typealias Logits = MLTensor
-    public typealias Assets = Void
-    public typealias GenerateParameters = EdgeToolsCoreMLGenerateParameters
-    public typealias GenerationState = EdgeToolsCoreMLGenerationState<ModelGenerationState>
     public typealias ToolCallParser = NeedleToolCallParser
 
     public var vocabularySize: Int { self.configuration.vocabularySize }
@@ -169,23 +189,19 @@
       prompt: NeedlePrompt,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsXGRTokenizer
-    ) throws -> NeedleModelInput {
-      NeedleModelInput(
+    ) throws -> EdgeToolsModelInput<NeedleModelInput> {
+      let input = NeedleModelInput(
         prompt: prompt,
         tools: tools,
         tokenIds: try tokenizer.encode(text: prompt.formatted(tools: tools))
       )
-    }
-
-    public func tokenIds(in input: NeedleModelInput) -> [EdgeToolsToken.ID] {
-      input.tokenIds
+      return EdgeToolsModelInput(value: input, tokenIds: input.tokenIds)
     }
 
     public nonisolated(nonsending) func prepare(
       input: NeedleModelInput,
-      parameters: GenerateParameters,
-      assets: Void
-    ) async throws -> EdgeToolsModelPreparation<MLTensor, GenerationState> {
+      parameters: GenerateParameters
+    ) async throws -> EdgeToolsModelPreparation {
       guard input.tokenIds.count <= self.configuration.encoderMaxLength else {
         throw EdgeToolsError.contextLengthExceeded(
           tokens: input.tokenIds.count,
@@ -199,8 +215,7 @@
         padTokenId: self.configuration.padTokenId
       )
       let start = self.clock.now
-      let processor = parameters.processor
-      processor?.prompt(promptTensor)
+      parameters.processor?.prompt(promptTensor)
       let encoderOutputs = try await self.runEncoder(inputIds: paddedPromptTensor)
       var cache = DecoderCache(configuration: self.configuration)
       let logits = try await self.decode(
@@ -209,18 +224,14 @@
         encoderOutputs: encoderOutputs,
         cache: &cache
       )
-      let modelState = ModelGenerationState(
+      self.generation = Generation(
         encoderOutputs: encoderOutputs,
         cache: cache,
-        position: 1
-      )
-      let state = EdgeToolsCoreMLGenerationState(
-        modelState: modelState,
-        parameters: parameters
+        position: 1,
+        logits: logits,
+        pendingTokenId: nil
       )
       return EdgeToolsModelPreparation(
-        logits: logits,
-        state: state,
         metrics: EdgeToolsPrefillMetrics(
           tokens: input.tokenIds.count,
           duration: start.duration(to: self.clock.now)
@@ -229,31 +240,36 @@
     }
 
     public nonisolated(nonsending) func decode(
-      tokenId: EdgeToolsToken.ID,
-      state: inout GenerationState,
-      assets: Void
-    ) async throws -> MLTensor {
-      let logits = try await self.decode(
-        inputIds: MLTensor(tokenIds: [tokenId]),
-        cachePosition: state.modelState.position,
-        encoderOutputs: state.modelState.encoderOutputs,
-        cache: &state.modelState.cache
-      )
-      state.modelState.position += 1
-      return logits
-    }
-
-    public nonisolated(nonsending) func sample(
-      logits: inout MLTensor,
       bitmask: GrammarBitmask,
-      state: inout GenerationState
+      parameters: GenerateParameters
     ) async throws -> EdgeToolsModelSample {
-      var stepLogits = logits.squeezingShape(at: 1)
-      return try await state.sample(logits: &stepLogits, bitmask: bitmask)
+      guard var generation = self.generation else {
+        throw EdgeToolsError.modelNotPrepared
+      }
+      if let pendingTokenId = generation.pendingTokenId {
+        generation.logits = try await self.decode(
+          inputIds: MLTensor(tokenIds: [pendingTokenId]),
+          cachePosition: generation.position,
+          encoderOutputs: generation.encoderOutputs,
+          cache: &generation.cache
+        )
+        generation.position += 1
+      }
+      var stepLogits = generation.logits.squeezingShape(at: 1)
+      let processedLogits =
+        try await parameters.processor?.process(logits: &stepLogits)
+        ?? stepLogits
+      let maskedLogits = applyBitmaskCoreML(logits: processedLogits, mask: bitmask)
+      let confidence = await tokenConfidenceCoreML(logits: maskedLogits)
+      let tokenId = try await parameters.sampler.sample(logits: maskedLogits)
+      parameters.processor?.didSample(tokenId: tokenId)
+      generation.pendingTokenId = tokenId
+      self.generation = generation
+      return EdgeToolsModelSample(tokenId: tokenId, confidence: confidence)
     }
 
-    public func didAccept(token: EdgeToolsToken, state: inout GenerationState) {
-      state.didAccept(token: token)
+    public func resetGeneration() {
+      self.generation = nil
     }
   }
 
@@ -262,13 +278,6 @@
 
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
   extension EdgeToolsModelEngine where Model == NeedleCoreMLModel {
-    public init(
-      model: sending NeedleCoreMLModel,
-      tokenizer: sending any EdgeToolsXGRTokenizer
-    ) throws {
-      try self.init(model: model, assets: (), tokenizer: tokenizer)
-    }
-
     public init(
       modelDirectoryURL: URL,
       modelConfiguration: MLModelConfiguration,

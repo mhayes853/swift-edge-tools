@@ -10,7 +10,7 @@
 
   // MARK: - FunctionGemma Model
 
-  extension MLXLLM.Gemma3TextModel: EdgeToolsMLXModel, EdgeToolsPrefillableModel {
+  extension MLXLLM.Gemma3TextModel: EdgeToolsMLXModel {
     public typealias ModelConfiguration = MLXLLM.Gemma3TextConfiguration
     public typealias Prompt = EdgeToolsLLMPrompt
     public typealias ToolCallParser = FunctionGemmaToolCallParser
@@ -26,10 +26,10 @@
   public typealias FunctionGemmaMLXModel = MLXLLM.Gemma3TextModel
 
   public typealias FunctionGemmaMLXModelEngine =
-    EdgeToolsModelEngine<MLXLLM.Gemma3TextModel>
+    EdgeToolsMLXEngine<MLXLLM.Gemma3TextModel>
 
-  extension EdgeToolsModelEngine where Model == MLXLLM.Gemma3TextModel {
-    public init(from directoryURL: URL) async throws {
+  extension EdgeToolsMLXEngine where Model == MLXLLM.Gemma3TextModel {
+    public convenience init(from directoryURL: URL) async throws {
       try await self.init(from: directoryURL, model: MLXLLM.Gemma3TextModel.init)
     }
   }

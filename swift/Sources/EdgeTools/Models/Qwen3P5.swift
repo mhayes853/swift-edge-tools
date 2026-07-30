@@ -12,7 +12,7 @@ import OrderedCollections
 
   // MARK: - Qwen3P5 Model
 
-  extension Qwen35Model: EdgeToolsMLXModel, EdgeToolsPrefillableModel {
+  extension Qwen35Model: EdgeToolsMLXModel {
     public typealias ModelConfiguration = Qwen35Configuration
     public typealias Prompt = EdgeToolsLLMPrompt
     public typealias ToolCallParser = Qwen3P5ToolCallParser
@@ -25,11 +25,11 @@ import OrderedCollections
     }
   }
 
-  public typealias Qwen35MLXModelEngine = EdgeToolsModelEngine<Qwen35Model>
-  public typealias Qwen3P5MLXModelEngine = EdgeToolsModelEngine<Qwen35Model>
+  public typealias Qwen35MLXModelEngine = EdgeToolsMLXEngine<Qwen35Model>
+  public typealias Qwen3P5MLXModelEngine = EdgeToolsMLXEngine<Qwen35Model>
 
-  extension EdgeToolsModelEngine where Model == Qwen35Model {
-    public init(from directoryURL: URL) async throws {
+  extension EdgeToolsMLXEngine where Model == Qwen35Model {
+    public convenience init(from directoryURL: URL) async throws {
       try await self.init(from: directoryURL, model: Qwen35Model.init)
     }
   }

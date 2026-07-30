@@ -8,5 +8,5 @@ public protocol EdgeToolsLogitsProcessor<Prompt, Logits> {
 
   nonisolated(nonsending) func process(logits: inout Logits) async throws -> Logits
 
-  func didSample(token: EdgeToolsToken)
+  func didSample(tokenId: EdgeToolsToken.ID)
 }

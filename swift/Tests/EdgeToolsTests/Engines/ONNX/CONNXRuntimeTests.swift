@@ -51,7 +51,7 @@
       let firstInput = try runtime.tensor(values: [Float(2), 4, 8], shape: [3])
       let secondInput = try runtime.tensor(values: [Float(1), 3, 5], shape: [3])
 
-      let error = #expect(throws: EdgeToolsONNXRuntimeError.self) {
+      let error = #expect(throws: ONNXRuntimeError.self) {
         try session.run(
           inputs: ["x": firstInput, "y": secondInput],
           outputNames: ["sum", "sum"]
@@ -85,7 +85,7 @@
       let int64Tensor = try runtime.tensor(values: [Int64(4), 5, 6], shape: [3])
       let int32View = try await int32Tensor.view(as: Int32.self)
       let int64View = try await int64Tensor.view(as: Int64.self)
-      var copiedView = EdgeToolsONNXTensorView<Int32>(copying: [7, 8, 9])
+      var copiedView = ONNXTensorView<Int32>(copying: [7, 8, 9])
 
       expectNoDifference([int32View[0], int32View[1], int32View[2]], [1, 2, 3])
       expectNoDifference([int64View[0], int64View[1], int64View[2]], [4, 5, 6])
@@ -101,7 +101,7 @@
     func `Reject Tensor Values That Do Not Match Shape`() throws {
       let runtime = try CONNXRuntime()
 
-      let error = #expect(throws: EdgeToolsONNXRuntimeError.self) {
+      let error = #expect(throws: ONNXRuntimeError.self) {
         try runtime.tensor(values: [Float(1), 2], shape: [3])
       }
       expectNoDifference(error?.code, .invalidTensorValueCount)
@@ -112,14 +112,14 @@
       let runtime = try CONNXRuntime()
       let tensor = try runtime.tensor(values: [Int64(1), 2, 3], shape: [3])
 
-      let error = await #expect(throws: EdgeToolsONNXRuntimeError.self) {
+      let error = await #expect(throws: ONNXRuntimeError.self) {
         let view = try await tensor.view(as: Float.self)
         _ = view.count
       }
       expectNoDifference(error?.code, .unexpectedTensorElementType)
     }
 
-    private static func executeAdd<Runtime: EdgeToolsONNXRuntime>(
+    private static func executeAdd<Runtime: ONNXRuntime>(
       runtime: Runtime,
       model: Runtime.ModelSource,
       configuration: Runtime.SessionConfiguration

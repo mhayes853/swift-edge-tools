@@ -12,22 +12,32 @@
     var maxTokens: Int? { get }
   }
 
+  // MARK: - EdgeToolsModelInput
+
+  public struct EdgeToolsModelInput<Value> {
+    public var value: Value
+    public var tokenIds: [EdgeToolsToken.ID]
+
+    public init(value: Value, tokenIds: [EdgeToolsToken.ID]) {
+      self.value = value
+      self.tokenIds = tokenIds
+    }
+  }
+
+  extension EdgeToolsModelInput: Equatable where Value: Equatable {}
+  extension EdgeToolsModelInput: Hashable where Value: Hashable {}
+  extension EdgeToolsModelInput: Sendable where Value: Sendable {}
+
   // MARK: - EdgeToolsModelPreparation
 
-  public struct EdgeToolsModelPreparation<Logits, GenerationState> {
-    public var logits: Logits
-    public var state: GenerationState
+  public struct EdgeToolsModelPreparation: Sendable {
     public var metrics: EdgeToolsPrefillMetrics
     public var metadata: EdgeToolsMetadata
 
     public init(
-      logits: Logits,
-      state: GenerationState,
       metrics: EdgeToolsPrefillMetrics,
       metadata: EdgeToolsMetadata = EdgeToolsMetadata()
     ) {
-      self.logits = logits
-      self.state = state
       self.metrics = metrics
       self.metadata = metadata
     }
@@ -47,12 +57,15 @@
 
   // MARK: - EdgeToolsModel
 
+  /// A model that drives a single generation at a time for ``EdgeToolsModelEngine``.
+  ///
+  /// A conformance owns both its global assets and the transient state of the generation that is
+  /// currently in flight. ``prepare(input:parameters:)`` starts a generation, each
+  /// ``decode(bitmask:parameters:)`` produces exactly one token, and ``resetGeneration()`` releases the
+  /// transient state once the generation succeeds, fails, or is cancelled.
   public protocol EdgeToolsModel: SendableMetatype {
     associatedtype Prompt: Sendable
     associatedtype Input
-    associatedtype Logits
-    associatedtype GenerationState
-    associatedtype Assets
     associatedtype GenerateParameters: EdgeToolsModelEngineGenerateParameters
     associatedtype ToolCallParser: EdgeToolCallParser
 
@@ -67,48 +80,36 @@
       prompt: Prompt,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsXGRTokenizer
-    ) throws -> Input
+    ) throws -> EdgeToolsModelInput<Input>
 
-    func tokenIds(in input: Input) -> [EdgeToolsToken.ID]
-
-    nonisolated(nonsending) func prepare(
+    nonisolated(nonsending) mutating func prepare(
       input: Input,
-      parameters: GenerateParameters,
-      assets: Assets
-    ) async throws -> EdgeToolsModelPreparation<Logits, GenerationState>
+      parameters: GenerateParameters
+    ) async throws -> EdgeToolsModelPreparation
 
-    nonisolated(nonsending) func decode(
-      tokenId: EdgeToolsToken.ID,
-      state: inout GenerationState,
-      assets: Assets
-    ) async throws -> Logits
-
-    nonisolated(nonsending) func sample(
-      logits: inout Logits,
+    nonisolated(nonsending) mutating func decode(
       bitmask: GrammarBitmask,
-      state: inout GenerationState
+      parameters: GenerateParameters
     ) async throws -> EdgeToolsModelSample
 
-    func didAccept(
-      token: EdgeToolsToken,
-      state: inout GenerationState
-    )
+    func finish() -> EdgeToolsMetadata
 
-    func finish(state: GenerationState) -> EdgeToolsMetadata
+    mutating func resetGeneration()
   }
 
   extension EdgeToolsModel {
-    public func finish(state: GenerationState) -> EdgeToolsMetadata {
+    public func finish() -> EdgeToolsMetadata {
       EdgeToolsMetadata()
     }
+
+    public mutating func resetGeneration() {}
   }
 
   // MARK: - EdgeToolsPrefillableModel
 
   public protocol EdgeToolsPrefillableModel: EdgeToolsModel {
-    nonisolated(nonsending) func prefill(
-      input: Input,
-      assets: Assets
+    nonisolated(nonsending) mutating func prefill(
+      input: Input
     ) async throws -> EdgeToolsEnginePrefill
   }
 
@@ -121,21 +122,18 @@
     private let generationGate = EdgeToolsModelGenerationGate()
     private let grammarCompiler: XGRCompiler
     private let matcherPool = XGRToolCallMatcherPool()
-    private let model: Model
-    private let assets: Model.Assets
+    private var model: Model
     private let tokenizer: any EdgeToolsXGRTokenizer
     private let clock = ContinuousClock()
 
     public init(
       model: sending Model,
-      assets: sending Model.Assets,
       tokenizer: sending any EdgeToolsXGRTokenizer
     ) throws {
       self.grammarCompiler = try XGRCompiler(
         tokenizerInfo: tokenizer.tokenizerInfo(modelVocabularySize: model.vocabularySize)
       )
       self.model = model
-      self.assets = assets
       self.tokenizer = tokenizer
     }
 
@@ -144,9 +142,8 @@
       tools: [EdgeToolDefinition] = []
     ) async throws -> [EdgeToolsToken] {
       let input = try self.model.input(prompt: prompt, tools: tools, tokenizer: self.tokenizer)
-      let tokenIds = self.model.tokenIds(in: input)
-      let tokens = self.tokenizer.convertIdsToTokens(tokenIds)
-      return zip(tokenIds, tokens)
+      let tokens = self.tokenizer.convertIdsToTokens(input.tokenIds)
+      return zip(input.tokenIds, tokens)
         .compactMap { tokenId, token in
           token.map { EdgeToolsToken(id: tokenId, stringValue: $0) }
         }
@@ -195,17 +192,41 @@
       channel: EdgeToolsGenerationChannel,
       isStopped: ManagedAtomic<Bool>
     ) async throws -> EdgeToolsEngineGeneration {
+      var model = self.model
+      do {
+        let generation = try await self.runGeneration(
+          prompt: prompt,
+          tools: tools,
+          parameters: parameters,
+          channel: channel,
+          isStopped: isStopped,
+          model: &model
+        )
+        model.resetGeneration()
+        self.model = model
+        return generation
+      } catch {
+        model.resetGeneration()
+        self.model = model
+        throw error
+      }
+    }
+
+    private func runGeneration(
+      prompt: Model.Prompt,
+      tools: [EdgeToolDefinition],
+      parameters: sending Model.GenerateParameters,
+      channel: EdgeToolsGenerationChannel,
+      isStopped: ManagedAtomic<Bool>,
+      model: inout Model
+    ) async throws -> EdgeToolsEngineGeneration {
       try Task.checkCancellation()
       guard !isStopped.load(ordering: .relaxed) else { return .empty }
 
       let matcher = try self.matcher(tools: tools, constraint: parameters.constraint)
       let generateStart = self.clock.now
-      let input = try self.model.input(prompt: prompt, tools: tools, tokenizer: self.tokenizer)
-      var preparation = try await self.model.prepare(
-        input: input,
-        parameters: parameters,
-        assets: self.assets
-      )
+      let input = try model.input(prompt: prompt, tools: tools, tokenizer: self.tokenizer)
+      var preparation = try await model.prepare(input: input.value, parameters: parameters)
       var detokenizer = StreamingDetokenizer()
       var parser = Model.ToolCallParser()
       var generatedTokens = [EdgeToolsToken]()
@@ -225,10 +246,9 @@
       }
 
       while let currentBitmask = bitmask {
-        let sample = try await self.model.sample(
-          logits: &preparation.logits,
+        let sample = try await model.decode(
           bitmask: currentBitmask,
-          state: &preparation.state
+          parameters: parameters
         )
         durationToFirstToken =
           durationToFirstToken ?? generateStart.duration(to: self.clock.now)
@@ -247,7 +267,6 @@
           toolCalls.append(rawToolCall)
           channel.emit(toolCall: rawToolCall)
         }
-        self.model.didAccept(token: token, state: &preparation.state)
 
         bitmask = nil
         if !matcher.isTerminated,
@@ -258,16 +277,10 @@
           try Task.checkCancellation()
           bitmask = matcher.grammarBitmask()
         }
-        guard bitmask != nil else { break }
-        preparation.logits = try await self.model.decode(
-          tokenId: token.id,
-          state: &preparation.state,
-          assets: self.assets
-        )
       }
 
       let finalDurationToFirstToken = durationToFirstToken ?? .zero
-      let finalMetadata = self.model.finish(state: preparation.state)
+      let finalMetadata = model.finish()
       preparation.metadata.merge(finalMetadata) { _, finalValue in finalValue }
       preparation.metadata.generationConfidence = confidence.mean
       preparation.metadata.perTokenConfidences = confidence.perTokenConfidences
@@ -297,7 +310,8 @@
       tools: [EdgeToolDefinition],
       constraint: EdgeToolsXGRGenerationConstraint
     ) throws -> XGRMatcher {
-      let toolsGrammar = try self.toolCallRange(for: constraint)
+      let toolsGrammar =
+        try self.toolCallRange(for: constraint)
         .map { try self.model.grammar(tools: tools, range: $0) } ?? .universal
       let grammar = try self.grammar(for: constraint, toolsGrammar: toolsGrammar)
       let matcher = try self.matcherPool.matcher(
@@ -339,16 +353,20 @@
       tools: [EdgeToolDefinition]
     ) async throws -> EdgeToolsEnginePrefill {
       await self.generationGate.acquire()
+      var model = self.model
       do {
-        let input = try self.model.input(
+        let input = try model.input(
           prompt: promptPrefix,
           tools: tools,
           tokenizer: self.tokenizer
         )
-        let prefill = try await self.model.prefill(input: input, assets: self.assets)
+        let prefill = try await model.prefill(input: input.value)
+        self.model = model
         await self.generationGate.release()
         return prefill
       } catch {
+        model.resetGeneration()
+        self.model = model
         await self.generationGate.release()
         throw error
       }

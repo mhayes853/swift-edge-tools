@@ -10,7 +10,7 @@
 
   // MARK: - Qwen3 Model
 
-  extension Qwen3Model: EdgeToolsMLXModel, EdgeToolsPrefillableModel {
+  extension Qwen3Model: EdgeToolsMLXModel {
     public typealias ModelConfiguration = Qwen3Configuration
     public typealias Prompt = EdgeToolsLLMPrompt
     public typealias ToolCallParser = Qwen3ToolCallParser
@@ -24,13 +24,13 @@
   }
 
   /// The shared model engine specialized for Qwen 3.
-  public typealias Qwen3MLXModelEngine = EdgeToolsModelEngine<Qwen3Model>
+  public typealias Qwen3MLXModelEngine = EdgeToolsMLXEngine<Qwen3Model>
 
   // MARK: - Model Engine Loading
 
-  extension EdgeToolsModelEngine where Model == Qwen3Model {
+  extension EdgeToolsMLXEngine where Model == Qwen3Model {
     /// Loads a Qwen 3 model engine from a model directory.
-    public init(from directoryURL: URL) async throws {
+    public convenience init(from directoryURL: URL) async throws {
       try await self.init(from: directoryURL, model: Qwen3Model.init)
     }
   }

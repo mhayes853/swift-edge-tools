@@ -1,7 +1,7 @@
 #if ONNXCore
-  // MARK: - EdgeToolsONNXDType
+  // MARK: - ONNXDType
 
-  public struct EdgeToolsONNXDType: RawRepresentable, Hashable, Sendable {
+  public struct ONNXDType: RawRepresentable, Hashable, Sendable {
     private static let names = [
       1: "float32",
       2: "uint8",
@@ -75,63 +75,63 @@
     public static let float8E8M0 = Self(rawValue: 26)
   }
 
-  // MARK: - EdgeToolsONNXElement
+  // MARK: - ONNXElement
 
-  public protocol EdgeToolsONNXElement: BitwiseCopyable, Sendable {
-    static var onnxDType: EdgeToolsONNXDType { get }
+  public protocol ONNXElement: BitwiseCopyable, Sendable {
+    static var onnxDType: ONNXDType { get }
   }
 
-  extension Float: EdgeToolsONNXElement {
-    public static var onnxDType: EdgeToolsONNXDType { .float }
+  extension Float: ONNXElement {
+    public static var onnxDType: ONNXDType { .float }
   }
 
-  extension Double: EdgeToolsONNXElement {
-    public static var onnxDType: EdgeToolsONNXDType { .double }
+  extension Double: ONNXElement {
+    public static var onnxDType: ONNXDType { .double }
   }
 
-  extension Float16: EdgeToolsONNXElement {
-    public static var onnxDType: EdgeToolsONNXDType { .float16 }
+  extension Float16: ONNXElement {
+    public static var onnxDType: ONNXDType { .float16 }
   }
 
-  extension Bool: EdgeToolsONNXElement {
-    public static var onnxDType: EdgeToolsONNXDType { .bool }
+  extension Bool: ONNXElement {
+    public static var onnxDType: ONNXDType { .bool }
   }
 
-  extension UInt8: EdgeToolsONNXElement {
-    public static var onnxDType: EdgeToolsONNXDType { .uint8 }
+  extension UInt8: ONNXElement {
+    public static var onnxDType: ONNXDType { .uint8 }
   }
 
-  extension Int8: EdgeToolsONNXElement {
-    public static var onnxDType: EdgeToolsONNXDType { .int8 }
+  extension Int8: ONNXElement {
+    public static var onnxDType: ONNXDType { .int8 }
   }
 
-  extension UInt16: EdgeToolsONNXElement {
-    public static var onnxDType: EdgeToolsONNXDType { .uint16 }
+  extension UInt16: ONNXElement {
+    public static var onnxDType: ONNXDType { .uint16 }
   }
 
-  extension Int16: EdgeToolsONNXElement {
-    public static var onnxDType: EdgeToolsONNXDType { .int16 }
+  extension Int16: ONNXElement {
+    public static var onnxDType: ONNXDType { .int16 }
   }
 
-  extension UInt32: EdgeToolsONNXElement {
-    public static var onnxDType: EdgeToolsONNXDType { .uint32 }
+  extension UInt32: ONNXElement {
+    public static var onnxDType: ONNXDType { .uint32 }
   }
 
-  extension Int32: EdgeToolsONNXElement {
-    public static var onnxDType: EdgeToolsONNXDType { .int32 }
+  extension Int32: ONNXElement {
+    public static var onnxDType: ONNXDType { .int32 }
   }
 
-  extension UInt64: EdgeToolsONNXElement {
-    public static var onnxDType: EdgeToolsONNXDType { .uint64 }
+  extension UInt64: ONNXElement {
+    public static var onnxDType: ONNXDType { .uint64 }
   }
 
-  extension Int64: EdgeToolsONNXElement {
-    public static var onnxDType: EdgeToolsONNXDType { .int64 }
+  extension Int64: ONNXElement {
+    public static var onnxDType: ONNXDType { .int64 }
   }
 
-  // MARK: - EdgeToolsONNXRuntimeError
+  // MARK: - ONNXRuntimeError
 
-  public struct EdgeToolsONNXRuntimeError: Hashable, Sendable, Error {
+  public struct ONNXRuntimeError: Hashable, Sendable, Error {
     public struct Code: RawRepresentable, Hashable, Sendable {
       public let rawValue: String
 
@@ -143,7 +143,9 @@
       public static let invalidTensorShape = Self(rawValue: "invalid-tensor-shape")
       public static let invalidTensorValueCount = Self(rawValue: "invalid-tensor-value-count")
       public static let tensorElementCountOverflow = Self(rawValue: "tensor-element-count-overflow")
-      public static let unexpectedTensorElementType = Self(rawValue: "unexpected-tensor-element-type")
+      public static let unexpectedTensorElementType = Self(
+        rawValue: "unexpected-tensor-element-type"
+      )
     }
 
     public let code: Code
@@ -160,14 +162,14 @@
   func edgeToolsONNXElementCount(for shape: [Int]) throws -> Int {
     try shape.reduce(1) { count, dimension in
       guard dimension >= 0 else {
-        throw EdgeToolsONNXRuntimeError(
+        throw ONNXRuntimeError(
           code: .invalidTensorShape,
           message: "Tensor dimensions must not be negative: \(shape)."
         )
       }
       let result = count.multipliedReportingOverflow(by: dimension)
       guard !result.overflow else {
-        throw EdgeToolsONNXRuntimeError(
+        throw ONNXRuntimeError(
           code: .tensorElementCountOverflow,
           message: "Tensor shape has too many elements: \(shape)."
         )
@@ -179,7 +181,7 @@
   func edgeToolsONNXValidateValueCount(_ count: Int, shape: [Int]) throws {
     let expectedCount = try edgeToolsONNXElementCount(for: shape)
     guard count == expectedCount else {
-      throw EdgeToolsONNXRuntimeError(
+      throw ONNXRuntimeError(
         code: .invalidTensorValueCount,
         message: "Tensor shape \(shape) requires \(expectedCount) values, got \(count)."
       )
@@ -188,17 +190,17 @@
 
   func edgeToolsONNXValidateOutputNames(_ names: [String]) throws {
     guard Set(names).count == names.count else {
-      throw EdgeToolsONNXRuntimeError(
+      throw ONNXRuntimeError(
         code: .duplicateOutputName,
         message: "Output names must be unique."
       )
     }
   }
 
-  // MARK: - EdgeToolsONNXTensorView
+  // MARK: - ONNXTensorView
 
   @_addressableForDependencies
-  public struct EdgeToolsONNXTensorView<Element: EdgeToolsONNXElement>: ~Copyable {
+  public struct ONNXTensorView<Element: ONNXElement>: ~Copyable {
     private let baseAddress: UnsafeMutablePointer<Element>?
 
     public let count: Int
@@ -268,21 +270,21 @@
     }
   }
 
-  // MARK: - EdgeToolsONNXLogitsProcessor
+  // MARK: - ONNXLogitsProcessor
 
-  public protocol EdgeToolsONNXLogitsProcessor {
+  public protocol ONNXLogitsProcessor {
     func prompt(_ prompt: [EdgeToolsToken.ID])
 
     nonisolated(nonsending) func process(
-      logits: inout EdgeToolsONNXTensorView<Float>
+      logits: inout ONNXTensorView<Float>
     ) async throws
 
-    func didSample(token: EdgeToolsToken)
+    func didSample(tokenId: EdgeToolsToken.ID)
   }
 
-  // MARK: - EdgeToolsONNXGraphOptimizationLevel
+  // MARK: - ONNXGraphOptimizationLevel
 
-  public struct EdgeToolsONNXGraphOptimizationLevel: RawRepresentable, Hashable, Sendable {
+  public struct ONNXGraphOptimizationLevel: RawRepresentable, Hashable, Sendable {
     public let rawValue: String
 
     public init(rawValue: String) {
@@ -298,17 +300,17 @@
 
   // MARK: - Runtime Protocols
 
-  public protocol EdgeToolsONNXTensor {
-    var dtype: EdgeToolsONNXDType { get }
+  public protocol ONNXTensor {
+    var dtype: ONNXDType { get }
     var shape: [Int] { get }
 
-    nonisolated(nonsending) func view<Element: EdgeToolsONNXElement>(
+    nonisolated(nonsending) func view<Element: ONNXElement>(
       as type: Element.Type
-    ) async throws -> EdgeToolsONNXTensorView<Element>
+    ) async throws -> ONNXTensorView<Element>
   }
 
-  extension EdgeToolsONNXTensor {
-    public nonisolated(nonsending) func array<Element: EdgeToolsONNXElement>(
+  extension ONNXTensor {
+    public nonisolated(nonsending) func array<Element: ONNXElement>(
       as type: Element.Type
     ) async throws -> [Element] {
       let view = try await self.view(as: type)
@@ -316,8 +318,8 @@
     }
   }
 
-  public protocol EdgeToolsONNXSession {
-    associatedtype Tensor: EdgeToolsONNXTensor
+  public protocol ONNXSession {
+    associatedtype Tensor: ONNXTensor
 
     var inputNames: [String] { get }
     var outputNames: [String] { get }
@@ -328,11 +330,11 @@
     ) async throws -> [String: Tensor]
   }
 
-  public protocol EdgeToolsONNXRuntime: SendableMetatype {
+  public protocol ONNXRuntime: SendableMetatype {
     associatedtype ModelSource
     associatedtype SessionConfiguration
-    associatedtype Session: EdgeToolsONNXSession where Session.Tensor == Tensor
-    associatedtype Tensor: EdgeToolsONNXTensor
+    associatedtype Session: ONNXSession where Session.Tensor == Tensor
+    associatedtype Tensor: ONNXTensor
 
     nonisolated(nonsending) func session(
       model: ModelSource,
@@ -342,6 +344,6 @@
     func tensor<Values: Sequence>(
       values: Values,
       shape: [Int]
-    ) throws -> Tensor where Values.Element: EdgeToolsONNXElement
+    ) throws -> Tensor where Values.Element: ONNXElement
   }
 #endif

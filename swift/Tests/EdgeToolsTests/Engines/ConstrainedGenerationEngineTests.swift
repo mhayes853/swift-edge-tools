@@ -32,7 +32,7 @@ import Testing
     @Test
     func `Generate With Explicit Grammar Constraint`() async throws {
       let engine = try await makeNeedleONNXModelEngine()
-      let parameters = EdgeToolsONNXGenerateParameters(
+      let parameters = ONNXGenerateParameters(
         constraint: .grammar(try .literal("OK"))
       )
       let generationTask = try engine.generate(

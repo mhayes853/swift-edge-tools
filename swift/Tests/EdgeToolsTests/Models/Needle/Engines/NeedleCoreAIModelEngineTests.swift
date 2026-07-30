@@ -249,7 +249,7 @@
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
         tools: NeedlePrompt.sendAdventureEmailDefinitions,
-        parameters: EdgeToolsCoreAIGenerateParameters(processor: processor),
+        parameters: NeedleCoreAIModel.GenerateParameters(processor: processor),
         channel: EdgeToolsGenerationChannel()
       )
       _ = try await generationTask.value
@@ -331,7 +331,7 @@
       return logits
     }
 
-    func didSample(token: EdgeToolsToken) {
+    func didSample(tokenId: EdgeToolsToken.ID) {
       self.counts.withLock { $0.didSample += 1 }
     }
   }

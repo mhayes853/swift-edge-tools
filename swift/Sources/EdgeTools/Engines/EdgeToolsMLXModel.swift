@@ -14,21 +14,29 @@
 
   // MARK: - EdgeTools MLX Model
 
-  public protocol EdgeToolsMLXModel: EdgeToolsModel, LanguageModel
-  where
-    Input == LMInput,
-    Logits == MLXArray,
-    Assets == EdgeToolsMLXModelAssets,
-    GenerateParameters == EdgeToolsMLXGenerateParameters,
-    GenerationState == EdgeToolsMLXGenerationState
-  {
+  public protocol EdgeToolsMLXModel: LanguageModel, SendableMetatype {
     associatedtype ModelConfiguration: Decodable
+    associatedtype Prompt: Sendable
+    associatedtype ToolCallParser: EdgeToolCallParser
+
+    var vocabularySize: Int { get }
+
+    func grammar(
+      tools: [EdgeToolDefinition],
+      range: GrammarToolCallRange
+    ) throws -> XGRGrammar
+
+    func input(
+      prompt: Prompt,
+      tools: [EdgeToolDefinition],
+      tokenizer: any EdgeToolsXGRTokenizer
+    ) throws -> LMInput
   }
 
   extension EdgeToolsMLXModel {
     package static func loadEdgeToolsLanguageModel(
       from directoryURL: URL,
-      model makeModel: (ModelConfiguration) throws -> Self
+      model makeModel: @Sendable (ModelConfiguration) throws -> Self
     ) throws -> Self {
       let configuration = try decodeModelConfiguration(
         ModelConfiguration.self,
@@ -107,248 +115,75 @@
     }
   }
 
-  // MARK: - EdgeToolsMLXModelAssets
+  // MARK: - EdgeToolsMLXEngine
 
-  public final class EdgeToolsMLXModelAssets {
-    struct CachedPrefill {
-      let tokenIds: [EdgeToolsToken.ID]
-      let cache: [any KVCache]
-      let output: LMOutput
+  public final class EdgeToolsMLXEngine<Model: EdgeToolsMLXModel>: EdgeToolsEngine, Sendable {
+    public typealias Prompt = Model.Prompt
+    public typealias GenerateParameters = EdgeToolsMLXGenerateParameters
+
+    private let engine: EdgeToolsModelEngine<_EdgeToolsMLXModel<Model>>
+
+    public init(model: sending Model, tokenizer: sending any EdgeToolsXGRTokenizer) throws {
+      let model = _EdgeToolsMLXModel(model: model)
+      self.engine = try EdgeToolsModelEngine(model: model, tokenizer: tokenizer)
     }
 
-    var cachedPrefill: CachedPrefill?
-
-    public init() {}
-  }
-
-  // MARK: - EdgeToolsMLXGenerationState
-
-  public struct EdgeToolsMLXGenerationState {
-    var cache: [any KVCache]
-    var outputState: LMOutput.State?
-    let sampler: any LogitSampler
-    var processor: (any LogitProcessor)?
-    let kvCacheQuantizationBits: Int?
-    let kvCacheQuantizationGroupSize: Int
-    let quantizedKVStart: Int
-    let synchronizeStreamForMemorySnapshots: Bool
-    let generationStartSnapshot: Memory.Snapshot
-    let postPrefillSnapshot: Memory.Snapshot
-
-    init(
-      cache: [any KVCache],
-      outputState: LMOutput.State?,
-      sampler: any LogitSampler,
-      processor: (any LogitProcessor)?,
-      parameters: EdgeToolsMLXGenerateParameters,
-      generationStartSnapshot: Memory.Snapshot,
-      postPrefillSnapshot: Memory.Snapshot
-    ) {
-      self.cache = cache
-      self.outputState = outputState
-      self.sampler = sampler
-      self.processor = processor
-      self.kvCacheQuantizationBits = parameters.kvCacheQuantizationBits
-      self.kvCacheQuantizationGroupSize = parameters.kvCacheQuantizationGroupSize
-      self.quantizedKVStart = parameters.quantizedKVStart
-      self.synchronizeStreamForMemorySnapshots =
-        parameters.synchronizeStreamForMemorySnapshots
-      self.generationStartSnapshot = generationStartSnapshot
-      self.postPrefillSnapshot = postPrefillSnapshot
-    }
-  }
-
-  // MARK: - MLX Language Model Defaults
-
-  extension EdgeToolsMLXModel {
-    public func tokenIds(in input: LMInput) -> [EdgeToolsToken.ID] {
-      input.text.tokens.asArray(EdgeToolsToken.ID.self)
+    private init(engine: EdgeToolsModelEngine<_EdgeToolsMLXModel<Model>>) {
+      self.engine = engine
     }
 
-    public nonisolated(nonsending) func prepare(
-      input: LMInput,
-      parameters: EdgeToolsMLXGenerateParameters,
-      assets: EdgeToolsMLXModelAssets
-    ) async throws -> EdgeToolsModelPreparation<MLXArray, EdgeToolsMLXGenerationState> {
-      let clock = ContinuousClock()
-      let generationStartSnapshot = Self.memorySnapshot(
-        synchronize: parameters.synchronizeStreamForMemorySnapshots
-      )
-      let tokenIds = self.tokenIds(in: input)
-      let start = clock.now
-      var processor = parameters.processor
-      processor?.prompt(input.text.tokens)
-      let prepared = try self.preparedOutput(input: input, tokenIds: tokenIds, assets: assets)
-      let metrics = EdgeToolsPrefillMetrics(
-        tokens: prepared.tokenCount,
-        duration: start.duration(to: clock.now)
-      )
-      let postPrefillSnapshot = Self.memorySnapshot(
-        synchronize: parameters.synchronizeStreamForMemorySnapshots
-      )
-      let state = EdgeToolsMLXGenerationState(
-        cache: prepared.cache,
-        outputState: prepared.output.state,
-        sampler: parameters.sampler,
-        processor: processor,
-        parameters: parameters,
-        generationStartSnapshot: generationStartSnapshot,
-        postPrefillSnapshot: postPrefillSnapshot
-      )
-      return EdgeToolsModelPreparation(
-        logits: prepared.output.logits,
-        state: state,
-        metrics: metrics
-      )
-    }
-
-    public nonisolated(nonsending) func decode(
-      tokenId: EdgeToolsToken.ID,
-      state: inout EdgeToolsMLXGenerationState,
-      assets: EdgeToolsMLXModelAssets
-    ) async throws -> MLXArray {
-      maybeQuantizeKVCache(
-        cache: &state.cache,
-        kvBits: state.kvCacheQuantizationBits,
-        kvGroupSize: state.kvCacheQuantizationGroupSize,
-        quantizedKVStart: state.quantizedKVStart
-      )
-      let token = MLXArray([tokenId])
-      let output = self(
-        LMInput.Text(tokens: token)[text: .newAxis],
-        cache: state.cache,
-        state: state.outputState
-      )
-      state.outputState = output.state
-      return output.logits
-    }
-
-    public nonisolated(nonsending) func sample(
-      logits: inout MLXArray,
-      bitmask: GrammarBitmask,
-      state: inout EdgeToolsMLXGenerationState
-    ) async throws -> EdgeToolsModelSample {
-      var stepLogits = logits[0..., -1, 0...]
-      stepLogits = state.processor?.process(logits: stepLogits) ?? stepLogits
-      let maskedLogits = applyBitmaskMLX(logits: stepLogits, mask: bitmask)
-      let confidence = tokenConfidenceMLX(logits: maskedLogits)
-      let tokenId = state.sampler.sample(logits: maskedLogits).item(EdgeToolsToken.ID.self)
-      return EdgeToolsModelSample(tokenId: tokenId, confidence: confidence)
-    }
-
-    public func didAccept(token: EdgeToolsToken, state: inout EdgeToolsMLXGenerationState) {
-      state.processor?.didSample(token: MLXArray([token.id]))
-    }
-
-    public func finish(state: EdgeToolsMLXGenerationState) -> EdgeToolsMetadata {
-      var metadata = EdgeToolsMetadata()
-      metadata.mlxEngineGenerationStartMemorySnapshot = state.generationStartSnapshot
-      metadata.mlxEnginePostPrefillMemorySnapshot = state.postPrefillSnapshot
-      metadata.mlxEnginePostDecodeMemorySnapshot = Self.memorySnapshot(
-        synchronize: state.synchronizeStreamForMemorySnapshots
-      )
-      return metadata
-    }
-
-    public nonisolated(nonsending) func prefill(
-      input: LMInput,
-      assets: EdgeToolsMLXModelAssets
-    ) async throws -> EdgeToolsEnginePrefill {
-      let clock = ContinuousClock()
-      let tokenIds = self.tokenIds(in: input)
-      let cache = self.newCache(parameters: nil)
-      let start = clock.now
-      let output = try self.edgeToolsPrepare(input: input, cache: cache)
-      eval(output.logits)
-      eval(cache)
-      assets.cachedPrefill = EdgeToolsMLXModelAssets.CachedPrefill(
-        tokenIds: tokenIds,
-        cache: cache.map { $0.copy() },
-        output: output
-      )
-      let snapshot = Self.memorySnapshot(synchronize: true)
-      var metadata = EdgeToolsMetadata()
-      metadata.mlxEnginePostPrefillMemorySnapshot = snapshot
-      return EdgeToolsEnginePrefill(
-        metrics: EdgeToolsPrefillMetrics(
-          tokens: tokenIds.count,
-          duration: start.duration(to: clock.now)
-        ),
-        metadata: metadata
-      )
-    }
-
-    private func preparedOutput(
-      input: LMInput,
-      tokenIds: [EdgeToolsToken.ID],
-      assets: EdgeToolsMLXModelAssets
-    ) throws -> (output: LMOutput, cache: [any KVCache], tokenCount: Int) {
-      guard let cachedPrefill = assets.cachedPrefill,
-        tokenIds.starts(with: cachedPrefill.tokenIds)
-      else {
-        let cache = self.newCache(parameters: nil)
-        return (
-          try self.edgeToolsPrepare(input: input, cache: cache),
-          cache,
-          tokenIds.count
-        )
-      }
-      let suffixCount = tokenIds.count - cachedPrefill.tokenIds.count
-      let cache = cachedPrefill.cache.map { $0.copy() }
-      let output =
-        if suffixCount == 0 {
-          cachedPrefill.output
-        } else {
-          self(
-            input.text[cachedPrefill.tokenIds.count...][text: .newAxis],
-            cache: cache,
-            state: cachedPrefill.output.state
-          )
-        }
-      return (output, cache, suffixCount)
-    }
-
-    private func edgeToolsPrepare(input: LMInput, cache: [any KVCache]) throws -> LMOutput {
-      switch try self.prepare(input, cache: cache, windowSize: nil) {
-      case .logits(let output):
-        return output
-      case .tokens(let tokens):
-        guard tokens.tokens.size > 0 else {
-          throw EdgeToolsMLXError(code: .emptyInput, message: "Model received empty input.")
-        }
-        return self(tokens[text: .newAxis], cache: cache.isEmpty ? nil : cache, state: nil)
-      }
-    }
-
-    private static func memorySnapshot(synchronize: Bool) -> Memory.Snapshot {
-      if synchronize {
-        Stream.defaultStream(.defaultDevice()).synchronize()
-      }
-      return Memory.snapshot()
-    }
-  }
-
-  // MARK: - MLX Model Loading
-
-  extension EdgeToolsModelEngine where Model: EdgeToolsMLXModel {
-    public init(
+    public convenience init(
       from directoryURL: URL,
-      model makeModel: (Model.ModelConfiguration) throws -> Model
+      model makeModel: @Sendable (Model.ModelConfiguration) throws -> Model
     ) async throws {
-      let tokenizer = try await loadEdgeToolsTokenizer(from: directoryURL)
-      guard let tokenizer = tokenizer as? any EdgeToolsXGRTokenizer else {
-        throw EdgeToolsError.unsupportedTokenizer
-      }
-      let model = try Model.loadEdgeToolsLanguageModel(from: directoryURL, model: makeModel)
-      try self.init(model: model, assets: EdgeToolsMLXModelAssets(), tokenizer: tokenizer)
+      let engine = try await EdgeToolsModelEngine<_EdgeToolsMLXModel<Model>>(
+        loading: Model.self,
+        from: directoryURL,
+        model: makeModel
+      )
+      self.init(engine: engine)
+    }
+
+    public func tokenize(
+      prompt: Model.Prompt,
+      tools: [EdgeToolDefinition] = []
+    ) async throws -> [EdgeToolsToken] {
+      try await self.engine.tokenize(prompt: prompt, tools: tools)
+    }
+
+    public func clearCaches() async {
+      await self.engine.clearCaches()
+    }
+
+    public func generate(
+      prompt: Model.Prompt,
+      tools: [EdgeToolDefinition] = [],
+      parameters: sending EdgeToolsMLXGenerateParameters,
+      channel: EdgeToolsGenerationChannel
+    ) throws -> some EdgeToolsEngineGenerationTask {
+      try self.engine.generate(
+        prompt: prompt,
+        tools: tools,
+        parameters: parameters,
+        channel: channel
+      )
+    }
+  }
+
+  extension EdgeToolsMLXEngine: EdgeToolsPrefillableEngine {
+    public func prefill(
+      promptPrefix: Model.Prompt,
+      tools: [EdgeToolDefinition]
+    ) async throws -> EdgeToolsEnginePrefill {
+      try await self.engine.prefill(promptPrefix: promptPrefix, tools: tools)
     }
   }
 
   // MARK: - Prompt Conversion
 
   #if Transformers
-    extension EdgeToolsModel
-    where Self: LLMModel, Prompt == EdgeToolsLLMPrompt, Input == LMInput {
+    extension EdgeToolsMLXModel
+    where Self: LLMModel, Prompt == EdgeToolsLLMPrompt {
       public func input(
         prompt: EdgeToolsLLMPrompt,
         tools: [EdgeToolDefinition],
@@ -454,5 +289,232 @@
         }
       }
     }
+
   #endif
+
+  // MARK: - EdgeToolsMLXEngineModel
+
+  private struct _EdgeToolsMLXModel<Model: EdgeToolsMLXModel>: EdgeToolsModel {
+    typealias Prompt = Model.Prompt
+    typealias Input = LMInput
+    typealias GenerateParameters = EdgeToolsMLXGenerateParameters
+    typealias ToolCallParser = Model.ToolCallParser
+
+    private struct CachedPrefill {
+      let tokenIds: [EdgeToolsToken.ID]
+      let cache: [any KVCache]
+      let output: LMOutput
+    }
+
+    private struct Generation {
+      var cache: [any KVCache]
+      var outputState: LMOutput.State?
+      var logits: MLXArray
+      var pendingTokenId: EdgeToolsToken.ID?
+      var processor: (any LogitProcessor)?
+      let synchronizeStreamForMemorySnapshots: Bool
+      let generationStartSnapshot: Memory.Snapshot
+      let postPrefillSnapshot: Memory.Snapshot
+    }
+
+    private var model: Model
+    private var cachedPrefill: CachedPrefill?
+    private var generation: Generation?
+
+    init(model: Model) {
+      self.model = model
+    }
+
+    var vocabularySize: Int { self.model.vocabularySize }
+
+    func grammar(
+      tools: [EdgeToolDefinition],
+      range: GrammarToolCallRange
+    ) throws -> XGRGrammar {
+      try self.model.grammar(tools: tools, range: range)
+    }
+
+    func input(
+      prompt: Model.Prompt,
+      tools: [EdgeToolDefinition],
+      tokenizer: any EdgeToolsXGRTokenizer
+    ) throws -> EdgeToolsModelInput<LMInput> {
+      let input = try self.model.input(prompt: prompt, tools: tools, tokenizer: tokenizer)
+      return EdgeToolsModelInput(
+        value: input,
+        tokenIds: input.text.tokens.asArray(EdgeToolsToken.ID.self)
+      )
+    }
+
+    nonisolated(nonsending) mutating func prepare(
+      input: LMInput,
+      parameters: EdgeToolsMLXGenerateParameters
+    ) async throws -> EdgeToolsModelPreparation {
+      let clock = ContinuousClock()
+      let generationStartSnapshot = Self.memorySnapshot(
+        synchronize: parameters.synchronizeStreamForMemorySnapshots
+      )
+      let tokenIds = input.text.tokens.asArray(EdgeToolsToken.ID.self)
+      let start = clock.now
+      var processor = parameters.processor
+      processor?.prompt(input.text.tokens)
+      let prepared = try self.preparedOutput(input: input, tokenIds: tokenIds)
+      let metrics = EdgeToolsPrefillMetrics(
+        tokens: prepared.tokenCount,
+        duration: start.duration(to: clock.now)
+      )
+      let postPrefillSnapshot = Self.memorySnapshot(
+        synchronize: parameters.synchronizeStreamForMemorySnapshots
+      )
+      self.generation = Generation(
+        cache: prepared.cache,
+        outputState: prepared.output.state,
+        logits: prepared.output.logits,
+        pendingTokenId: nil,
+        processor: processor,
+        synchronizeStreamForMemorySnapshots: parameters.synchronizeStreamForMemorySnapshots,
+        generationStartSnapshot: generationStartSnapshot,
+        postPrefillSnapshot: postPrefillSnapshot
+      )
+      return EdgeToolsModelPreparation(metrics: metrics)
+    }
+
+    nonisolated(nonsending) mutating func decode(
+      bitmask: GrammarBitmask,
+      parameters: EdgeToolsMLXGenerateParameters
+    ) async throws -> EdgeToolsModelSample {
+      guard var generation = self.generation else {
+        throw EdgeToolsError.modelNotPrepared
+      }
+      if let pendingTokenId = generation.pendingTokenId {
+        maybeQuantizeKVCache(
+          cache: &generation.cache,
+          kvBits: parameters.kvCacheQuantizationBits,
+          kvGroupSize: parameters.kvCacheQuantizationGroupSize,
+          quantizedKVStart: parameters.quantizedKVStart
+        )
+        let token = MLXArray([pendingTokenId])
+        let output = self.model(
+          LMInput.Text(tokens: token)[text: .newAxis],
+          cache: generation.cache,
+          state: generation.outputState
+        )
+        generation.outputState = output.state
+        generation.logits = output.logits
+      }
+      var stepLogits = generation.logits[0..., -1, 0...]
+      stepLogits = generation.processor?.process(logits: stepLogits) ?? stepLogits
+      let maskedLogits = applyBitmaskMLX(logits: stepLogits, mask: bitmask)
+      let confidence = tokenConfidenceMLX(logits: maskedLogits)
+      let tokenId = parameters.sampler.sample(logits: maskedLogits).item(EdgeToolsToken.ID.self)
+      generation.processor?.didSample(token: MLXArray([tokenId]))
+      generation.pendingTokenId = tokenId
+      self.generation = generation
+      return EdgeToolsModelSample(tokenId: tokenId, confidence: confidence)
+    }
+
+    func finish() -> EdgeToolsMetadata {
+      guard let generation = self.generation else { return EdgeToolsMetadata() }
+      var metadata = EdgeToolsMetadata()
+      metadata.mlxEngineGenerationStartMemorySnapshot = generation.generationStartSnapshot
+      metadata.mlxEnginePostPrefillMemorySnapshot = generation.postPrefillSnapshot
+      metadata.mlxEnginePostDecodeMemorySnapshot = Self.memorySnapshot(
+        synchronize: generation.synchronizeStreamForMemorySnapshots
+      )
+      return metadata
+    }
+
+    mutating func resetGeneration() {
+      self.generation = nil
+    }
+
+    nonisolated(nonsending) mutating func prefill(
+      input: LMInput
+    ) async throws -> EdgeToolsEnginePrefill {
+      let clock = ContinuousClock()
+      let tokenIds = input.text.tokens.asArray(EdgeToolsToken.ID.self)
+      let cache = self.model.newCache(parameters: nil)
+      let start = clock.now
+      let output = try self.edgeToolsPrepare(input: input, cache: cache)
+      eval(output.logits)
+      eval(cache)
+      self.cachedPrefill = CachedPrefill(
+        tokenIds: tokenIds,
+        cache: cache.map { $0.copy() },
+        output: output
+      )
+      let snapshot = Self.memorySnapshot(synchronize: true)
+      var metadata = EdgeToolsMetadata()
+      metadata.mlxEnginePostPrefillMemorySnapshot = snapshot
+      return EdgeToolsEnginePrefill(
+        metrics: EdgeToolsPrefillMetrics(
+          tokens: tokenIds.count,
+          duration: start.duration(to: clock.now)
+        ),
+        metadata: metadata
+      )
+    }
+
+    private func preparedOutput(
+      input: LMInput,
+      tokenIds: [EdgeToolsToken.ID]
+    ) throws -> (output: LMOutput, cache: [any KVCache], tokenCount: Int) {
+      guard let cachedPrefill = self.cachedPrefill,
+        tokenIds.starts(with: cachedPrefill.tokenIds)
+      else {
+        let cache = self.model.newCache(parameters: nil)
+        return (try self.edgeToolsPrepare(input: input, cache: cache), cache, tokenIds.count)
+      }
+      let suffixCount = tokenIds.count - cachedPrefill.tokenIds.count
+      let cache = cachedPrefill.cache.map { $0.copy() }
+      let output =
+        if suffixCount == 0 {
+          cachedPrefill.output
+        } else {
+          self.model(
+            input.text[cachedPrefill.tokenIds.count...][text: .newAxis],
+            cache: cache,
+            state: cachedPrefill.output.state
+          )
+        }
+      return (output, cache, suffixCount)
+    }
+
+    private func edgeToolsPrepare(input: LMInput, cache: [any KVCache]) throws -> LMOutput {
+      switch try self.model.prepare(input, cache: cache, windowSize: nil) {
+      case .logits(let output):
+        return output
+      case .tokens(let tokens):
+        guard tokens.tokens.size > 0 else {
+          throw EdgeToolsMLXError(code: .emptyInput, message: "Model received empty input.")
+        }
+        return self.model(tokens[text: .newAxis], cache: cache.isEmpty ? nil : cache, state: nil)
+      }
+    }
+
+    private static func memorySnapshot(synchronize: Bool) -> Memory.Snapshot {
+      if synchronize {
+        Stream.defaultStream(.defaultDevice()).synchronize()
+      }
+      return Memory.snapshot()
+    }
+  }
+
+  extension _EdgeToolsMLXModel: EdgeToolsPrefillableModel {}
+
+  extension EdgeToolsModelEngine {
+    fileprivate init<MLXModel: EdgeToolsMLXModel>(
+      loading modelType: MLXModel.Type,
+      from directoryURL: URL,
+      model makeModel: @Sendable (MLXModel.ModelConfiguration) throws -> MLXModel
+    ) async throws where Model == _EdgeToolsMLXModel<MLXModel> {
+      let tokenizer = try await loadEdgeToolsTokenizer(from: directoryURL)
+      guard let tokenizer = tokenizer as? any EdgeToolsXGRTokenizer else {
+        throw EdgeToolsError.unsupportedTokenizer
+      }
+      let model = try MLXModel.loadEdgeToolsLanguageModel(from: directoryURL, model: makeModel)
+      try self.init(model: _EdgeToolsMLXModel(model: model), tokenizer: tokenizer)
+    }
+  }
+
 #endif

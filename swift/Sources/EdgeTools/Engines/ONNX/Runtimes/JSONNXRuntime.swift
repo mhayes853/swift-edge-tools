@@ -66,7 +66,7 @@
     public func tensor<Values: Sequence>(
       values: Values,
       shape: [Int]
-    ) throws -> JSONNXTensor where Values.Element: EdgeToolsONNXElement {
+    ) throws -> JSONNXTensor where Values.Element: ONNXElement {
       let values = ContiguousArray(values)
       try edgeToolsONNXValidateValueCount(values.count, shape: shape)
       let dtype = Values.Element.onnxDType
@@ -124,9 +124,9 @@
       return object
     }
 
-    static func jsType(for dtype: EdgeToolsONNXDType) throws -> String {
+    static func jsType(for dtype: ONNXDType) throws -> String {
       guard let name = dtype.name else {
-        throw EdgeToolsONNXRuntimeError(
+        throw ONNXRuntimeError(
           code: .unexpectedTensorElementType,
           message: "ONNX tensor element type \(dtype.rawValue) has no JS representation."
         )
@@ -134,7 +134,7 @@
       return name
     }
 
-    static func jsTypedArrayConstructor(for dtype: EdgeToolsONNXDType) throws -> JSObject {
+    static func jsTypedArrayConstructor(for dtype: ONNXDType) throws -> JSObject {
       let name: String
       switch dtype {
       case .bool: name = "Uint8Array"
@@ -146,7 +146,7 @@
         name = type.prefix(1).uppercased() + type.dropFirst() + "Array"
       }
       guard let constructor = JSObject.global[name].object else {
-        throw EdgeToolsONNXRuntimeError(
+        throw ONNXRuntimeError(
           code: .unexpectedTensorElementType,
           message: "JS does not provide \(name)."
         )
@@ -230,10 +230,10 @@
 
   public final class JSONNXTensor {
     public let object: JSObject
-    public let dtype: EdgeToolsONNXDType
+    public let dtype: ONNXDType
     public let shape: [Int]
 
-    init(object: JSObject, dtype: EdgeToolsONNXDType, shape: [Int]) {
+    init(object: JSObject, dtype: ONNXDType, shape: [Int]) {
       self.object = object
       self.dtype = dtype
       self.shape = shape
@@ -242,7 +242,7 @@
     convenience init(object: JSObject) throws {
       guard
         let name = object["type"].string,
-        let dtype = EdgeToolsONNXDType(name: name),
+        let dtype = ONNXDType(name: name),
         let dimensions = object["dims"].array
       else {
         throw JSONNXRuntimeError(code: .invalidJSValue, message: "Invalid JS tensor metadata.")
@@ -261,13 +261,14 @@
       _ = try? dispose.throws(this: self.object)
     }
 
-    nonisolated(nonsending) public func view<Element: EdgeToolsONNXElement>(
+    nonisolated(nonsending) public func view<Element: ONNXElement>(
       as type: Element.Type
-    ) async throws -> EdgeToolsONNXTensorView<Element> {
+    ) async throws -> ONNXTensorView<Element> {
       guard self.dtype == Element.onnxDType else {
-        throw EdgeToolsONNXRuntimeError(
+        throw ONNXRuntimeError(
           code: .unexpectedTensorElementType,
-          message: "Expected tensor element type \(Element.onnxDType.rawValue), got \(self.dtype.rawValue)."
+          message:
+            "Expected tensor element type \(Element.onnxDType.rawValue), got \(self.dtype.rawValue)."
         )
       }
       guard let getData = self.object["getData"].object else {
@@ -290,22 +291,23 @@
       let baseAddress = count == 0 ? nil : UnsafeMutablePointer<Element>.allocate(capacity: count)
       if let baseAddress {
         let bytes = UInt8.typedArrayClass.new(buffer, byteOffset, byteCount)
-        JSTypedArray<UInt8>(unsafelyWrapping: bytes).copyMemory(
-          to: UnsafeMutableRawBufferPointer(start: baseAddress, count: byteCount)
-            .bindMemory(to: UInt8.self)
-        )
+        JSTypedArray<UInt8>(unsafelyWrapping: bytes)
+          .copyMemory(
+            to: UnsafeMutableRawBufferPointer(start: baseAddress, count: byteCount)
+              .bindMemory(to: UInt8.self)
+          )
       }
-      return EdgeToolsONNXTensorView(owning: baseAddress, count: count)
+      return ONNXTensorView(owning: baseAddress, count: count)
     }
   }
 
-  extension JSONNXTensor: EdgeToolsONNXTensor {}
+  extension JSONNXTensor: ONNXTensor {}
 
-  extension JSONNXSession: EdgeToolsONNXSession {
+  extension JSONNXSession: ONNXSession {
     public typealias Tensor = JSONNXTensor
   }
 
-  extension JSONNXRuntime: EdgeToolsONNXRuntime {
+  extension JSONNXRuntime: ONNXRuntime {
     public typealias Session = JSONNXSession
     public typealias Tensor = JSONNXTensor
   }

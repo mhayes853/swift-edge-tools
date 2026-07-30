@@ -25,6 +25,7 @@ public struct EdgeToolsError: Error, Hashable, Sendable {
     public static let unsupportedTokenizer = Self(rawValue: "unsupported-tokenizer")
     public static let grammarRejectedToken = Self(rawValue: "grammar-rejected-token")
     public static let missingModelOutputs = Self(rawValue: "missing-model-outputs")
+    public static let modelNotPrepared = Self(rawValue: "model-not-prepared")
   }
 
   public let code: Code
@@ -111,5 +112,10 @@ extension EdgeToolsError {
   static let missingModelOutputs = Self(
     code: .missingModelOutputs,
     message: "The model did not return expected outputs."
+  )
+
+  static let modelNotPrepared = Self(
+    code: .modelNotPrepared,
+    message: "The model has no active generation. Call prepare before decoding."
   )
 }

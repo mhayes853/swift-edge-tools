@@ -15,17 +15,9 @@
     import JavaScriptKit
   #endif
 
-  // MARK: - NeedleONNXModelAssets
-
-  public struct NeedleONNXModelAssets<Runtime: EdgeToolsONNXRuntime> {
-    let runtime: Runtime
-    let encoderSession: Runtime.Session
-    let decoderSession: Runtime.Session
-  }
-
   // MARK: - NeedleONNXModel
 
-  public struct NeedleONNXModel<Runtime: EdgeToolsONNXRuntime> {
+  public struct NeedleONNXModel<Runtime: ONNXRuntime> {
     public typealias ModelConfiguration = NeedleModelConfiguration
     public typealias Prompt = NeedlePrompt
     public typealias ToolCallParser = NeedleToolCallParser
@@ -36,19 +28,34 @@
       let encoderProjectedV: Runtime.Tensor
     }
 
-    public struct ModelState {
-      fileprivate let encoderOutputs: EncoderOutputs
+    fileprivate struct Generation {
+      let encoderOutputs: EncoderOutputs
       var keyCache: Runtime.Tensor
       var valueCache: Runtime.Tensor
       var position: Int
+      var logits: [Float]
+      var pendingTokenId: EdgeToolsToken.ID?
     }
 
     public var vocabularySize: Int { self.configuration.vocabularySize }
 
     let configuration: NeedleModelConfiguration
 
-    public init(configuration: NeedleModelConfiguration) {
+    private let runtime: Runtime
+    private let encoderSession: Runtime.Session
+    private let decoderSession: Runtime.Session
+    private var generation: Generation?
+
+    public init(
+      configuration: NeedleModelConfiguration,
+      runtime: sending Runtime,
+      encoderSession: sending Runtime.Session,
+      decoderSession: sending Runtime.Session
+    ) {
       self.configuration = configuration
+      self.runtime = runtime
+      self.encoderSession = encoderSession
+      self.decoderSession = decoderSession
     }
 
     public func grammar(
@@ -58,10 +65,9 @@
       try XGRGrammar.needle(tools: tools, range: range)
     }
 
-    private nonisolated(nonsending) func prepareModel(
-      tokenIds: [EdgeToolsToken.ID],
-      assets: NeedleONNXModelAssets<Runtime>
-    ) async throws -> (logits: [Float], state: ModelState) {
+    private nonisolated(nonsending) mutating func startGeneration(
+      tokenIds: [EdgeToolsToken.ID]
+    ) async throws {
       guard tokenIds.count <= self.configuration.encoderMaxLength else {
         throw EdgeToolsError.contextLengthExceeded(
           tokens: tokenIds.count,
@@ -69,51 +75,60 @@
         )
       }
 
-      let encoderOutputs = try await self.encoderOutputs(
-        tokenIDs: tokenIds,
-        assets: assets
-      )
-      var state = try self.initialGenerationState(
+      let encoderOutputs = try await self.encoderOutputs(tokenIDs: tokenIds)
+      let cacheShape = [
+        self.configuration.decoderLayers,
+        self.configuration.encoderMaxLength,
+        self.configuration.attentionHeads,
+        self.configuration.attentionHeadDimensions
+      ]
+      let cacheValueCount = cacheShape.reduce(1, *)
+      self.generation = Generation(
         encoderOutputs: encoderOutputs,
-        using: assets.runtime
+        keyCache: try self.runtime.tensor(
+          values: [Float](repeating: 0, count: cacheValueCount),
+          shape: cacheShape
+        ),
+        valueCache: try self.runtime.tensor(
+          values: [Float](repeating: 0, count: cacheValueCount),
+          shape: cacheShape
+        ),
+        position: 0,
+        logits: [],
+        pendingTokenId: nil
       )
-      let logits = try await self.decode(
-        tokenID: self.configuration.decoderStartTokenId,
-        state: &state,
-        assets: assets
-      )
-      return (logits, state)
+      try await self.runDecoder(tokenID: self.configuration.decoderStartTokenId)
     }
 
-    private nonisolated(nonsending) func decode(
-      tokenID: EdgeToolsToken.ID,
-      state: inout ModelState,
-      assets: NeedleONNXModelAssets<Runtime>
-    ) async throws -> [Float] {
-      let runtime = assets.runtime
-      let inputIDs = try runtime.tensor(values: [Int64(tokenID)], shape: [1, 1])
-      let position = try Int32(exactly: state.position)
+    private nonisolated(nonsending) mutating func runDecoder(
+      tokenID: EdgeToolsToken.ID
+    ) async throws {
+      guard var generation = self.generation else {
+        throw EdgeToolsError.modelNotPrepared
+      }
+      let inputIDs = try self.runtime.tensor(values: [Int64(tokenID)], shape: [1, 1])
+      let position = try Int32(exactly: generation.position)
         .unwrapONNXInteger(
           name: NeedleExportTensorName.cachePosition
         )
-      let cachePosition = try runtime.tensor(values: [position], shape: [1])
-      let selfAttentionMask = try runtime.tensor(
+      let cachePosition = try self.runtime.tensor(values: [position], shape: [1])
+      let selfAttentionMask = try self.runtime.tensor(
         values: Self.selfAttentionMask(
           step: Int(position),
           maxLength: self.configuration.encoderMaxLength
         ),
         shape: [1, 1, 1, self.configuration.encoderMaxLength]
       )
-      var outputs = try await assets.decoderSession.run(
+      var outputs = try await self.decoderSession.run(
         inputs: [
           NeedleExportTensorName.inputIDs: inputIDs,
           NeedleExportTensorName.cachePosition: cachePosition,
           NeedleExportTensorName.selfAttentionMask: selfAttentionMask,
-          NeedleExportTensorName.crossAttentionMask: state.encoderOutputs.crossAttentionMask,
-          NeedleExportTensorName.encoderProjectedK: state.encoderOutputs.encoderProjectedK,
-          NeedleExportTensorName.encoderProjectedV: state.encoderOutputs.encoderProjectedV,
-          NeedleExportTensorName.keyCache: state.keyCache,
-          NeedleExportTensorName.valueCache: state.valueCache
+          NeedleExportTensorName.crossAttentionMask: generation.encoderOutputs.crossAttentionMask,
+          NeedleExportTensorName.encoderProjectedK: generation.encoderOutputs.encoderProjectedK,
+          NeedleExportTensorName.encoderProjectedV: generation.encoderOutputs.encoderProjectedV,
+          NeedleExportTensorName.keyCache: generation.keyCache,
+          NeedleExportTensorName.valueCache: generation.valueCache
         ],
         outputNames: [
           NeedleExportTensorName.logits,
@@ -128,17 +143,18 @@
       else {
         throw EdgeToolsError.missingModelOutputs
       }
-      state.keyCache = updatedKey
-      state.valueCache = updatedValue
-      state.position += 1
-      return try await logits.array(as: Float.self)
+      generation.keyCache = updatedKey
+      generation.valueCache = updatedValue
+      generation.position += 1
+      generation.logits = try await logits.array(as: Float.self)
+      generation.pendingTokenId = nil
+      self.generation = generation
     }
 
     private nonisolated(nonsending) func encoderOutputs(
-      tokenIDs: [EdgeToolsToken.ID],
-      assets: NeedleONNXModelAssets<Runtime>
+      tokenIDs: [EdgeToolsToken.ID]
     ) async throws -> EncoderOutputs {
-      let runtime = assets.runtime
+      let runtime = self.runtime
       var paddedTokens = tokenIDs.map(Int64.init)
       paddedTokens.append(
         contentsOf: repeatElement(
@@ -150,7 +166,7 @@
         values: paddedTokens,
         shape: [1, self.configuration.encoderMaxLength]
       )
-      var outputs = try await assets.encoderSession.run(
+      var outputs = try await self.encoderSession.run(
         inputs: [NeedleExportTensorName.inputIDs: inputIDs],
         outputNames: [
           NeedleExportTensorName.crossAttentionMask,
@@ -178,31 +194,6 @@
       )
     }
 
-    private func initialGenerationState(
-      encoderOutputs: EncoderOutputs,
-      using runtime: Runtime
-    ) throws -> ModelState {
-      let cacheShape = [
-        self.configuration.decoderLayers,
-        self.configuration.encoderMaxLength,
-        self.configuration.attentionHeads,
-        self.configuration.attentionHeadDimensions
-      ]
-      let cacheValueCount = cacheShape.reduce(1, *)
-      return ModelState(
-        encoderOutputs: encoderOutputs,
-        keyCache: try runtime.tensor(
-          values: [Float](repeating: 0, count: cacheValueCount),
-          shape: cacheShape
-        ),
-        valueCache: try runtime.tensor(
-          values: [Float](repeating: 0, count: cacheValueCount),
-          shape: cacheShape
-        ),
-        position: 0
-      )
-    }
-
     private static func selfAttentionMask(step: Int, maxLength: Int) -> [Float] {
       let allowedStart = max(0, maxLength - step - 1)
       return (0..<maxLength).map { $0 < allowedStart ? -65500 : 0 }
@@ -213,43 +204,26 @@
 
   extension NeedleONNXModel: EdgeToolsModel {
     public typealias Input = [EdgeToolsToken.ID]
-    public typealias Logits = [Float]
-    public typealias Assets = NeedleONNXModelAssets<Runtime>
-    public typealias GenerateParameters = EdgeToolsONNXGenerateParameters
-    public typealias GenerationState = EdgeToolsONNXGenerationState<NeedleONNXModel.ModelState>
+    public typealias GenerateParameters = ONNXGenerateParameters
 
     public func input(
       prompt: NeedlePrompt,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsXGRTokenizer
-    ) throws -> [EdgeToolsToken.ID] {
-      try tokenizer.encode(text: prompt.formatted(tools: tools))
+    ) throws -> EdgeToolsModelInput<[EdgeToolsToken.ID]> {
+      let tokenIds = try tokenizer.encode(text: prompt.formatted(tools: tools))
+      return EdgeToolsModelInput(value: tokenIds, tokenIds: tokenIds)
     }
 
-    public func tokenIds(
-      in input: [EdgeToolsToken.ID]
-    ) -> [EdgeToolsToken.ID] {
-      input
-    }
-
-    public func prepare(
+    public nonisolated(nonsending) mutating func prepare(
       input: [EdgeToolsToken.ID],
-      parameters: EdgeToolsONNXGenerateParameters,
-      assets: NeedleONNXModelAssets<Runtime>
-    ) async throws -> EdgeToolsModelPreparation<[Float], GenerationState> {
+      parameters: ONNXGenerateParameters
+    ) async throws -> EdgeToolsModelPreparation {
       let clock = ContinuousClock()
       let start = clock.now
-      let processor = parameters.processor
-      processor?.prompt(input)
-      let preparation = try await self.prepareModel(tokenIds: input, assets: assets)
-      let state = EdgeToolsONNXGenerationState(
-        modelState: preparation.state,
-        sampler: parameters.sampler,
-        processor: processor
-      )
+      parameters.processor?.prompt(input)
+      try await self.startGeneration(tokenIds: input)
       return EdgeToolsModelPreparation(
-        logits: preparation.logits,
-        state: state,
         metrics: EdgeToolsPrefillMetrics(
           tokens: input.count,
           duration: start.duration(to: clock.now)
@@ -257,43 +231,39 @@
       )
     }
 
-    public func decode(
-      tokenId: EdgeToolsToken.ID,
-      state: inout GenerationState,
-      assets: NeedleONNXModelAssets<Runtime>
-    ) async throws -> [Float] {
-      try await self.decode(
-        tokenID: tokenId,
-        state: &state.modelState,
-        assets: assets
-      )
-    }
-
-    public func sample(
-      logits: inout [Float],
+    public nonisolated(nonsending) mutating func decode(
       bitmask: GrammarBitmask,
-      state: inout GenerationState
+      parameters: ONNXGenerateParameters
     ) async throws -> EdgeToolsModelSample {
-      guard logits.count == self.vocabularySize else {
-        throw EdgeToolsONNXError(
+      if let pendingTokenId = self.generation?.pendingTokenId {
+        try await self.runDecoder(tokenID: pendingTokenId)
+      }
+      guard var generation = self.generation else {
+        throw EdgeToolsError.modelNotPrepared
+      }
+      guard generation.logits.count == self.vocabularySize else {
+        throw ONNXError(
           code: .invalidLogitsCount,
-          message: "Expected \(self.vocabularySize) logits, got \(logits.count)."
+          message: "Expected \(self.vocabularySize) logits, got \(generation.logits.count)."
         )
       }
-      var logitsView = EdgeToolsONNXTensorView(copying: logits)
-      try await state.processor?.process(logits: &logitsView)
+      var logitsView = ONNXTensorView(copying: generation.logits)
+      try await parameters.processor?.process(logits: &logitsView)
       applyONNXBitmask(logits: &logitsView, mask: bitmask)
       let confidence = tokenConfidenceONNX(logits: logitsView)
-      let tokenId = try await state.sampler.sample(logits: logitsView)
+      let tokenId = try await parameters.sampler.sample(logits: logitsView)
+      parameters.processor?.didSample(tokenId: tokenId)
+      generation.pendingTokenId = tokenId
+      self.generation = generation
       return EdgeToolsModelSample(tokenId: tokenId, confidence: confidence)
     }
 
-    public func didAccept(token: EdgeToolsToken, state: inout GenerationState) {
-      state.processor?.didSample(token: token)
+    public mutating func resetGeneration() {
+      self.generation = nil
     }
   }
 
-  public typealias NeedleONNXModelEngine<Runtime: EdgeToolsONNXRuntime> =
+  public typealias NeedleONNXModelEngine<Runtime: ONNXRuntime> =
     EdgeToolsModelEngine<NeedleONNXModel<Runtime>>
 
   // MARK: - C ONNX Runtime Loading
@@ -321,16 +291,13 @@
           let decoderSession = try runtime.session(
             modelURL: directoryURL.appending(path: "decoder.onnx")
           )
-          let assets = NeedleONNXModelAssets(
+          let model = NeedleONNXModel(
+            configuration: configuration,
             runtime: runtime,
             encoderSession: encoderSession,
             decoderSession: decoderSession
           )
-          try self.init(
-            model: NeedleONNXModel(configuration: configuration),
-            assets: assets,
-            tokenizer: tokenizer
-          )
+          try self.init(model: model, tokenizer: tokenizer)
         }
 
         #if ONNX
@@ -380,16 +347,13 @@
           model: decoderModel,
           configuration: decoderConfiguration
         )
-        let assets = NeedleONNXModelAssets(
+        let model = NeedleONNXModel<JSONNXRuntime>(
+          configuration: configuration,
           runtime: consume runtime,
           encoderSession: consume encoderSession,
           decoderSession: consume decoderSession
         )
-        try self.init(
-          model: NeedleONNXModel<JSONNXRuntime>(configuration: configuration),
-          assets: consume assets,
-          tokenizer: tokenizer
-        )
+        try self.init(model: consume model, tokenizer: tokenizer)
       }
     }
   #endif
@@ -399,7 +363,7 @@
   extension Optional where Wrapped: FixedWidthInteger {
     fileprivate func unwrapONNXInteger(name: String) throws -> Wrapped {
       guard let value = self else {
-        throw EdgeToolsONNXError(
+        throw ONNXError(
           code: .integerConversionFailure,
           message: "Value for \(name) cannot be represented by the ONNX model's integer type."
         )

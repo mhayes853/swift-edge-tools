@@ -13,7 +13,6 @@
       let model = TestModel()
       let engine = try EdgeToolsModelEngine(
         model: model,
-        assets: TestAssets(),
         tokenizer: tokenizer
       )
       let task = try engine.generate(
@@ -38,7 +37,6 @@
       let model = TestModel(constraintObservation: observation)
       let engine = try EdgeToolsModelEngine(
         model: model,
-        assets: TestAssets(),
         tokenizer: tokenizer
       )
       let range = GrammarToolCallRange.exact(1)
@@ -70,8 +68,7 @@
       let eosTokenId = try requiredTestEOSToken(tokenizer: tokenizer)
       let assets = TestAssets()
       let engine = try EdgeToolsModelEngine(
-        model: TestModel(),
-        assets: assets,
+        model: TestModel(assets: assets),
         tokenizer: tokenizer
       )
       let parameters = TestModel.Parameters(
@@ -152,20 +149,14 @@
       var maxTokens: Int? = 32
     }
 
-    struct State: Hashable, Sendable {
-      var tokenIds: [EdgeToolsToken.ID]
-      var index = 0
-    }
-
     typealias Prompt = NeedlePrompt
     typealias Input = [EdgeToolsToken.ID]
-    typealias Logits = [Float]
-    typealias GenerationState = State
-    typealias Assets = TestAssets
     typealias GenerateParameters = Parameters
     typealias ToolCallParser = NeedleToolCallParser
 
+    var assets: TestAssets?
     var constraintObservation: ConstraintObservation?
+    var index = 0
 
     var vocabularySize: Int { 8192 }
 
@@ -181,47 +172,35 @@
       prompt: NeedlePrompt,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsXGRTokenizer
-    ) throws -> [EdgeToolsToken.ID] {
-      tokenizer.encode(text: prompt.user)
+    ) throws -> EdgeToolsModelInput<[EdgeToolsToken.ID]> {
+      let tokenIds = tokenizer.encode(text: prompt.user)
+      return EdgeToolsModelInput(value: tokenIds, tokenIds: tokenIds)
     }
 
-    func tokenIds(in input: [EdgeToolsToken.ID]) -> [EdgeToolsToken.ID] {
-      input
-    }
-
-    nonisolated(nonsending) func prepare(
+    nonisolated(nonsending) mutating func prepare(
       input: [EdgeToolsToken.ID],
-      parameters: Parameters,
-      assets: TestAssets
-    ) async throws -> EdgeToolsModelPreparation<[Float], State> {
-      assets.begin()
-      defer { assets.end() }
+      parameters: Parameters
+    ) async throws -> EdgeToolsModelPreparation {
+      self.assets?.begin()
+      defer { self.assets?.end() }
       try await Task.sleep(for: parameters.preparationDelay)
+      self.index = 0
       return EdgeToolsModelPreparation(
-        logits: [],
-        state: State(tokenIds: parameters.tokenIds),
         metrics: EdgeToolsPrefillMetrics(tokens: input.count, duration: .zero)
       )
     }
 
-    nonisolated(nonsending) func decode(
-      tokenId: EdgeToolsToken.ID,
-      state: inout State,
-      assets: TestAssets
-    ) async throws -> [Float] {
-      []
-    }
-
-    nonisolated(nonsending) func sample(
-      logits: inout [Float],
+    nonisolated(nonsending) mutating func decode(
       bitmask: GrammarBitmask,
-      state: inout State
+      parameters: Parameters
     ) async throws -> EdgeToolsModelSample {
-      let tokenId = state.tokenIds[state.index]
-      state.index += 1
+      let tokenId = parameters.tokenIds[self.index]
+      self.index += 1
       return EdgeToolsModelSample(tokenId: tokenId, confidence: 1)
     }
 
-    func didAccept(token: EdgeToolsToken, state: inout State) {}
+    mutating func resetGeneration() {
+      self.index = 0
+    }
   }
 #endif

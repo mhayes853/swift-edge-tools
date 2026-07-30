@@ -3,19 +3,19 @@
 #endif
 
 #if ONNXCore
-  // MARK: - EdgeToolsONNXGenerateParameters
+  // MARK: - ONNXGenerateParameters
 
-  public struct EdgeToolsONNXGenerateParameters: EdgeToolsModelEngineGenerateParameters {
+  public struct ONNXGenerateParameters: EdgeToolsModelEngineGenerateParameters {
     public static var `default`: Self { Self() }
 
-    public var sampler: any EdgeToolsONNXSampler
-    public var processor: (any EdgeToolsONNXLogitsProcessor)?
+    public var sampler: any ONNXSampler
+    public var processor: (any ONNXLogitsProcessor)?
     public var constraint: EdgeToolsXGRGenerationConstraint
     public var maxTokens: Int?
 
     public init(
-      sampler: any EdgeToolsONNXSampler = ONNXArgmaxSampler(),
-      processor: (any EdgeToolsONNXLogitsProcessor)? = nil,
+      sampler: any ONNXSampler = ONNXArgmaxSampler(),
+      processor: (any ONNXLogitsProcessor)? = nil,
       constraint: EdgeToolsXGRGenerationConstraint = .tools,
       maxTokens: Int? = 1024
     ) {
@@ -26,17 +26,9 @@
     }
   }
 
-  // MARK: - EdgeToolsONNXGenerationState
+  // MARK: - ONNXError
 
-  public struct EdgeToolsONNXGenerationState<ModelState> {
-    var modelState: ModelState
-    let sampler: any EdgeToolsONNXSampler
-    var processor: (any EdgeToolsONNXLogitsProcessor)?
-  }
-
-  // MARK: - EdgeToolsONNXError
-
-  public struct EdgeToolsONNXError: Hashable, Sendable, Error {
+  public struct ONNXError: Hashable, Sendable, Error {
     public struct Code: RawRepresentable, Hashable, Sendable {
       public let rawValue: String
 

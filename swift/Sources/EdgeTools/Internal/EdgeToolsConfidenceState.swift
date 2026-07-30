@@ -128,7 +128,7 @@ func tokenConfidence(unorderedPair values: some Collection<Float>) -> Float {
 // MARK: - ONNX
 
 #if ONNXCore
-  func tokenConfidenceONNX(logits: borrowing EdgeToolsONNXTensorView<Float>) -> Float {
+  func tokenConfidenceONNX(logits: borrowing ONNXTensorView<Float>) -> Float {
     let top = logits.withUnsafeBufferPointer { top2SIMD($0) }
     return tokenConfidence(top1: top.top1, top2: top.top2)
   }

@@ -16,7 +16,9 @@
       }
 
       public static let incompatibleSessionOptions = Self(rawValue: "incompatible-session-options")
-      public static let invalidGraphOptimizationLevel = Self(rawValue: "invalid-graph-optimization-level")
+      public static let invalidGraphOptimizationLevel = Self(
+        rawValue: "invalid-graph-optimization-level"
+      )
       public static let onnxRuntime = Self(rawValue: "onnx-runtime")
       public static let unsupportedAPIVersion = Self(rawValue: "unsupported-api-version")
     }
@@ -132,7 +134,7 @@
     public func tensor<Values: Sequence>(
       values: Values,
       shape: [Int]
-    ) throws -> CONNXRuntimeTensor where Values.Element: EdgeToolsONNXElement {
+    ) throws -> CONNXRuntimeTensor where Values.Element: ONNXElement {
       let values = ContiguousArray(values)
       try edgeToolsONNXValidateValueCount(values.count, shape: shape)
       let dimensions = shape.map(Int64.init)
@@ -164,7 +166,7 @@
     }
 
     private static func graphOptimizationLevel(
-      _ level: EdgeToolsONNXGraphOptimizationLevel
+      _ level: ONNXGraphOptimizationLevel
     ) throws -> GraphOptimizationLevel {
       switch level {
       case .disabled: ORT_DISABLE_ALL
@@ -193,7 +195,8 @@
       guard let status else { return }
       defer { api.pointee.ReleaseStatus(status) }
       let code = api.pointee.GetErrorCode(status)
-      let message = api.pointee.GetErrorMessage(status).map(String.init(cString:))
+      let message =
+        api.pointee.GetErrorMessage(status).map(String.init(cString:))
         ?? "Unknown ONNX Runtime error."
       throw CONNXRuntimeError(
         code: .onnxRuntime,
@@ -206,13 +209,15 @@
   extension CONNXRuntime {
     public struct Configuration: Sendable {
       public var logIdentifier: String
-      public var graphOptimizationLevel: EdgeToolsONNXGraphOptimizationLevel
+      public var graphOptimizationLevel: ONNXGraphOptimizationLevel
       public var configureSessionOptions: @Sendable (borrowing SessionOptions) throws -> Void
 
       public init(
         logIdentifier: String = "swift-edge-tools",
-        graphOptimizationLevel: EdgeToolsONNXGraphOptimizationLevel = .all,
-        configureSessionOptions: @escaping @Sendable (borrowing SessionOptions) throws -> Void = { _ in }
+        graphOptimizationLevel: ONNXGraphOptimizationLevel = .all,
+        configureSessionOptions: @escaping @Sendable (borrowing SessionOptions) throws -> Void = {
+          _ in
+        }
       ) {
         self.logIdentifier = logIdentifier
         self.graphOptimizationLevel = graphOptimizationLevel
@@ -266,7 +271,7 @@
       }
 
       borrowing func setGraphOptimizationLevel(
-        _ level: EdgeToolsONNXGraphOptimizationLevel
+        _ level: ONNXGraphOptimizationLevel
       ) throws {
         try self.check(
           self.api.pointee.SetSessionGraphOptimizationLevel(
@@ -369,9 +374,10 @@
       let handles = outputValues.map { $0! }
       do {
         return try Dictionary(
-          uniqueKeysWithValues: zip(outputNames, handles).map { name, handle in
-            (name, try CONNXRuntimeTensor(runtime: self.runtime, handle: handle))
-          }
+          uniqueKeysWithValues: zip(outputNames, handles)
+            .map { name, handle in
+              (name, try CONNXRuntimeTensor(runtime: self.runtime, handle: handle))
+            }
         )
       } catch {
         handles.forEach { self.api.pointee.ReleaseValue($0) }
@@ -390,13 +396,14 @@
     ) throws -> [String] {
       var count = 0
       try runtime.check(getCount(handle, &count))
-      return try (0..<count).map { index in
-        let name: UnsafeMutablePointer<CChar> = try CONNXRuntime.output(api: runtime.api) {
-          getName(handle, index, runtime.allocator, $0)
+      return try (0..<count)
+        .map { index in
+          let name: UnsafeMutablePointer<CChar> = try CONNXRuntime.output(api: runtime.api) {
+            getName(handle, index, runtime.allocator, $0)
+          }
+          defer { runtime.allocator.pointee.Free(runtime.allocator, name) }
+          return String(cString: name)
         }
-        defer { runtime.allocator.pointee.Free(runtime.allocator, name) }
-        return String(cString: name)
-      }
     }
   }
 
@@ -404,7 +411,7 @@
 
   public final class CONNXRuntimeTensor: @unchecked Sendable {
     // The tensor is immutable after publication and its handle is safe for concurrent reads.
-    public typealias DType = EdgeToolsONNXDType
+    public typealias DType = ONNXDType
 
     private let runtime: CONNXRuntime
 
@@ -428,19 +435,20 @@
       self.runtime.api.pointee.ReleaseValue(self.handle)
     }
 
-    nonisolated(nonsending) public func view<Element: EdgeToolsONNXElement>(
+    nonisolated(nonsending) public func view<Element: ONNXElement>(
       as type: Element.Type
-    ) async throws -> EdgeToolsONNXTensorView<Element> {
+    ) async throws -> ONNXTensorView<Element> {
       guard self.dtype == Element.onnxDType else {
-        throw EdgeToolsONNXRuntimeError(
+        throw ONNXRuntimeError(
           code: .unexpectedTensorElementType,
-          message: "Expected tensor element type \(Element.onnxDType.rawValue), got \(self.dtype.rawValue)."
+          message:
+            "Expected tensor element type \(Element.onnxDType.rawValue), got \(self.dtype.rawValue)."
         )
       }
       let count = try edgeToolsONNXElementCount(for: self.shape)
       var data: UnsafeMutableRawPointer?
       try self.runtime.check(self.runtime.api.pointee.GetTensorMutableData(self.handle, &data))
-      return EdgeToolsONNXTensorView(
+      return ONNXTensorView(
         copying: UnsafeBufferPointer(
           start: count == 0 ? nil : data!.assumingMemoryBound(to: Element.self),
           count: count
@@ -471,13 +479,13 @@
     }
   }
 
-  extension CONNXRuntimeTensor: EdgeToolsONNXTensor {}
+  extension CONNXRuntimeTensor: ONNXTensor {}
 
-  extension CONNXRuntimeSession: EdgeToolsONNXSession {
+  extension CONNXRuntimeSession: ONNXSession {
     public typealias Tensor = CONNXRuntimeTensor
   }
 
-  extension CONNXRuntime: EdgeToolsONNXRuntime {
+  extension CONNXRuntime: ONNXRuntime {
     public typealias ModelSource = String
     public typealias Session = CONNXRuntimeSession
     public typealias Tensor = CONNXRuntimeTensor
