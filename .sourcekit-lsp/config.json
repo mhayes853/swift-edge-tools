@@ -1,0 +1,5 @@
+{
+  "swiftPM": {
+    "extraArguments": ["--enable-all-traits"]
+  }
+}
