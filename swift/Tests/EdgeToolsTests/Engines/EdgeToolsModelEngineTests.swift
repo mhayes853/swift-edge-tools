@@ -63,6 +63,41 @@
     }
 
     @Test
+    func `Unions Tool And User Grammars Inside The Model Engine`() async throws {
+      let tokenizer = try testTokenizer()
+      let eosTokenId = try requiredTestEOSToken(tokenizer: tokenizer)
+      let observation = ConstraintObservation()
+      let model = TestModel(constraintObservation: observation)
+      let engine = try EdgeToolsModelEngine(
+        model: model,
+        tokenizer: tokenizer
+      )
+      let range = GrammarToolCallRange.exact(1)
+      let userGrammar = try XGRGrammar.literal("USER")
+      let constraint = EdgeToolsXGRGenerationConstraint.toolsOrGrammar(
+        userGrammar,
+        range: range,
+        transform: { toolsGrammar, _ in
+          observation.recordTransform()
+          return toolsGrammar
+        }
+      )
+      let task = try engine.generate(
+        prompt: NeedlePrompt(system: "", user: "Prompt"),
+        parameters: TestModel.Parameters(
+          tokenIds: [eosTokenId],
+          constraint: constraint
+        ),
+        channel: EdgeToolsGenerationChannel()
+      )
+
+      _ = try await task.value
+
+      expectNoDifference(observation.toolCallRange, range)
+      expectNoDifference(observation.didTransform, true)
+    }
+
+    @Test
     func `Serializes Concurrent Generations`() async throws {
       let tokenizer = try testTokenizer()
       let eosTokenId = try requiredTestEOSToken(tokenizer: tokenizer)

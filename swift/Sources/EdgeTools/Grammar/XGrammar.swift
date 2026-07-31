@@ -157,6 +157,26 @@
     /// The default tool-call constraint.
     public static let tools = Self.toolsWithGrammar()
 
+    /// Uses either the engine's model-specific tool-call grammar or the supplied grammar.
+    ///
+    /// The engine builds its model-specific tool-call grammar, then optionally transforms it with
+    /// ``transform`` (mirroring ``toolsWithGrammar(range:grammar:)``), and finally unions the
+    /// result with ``userGrammar``.
+    public static func toolsOrGrammar(
+      _ userGrammar: XGRGrammar,
+      range: GrammarToolCallRange = .unbounded(minimum: 0),
+      transform: (@Sendable (XGRGrammar, XGRTokenizerInfo) throws -> XGRGrammar)? = nil
+    ) -> Self {
+      toolsWithGrammar(
+        range: range,
+        grammar: { toolsGrammar, tokenizerInfo in
+          let resolvedToolsGrammar =
+            try transform?(toolsGrammar, tokenizerInfo) ?? toolsGrammar
+          return try resolvedToolsGrammar.union(userGrammar)
+        }
+      )
+    }
+
     /// Constrains output to a value described by an EdgeTools generation schema.
     public static func schema(_ type: (some EdgeToolsGenerable).Type) -> Self {
       Self.grammar(.schema(type))
