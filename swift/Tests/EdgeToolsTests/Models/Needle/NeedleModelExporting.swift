@@ -170,7 +170,7 @@ private enum NeedleTestModelExport {
       .compactMap { $0 }
       .joined(separator: "-")
       let suffix = compressionSuffix.isEmpty ? "" : "-\(compressionSuffix)"
-      return "coreai-export-v5\(suffix)\(compileSuffix)"
+      return "coreai-export-v6\(suffix)\(compileSuffix)"
     }
   }
 
@@ -216,7 +216,7 @@ private enum NeedleTestModelExport {
       compilePlatforms: compilePlatforms
     )
     let configuration = MLModelConfiguration()
-    configuration.computeUnits = .cpuAndNeuralEngine
+    configuration.computeUnits = .cpuAndGPU
     return try await NeedleCoreMLModelEngine(
       modelDirectoryURL: directory,
       modelConfiguration: configuration
@@ -263,7 +263,7 @@ private enum NeedleTestModelExport {
       .compactMap { $0 }
       .joined(separator: "-")
       let suffix = compressionSuffix.isEmpty ? "" : "-\(compressionSuffix)"
-      return "coreml-export-v17\(suffix)\(compileSuffix)"
+      return "coreml-export-v18\(suffix)\(compileSuffix)"
     }
   }
 
@@ -274,7 +274,7 @@ private enum NeedleTestModelExport {
 
 #if ONNX && canImport(COnnxRuntime)
   func exportNeedleONNX(
-    outputDirectoryName: String = "onnx-export-v1-float32",
+    outputDirectoryName: String = "onnx-export-v2-float32",
     quantization: String? = nil
   ) async throws -> URL {
     var arguments = ["--onnx-dtype", "float32"]
@@ -294,7 +294,7 @@ private enum NeedleTestModelExport {
   ) async throws -> NeedleCONNXModelEngine {
     let quantizationSuffix = quantization.map { "-\($0)" } ?? ""
     let directory = try await exportNeedleONNX(
-      outputDirectoryName: "onnx-export-v1-float32\(quantizationSuffix)",
+      outputDirectoryName: "onnx-export-v2-float32\(quantizationSuffix)",
       quantization: quantization
     )
     return try await NeedleCONNXModelEngine(

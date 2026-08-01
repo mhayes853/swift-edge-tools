@@ -37,30 +37,9 @@
       let encoderProjectedV: MLTensor
     }
 
-    fileprivate struct DecoderCache: Sendable {
-      var key: MLTensor
-      var value: MLTensor
-
-      init(key: MLTensor, value: MLTensor) {
-        self.key = key
-        self.value = value
-      }
-
-      init(configuration: NeedleModelConfiguration) {
-        let shape = [
-          configuration.decoderLayers,
-          configuration.encoderMaxLength,
-          configuration.attentionHeads,
-          configuration.attentionHeadDimensions
-        ]
-        self.key = MLTensor(repeating: Float16.zero, shape: shape, scalarType: Float16.self)
-        self.value = MLTensor(repeating: Float16.zero, shape: shape, scalarType: Float16.self)
-      }
-    }
-
     private struct Generation {
-      let encoderOutputs: EncoderOutputs
-      var cache: DecoderCache
+      let crossAttentionMask: MLTensor
+      let state: MLState
       var position: Int
       var logits: MLTensor
       var pendingTokenId: EdgeToolsToken.ID?
@@ -139,31 +118,22 @@
     private nonisolated(nonsending) func decode(
       inputIds: MLTensor,
       cachePosition: Int,
-      encoderOutputs: EncoderOutputs,
-      cache: inout DecoderCache
+      crossAttentionMask: MLTensor,
+      state: MLState
     ) async throws -> MLTensor {
       let inputs = [
         NeedleExportTensorName.inputIDs: inputIds,
         NeedleExportTensorName.cachePosition: MLTensor(shape: [1], scalars: [Int32(cachePosition)]),
         NeedleExportTensorName.selfAttentionMask: Self.selfAttentionMask(
           step: cachePosition,
-          maxLength: self.configuration.encoderMaxLength
+          maxLength: self.configuration.decoderMaxLength
         ),
-        NeedleExportTensorName.crossAttentionMask: encoderOutputs.crossAttentionMask,
-        NeedleExportTensorName.encoderProjectedK: encoderOutputs.encoderProjectedK,
-        NeedleExportTensorName.encoderProjectedV: encoderOutputs.encoderProjectedV,
-        NeedleExportTensorName.keyCache: cache.key,
-        NeedleExportTensorName.valueCache: cache.value
+        NeedleExportTensorName.crossAttentionMask: crossAttentionMask
       ]
-      let outputs = try await self.decoderModel.prediction(from: inputs)
-      guard
-        let logits = outputs[NeedleExportTensorName.logits],
-        let updatedKey = outputs[NeedleExportTensorName.updatedKeyCache],
-        let updatedValue = outputs[NeedleExportTensorName.updatedValueCache]
-      else {
+      let outputs = try await self.decoderModel.prediction(from: inputs, using: state)
+      guard let logits = outputs[NeedleExportTensorName.logits] else {
         throw EdgeToolsError.missingModelOutputs
       }
-      cache = DecoderCache(key: updatedKey, value: updatedValue)
       return logits
     }
 
@@ -217,16 +187,20 @@
       let start = self.clock.now
       parameters.processor?.prompt(promptTensor)
       let encoderOutputs = try await self.runEncoder(inputIds: paddedPromptTensor)
-      var cache = DecoderCache(configuration: self.configuration)
+      let state = try await self.decoderModel.makeState(
+        encoderProjectedK: encoderOutputs.encoderProjectedK,
+        encoderProjectedV: encoderOutputs.encoderProjectedV,
+        configuration: self.configuration
+      )
       let logits = try await self.decode(
         inputIds: MLTensor(tokenIds: [self.configuration.decoderStartTokenId]),
         cachePosition: 0,
-        encoderOutputs: encoderOutputs,
-        cache: &cache
+        crossAttentionMask: encoderOutputs.crossAttentionMask,
+        state: state
       )
       self.generation = Generation(
-        encoderOutputs: encoderOutputs,
-        cache: cache,
+        crossAttentionMask: encoderOutputs.crossAttentionMask,
+        state: state,
         position: 1,
         logits: logits,
         pendingTokenId: nil
@@ -247,11 +221,17 @@
         throw EdgeToolsError.modelNotPrepared
       }
       if let pendingTokenId = generation.pendingTokenId {
+        guard generation.position < self.configuration.decoderMaxLength else {
+          throw EdgeToolsError.contextLengthExceeded(
+            tokens: generation.position + 1,
+            maximum: self.configuration.decoderMaxLength
+          )
+        }
         generation.logits = try await self.decode(
           inputIds: MLTensor(tokenIds: [pendingTokenId]),
           cachePosition: generation.position,
-          encoderOutputs: generation.encoderOutputs,
-          cache: &generation.cache
+          crossAttentionMask: generation.crossAttentionMask,
+          state: generation.state
         )
         generation.position += 1
       }
@@ -386,8 +366,130 @@
         self.model = model
       }
 
-      func prediction(from inputs: [String: MLTensor]) async throws -> [String: MLTensor] {
-        try await self.model.prediction(from: inputs)
+      func prediction(
+        from inputs: [String: MLTensor],
+        using state: MLState
+      ) async throws -> [String: MLTensor] {
+        try await self.model.prediction(from: inputs, using: state)
+      }
+
+      func makeState(
+        encoderProjectedK: MLTensor,
+        encoderProjectedV: MLTensor,
+        configuration: NeedleModelConfiguration
+      ) async throws -> MLState {
+        async let projectedK = encoderProjectedK.shapedArray(of: Float16.self)
+        async let projectedV = encoderProjectedV.shapedArray(of: Float16.self)
+        let (keys, values) = await (projectedK, projectedV)
+        let state = self.model.makeState()
+        for layer in 0..<configuration.decoderLayers {
+          try Self.zeroSelfAttention(
+            state: state,
+            name: NeedleExportTensorName.selfAttentionKeyCache(layer: layer),
+            configuration: configuration
+          )
+          try Self.zeroSelfAttention(
+            state: state,
+            name: NeedleExportTensorName.selfAttentionValueCache(layer: layer),
+            configuration: configuration
+          )
+          try Self.initializeCrossAttention(
+            state: state,
+            name: NeedleExportTensorName.crossAttentionKeyCache(layer: layer),
+            projected: keys,
+            layer: layer,
+            configuration: configuration
+          )
+          try Self.initializeCrossAttention(
+            state: state,
+            name: NeedleExportTensorName.crossAttentionValueCache(layer: layer),
+            projected: values,
+            layer: layer,
+            configuration: configuration
+          )
+        }
+        return state
+      }
+
+      private static func zeroSelfAttention(
+        state: MLState,
+        name: String,
+        configuration: NeedleModelConfiguration
+      ) throws {
+        try state.withMultiArray(for: name) { array in
+          let stateShape = array.shape.map(\.intValue)
+          let expectedStateShape = [
+            configuration.decoderMaxLength,
+            configuration.kvHeads,
+            configuration.attentionHeadDimensions
+          ]
+          guard stateShape == expectedStateShape else {
+            throw EdgeToolsCoreMLError(
+              code: .invalidStateShape,
+              message: "Expected state shape \(expectedStateShape), got \(stateShape)."
+            )
+          }
+          array.withUnsafeMutableBufferPointer(ofType: Float16.self) { values, _ in
+            for index in values.indices {
+              values[index] = 0
+            }
+          }
+        }
+      }
+
+      private static func initializeCrossAttention(
+        state: MLState,
+        name: String,
+        projected: MLShapedArray<Float16>,
+        layer: Int,
+        configuration: NeedleModelConfiguration
+      ) throws {
+        let kvHeads = configuration.kvHeads
+        let encoderLength = configuration.encoderMaxLength
+        let headDimensions = configuration.attentionHeadDimensions
+        let expectedShape = [
+          configuration.decoderLayers,
+          1,
+          kvHeads,
+          encoderLength,
+          headDimensions
+        ]
+        guard projected.shape == expectedShape else {
+          throw EdgeToolsCoreMLError(
+            code: .invalidStateShape,
+            message: "Expected projected encoder shape \(expectedShape), got \(projected.shape)."
+          )
+        }
+        let layerOffset = layer * kvHeads * encoderLength * headDimensions
+        let projectedScalars = projected.scalars
+        try projectedScalars.withUnsafeBufferPointer { source in
+          try state.withMultiArray(for: name) { array in
+            let stateShape = array.shape.map(\.intValue)
+            let expectedStateShape = [1, kvHeads, encoderLength, headDimensions]
+            guard stateShape == expectedStateShape else {
+              throw EdgeToolsCoreMLError(
+                code: .invalidStateShape,
+                message: "Expected state shape \(expectedStateShape), got \(stateShape)."
+              )
+            }
+            array.withUnsafeMutableBufferPointer(ofType: Float16.self) { destination, strides in
+              for head in 0..<kvHeads {
+                for token in 0..<encoderLength {
+                  let sourceOffset =
+                    layerOffset + (head * encoderLength + token) * headDimensions
+                  let destinationOffset =
+                    head * strides[1] + token * strides[2]
+                  destination.baseAddress!
+                    .advanced(by: destinationOffset)
+                    .update(
+                      from: source.baseAddress!.advanced(by: sourceOffset),
+                      count: headDimensions
+                    )
+                }
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -403,6 +505,7 @@
         self.rawValue = rawValue
       }
 
+      public static let invalidStateShape = Self(rawValue: "invalid-state-shape")
       public static let missingAOTModel = Self(rawValue: "missing-aot-model")
     }
 
@@ -439,10 +542,8 @@
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
   extension NeedleCoreMLModel {
     private static func selfAttentionMask(step: Int, maxLength: Int) -> MLTensor {
-      var scalars = Array(repeating: Float16(-65500), count: maxLength)
-      let allowedStart = max(0, maxLength - step - 1)
-      for index in allowedStart..<maxLength {
-        scalars[index] = 0
+      let scalars = (0..<maxLength).map {
+        $0 <= step ? Float16.zero : Float16(NeedleNumerics.maskedAttentionScore)
       }
       return MLTensor(shape: [1, 1, 1, maxLength], scalars: scalars)
     }

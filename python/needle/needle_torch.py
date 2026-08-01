@@ -796,7 +796,6 @@ def _update_kv_cache(
     projected: torch.Tensor,
     cache_position: torch.Tensor,
 ) -> torch.Tensor:
-    # CoreAI runs a bf16 graph against fp32 caches; index_put needs them to agree.
     current = projected[0].transpose(0, 1).to(dtype=layer_cache.dtype)
     return torch.index_put(layer_cache, (cache_position.to(dtype=torch.long),), current)
 

@@ -1,72 +1,74 @@
 ▿ EdgeToolsEngineGeneration
   ▿ decodeMetrics: EdgeToolsDecodeMetrics
-    ▿ duration: 0.426882833 seconds
-      - _low: 426882833000000000
+    ▿ duration: 0.427218167 seconds
+      - _low: 427218167000000000
       - _high: 0
-    ▿ durationToFirstToken: 0.105553792 seconds
-      - _low: 105553792000000000
+    ▿ durationToFirstToken: 2.747281083 seconds
+      - _low: 2747281083000000000
       - _high: 0
-    - tokens: 44
+    - tokens: 46
   ▿ metadata: 2 key/value pairs
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "GenerationConfidence"
-      - value: 0.92915
+      - value: 0.9079586
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "PerTokenConfidences"
-      ▿ value: 44 elements
+      ▿ value: 46 elements
         - 1.0
-        - 0.9938788
-        - 0.99999917
-        - 1.0
+        - 0.9893349
+        - 0.9999969
         - 0.99999976
+        - 0.99999905
         - 1.0
-        - 0.9999995
-        - 0.999828
-        - 0.9999925
+        - 0.99999833
+        - 0.99889237
+        - 0.99995923
+        - 0.99999976
+        - 0.97840244
+        - 0.9999423
+        - 0.523392
+        - 0.8611273
+        - 0.63389754
+        - 0.63191134
+        - 0.58534014
+        - 0.9992187
+        - 0.9999994
+        - 0.99990356
         - 1.0
-        - 0.9797065
-        - 0.9999747
-        - 0.64332926
-        - 0.92482364
-        - 0.5585678
-        - 0.9790758
-        - 0.9999999
-        - 0.9999993
-        - 1.0
-        - 0.9999889
-        - 0.99999464
-        - 1.0
-        - 0.9989641
-        - 0.6859495
-        - 0.9986223
-        - 0.99678373
-        - 0.920218
-        - 0.99999535
-        - 0.99986494
-        - 0.61970145
-        - 0.68763
-        - 0.7923036
-        - 0.7829945
-        - 0.9948001
-        - 0.98886347
-        - 0.8384815
-        - 0.99622357
-        - 0.9920002
-        - 0.99889094
-        - 0.9995876
-        - 0.9999268
-        - 0.8350132
-        - 0.67661995
+        - 0.9998487
+        - 0.99988246
+        - 0.9999988
+        - 0.99568605
+        - 0.6915128
+        - 0.9969764
+        - 0.99357706
+        - 0.8695338
+        - 0.99996173
+        - 0.9993666
+        - 0.586686
+        - 0.6950466
+        - 0.902178
+        - 0.7242815
+        - 0.99191475
+        - 0.9940398
+        - 0.68643445
+        - 0.982272
+        - 0.92131174
+        - 0.99273455
+        - 0.9965089
+        - 0.9997094
+        - 0.81677854
+        - 0.72853935
         - 1.0
   ▿ prefillMetrics: EdgeToolsPrefillMetrics
-    ▿ duration: 0.102131917 seconds
-      - _low: 102131917000000000
+    ▿ duration: 2.743956917 seconds
+      - _low: 2743956917000000000
       - _high: 0
     - tokens: 150
-  - response: "<tool_call> [{\"name\":\"send_email\",\"arguments\":{\"address\":\"henderry@gmail.com\",\"subject\":\"Adventure\",\"body\":\"Hi, could you please go on an adventure?\"}}]"
-  ▿ tokens: 44 elements
+  - response: "<tool_call> [{\"name\":\"send_email\",\"arguments\":{\"address\":\"henderyanal@gmail.com\",\"subject\":\"Adventure\",\"body\":\"Hi, could you please go on an adventure?\"}}]"
+  ▿ tokens: 46 elements
     ▿ EdgeToolsToken
       - id: 4
       - stringValue: "<tool_call>"
@@ -110,8 +112,14 @@
       - id: 1665
       - stringValue: "nder"
     ▿ EdgeToolsToken
-      - id: 1127
-      - stringValue: "ry"
+      - id: 8061
+      - stringValue: "y"
+    ▿ EdgeToolsToken
+      - id: 327
+      - stringValue: "an"
+    ▿ EdgeToolsToken
+      - id: 304
+      - stringValue: "al"
     ▿ EdgeToolsToken
       - id: 8181
       - stringValue: "@"
@@ -206,7 +214,7 @@
           ▿ (2 elements)
             - key: "address"
             ▿ value: EdgeToolsValue
-              - string: "henderry@gmail.com"
+              - string: "henderyanal@gmail.com"
           ▿ (2 elements)
             - key: "body"
             ▿ value: EdgeToolsValue

@@ -22,22 +22,25 @@
     public typealias Prompt = NeedlePrompt
     public typealias ToolCallParser = NeedleToolCallParser
 
-    fileprivate struct EncoderOutputs {
+    private struct EncoderOutputs {
       let crossAttentionMask: Runtime.Tensor
       let encoderProjectedK: Runtime.Tensor
       let encoderProjectedV: Runtime.Tensor
     }
 
-    fileprivate struct Generation {
+    private struct Generation {
       let encoderOutputs: EncoderOutputs
       var keyCache: Runtime.Tensor
       var valueCache: Runtime.Tensor
+      var activeCacheLength: Int
       var position: Int
       var logitsTensor: Runtime.Tensor?
       var pendingTokenId: EdgeToolsToken.ID?
     }
 
-    public var vocabularySize: Int { self.configuration.vocabularySize }
+    public var vocabularySize: Int {
+      self.configuration.vocabularySize
+    }
 
     let configuration: NeedleModelConfiguration
 
@@ -48,9 +51,9 @@
 
     public init(
       configuration: NeedleModelConfiguration,
-      runtime: sending Runtime,
-      encoderSession: sending Runtime.Session,
-      decoderSession: sending Runtime.Session
+      runtime: Runtime,
+      encoderSession: Runtime.Session,
+      decoderSession: Runtime.Session
     ) {
       self.configuration = configuration
       self.runtime = runtime
@@ -76,10 +79,11 @@
       }
 
       let encoderOutputs = try await self.encoderOutputs(tokenIDs: tokenIds)
+      let activeCacheLength = min(128, self.configuration.decoderMaxLength)
       let cacheShape = [
         self.configuration.decoderLayers,
-        self.configuration.encoderMaxLength,
-        self.configuration.attentionHeads,
+        activeCacheLength,
+        self.configuration.kvHeads,
         self.configuration.attentionHeadDimensions
       ]
       let cacheValueCount = cacheShape.reduce(1, *)
@@ -93,6 +97,7 @@
           values: [Float](repeating: 0, count: cacheValueCount),
           shape: cacheShape
         ),
+        activeCacheLength: activeCacheLength,
         position: 0,
         logitsTensor: nil,
         pendingTokenId: nil
@@ -106,18 +111,23 @@
       guard var generation = self.generation else {
         throw EdgeToolsError.modelNotPrepared
       }
+      guard generation.position < self.configuration.decoderMaxLength else {
+        throw EdgeToolsError.contextLengthExceeded(
+          tokens: generation.position + 1,
+          maximum: self.configuration.decoderMaxLength
+        )
+      }
+      try await self.growCachesIfNeeded(generation: &generation)
       let inputIDs = try self.runtime.tensor(values: [Int64(tokenID)], shape: [1, 1])
       let position = try Int32(exactly: generation.position)
-        .unwrapONNXInteger(
-          name: NeedleExportTensorName.cachePosition
-        )
+        .unwrapONNXInteger(name: NeedleExportTensorName.cachePosition)
       let cachePosition = try self.runtime.tensor(values: [position], shape: [1])
       let selfAttentionMask = try self.runtime.tensor(
         values: Self.selfAttentionMask(
           step: Int(position),
-          maxLength: self.configuration.encoderMaxLength
+          maxLength: generation.activeCacheLength
         ),
-        shape: [1, 1, 1, self.configuration.encoderMaxLength]
+        shape: [1, 1, 1, generation.activeCacheLength]
       )
       var outputs = try await self.decoderSession.run(
         inputs: [
@@ -132,24 +142,190 @@
         ],
         outputNames: [
           NeedleExportTensorName.logits,
-          NeedleExportTensorName.updatedKeyCache,
-          NeedleExportTensorName.updatedValueCache
+          NeedleExportTensorName.keyCacheDelta,
+          NeedleExportTensorName.valueCacheDelta
         ]
       )
       guard
         let logits = outputs.removeValue(forKey: NeedleExportTensorName.logits),
-        let updatedKey = outputs.removeValue(forKey: NeedleExportTensorName.updatedKeyCache),
-        let updatedValue = outputs.removeValue(forKey: NeedleExportTensorName.updatedValueCache)
+        let keyDelta = outputs.removeValue(forKey: NeedleExportTensorName.keyCacheDelta),
+        let valueDelta = outputs.removeValue(forKey: NeedleExportTensorName.valueCacheDelta)
       else {
         throw EdgeToolsError.missingModelOutputs
       }
-      generation.keyCache = updatedKey
-      generation.valueCache = updatedValue
+      try await self.append(
+        delta: keyDelta,
+        to: generation.keyCache,
+        position: generation.position,
+        cacheLength: generation.activeCacheLength
+      )
+      try await self.append(
+        delta: valueDelta,
+        to: generation.valueCache,
+        position: generation.position,
+        cacheLength: generation.activeCacheLength
+      )
       generation.position += 1
       generation.logitsTensor = logits
       generation.pendingTokenId = nil
       self.generation = generation
     }
+
+  }
+
+  extension NeedleONNXModel {
+    private struct CacheCopyRegion: Hashable, Sendable {
+      let sourceLength: Int
+      let destinationLength: Int
+      let sourcePosition: Int
+      let destinationPosition: Int
+      let positionCount: Int
+    }
+
+    private nonisolated(nonsending) func growCachesIfNeeded(
+      generation: inout Generation
+    ) async throws {
+      guard generation.position == generation.activeCacheLength else { return }
+      let newLength = min(
+        generation.activeCacheLength * 2,
+        self.configuration.decoderMaxLength
+      )
+      guard newLength > generation.activeCacheLength else { return }
+
+      let cacheShape = [
+        self.configuration.decoderLayers,
+        newLength,
+        self.configuration.kvHeads,
+        self.configuration.attentionHeadDimensions
+      ]
+      let cacheValueCount = cacheShape.reduce(1, *)
+      let keyCache = try self.runtime.tensor(
+        values: [Float](repeating: 0, count: cacheValueCount),
+        shape: cacheShape
+      )
+      let valueCache = try self.runtime.tensor(
+        values: [Float](repeating: 0, count: cacheValueCount),
+        shape: cacheShape
+      )
+      let copyRegion = CacheCopyRegion(
+        sourceLength: generation.activeCacheLength,
+        destinationLength: newLength,
+        sourcePosition: 0,
+        destinationPosition: 0,
+        positionCount: generation.activeCacheLength
+      )
+      try await self.copyCacheLayers(
+        from: generation.keyCache,
+        to: keyCache,
+        region: copyRegion
+      )
+      try await self.copyCacheLayers(
+        from: generation.valueCache,
+        to: valueCache,
+        region: copyRegion
+      )
+      generation.keyCache = keyCache
+      generation.valueCache = valueCache
+      generation.activeCacheLength = newLength
+    }
+
+    private nonisolated(nonsending) func append(
+      delta: Runtime.Tensor,
+      to cache: Runtime.Tensor,
+      position: Int,
+      cacheLength: Int
+    ) async throws {
+      try await self.copyCacheLayers(
+        from: delta,
+        to: cache,
+        region: CacheCopyRegion(
+          sourceLength: 1,
+          destinationLength: cacheLength,
+          sourcePosition: 0,
+          destinationPosition: position,
+          positionCount: 1
+        )
+      )
+    }
+
+    private nonisolated(nonsending) func copyCacheLayers(
+      from source: Runtime.Tensor,
+      to destination: Runtime.Tensor,
+      region: CacheCopyRegion
+    ) async throws {
+      let layers = self.configuration.decoderLayers
+      let kvHeads = self.configuration.kvHeads
+      let headDimensions = self.configuration.attentionHeadDimensions
+      #if JS && canImport(JavaScriptKit)
+        if
+          let source = source as? JSONNXTensor,
+          let destination = destination as? JSONNXTensor
+        {
+          try await Self.copyJSONCacheLayers(
+            from: source,
+            to: destination,
+            region: region,
+            layers: layers,
+            rowCount: kvHeads * headDimensions
+          )
+          return
+        }
+      #endif
+
+      let rowCount = kvHeads * headDimensions
+      try await destination.withMutableView(as: Float.self) { destinationView in
+        try await source.withView(as: Float.self) { sourceView in
+          var destinationSpan = destinationView.mutableSpan
+          let sourceSpan = sourceView.span
+          let valueCount = region.positionCount * rowCount
+          for layer in 0..<layers {
+            let sourceOffset =
+              (layer * region.sourceLength + region.sourcePosition) * rowCount
+            let destinationOffset =
+              (layer * region.destinationLength + region.destinationPosition) * rowCount
+            for valueOffset in 0..<valueCount {
+              destinationSpan[destinationOffset + valueOffset] =
+                sourceSpan[sourceOffset + valueOffset]
+            }
+          }
+        }
+      }
+    }
+
+    #if JS && canImport(JavaScriptKit)
+      private static nonisolated(nonsending) func copyJSONCacheLayers(
+        from source: JSONNXTensor,
+        to destination: JSONNXTensor,
+        region: CacheCopyRegion,
+        layers: Int,
+        rowCount: Int
+      ) async throws {
+        let sourceData = try await Self.jsonData(for: source)
+        let destinationData = try await Self.jsonData(for: destination)
+        let subarray = sourceData["subarray"].object!
+        let set = destinationData["set"].object!
+
+        for layer in 0..<layers {
+          let sourceOffset =
+            (layer * region.sourceLength + region.sourcePosition) * rowCount
+          let destinationOffset =
+            (layer * region.destinationLength + region.destinationPosition) * rowCount
+          let sourceSlice = try subarray.throws(
+            this: sourceData,
+            sourceOffset,
+            sourceOffset + region.positionCount * rowCount
+          ).object!
+          _ = try set.throws(this: destinationData, sourceSlice, destinationOffset)
+        }
+      }
+
+      private static nonisolated(nonsending) func jsonData(
+        for tensor: JSONNXTensor
+      ) async throws -> JSObject {
+        let getData = tensor.object["getData"].object!
+        return try await JSONNXRuntime.promiseObject(try getData.throws(this: tensor.object))
+      }
+    #endif
 
     private nonisolated(nonsending) func encoderOutputs(
       tokenIDs: [EdgeToolsToken.ID]
@@ -195,8 +371,7 @@
     }
 
     private static func selfAttentionMask(step: Int, maxLength: Int) -> [Float] {
-      let allowedStart = max(0, maxLength - step - 1)
-      return (0..<maxLength).map { $0 < allowedStart ? -65500 : 0 }
+      (0..<maxLength).map { $0 <= step ? 0 : NeedleNumerics.maskedAttentionScore }
     }
   }
 

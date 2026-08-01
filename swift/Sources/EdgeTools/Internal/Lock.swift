@@ -68,5 +68,4 @@ package struct Lock<Value: ~Copyable>: ~Copyable {
   }
 }
 
-// Safe because this noncopyable wrapper uniquely owns its state and guards every access with a lock.
 extension Lock: @unchecked Sendable where Value: ~Copyable {}

@@ -34,35 +34,16 @@
 
     public typealias Prompt = NeedlePrompt
 
-    fileprivate struct EncoderOutputs {
+    private struct EncoderOutputs {
       let crossAttentionMask: InferenceFunction.AsyncValue
       let encoderProjectedK: InferenceFunction.AsyncValue
       let encoderProjectedV: InferenceFunction.AsyncValue
     }
 
-    fileprivate struct DecoderCache {
-      var key: InferenceFunction.AsyncValue
-      var value: InferenceFunction.AsyncValue
-
-      init(descriptor: InferenceFunctionDescriptor) throws {
-        guard
-          let keyDescriptor = descriptor.arrayDescriptor(
-            for: NeedleExportTensorName.updatedKeyCache
-          ),
-          let valueDescriptor = descriptor.arrayDescriptor(
-            for: NeedleExportTensorName.updatedValueCache
-          )
-        else {
-          throw EdgeToolsError.missingModelOutputs
-        }
-        self.key = InferenceFunction.AsyncValue(NDArray(descriptor: keyDescriptor))
-        self.value = InferenceFunction.AsyncValue(NDArray(descriptor: valueDescriptor))
-      }
-    }
-
     private struct Generation {
       let encoderOutputs: EncoderOutputs
-      var cache: DecoderCache
+      let state: InferenceFunctionState
+      let stream: ComputeStream?
       var position: Int
       var logits: NDArray
       var pendingTokenId: EdgeToolsToken.ID?
@@ -154,6 +135,14 @@
       case .bfloat16:
         let view = Span<UInt16>(viewing: logits.rawView().bytes)
         scalars = (0..<vocabularySize).map { Float(bfloat16Bits: view[offset + $0]) }
+      case .float16:
+        let view = Span<UInt16>(viewing: logits.rawView().bytes)
+        scalars = (0..<vocabularySize).map {
+          Float(Float16(bitPattern: view[offset + $0]))
+        }
+      case .float32:
+        let view = Span<Float>(viewing: logits.rawView().bytes)
+        scalars = (0..<vocabularySize).map { view[offset + $0] }
       default:
         throw EdgeToolsCoreAIError(
           code: .unsupportedLogitsScalarType,
@@ -281,20 +270,24 @@
       let stream = parameters.computeStream
       let encoderOutputs = try await self.runEncoder(
         inputIds: paddedPromptArray,
-        stream: stream
+        stream: parameters.computeStream
       )
-      var cache = try DecoderCache(descriptor: self.decoderFunction.descriptor)
+      let state = try Self.decoderState(
+        descriptor: self.decoderFunction.descriptor,
+        configuration: self.configuration
+      )
       let decoderLogits = try await self.decode(
         inputIds: NDArray(tokenIds: [self.configuration.decoderStartTokenId]),
         cachePosition: 0,
         encoderOutputs: encoderOutputs,
-        cache: &cache,
+        state: state,
         stream: stream
       )
       let logits = try self.stepLogits(from: decoderLogits)
       self.generation = Generation(
         encoderOutputs: encoderOutputs,
-        cache: cache,
+        state: state,
+        stream: stream,
         position: 1,
         logits: logits,
         pendingTokenId: nil
@@ -315,12 +308,18 @@
         throw EdgeToolsError.modelNotPrepared
       }
       if let pendingTokenId = generation.pendingTokenId {
+        guard generation.position < self.configuration.decoderMaxLength else {
+          throw EdgeToolsError.contextLengthExceeded(
+            tokens: generation.position + 1,
+            maximum: self.configuration.decoderMaxLength
+          )
+        }
         let decoderLogits = try await self.decode(
           inputIds: NDArray(tokenIds: [pendingTokenId]),
           cachePosition: generation.position,
           encoderOutputs: generation.encoderOutputs,
-          cache: &generation.cache,
-          stream: parameters.computeStream
+          state: generation.state,
+          stream: generation.stream
         )
         generation.logits = try self.stepLogits(from: decoderLogits)
         generation.position += 1
@@ -380,7 +379,7 @@
       inputIds: NDArray,
       cachePosition: Int,
       encoderOutputs: EncoderOutputs,
-      cache: inout DecoderCache,
+      state: InferenceFunctionState,
       stream: ComputeStream?
     ) async throws -> NDArray {
       let outputs = try await self.decoderFunction.invoke(
@@ -392,31 +391,20 @@
           NeedleExportTensorName.selfAttentionMask: InferenceFunction.AsyncValue(
             Self.selfAttentionMask(
               step: cachePosition,
-              maxLength: self.configuration.encoderMaxLength
+              maxLength: self.configuration.decoderMaxLength
             )
           ),
           NeedleExportTensorName.crossAttentionMask: encoderOutputs.crossAttentionMask,
           NeedleExportTensorName.encoderProjectedK: encoderOutputs.encoderProjectedK,
-          NeedleExportTensorName.encoderProjectedV: encoderOutputs.encoderProjectedV,
-          NeedleExportTensorName.keyCache: cache.key,
-          NeedleExportTensorName.valueCache: cache.value
+          NeedleExportTensorName.encoderProjectedV: encoderOutputs.encoderProjectedV
         ],
-        outputNames: [
-          NeedleExportTensorName.logits,
-          NeedleExportTensorName.updatedKeyCache,
-          NeedleExportTensorName.updatedValueCache
-        ],
+        outputNames: [NeedleExportTensorName.logits],
+        state: state,
         on: stream
       )
-      guard
-        let logits = outputs[NeedleExportTensorName.logits],
-        let key = outputs[NeedleExportTensorName.updatedKeyCache],
-        let value = outputs[NeedleExportTensorName.updatedValueCache]
-      else {
+      guard let logits = outputs[NeedleExportTensorName.logits] else {
         throw EdgeToolsError.missingModelOutputs
       }
-      cache.key = key
-      cache.value = value
       guard let logitsArray = try await logits.ndArray else {
         throw EdgeToolsError.missingModelOutputs
       }
@@ -436,6 +424,7 @@
       }
 
       public static let failedToLoadFunction = Self(rawValue: "failed-to-load-function")
+      public static let invalidStateShape = Self(rawValue: "invalid-state-shape")
       public static let missingModelStateDescriptors = Self(
         rawValue: "missing-model-state-descriptors"
       )
@@ -457,16 +446,6 @@
 
   @available(anyAppleOS 27.0, *)
   extension NDArray {
-    fileprivate init(descriptor: InferenceValue.Descriptor) throws {
-      guard case .ndArray(let descriptor) = descriptor else {
-        throw EdgeToolsCoreAIError(
-          code: .missingModelStateDescriptors,
-          message: "CoreAI model did not return expected state descriptors."
-        )
-      }
-      self.init(descriptor: descriptor)
-    }
-
     fileprivate init(tokenIds: some Sequence<EdgeToolsToken.ID>) {
       let ids = tokenIds.map(Int32.init)
       self.init(scalars: ids, shape: [1, ids.count])
@@ -494,23 +473,59 @@
 
   @available(anyAppleOS 27.0, *)
   extension NeedleCoreAIModel {
+    private static func decoderState(
+      descriptor: InferenceFunctionDescriptor,
+      configuration: NeedleModelConfiguration
+    ) throws -> InferenceFunctionState {
+      let names = (0..<configuration.decoderLayers).flatMap { layer in
+        [
+          NeedleExportTensorName.selfAttentionKeyCache(layer: layer),
+          NeedleExportTensorName.selfAttentionValueCache(layer: layer)
+        ]
+      }
+      guard Set(descriptor.stateNames) == Set(names) else {
+        throw EdgeToolsCoreAIError(
+          code: .missingModelStateDescriptors,
+          message: "Expected CoreAI decoder states \(names), got \(descriptor.stateNames)."
+        )
+      }
+      let values = try names.map { name in
+        guard
+          let descriptor = descriptor.stateDescriptor(of: name),
+          case .ndArray(let arrayDescriptor) = descriptor
+        else {
+          throw EdgeToolsCoreAIError(
+            code: .missingModelStateDescriptors,
+            message: "CoreAI decoder did not expose an array state named \(name)."
+          )
+        }
+        let expectedShape = [
+          configuration.decoderMaxLength,
+          configuration.kvHeads,
+          configuration.attentionHeadDimensions
+        ]
+        guard arrayDescriptor.shape == expectedShape else {
+          throw EdgeToolsCoreAIError(
+            code: .invalidStateShape,
+            message: "Expected state shape \(expectedShape), got \(arrayDescriptor.shape)."
+          )
+        }
+        var array = NDArray(descriptor: arrayDescriptor)
+        array.zero()
+        return (name: name, array: array)
+      }
+      return InferenceFunctionState(values: values)
+    }
+
     private static func selfAttentionMask(step: Int, maxLength: Int) -> NDArray {
       var mask = NDArray(shape: [1, 1, 1, maxLength], scalarType: .float16)
-      let allowedStart = max(0, maxLength - step - 1)
       var rawView = mask.mutableRawView()
       var values = MutableSpan<UInt16>(mutableBytes: rawView.mutableBytes)
       for index in 0..<maxLength {
-        values[index] = index >= allowedStart ? 0 : Float16(-65500).bitPattern
+        values[index] =
+          index <= step ? 0 : Float16(NeedleNumerics.maskedAttentionScore).bitPattern
       }
       return mask
-    }
-  }
-
-  @available(anyAppleOS 27.0, *)
-  extension InferenceFunctionDescriptor {
-    fileprivate func arrayDescriptor(for name: String) -> NDArrayDescriptor? {
-      guard case .ndArray(let arrayDescriptor) = self.outputDescriptor(of: name) else { return nil }
-      return arrayDescriptor
     }
   }
 

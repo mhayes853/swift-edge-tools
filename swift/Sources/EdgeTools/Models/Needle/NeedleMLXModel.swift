@@ -614,7 +614,11 @@
     gate: MLXArray,
     sublayer: MLXArray
   ) -> MLXArray {
-    clip(input + sigmoid(gate).asType(sublayer.dtype) * sublayer, min: -65500.0, max: 65500.0)
+    clip(
+      input + sigmoid(gate).asType(sublayer.dtype) * sublayer,
+      min: -NeedleNumerics.float16ClippingMagnitude,
+      max: NeedleNumerics.float16ClippingMagnitude
+    )
   }
 
   private func paddingMask(inputIds: MLXArray, padTokenId: Int) -> MLXArray {

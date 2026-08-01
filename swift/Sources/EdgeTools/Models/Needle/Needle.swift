@@ -24,6 +24,7 @@ public struct NeedleModelConfiguration: Hashable, Sendable, Codable {
   public var tieWordEmbeddings: Bool = true
   public var maxSeqLen: Int?
   public var maxPositionEmbeddings: Int?
+  private var decoderMaxLengthValue: Int?
   private var dtypeValue: String?
   private var torchDTypeValue: String?
 
@@ -44,6 +45,11 @@ public struct NeedleModelConfiguration: Hashable, Sendable, Codable {
     self.maxSeqLen ?? self.maxPositionEmbeddings ?? 1024
   }
 
+  public var decoderMaxLength: Int {
+    get { self.decoderMaxLengthValue ?? min(self.encoderMaxLength, 512) }
+    set { self.decoderMaxLengthValue = newValue }
+  }
+
   public init(
     vocabularySize: Int = 8192,
     dimensions: Int = 512,
@@ -60,6 +66,7 @@ public struct NeedleModelConfiguration: Hashable, Sendable, Codable {
     tieWordEmbeddings: Bool = true,
     maxSeqLen: Int? = nil,
     maxPositionEmbeddings: Int? = nil,
+    decoderMaxLength: Int? = nil,
     dtype: String = "bfloat16"
   ) {
     self.vocabularySize = vocabularySize
@@ -77,6 +84,7 @@ public struct NeedleModelConfiguration: Hashable, Sendable, Codable {
     self.tieWordEmbeddings = tieWordEmbeddings
     self.maxSeqLen = maxSeqLen
     self.maxPositionEmbeddings = maxPositionEmbeddings
+    self.decoderMaxLengthValue = decoderMaxLength
     self.dtypeValue = dtype
     self.torchDTypeValue = nil
   }
@@ -97,9 +105,17 @@ public struct NeedleModelConfiguration: Hashable, Sendable, Codable {
     case tieWordEmbeddings = "tie_word_embeddings"
     case maxSeqLen = "max_seq_len"
     case maxPositionEmbeddings = "max_position_embeddings"
+    case decoderMaxLengthValue = "decoder_max_length"
     case dtypeValue = "dtype"
     case torchDTypeValue = "torch_dtype"
   }
+}
+
+// MARK: - NeedleNumerics
+
+enum NeedleNumerics {
+  static let float16ClippingMagnitude: Float = 65_500
+  static let maskedAttentionScore = -Self.float16ClippingMagnitude
 }
 
 // MARK: - Loading

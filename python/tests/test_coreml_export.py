@@ -97,6 +97,15 @@ class CoreMLExportTests(unittest.TestCase):
         compressor = CoreMLQuantizerCompressor(QuantizerConfig.presets.w8())
         self._assert_export_runs_end_to_end(compressor=compressor)
 
+    def test_export_needle_coreml_quantizer_supports_dynamic_head_dimensions(
+        self,
+    ) -> None:
+        compressor = CoreMLQuantizerCompressor(QuantizerConfig.presets.w8())
+        self._assert_export_runs_end_to_end(
+            compressor=compressor,
+            dimensions=128,
+        )
+
     def test_export_needle_coreml_supports_quantizer_and_palettizer_compressor(
         self,
     ) -> None:
@@ -195,6 +204,7 @@ class CoreMLExportTests(unittest.TestCase):
         compute_units: CoreMLComputeUnits = CoreMLComputeUnits.ALL,
         decoder_use_native_sdpa: bool | None = None,
         dynamic_decoder_cache: bool = False,
+        dimensions: int = 8,
     ) -> None:
         source_ctx = tempfile.TemporaryDirectory()
         output_ctx = tempfile.TemporaryDirectory()
@@ -206,8 +216,8 @@ class CoreMLExportTests(unittest.TestCase):
                 json.dumps(
                     {
                         "vocab_size": 16,
-                        "d_model": 8,
-                        "hidden_size": 8,
+                        "d_model": dimensions,
+                        "hidden_size": dimensions,
                         "num_attention_heads": 2,
                         "num_kv_heads": 1,
                         "num_encoder_layers": 1,

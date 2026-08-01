@@ -6,31 +6,7 @@ import Testing
 struct `Needle JSONNX model engine tests` {
   @Test
   func `Generates Real Tool Call`() async throws {
-    let fixture = try #require(JSObject.global["edgeToolsNeedleFixture"].object)
-    let namespace = try #require(JSObject.global["edgeToolsONNXRuntime"].object)
-    let tokenizerData = try Self.bytes(named: "tokenizer.model", in: fixture)
-    let tokenizer = try NeedleSPTokenizer(data: tokenizerData)
-    let encoderData = try Self.file(named: "encoder.onnx.data", in: fixture)
-    let decoderData = try Self.file(named: "decoder.onnx.data", in: fixture)
-    let engine = try await NeedleJSONNXModelEngine(
-      onnxRuntime: namespace,
-      configuration: NeedleModelConfiguration(dtype: "float32"),
-      tokenizer: tokenizer,
-      encoderModel: JSONNXRuntime.ModelSource.object(
-        try Self.file(named: "encoder.onnx", in: fixture)
-      ),
-      decoderModel: JSONNXRuntime.ModelSource.object(
-        try Self.file(named: "decoder.onnx", in: fixture)
-      ),
-      encoderConfiguration: Self.configuration(
-        externalDataPath: "encoder.onnx.data",
-        data: encoderData
-      ),
-      decoderConfiguration: Self.configuration(
-        externalDataPath: "decoder.onnx.data",
-        data: decoderData
-      )
-    )
+    let engine = try await Self.engine()
     let session = EdgeToolsSession(engine: engine, tools: [SendEmailTool()])
     let parameters = NeedleJSONNXModelEngine.GenerateParameters(
       constraint: .toolsWithGrammar(range: .exact(1)),
@@ -61,6 +37,59 @@ struct `Needle JSONNX model engine tests` {
     )
   }
 
+  @Test
+  func `Grows Adaptive Cache Beyond Initial Capacity`() async throws {
+    let engine = try await Self.engine()
+    let generationTask = try engine.generate(
+      prompt: NeedlePrompt(
+        system: "",
+        user: "Send an email to Henry asking him to go on an adventure."
+      ),
+      parameters: ONNXGenerateParameters(
+        processor: SuppressingTokenONNXLogitsProcessor(tokenID: 1),
+        constraint: .unconstrained,
+        maxTokens: 130
+      ),
+      channel: EdgeToolsGenerationChannel()
+    )
+    let generation = try await generationTask.value
+
+    let tokensAcrossCacheGrowth = generation.tokens.suffix(6).map(\.stringValue)
+    #expect(!generation.wasStopped)
+    #expect(generation.tokens.count == 130)
+    #expect(
+      tokensAcrossCacheGrowth == ["\"", "json", " []", "[", "\"", "]]"]
+    )
+  }
+
+  private static func engine() async throws -> NeedleJSONNXModelEngine {
+    let fixture = try #require(JSObject.global["edgeToolsNeedleFixture"].object)
+    let namespace = try #require(JSObject.global["edgeToolsONNXRuntime"].object)
+    let tokenizerData = try Self.bytes(named: "tokenizer.model", in: fixture)
+    let tokenizer = try NeedleSPTokenizer(data: tokenizerData)
+    let encoderData = try Self.file(named: "encoder.onnx.data", in: fixture)
+    let decoderData = try Self.file(named: "decoder.onnx.data", in: fixture)
+    return try await NeedleJSONNXModelEngine(
+      onnxRuntime: namespace,
+      configuration: NeedleModelConfiguration(dtype: "float32"),
+      tokenizer: tokenizer,
+      encoderModel: JSONNXRuntime.ModelSource.object(
+        try Self.file(named: "encoder.onnx", in: fixture)
+      ),
+      decoderModel: JSONNXRuntime.ModelSource.object(
+        try Self.file(named: "decoder.onnx", in: fixture)
+      ),
+      encoderConfiguration: Self.configuration(
+        externalDataPath: "encoder.onnx.data",
+        data: encoderData
+      ),
+      decoderConfiguration: Self.configuration(
+        externalDataPath: "decoder.onnx.data",
+        data: decoderData
+      )
+    )
+  }
+
   private static func configuration(
     externalDataPath path: String,
     data: JSObject
@@ -83,6 +112,18 @@ struct `Needle JSONNX model engine tests` {
     let bytes = JSUint8Array(unsafelyWrapping: object)
     return bytes.withUnsafeBytes { Array($0) }
   }
+}
+
+private struct SuppressingTokenONNXLogitsProcessor: ONNXLogitsProcessor, Sendable {
+  let tokenID: EdgeToolsToken.ID
+
+  func prompt(_ prompt: [EdgeToolsToken.ID]) {}
+
+  func process(logits: inout MutableSpan<Float>) {
+    logits[self.tokenID] = -.infinity
+  }
+
+  func didSample(tokenId: EdgeToolsToken.ID) {}
 }
 
 private struct SendEmailTool: EdgeTool {

@@ -25,7 +25,7 @@ globalThis.edgeToolsAddModel = new Uint8Array(
 
 const defaultNeedleDirectory = path.resolve(
 	fileURLToPath(new URL("../../..", import.meta.url)),
-	".swift-needle-tests/onnx-export-v1-float32-int4",
+	".swift-needle-tests/onnx-export-v2-float32-int4",
 );
 const needleDirectory =
 	process.env.EDGE_TOOLS_NEEDLE_MODEL_DIRECTORY ?? defaultNeedleDirectory;

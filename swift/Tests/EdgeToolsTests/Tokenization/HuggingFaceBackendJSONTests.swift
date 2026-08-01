@@ -25,23 +25,25 @@ struct `HuggingFace Backend JSON tests` {
     expectNoDifference(object.preTokenizer.type, "Metaspace")
   }
 
-  @Test
-  func `Projected Metadata Matches Complete Backend`() throws {
-    let source = #"""
-      {
-        "decoder": {"type": "ByteLevel"},
-        "normalizer": null,
-        "pre_tokenizer": {"type": "ByteLevel"},
-        "model": {"vocab": {"token": 0}}
-      }
-      """#
-    let projected = try projectedBackendJSON(from: source)
+  #if XGrammar
+    @Test
+    func `Projected Metadata Matches Complete Backend`() throws {
+      let source = #"""
+        {
+          "decoder": {"type": "ByteLevel"},
+          "normalizer": null,
+          "pre_tokenizer": {"type": "ByteLevel"},
+          "model": {"vocab": {"token": 0}}
+        }
+        """#
+      let projected = try projectedBackendJSON(from: source)
 
-    expectNoDifference(
-      try XGRTokenizerInfo.metadata(huggingFaceBackendJSON: projected),
-      try XGRTokenizerInfo.metadata(huggingFaceBackendJSON: source)
-    )
-  }
+      expectNoDifference(
+        try XGRTokenizerInfo.metadata(huggingFaceBackendJSON: projected),
+        try XGRTokenizerInfo.metadata(huggingFaceBackendJSON: source)
+      )
+    }
+  #endif
 
   @Test
   func `Does Not Include Large Vocabulary`() throws {

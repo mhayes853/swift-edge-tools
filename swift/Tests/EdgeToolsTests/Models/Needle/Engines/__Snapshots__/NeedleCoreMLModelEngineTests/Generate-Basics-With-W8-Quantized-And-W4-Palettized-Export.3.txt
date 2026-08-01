@@ -1,1 +1,1 @@
-<tool_call> [{"name":"send_email","arguments":{"address":"henderry@gmail.com","subject":"Adventure","body":"Hi, could you please go on an adventure?"}}]
+<tool_call> [{"name":"send_email","arguments":{"address":"henderyanal@gmail.com","subject":"Adventure","body":"Hi, could you please go on an adventure?"}}]

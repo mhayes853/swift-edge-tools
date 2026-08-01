@@ -215,9 +215,7 @@
       public init(
         logIdentifier: String = "swift-edge-tools",
         graphOptimizationLevel: ONNXGraphOptimizationLevel = .all,
-        configureSessionOptions: @escaping @Sendable (borrowing SessionOptions) throws -> Void = {
-          _ in
-        }
+        configureSessionOptions: @escaping @Sendable (borrowing SessionOptions) throws -> Void = { _ in }
       ) {
         self.logIdentifier = logIdentifier
         self.graphOptimizationLevel = graphOptimizationLevel
@@ -438,7 +436,7 @@
 
     nonisolated(nonsending) public func withUnsafeMutableBufferPointer<Element: ONNXElement, Result>(
       as type: Element.Type,
-      _ body: (UnsafeMutableBufferPointer<Element>) async throws -> Result
+      _ body: nonisolated(nonsending) (UnsafeMutableBufferPointer<Element>) async throws -> Result
     ) async throws -> Result {
       guard self.dtype == Element.onnxDType else {
         throw ONNXRuntimeError(

@@ -8,9 +8,7 @@ from pathlib import Path
 import torch
 
 from . import export_helpers
-from .decoder_strategy import (  # pyright: ignore[reportMissingImports]
-    DecoderExportStrategy,
-)
+from .decoder_strategy import DecoderExportStrategy
 from .needle_configuration import NeedleModelConfiguation
 from .needle_torch import Needle
 from .onnx_compression import ONNXCompressor, ONNXModelComponent

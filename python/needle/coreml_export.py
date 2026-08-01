@@ -182,7 +182,10 @@ def convert_needle_coreml_models(
         needle.encoder,
         encoder_sample,
         compressor=compressor,
-        dynamic_shapes=encoder_spec.dynamic_shapes,
+        dynamic_shapes=_compression_dynamic_shapes(
+            encoder_spec.dynamic_shapes,
+            compressor=compressor,
+        ),
     )
     encoder_model = typing.cast(
         MLModel,
@@ -190,7 +193,10 @@ def convert_needle_coreml_models(
             _coreml_source_model(
                 encoder_module,
                 encoder_sample,
-                dynamic_shapes=encoder_spec.dynamic_shapes,
+                dynamic_shapes=_compression_dynamic_shapes(
+                    encoder_spec.dynamic_shapes,
+                    compressor=compressor,
+                ),
                 use_torchscript=uses_dynamic_encoder and compressor is None,
             ),
             convert_to="mlprogram",
@@ -320,7 +326,10 @@ def convert_needle_coreml_models(
         needle.decoder,
         decoder_sample,
         compressor=compressor,
-        dynamic_shapes=decoder_spec.dynamic_shapes,
+        dynamic_shapes=_compression_dynamic_shapes(
+            decoder_spec.dynamic_shapes,
+            compressor=compressor,
+        ),
     )
     decoder_outputs = decoder_module(*decoder_sample)
     if isinstance(decoder_outputs, torch.Tensor):
@@ -352,7 +361,10 @@ def convert_needle_coreml_models(
             _coreml_source_model(
                 decoder_module,
                 decoder_sample,
-                dynamic_shapes=decoder_spec.dynamic_shapes,
+                dynamic_shapes=_compression_dynamic_shapes(
+                    decoder_spec.dynamic_shapes,
+                    compressor=compressor,
+                ),
                 use_torchscript=(uses_dynamic_encoder or strategy.stateful)
                 and compressor is None,
             ),
@@ -395,6 +407,26 @@ def convert_needle_coreml_models(
         state_names=decoder_spec.state_names,
     )
     return encoder_model, decoder_model
+
+
+def _compression_dynamic_shapes(
+    dynamic_shapes: tuple[dict[int, Any], ...],
+    *,
+    compressor: NeedleCompressor | None,
+) -> tuple[dict[int, Any], ...]:
+    if compressor is None:
+        return dynamic_shapes
+    return tuple(
+        {
+            axis: (
+                torch.export.Dim.STATIC
+                if dimension is torch.export.Dim.STATIC
+                else torch.export.Dim.AUTO
+            )
+            for axis, dimension in shape.items()
+        }
+        for shape in dynamic_shapes
+    )
 
 
 def _coreml_source_model(

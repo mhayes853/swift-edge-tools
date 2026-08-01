@@ -1,6 +1,6 @@
 import Foundation
 
-#if canImport(Hub)
+#if MLX
   import Hub
 
   func downloadNeedle() async throws -> URL {

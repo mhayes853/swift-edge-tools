@@ -1,19 +1,26 @@
+import EdgeTools
+
 #if XGrammar
   import CustomDump
-  import EdgeTools
   import Testing
+#endif
 
-  func testTokenizer() throws -> NeedleSPTokenizer {
-    #if Foundation
-      try NeedleSPTokenizer(modelURL: .testTokenizerModel)
-    #else
-      throw XGRError(
-        code: EdgeToolsXGRError.invalidNeedleTokenizer,
-        message: "Test tokenizer loading requires the Foundation trait."
-      )
-    #endif
-  }
+private struct TestTokenizerLoadingError: Hashable, Sendable, Error {}
 
+func testTokenizer() throws -> NeedleSPTokenizer {
+  #if Foundation
+    try NeedleSPTokenizer(modelURL: .testTokenizerModel)
+  #elseif XGrammar
+    throw XGRError(
+      code: EdgeToolsXGRError.invalidNeedleTokenizer,
+      message: "Test tokenizer loading requires the Foundation trait."
+    )
+  #else
+    throw TestTokenizerLoadingError()
+  #endif
+}
+
+#if XGrammar
   func requiredTestEOSToken(
     tokenizer: some EdgeToolsXGRTokenizer
   ) throws -> EdgeToolsToken.ID {

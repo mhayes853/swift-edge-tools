@@ -227,7 +227,7 @@
           strides: self.strides,
           indices: indices
         )
-        return self.baseAddress.unsafelyUnwrapped[index]
+        return self.baseAddress![index]
       }
       nonmutating set {
         let index = edgeToolsONNXFlatIndex(
@@ -235,7 +235,7 @@
           strides: self.strides,
           indices: indices
         )
-        self.baseAddress.unsafelyUnwrapped[index] = newValue
+        self.baseAddress![index] = newValue
       }
     }
 
@@ -249,16 +249,18 @@
       }
     }
 
+    @_lifetime(borrow self)
     public borrowing func slice(at leadingIndices: [Int]) -> ONNXTensorView<Element> {
       let (offset, slicedShape) = edgeToolsONNXAxisSliceOffset(
         shape: self.shape,
         strides: self.strides,
         leadingIndices: leadingIndices
       )
-      return ONNXTensorView(
+      let view = ONNXTensorView(
         unsafelyWrapping: self.baseAddress.map { $0 + offset },
         shape: slicedShape
       )
+      return _overrideLifetime(view, borrowing: self)
     }
 
     public func withUnsafePointer<Result, Failure: Error>(
@@ -334,14 +336,14 @@
 
     nonisolated(nonsending) func withUnsafeMutableBufferPointer<Element: ONNXElement, Result>(
       as type: Element.Type,
-      _ body: (UnsafeMutableBufferPointer<Element>) async throws -> Result
+      _ body: nonisolated(nonsending) (UnsafeMutableBufferPointer<Element>) async throws -> Result
     ) async throws -> Result
   }
 
   extension ONNXTensor {
     public nonisolated(nonsending) func withUnsafeBufferPointer<Element: ONNXElement, Result>(
       as type: Element.Type,
-      _ body: (UnsafeBufferPointer<Element>) async throws -> Result
+      _ body: nonisolated(nonsending) (UnsafeBufferPointer<Element>) async throws -> Result
     ) async throws -> Result {
       try await self.withUnsafeMutableBufferPointer(as: type) {
         try await body(UnsafeBufferPointer($0))
@@ -354,7 +356,7 @@
       as sourceType: Source.Type,
       materializing materializedType: Materialized.Type,
       shape: [Int],
-      _ body: (inout ONNXTensorView<Materialized>) async throws -> Result
+      _ body: nonisolated(nonsending) (inout ONNXTensorView<Materialized>) async throws -> Result
     ) async throws -> Result {
       try await self.withUnsafeMutableBufferPointer(as: sourceType) { buffer in
         let materializedCount = try edgeToolsONNXElementCount(for: shape)
@@ -384,7 +386,7 @@
       as sourceType: Source.Type,
       materializing materializedType: Materialized.Type,
       shape: [Int],
-      _ body: (borrowing ONNXTensorView<Materialized>) async throws -> Result
+      _ body: nonisolated(nonsending) (borrowing ONNXTensorView<Materialized>) async throws -> Result
     ) async throws -> Result {
       try await self.withMutableView(
         as: sourceType,
@@ -395,14 +397,14 @@
 
     public nonisolated(nonsending) func withView<Element: ONNXElement, Result>(
       as type: Element.Type,
-      _ body: (borrowing ONNXTensorView<Element>) async throws -> Result
+      _ body: nonisolated(nonsending) (borrowing ONNXTensorView<Element>) async throws -> Result
     ) async throws -> Result {
       try await self.withView(as: type, materializing: type, shape: self.shape, body)
     }
 
     public nonisolated(nonsending) func withMutableView<Element: ONNXElement, Result>(
       as type: Element.Type,
-      _ body: (inout ONNXTensorView<Element>) async throws -> Result
+      _ body: nonisolated(nonsending) (inout ONNXTensorView<Element>) async throws -> Result
     ) async throws -> Result {
       try await self.withMutableView(as: type, materializing: type, shape: self.shape, body)
     }
