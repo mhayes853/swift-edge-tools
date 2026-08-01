@@ -261,9 +261,10 @@
       _ = try? dispose.throws(this: self.object)
     }
 
-    nonisolated(nonsending) public func view<Element: ONNXElement>(
-      as type: Element.Type
-    ) async throws -> ONNXTensorView<Element> {
+    nonisolated(nonsending) public func withUnsafeMutableBufferPointer<Element: ONNXElement, Result>(
+      as type: Element.Type,
+      _ body: (UnsafeMutableBufferPointer<Element>) async throws -> Result
+    ) async throws -> Result {
       guard self.dtype == Element.onnxDType else {
         throw ONNXRuntimeError(
           code: .unexpectedTensorElementType,
@@ -289,6 +290,7 @@
         throw JSONNXRuntimeError(code: .invalidJSValue, message: "Invalid JS tensor buffer.")
       }
       let baseAddress = count == 0 ? nil : UnsafeMutablePointer<Element>.allocate(capacity: count)
+      defer { baseAddress?.deallocate() }
       if let baseAddress {
         let bytes = UInt8.typedArrayClass.new(buffer, byteOffset, byteCount)
         JSTypedArray<UInt8>(unsafelyWrapping: bytes)
@@ -297,7 +299,7 @@
               .bindMemory(to: UInt8.self)
           )
       }
-      return ONNXTensorView(owning: baseAddress, count: count)
+      return try await body(UnsafeMutableBufferPointer(start: baseAddress, count: count))
     }
   }
 

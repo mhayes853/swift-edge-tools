@@ -39,9 +39,8 @@
       )
 
       let sum = try #require(outputs["sum"])
-      let view = try await sum.view(as: Float.self)
-      expectNoDifference(view.count, 3)
-      expectNoDifference([view[0], view[1], view[2]], [3, 7, 13])
+      let values = try await sum.array(as: Float.self)
+      expectNoDifference(values, [3, 7, 13])
     }
 
     @Test
@@ -80,21 +79,41 @@
     @Test
     func `Create And Read Integer Tensors`() async throws {
       let runtime = try CONNXRuntime()
-      let int32Values = (1...3).lazy.map(Int32.init)
-      let int32Tensor = try runtime.tensor(values: int32Values, shape: [3])
+      let int32InputValues = (1...3).lazy.map(Int32.init)
+      let int32Tensor = try runtime.tensor(values: int32InputValues, shape: [3])
       let int64Tensor = try runtime.tensor(values: [Int64(4), 5, 6], shape: [3])
-      let int32View = try await int32Tensor.view(as: Int32.self)
-      let int64View = try await int64Tensor.view(as: Int64.self)
-      var copiedView = ONNXTensorView<Int32>(copying: [7, 8, 9])
+      let mutableTensor = try runtime.tensor(values: [Int32(7), 8, 9], shape: [3])
 
-      expectNoDifference([int32View[0], int32View[1], int32View[2]], [1, 2, 3])
-      expectNoDifference([int64View[0], int64View[1], int64View[2]], [4, 5, 6])
-      expectNoDifference([copiedView[0], copiedView[1], copiedView[2]], [7, 8, 9])
-      do {
-        var mutableSpan = copiedView.mutableSpan
-        mutableSpan[1] = 10
+      let int32Values = try await int32Tensor.array(as: Int32.self)
+      let int64Values = try await int64Tensor.array(as: Int64.self)
+      expectNoDifference(int32Values, [1, 2, 3])
+      expectNoDifference(int64Values, [4, 5, 6])
+
+      try await mutableTensor.withMutableView(as: Int32.self) { view in
+        var span = view.mutableSpan
+        span[1] = 10
       }
-      expectNoDifference(copiedView.span[1], 10)
+      let mutatedValues = try await mutableTensor.array(as: Int32.self)
+      expectNoDifference(mutatedValues, [7, 10, 9])
+    }
+
+    @Test
+    func `Axis-Aware View Supports Scalar Indexing And Slicing`() async throws {
+      let runtime = try CONNXRuntime()
+      let tensor = try runtime.tensor(values: (0..<6).map(Float.init), shape: [2, 3])
+
+      let secondRow = try await tensor.withView(as: Float.self) { view -> [Float] in
+        expectNoDifference(view.shape, [2, 3])
+        expectNoDifference(view[scalarAt: [1, 2]], 5)
+        return view.slice(at: [1]).span.withUnsafeBufferPointer { Array($0) }
+      }
+      expectNoDifference(secondRow, [3, 4, 5])
+
+      try await tensor.withMutableView(as: Float.self) { view in
+        view[scalarAt: [0, 1]] = 42
+      }
+      let updatedValues = try await tensor.array(as: Float.self)
+      expectNoDifference(updatedValues, [0, 42, 2, 3, 4, 5])
     }
 
     @Test
@@ -113,8 +132,7 @@
       let tensor = try runtime.tensor(values: [Int64(1), 2, 3], shape: [3])
 
       let error = await #expect(throws: ONNXRuntimeError.self) {
-        let view = try await tensor.view(as: Float.self)
-        _ = view.count
+        _ = try await tensor.array(as: Float.self)
       }
       expectNoDifference(error?.code, .unexpectedTensorElementType)
     }
@@ -137,6 +155,14 @@
 
     private static func modelURL() throws -> URL {
       try #require(Bundle.module.url(forResource: "add", withExtension: "onnx"))
+    }
+  }
+
+  extension ONNXTensor {
+    fileprivate nonisolated(nonsending) func array<Element: ONNXElement>(
+      as type: Element.Type
+    ) async throws -> [Element] {
+      try await self.withUnsafeBufferPointer(as: type) { Array($0) }
     }
   }
 #endif

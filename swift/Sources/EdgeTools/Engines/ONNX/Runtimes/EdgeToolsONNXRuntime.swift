@@ -142,6 +142,9 @@
       public static let duplicateOutputName = Self(rawValue: "duplicate-output-name")
       public static let invalidTensorShape = Self(rawValue: "invalid-tensor-shape")
       public static let invalidTensorValueCount = Self(rawValue: "invalid-tensor-value-count")
+      public static let materializedTensorShapeMismatch = Self(
+        rawValue: "materialized-tensor-shape-mismatch"
+      )
       public static let tensorElementCountOverflow = Self(rawValue: "tensor-element-count-overflow")
       public static let unexpectedTensorElementType = Self(
         rawValue: "unexpected-tensor-element-type"
@@ -200,56 +203,85 @@
   // MARK: - ONNXTensorView
 
   @_addressableForDependencies
-  public struct ONNXTensorView<Element: ONNXElement>: ~Copyable {
+  public struct ONNXTensorView<Element: BitwiseCopyable>: ~Copyable, ~Escapable {
     private let baseAddress: UnsafeMutablePointer<Element>?
 
-    public let count: Int
+    public let shape: [Int]
 
-    public init<Values: Collection>(copying values: Values)
-    where Values.Element == Element {
-      let values = ContiguousArray(values)
-      let baseAddress =
-        values.isEmpty ? nil : UnsafeMutablePointer<Element>.allocate(capacity: values.count)
-      if let baseAddress {
-        values.withUnsafeBufferPointer {
-          baseAddress.initialize(from: $0.baseAddress!, count: $0.count)
-        }
-      }
+    @_unsafeNonescapableResult
+    public init(unsafelyWrapping baseAddress: UnsafeMutablePointer<Element>?, shape: [Int]) {
       self.baseAddress = baseAddress
-      self.count = values.count
+      self.shape = shape
     }
 
-    public init(owning baseAddress: consuming UnsafeMutablePointer<Element>?, count: Int) {
-      self.baseAddress = baseAddress
-      self.count = count
-    }
+    public var count: Int { self.shape.reduce(1, *) }
 
-    deinit {
-      guard let baseAddress = self.baseAddress else { return }
-      baseAddress.deinitialize(count: self.count)
-      baseAddress.deallocate()
-    }
+    public var rank: Int { self.shape.count }
 
-    public subscript(index: Int) -> Element {
+    public var strides: [Int] { edgeToolsONNXRowMajorStrides(for: self.shape) }
+
+    public subscript(scalarAt indices: [Int]) -> Element {
       borrowing get {
-        precondition(index >= 0 && index < self.count, "Tensor view index is out of bounds.")
+        let index = edgeToolsONNXFlatIndex(
+          shape: self.shape,
+          strides: self.strides,
+          indices: indices
+        )
         return self.baseAddress.unsafelyUnwrapped[index]
       }
-      set {
-        precondition(index >= 0 && index < self.count, "Tensor view index is out of bounds.")
+      nonmutating set {
+        let index = edgeToolsONNXFlatIndex(
+          shape: self.shape,
+          strides: self.strides,
+          indices: indices
+        )
         self.baseAddress.unsafelyUnwrapped[index] = newValue
       }
     }
 
-    public func withUnsafeBufferPointer<Result>(
-      _ body: (UnsafeBufferPointer<Element>) throws -> Result
-    ) rethrows -> Result {
+    @available(macOS 26, iOS 26, tvOS 26, watchOS 26, visionOS 26, *)
+    public subscript<let rank: Int>(scalarAt indices: InlineArray<rank, Int>) -> Element {
+      borrowing get {
+        self[scalarAt: indices.span.withUnsafeBufferPointer { Array($0) }]
+      }
+      nonmutating set {
+        self[scalarAt: indices.span.withUnsafeBufferPointer { Array($0) }] = newValue
+      }
+    }
+
+    public borrowing func slice(at leadingIndices: [Int]) -> ONNXTensorView<Element> {
+      let (offset, slicedShape) = edgeToolsONNXAxisSliceOffset(
+        shape: self.shape,
+        strides: self.strides,
+        leadingIndices: leadingIndices
+      )
+      return ONNXTensorView(
+        unsafelyWrapping: self.baseAddress.map { $0 + offset },
+        shape: slicedShape
+      )
+    }
+
+    public func withUnsafePointer<Result, Failure: Error>(
+      _ body: (UnsafePointer<Element>?) throws(Failure) -> Result
+    ) throws(Failure) -> Result {
+      try body(self.baseAddress.map { UnsafePointer($0) })
+    }
+
+    public mutating func withUnsafeMutablePointer<Result, Failure: Error>(
+      _ body: (UnsafeMutablePointer<Element>?) throws(Failure) -> Result
+    ) throws(Failure) -> Result {
+      try body(self.baseAddress)
+    }
+
+    public func withUnsafeBufferPointer<Result, Failure: Error>(
+      _ body: (UnsafeBufferPointer<Element>) throws(Failure) -> Result
+    ) throws(Failure) -> Result {
       try body(UnsafeBufferPointer(start: self.baseAddress, count: self.count))
     }
 
-    public mutating func withUnsafeMutableBufferPointer<Result>(
-      _ body: (UnsafeMutableBufferPointer<Element>) throws -> Result
-    ) rethrows -> Result {
+    public mutating func withUnsafeMutableBufferPointer<Result, Failure: Error>(
+      _ body: (UnsafeMutableBufferPointer<Element>) throws(Failure) -> Result
+    ) throws(Failure) -> Result {
       try body(UnsafeMutableBufferPointer(start: self.baseAddress, count: self.count))
     }
 
@@ -274,11 +306,7 @@
 
   public protocol ONNXLogitsProcessor {
     func prompt(_ prompt: [EdgeToolsToken.ID])
-
-    nonisolated(nonsending) func process(
-      logits: inout ONNXTensorView<Float>
-    ) async throws
-
+    func process(logits: inout MutableSpan<Float>) throws
     func didSample(tokenId: EdgeToolsToken.ID)
   }
 
@@ -304,17 +332,79 @@
     var dtype: ONNXDType { get }
     var shape: [Int] { get }
 
-    nonisolated(nonsending) func view<Element: ONNXElement>(
-      as type: Element.Type
-    ) async throws -> ONNXTensorView<Element>
+    nonisolated(nonsending) func withUnsafeMutableBufferPointer<Element: ONNXElement, Result>(
+      as type: Element.Type,
+      _ body: (UnsafeMutableBufferPointer<Element>) async throws -> Result
+    ) async throws -> Result
   }
 
   extension ONNXTensor {
-    public nonisolated(nonsending) func array<Element: ONNXElement>(
-      as type: Element.Type
-    ) async throws -> [Element] {
-      let view = try await self.view(as: type)
-      return (0..<view.count).map { view[$0] }
+    public nonisolated(nonsending) func withUnsafeBufferPointer<Element: ONNXElement, Result>(
+      as type: Element.Type,
+      _ body: (UnsafeBufferPointer<Element>) async throws -> Result
+    ) async throws -> Result {
+      try await self.withUnsafeMutableBufferPointer(as: type) {
+        try await body(UnsafeBufferPointer($0))
+      }
+    }
+
+    public nonisolated(nonsending) func withMutableView<
+      Source: ONNXElement, Materialized: BitwiseCopyable, Result
+    >(
+      as sourceType: Source.Type,
+      materializing materializedType: Materialized.Type,
+      shape: [Int],
+      _ body: (inout ONNXTensorView<Materialized>) async throws -> Result
+    ) async throws -> Result {
+      try await self.withUnsafeMutableBufferPointer(as: sourceType) { buffer in
+        let materializedCount = try edgeToolsONNXElementCount(for: shape)
+        let byteCount = buffer.count * MemoryLayout<Source>.stride
+        let materializedByteCount = materializedCount * MemoryLayout<Materialized>.stride
+        guard byteCount == materializedByteCount else {
+          throw ONNXRuntimeError(
+            code: .materializedTensorShapeMismatch,
+            message:
+              "Shape \(shape) of \(Materialized.self) (\(materializedByteCount) bytes) does not "
+              + "match the tensor's \(byteCount) underlying bytes."
+          )
+        }
+        let materializedBuffer = UnsafeMutableRawBufferPointer(buffer)
+          .bindMemory(to: Materialized.self)
+        var view = ONNXTensorView(
+          unsafelyWrapping: materializedBuffer.baseAddress,
+          shape: shape
+        )
+        return try await body(&view)
+      }
+    }
+
+    public nonisolated(nonsending) func withView<
+      Source: ONNXElement, Materialized: BitwiseCopyable, Result
+    >(
+      as sourceType: Source.Type,
+      materializing materializedType: Materialized.Type,
+      shape: [Int],
+      _ body: (borrowing ONNXTensorView<Materialized>) async throws -> Result
+    ) async throws -> Result {
+      try await self.withMutableView(
+        as: sourceType,
+        materializing: materializedType,
+        shape: shape
+      ) { try await body($0) }
+    }
+
+    public nonisolated(nonsending) func withView<Element: ONNXElement, Result>(
+      as type: Element.Type,
+      _ body: (borrowing ONNXTensorView<Element>) async throws -> Result
+    ) async throws -> Result {
+      try await self.withView(as: type, materializing: type, shape: self.shape, body)
+    }
+
+    public nonisolated(nonsending) func withMutableView<Element: ONNXElement, Result>(
+      as type: Element.Type,
+      _ body: (inout ONNXTensorView<Element>) async throws -> Result
+    ) async throws -> Result {
+      try await self.withMutableView(as: type, materializing: type, shape: self.shape, body)
     }
   }
 
@@ -345,5 +435,55 @@
       values: Values,
       shape: [Int]
     ) throws -> Tensor where Values.Element: ONNXElement
+  }
+
+  // MARK: - Axis Helpers
+
+  private func edgeToolsONNXRowMajorStrides(for shape: [Int]) -> [Int] {
+    guard !shape.isEmpty else { return [] }
+    return Array(
+      shape.dropFirst().reversed()
+        .reduce(into: [1]) { strides, dimension in
+          strides.append(strides[strides.count - 1] * dimension)
+        }
+        .reversed()
+    )
+  }
+
+  private func edgeToolsONNXFlatIndex(shape: [Int], strides: [Int], indices: [Int]) -> Int {
+    precondition(
+      indices.count == shape.count,
+      "Expected \(shape.count) indices for tensor shape \(shape), got \(indices.count)."
+    )
+    return zip(indices.enumerated(), zip(shape, strides))
+      .reduce(into: 0) { flatIndex, element in
+        let ((axis, index), (dimension, stride)) = element
+        precondition(
+          index >= 0 && index < dimension,
+          "Index \(index) at axis \(axis) is out of bounds for dimension \(dimension)."
+        )
+        flatIndex += index * stride
+      }
+  }
+
+  private func edgeToolsONNXAxisSliceOffset(
+    shape: [Int],
+    strides: [Int],
+    leadingIndices: [Int]
+  ) -> (offset: Int, shape: [Int]) {
+    precondition(
+      leadingIndices.count <= shape.count,
+      "Cannot index \(leadingIndices.count) axes on a rank-\(shape.count) tensor."
+    )
+    let offset = zip(leadingIndices.enumerated(), zip(shape, strides))
+      .reduce(into: 0) { offset, element in
+        let ((axis, index), (dimension, stride)) = element
+        precondition(
+          index >= 0 && index < dimension,
+          "Index \(index) at axis \(axis) is out of bounds for dimension \(dimension)."
+        )
+        offset += index * stride
+      }
+    return (offset, Array(shape.dropFirst(leadingIndices.count)))
   }
 #endif

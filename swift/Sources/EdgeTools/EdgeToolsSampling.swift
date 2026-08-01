@@ -126,17 +126,13 @@ func argmaxScalar(
 
 #if ONNXCore
   public protocol ONNXSampler {
-    nonisolated(nonsending) func sample(
-      logits: borrowing ONNXTensorView<Float>
-    ) async throws -> EdgeToolsToken.ID
+    func sample(logits: Span<Float>) throws -> EdgeToolsToken.ID
   }
 
   public struct ONNXArgmaxSampler: ONNXSampler {
     public init() {}
 
-    public func sample(
-      logits: borrowing ONNXTensorView<Float>
-    ) -> EdgeToolsToken.ID {
+    public func sample(logits: Span<Float>) -> EdgeToolsToken.ID {
       logits.withUnsafeBufferPointer { argmaxContiguous($0) }
     }
   }

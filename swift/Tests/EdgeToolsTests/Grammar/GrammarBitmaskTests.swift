@@ -98,8 +98,11 @@ struct GrammarBitmaskConsolidatedTests {
         @Test
         func `ONNX Filters Masked Tokens`() {
           let mask = Self.mask()
-          var logits = ONNXTensorView(copying: (0..<64).map(Float.init))
-          applyONNXBitmask(logits: &logits, mask: mask)
+          var logits = (0..<64).map(Float.init)
+          logits.withUnsafeMutableBufferPointer {
+            var span = MutableSpan(_unsafeElements: $0)
+            applyBitmaskONNX(logits: &span, mask: mask)
+          }
           let filtered = (0..<logits.count)
             .filter { logits[$0] == -.infinity }
 

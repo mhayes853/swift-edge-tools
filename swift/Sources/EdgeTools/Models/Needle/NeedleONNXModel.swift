@@ -33,7 +33,7 @@
       var keyCache: Runtime.Tensor
       var valueCache: Runtime.Tensor
       var position: Int
-      var logits: [Float]
+      var logitsTensor: Runtime.Tensor?
       var pendingTokenId: EdgeToolsToken.ID?
     }
 
@@ -94,7 +94,7 @@
           shape: cacheShape
         ),
         position: 0,
-        logits: [],
+        logitsTensor: nil,
         pendingTokenId: nil
       )
       try await self.runDecoder(tokenID: self.configuration.decoderStartTokenId)
@@ -146,7 +146,7 @@
       generation.keyCache = updatedKey
       generation.valueCache = updatedValue
       generation.position += 1
-      generation.logits = try await logits.array(as: Float.self)
+      generation.logitsTensor = logits
       generation.pendingTokenId = nil
       self.generation = generation
     }
@@ -238,20 +238,26 @@
       if let pendingTokenId = self.generation?.pendingTokenId {
         try await self.runDecoder(tokenID: pendingTokenId)
       }
-      guard var generation = self.generation else {
+      guard var generation = self.generation, let logitsTensor = generation.logitsTensor else {
         throw EdgeToolsError.modelNotPrepared
       }
-      guard generation.logits.count == self.vocabularySize else {
-        throw ONNXError(
-          code: .invalidLogitsCount,
-          message: "Expected \(self.vocabularySize) logits, got \(generation.logits.count)."
-        )
+      let vocabularySize = self.vocabularySize
+      let (tokenId, confidence) = try await logitsTensor.withUnsafeMutableBufferPointer(
+        as: Float.self
+      ) { logits -> (EdgeToolsToken.ID, Float) in
+        guard logits.count == vocabularySize else {
+          throw ONNXError(
+            code: .invalidLogitsCount,
+            message: "Expected \(vocabularySize) logits, got \(logits.count)."
+          )
+        }
+        var span = MutableSpan(_unsafeElements: logits)
+        try parameters.processor?.process(logits: &span)
+        applyBitmaskONNX(logits: &span, mask: bitmask)
+        let confidence = tokenConfidenceONNX(logits: Span(_unsafeElements: logits))
+        let tokenId = try parameters.sampler.sample(logits: Span(_unsafeElements: logits))
+        return (tokenId, confidence)
       }
-      var logitsView = ONNXTensorView(copying: generation.logits)
-      try await parameters.processor?.process(logits: &logitsView)
-      applyONNXBitmask(logits: &logitsView, mask: bitmask)
-      let confidence = tokenConfidenceONNX(logits: logitsView)
-      let tokenId = try await parameters.sampler.sample(logits: logitsView)
       parameters.processor?.didSample(tokenId: tokenId)
       generation.pendingTokenId = tokenId
       self.generation = generation

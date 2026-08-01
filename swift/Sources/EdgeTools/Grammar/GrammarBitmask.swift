@@ -146,17 +146,17 @@ extension GrammarBitmask: RandomAccessCollection {}
 // MARK: - ONNX
 
 #if ONNXCore
-  public func applyONNXBitmask(
-    logits: inout ONNXTensorView<Float>,
+  public func applyBitmaskONNX(
+    logits: inout MutableSpan<Float>,
     mask: GrammarBitmask
   ) {
     validateBitmaskCoverage(mask: mask, vocabularySize: logits.count)
     mask.storage.withUnsafeBufferPointer { maskBytes in
-      logits.withUnsafeMutableBufferPointer { logits in
-        guard let baseAddress = logits.baseAddress else { return }
+      logits.withUnsafeMutableBufferPointer { buffer in
+        guard let baseAddress = buffer.baseAddress else { return }
         applyBitmaskSIMDRow(
           logits: baseAddress,
-          vocabularySize: logits.count,
+          vocabularySize: buffer.count,
           maskBytes: maskBytes
         )
       }

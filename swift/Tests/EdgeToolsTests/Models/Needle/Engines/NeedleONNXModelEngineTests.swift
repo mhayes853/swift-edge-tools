@@ -410,7 +410,7 @@
       self.counts.withLock { $0.prompt += 1 }
     }
 
-    func process(logits: inout ONNXTensorView<Float>) {
+    func process(logits: inout MutableSpan<Float>) {
       self.counts.withLock { $0.process += 1 }
     }
 

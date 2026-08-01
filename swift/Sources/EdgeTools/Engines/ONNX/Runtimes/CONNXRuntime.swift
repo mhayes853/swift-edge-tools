@@ -410,7 +410,8 @@
   // MARK: - CONNXRuntimeTensor
 
   public final class CONNXRuntimeTensor: @unchecked Sendable {
-    // The tensor is immutable after publication and its handle is safe for concurrent reads.
+    // @unchecked Sendable is safe for concurrent reads, but `withUnsafeMutableBufferPointer` exposes
+    // the tensor's own buffer directly (no copy) - callers must not mutate it concurrently.
     public typealias DType = ONNXDType
 
     private let runtime: CONNXRuntime
@@ -435,9 +436,10 @@
       self.runtime.api.pointee.ReleaseValue(self.handle)
     }
 
-    nonisolated(nonsending) public func view<Element: ONNXElement>(
-      as type: Element.Type
-    ) async throws -> ONNXTensorView<Element> {
+    nonisolated(nonsending) public func withUnsafeMutableBufferPointer<Element: ONNXElement, Result>(
+      as type: Element.Type,
+      _ body: (UnsafeMutableBufferPointer<Element>) async throws -> Result
+    ) async throws -> Result {
       guard self.dtype == Element.onnxDType else {
         throw ONNXRuntimeError(
           code: .unexpectedTensorElementType,
@@ -448,12 +450,11 @@
       let count = try edgeToolsONNXElementCount(for: self.shape)
       var data: UnsafeMutableRawPointer?
       try self.runtime.check(self.runtime.api.pointee.GetTensorMutableData(self.handle, &data))
-      return ONNXTensorView(
-        copying: UnsafeBufferPointer(
-          start: count == 0 ? nil : data!.assumingMemoryBound(to: Element.self),
-          count: count
-        )
+      let buffer = UnsafeMutableBufferPointer<Element>(
+        start: count == 0 ? nil : data!.assumingMemoryBound(to: Element.self),
+        count: count
       )
+      return try await body(buffer)
     }
 
     private static func metadata(
