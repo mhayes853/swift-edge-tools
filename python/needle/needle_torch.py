@@ -9,22 +9,20 @@ from .cache_layout import (
     decoder_state_names,
     self_attention_state_shape,
 )
-from .decoder_strategy import (
-    ActiveCacheStrategy,
-    CacheLayout,
-    CacheOutput,
-    DecoderExportStrategy,
-)
+from .decoder_strategy import ActiveCacheStrategy, DecoderExportStrategy
 from .needle_configuration import NeedleModelConfiguation
 
 
-class NeedleModel(nn.Module):
+class Needle(nn.Module):
+    encoder: "NeedleEncoder"
+    decoder: "NeedleDecoder"
+
     def __init__(
         self,
         configuration: NeedleModelConfiguation,
         *,
-        encoder_use_native_sdpa: bool,
         decoder_strategy: DecoderExportStrategy,
+        encoder_use_native_sdpa: bool = True,
     ):
         super().__init__()
         self.model = _NeedleSimpleAttentionNetwork(
@@ -42,47 +40,15 @@ class NeedleModel(nn.Module):
             )
         )
         self.configuration = configuration
-
-
-class Needle:
-    def __init__(
-        self,
-        configuration: NeedleModelConfiguation,
-        *,
-        decoder_strategy: DecoderExportStrategy,
-        encoder_use_native_sdpa: bool = True,
-    ):
-        self.configuration = configuration
         self.decoder_strategy = decoder_strategy
-        self._weights = NeedleModel(
-            configuration,
-            encoder_use_native_sdpa=encoder_use_native_sdpa,
-            decoder_strategy=decoder_strategy,
+        object.__setattr__(self, "encoder", NeedleEncoder(self))
+        object.__setattr__(
+            self, "decoder", NeedleDecoder(self, strategy=decoder_strategy)
         )
-        self.encoder = NeedleEncoder(self._weights)
-        self.decoder = _make_decoder(self._weights, decoder_strategy)
-
-    def state_dict(self, *args: typing.Any, **kwargs: typing.Any):
-        return self._weights.state_dict(*args, **kwargs)
-
-    def load_state_dict(self, *args: typing.Any, **kwargs: typing.Any):
-        return self._weights.load_state_dict(*args, **kwargs)
-
-    def parameters(self, recurse: bool = True):
-        return self._weights.parameters(recurse=recurse)
-
-    def to(self, *args: typing.Any, **kwargs: typing.Any) -> "Needle":
-        self.decoder.to(*args, **kwargs)
-        return self
-
-    def eval(self) -> "Needle":
-        self.encoder.eval()
-        self.decoder.eval()
-        return self
 
 
 class NeedleEncoder(nn.Module):
-    def __init__(self, model: NeedleModel):
+    def __init__(self, model: Needle):
         super().__init__()
         self.configuration = model.configuration
         self.model = model.model
@@ -106,7 +72,7 @@ class NeedleEncoder(nn.Module):
 class NeedleDecoder(nn.Module):
     def __init__(
         self,
-        model: NeedleModel,
+        model: Needle,
         *,
         strategy: DecoderExportStrategy,
     ):
@@ -273,38 +239,6 @@ class NeedleDecoder(nn.Module):
         )
 
 
-class StatelessReferenceDecoder(NeedleDecoder):
-    def __init__(self, model: NeedleModel, strategy: DecoderExportStrategy):
-        if strategy.stateful or strategy.cache_output != CacheOutput.FULL:
-            raise ValueError("Reference decoder requires explicit full caches")
-        super().__init__(model, strategy=strategy)
-
-
-class ONNXDeltaDecoder(NeedleDecoder):
-    def __init__(self, model: NeedleModel, strategy: DecoderExportStrategy):
-        if strategy.stateful or strategy.cache_output != CacheOutput.DELTA:
-            raise ValueError("ONNX delta decoder requires explicit cache deltas")
-        super().__init__(model, strategy=strategy)
-
-
-class StatefulPerLayerDecoder(NeedleDecoder):
-    def __init__(self, model: NeedleModel, strategy: DecoderExportStrategy):
-        if strategy.cache_layout != CacheLayout.PER_LAYER_STATE:
-            raise ValueError("Per-layer decoder requires per-layer cache state")
-        super().__init__(model, strategy=strategy)
-
-
-def _make_decoder(
-    model: NeedleModel,
-    strategy: DecoderExportStrategy,
-) -> NeedleDecoder:
-    if strategy.cache_layout == CacheLayout.PER_LAYER_STATE:
-        return StatefulPerLayerDecoder(model, strategy)
-    if strategy.cache_output == CacheOutput.DELTA:
-        return ONNXDeltaDecoder(model, strategy)
-    return StatelessReferenceDecoder(model, strategy)
-
-
 class _RoPEFrequencies:
     @staticmethod
     def inverse(dimensions: int, theta: float) -> torch.Tensor:
@@ -313,28 +247,36 @@ class _RoPEFrequencies:
 
     @staticmethod
     def table(dimensions: int, theta: float, length: int) -> torch.Tensor:
-        inverse = _RoPEFrequencies.inverse(dimensions, theta)
-        positions = torch.arange(0, length, dtype=torch.float32)
-        frequencies = positions[:, None] * inverse[None, :]
-        embeddings = torch.cat((frequencies, frequencies), dim=-1)
+        embeddings = _rope_embeddings(
+            torch.arange(0, length, dtype=torch.float32),
+            _RoPEFrequencies.inverse(dimensions, theta),
+        )
         return torch.stack((torch.sin(embeddings), torch.cos(embeddings)), dim=0)
 
-    def __init__(self, inverse: torch.Tensor, seq_len: int, dtype: torch.dtype):
+    def __init__(self, sin: torch.Tensor, cos: torch.Tensor):
+        self.sin = sin
+        self.cos = cos
+
+    @classmethod
+    def from_inverse(
+        cls, inverse: torch.Tensor, seq_len: int, dtype: torch.dtype
+    ) -> "_RoPEFrequencies":
         positions = torch.arange(0, seq_len, dtype=torch.float32, device=inverse.device)
-        frequencies = positions[:, None] * inverse[None, :]
-        embeddings = torch.cat([frequencies, frequencies], dim=-1)
-        self.sin = torch.sin(embeddings)[None, :].to(device=inverse.device, dtype=dtype)
-        self.cos = torch.cos(embeddings)[None, :].to(device=inverse.device, dtype=dtype)
+        embeddings = _rope_embeddings(positions, inverse)
+        return cls(
+            torch.sin(embeddings)[None, :].to(device=inverse.device, dtype=dtype),
+            torch.cos(embeddings)[None, :].to(device=inverse.device, dtype=dtype),
+        )
 
     @classmethod
     def from_table(
         cls, table: torch.Tensor, positions: torch.Tensor, dtype: torch.dtype
     ) -> "_RoPEFrequencies":
-        rope = cls.__new__(cls)
         selected = table[:, positions.to(dtype=torch.long)]
-        rope.sin = selected[0].unsqueeze(0).to(dtype=dtype)
-        rope.cos = selected[1].unsqueeze(0).to(dtype=dtype)
-        return rope
+        return cls(
+            selected[0].unsqueeze(0).to(dtype=dtype),
+            selected[1].unsqueeze(0).to(dtype=dtype),
+        )
 
     def apply(self, x: torch.Tensor) -> torch.Tensor:
         sin = self.sin.unsqueeze(1)
@@ -568,7 +510,7 @@ class _NeedleEncoder(nn.Module):
         )
 
     def forward(self, x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-        rope = _RoPEFrequencies(
+        rope = _RoPEFrequencies.from_inverse(
             inverse=typing.cast(torch.Tensor, self.inverse_rope),
             seq_len=x.shape[1],
             dtype=x.dtype,
@@ -789,6 +731,14 @@ class _ZCRMSNorm(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         weight = self.weight.to(x.dtype) + 1.0
         return torch.rms_norm(x, (x.shape[-1],), weight, self.eps)
+
+
+def _rope_embeddings(
+    positions: torch.Tensor,
+    inverse: torch.Tensor,
+) -> torch.Tensor:
+    frequencies = positions[:, None] * inverse[None, :]
+    return torch.cat((frequencies, frequencies), dim=-1)
 
 
 def _update_kv_cache(

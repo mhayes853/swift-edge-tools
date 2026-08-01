@@ -15,17 +15,17 @@ from needle import (
     JSONObject,
     Needle,
     NeedleModelConfiguation,
-)
-from needle.export_helpers import (
     empty_decoder_caches,
+)
+from needle.export.helpers import (
     sample_decoder_inputs_from_encoder_outputs,
     sample_encoder_input,
 )
-from needle.onnx_compression import (  # pyright: ignore[reportMissingImports]
-    ONNXModelComponent,
-)
-from needle.onnx_export import (
+from needle.export.onnx import (
     export_needle_onnx,  # pyright: ignore[reportMissingImports]
+)
+from needle.export.onnx_compression import (  # pyright: ignore[reportMissingImports]
+    ONNXModelComponent,
 )
 
 

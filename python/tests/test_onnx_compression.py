@@ -8,7 +8,7 @@ import numpy as np
 import onnx
 from onnx import TensorProto, helper, numpy_helper
 
-from needle.onnx_compression import (  # pyright: ignore[reportMissingImports]
+from needle.export.onnx_compression import (  # pyright: ignore[reportMissingImports]
     MatMulNBitsONNXCompressor,
     ONNXQuantizationBits,
 )

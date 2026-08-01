@@ -24,7 +24,7 @@ from cli import (
     parse_arguments,
 )
 from needle import DecoderExportStrategy, Needle, NeedleModelConfiguation
-from needle.coreml_export import CoreMLComputeUnits
+from needle.export.coreml import CoreMLComputeUnits
 
 
 class CLITests(unittest.TestCase):

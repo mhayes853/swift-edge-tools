@@ -11,16 +11,12 @@ import torch
 from coreai_torch import get_decomp_table
 from huggingface_hub import snapshot_download
 
-from . import Needle, NeedleModelConfiguation
-from .cache_layout import (  # pyright: ignore[reportMissingImports]
-    decoder_state_names,
-    empty_decoder_caches as make_empty_decoder_caches,
-)
-from .decoder_strategy import (  # pyright: ignore[reportMissingImports]
-    DecoderExportStrategy,
-)
-from .needle_compression import NeedleCompressor
-from .torch_utils import load_state_dict, torch_dtype
+from ..cache_layout import decoder_state_names
+from ..decoder_strategy import DecoderExportStrategy
+from ..needle_configuration import NeedleModelConfiguation
+from ..needle_torch import Needle
+from ..torch_utils import load_state_dict, torch_dtype
+from .compression import NeedleCompressor
 
 DEFAULT_SOURCE = "Cactus-Compute/needle"
 CONFIG_FILENAMES = ("configuration.json", "config.json")
@@ -43,26 +39,12 @@ def prepare_module_for_export(
     module: torch.nn.Module,
     sample_args: tuple[torch.Tensor, ...],
     *,
-    compressor: NeedleCompressor | None = None,
-    dynamic_shapes: dict[str, Any] | tuple[Any, ...] | list[Any] | None = None,
+    compressor: NeedleCompressor | None,
+    dynamic_shapes: tuple[Any, ...],
 ) -> torch.nn.Module:
     if compressor is None:
         return module
     return compressor.compress(module, sample_args, dynamic_shapes=dynamic_shapes)
-
-
-def empty_decoder_caches(
-    configuration: NeedleModelConfiguation,
-    *,
-    dtype: torch.dtype,
-    device: torch.device | None = None,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    """Compatibility wrapper for the centralized decoder cache layout."""
-    return make_empty_decoder_caches(
-        configuration,
-        dtype=dtype,
-        device=device,
-    )
 
 
 @dataclass(frozen=True)
@@ -128,10 +110,7 @@ def load_needle_model(
         decoder_strategy=decoder_strategy,
         encoder_use_native_sdpa=encoder_use_native_sdpa,
     )
-    dtype = torch_dtype(configuration.resolved_dtype)
-    model = model.to(dtype=dtype)
-    model.encoder.to(dtype=dtype)
-    model.decoder.to(dtype=dtype)
+    model = model.to(dtype=torch_dtype(configuration.resolved_dtype))
     state_dict = load_state_dict(weights_path)
     if configuration.tie_word_embeddings:
         state_dict.pop("lm_head.weight", None)
@@ -352,50 +331,30 @@ def decoder_dynamic_shapes(
         dynamic=strategy.dynamic_cache,
     )
     shapes = (
-        {0: torch.export.Dim.STATIC, 1: torch.export.Dim.STATIC},
-        {0: torch.export.Dim.STATIC},
-        {
-            0: torch.export.Dim.STATIC,
-            1: torch.export.Dim.STATIC,
-            2: torch.export.Dim.STATIC,
-            3: decoder_length,
-        },
-        {
-            0: torch.export.Dim.STATIC,
-            1: torch.export.Dim.STATIC,
-            2: torch.export.Dim.STATIC,
-            3: encoder_length,
-        },
-        {
-            0: torch.export.Dim.STATIC,
-            1: torch.export.Dim.STATIC,
-            2: torch.export.Dim.STATIC,
-            3: encoder_length,
-            4: torch.export.Dim.STATIC,
-        },
-        {
-            0: torch.export.Dim.STATIC,
-            1: torch.export.Dim.STATIC,
-            2: torch.export.Dim.STATIC,
-            3: encoder_length,
-            4: torch.export.Dim.STATIC,
-        },
-        {
-            0: torch.export.Dim.STATIC,
-            1: decoder_length,
-            2: torch.export.Dim.STATIC,
-            3: torch.export.Dim.STATIC,
-        },
-        {
-            0: torch.export.Dim.STATIC,
-            1: decoder_length,
-            2: torch.export.Dim.STATIC,
-            3: torch.export.Dim.STATIC,
-        },
+        _tensor_shape(2),
+        _tensor_shape(1),
+        _tensor_shape(4, axis=3, dimension=decoder_length),
+        _tensor_shape(4, axis=3, dimension=encoder_length),
+        _tensor_shape(5, axis=3, dimension=encoder_length),
+        _tensor_shape(5, axis=3, dimension=encoder_length),
+        _tensor_shape(4, axis=1, dimension=decoder_length),
+        _tensor_shape(4, axis=1, dimension=decoder_length),
     )
     if strategy.cross_attention_cache_states:
         return (*shapes[:4], *(() if strategy.stateful else shapes[6:]))
     return shapes[:6] if strategy.stateful else shapes
+
+
+def _tensor_shape(
+    rank: int,
+    *,
+    axis: int | None = None,
+    dimension: Any = None,
+) -> dict[int, Any]:
+    shape = dict.fromkeys(range(rank), torch.export.Dim.STATIC)
+    if axis is not None:
+        shape[axis] = dimension
+    return shape
 
 
 def _bounded_dimension(name: str, maximum: int, *, dynamic: bool) -> Any:

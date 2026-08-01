@@ -19,20 +19,21 @@ from coreai_opt.palettization import (
     PalettizationSpec,
 )
 from coreai_opt.quantization import QuantizerConfig
-from needle.coreai_export import export_needle_coreai
-from needle.coreml_export import CoreMLComputeUnits, export_needle_coreml
+
 from needle.decoder_strategy import (  # pyright: ignore[reportMissingImports]
     AttentionImplementation,
     DecoderExportStrategy,
 )
-from needle.export_helpers import DEFAULT_SOURCE
-from needle.needle_compression import (
+from needle.export.compression import (
     CoreAIQuantizerCompressor,
     CoreMLQuantizerCompressor,
     NeedleCompressor,
 )
-from needle.onnx_compression import MatMulNBitsONNXCompressor, ONNXCompressor
-from needle.onnx_export import export_needle_onnx
+from needle.export.coreai import export_needle_coreai
+from needle.export.coreml import CoreMLComputeUnits, export_needle_coreml
+from needle.export.helpers import DEFAULT_SOURCE
+from needle.export.onnx import export_needle_onnx
+from needle.export.onnx_compression import MatMulNBitsONNXCompressor, ONNXCompressor
 
 _QUANTIZER_PRESETS = ("w4", "w4_per_block", "w8")
 _PALETTIZER_N_BITS = (1, 2, 3, 4, 6, 8)

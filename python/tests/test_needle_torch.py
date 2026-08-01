@@ -316,15 +316,18 @@ class NeedleTorchTests(unittest.TestCase):
         self.assertIn("torch.ops.aten.matmul", canonical.graph_module.code)
         self.assertIn("torch.ops.aten.softmax", canonical.graph_module.code)
 
-    def test_needle_wraps_export_modules(self) -> None:
+    def test_needle_exposes_unregistered_export_modules(self) -> None:
         model = Needle(
             mock_configuration(),
             decoder_strategy=DecoderExportStrategy.reference(),
         )
 
-        self.assertNotIsInstance(model, torch.nn.Module)
         self.assertIsInstance(model.encoder, torch.nn.Module)
         self.assertIsInstance(model.decoder, torch.nn.Module)
+        self.assertTrue(
+            all(key.startswith(("model.", "lm_head.")) for key in model.state_dict()),
+            model.state_dict().keys(),
+        )
 
 
 if __name__ == "__main__":

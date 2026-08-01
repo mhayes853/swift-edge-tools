@@ -4,7 +4,7 @@ from pathlib import Path
 
 import torch
 
-from needle.export_helpers import DEFAULT_SOURCE, resolve_weights_path
+from needle.export.helpers import DEFAULT_SOURCE, resolve_weights_path
 from needle.torch_utils import extract_state_dict, load_state_dict, torch_dtype
 
 

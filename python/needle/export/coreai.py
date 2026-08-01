@@ -4,17 +4,17 @@ import subprocess
 from collections.abc import Sequence
 from pathlib import Path
 
-import needle.export_helpers as export_helpers
 import torch
 from coreai.authoring.asset import AIProgram
 from coreai.runtime import AIModelAssetMetadata
 from coreai_torch import TorchConverter
 
-from . import Needle, NeedleModelConfiguation
-from .decoder_strategy import (  # pyright: ignore[reportMissingImports]
-    DecoderExportStrategy,
-)
-from .needle_compression import NeedleCompressor
+from ..cache_layout import empty_decoder_caches
+from ..decoder_strategy import DecoderExportStrategy
+from ..needle_configuration import NeedleModelConfiguation
+from ..needle_torch import Needle
+from . import helpers
+from .compression import NeedleCompressor
 
 
 class _CoreAIEncoder(torch.nn.Module):
@@ -83,12 +83,12 @@ def export_needle_coreai(
     decoder_strategy: DecoderExportStrategy | None = None,
     compile_platforms: Sequence[str] = (),
 ) -> Path:
-    source_files, configuration, output_directory = export_helpers.prepare_export(
+    source_files, configuration, output_directory = helpers.prepare_export(
         source,
         output_directory,
     )
     resolved_decoder_strategy = decoder_strategy or DecoderExportStrategy.coreai()
-    needle = export_helpers.load_needle_model(
+    needle = helpers.load_needle_model(
         configuration,
         source_files.weights_path,
         encoder_use_native_sdpa=True,
@@ -115,8 +115,8 @@ def export_needle_coreai(
         metadata=model_metadata,
         compile_platforms=compile_platforms,
     )
-    export_helpers.copy_bundle_resources(source_files, output_directory)
-    export_helpers.write_exported_decoder_length(output_directory, configuration)
+    helpers.copy_bundle_resources(source_files, output_directory)
+    helpers.write_exported_decoder_length(output_directory, configuration)
     return output_directory
 
 
@@ -129,17 +129,17 @@ def convert_needle_coreai_programs(
     strategy = needle.decoder.strategy
     model_dtype = next(needle.parameters()).dtype
     uses_dynamic_buffers = True
-    encoder_spec = export_helpers.encoder_export_spec(
+    encoder_spec = helpers.encoder_export_spec(
         configuration,
         dynamic_buffers=uses_dynamic_buffers,
     )
     encoder_sample = (
-        export_helpers.sample_encoder_input(
+        helpers.sample_encoder_input(
             configuration,
             configuration.encoder_max_length,
         ),
     )
-    encoder_module = export_helpers.prepare_module_for_export(
+    encoder_module = helpers.prepare_module_for_export(
         _CoreAIEncoder(needle.encoder),
         encoder_sample,
         compressor=compressor,
@@ -148,7 +148,7 @@ def convert_needle_coreai_programs(
 
     with torch.no_grad():
         encoder_outputs = encoder_module(*encoder_sample)
-    decoder_prefix = export_helpers.sample_decoder_inputs_from_encoder_outputs(
+    decoder_prefix = helpers.sample_decoder_inputs_from_encoder_outputs(
         configuration,
         encoder_outputs,
     )
@@ -159,17 +159,14 @@ def convert_needle_coreai_programs(
     if not strategy.stateful:
         decoder_sample = (
             *decoder_prefix,
-            *export_helpers.empty_decoder_caches(
-                configuration,
-                dtype=model_dtype,
-            ),
+            *empty_decoder_caches(configuration, dtype=model_dtype),
         )
 
     encoder_program = (
         TorchConverter()
         .add_pytorch_module(
             encoder_module,
-            export_fn=lambda module: export_helpers.export_program(
+            export_fn=lambda module: helpers.export_program(
                 module,
                 encoder_sample,
                 dynamic_shapes=encoder_spec.dynamic_shapes,
@@ -181,12 +178,12 @@ def convert_needle_coreai_programs(
     )
     encoder_program.optimize()
 
-    decoder_spec = export_helpers.decoder_export_spec(
+    decoder_spec = helpers.decoder_export_spec(
         configuration,
         strategy,
         dynamic_buffers=uses_dynamic_buffers,
     )
-    decoder_module = export_helpers.prepare_module_for_export(
+    decoder_module = helpers.prepare_module_for_export(
         _CoreAIDecoder(needle.decoder, dtype=model_dtype),
         decoder_sample,
         compressor=compressor,
@@ -196,7 +193,7 @@ def convert_needle_coreai_programs(
         TorchConverter()
         .add_pytorch_module(
             decoder_module,
-            export_fn=lambda module: export_helpers.export_program(
+            export_fn=lambda module: helpers.export_program(
                 module,
                 decoder_sample,
                 dynamic_shapes=decoder_spec.dynamic_shapes,
@@ -220,33 +217,22 @@ def _persist_program(
     metadata: AIModelAssetMetadata | None = None,
     compile_platforms: Sequence[str] = (),
 ) -> None:
-    export_helpers.persist_export_artifact(
+    helpers.persist_export_artifact(
         program,
         output_directory=output_directory,
         name=name,
         extension=".aimodel",
         metadata=metadata,
         compile_platforms=compile_platforms,
-        save=lambda artifact, path, metadata: _save_program(
-            artifact,
-            path,
-            metadata=metadata,
-        ),
-        compile_artifact=lambda source_path, output_directory, platforms: (
-            _compile_model_asset(
-                source_path,
-                output_directory=output_directory,
-                platforms=platforms,
-            )
-        ),
+        save=_save_program,
+        compile_artifact=_compile_model_asset,
     )
 
 
 def _save_program(
     program: AIProgram,
     path: Path,
-    *,
-    metadata: AIModelAssetMetadata | None = None,
+    metadata: AIModelAssetMetadata | None,
 ) -> None:
     if path.exists():
         subprocess.run(["rm", "-rf", str(path)], check=True)
@@ -255,7 +241,6 @@ def _save_program(
 
 def _compile_model_asset(
     source_asset_path: Path,
-    *,
     output_directory: Path,
     platforms: Sequence[str],
 ) -> None:

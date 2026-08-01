@@ -7,10 +7,11 @@ from pathlib import Path
 
 import torch
 
-from . import export_helpers
-from .decoder_strategy import DecoderExportStrategy
-from .needle_configuration import NeedleModelConfiguation
-from .needle_torch import Needle
+from ..cache_layout import empty_decoder_caches
+from ..decoder_strategy import DecoderExportStrategy
+from ..needle_configuration import NeedleModelConfiguation
+from ..needle_torch import Needle
+from . import helpers
 from .onnx_compression import ONNXCompressor, ONNXModelComponent
 
 
@@ -24,12 +25,12 @@ def export_needle_onnx(
     opset_version: int = 21,
     external_data: bool = True,
 ) -> Path:
-    source_files, configuration, output_directory = export_helpers.prepare_export(
+    source_files, configuration, output_directory = helpers.prepare_export(
         source,
         output_directory,
     )
     export_configuration = replace(configuration, dtype=dtype)
-    needle = export_helpers.load_needle_model(
+    needle = helpers.load_needle_model(
         export_configuration,
         source_files.weights_path,
         decoder_strategy=decoder_strategy or DecoderExportStrategy.onnx(),
@@ -42,8 +43,8 @@ def export_needle_onnx(
         opset_version=opset_version,
         external_data=external_data,
     )
-    export_helpers.copy_bundle_resources(source_files, output_directory)
-    export_helpers.write_exported_decoder_length(
+    helpers.copy_bundle_resources(source_files, output_directory)
+    helpers.write_exported_decoder_length(
         output_directory,
         export_configuration,
     )
@@ -80,27 +81,24 @@ def convert_needle_onnx_models(
     output_directory = Path(output_directory).expanduser().resolve()
     output_directory.mkdir(parents=True, exist_ok=True)
 
-    encoder_spec = export_helpers.encoder_export_spec(
+    encoder_spec = helpers.encoder_export_spec(
         configuration,
         dynamic_buffers=True,
     )
     encoder_sample = (
-        export_helpers.sample_encoder_input(
+        helpers.sample_encoder_input(
             configuration,
             configuration.encoder_max_length,
         ),
     )
-    decoder_spec = export_helpers.decoder_export_spec(
+    decoder_spec = helpers.decoder_export_spec(
         configuration,
         needle.decoder.strategy,
         dynamic_buffers=True,
     )
     decoder_sample = (
-        *export_helpers.sample_decoder_inputs(needle, configuration),
-        *export_helpers.empty_decoder_caches(
-            configuration,
-            dtype=next(needle.parameters()).dtype,
-        ),
+        *helpers.sample_decoder_inputs(needle, configuration),
+        *empty_decoder_caches(configuration, dtype=next(needle.parameters()).dtype),
     )
 
     with tempfile.TemporaryDirectory() as temporary_name:
@@ -135,7 +133,7 @@ def _export_onnx_component(
     module: torch.nn.Module,
     sample_args: tuple[torch.Tensor, ...],
     *,
-    spec: export_helpers.ModuleExportSpec,
+    spec: helpers.ModuleExportSpec,
     component: ONNXModelComponent,
     temporary_directory: Path,
     output_directory: Path,
