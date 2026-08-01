@@ -23,10 +23,7 @@ from cli import (
     main,
     parse_arguments,
 )
-from needle import (
-    Needle,
-    NeedleModelConfiguation,
-)
+from needle import DecoderExportStrategy, Needle, NeedleModelConfiguation
 from needle.coreml_export import CoreMLComputeUnits
 
 
@@ -292,6 +289,52 @@ class CLITests(unittest.TestCase):
         compressor = export_needle_onnx_mock.call_args.kwargs["compressor"]
         self.assertEqual(compressor.bits, 4)
 
+    def test_main_selects_backend_specific_cache_state_defaults(self) -> None:
+        with patch("cli.export_needle_coreai") as coreai_export:
+            coreai_export.return_value = Path("/tmp/coreai-export")
+            with redirect_stdout(io.StringIO()):
+                exit_code = main(
+                    ["--output", "./build/coreai-export", "--backend", "coreai"]
+                )
+
+        self.assertEqual(exit_code, 0)
+        coreai_strategy = coreai_export.call_args.kwargs["decoder_strategy"]
+        self.assertTrue(coreai_strategy.stateful)
+        self.assertFalse(coreai_strategy.cross_attention_cache_states)
+
+        with patch("cli._export_needle_coreml") as coreml_export:
+            coreml_export.return_value = Path("/tmp/coreml-export")
+            with redirect_stdout(io.StringIO()):
+                exit_code = main(
+                    ["--output", "./build/coreml-export", "--backend", "coreml"]
+                )
+
+        self.assertEqual(exit_code, 0)
+        coreml_strategy = coreml_export.call_args.kwargs["decoder_strategy"]
+        self.assertTrue(coreml_strategy.stateful)
+        self.assertTrue(coreml_strategy.cross_attention_cache_states)
+        self.assertFalse(coreml_strategy.uses_native_attention)
+
+    def test_reference_decoder_profile_uses_explicit_caches(self) -> None:
+        with patch("cli._export_needle_coreml") as coreml_export:
+            coreml_export.return_value = Path("/tmp/coreml-export")
+            with redirect_stdout(io.StringIO()):
+                exit_code = main(
+                    [
+                        "--output",
+                        "./build/coreml-export",
+                        "--backend",
+                        "coreml",
+                        "--decoder-profile",
+                        "reference",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        strategy = coreml_export.call_args.kwargs["decoder_strategy"]
+        self.assertFalse(strategy.stateful)
+        self.assertFalse(strategy.cross_attention_cache_states)
+
     def test_main_passes_compile_platforms_to_coreml_export(self) -> None:
         with patch("cli._export_needle_coreml") as export_needle_coreml_mock:
             export_needle_coreml_mock.return_value = Path("/tmp/coreml-export")
@@ -390,7 +433,10 @@ class CLITests(unittest.TestCase):
             configuration = NeedleModelConfiguation.from_file(
                 source_directory / "configuration.json"
             )
-            needle_instance = Needle(configuration)
+            needle_instance = Needle(
+                configuration,
+                decoder_strategy=DecoderExportStrategy.reference(),
+            )
             torch.save(needle_instance.state_dict(), source_directory / "weights.pkl")
 
             stdout = io.StringIO()

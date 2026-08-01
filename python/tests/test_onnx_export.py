@@ -10,15 +10,22 @@ import onnxruntime as ort  # type: ignore[import-not-found]
 import torch
 
 import cli
-from needle import JSONObject, Needle, NeedleModelConfiguation
-from needle.onnx_compression import (  # pyright: ignore[reportMissingImports]
-    ONNXModelComponent,
+from needle import (
+    DecoderExportStrategy,
+    JSONObject,
+    Needle,
+    NeedleModelConfiguation,
 )
-from needle.onnx_export import export_needle_onnx  # pyright: ignore[reportMissingImports]
 from needle.export_helpers import (
     empty_decoder_caches,
     sample_decoder_inputs_from_encoder_outputs,
     sample_encoder_input,
+)
+from needle.onnx_compression import (  # pyright: ignore[reportMissingImports]
+    ONNXModelComponent,
+)
+from needle.onnx_export import (
+    export_needle_onnx,  # pyright: ignore[reportMissingImports]
 )
 
 
@@ -66,7 +73,10 @@ class ONNXExportTests(unittest.TestCase):
             (source_directory / "tokenizer.json").write_text(tokenizer_contents)
 
             configuration = NeedleModelConfiguation.from_json_object(configuration_data)
-            needle = Needle(configuration)
+            needle = Needle(
+                configuration,
+                decoder_strategy=DecoderExportStrategy.reference(),
+            )
             torch.save(needle.state_dict(), source_directory / "weights.pkl")
 
             result = cli.main(
@@ -88,7 +98,11 @@ class ONNXExportTests(unittest.TestCase):
             )
             self.assertEqual(
                 exported_configuration,
-                {**configuration_data, "dtype": "float32"},
+                {
+                    **configuration_data,
+                    "decoder_max_length": 4,
+                    "dtype": "float32",
+                },
             )
             self.assertEqual(
                 (output_directory / "tokenizer.json").read_text(),
@@ -154,7 +168,7 @@ class ONNXExportTests(unittest.TestCase):
 
             self.assertEqual(
                 [output.name for output in decoder_session.get_outputs()],
-                ["logits", "updated_key_cache", "updated_value_cache"],
+                ["logits", "key_cache_delta", "value_cache_delta"],
             )
             self.assertTrue(
                 all(
@@ -188,7 +202,10 @@ class ONNXExportTests(unittest.TestCase):
             (source_directory / "tokenizer.json").write_text("{}")
             configuration = NeedleModelConfiguation.from_json_object(configuration_data)
             torch.save(
-                Needle(configuration).state_dict(),
+                Needle(
+                    configuration,
+                    decoder_strategy=DecoderExportStrategy.reference(),
+                ).state_dict(),
                 source_directory / "weights.pkl",
             )
             compressor = RecordingCompressor()
@@ -206,11 +223,28 @@ class ONNXExportTests(unittest.TestCase):
             )
             self.assertEqual(exported_configuration["dtype"], "float32")
             self.assertEqual(exported_configuration["torch_dtype"], "float32")
+            self.assertEqual(exported_configuration["decoder_max_length"], 4)
 
             encoder_model = onnx.load(result / "encoder.onnx")
             decoder_model = onnx.load(result / "decoder.onnx")
             onnx.checker.check_model(encoder_model)
             onnx.checker.check_model(decoder_model)
+            self.assertEqual(
+                encoder_model.graph.input[0].type.tensor_type.shape.dim[1].dim_param,
+                "encoder_sequence_length",
+            )
+            decoder_input_shapes = {
+                model_input.name: model_input.type.tensor_type.shape
+                for model_input in decoder_model.graph.input
+            }
+            self.assertEqual(
+                decoder_input_shapes["cross_attention_mask"].dim[3].dim_param,
+                "encoder_sequence_length",
+            )
+            self.assertEqual(
+                decoder_input_shapes["key_cache"].dim[1].dim_param,
+                "decoder_cache_length",
+            )
             self.assertFalse(
                 any(
                     initializer.data_type == onnx.TensorProto.BFLOAT16

@@ -12,7 +12,7 @@ from coreai.runtime import AIModelAssetMetadata
 from coreai_opt.palettization import KMeansPalettizerConfig
 from coreai_opt.quantization import QuantizerConfig
 
-from needle import Needle, NeedleModelConfiguation
+from needle import DecoderExportStrategy, Needle, NeedleModelConfiguation
 from needle.coreai_export import convert_needle_coreai_programs, export_needle_coreai
 from needle.export_helpers import (
     encoder_dynamic_shapes,
@@ -40,7 +40,10 @@ class CoreAIExportTests(unittest.TestCase):
             max_seq_len=16,
             dtype="float32",
         )
-        needle = Needle(configuration, use_native_sdpa=True)
+        needle = Needle(
+            configuration,
+            decoder_strategy=DecoderExportStrategy.coreai(),
+        )
         exported_programs = []
 
         def capture_exported_program(*args, **kwargs):
@@ -61,7 +64,7 @@ class CoreAIExportTests(unittest.TestCase):
                 program.graph_module.code,
             )
 
-    def test_export_program_uses_static_encoder_sequence_length(self) -> None:
+    def test_export_program_uses_dynamic_encoder_sequence_length(self) -> None:
         configuration = NeedleModelConfiguation(
             vocabulary_size=16,
             dimensions=8,
@@ -74,16 +77,30 @@ class CoreAIExportTests(unittest.TestCase):
             max_seq_len=32,
             dtype="float32",
         )
-        needle = Needle(configuration)
+        needle = Needle(
+            configuration,
+            decoder_strategy=DecoderExportStrategy.reference(),
+        )
         sample = (sample_encoder_input(configuration, 4),)
 
         exported_program = export_program(
             needle.encoder,
             sample,
-            dynamic_shapes=encoder_dynamic_shapes(configuration),
+            dynamic_shapes=encoder_dynamic_shapes(
+                configuration,
+                dynamic_buffers=True,
+            ),
         )
 
-        self.assertEqual(len(exported_program.range_constraints), 0)
+        self.assertEqual(len(exported_program.range_constraints), 1)
+        self.assertEqual(
+            tuple(
+                exported_program.module()(sample_encoder_input(configuration, 8))[
+                    0
+                ].shape
+            ),
+            (1, 1, 1, 8),
+        )
 
     def test_load_needle_model_uses_configuration_dtype(self) -> None:
         source_ctx = tempfile.TemporaryDirectory()
@@ -101,10 +118,15 @@ class CoreAIExportTests(unittest.TestCase):
                 max_seq_len=32,
                 dtype="bfloat16",
             )
-            needle = Needle(configuration)
+            strategy = DecoderExportStrategy.reference()
+            needle = Needle(configuration, decoder_strategy=strategy)
             torch.save(needle.state_dict(), source_directory / "weights.pkl")
 
-            loaded = load_needle_model(configuration, source_directory / "weights.pkl")
+            loaded = load_needle_model(
+                configuration,
+                source_directory / "weights.pkl",
+                decoder_strategy=strategy,
+            )
 
             self.assertEqual(next(loaded.parameters()).dtype, torch.bfloat16)
         finally:
@@ -209,7 +231,10 @@ class CoreAIExportTests(unittest.TestCase):
             configuration = NeedleModelConfiguation.from_file(
                 source_directory / "configuration.json"
             )
-            needle_instance = Needle(configuration)
+            needle_instance = Needle(
+                configuration,
+                decoder_strategy=DecoderExportStrategy.reference(),
+            )
             torch.save(needle_instance.state_dict(), source_directory / "weights.pkl")
 
             result = export_needle_coreai(

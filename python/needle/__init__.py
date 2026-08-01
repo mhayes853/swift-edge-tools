@@ -1,7 +1,26 @@
+from .decoder_strategy import (  # pyright: ignore[reportMissingImports]
+    ActiveCacheStrategy,
+    AttentionImplementation,
+    CacheLayout,
+    CacheOutput,
+    CrossAttentionStorage,
+    DecoderExportStrategy,
+)
 from .json import JSONObject, JSONScalar, JSONValue
 from .needle_configuration import NeedleModelConfiguation
-from .needle_torch import Needle, NeedleDecoder, NeedleEncoder
-from .onnx_compression import MatMulNBitsONNXCompressor, ONNXCompressor, ONNXModelComponent
+from .needle_torch import (
+    ONNXDeltaDecoder,
+    Needle,
+    NeedleDecoder,
+    NeedleEncoder,
+    StatefulPerLayerDecoder,
+    StatelessReferenceDecoder,
+)
+from .onnx_compression import (
+    MatMulNBitsONNXCompressor,
+    ONNXCompressor,
+    ONNXModelComponent,
+)
 from .onnx_export import convert_needle_onnx_models, export_needle_onnx
 from .torch_utils import (
     StateDictPayload,
@@ -12,6 +31,12 @@ from .torch_utils import (
 )
 
 __all__ = [
+    "ActiveCacheStrategy",
+    "AttentionImplementation",
+    "CacheLayout",
+    "CacheOutput",
+    "CrossAttentionStorage",
+    "DecoderExportStrategy",
     "JSONObject",
     "JSONScalar",
     "JSONValue",
@@ -19,10 +44,13 @@ __all__ = [
     "NeedleDecoder",
     "NeedleEncoder",
     "NeedleModelConfiguation",
+    "ONNXDeltaDecoder",
     "MatMulNBitsONNXCompressor",
     "ONNXCompressor",
     "ONNXModelComponent",
     "StateDictPayload",
+    "StatefulPerLayerDecoder",
+    "StatelessReferenceDecoder",
     "convert_needle_onnx_models",
     "export_needle_onnx",
     "extract_state_dict",

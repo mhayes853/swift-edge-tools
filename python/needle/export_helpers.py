@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shutil
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -11,6 +12,13 @@ from coreai_torch import get_decomp_table
 from huggingface_hub import snapshot_download
 
 from . import Needle, NeedleModelConfiguation
+from .cache_layout import (  # pyright: ignore[reportMissingImports]
+    decoder_state_names,
+    empty_decoder_caches as make_empty_decoder_caches,
+)
+from .decoder_strategy import (  # pyright: ignore[reportMissingImports]
+    DecoderExportStrategy,
+)
 from .needle_compression import NeedleCompressor
 from .torch_utils import load_state_dict, torch_dtype
 
@@ -28,6 +36,7 @@ class ModuleExportSpec:
     input_names: tuple[str, ...]
     output_names: tuple[str, ...]
     dynamic_shapes: tuple[Any, ...]
+    state_names: tuple[str, ...] = ()
 
 
 def prepare_module_for_export(
@@ -48,14 +57,11 @@ def empty_decoder_caches(
     dtype: torch.dtype,
     device: torch.device | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    shape = (
-        configuration.decoder_layers,
-        configuration.encoder_max_length,
-        configuration.attention_heads,
-        configuration.attention_head_dimensions,
-    )
-    return torch.zeros(shape, dtype=dtype, device=device), torch.zeros(
-        shape, dtype=dtype, device=device
+    """Compatibility wrapper for the centralized decoder cache layout."""
+    return make_empty_decoder_caches(
+        configuration,
+        dtype=dtype,
+        device=device,
     )
 
 
@@ -114,11 +120,13 @@ def load_needle_model(
     configuration: NeedleModelConfiguation,
     weights_path: str | Path,
     *,
-    use_native_sdpa: bool = True,
+    decoder_strategy: DecoderExportStrategy,
+    encoder_use_native_sdpa: bool = True,
 ) -> Needle:
     model = Needle(
         configuration,
-        use_native_sdpa=use_native_sdpa,
+        decoder_strategy=decoder_strategy,
+        encoder_use_native_sdpa=encoder_use_native_sdpa,
     )
     dtype = torch_dtype(configuration.resolved_dtype)
     model = model.to(dtype=dtype)
@@ -154,6 +162,23 @@ def resolve_configuration_path(directory: Path) -> Path:
 
 def resolve_tokenizer_path(directory: Path) -> Path:
     return resolve_named_file(directory, TOKENIZER_FILENAMES, label="tokenizer")
+
+
+def write_exported_decoder_length(
+    output_directory: Path,
+    configuration: NeedleModelConfiguation,
+) -> None:
+    configuration_path = resolve_configuration_path(output_directory)
+    try:
+        exported_configuration = json.loads(configuration_path.read_text())
+        if not isinstance(exported_configuration, dict):
+            raise ValueError("Expected a JSON object")
+        exported_configuration["decoder_max_length"] = configuration.decoder_max_length
+        configuration_path.write_text(json.dumps(exported_configuration))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(
+            f"Failed to update exported configuration {configuration_path}: {error}"
+        ) from error
 
 
 def resolve_weights_path(directory: Path) -> Path:
@@ -224,12 +249,12 @@ def sample_decoder_inputs_from_encoder_outputs(
             1,
             1,
             DEFAULT_DECODER_SAMPLE_LENGTH,
-            configuration.encoder_max_length,
+            configuration.decoder_max_length,
         ),
         fill_value=-65500.0,
         dtype=cross_attention_mask.dtype,
     )
-    self_attention_mask[..., -1] = 0
+    self_attention_mask[..., 0] = 0
     return (
         decoder_input,
         cache_position,
@@ -242,6 +267,8 @@ def sample_decoder_inputs_from_encoder_outputs(
 
 def encoder_export_spec(
     configuration: NeedleModelConfiguation,
+    *,
+    dynamic_buffers: bool = False,
 ) -> ModuleExportSpec:
     return ModuleExportSpec(
         input_names=("input_ids",),
@@ -250,80 +277,131 @@ def encoder_export_spec(
             "encoder_projected_k",
             "encoder_projected_v",
         ),
-        dynamic_shapes=encoder_dynamic_shapes(configuration),
+        dynamic_shapes=encoder_dynamic_shapes(
+            configuration,
+            dynamic_buffers=dynamic_buffers,
+        ),
     )
 
 
 def decoder_export_spec(
     configuration: NeedleModelConfiguation,
+    strategy: DecoderExportStrategy,
+    *,
+    dynamic_buffers: bool = False,
 ) -> ModuleExportSpec:
-    cache_shapes = {
-        0: torch.export.Dim.STATIC,
-        1: torch.export.Dim.STATIC,
-        2: torch.export.Dim.STATIC,
-        3: torch.export.Dim.STATIC,
-    }
+    base_input_names = (
+        "input_ids",
+        "cache_position",
+        "self_attention_mask",
+        "cross_attention_mask",
+    )
+    cross_input_names = ("encoder_projected_k", "encoder_projected_v")
+    cache_input_names = ("key_cache", "value_cache")
+    input_names = (
+        *base_input_names,
+        *(() if strategy.cross_attention_cache_states else cross_input_names),
+        *(() if strategy.stateful else cache_input_names),
+    )
+    cache_output_names = (
+        ("key_cache_delta", "value_cache_delta")
+        if strategy.returns_cache_deltas
+        else ("updated_key_cache", "updated_value_cache")
+    )
     return ModuleExportSpec(
-        input_names=(
-            "input_ids",
-            "cache_position",
-            "self_attention_mask",
-            "cross_attention_mask",
-            "encoder_projected_k",
-            "encoder_projected_v",
-            "key_cache",
-            "value_cache",
+        input_names=input_names,
+        output_names=(
+            ("logits",) if strategy.stateful else ("logits", *cache_output_names)
         ),
-        output_names=("logits", "updated_key_cache", "updated_value_cache"),
-        dynamic_shapes=(
-            *decoder_dynamic_shapes(configuration),
-            dict(cache_shapes),
-            dict(cache_shapes),
+        dynamic_shapes=decoder_dynamic_shapes(
+            configuration,
+            strategy,
+            dynamic_buffers=dynamic_buffers,
         ),
+        state_names=decoder_state_names(configuration, strategy),
     )
 
 
 def encoder_dynamic_shapes(
     configuration: NeedleModelConfiguation,
+    *,
+    dynamic_buffers: bool = False,
 ) -> tuple[dict[int, Any], ...]:
-    _ = configuration
-    return ({0: torch.export.Dim.STATIC, 1: torch.export.Dim.STATIC},)
+    sequence_length = _bounded_dimension(
+        "encoder_sequence_length",
+        configuration.encoder_max_length,
+        dynamic=dynamic_buffers,
+    )
+    return ({0: torch.export.Dim.STATIC, 1: sequence_length},)
 
 
 def decoder_dynamic_shapes(
     configuration: NeedleModelConfiguation,
+    strategy: DecoderExportStrategy,
+    *,
+    dynamic_buffers: bool = False,
 ) -> tuple[dict[int, Any], ...]:
-    _ = configuration
-    return (
+    encoder_length = _bounded_dimension(
+        "encoder_sequence_length",
+        configuration.encoder_max_length,
+        dynamic=dynamic_buffers,
+    )
+    decoder_length = _bounded_dimension(
+        "decoder_cache_length",
+        configuration.decoder_max_length,
+        dynamic=strategy.dynamic_cache,
+    )
+    shapes = (
         {0: torch.export.Dim.STATIC, 1: torch.export.Dim.STATIC},
         {0: torch.export.Dim.STATIC},
         {
             0: torch.export.Dim.STATIC,
             1: torch.export.Dim.STATIC,
             2: torch.export.Dim.STATIC,
-            3: torch.export.Dim.STATIC,
+            3: decoder_length,
         },
         {
             0: torch.export.Dim.STATIC,
             1: torch.export.Dim.STATIC,
             2: torch.export.Dim.STATIC,
-            3: torch.export.Dim.STATIC,
+            3: encoder_length,
         },
         {
             0: torch.export.Dim.STATIC,
             1: torch.export.Dim.STATIC,
             2: torch.export.Dim.STATIC,
-            3: torch.export.Dim.STATIC,
+            3: encoder_length,
             4: torch.export.Dim.STATIC,
         },
         {
             0: torch.export.Dim.STATIC,
             1: torch.export.Dim.STATIC,
             2: torch.export.Dim.STATIC,
-            3: torch.export.Dim.STATIC,
+            3: encoder_length,
             4: torch.export.Dim.STATIC,
+        },
+        {
+            0: torch.export.Dim.STATIC,
+            1: decoder_length,
+            2: torch.export.Dim.STATIC,
+            3: torch.export.Dim.STATIC,
+        },
+        {
+            0: torch.export.Dim.STATIC,
+            1: decoder_length,
+            2: torch.export.Dim.STATIC,
+            3: torch.export.Dim.STATIC,
         },
     )
+    if strategy.cross_attention_cache_states:
+        return (*shapes[:4], *(() if strategy.stateful else shapes[6:]))
+    return shapes[:6] if strategy.stateful else shapes
+
+
+def _bounded_dimension(name: str, maximum: int, *, dynamic: bool) -> Any:
+    if not dynamic or maximum <= 1:
+        return torch.export.Dim.STATIC
+    return torch.export.Dim(name, min=1, max=maximum)
 
 
 def persist_export_artifact(
@@ -355,9 +433,11 @@ def export_program(
     *,
     dynamic_shapes: dict[str, Any] | tuple[Any, ...] | list[Any] | None = None,
     decomposition_table: dict[Any, Any] | None = None,
+    draft: bool = False,
 ) -> torch.export.ExportedProgram:
     module.eval()
-    exported_program = torch.export.export(
+    export = torch.export.draft_export if draft else torch.export.export
+    exported_program = export(
         module,
         args=args,
         dynamic_shapes=dynamic_shapes,

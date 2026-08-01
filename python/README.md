@@ -69,9 +69,29 @@ python3 cli.py \
   --authoring-description "CoreAI export" \
   --authoring-license "BSD-3-Clause" \
   --authoring-custom suite=cli \
-  --quantizer-preset w8 \
-  --quantizer-execution-mode eager
+  --quantizer-preset w4_per_block
 ```
+
+For CoreAI int4 exports, prefer per-block weight quantization
+(`--quantizer-preset w4_per_block`). Exports remain unquantized unless compression
+is requested explicitly.
+
+Needle uses independent encoder and decoder limits. The encoder supports up to
+1024 tokens; decoder caches default to the canonical 512-token context. ONNX
+exports use dynamic encoder and decoder-cache dimensions. CoreAI exports use a
+dynamic encoder dimension and a static 512-token cache state, including
+compressed exports. CoreML exports enumerate encoder lengths 128, 256, 512, and
+1024 and use a static 512-token cache state.
+
+CoreAI and CoreML decoders are stateful by default. Each decoder layer owns
+separate self-attention K/V states, avoiding a full-cache stack at the end of
+every decode. CoreML also stores cross-attention K/V in read-only decoder states
+by default; CoreAI keeps those tensors as inputs because its current read-only
+state workaround is slower. Native runtimes initialize CoreML
+`cross_attention_{key,value}_cache_N` through `MLState` before the first decoder
+call. Stateful Apple exports always use the measured per-layer layout. Use
+`--decoder-profile reference` when an explicit full-cache interface is needed
+for compatibility or parity testing.
 
 With ahead-of-time compilation:
 
@@ -97,6 +117,26 @@ ONNX weight-only quantization uses ONNX Runtime's `MatMulNBits` representation:
 python3 cli.py --backend onnx --onnx-quantization int4 --output ./build/onnx-int4
 python3 cli.py --backend onnx --onnx-quantization int8 --output ./build/onnx-int8
 ```
+
+The ONNX decoder returns only `key_cache_delta` and `value_cache_delta`, each
+containing the newly generated row for every layer. The runtime appends these
+small outputs to its local cache tensors instead of receiving complete updated
+caches from the model. The benchmark includes that append in measured per-token
+latency.
+
+The ONNX benchmark retains the configured 512-position maximum cache but starts
+with 128 active positions by default, growing to 256 and 512 only when needed:
+
+```bash
+python3 scripts/benchmark_needle.py ./build/onnx-export \
+  --backend onnx \
+  --encoder-length 128 \
+  --generate 32
+```
+
+Use `--initial-cache-length 512` for a fixed-size baseline. `--cache-length`
+sets the maximum capacity rather than the initial active size. Apple benchmark
+results report `cross_cache_init_ms` separately and include it in TTFT.
 
 For custom compression, use the Python API:
 
@@ -125,7 +165,7 @@ export_needle_onnx(
 )
 ```
 
-With CoreML CPU/GPU execution and native SDPA:
+With the preferred CoreML CPU/GPU decoder placement and decomposed GQA:
 
 ```bash
 python3 cli.py \
@@ -174,13 +214,36 @@ ONNX quantization flags:
 
 - `--onnx-quantization {int4,int8}`
 
-Compute-unit flags:
+Decoder and compute-unit flags:
 
+- `--decoder-profile {default,reference}`
+- `--experimental-coreml-dynamic-cache`
+- `--coreml-decoder-attention {automatic,native,decomposed}`
 - `--compute-units {all,cpu-only,cpu-and-gpu,cpu-and-ne}`
+- `--encoder-compute-units {all,cpu-only,cpu-and-gpu,cpu-and-ne}`
+- `--decoder-compute-units {all,cpu-only,cpu-and-gpu,cpu-and-ne}`
 
-For CoreML, `all` and `cpu-and-ne` select the ANE-compatible decomposed
-attention graph. `cpu-only` and `cpu-and-gpu` select native SDPA. CoreAI
-always exports native SDPA; this option does not alter its graph.
+CoreML defaults to CPU+ANE for the encoder and CPU+GPU for the decoder. The
+legacy `--compute-units` flag overrides both components; the component-specific
+flags take precedence. The CoreML decoder uses decomposed grouped attention by
+default because it avoids native SDPA's K/V head expansion. Use
+`--coreml-decoder-attention` to override the decoder strategy independently of
+placement. CoreAI always exports native SDPA; compute-unit selection is a runtime
+specialization preference rather than a graph change.
+
+The Python implementation resolves these choices into one immutable
+`DecoderExportStrategy` before model construction. Use the named
+`reference()`, `onnx()`, `coreml()`, and `coreai()` constructors rather than
+combining cache booleans. ONNX uses explicit adaptive caches with delta outputs,
+CoreML uses per-layer self/cross states with decomposed attention, and CoreAI
+uses per-layer self states with cross K/V inputs and native GQA. Cache names and
+shapes live in `needle/cache_layout.py`; backend benchmark adapters live under
+`needle/benchmark/`.
+
+`--experimental-coreml-dynamic-cache` retains the fixed 512-position CoreML
+state while allowing the self-attention mask to select a dynamic active prefix.
+Benchmark with `--initial-cache-length 128` to start at 128 positions and grow
+to 256/512. Dynamic CoreML state currently requires an uncompressed export.
 
 Supported compression convenience flags:
 

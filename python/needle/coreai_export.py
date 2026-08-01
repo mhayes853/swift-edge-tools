@@ -11,6 +11,9 @@ from coreai.runtime import AIModelAssetMetadata
 from coreai_torch import TorchConverter
 
 from . import Needle, NeedleModelConfiguation
+from .decoder_strategy import (  # pyright: ignore[reportMissingImports]
+    DecoderExportStrategy,
+)
 from .needle_compression import NeedleCompressor
 
 
@@ -44,18 +47,28 @@ class _CoreAIDecoder(torch.nn.Module):
         cache_position: torch.Tensor,
         self_attention_mask: torch.Tensor,
         cross_attention_mask: torch.Tensor,
-        encoder_projected_k: torch.Tensor,
-        encoder_projected_v: torch.Tensor,
-        key_cache: torch.Tensor,
-        value_cache: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        encoder_projected_k: torch.Tensor | None = None,
+        encoder_projected_v: torch.Tensor | None = None,
+        key_cache: torch.Tensor | None = None,
+        value_cache: torch.Tensor | None = None,
+    ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        projected_k = (
+            encoder_projected_k.to(dtype=self.dtype)
+            if encoder_projected_k is not None
+            else None
+        )
+        projected_v = (
+            encoder_projected_v.to(dtype=self.dtype)
+            if encoder_projected_v is not None
+            else None
+        )
         return self.decoder(
             input_ids,
             cache_position,
             self_attention_mask.to(dtype=self.dtype),
             cross_attention_mask.to(dtype=self.dtype),
-            encoder_projected_k.to(dtype=self.dtype),
-            encoder_projected_v.to(dtype=self.dtype),
+            projected_k,
+            projected_v,
             key_cache,
             value_cache,
         )
@@ -67,17 +80,21 @@ def export_needle_coreai(
     *,
     compressor: NeedleCompressor | None = None,
     model_metadata: AIModelAssetMetadata | None = None,
+    decoder_strategy: DecoderExportStrategy | None = None,
     compile_platforms: Sequence[str] = (),
 ) -> Path:
     source_files, configuration, output_directory = export_helpers.prepare_export(
         source,
         output_directory,
     )
+    resolved_decoder_strategy = decoder_strategy or DecoderExportStrategy.coreai()
     needle = export_helpers.load_needle_model(
         configuration,
         source_files.weights_path,
-        use_native_sdpa=True,
+        encoder_use_native_sdpa=True,
+        decoder_strategy=resolved_decoder_strategy,
     )
+    needle = needle.to(dtype=torch.float16)
 
     encoder_program, decoder_program = convert_needle_coreai_programs(
         needle,
@@ -99,6 +116,7 @@ def export_needle_coreai(
         compile_platforms=compile_platforms,
     )
     export_helpers.copy_bundle_resources(source_files, output_directory)
+    export_helpers.write_exported_decoder_length(output_directory, configuration)
     return output_directory
 
 
@@ -108,8 +126,13 @@ def convert_needle_coreai_programs(
     *,
     compressor: NeedleCompressor | None = None,
 ) -> tuple[AIProgram, AIProgram]:
+    strategy = needle.decoder.strategy
     model_dtype = next(needle.parameters()).dtype
-    encoder_spec = export_helpers.encoder_export_spec(configuration)
+    uses_dynamic_buffers = True
+    encoder_spec = export_helpers.encoder_export_spec(
+        configuration,
+        dynamic_buffers=uses_dynamic_buffers,
+    )
     encoder_sample = (
         export_helpers.sample_encoder_input(
             configuration,
@@ -125,13 +148,22 @@ def convert_needle_coreai_programs(
 
     with torch.no_grad():
         encoder_outputs = encoder_module(*encoder_sample)
-    decoder_sample = (
-        *export_helpers.sample_decoder_inputs_from_encoder_outputs(
-            configuration,
-            encoder_outputs,
-        ),
-        *export_helpers.empty_decoder_caches(configuration, dtype=torch.float32),
+    decoder_prefix = export_helpers.sample_decoder_inputs_from_encoder_outputs(
+        configuration,
+        encoder_outputs,
     )
+    uses_cross_attention_states = strategy.cross_attention_cache_states
+    decoder_sample: tuple[torch.Tensor, ...] = (
+        decoder_prefix[:4] if uses_cross_attention_states else decoder_prefix
+    )
+    if not strategy.stateful:
+        decoder_sample = (
+            *decoder_prefix,
+            *export_helpers.empty_decoder_caches(
+                configuration,
+                dtype=model_dtype,
+            ),
+        )
 
     encoder_program = (
         TorchConverter()
@@ -149,7 +181,11 @@ def convert_needle_coreai_programs(
     )
     encoder_program.optimize()
 
-    decoder_spec = export_helpers.decoder_export_spec(configuration)
+    decoder_spec = export_helpers.decoder_export_spec(
+        configuration,
+        strategy,
+        dynamic_buffers=uses_dynamic_buffers,
+    )
     decoder_module = export_helpers.prepare_module_for_export(
         _CoreAIDecoder(needle.decoder, dtype=model_dtype),
         decoder_sample,
@@ -167,6 +203,7 @@ def convert_needle_coreai_programs(
             ),
             input_names=decoder_spec.input_names,
             output_names=decoder_spec.output_names,
+            state_names=decoder_spec.state_names,
         )
         .to_coreai()
     )

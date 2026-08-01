@@ -4,6 +4,17 @@ import typing
 import torch
 from torch import nn
 
+from .cache_layout import (
+    cross_attention_state_shape,
+    decoder_state_names,
+    self_attention_state_shape,
+)
+from .decoder_strategy import (
+    ActiveCacheStrategy,
+    CacheLayout,
+    CacheOutput,
+    DecoderExportStrategy,
+)
 from .needle_configuration import NeedleModelConfiguation
 
 
@@ -12,12 +23,14 @@ class NeedleModel(nn.Module):
         self,
         configuration: NeedleModelConfiguation,
         *,
-        use_native_sdpa: bool,
+        encoder_use_native_sdpa: bool,
+        decoder_strategy: DecoderExportStrategy,
     ):
         super().__init__()
         self.model = _NeedleSimpleAttentionNetwork(
             configuration,
-            use_native_sdpa=use_native_sdpa,
+            encoder_use_native_sdpa=encoder_use_native_sdpa,
+            decoder_strategy=decoder_strategy,
         )
         self.lm_head = (
             None
@@ -36,15 +49,18 @@ class Needle:
         self,
         configuration: NeedleModelConfiguation,
         *,
-        use_native_sdpa: bool = True,
+        decoder_strategy: DecoderExportStrategy,
+        encoder_use_native_sdpa: bool = True,
     ):
         self.configuration = configuration
+        self.decoder_strategy = decoder_strategy
         self._weights = NeedleModel(
             configuration,
-            use_native_sdpa=use_native_sdpa,
+            encoder_use_native_sdpa=encoder_use_native_sdpa,
+            decoder_strategy=decoder_strategy,
         )
         self.encoder = NeedleEncoder(self._weights)
-        self.decoder = NeedleDecoder(self._weights)
+        self.decoder = _make_decoder(self._weights, decoder_strategy)
 
     def state_dict(self, *args: typing.Any, **kwargs: typing.Any):
         return self._weights.state_dict(*args, **kwargs)
@@ -88,11 +104,29 @@ class NeedleEncoder(nn.Module):
 
 
 class NeedleDecoder(nn.Module):
-    def __init__(self, model: NeedleModel):
+    def __init__(
+        self,
+        model: NeedleModel,
+        *,
+        strategy: DecoderExportStrategy,
+    ):
         super().__init__()
         self.configuration = model.configuration
         self.model = model.model
         self.lm_head = model.lm_head
+        self.strategy = strategy
+
+    @property
+    def state_names(self) -> tuple[str, ...]:
+        return decoder_state_names(self.configuration, self.strategy)
+
+    @property
+    def state_buffer_names(self) -> tuple[str, ...]:
+        return tuple(
+            f"model.decoder.layers.{state_name.rsplit('_', 1)[1]}."
+            f"{state_name.rsplit('_', 1)[0]}"
+            for state_name in self.state_names
+        )
 
     def forward(
         self,
@@ -100,11 +134,26 @@ class NeedleDecoder(nn.Module):
         cache_position: torch.Tensor,
         self_attention_mask: torch.Tensor,
         cross_attention_mask: torch.Tensor,
-        encoder_projected_k: torch.Tensor,
-        encoder_projected_v: torch.Tensor,
-        key_cache: torch.Tensor,
-        value_cache: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        encoder_projected_k: torch.Tensor | None = None,
+        encoder_projected_v: torch.Tensor | None = None,
+        key_cache: torch.Tensor | None = None,
+        value_cache: torch.Tensor | None = None,
+    ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        if self.strategy.stateful:
+            return self._forward_with_per_layer_states(
+                input_ids,
+                cache_position,
+                self_attention_mask,
+                cross_attention_mask,
+                encoder_projected_k,
+                encoder_projected_v,
+            )
+        if encoder_projected_k is None or encoder_projected_v is None:
+            raise ValueError("Decoding requires encoder projected K/V")
+
+        if key_cache is None or value_cache is None:
+            raise ValueError("Stateless decoding requires key and value caches")
+
         hidden_state, updated_key_cache, updated_value_cache = self.model.decoder(
             self.model.embed_tokens(input_ids) * self.model.embed_scale,
             cache_position,
@@ -116,11 +165,144 @@ class NeedleDecoder(nn.Module):
             value_cache,
         )
         logits = _project_logits(
+            hidden_state, self.lm_head, self.model.embed_tokens.weight
+        )
+        if self.strategy.returns_cache_deltas:
+            positions = cache_position.to(dtype=torch.long)
+            return (
+                logits,
+                torch.index_select(updated_key_cache, 1, positions),
+                torch.index_select(updated_value_cache, 1, positions),
+            )
+        return logits, updated_key_cache, updated_value_cache
+
+    def _forward_with_per_layer_states(
+        self,
+        input_ids: torch.Tensor,
+        cache_position: torch.Tensor,
+        self_attention_mask: torch.Tensor,
+        cross_attention_mask: torch.Tensor,
+        encoder_projected_k: torch.Tensor | None,
+        encoder_projected_v: torch.Tensor | None,
+    ) -> torch.Tensor:
+        hidden_state = self.model.embed_tokens(input_ids) * self.model.embed_scale
+        rope = _RoPEFrequencies.from_table(
+            table=typing.cast(torch.Tensor, self.model.decoder.rope_table),
+            positions=cache_position,
+            dtype=hidden_state.dtype,
+        )
+        self_indices = torch.arange(
+            self_attention_mask.shape[-1],
+            device=hidden_state.device,
+        )
+        cross_indices = torch.arange(
+            cross_attention_mask.shape[-1],
+            device=hidden_state.device,
+        )
+
+        for index, module in enumerate(self.model.decoder.layers):
+            layer = typing.cast(_NeedleDecoderBlock, module)
+            key_state = typing.cast(torch.Tensor, layer.self_attention_key_cache)
+            value_state = typing.cast(torch.Tensor, layer.self_attention_value_cache)
+            uses_dynamic_prefix = (
+                self.strategy.active_cache == ActiveCacheStrategy.DYNAMIC_PREFIX
+            )
+            layer_key_cache = (
+                torch.index_select(key_state, 0, self_indices)
+                if uses_dynamic_prefix
+                else key_state
+            )
+            layer_value_cache = (
+                torch.index_select(value_state, 0, self_indices)
+                if uses_dynamic_prefix
+                else value_state
+            )
+            if self.strategy.cross_attention_cache_states:
+                cross_key_state = typing.cast(
+                    torch.Tensor,
+                    layer.cross_attention_key_cache,
+                )
+                cross_value_state = typing.cast(
+                    torch.Tensor,
+                    layer.cross_attention_value_cache,
+                )
+                # Exporters only expose mutated buffers as externally writable state.
+                # Touch one scalar so these read-mostly caches remain state operands.
+                cross_key_state[0, 0, 0, 0] = cross_key_state[0, 0, 0, 0]
+                cross_value_state[0, 0, 0, 0] = cross_value_state[0, 0, 0, 0]
+                layer_encoder_k = torch.index_select(
+                    cross_key_state,
+                    2,
+                    cross_indices,
+                )
+                layer_encoder_v = torch.index_select(
+                    cross_value_state,
+                    2,
+                    cross_indices,
+                )
+            else:
+                if encoder_projected_k is None or encoder_projected_v is None:
+                    raise ValueError("Decoding requires encoder projected K/V")
+                layer_encoder_k = encoder_projected_k[index]
+                layer_encoder_v = encoder_projected_v[index]
+
+            hidden_state, updated_key, updated_value = layer(
+                hidden_state,
+                cache_position,
+                self_attention_mask,
+                cross_attention_mask,
+                layer_encoder_k,
+                layer_encoder_v,
+                rope,
+                layer_key_cache,
+                layer_value_cache,
+            )
+            if self.strategy.active_cache == ActiveCacheStrategy.DYNAMIC_PREFIX:
+                active_cache_length = self_attention_mask.shape[-1]
+                key_state[:active_cache_length] = updated_key
+                value_state[:active_cache_length] = updated_value
+            else:
+                key_state[:] = updated_key
+                value_state[:] = updated_value
+
+        hidden_state = self.model.decoder.norm(hidden_state)
+        return _project_logits(
             hidden_state,
             self.lm_head,
             self.model.embed_tokens.weight,
         )
-        return logits, updated_key_cache, updated_value_cache
+
+
+class StatelessReferenceDecoder(NeedleDecoder):
+    def __init__(self, model: NeedleModel, strategy: DecoderExportStrategy):
+        if strategy.stateful or strategy.cache_output != CacheOutput.FULL:
+            raise ValueError("Reference decoder requires explicit full caches")
+        super().__init__(model, strategy=strategy)
+
+
+class ONNXDeltaDecoder(NeedleDecoder):
+    def __init__(self, model: NeedleModel, strategy: DecoderExportStrategy):
+        if strategy.stateful or strategy.cache_output != CacheOutput.DELTA:
+            raise ValueError("ONNX delta decoder requires explicit cache deltas")
+        super().__init__(model, strategy=strategy)
+
+
+class StatefulPerLayerDecoder(NeedleDecoder):
+    def __init__(self, model: NeedleModel, strategy: DecoderExportStrategy):
+        if strategy.cache_layout != CacheLayout.PER_LAYER_STATE:
+            raise ValueError("Per-layer decoder requires per-layer cache state")
+        super().__init__(model, strategy=strategy)
+
+
+def _make_decoder(
+    model: NeedleModel,
+    strategy: DecoderExportStrategy,
+) -> NeedleDecoder:
+    if strategy.cache_layout == CacheLayout.PER_LAYER_STATE:
+        return StatefulPerLayerDecoder(model, strategy)
+    if strategy.cache_output == CacheOutput.DELTA:
+        return ONNXDeltaDecoder(model, strategy)
+    return StatelessReferenceDecoder(model, strategy)
 
 
 class _RoPEFrequencies:
@@ -167,7 +349,8 @@ class _NeedleSimpleAttentionNetwork(nn.Module):
         self,
         configuration: NeedleModelConfiguation,
         *,
-        use_native_sdpa: bool,
+        encoder_use_native_sdpa: bool,
+        decoder_strategy: DecoderExportStrategy,
     ):
         super().__init__()
         self.embed_tokens = nn.Embedding(
@@ -176,11 +359,11 @@ class _NeedleSimpleAttentionNetwork(nn.Module):
         )
         self.encoder = _NeedleEncoder(
             configuration,
-            use_native_sdpa=use_native_sdpa,
+            use_native_sdpa=encoder_use_native_sdpa,
         )
         self.decoder = _NeedleDecoder(
             configuration,
-            use_native_sdpa=use_native_sdpa,
+            strategy=decoder_strategy,
         )
         self.embed_scale = math.sqrt(configuration.dimensions)
 
@@ -192,11 +375,7 @@ class _NeedleSimpleAttentionNetwork(nn.Module):
         encoder_output: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         projected = [
-            typing.cast(_NeedleAttention, layer.encoder_attn).expand_kv_heads(
-                *typing.cast(_NeedleAttention, layer.encoder_attn).project_kv(
-                    encoder_output
-                )
-            )
+            typing.cast(_NeedleAttention, layer.encoder_attn).project_kv(encoder_output)
             for layer in self.decoder.layers
         ]
         projected_k = torch.stack([k for k, _ in projected], dim=0)
@@ -209,14 +388,14 @@ class _NeedleDecoder(nn.Module):
         self,
         configuration: NeedleModelConfiguation,
         *,
-        use_native_sdpa: bool,
+        strategy: DecoderExportStrategy,
     ):
         super().__init__()
         self.layers = nn.ModuleList(
             [
                 _NeedleDecoderBlock(
                     configuration,
-                    use_native_sdpa=use_native_sdpa,
+                    strategy=strategy,
                 )
                 for _ in range(configuration.decoder_layers)
             ]
@@ -227,7 +406,7 @@ class _NeedleDecoder(nn.Module):
             _RoPEFrequencies.table(
                 dimensions=configuration.attention_head_dimensions,
                 theta=configuration.rope_theta,
-                length=configuration.encoder_max_length,
+                length=configuration.decoder_max_length,
             ),
             persistent=False,
         )
@@ -254,6 +433,7 @@ class _NeedleDecoder(nn.Module):
         for index, layer in enumerate(self.layers):
             x, updated_key, updated_value = layer(
                 x,
+                cache_position,
                 self_mask,
                 cross_mask,
                 encoder_projected_k[index],
@@ -276,25 +456,56 @@ class _NeedleDecoderBlock(nn.Module):
         self,
         configuration: NeedleModelConfiguation,
         *,
-        use_native_sdpa: bool,
+        strategy: DecoderExportStrategy,
     ):
         super().__init__()
         self.input_layernorm = _ZCRMSNorm.from_configuration(configuration)
         self.self_attn = _NeedleAttention(
             configuration,
-            use_native_sdpa=use_native_sdpa,
+            use_native_sdpa=strategy.uses_native_attention,
+            use_native_gqa=strategy.use_native_gqa,
         )
         self.self_attn_gate = nn.Parameter(torch.zeros(1))
         self.encoder_attn_layer_norm = _ZCRMSNorm.from_configuration(configuration)
         self.encoder_attn = _NeedleAttention(
             configuration,
-            use_native_sdpa=use_native_sdpa,
+            use_native_sdpa=strategy.uses_native_attention,
+            use_native_gqa=strategy.use_native_gqa,
         )
         self.cross_attn_gate = nn.Parameter(torch.zeros(1))
+        self.self_attention_key_cache: torch.Tensor
+        self.self_attention_value_cache: torch.Tensor
+        self.cross_attention_key_cache: torch.Tensor
+        self.cross_attention_value_cache: torch.Tensor
+        if strategy.stateful:
+            self_cache_shape = self_attention_state_shape(configuration)
+            self.register_buffer(
+                "self_attention_key_cache",
+                torch.zeros(self_cache_shape),
+                persistent=False,
+            )
+            self.register_buffer(
+                "self_attention_value_cache",
+                torch.zeros(self_cache_shape),
+                persistent=False,
+            )
+        if strategy.cross_attention_cache_states:
+            cross_cache_shape = cross_attention_state_shape(configuration)
+            self.register_buffer(
+                "cross_attention_key_cache",
+                torch.zeros(cross_cache_shape),
+                persistent=False,
+            )
+            self.register_buffer(
+                "cross_attention_value_cache",
+                torch.zeros(cross_cache_shape),
+                persistent=False,
+            )
 
     def forward(
         self,
         x: torch.Tensor,
+        cache_position: torch.Tensor,
         self_mask: torch.Tensor,
         cross_mask: torch.Tensor,
         encoder_projected_k: torch.Tensor,
@@ -310,6 +521,7 @@ class _NeedleDecoderBlock(nn.Module):
                 kv=self_normed,
                 mask=self_mask,
                 rope=rope,
+                cache_position=cache_position,
                 layer_key_cache=layer_key_cache,
                 layer_value_cache=layer_value_cache,
             )
@@ -395,10 +607,12 @@ class _NeedleAttention(nn.Module):
         configuration: NeedleModelConfiguation,
         *,
         use_native_sdpa: bool,
+        use_native_gqa: bool = True,
     ):
         super().__init__()
         self.heads = configuration.attention_heads
         self.use_native_sdpa = use_native_sdpa
+        self.use_native_gqa = use_native_gqa
         self.kv_heads = configuration.kv_heads
         self.head_dimensions = configuration.attention_head_dimensions
 
@@ -434,7 +648,6 @@ class _NeedleAttention(nn.Module):
         projected_k, projected_v = self.project_kv(kv)
         if rope is not None:
             projected_k = rope.apply(projected_k)
-        projected_k, projected_v = self.expand_kv_heads(projected_k, projected_v)
         return self.forward_with_projected_kv(
             q=q,
             projected_k=projected_k,
@@ -449,14 +662,14 @@ class _NeedleAttention(nn.Module):
         kv: torch.Tensor,
         mask: torch.Tensor | None,
         rope: _RoPEFrequencies,
+        cache_position: torch.Tensor,
         layer_key_cache: torch.Tensor,
         layer_value_cache: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         projected_k, projected_v = self.project_kv(kv)
         projected_k = rope.apply(projected_k)
-        projected_k, projected_v = self.expand_kv_heads(projected_k, projected_v)
-        updated_key = _update_kv_cache(layer_key_cache, projected_k)
-        updated_value = _update_kv_cache(layer_value_cache, projected_v)
+        updated_key = _update_kv_cache(layer_key_cache, projected_k, cache_position)
+        updated_value = _update_kv_cache(layer_value_cache, projected_v, cache_position)
         active_k = updated_key.transpose(0, 1).unsqueeze(0)
         active_v = updated_value.transpose(0, 1).unsqueeze(0)
         output = self.forward_with_projected_kv(
@@ -487,20 +700,45 @@ class _NeedleAttention(nn.Module):
             q = rope.apply(q)
 
         if self.use_native_sdpa:
+            enable_gqa = self.use_native_gqa and self.heads != self.kv_heads
+            if not self.use_native_gqa:
+                projected_k, projected_v = self.expand_kv_heads(
+                    projected_k,
+                    projected_v,
+                )
             output = nn.functional.scaled_dot_product_attention(
                 q,
                 projected_k,
                 projected_v,
                 attn_mask=mask,
                 dropout_p=0.0,
+                enable_gqa=enable_gqa,
             )
         else:
-            attention_scores = torch.matmul(q, projected_k.transpose(-2, -1))
+            groups = self.heads // self.kv_heads
+            grouped_q = q.view(
+                batch,
+                self.kv_heads,
+                groups,
+                seq_len,
+                self.head_dimensions,
+            )
+            grouped_k = projected_k.unsqueeze(2)
+            grouped_v = projected_v.unsqueeze(2)
+            attention_scores = torch.matmul(
+                grouped_q,
+                grouped_k.transpose(-2, -1),
+            )
             attention_scores = attention_scores / math.sqrt(q.shape[-1])
             if mask is not None:
-                attention_scores = attention_scores + mask
+                attention_scores = attention_scores + mask.unsqueeze(2)
             attention_probabilities = torch.softmax(attention_scores, dim=-1)
-            output = torch.matmul(attention_probabilities, projected_v)
+            output = torch.matmul(attention_probabilities, grouped_v).view(
+                batch,
+                self.heads,
+                seq_len,
+                self.head_dimensions,
+            )
 
         output = (
             output.transpose(1, 2)
@@ -549,15 +787,18 @@ class _ZCRMSNorm(nn.Module):
         self.eps = eps
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        weight = self.weight.to(x.dtype) + torch.ones_like(self.weight, dtype=x.dtype)
+        weight = self.weight.to(x.dtype) + 1.0
         return torch.rms_norm(x, (x.shape[-1],), weight, self.eps)
 
 
 def _update_kv_cache(
-    layer_cache: torch.Tensor, projected: torch.Tensor
+    layer_cache: torch.Tensor,
+    projected: torch.Tensor,
+    cache_position: torch.Tensor,
 ) -> torch.Tensor:
-    current = projected[0].transpose(0, 1)
-    return torch.cat((layer_cache[1:], current), dim=0)
+    # CoreAI runs a bf16 graph against fp32 caches; index_put needs them to agree.
+    current = projected[0].transpose(0, 1).to(dtype=layer_cache.dtype)
+    return torch.index_put(layer_cache, (cache_position.to(dtype=torch.long),), current)
 
 
 def _gated_residual(

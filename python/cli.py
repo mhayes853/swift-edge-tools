@@ -20,9 +20,10 @@ from coreai_opt.palettization import (
 )
 from coreai_opt.quantization import QuantizerConfig
 from needle.coreai_export import export_needle_coreai
-from needle.coreml_export import (
-    CoreMLComputeUnits,
-    export_needle_coreml,
+from needle.coreml_export import CoreMLComputeUnits, export_needle_coreml
+from needle.decoder_strategy import (  # pyright: ignore[reportMissingImports]
+    AttentionImplementation,
+    DecoderExportStrategy,
 )
 from needle.export_helpers import DEFAULT_SOURCE
 from needle.needle_compression import (
@@ -71,11 +72,35 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--compute-units",
         choices=_COMPUTE_UNITS,
-        default=CoreMLComputeUnits.ALL.value,
-        help=(
-            "Target compute units; selects an ANE-compatible CoreML attention "
-            "graph when applicable."
-        ),
+        help="Legacy override that applies the same compute units to both components.",
+    )
+    parser.add_argument(
+        "--encoder-compute-units",
+        choices=_COMPUTE_UNITS,
+        default=CoreMLComputeUnits.CPU_AND_NE.value,
+    )
+    parser.add_argument(
+        "--decoder-compute-units",
+        choices=_COMPUTE_UNITS,
+        default=CoreMLComputeUnits.CPU_AND_GPU.value,
+    )
+    decoder_experiments = parser.add_argument_group("decoder experiments")
+    decoder_experiments.add_argument(
+        "--coreml-decoder-attention",
+        choices=("automatic", "native", "decomposed"),
+        default="automatic",
+        help="Override the CoreML decoder attention lowering strategy.",
+    )
+    decoder_experiments.add_argument(
+        "--decoder-profile",
+        choices=("default", "reference"),
+        default="default",
+        help="Use the optimized backend contract or explicit-cache reference contract.",
+    )
+    decoder_experiments.add_argument(
+        "--experimental-coreml-dynamic-cache",
+        action="store_true",
+        help="Limit CoreML self-attention to a dynamic active cache prefix.",
     )
     parser.add_argument(
         "--compile-platform",
@@ -335,32 +360,68 @@ def _export_for_backend(
     onnx_compressor: ONNXCompressor | None = None,
     onnx_dtype: str = "float32",
     model_metadata: AIModelAssetMetadata | None = None,
-    compute_units: CoreMLComputeUnits = CoreMLComputeUnits.ALL,
+    compute_units: CoreMLComputeUnits | None = None,
+    encoder_compute_units: CoreMLComputeUnits = CoreMLComputeUnits.CPU_AND_NE,
+    decoder_compute_units: CoreMLComputeUnits = CoreMLComputeUnits.CPU_AND_GPU,
+    decoder_use_native_sdpa: bool | None = None,
+    decoder_profile: str = "default",
+    experimental_coreml_dynamic_cache: bool = False,
     compile_platforms: Sequence[str] = (),
 ) -> Path:
+    coreml_attention = (
+        AttentionImplementation.NATIVE
+        if decoder_use_native_sdpa
+        else AttentionImplementation.DECOMPOSED
+    )
     if backend == CLIBackend.COREAI:
+        decoder_strategy = (
+            DecoderExportStrategy.reference()
+            if decoder_profile == "reference"
+            else DecoderExportStrategy.coreai()
+        )
         return export_needle_coreai(
             source,
             output,
             compressor=compressor,
             model_metadata=model_metadata,
+            decoder_strategy=decoder_strategy,
             compile_platforms=compile_platforms,
         )
     if backend == CLIBackend.COREML:
+        decoder_strategy = (
+            DecoderExportStrategy.reference(
+                attention=coreml_attention,
+                use_native_gqa=False,
+            )
+            if decoder_profile == "reference"
+            else DecoderExportStrategy.coreml(
+                attention=coreml_attention,
+                dynamic_cache=experimental_coreml_dynamic_cache,
+            )
+        )
         return _export_needle_coreml(
             source,
             output,
             compressor=compressor,
             model_metadata=model_metadata,
             compute_units=compute_units,
+            encoder_compute_units=encoder_compute_units,
+            decoder_compute_units=decoder_compute_units,
+            decoder_strategy=decoder_strategy,
             compile_platforms=compile_platforms,
         )
     if backend == CLIBackend.ONNX:
+        decoder_strategy = (
+            DecoderExportStrategy.reference()
+            if decoder_profile == "reference"
+            else DecoderExportStrategy.onnx()
+        )
         return export_needle_onnx(
             source,
             output,
             compressor=onnx_compressor,
             dtype=onnx_dtype,
+            decoder_strategy=decoder_strategy,
         )
 
 
@@ -370,7 +431,10 @@ def _export_needle_coreml(
     *,
     compressor: NeedleCompressor | None = None,
     model_metadata: AIModelAssetMetadata | None = None,
-    compute_units: CoreMLComputeUnits = CoreMLComputeUnits.ALL,
+    compute_units: CoreMLComputeUnits | None = None,
+    encoder_compute_units: CoreMLComputeUnits = CoreMLComputeUnits.CPU_AND_NE,
+    decoder_compute_units: CoreMLComputeUnits = CoreMLComputeUnits.CPU_AND_GPU,
+    decoder_strategy: DecoderExportStrategy | None = None,
     compile_platforms: Sequence[str] = (),
 ) -> Path:
     return export_needle_coreml(
@@ -379,6 +443,9 @@ def _export_needle_coreml(
         compressor=compressor,
         model_metadata=model_metadata,
         compute_units=compute_units,
+        encoder_compute_units=encoder_compute_units,
+        decoder_compute_units=decoder_compute_units,
+        decoder_strategy=decoder_strategy,
         compile_platforms=compile_platforms,
     )
 
@@ -391,7 +458,22 @@ def main(arguments: Sequence[str] | None = None) -> int:
         compressor = _build_compressor(parsed)
         onnx_compressor = _build_onnx_compressor(parsed)
         model_metadata = _build_authoring_metadata(parsed)
-        compute_units = _parse_compute_units(parsed.compute_units)
+        compute_units = (
+            _parse_compute_units(parsed.compute_units)
+            if parsed.compute_units is not None
+            else None
+        )
+        encoder_compute_units = _parse_compute_units(parsed.encoder_compute_units)
+        decoder_compute_units = _parse_compute_units(parsed.decoder_compute_units)
+        decoder_use_native_sdpa = {
+            "automatic": None,
+            "native": True,
+            "decomposed": False,
+        }[parsed.coreml_decoder_attention]
+        if parsed.experimental_coreml_dynamic_cache and backend != CLIBackend.COREML:
+            raise ValueError(
+                "Experimental dynamic decoder caches are only supported by CoreML"
+            )
     except ValueError as error:
         parser.error(str(error))
 
@@ -405,6 +487,13 @@ def main(arguments: Sequence[str] | None = None) -> int:
             onnx_dtype=parsed.onnx_dtype,
             model_metadata=model_metadata,
             compute_units=compute_units,
+            encoder_compute_units=encoder_compute_units,
+            decoder_compute_units=decoder_compute_units,
+            decoder_use_native_sdpa=decoder_use_native_sdpa,
+            decoder_profile=parsed.decoder_profile,
+            experimental_coreml_dynamic_cache=(
+                parsed.experimental_coreml_dynamic_cache
+            ),
             compile_platforms=parsed.compile_platforms,
         )
     sys.stdout.write(f"{output_directory}\n")

@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, Union
 
 from .json import JSONObject, JSONScalar, JSONValue, load_json_object
 
@@ -20,9 +19,10 @@ class NeedleModelConfiguation:
     pad_token_id: int = 0
     decoder_start_token_id: int = 1
     tie_word_embeddings: bool = True
-    max_seq_len: Optional[int] = field(default=None)
-    max_position_embeddings: Optional[int] = field(default=None)
-    dtype: Optional[str] = field(default="bfloat16")
+    max_seq_len: int | None = field(default=None)
+    max_position_embeddings: int | None = field(default=None)
+    max_decoder_length: int | None = field(default=None)
+    dtype: str | None = field(default="bfloat16")
 
     @property
     def resolved_dtype(self) -> str:
@@ -40,10 +40,12 @@ class NeedleModelConfiguation:
     def encoder_max_length(self) -> int:
         return self.max_seq_len or self.max_position_embeddings or 1024
 
+    @property
+    def decoder_max_length(self) -> int:
+        return self.max_decoder_length or min(self.encoder_max_length, 512)
+
     @classmethod
-    def from_file(
-        cls, configuration_path: Union[str, Path]
-    ) -> "NeedleModelConfiguation":
+    def from_file(cls, configuration_path: str | Path) -> "NeedleModelConfiguation":
         return cls.from_json_object(load_json_object(configuration_path))
 
     @classmethod
@@ -123,6 +125,13 @@ class NeedleModelConfiguation:
             max_position_embeddings=_optional_int_value(
                 data, "max_position_embeddings"
             ),
+            max_decoder_length=_optional_int_value(
+                data,
+                "decoder_max_length",
+                "max_decoder_length",
+                "max_dec_len",
+                "max_gen_len",
+            ),
             dtype=_optional_str_value(
                 data, "dtype", "torch_dtype", default=defaults.dtype
             ),
@@ -136,9 +145,7 @@ def _config_value(data: JSONObject, *keys: str, default: JSONValue) -> JSONValue
     return default
 
 
-def _scalar_value(
-    data: JSONObject, *keys: str, default: JSONValue
-) -> JSONScalar:
+def _scalar_value(data: JSONObject, *keys: str, default: JSONValue) -> JSONScalar:
     value = _config_value(data, *keys, default=default)
     if isinstance(value, (dict, list)):
         raise ValueError(f"Expected scalar config value for keys {keys}, got {value!r}")
@@ -149,14 +156,20 @@ def _int_value(data: JSONObject, *keys: str, default: int) -> int:
     value = _scalar_value(data, *keys, default=default)
     if value is None:
         return default
-    return int(value)
+    try:
+        return int(value)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"Expected integer config value for keys {keys}") from error
 
 
 def _float_value(data: JSONObject, *keys: str, default: float) -> float:
     value = _scalar_value(data, *keys, default=default)
     if value is None:
         return default
-    return float(value)
+    try:
+        return float(value)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"Expected numeric config value for keys {keys}") from error
 
 
 def _bool_value(data: JSONObject, *keys: str, default: bool) -> bool:
@@ -166,16 +179,19 @@ def _bool_value(data: JSONObject, *keys: str, default: bool) -> bool:
     return bool(value)
 
 
-def _optional_int_value(data: JSONObject, key: str) -> Optional[int]:
-    value = _scalar_value(data, key, default=None)
+def _optional_int_value(data: JSONObject, *keys: str) -> int | None:
+    value = _scalar_value(data, *keys, default=None)
     if value is None:
         return None
-    return int(value)
+    try:
+        return int(value)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"Expected integer config value for keys {keys}") from error
 
 
 def _optional_str_value(
-    data: JSONObject, *keys: str, default: Optional[str]
-) -> Optional[str]:
+    data: JSONObject, *keys: str, default: str | None
+) -> str | None:
     value = _scalar_value(data, *keys, default=default)
     if value is None:
         return None

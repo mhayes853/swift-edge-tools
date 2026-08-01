@@ -13,8 +13,13 @@ from coreai.runtime import AIModelAssetMetadata
 from coreai_opt.palettization import KMeansPalettizerConfig
 from coreai_opt.quantization import QuantizerConfig
 
-from needle import Needle, NeedleModelConfiguation
 import needle.coreml_export as coreml_export
+from needle import (
+    AttentionImplementation,
+    DecoderExportStrategy,
+    Needle,
+    NeedleModelConfiguation,
+)
 from needle.coreml_export import (
     CoreMLComputeUnits,
     coreml_operation_histogram,
@@ -68,6 +73,26 @@ class CoreMLExportTests(unittest.TestCase):
     def test_export_needle_coreml_runs_end_to_end_on_local_bundle(self) -> None:
         self._assert_export_runs_end_to_end()
 
+    def test_stateful_coreml_decoder_supports_dynamic_cache_prefix(self) -> None:
+        def assert_dynamic_cache(output_directory: Path) -> None:
+            model = ct.models.MLModel(
+                str(output_directory / "decoder.mlpackage"),
+                skip_model_load=True,
+            )
+            mask = next(
+                feature
+                for feature in model.get_spec().description.input
+                if feature.name == "self_attention_mask"
+            )
+            cache_range = mask.type.multiArrayType.shapeRange.sizeRanges[-1]
+            self.assertEqual(cache_range.lowerBound, 1)
+            self.assertEqual(cache_range.upperBound, 512)
+
+        self._assert_export_runs_end_to_end(
+            dynamic_decoder_cache=True,
+            post_export_assertions=assert_dynamic_cache,
+        )
+
     def test_export_needle_coreml_supports_quantizer_compressor(self) -> None:
         compressor = CoreMLQuantizerCompressor(QuantizerConfig.presets.w8())
         self._assert_export_runs_end_to_end(compressor=compressor)
@@ -81,13 +106,13 @@ class CoreMLExportTests(unittest.TestCase):
         )
         self._assert_export_runs_end_to_end(compressor=compressor)
 
-    def test_coreml_export_uses_native_sdpa_without_ane(self) -> None:
+    def test_coreml_export_defaults_to_decomposed_decoder_attention(self) -> None:
         histograms = self._export_operation_histograms(
             compute_units=CoreMLComputeUnits.CPU_AND_GPU,
         )
 
-        for histogram in histograms:
-            self.assertGreater(histogram["scaled_dot_product_attention"], 0)
+        self.assertGreater(histograms[0]["scaled_dot_product_attention"], 0)
+        self.assertEqual(histograms[1]["scaled_dot_product_attention"], 0)
 
     def test_coreml_export_avoids_native_sdpa_with_ane(self) -> None:
         histograms = self._export_operation_histograms(
@@ -96,6 +121,15 @@ class CoreMLExportTests(unittest.TestCase):
 
         for histogram in histograms:
             self.assertEqual(histogram["scaled_dot_product_attention"], 0)
+
+    def test_coreml_decoder_attention_strategy_can_be_overridden(self) -> None:
+        histograms = self._export_operation_histograms(
+            compute_units=CoreMLComputeUnits.CPU_AND_GPU,
+            decoder_use_native_sdpa=True,
+        )
+
+        for histogram in histograms:
+            self.assertGreater(histogram["scaled_dot_product_attention"], 0)
 
     def test_export_needle_coreml_supports_bfloat16_source_weights(self) -> None:
         self._assert_export_runs_end_to_end(source_dtype="bfloat16")
@@ -128,6 +162,7 @@ class CoreMLExportTests(unittest.TestCase):
         self,
         *,
         compute_units: CoreMLComputeUnits,
+        decoder_use_native_sdpa: bool | None = None,
     ) -> list[Counter[str]]:
         histograms: list[Counter[str]] = []
         persist_model = coreml_export._persist_model
@@ -144,7 +179,10 @@ class CoreMLExportTests(unittest.TestCase):
             "_persist_model",
             side_effect=persist_model_with_histogram,
         ):
-            self._assert_export_runs_end_to_end(compute_units=compute_units)
+            self._assert_export_runs_end_to_end(
+                compute_units=compute_units,
+                decoder_use_native_sdpa=decoder_use_native_sdpa,
+            )
 
         return histograms
 
@@ -155,6 +193,8 @@ class CoreMLExportTests(unittest.TestCase):
         post_export_assertions: Callable[[Path], None] | None = None,
         source_dtype: str = "float32",
         compute_units: CoreMLComputeUnits = CoreMLComputeUnits.ALL,
+        decoder_use_native_sdpa: bool | None = None,
+        dynamic_decoder_cache: bool = False,
     ) -> None:
         source_ctx = tempfile.TemporaryDirectory()
         output_ctx = tempfile.TemporaryDirectory()
@@ -185,15 +225,27 @@ class CoreMLExportTests(unittest.TestCase):
             configuration = NeedleModelConfiguation.from_file(
                 source_directory / "configuration.json"
             )
-            needle_instance = Needle(configuration)
+            needle_instance = Needle(
+                configuration,
+                decoder_strategy=DecoderExportStrategy.reference(),
+            )
             torch.save(needle_instance.state_dict(), source_directory / "weights.pkl")
 
+            decoder_strategy = DecoderExportStrategy.coreml(
+                attention=(
+                    AttentionImplementation.NATIVE
+                    if decoder_use_native_sdpa
+                    else AttentionImplementation.DECOMPOSED
+                ),
+                dynamic_cache=dynamic_decoder_cache,
+            )
             result = export_needle_coreml(
                 str(source_directory),
                 output_directory,
                 compressor=compressor,
                 model_metadata=model_metadata,
                 compute_units=compute_units,
+                decoder_strategy=decoder_strategy,
             )
 
             self.assertEqual(result, output_directory.resolve())
@@ -231,19 +283,28 @@ class CoreMLExportTests(unittest.TestCase):
                     "cache_position",
                     "self_attention_mask",
                     "cross_attention_mask",
-                    "encoder_projected_k",
-                    "encoder_projected_v",
-                    "key_cache",
-                    "value_cache",
                 ],
             )
+            expected_state_names = [
+                "self_attention_key_cache_0",
+                "self_attention_value_cache_0",
+                "cross_attention_key_cache_0",
+                "cross_attention_value_cache_0",
+            ]
+            decoder_model_spec = decoder_model.get_spec()
             self.assertEqual(
-                [field.name for field in decoder_model.get_spec().description.state],
-                [],
+                [field.name for field in decoder_model_spec.description.state],
+                expected_state_names,
             )
+            program_input_names = {
+                value.name
+                for function in decoder_model_spec.mlProgram.functions.values()
+                for value in function.inputs
+            }
+            self.assertTrue(set(expected_state_names).issubset(program_input_names))
             self.assertEqual(
                 [field.name for field in decoder_model.get_spec().description.output],
-                ["logits", "updated_key_cache", "updated_value_cache"],
+                ["logits"],
             )
             if post_export_assertions is not None:
                 post_export_assertions(result)

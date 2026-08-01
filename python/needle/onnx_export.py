@@ -8,6 +8,9 @@ from pathlib import Path
 import torch
 
 from . import export_helpers
+from .decoder_strategy import (  # pyright: ignore[reportMissingImports]
+    DecoderExportStrategy,
+)
 from .needle_configuration import NeedleModelConfiguation
 from .needle_torch import Needle
 from .onnx_compression import ONNXCompressor, ONNXModelComponent
@@ -19,6 +22,7 @@ def export_needle_onnx(
     *,
     compressor: ONNXCompressor | None = None,
     dtype: str = "float32",
+    decoder_strategy: DecoderExportStrategy | None = None,
     opset_version: int = 21,
     external_data: bool = True,
 ) -> Path:
@@ -30,7 +34,7 @@ def export_needle_onnx(
     needle = export_helpers.load_needle_model(
         export_configuration,
         source_files.weights_path,
-        use_native_sdpa=True,
+        decoder_strategy=decoder_strategy or DecoderExportStrategy.onnx(),
     )
     convert_needle_onnx_models(
         needle,
@@ -41,6 +45,10 @@ def export_needle_onnx(
         external_data=external_data,
     )
     export_helpers.copy_bundle_resources(source_files, output_directory)
+    export_helpers.write_exported_decoder_length(
+        output_directory,
+        export_configuration,
+    )
     _write_exported_configuration_dtype(output_directory, dtype=dtype)
     return output_directory
 
@@ -74,14 +82,21 @@ def convert_needle_onnx_models(
     output_directory = Path(output_directory).expanduser().resolve()
     output_directory.mkdir(parents=True, exist_ok=True)
 
-    encoder_spec = export_helpers.encoder_export_spec(configuration)
+    encoder_spec = export_helpers.encoder_export_spec(
+        configuration,
+        dynamic_buffers=True,
+    )
     encoder_sample = (
         export_helpers.sample_encoder_input(
             configuration,
             configuration.encoder_max_length,
         ),
     )
-    decoder_spec = export_helpers.decoder_export_spec(configuration)
+    decoder_spec = export_helpers.decoder_export_spec(
+        configuration,
+        needle.decoder.strategy,
+        dynamic_buffers=True,
+    )
     decoder_sample = (
         *export_helpers.sample_decoder_inputs(needle, configuration),
         *export_helpers.empty_decoder_caches(
