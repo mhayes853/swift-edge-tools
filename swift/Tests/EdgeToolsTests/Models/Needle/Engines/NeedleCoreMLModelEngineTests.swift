@@ -11,7 +11,7 @@
     @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
     func `Generate Basics`() async throws {
       let engine = try await makeNeedleCoreMLModelEngine()
-      let tokens = Lock([EdgeToolsToken]())
+      let tokens = LockBox([EdgeToolsToken]())
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
         tools: NeedlePrompt.sendAdventureEmailDefinitions,
@@ -85,7 +85,7 @@
     @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
     func `Generate Streamed Response Matches Final Response`() async throws {
       let engine = try await makeNeedleCoreMLModelEngine()
-      let tokens = Lock([EdgeToolsToken]())
+      let tokens = LockBox([EdgeToolsToken]())
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
         tools: NeedlePrompt.sendAdventureEmailDefinitions,
@@ -105,8 +105,8 @@
     @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
     func `Generate Stops And Returns Stopped Generation`() async throws {
       let engine = try await makeNeedleCoreMLModelEngine()
-      let tokens = Lock([EdgeToolsToken]())
-      let generationTaskBox = Lock<NeedleCoreMLModelEngine.GenerationTask?>(nil)
+      let tokens = LockBox([EdgeToolsToken]())
+      let generationTaskBox = LockBox<NeedleCoreMLModelEngine.GenerationTask?>(nil)
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
         tools: NeedlePrompt.sendAdventureEmailDefinitions,
@@ -152,7 +152,7 @@
     @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
     func `Generate Basics With W8 Quantized Export`() async throws {
       let engine = try await makeNeedleCoreMLModelEngine(quantizerPreset: "w8")
-      let tokens = Lock([EdgeToolsToken]())
+      let tokens = LockBox([EdgeToolsToken]())
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
         tools: NeedlePrompt.sendAdventureEmailDefinitions,
@@ -178,7 +178,7 @@
         quantizerPreset: "w8",
         palettizerBits: 4
       )
-      let tokens = Lock([EdgeToolsToken]())
+      let tokens = LockBox([EdgeToolsToken]())
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
         tools: NeedlePrompt.sendAdventureEmailDefinitions,

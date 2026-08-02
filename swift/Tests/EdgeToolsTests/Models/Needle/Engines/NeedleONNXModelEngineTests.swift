@@ -186,7 +186,7 @@
     @Test
     func `Generate Stops And Returns Stopped Generation`() async throws {
       let engine = try await makeNeedleONNXModelEngine()
-      let generationTaskBox = Lock<NeedleCONNXModelEngine.GenerationTask?>(nil)
+      let generationTaskBox = LockBox<NeedleCONNXModelEngine.GenerationTask?>(nil)
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
         tools: NeedlePrompt.sendAdventureEmailDefinitions,
@@ -362,7 +362,7 @@
     @Test
     func `Generate Streamed Response Matches Final Response`() async throws {
       let engine = try await makeNeedleONNXModelEngine()
-      let streamedTokens = Lock([EdgeToolsToken]())
+      let streamedTokens = LockBox([EdgeToolsToken]())
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
         tools: NeedlePrompt.sendAdventureEmailDefinitions,

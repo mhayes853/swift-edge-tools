@@ -11,7 +11,7 @@
     @available(anyAppleOS 27.0, *)
     func `Generate Basics`() async throws {
       let engine = try await makeNeedleCoreAIModelEngine()
-      let tokens = Lock([EdgeToolsToken]())
+      let tokens = LockBox([EdgeToolsToken]())
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
         tools: NeedlePrompt.sendAdventureEmailDefinitions,
@@ -85,7 +85,7 @@
     @available(anyAppleOS 27.0, *)
     func `Generate Streamed Response Matches Final Response`() async throws {
       let engine = try await makeNeedleCoreAIModelEngine()
-      let tokens = Lock([EdgeToolsToken]())
+      let tokens = LockBox([EdgeToolsToken]())
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
         tools: NeedlePrompt.sendAdventureEmailDefinitions,
@@ -125,8 +125,8 @@
     @available(anyAppleOS 27.0, *)
     func `Generate Stops And Returns Stopped Generation`() async throws {
       let engine = try await makeNeedleCoreAIModelEngine()
-      let tokens = Lock([EdgeToolsToken]())
-      let generationTaskBox = Lock<NeedleCoreAIModelEngine.GenerationTask?>(nil)
+      let tokens = LockBox([EdgeToolsToken]())
+      let generationTaskBox = LockBox<NeedleCoreAIModelEngine.GenerationTask?>(nil)
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
         tools: NeedlePrompt.sendAdventureEmailDefinitions,
@@ -172,7 +172,7 @@
     @available(anyAppleOS 27.0, *)
     func `Generate Basics With W8 Quantized Export`() async throws {
       let engine = try await makeNeedleCoreAIModelEngine(quantizerPreset: "w8")
-      let tokens = Lock([EdgeToolsToken]())
+      let tokens = LockBox([EdgeToolsToken]())
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
         tools: NeedlePrompt.sendAdventureEmailDefinitions,
@@ -288,7 +288,7 @@
         quantizerPreset: "w8",
         palettizerBits: 4
       )
-      let tokens = Lock([EdgeToolsToken]())
+      let tokens = LockBox([EdgeToolsToken]())
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
         tools: NeedlePrompt.sendAdventureEmailDefinitions,
