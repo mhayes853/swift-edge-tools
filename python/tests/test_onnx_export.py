@@ -113,7 +113,6 @@ class ONNXExportTests(unittest.TestCase):
             decoder_path = output_directory / "decoder.onnx"
             for model_path in (encoder_path, decoder_path):
                 model = onnx.load(model_path)
-                onnx.checker.check_model(model)
                 quantized_nodes = [
                     node for node in model.graph.node if node.op_type == "MatMulNBits"
                 ]
@@ -227,8 +226,18 @@ class ONNXExportTests(unittest.TestCase):
 
             encoder_model = onnx.load(result / "encoder.onnx")
             decoder_model = onnx.load(result / "decoder.onnx")
-            onnx.checker.check_model(encoder_model)
-            onnx.checker.check_model(decoder_model)
+            # ORT registers SimplifiedLayerNormalization in the default domain,
+            # but the ONNX checker does not know that schema at opset 21. Loading
+            # sessions validates the final runtime graphs instead.
+            ort.InferenceSession(
+                str(result / "encoder.onnx"), providers=["CPUExecutionProvider"]
+            )
+            ort.InferenceSession(
+                str(result / "decoder.onnx"), providers=["CPUExecutionProvider"]
+            )
+            decoder_operations = [node.op_type for node in decoder_model.graph.node]
+            self.assertIn("SimplifiedLayerNormalization", decoder_operations)
+            self.assertNotIn("ReduceMean", decoder_operations)
             self.assertEqual(
                 encoder_model.graph.input[0].type.tensor_type.shape.dim[1].dim_param,
                 "encoder_sequence_length",

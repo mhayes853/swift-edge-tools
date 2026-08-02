@@ -6,6 +6,8 @@ from dataclasses import replace
 from pathlib import Path
 
 import torch
+from onnxruntime.transformers.fusion_options import FusionOptions
+from onnxruntime.transformers.optimizer import optimize_model
 
 from ..cache_layout import empty_decoder_caches
 from ..decoder_strategy import DecoderExportStrategy
@@ -111,6 +113,7 @@ def convert_needle_onnx_models(
             temporary_directory=temporary_directory,
             output_directory=output_directory,
             compressor=compressor,
+            configuration=configuration,
             opset_version=opset_version,
             external_data=external_data,
         )
@@ -122,6 +125,7 @@ def convert_needle_onnx_models(
             temporary_directory=temporary_directory,
             output_directory=output_directory,
             compressor=compressor,
+            configuration=configuration,
             opset_version=opset_version,
             external_data=external_data,
         )
@@ -138,12 +142,15 @@ def _export_onnx_component(
     temporary_directory: Path,
     output_directory: Path,
     compressor: ONNXCompressor | None,
+    configuration: NeedleModelConfiguation,
     opset_version: int,
     external_data: bool,
 ) -> Path:
     destination = output_directory / f"{component}.onnx"
     export_path = (
-        destination if compressor is None else temporary_directory / destination.name
+        destination
+        if compressor is None and component == "encoder"
+        else temporary_directory / f"unoptimized-{destination.name}"
     )
     module.eval()
     torch.onnx.export(
@@ -157,6 +164,45 @@ def _export_onnx_component(
         opset_version=opset_version,
         external_data=external_data,
     )
+    exported_path = export_path
+    if component == "decoder":
+        exported_path = (
+            destination
+            if compressor is None
+            else temporary_directory / f"optimized-{destination.name}"
+        )
+        _fuse_rms_norms(
+            export_path,
+            exported_path,
+            configuration=configuration,
+            external_data=external_data,
+        )
     if compressor is not None:
-        compressor.compress(export_path, destination, component=component)
+        compressor.compress(exported_path, destination, component=component)
     return destination
+
+
+def _fuse_rms_norms(
+    source: Path,
+    destination: Path,
+    *,
+    configuration: NeedleModelConfiguation,
+    external_data: bool,
+) -> None:
+    options = FusionOptions("bert")
+    for name in vars(options):
+        if name.startswith("enable_"):
+            setattr(options, name, name == "enable_layer_norm")
+    options.enable_shape_inference = False
+    optimized = optimize_model(
+        str(source),
+        model_type="bert",
+        num_heads=configuration.attention_heads,
+        hidden_size=configuration.dimensions,
+        opt_level=0,
+        optimization_options=options,
+    )
+    optimized.save_model_to_file(
+        str(destination),
+        use_external_data_format=external_data,
+    )
