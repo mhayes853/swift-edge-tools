@@ -28,6 +28,28 @@
     }
 
     @Test
+    func `Configure Intra-Op Thread Count`() throws {
+      let runtime = try CONNXRuntime()
+      let options = try runtime.sessionOptions()
+      try options.setIntraOpThreadCount(1)
+      let session = try runtime.session(modelPath: try Self.modelURL().path(), options: options)
+
+      expectNoDifference(session.inputNames, ["x", "y"])
+    }
+
+    @Test
+    func `Reject Invalid Intra-Op Thread Count`() throws {
+      let runtime = try CONNXRuntime()
+      let options = try runtime.sessionOptions()
+
+      let error = #expect(throws: CONNXRuntimeError.self) {
+        try options.setIntraOpThreadCount(0)
+      }
+
+      expectNoDifference(error?.code, .invalidThreadCount)
+    }
+
+    @Test
     func `Run Model Using Vendored ONNX Runtime`() async throws {
       let runtime = try CONNXRuntime()
       let session = try runtime.session(modelURL: try Self.modelURL())

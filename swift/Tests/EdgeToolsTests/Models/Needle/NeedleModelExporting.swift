@@ -290,6 +290,7 @@ private enum NeedleTestModelExport {
 
   func makeNeedleONNXModelEngine(
     runtimeConfiguration: CONNXRuntime.Configuration = CONNXRuntime.Configuration(),
+    sessionPolicy: NeedleCONNXSessionPolicy = .default,
     quantization: String? = nil
   ) async throws -> NeedleCONNXModelEngine {
     let quantizationSuffix = quantization.map { "-\($0)" } ?? ""
@@ -299,7 +300,8 @@ private enum NeedleTestModelExport {
     )
     return try await NeedleCONNXModelEngine(
       from: directory,
-      runtimeConfiguration: runtimeConfiguration
+      runtimeConfiguration: runtimeConfiguration,
+      sessionPolicy: sessionPolicy
     )
   }
 

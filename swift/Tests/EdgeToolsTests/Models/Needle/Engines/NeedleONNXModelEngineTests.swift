@@ -9,7 +9,7 @@
   struct `NeedleONNXModelEngine tests` {
     @Test
     func `Generate Basics With CPU Execution Provider`() async throws {
-      let engine = try await makeNeedleONNXModelEngine()
+      let engine = try await makeNeedleONNXModelEngine(sessionPolicy: .cpu)
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
         tools: NeedlePrompt.sendAdventureEmailDefinitions,

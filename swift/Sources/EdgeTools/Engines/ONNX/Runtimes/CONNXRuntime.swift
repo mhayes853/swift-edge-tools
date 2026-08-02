@@ -19,6 +19,7 @@
       public static let invalidGraphOptimizationLevel = Self(
         rawValue: "invalid-graph-optimization-level"
       )
+      public static let invalidThreadCount = Self(rawValue: "invalid-thread-count")
       public static let onnxRuntime = Self(rawValue: "onnx-runtime")
       public static let unsupportedAPIVersion = Self(rawValue: "unsupported-api-version")
     }
@@ -242,6 +243,16 @@
 
       public borrowing func check(_ status: OpaquePointer?) throws {
         try CONNXRuntime.check(api: self.api, status: status)
+      }
+
+      public borrowing func setIntraOpThreadCount(_ count: Int) throws {
+        guard let count = Int32(exactly: count), count > 0 else {
+          throw CONNXRuntimeError(
+            code: .invalidThreadCount,
+            message: "The intra-op thread count must be between 1 and \(Int32.max)."
+          )
+        }
+        try self.check(self.api.pointee.SetIntraOpNumThreads(self.handle, count))
       }
 
       public borrowing func configure(
