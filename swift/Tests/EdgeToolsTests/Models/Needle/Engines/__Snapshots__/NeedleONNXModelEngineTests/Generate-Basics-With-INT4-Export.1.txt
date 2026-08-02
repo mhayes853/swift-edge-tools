@@ -1,17 +1,17 @@
 ▿ EdgeToolsEngineGeneration
   ▿ decodeMetrics: EdgeToolsDecodeMetrics
-    ▿ duration: 0.288314792 seconds
-      - _low: 288314792000000000
+    ▿ duration: 0.235513042 seconds
+      - _low: 235513042000000000
       - _high: 0
-    ▿ durationToFirstToken: 0.204597041 seconds
-      - _low: 204597041000000000
+    ▿ durationToFirstToken: 0.035855083 seconds
+      - _low: 35855083000000000
       - _high: 0
     - tokens: 44
   ▿ metadata: 2 key/value pairs
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "GenerationConfidence"
-      - value: 0.89887756
+      - value: 0.8988775
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "PerTokenConfidences"
@@ -26,12 +26,12 @@
         - 0.99967945
         - 0.9999627
         - 0.99999976
-        - 0.8660024
+        - 0.8660022
         - 0.99997175
         - 0.6355744
-        - 0.5185295
-        - 0.74383795
-        - 0.6668441
+        - 0.5185296
+        - 0.7438378
+        - 0.6668436
         - 1.0
         - 0.9999747
         - 1.0
@@ -40,29 +40,29 @@
         - 0.9999995
         - 0.9960232
         - 0.65554327
-        - 0.68915385
+        - 0.68915296
         - 0.99407923
-        - 0.9222524
+        - 0.92225254
         - 0.99995995
         - 0.9990716
-        - 0.524344
-        - 0.64503694
-        - 0.9967229
+        - 0.5243431
+        - 0.6450365
+        - 0.99672276
         - 0.9864609
-        - 0.8898916
+        - 0.88989145
         - 0.9577609
-        - 0.7802267
+        - 0.7802269
         - 0.99068916
         - 0.9997558
         - 0.9999163
-        - 0.894393
-        - 0.94256794
-        - 0.7945407
-        - 0.5118361
+        - 0.8943933
+        - 0.9425679
+        - 0.79454076
+        - 0.51183575
         - 1.0
   ▿ prefillMetrics: EdgeToolsPrefillMetrics
-    ▿ duration: 0.201547417 seconds
-      - _low: 201547417000000000
+    ▿ duration: 0.032881584 seconds
+      - _low: 32881584000000000
       - _high: 0
     - tokens: 150
   - response: "<tool_call> [{\"name\":\"send_email\",\"arguments\":{\"address\":\"hendery@gmail.com\",\"subject\":\"Hello\",\"body\":\"Could you please go on an adventure?[{\"}}]"

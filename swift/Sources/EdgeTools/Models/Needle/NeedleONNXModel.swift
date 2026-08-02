@@ -331,17 +331,8 @@
       tokenIDs: [EdgeToolsToken.ID]
     ) async throws -> EncoderOutputs {
       let runtime = self.runtime
-      var paddedTokens = tokenIDs.map(Int64.init)
-      paddedTokens.append(
-        contentsOf: repeatElement(
-          Int64(self.configuration.padTokenId),
-          count: self.configuration.encoderMaxLength - paddedTokens.count
-        )
-      )
-      let inputIDs = try runtime.tensor(
-        values: paddedTokens,
-        shape: [1, self.configuration.encoderMaxLength]
-      )
+      var tokens = tokenIDs.map(Int64.init)
+      let inputIDs = try runtime.tensor(values: tokens, shape: [1, tokens.count])
       var outputs = try await self.encoderSession.run(
         inputs: [NeedleExportTensorName.inputIDs: inputIDs],
         outputNames: [
