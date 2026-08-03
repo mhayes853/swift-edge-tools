@@ -15,11 +15,9 @@
         self.rawValue = rawValue
       }
 
-      public static let incompatibleSessionOptions = Self(rawValue: "incompatible-session-options")
       public static let invalidGraphOptimizationLevel = Self(
         rawValue: "invalid-graph-optimization-level"
       )
-      public static let invalidThreadCount = Self(rawValue: "invalid-thread-count")
       public static let onnxRuntime = Self(rawValue: "onnx-runtime")
       public static let unsupportedAPIVersion = Self(rawValue: "unsupported-api-version")
     }
@@ -92,38 +90,41 @@
       try Self.check(api: self.api, status: status)
     }
 
-    public func sessionOptions() throws -> SessionOptions {
-      try self.sessionOptions(configuration: self.configuration)
-    }
-
-    public func sessionOptions(configuration: Configuration) throws -> SessionOptions {
-      let options = try SessionOptions(runtime: self)
-      try options.setGraphOptimizationLevel(configuration.graphOptimizationLevel)
-      try configuration.configureSessionOptions(options)
-      return options
-    }
-
     public func session(modelPath: String) throws -> CONNXRuntimeSession {
-      let options = try self.sessionOptions()
-      return try self.session(modelPath: modelPath, options: options)
+      try self.session(modelPath: modelPath, configuration: self.configuration)
     }
 
     public func session(
       modelPath: String,
-      options: borrowing SessionOptions
+      configuration: Configuration
     ) throws -> CONNXRuntimeSession {
-      guard options.runtime === self else {
-        throw CONNXRuntimeError(
-          code: .incompatibleSessionOptions,
-          message: "Session options must be created by the runtime creating the session."
-        )
-      }
+      let optionsHandle = try self.makeSessionOptionsHandle(configuration: configuration)
+      defer { self.api.pointee.ReleaseSessionOptions(optionsHandle) }
       let handle: OpaquePointer = try modelPath.withCString { path in
         try Self.output(api: self.api) {
-          self.api.pointee.CreateSession(self.environment, path, options.handle, $0)
+          self.api.pointee.CreateSession(self.environment, path, optionsHandle, $0)
         }
       }
       return try CONNXRuntimeSession.make(runtime: self, handle: handle)
+    }
+
+    private func makeSessionOptionsHandle(configuration: Configuration) throws -> OpaquePointer {
+      let handle: OpaquePointer = try Self.output(api: self.api) {
+        self.api.pointee.CreateSessionOptions($0)
+      }
+      do {
+        try self.check(
+          self.api.pointee.SetSessionGraphOptimizationLevel(
+            handle,
+            try Self.graphOptimizationLevel(configuration.graphOptimizationLevel)
+          )
+        )
+        try configuration.configureSessionOptions(self, handle)
+        return handle
+      } catch {
+        self.api.pointee.ReleaseSessionOptions(handle)
+        throw error
+      }
     }
 
     #if Foundation
@@ -211,83 +212,17 @@
     public struct Configuration: Sendable {
       public var logIdentifier: String
       public var graphOptimizationLevel: ONNXGraphOptimizationLevel
-      public var configureSessionOptions: @Sendable (borrowing SessionOptions) throws -> Void
+      public var configureSessionOptions: @Sendable (CONNXRuntime, OpaquePointer) throws -> Void
 
       public init(
         logIdentifier: String = "swift-edge-tools",
         graphOptimizationLevel: ONNXGraphOptimizationLevel = .all,
-        configureSessionOptions: @escaping @Sendable (borrowing SessionOptions) throws -> Void = { _ in }
+        configureSessionOptions: @escaping @Sendable (CONNXRuntime, OpaquePointer) throws -> Void =
+          { _, _ in }
       ) {
         self.logIdentifier = logIdentifier
         self.graphOptimizationLevel = graphOptimizationLevel
         self.configureSessionOptions = configureSessionOptions
-      }
-    }
-
-    public struct SessionOptions: ~Copyable {
-      let runtime: CONNXRuntime
-      public let api: UnsafePointer<OrtApi>
-      public let handle: OpaquePointer
-
-      init(runtime: CONNXRuntime) throws {
-        self.runtime = runtime
-        self.api = runtime.api
-        self.handle = try CONNXRuntime.output(api: runtime.api) {
-          runtime.api.pointee.CreateSessionOptions($0)
-        }
-      }
-
-      deinit {
-        self.api.pointee.ReleaseSessionOptions(self.handle)
-      }
-
-      public borrowing func check(_ status: OpaquePointer?) throws {
-        try CONNXRuntime.check(api: self.api, status: status)
-      }
-
-      public borrowing func setIntraOpThreadCount(_ count: Int) throws {
-        guard let count = Int32(exactly: count), count > 0 else {
-          throw CONNXRuntimeError(
-            code: .invalidThreadCount,
-            message: "The intra-op thread count must be between 1 and \(Int32.max)."
-          )
-        }
-        try self.check(self.api.pointee.SetIntraOpNumThreads(self.handle, count))
-      }
-
-      public borrowing func configure(
-        providerNamed name: String,
-        options: [String: String] = [:]
-      ) throws {
-        guard name.lowercased() != "cpu" else { return }
-        let keys = Array(options.keys)
-        let values = keys.map { options[$0]! }
-        try withCopiedCStringPointerBuffer(keys) { keys in
-          try withCopiedCStringPointerBuffer(values) { values in
-            try name.withCString {
-              try self.check(
-                self.api.pointee.SessionOptionsAppendExecutionProvider(
-                  self.handle,
-                  $0,
-                  keys.baseAddress,
-                  values.baseAddress,
-                  keys.count
-                )
-              )
-            }
-          }
-        }
-      }
-
-      borrowing func setGraphOptimizationLevel(
-        _ level: ONNXGraphOptimizationLevel
-      ) throws {
-        try self.check(
-          self.api.pointee.SetSessionGraphOptimizationLevel(
-            self.handle,
-            try CONNXRuntime.graphOptimizationLevel(level)
-          )
-        )
       }
     }
   }
@@ -500,12 +435,8 @@
     public typealias Session = CONNXRuntimeSession
     public typealias Tensor = CONNXRuntimeTensor
 
-    public func session(
-      model: String,
-      configuration: Configuration
-    ) throws -> CONNXRuntimeSession {
-      let options = try self.sessionOptions(configuration: configuration)
-      return try self.session(modelPath: model, options: options)
+    public func session(model: String, configuration: Configuration) throws -> CONNXRuntimeSession {
+      try self.session(modelPath: model, configuration: configuration)
     }
   }
 #endif

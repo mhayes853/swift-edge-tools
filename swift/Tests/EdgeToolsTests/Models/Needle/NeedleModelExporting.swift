@@ -289,8 +289,6 @@ private enum NeedleTestModelExport {
   }
 
   func makeNeedleONNXModelEngine(
-    runtimeConfiguration: CONNXRuntime.Configuration = CONNXRuntime.Configuration(),
-    sessionPolicy: NeedleCONNXSessionPolicy = .default,
     quantization: String? = nil
   ) async throws -> NeedleCONNXModelEngine {
     let quantizationSuffix = quantization.map { "-\($0)" } ?? ""
@@ -298,11 +296,7 @@ private enum NeedleTestModelExport {
       outputDirectoryName: "onnx-export-v2-float32\(quantizationSuffix)",
       quantization: quantization
     )
-    return try await NeedleCONNXModelEngine(
-      from: directory,
-      runtimeConfiguration: runtimeConfiguration,
-      sessionPolicy: sessionPolicy
-    )
+    return try await NeedleCONNXModelEngine(from: directory)
   }
 
   private enum SelfONNXExport {

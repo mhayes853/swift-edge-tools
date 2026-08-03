@@ -463,43 +463,11 @@
     public typealias NeedleCONNXModelEngine =
       EdgeToolsModelEngine<NeedleONNXModel<CONNXRuntime>>
 
-    public struct NeedleCONNXSessionPolicy: Sendable {
-      public var configureEncoderSessionOptions:
-        @Sendable (borrowing CONNXRuntime.SessionOptions) throws -> Void
-      public var configureDecoderSessionOptions:
-        @Sendable (borrowing CONNXRuntime.SessionOptions) throws -> Void
-
-      public init(
-        configureEncoderSessionOptions: @escaping @Sendable (
-          borrowing CONNXRuntime.SessionOptions
-        ) throws -> Void = { _ in },
-        configureDecoderSessionOptions: @escaping @Sendable (
-          borrowing CONNXRuntime.SessionOptions
-        ) throws -> Void = { _ in }
-      ) {
-        self.configureEncoderSessionOptions = configureEncoderSessionOptions
-        self.configureDecoderSessionOptions = configureDecoderSessionOptions
-      }
-
-      public static var `default`: Self {
-        Self()
-      }
-
-      public static var cpu: Self {
-        Self(
-          configureDecoderSessionOptions: { options in
-            try options.setIntraOpThreadCount(1)
-          }
-        )
-      }
-    }
-
     #if Foundation
       extension EdgeToolsModelEngine where Model == NeedleONNXModel<CONNXRuntime> {
         public init(
           from directoryURL: URL,
-          runtime: sending CONNXRuntime,
-          sessionPolicy: NeedleCONNXSessionPolicy = .default
+          runtime: sending CONNXRuntime
         ) async throws {
           let tokenizer = try await loadEdgeToolsTokenizer(from: directoryURL)
           guard let tokenizer = tokenizer as? any EdgeToolsXGRTokenizer else {
@@ -508,17 +476,16 @@
           guard let configuration = try NeedleModelConfiguration.decode(in: directoryURL) else {
             throw EdgeToolsError.failedToLoadConfiguration
           }
-          let encoderOptions = try runtime.sessionOptions()
-          try sessionPolicy.configureEncoderSessionOptions(encoderOptions)
           let encoderSession = try runtime.session(
-            modelPath: directoryURL.appending(path: "encoder.onnx").path(),
-            options: encoderOptions
+            modelPath: directoryURL.appending(path: "encoder.onnx").path()
           )
-          let decoderOptions = try runtime.sessionOptions()
-          try sessionPolicy.configureDecoderSessionOptions(decoderOptions)
           let decoderSession = try runtime.session(
             modelPath: directoryURL.appending(path: "decoder.onnx").path(),
-            options: decoderOptions
+            configuration: CONNXRuntime.Configuration(
+              configureSessionOptions: { runtime, handle in
+                try runtime.check(runtime.api.pointee.SetIntraOpNumThreads(handle, 1))
+              }
+            )
           )
           let model = NeedleONNXModel(
             configuration: configuration,
@@ -532,30 +499,20 @@
         #if ONNX
           public init(
             from directoryURL: URL,
-            runtimeConfiguration: CONNXRuntime.Configuration = CONNXRuntime.Configuration(),
-            sessionPolicy: NeedleCONNXSessionPolicy = .default
+            runtimeConfiguration: CONNXRuntime.Configuration = CONNXRuntime.Configuration()
           ) async throws {
             let runtime = try CONNXRuntime(configuration: runtimeConfiguration)
-            try await self.init(
-              from: directoryURL,
-              runtime: runtime,
-              sessionPolicy: sessionPolicy
-            )
+            try await self.init(from: directoryURL, runtime: runtime)
           }
         #endif
 
         public init(
           api: OpaquePointer,
           from directoryURL: URL,
-          runtimeConfiguration: CONNXRuntime.Configuration = CONNXRuntime.Configuration(),
-          sessionPolicy: NeedleCONNXSessionPolicy = .default
+          runtimeConfiguration: CONNXRuntime.Configuration = CONNXRuntime.Configuration()
         ) async throws {
           let runtime = try CONNXRuntime(api: api, configuration: runtimeConfiguration)
-          try await self.init(
-            from: directoryURL,
-            runtime: runtime,
-            sessionPolicy: sessionPolicy
-          )
+          try await self.init(from: directoryURL, runtime: runtime)
         }
       }
     #endif

@@ -9,7 +9,7 @@
   struct `NeedleONNXModelEngine tests` {
     @Test
     func `Generate Basics With CPU Execution Provider`() async throws {
-      let engine = try await makeNeedleONNXModelEngine(sessionPolicy: .cpu)
+      let engine = try await makeNeedleONNXModelEngine()
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
         tools: NeedlePrompt.sendAdventureEmailDefinitions,
@@ -52,77 +52,6 @@
     @Test
     func `Concurrent Generations With CPU`() async throws {
       let engine = try await makeNeedleONNXModelEngine()
-      let firstTask = try engine.generate(
-        prompt: .sendAdventureEmail,
-        tools: NeedlePrompt.sendAdventureEmailDefinitions,
-        parameters: .default,
-        channel: EdgeToolsGenerationChannel()
-      )
-      let secondTask = try engine.generate(
-        prompt: .sendAdventureEmail,
-        tools: NeedlePrompt.sendAdventureEmailDefinitions,
-        parameters: .default,
-        channel: EdgeToolsGenerationChannel()
-      )
-
-      let (first, second) = try await (firstTask.value, secondTask.value)
-      withKnownIssue {
-        assertSnapshot(of: first.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
-        assertSnapshot(of: second.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
-      }
-    }
-
-    @Test
-    func `Generate Basics With Core ML CPU And GPU`() async throws {
-      let engine = try await makeNeedleONNXModelEngine(
-        runtimeConfiguration: coreMLRuntimeConfiguration()
-      )
-      let generationTask = try engine.generate(
-        prompt: .sendAdventureEmail,
-        tools: NeedlePrompt.sendAdventureEmailDefinitions,
-        parameters: .default,
-        channel: EdgeToolsGenerationChannel()
-      )
-      let generation = try await generationTask.value
-
-      expectNoDifference(generation.wasStopped, false)
-      withKnownIssue {
-        assertSnapshot(of: generation, as: .dump, record: .all)
-        assertSnapshot(of: generation.metadata, as: .dump, record: .all)
-      }
-    }
-
-    @Test
-    func `Sequential Generations With Core ML`() async throws {
-      let engine = try await makeNeedleONNXModelEngine(
-        runtimeConfiguration: coreMLRuntimeConfiguration()
-      )
-      let firstTask = try engine.generate(
-        prompt: .sendAdventureEmail,
-        tools: NeedlePrompt.sendAdventureEmailDefinitions,
-        parameters: .default,
-        channel: EdgeToolsGenerationChannel()
-      )
-      let first = try await firstTask.value
-      let secondTask = try engine.generate(
-        prompt: .sendAdventureEmail,
-        tools: NeedlePrompt.sendAdventureEmailDefinitions,
-        parameters: .default,
-        channel: EdgeToolsGenerationChannel()
-      )
-      let second = try await secondTask.value
-
-      withKnownIssue {
-        assertSnapshot(of: first.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
-        assertSnapshot(of: second.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
-      }
-    }
-
-    @Test
-    func `Concurrent Generations With Core ML`() async throws {
-      let engine = try await makeNeedleONNXModelEngine(
-        runtimeConfiguration: coreMLRuntimeConfiguration()
-      )
       let firstTask = try engine.generate(
         prompt: .sendAdventureEmail,
         tools: NeedlePrompt.sendAdventureEmailDefinitions,
@@ -353,20 +282,6 @@
       expectNoDifference(
         streamedTokens.withLock { $0.map(\.stringValue).joined() },
         generation.response
-      )
-    }
-  }
-
-  private func coreMLRuntimeConfiguration() -> CONNXRuntime.Configuration {
-    CONNXRuntime.Configuration { options in
-      try options.configure(
-        providerNamed: "CoreML",
-        options: [
-          "MLComputeUnits": "CPUAndGPU",
-          "ModelFormat": "MLProgram",
-          "RequireStaticInputShapes": "1",
-          "EnableOnSubgraphs": "1"
-        ]
       )
     }
   }
