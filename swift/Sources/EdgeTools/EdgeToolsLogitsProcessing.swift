@@ -1,5 +1,3 @@
-// MARK: - EdgeToolsLogitsProcessor
-
 public struct EdgeToolsLogitsProcessor<Prompt, Logits: ~Copyable & ~Escapable> {
   private let promptBody: (Prompt) -> Void
   private let processBody: nonisolated(nonsending) (inout Logits) async throws -> Void
