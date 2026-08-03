@@ -231,12 +231,9 @@
 
   public typealias NeedleMLXModelEngine = EdgeToolsMLXEngine<NeedleMLXModel>
 
-  extension EdgeToolsMLXEngine where Model == NeedleMLXModel {
-    public convenience init(from directoryURL: URL) async throws {
-      try await self.init(
-        from: directoryURL,
-        model: { NeedleMLXModel(configuration: $0) }
-      )
+  extension NeedleMLXModelEngine {
+    public init(from directoryURL: URL) async throws {
+      try await self.init(from: directoryURL, model: NeedleMLXModel.init(configuration:))
     }
   }
 

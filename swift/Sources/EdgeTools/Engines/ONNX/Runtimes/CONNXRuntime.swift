@@ -86,10 +86,6 @@
       self.api.pointee.ReleaseEnv(self.environment)
     }
 
-    public func check(_ status: OpaquePointer?) throws {
-      try Self.check(api: self.api, status: status)
-    }
-
     public func session(modelPath: String) throws -> CONNXRuntimeSession {
       try self.session(modelPath: modelPath, configuration: self.configuration)
     }
@@ -113,8 +109,9 @@
         self.api.pointee.CreateSessionOptions($0)
       }
       do {
-        try self.check(
-          self.api.pointee.SetSessionGraphOptimizationLevel(
+        try check(
+          api: self.api,
+          status: self.api.pointee.SetSessionGraphOptimizationLevel(
             handle,
             try Self.graphOptimizationLevel(configuration.graphOptimizationLevel)
           )
@@ -189,24 +186,26 @@
       _ operation: (UnsafeMutablePointer<Value?>) -> OpaquePointer?
     ) throws -> Value {
       var value: Value?
-      try Self.check(api: api, status: operation(&value))
+      try check(api: api, status: operation(&value))
       return value!
     }
-
-    static func check(api: UnsafePointer<OrtApi>, status: OpaquePointer?) throws {
-      guard let status else { return }
-      defer { api.pointee.ReleaseStatus(status) }
-      let code = api.pointee.GetErrorCode(status)
-      let message =
-        api.pointee.GetErrorMessage(status).map(String.init(cString:))
-        ?? "Unknown ONNX Runtime error."
-      throw CONNXRuntimeError(
-        code: .onnxRuntime,
-        message: message,
-        onnxRuntimeCode: Int(code.rawValue)
-      )
-    }
   }
+
+  private func check(api: UnsafePointer<OrtApi>, status: OpaquePointer?) throws {
+    guard let status else { return }
+    defer { api.pointee.ReleaseStatus(status) }
+    let code = api.pointee.GetErrorCode(status)
+    let message =
+      api.pointee.GetErrorMessage(status).map(String.init(cString:))
+      ?? "Unknown ONNX Runtime error."
+    throw CONNXRuntimeError(
+      code: .onnxRuntime,
+      message: message,
+      onnxRuntimeCode: Int(code.rawValue)
+    )
+  }
+
+  // MARK: - Configuration
 
   extension CONNXRuntime {
     public struct Configuration: Sendable {
@@ -293,7 +292,7 @@
           try withCopiedCStringPointerBuffer(outputNames) { outputNames in
             try inputValues.withUnsafeBufferPointer { inputValues in
               try outputValues.withUnsafeMutableBufferPointer { outputValues in
-                try CONNXRuntime.check(
+                try check(
                   api: self.api,
                   status: self.api.pointee.Run(
                     self.handle,
@@ -339,7 +338,7 @@
       ) -> OpaquePointer?
     ) throws -> [String] {
       var count = 0
-      try runtime.check(getCount(handle, &count))
+      try check(api: runtime.api, status: getCount(handle, &count))
       return try (0..<count)
         .map { index in
           let name: UnsafeMutablePointer<CChar> = try CONNXRuntime.output(api: runtime.api) {
@@ -393,7 +392,10 @@
       }
       let count = try edgeToolsONNXElementCount(for: self.shape)
       var data: UnsafeMutableRawPointer?
-      try self.runtime.check(self.runtime.api.pointee.GetTensorMutableData(self.handle, &data))
+      try check(
+        api: self.runtime.api,
+        status: self.runtime.api.pointee.GetTensorMutableData(self.handle, &data)
+      )
       let buffer = UnsafeMutableBufferPointer<Element>(
         start: count == 0 ? nil : data!.assumingMemoryBound(to: Element.self),
         count: count
@@ -410,17 +412,23 @@
       }
       defer { runtime.api.pointee.ReleaseTensorTypeAndShapeInfo(info) }
       var elementType = ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED
-      try runtime.check(runtime.api.pointee.GetTensorElementType(info, &elementType))
+      try check(
+        api: runtime.api,
+        status: runtime.api.pointee.GetTensorElementType(info, &elementType)
+      )
       var count = 0
-      try runtime.check(runtime.api.pointee.GetDimensionsCount(info, &count))
+      try check(
+        api: runtime.api,
+        status: runtime.api.pointee.GetDimensionsCount(info, &count)
+      )
       var dimensions = [Int64](repeating: 0, count: count)
       try dimensions.withUnsafeMutableBufferPointer {
-        try runtime.check(runtime.api.pointee.GetDimensions(info, $0.baseAddress, $0.count))
+        try check(
+          api: runtime.api,
+          status: runtime.api.pointee.GetDimensions(info, $0.baseAddress, $0.count)
+        )
       }
-      return (
-        DType(rawValue: Int(elementType.rawValue)),
-        dimensions.map(Int.init)
-      )
+      return (DType(rawValue: Int(elementType.rawValue)), dimensions.map(Int.init))
     }
   }
 

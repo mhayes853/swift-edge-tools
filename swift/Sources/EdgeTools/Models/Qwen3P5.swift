@@ -28,8 +28,8 @@ import OrderedCollections
   public typealias Qwen35MLXModelEngine = EdgeToolsMLXEngine<Qwen35Model>
   public typealias Qwen3P5MLXModelEngine = EdgeToolsMLXEngine<Qwen35Model>
 
-  extension EdgeToolsMLXEngine where Model == Qwen35Model {
-    public convenience init(from directoryURL: URL) async throws {
+  extension Qwen3P5MLXModelEngine {
+    public init(from directoryURL: URL) async throws {
       try await self.init(from: directoryURL, model: Qwen35Model.init)
     }
   }

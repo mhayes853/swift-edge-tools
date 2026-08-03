@@ -23,14 +23,12 @@
     }
   }
 
-  /// The shared model engine specialized for Qwen 3.
   public typealias Qwen3MLXModelEngine = EdgeToolsMLXEngine<Qwen3Model>
 
   // MARK: - Model Engine Loading
 
-  extension EdgeToolsMLXEngine where Model == Qwen3Model {
-    /// Loads a Qwen 3 model engine from a model directory.
-    public convenience init(from directoryURL: URL) async throws {
+  extension Qwen3MLXModelEngine {
+    public init(from directoryURL: URL) async throws {
       try await self.init(from: directoryURL, model: Qwen3Model.init)
     }
   }

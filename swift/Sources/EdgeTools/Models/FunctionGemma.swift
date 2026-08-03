@@ -28,9 +28,12 @@
   public typealias FunctionGemmaMLXModelEngine =
     EdgeToolsMLXEngine<MLXLLM.Gemma3TextModel>
 
-  extension EdgeToolsMLXEngine where Model == MLXLLM.Gemma3TextModel {
-    public convenience init(from directoryURL: URL) async throws {
-      try await self.init(from: directoryURL, model: MLXLLM.Gemma3TextModel.init)
+  extension FunctionGemmaMLXModelEngine {
+    public init(from directoryURL: URL) async throws {
+      try await self.init(
+        from: directoryURL,
+        model: MLXLLM.Gemma3TextModel.init
+      )
     }
   }
 #endif

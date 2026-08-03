@@ -61,6 +61,14 @@
     }
 
     @Test
+    func `Infer Flat Shape When Unspecified`() throws {
+      let runtime = try CONNXRuntime()
+      let tensor = try runtime.tensor(values: [Float(1), 2, 3])
+
+      expectNoDifference(tensor.shape, [3])
+    }
+
+    @Test
     func `Expose Session And Tensor Metadata`() throws {
       let runtime = try CONNXRuntime()
       let session = try runtime.session(modelURL: try Self.modelURL())

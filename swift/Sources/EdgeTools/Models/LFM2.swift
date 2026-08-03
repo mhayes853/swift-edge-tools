@@ -28,8 +28,8 @@ import OrderedCollections
   public typealias LFM2MLXModelEngine = EdgeToolsMLXEngine<LFM2Model>
   public typealias LFM2P5MLXModelEngine = EdgeToolsMLXEngine<LFM2Model>
 
-  extension EdgeToolsMLXEngine where Model == LFM2Model {
-    public convenience init(from directoryURL: URL) async throws {
+  extension LFM2MLXModelEngine {
+    public init(from directoryURL: URL) async throws {
       try await self.init(from: directoryURL, model: LFM2Model.init)
     }
   }

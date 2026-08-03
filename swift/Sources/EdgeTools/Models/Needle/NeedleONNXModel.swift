@@ -140,7 +140,7 @@
       let inputIDs = try self.runtime.tensor(values: [Int64(tokenID)], shape: [1, 1])
       let position = try Int32(exactly: generation.position)
         .unwrapONNXInteger(name: NeedleExportTensorName.cachePosition)
-      let cachePosition = try self.runtime.tensor(values: [position], shape: [1])
+      let cachePosition = try self.runtime.tensor(values: [position])
       let selfAttentionMask = try self.runtime.tensor(
         values: Self.selfAttentionMask(
           step: Int(position),
@@ -483,7 +483,7 @@
             modelPath: directoryURL.appending(path: "decoder.onnx").path(),
             configuration: CONNXRuntime.Configuration(
               configureSessionOptions: { runtime, handle in
-                try runtime.check(runtime.api.pointee.SetIntraOpNumThreads(handle, 1))
+                _ = runtime.api.pointee.SetIntraOpNumThreads(handle, 1)
               }
             )
           )

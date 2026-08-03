@@ -153,67 +153,8 @@
 
   // MARK: - EdgeToolsMLXEngine
 
-  public final class EdgeToolsMLXEngine<Model: EdgeToolsMLXModel>: EdgeToolsEngine, Sendable {
-    public typealias Prompt = Model.Prompt
-    public typealias GenerateParameters = Model.GenerateParameters
-
-    private let engine: EdgeToolsModelEngine<_EdgeToolsMLXModel<Model>>
-
-    public init(model: sending Model, tokenizer: sending any EdgeToolsXGRTokenizer) throws {
-      let model = _EdgeToolsMLXModel(model: model)
-      self.engine = try EdgeToolsModelEngine(model: model, tokenizer: tokenizer)
-    }
-
-    private init(engine: EdgeToolsModelEngine<_EdgeToolsMLXModel<Model>>) {
-      self.engine = engine
-    }
-
-    public convenience init(
-      from directoryURL: URL,
-      model makeModel: @Sendable (Model.ModelConfiguration) throws -> Model
-    ) async throws {
-      let engine = try await EdgeToolsModelEngine<_EdgeToolsMLXModel<Model>>(
-        loading: Model.self,
-        from: directoryURL,
-        model: makeModel
-      )
-      self.init(engine: engine)
-    }
-
-    public func tokenize(
-      prompt: Model.Prompt,
-      tools: [EdgeToolDefinition] = []
-    ) async throws -> [EdgeToolsToken] {
-      try await self.engine.tokenize(prompt: prompt, tools: tools)
-    }
-
-    public func clearCaches() async {
-      await self.engine.clearCaches()
-    }
-
-    public func generate(
-      prompt: Model.Prompt,
-      tools: [EdgeToolDefinition] = [],
-      parameters: sending Model.GenerateParameters,
-      channel: EdgeToolsGenerationChannel
-    ) throws -> some EdgeToolsEngineGenerationTask {
-      try self.engine.generate(
-        prompt: prompt,
-        tools: tools,
-        parameters: parameters,
-        channel: channel
-      )
-    }
-  }
-
-  extension EdgeToolsMLXEngine: EdgeToolsPrefillableEngine {
-    public func prefill(
-      promptPrefix: Model.Prompt,
-      tools: [EdgeToolDefinition]
-    ) async throws -> EdgeToolsEnginePrefill {
-      try await self.engine.prefill(promptPrefix: promptPrefix, tools: tools)
-    }
-  }
+  public typealias EdgeToolsMLXEngine<Model: EdgeToolsMLXModel> =
+    EdgeToolsModelEngine<_EdgeToolsMLXModel<Model>>
 
   // MARK: - Prompt Conversion
 
@@ -328,13 +269,13 @@
 
   #endif
 
-  // MARK: - EdgeToolsMLXEngineModel
+  // MARK: - EdgeToolsMLXModel Adapter
 
-  private struct _EdgeToolsMLXModel<Model: EdgeToolsMLXModel>: EdgeToolsModel {
-    typealias Prompt = Model.Prompt
-    typealias Input = LMInput
-    typealias GenerateParameters = Model.GenerateParameters
-    typealias ToolCallParser = Model.ToolCallParser
+  public struct _EdgeToolsMLXModel<Model: EdgeToolsMLXModel>: EdgeToolsModel {
+    public typealias Prompt = Model.Prompt
+    public typealias Input = LMInput
+    public typealias GenerateParameters = Model.GenerateParameters
+    public typealias ToolCallParser = Model.ToolCallParser
 
     private struct CachedPrefill {
       let tokenIds: [EdgeToolsToken.ID]
@@ -357,13 +298,13 @@
     private var cachedPrefill: CachedPrefill?
     private var generation: Generation?
 
-    init(model: Model) {
+    public init(model: Model) {
       self.model = model
     }
 
-    var vocabularySize: Int { self.model.vocabularySize }
+    public var vocabularySize: Int { self.model.vocabularySize }
 
-    func grammar(
+    public func grammar(
       tools: [EdgeToolDefinition],
       parameters: Model.GenerateParameters,
       tokenizerInfo: XGRTokenizerInfo
@@ -375,14 +316,14 @@
       )
     }
 
-    func toolCallGrammar(
+    public func toolCallGrammar(
       tools: [EdgeToolDefinition],
       range: GrammarToolCallRange
     ) throws -> XGRGrammar {
       try self.model.toolCallGrammar(tools: tools, range: range)
     }
 
-    func input(
+    public func input(
       prompt: Model.Prompt,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsXGRTokenizer
@@ -394,7 +335,7 @@
       )
     }
 
-    nonisolated(nonsending) mutating func prepare(
+    public nonisolated(nonsending) mutating func prepare(
       input: LMInput,
       parameters: Model.GenerateParameters
     ) async throws -> EdgeToolsModelPreparation {
@@ -427,7 +368,7 @@
       return EdgeToolsModelPreparation(metrics: metrics)
     }
 
-    nonisolated(nonsending) mutating func decode(
+    public nonisolated(nonsending) mutating func decode(
       bitmask: GrammarBitmask,
       parameters: Model.GenerateParameters
     ) async throws -> EdgeToolsModelSample {
@@ -461,7 +402,7 @@
       return EdgeToolsModelSample(tokenId: tokenId, confidence: confidence)
     }
 
-    func finish() -> EdgeToolsMetadata {
+    public func finish() -> EdgeToolsMetadata {
       guard let generation = self.generation else { return EdgeToolsMetadata() }
       var metadata = EdgeToolsMetadata()
       metadata.mlxEngineGenerationStartMemorySnapshot = generation.generationStartSnapshot
@@ -472,11 +413,11 @@
       return metadata
     }
 
-    mutating func resetGeneration() {
+    public mutating func resetGeneration() {
       self.generation = nil
     }
 
-    nonisolated(nonsending) mutating func prefill(
+    public nonisolated(nonsending) mutating func prefill(
       input: LMInput
     ) async throws -> EdgeToolsEnginePrefill {
       let clock = ContinuousClock()
@@ -551,7 +492,25 @@
   extension _EdgeToolsMLXModel: EdgeToolsPrefillableModel {}
 
   extension EdgeToolsModelEngine {
-    fileprivate init<MLXModel: EdgeToolsMLXModel>(
+    public init<MLXModel: EdgeToolsMLXModel>(
+      model: sending MLXModel,
+      tokenizer: sending any EdgeToolsXGRTokenizer
+    ) throws where Model == _EdgeToolsMLXModel<MLXModel> {
+      try self.init(model: _EdgeToolsMLXModel(model: model), tokenizer: tokenizer)
+    }
+
+    public init<MLXModel: EdgeToolsMLXModel>(
+      from directoryURL: URL,
+      model makeModel: @Sendable (MLXModel.ModelConfiguration) throws -> MLXModel
+    ) async throws where Model == _EdgeToolsMLXModel<MLXModel> {
+      try await self.init(
+        loading: MLXModel.self,
+        from: directoryURL,
+        model: makeModel
+      )
+    }
+
+    private init<MLXModel: EdgeToolsMLXModel>(
       loading modelType: MLXModel.Type,
       from directoryURL: URL,
       model makeModel: @Sendable (MLXModel.ModelConfiguration) throws -> MLXModel

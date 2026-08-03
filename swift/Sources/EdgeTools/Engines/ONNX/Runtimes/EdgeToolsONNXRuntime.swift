@@ -431,6 +431,15 @@
     ) throws -> Tensor where Values.Element: ONNXElement
   }
 
+  extension ONNXRuntime {
+    public func tensor<Values: Sequence>(
+      values: Values
+    ) throws -> Tensor where Values.Element: ONNXElement {
+      let values = Array(values)
+      return try self.tensor(values: values, shape: [values.count])
+    }
+  }
+
   // MARK: - Axis Helpers
 
   private func edgeToolsONNXRowMajorStrides(for shape: [Int]) -> [Int] {
