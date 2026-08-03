@@ -47,7 +47,7 @@ struct PatchPlugin: BuildToolPlugin {
     return [
       .buildCommand(
         displayName: "Preparing patched XGrammar sources",
-        executable: URL(fileURLWithPath: "/bin/sh"),
+        executable: try self.shellURL(),
         arguments: [script.path, sourceRoot.path, outputRoot.path]
           + patches.flatMap { ["--patch", $0.path] }
           + ["--prepend-include", "cpp/support/no_exceptions.h", "--"]
@@ -60,4 +60,25 @@ struct PatchPlugin: BuildToolPlugin {
       )
     ]
   }
+
+  private func shellURL() throws -> URL {
+    #if os(Windows)
+      let path = ProcessInfo.processInfo.environment.first {
+        $0.key.caseInsensitiveCompare("PATH") == .orderedSame
+      }?.value
+      let shell = path?
+        .split(separator: ";")
+        .lazy
+        .map { URL(fileURLWithPath: String($0)).appendingPathComponent("sh.exe") }
+        .first { FileManager.default.isExecutableFile(atPath: $0.path) }
+      guard let shell else { throw PatchPluginError.shellNotFound }
+      return shell
+    #else
+      return URL(fileURLWithPath: "/bin/sh")
+    #endif
+  }
+}
+
+private enum PatchPluginError: Error {
+  case shellNotFound
 }

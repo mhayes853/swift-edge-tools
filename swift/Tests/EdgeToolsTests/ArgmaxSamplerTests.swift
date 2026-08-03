@@ -45,6 +45,21 @@ private func argmaxValues(count: Int, maximumAt index: Int) -> [Float] {
 }
 
 #if ONNXCore
+  private func sampleONNXArgmax(values: [Float]) async throws -> EdgeToolsToken.ID {
+    let buffer = UnsafeMutableBufferPointer<Float>.allocate(capacity: values.count)
+    _ = buffer.initialize(from: values)
+    defer {
+      buffer.deinitialize()
+      buffer.deallocate()
+    }
+
+    let view = ONNXTensorView(
+      unsafelyWrapping: buffer.baseAddress,
+      shape: [values.count]
+    )
+    return try await EdgeToolsSampler<ONNXTensorView<Float>>.argmax.sample(logits: view)
+  }
+
   @Suite
   struct `ONNXArgmaxSampler tests` {
     @Test(
@@ -60,15 +75,7 @@ private func argmaxValues(count: Int, maximumAt index: Int) -> [Float] {
       values: [Float],
       expectedToken: EdgeToolsToken.ID
     ) async throws {
-      var values = values
-      let count = values.count
-      let token = try await values.withUnsafeMutableBufferPointer {
-        let view = ONNXTensorView(
-          unsafelyWrapping: $0.baseAddress,
-          shape: [count]
-        )
-        return try await EdgeToolsSampler<ONNXTensorView<Float>>.argmax.sample(logits: view)
-      }
+      let token = try await sampleONNXArgmax(values: values)
 
       expectNoDifference(token, expectedToken)
     }
@@ -78,14 +85,7 @@ private func argmaxValues(count: Int, maximumAt index: Int) -> [Float] {
       var values = Array(repeating: Float(-1), count: 67)
       values[66] = 1
 
-      let count = values.count
-      let token = try await values.withUnsafeMutableBufferPointer {
-        let view = ONNXTensorView(
-          unsafelyWrapping: $0.baseAddress,
-          shape: [count]
-        )
-        return try await EdgeToolsSampler<ONNXTensorView<Float>>.argmax.sample(logits: view)
-      }
+      let token = try await sampleONNXArgmax(values: values)
 
       expectNoDifference(token, 66)
     }

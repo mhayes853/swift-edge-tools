@@ -21,7 +21,7 @@ jobs:
   macos:
     name: macOS Tests
     runs-on: macos-26
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -37,7 +37,7 @@ jobs:
   python-macos:
     name: macOS Python Tests
     runs-on: macos-26
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -59,7 +59,7 @@ jobs:
   linux:
     name: Linux Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -72,7 +72,7 @@ jobs:
   android:
     name: Android Build
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -80,7 +80,6 @@ jobs:
           persist-credentials: false
           submodules: recursive
       - name: Build Swift package for Android
-        # pi-lens-ignore: line-length
         uses: "swift-android-sdk/swift-android-action@2044b79660f201ccef8cbce62877e4ec5409f9c8"
         with:
           swift-version: 6.3
@@ -93,7 +92,7 @@ jobs:
   windows:
     name: Windows Build
     runs-on: windows-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -104,8 +103,8 @@ jobs:
         uses: "compnerd/gha-setup-swift@\
           eeda069c5bc95ac8a9ac5cea7d4f588ae5420ca5"
         with:
-          branch: swift-6.3-release
-          tag: 6.3-RELEASE
+          swift-version: swift-6.3-release
+          swift-build: 6.3-RELEASE
       - name: Build Swift package
         run: >
           swift build --disable-experimental-prebuilts
@@ -114,7 +113,7 @@ jobs:
   wasm:
     name: WebAssembly Tests (${{ matrix.onnx-package }})
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -124,11 +123,11 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          lfs: true
           persist-credentials: false
           submodules: recursive
       - name: Install Swift 6.3.2
-        uses: "swift-actions/setup-swift@\
-          364295d9c23900ce04d4e5cc708387921b4e50f9"
+        uses: "swift-actions/setup-swift@364295d9c23900ce04d4e5cc708387921b4e50f9"
         with:
           swift-version: "6.3.2"
           skip-verify-signature: true
