@@ -17,7 +17,7 @@ import OrderedCollections
     public typealias Prompt = EdgeToolsLLMPrompt
     public typealias ToolCallParser = Qwen3P5ToolCallParser
 
-    public func grammar(
+    public func toolCallGrammar(
       tools: [EdgeToolDefinition],
       range: GrammarToolCallRange
     ) throws -> XGRGrammar {

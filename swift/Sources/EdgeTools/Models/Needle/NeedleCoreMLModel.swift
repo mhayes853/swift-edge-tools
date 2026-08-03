@@ -8,28 +8,26 @@
 
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
   public final class NeedleCoreMLModel {
-    public struct GenerateParameters: EdgeToolsModelEngineGenerateParameters {
+    public struct GenerateParameters: NeedleGenerateParameters {
       public static var `default`: Self { Self() }
 
       public var sampler: any EdgeToolsSampler<MLTensor>
       public var processor: (any EdgeToolsLogitsProcessor<MLTensor, MLTensor>)?
-      public var constraint: EdgeToolsXGRGenerationConstraint
       public var maxTokens: Int?
+      public var toolCallRange: GrammarToolCallRange
 
       public init(
         sampler: any EdgeToolsSampler<MLTensor> = CoreMLArgmaxSampler(),
         processor: (any EdgeToolsLogitsProcessor<MLTensor, MLTensor>)? = nil,
-        constraint: EdgeToolsXGRGenerationConstraint = .tools,
-        maxTokens: Int? = 1024
+        maxTokens: Int? = 1024,
+        toolCallRange: GrammarToolCallRange = .unbounded(minimum: 0)
       ) {
         self.sampler = sampler
         self.processor = processor
-        self.constraint = constraint
         self.maxTokens = maxTokens
+        self.toolCallRange = toolCallRange
       }
     }
-
-    public typealias Prompt = NeedlePrompt
 
     fileprivate struct EncoderOutputs {
       let crossAttentionMask: MLTensor
@@ -139,21 +137,13 @@
 
   }
 
-  // MARK: - EdgeToolsModel
+  // MARK: - NeedleModel
 
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-  extension NeedleCoreMLModel: EdgeToolsModel {
+  extension NeedleCoreMLModel: NeedleModel {
     public typealias Input = NeedleModelInput
-    public typealias ToolCallParser = NeedleToolCallParser
 
     public var vocabularySize: Int { self.configuration.vocabularySize }
-
-    public func grammar(
-      tools: [EdgeToolDefinition],
-      range: GrammarToolCallRange
-    ) throws -> XGRGrammar {
-      try XGRGrammar.needle(tools: tools, range: range)
-    }
 
     public func input(
       prompt: NeedlePrompt,

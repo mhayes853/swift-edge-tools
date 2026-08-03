@@ -233,6 +233,40 @@ public struct NeedleToolCallParser: EdgeToolCallParser, Sendable {
 // MARK: - Needle Grammar
 
 #if XGrammar
+  // MARK: - NeedleGenerateParameters
+
+  public protocol NeedleGenerateParameters: EdgeToolsEngineGenerateParameters {
+    var toolCallRange: GrammarToolCallRange { get }
+  }
+
+  #if Atomics
+    // MARK: - NeedleModel
+
+    public protocol NeedleModel: EdgeToolsModel
+    where
+      Prompt == NeedlePrompt,
+      GenerateParameters: NeedleGenerateParameters,
+      ToolCallParser == NeedleToolCallParser
+    {}
+
+    extension NeedleModel {
+      public func grammar(
+        tools: [EdgeToolDefinition],
+        parameters: GenerateParameters,
+        tokenizerInfo _: XGRTokenizerInfo
+      ) throws -> XGRGrammar {
+        try self.toolCallGrammar(tools: tools, range: parameters.toolCallRange)
+      }
+
+      public func toolCallGrammar(
+        tools: [EdgeToolDefinition],
+        range: GrammarToolCallRange
+      ) throws -> XGRGrammar {
+        try XGRGrammar.needle(tools: tools, range: range)
+      }
+    }
+  #endif
+
   // MARK: - XGR Tokenizer Info
 
   extension XGRTokenizerInfo {

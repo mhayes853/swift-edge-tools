@@ -160,14 +160,60 @@
     }
   }
 
+  // MARK: - NeedleMLXGenerateParameters
+
+  public struct NeedleMLXGenerateParameters:
+    EdgeToolsMLXGenerateParameters,
+    NeedleGenerateParameters {
+    public static var `default`: Self { Self() }
+
+    public var sampler: any LogitSampler
+    public var processor: (any LogitProcessor)?
+    public var maxTokens: Int?
+    public var toolCallRange: GrammarToolCallRange
+    public var kvCacheQuantizationBits: Int?
+    public var kvCacheQuantizationGroupSize: Int
+    public var quantizedKVStart: Int
+    public var synchronizeStreamForMemorySnapshots: Bool
+
+    public init(
+      sampler: any LogitSampler = ArgMaxSampler(),
+      processor: (any LogitProcessor)? = nil,
+      maxTokens: Int? = 1024,
+      toolCallRange: GrammarToolCallRange = .unbounded(minimum: 0),
+      kvCacheQuantizationBits: Int? = nil,
+      kvCacheQuantizationGroupSize: Int = 64,
+      quantizedKVStart: Int = 0,
+      synchronizeStreamForMemorySnapshots: Bool = true
+    ) {
+      self.sampler = sampler
+      self.processor = processor
+      self.maxTokens = maxTokens
+      self.toolCallRange = toolCallRange
+      self.kvCacheQuantizationBits = kvCacheQuantizationBits
+      self.kvCacheQuantizationGroupSize = kvCacheQuantizationGroupSize
+      self.quantizedKVStart = quantizedKVStart
+      self.synchronizeStreamForMemorySnapshots = synchronizeStreamForMemorySnapshots
+    }
+  }
+
   // MARK: - EdgeToolsMLXModel
 
   extension NeedleMLXModel: EdgeToolsMLXModel {
     public typealias ModelConfiguration = NeedleModelConfiguration
     public typealias Prompt = NeedlePrompt
+    public typealias GenerateParameters = NeedleMLXGenerateParameters
     public typealias ToolCallParser = NeedleToolCallParser
 
     public func grammar(
+      tools: [EdgeToolDefinition],
+      parameters: NeedleMLXGenerateParameters,
+      tokenizerInfo _: XGRTokenizerInfo
+    ) throws -> XGRGrammar {
+      try self.toolCallGrammar(tools: tools, range: parameters.toolCallRange)
+    }
+
+    public func toolCallGrammar(
       tools: [EdgeToolDefinition],
       range: GrammarToolCallRange
     ) throws -> XGRGrammar {

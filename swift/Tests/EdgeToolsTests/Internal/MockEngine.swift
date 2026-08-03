@@ -32,6 +32,8 @@ final class MockEngine: EdgeToolsPrefillableEngine, Sendable {
 
   struct GenerateParameters: EdgeToolsEngineGenerateParameters {
     static let `default` = GenerateParameters()
+
+    var maxTokens: Int? { nil }
   }
 
   enum Event: Sendable {

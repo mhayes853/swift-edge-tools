@@ -5,11 +5,10 @@
 #if XGrammar && Atomics
   import Atomics
 
-  // MARK: - EdgeToolsModelEngineGenerateParameters
+  // MARK: - EdgeToolsConstrainedGenerateParameters
 
-  public protocol EdgeToolsModelEngineGenerateParameters: EdgeToolsEngineGenerateParameters {
+  public protocol EdgeToolsConstrainedGenerateParameters: EdgeToolsEngineGenerateParameters {
     var constraint: EdgeToolsXGRGenerationConstraint { get }
-    var maxTokens: Int? { get }
   }
 
   // MARK: - EdgeToolsModelInput
@@ -66,12 +65,18 @@
   public protocol EdgeToolsModel: SendableMetatype {
     associatedtype Prompt: Sendable
     associatedtype Input
-    associatedtype GenerateParameters: EdgeToolsModelEngineGenerateParameters
+    associatedtype GenerateParameters: EdgeToolsEngineGenerateParameters
     associatedtype ToolCallParser: EdgeToolCallParser
 
     var vocabularySize: Int { get }
 
     func grammar(
+      tools: [EdgeToolDefinition],
+      parameters: GenerateParameters,
+      tokenizerInfo: XGRTokenizerInfo
+    ) throws -> XGRGrammar
+
+    func toolCallGrammar(
       tools: [EdgeToolDefinition],
       range: GrammarToolCallRange
     ) throws -> XGRGrammar
@@ -103,6 +108,22 @@
     }
 
     public mutating func resetGeneration() {}
+  }
+
+  extension EdgeToolsModel
+  where GenerateParameters: EdgeToolsConstrainedGenerateParameters {
+    public func grammar(
+      tools: [EdgeToolDefinition],
+      parameters: GenerateParameters,
+      tokenizerInfo: XGRTokenizerInfo
+    ) throws -> XGRGrammar {
+      try parameters.constraint.resolveGrammar(
+        tokenizerInfo: tokenizerInfo,
+        toolCallGrammar: { range in
+          try self.toolCallGrammar(tools: tools, range: range)
+        }
+      )
+    }
   }
 
   // MARK: - EdgeToolsPrefillableModel
@@ -223,7 +244,12 @@
       try Task.checkCancellation()
       guard !isStopped.load(ordering: .relaxed) else { return .empty }
 
-      let matcher = try self.matcher(tools: tools, constraint: parameters.constraint)
+      let grammar = try model.grammar(
+        tools: tools,
+        parameters: parameters,
+        tokenizerInfo: self.grammarCompiler.tokenizerInfo
+      )
+      let matcher = try self.matcher(grammar: grammar)
       let generateStart = self.clock.now
       let input = try model.input(prompt: prompt, tools: tools, tokenizer: self.tokenizer)
       var preparation = try await model.prepare(input: input.value, parameters: parameters)
@@ -306,43 +332,13 @@
       )
     }
 
-    private func matcher(
-      tools: [EdgeToolDefinition],
-      constraint: EdgeToolsXGRGenerationConstraint
-    ) throws -> XGRMatcher {
-      let toolsGrammar =
-        try self.toolCallRange(for: constraint)
-        .map { try self.model.grammar(tools: tools, range: $0) } ?? .universal
-      let grammar = try self.grammar(for: constraint, toolsGrammar: toolsGrammar)
+    private func matcher(grammar: XGRGrammar) throws -> XGRMatcher {
       let matcher = try self.matcherPool.matcher(
         grammar: grammar,
         compilingWith: self.grammarCompiler
       )
       matcher.reset()
       return matcher
-    }
-
-    private func toolCallRange(
-      for constraint: EdgeToolsXGRGenerationConstraint
-    ) -> GrammarToolCallRange? {
-      switch constraint.kind {
-      case .toolsWithGrammar(let range, _): range
-      default: nil
-      }
-    }
-
-    private func grammar(
-      for constraint: EdgeToolsXGRGenerationConstraint,
-      toolsGrammar: XGRGrammar
-    ) throws -> XGRGrammar {
-      switch constraint.kind {
-      case .unconstrained:
-        .universal
-      case .grammar(let grammar):
-        grammar
-      case .toolsWithGrammar(_, let transform):
-        try transform?(toolsGrammar, self.grammarCompiler.tokenizerInfo) ?? toolsGrammar
-      }
     }
   }
 

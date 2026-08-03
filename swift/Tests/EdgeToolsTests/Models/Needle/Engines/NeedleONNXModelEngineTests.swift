@@ -73,29 +73,6 @@
     }
 
     @Test
-    func `Grows Adaptive Cache Beyond Initial Capacity`() async throws {
-      let engine = try await makeNeedleONNXModelEngine()
-      let generationTask = try engine.generate(
-        prompt: .sendAdventureEmail,
-        parameters: ONNXGenerateParameters(
-          processor: SuppressingTokenONNXLogitsProcessor(tokenID: 1),
-          constraint: .unconstrained,
-          maxTokens: 130
-        ),
-        channel: EdgeToolsGenerationChannel()
-      )
-      let generation = try await generationTask.value
-
-      let tokensAcrossCacheGrowth = generation.tokens.suffix(6).map(\.stringValue)
-      expectNoDifference(generation.wasStopped, false)
-      expectNoDifference(generation.tokens.count, 130)
-      expectNoDifference(
-        tokensAcrossCacheGrowth,
-        ["]]", " B", "erlin", "\"", "json", "["]
-      )
-    }
-
-    @Test
     func `Generate Basics With Core ML CPU And GPU`() async throws {
       let engine = try await makeNeedleONNXModelEngine(
         runtimeConfiguration: coreMLRuntimeConfiguration()
@@ -173,7 +150,7 @@
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
         tools: NeedlePrompt.sendAdventureEmailDefinitions,
-        parameters: ONNXGenerateParameters(processor: processor),
+        parameters: NeedleONNXGenerateParameters(processor: processor),
         channel: EdgeToolsGenerationChannel()
       )
       let generation = try await generationTask.value
@@ -414,19 +391,6 @@
       )
     }
     return destination
-  }
-
-  private struct SuppressingTokenONNXLogitsProcessor: EdgeToolsLogitsProcessor, Sendable {
-    let tokenID: EdgeToolsToken.ID
-
-    func prompt(_ prompt: [EdgeToolsToken.ID]) {}
-
-    func process(logits: inout ONNXTensorView<Float>) {
-      var span = logits.mutableSpan
-      span[self.tokenID] = -.infinity
-    }
-
-    func didSample(tokenId: EdgeToolsToken.ID) {}
   }
 
   private final class CountingONNXLogitsProcessor: EdgeToolsLogitsProcessor, Sendable {

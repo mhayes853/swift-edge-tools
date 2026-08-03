@@ -15,7 +15,7 @@
     public typealias Prompt = EdgeToolsLLMPrompt
     public typealias ToolCallParser = FunctionGemmaToolCallParser
 
-    public func grammar(
+    public func toolCallGrammar(
       tools: [EdgeToolDefinition],
       range: GrammarToolCallRange
     ) throws -> XGRGrammar {

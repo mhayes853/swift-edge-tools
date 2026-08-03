@@ -3,34 +3,6 @@
 #endif
 
 #if ONNXCore
-  // MARK: - ONNXGenerateParameters
-
-  public struct ONNXGenerateParameters: EdgeToolsModelEngineGenerateParameters {
-    public static var `default`: Self { Self() }
-
-    public var sampler: any EdgeToolsSampler<ONNXTensorView<Float>>
-    public var processor:
-      (any EdgeToolsLogitsProcessor<[EdgeToolsToken.ID], ONNXTensorView<Float>>)?
-    public var constraint: EdgeToolsXGRGenerationConstraint
-    public var maxTokens: Int?
-
-    public init(
-      sampler: any EdgeToolsSampler<ONNXTensorView<Float>> = ONNXArgmaxSampler(),
-      processor: (
-        any EdgeToolsLogitsProcessor<
-          [EdgeToolsToken.ID], ONNXTensorView<Float>
-        >
-      )? = nil,
-      constraint: EdgeToolsXGRGenerationConstraint = .tools,
-      maxTokens: Int? = 1024
-    ) {
-      self.sampler = sampler
-      self.processor = processor
-      self.constraint = constraint
-      self.maxTokens = maxTokens
-    }
-  }
-
   // MARK: - ONNXError
 
   public struct ONNXError: Hashable, Sendable, Error {

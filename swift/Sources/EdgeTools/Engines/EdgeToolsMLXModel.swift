@@ -17,11 +17,19 @@
   public protocol EdgeToolsMLXModel: LanguageModel, SendableMetatype {
     associatedtype ModelConfiguration: Decodable
     associatedtype Prompt: Sendable
+    associatedtype GenerateParameters: EdgeToolsMLXGenerateParameters =
+      DefaultEdgeToolsMLXGenerateParameters
     associatedtype ToolCallParser: EdgeToolCallParser
 
     var vocabularySize: Int { get }
 
     func grammar(
+      tools: [EdgeToolDefinition],
+      parameters: GenerateParameters,
+      tokenizerInfo: XGRTokenizerInfo
+    ) throws -> XGRGrammar
+
+    func toolCallGrammar(
       tools: [EdgeToolDefinition],
       range: GrammarToolCallRange
     ) throws -> XGRGrammar
@@ -31,6 +39,22 @@
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsXGRTokenizer
     ) throws -> LMInput
+  }
+
+  extension EdgeToolsMLXModel
+  where GenerateParameters: EdgeToolsConstrainedGenerateParameters {
+    public func grammar(
+      tools: [EdgeToolDefinition],
+      parameters: GenerateParameters,
+      tokenizerInfo: XGRTokenizerInfo
+    ) throws -> XGRGrammar {
+      try parameters.constraint.resolveGrammar(
+        tokenizerInfo: tokenizerInfo,
+        toolCallGrammar: { range in
+          try self.toolCallGrammar(tools: tools, range: range)
+        }
+      )
+    }
   }
 
   extension EdgeToolsMLXModel {
@@ -82,7 +106,19 @@
 
   // MARK: - EdgeToolsMLXGenerateParameters
 
-  public struct EdgeToolsMLXGenerateParameters: EdgeToolsModelEngineGenerateParameters {
+  public protocol EdgeToolsMLXGenerateParameters: EdgeToolsEngineGenerateParameters {
+    var sampler: any LogitSampler { get }
+    var processor: (any LogitProcessor)? { get }
+    var kvCacheQuantizationBits: Int? { get }
+    var kvCacheQuantizationGroupSize: Int { get }
+    var quantizedKVStart: Int { get }
+    var synchronizeStreamForMemorySnapshots: Bool { get }
+  }
+
+  public struct DefaultEdgeToolsMLXGenerateParameters:
+    EdgeToolsMLXGenerateParameters,
+    EdgeToolsConstrainedGenerateParameters
+  {
     public static var `default`: Self { Self() }
 
     public var sampler: any LogitSampler
@@ -95,9 +131,9 @@
     public var synchronizeStreamForMemorySnapshots: Bool
 
     public init(
-      sampler: any LogitSampler = ArgMaxSampler(),
+      sampler: any LogitSampler = CategoricalSampler(temperature: 0.6),
       processor: (any LogitProcessor)? = nil,
-      constraint: EdgeToolsXGRGenerationConstraint = .tools,
+      constraint: EdgeToolsXGRGenerationConstraint = .unconstrained,
       maxTokens: Int? = 1024,
       kvCacheQuantizationBits: Int? = nil,
       kvCacheQuantizationGroupSize: Int = 64,
@@ -119,7 +155,7 @@
 
   public final class EdgeToolsMLXEngine<Model: EdgeToolsMLXModel>: EdgeToolsEngine, Sendable {
     public typealias Prompt = Model.Prompt
-    public typealias GenerateParameters = EdgeToolsMLXGenerateParameters
+    public typealias GenerateParameters = Model.GenerateParameters
 
     private let engine: EdgeToolsModelEngine<_EdgeToolsMLXModel<Model>>
 
@@ -158,7 +194,7 @@
     public func generate(
       prompt: Model.Prompt,
       tools: [EdgeToolDefinition] = [],
-      parameters: sending EdgeToolsMLXGenerateParameters,
+      parameters: sending Model.GenerateParameters,
       channel: EdgeToolsGenerationChannel
     ) throws -> some EdgeToolsEngineGenerationTask {
       try self.engine.generate(
@@ -297,7 +333,7 @@
   private struct _EdgeToolsMLXModel<Model: EdgeToolsMLXModel>: EdgeToolsModel {
     typealias Prompt = Model.Prompt
     typealias Input = LMInput
-    typealias GenerateParameters = EdgeToolsMLXGenerateParameters
+    typealias GenerateParameters = Model.GenerateParameters
     typealias ToolCallParser = Model.ToolCallParser
 
     private struct CachedPrefill {
@@ -329,9 +365,21 @@
 
     func grammar(
       tools: [EdgeToolDefinition],
+      parameters: Model.GenerateParameters,
+      tokenizerInfo: XGRTokenizerInfo
+    ) throws -> XGRGrammar {
+      try self.model.grammar(
+        tools: tools,
+        parameters: parameters,
+        tokenizerInfo: tokenizerInfo
+      )
+    }
+
+    func toolCallGrammar(
+      tools: [EdgeToolDefinition],
       range: GrammarToolCallRange
     ) throws -> XGRGrammar {
-      try self.model.grammar(tools: tools, range: range)
+      try self.model.toolCallGrammar(tools: tools, range: range)
     }
 
     func input(
@@ -348,7 +396,7 @@
 
     nonisolated(nonsending) mutating func prepare(
       input: LMInput,
-      parameters: EdgeToolsMLXGenerateParameters
+      parameters: Model.GenerateParameters
     ) async throws -> EdgeToolsModelPreparation {
       let clock = ContinuousClock()
       let generationStartSnapshot = Self.memorySnapshot(
@@ -381,7 +429,7 @@
 
     nonisolated(nonsending) mutating func decode(
       bitmask: GrammarBitmask,
-      parameters: EdgeToolsMLXGenerateParameters
+      parameters: Model.GenerateParameters
     ) async throws -> EdgeToolsModelSample {
       guard var generation = self.generation else {
         throw EdgeToolsError.modelNotPrepared

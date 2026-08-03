@@ -30,7 +30,7 @@
     }
 
     @Test
-    func `Resolves Tool Constraints Inside The Model Engine`() async throws {
+    func `Constrained Model Parameters Resolve Tool Constraints`() async throws {
       let tokenizer = try testTokenizer()
       let eosTokenId = try requiredTestEOSToken(tokenizer: tokenizer)
       let observation = ConstraintObservation()
@@ -63,7 +63,7 @@
     }
 
     @Test
-    func `Unions Tool And User Grammars Inside The Model Engine`() async throws {
+    func `Constrained Model Parameters Union Tool And User Grammars`() async throws {
       let tokenizer = try testTokenizer()
       let eosTokenId = try requiredTestEOSToken(tokenizer: tokenizer)
       let observation = ConstraintObservation()
@@ -175,7 +175,7 @@
   }
 
   private struct TestModel: EdgeToolsModel, Sendable {
-    struct Parameters: EdgeToolsModelEngineGenerateParameters {
+    struct Parameters: EdgeToolsConstrainedGenerateParameters {
       static var `default`: Self { Parameters(tokenIds: []) }
 
       var tokenIds: [EdgeToolsToken.ID]
@@ -195,7 +195,7 @@
 
     var vocabularySize: Int { 8192 }
 
-    func grammar(
+    func toolCallGrammar(
       tools: [EdgeToolDefinition],
       range: GrammarToolCallRange
     ) throws -> XGRGrammar {

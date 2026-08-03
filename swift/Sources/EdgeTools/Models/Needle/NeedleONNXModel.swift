@@ -15,12 +15,38 @@
     import JavaScriptKit
   #endif
 
+  // MARK: - NeedleONNXGenerateParameters
+
+  public struct NeedleONNXGenerateParameters: NeedleGenerateParameters {
+    public static var `default`: Self { Self() }
+
+    public var sampler: any EdgeToolsSampler<ONNXTensorView<Float>>
+    public var processor:
+      (any EdgeToolsLogitsProcessor<[EdgeToolsToken.ID], ONNXTensorView<Float>>)?
+    public var maxTokens: Int?
+    public var toolCallRange: GrammarToolCallRange
+
+    public init(
+      sampler: any EdgeToolsSampler<ONNXTensorView<Float>> = ONNXArgmaxSampler(),
+      processor: (
+        any EdgeToolsLogitsProcessor<
+          [EdgeToolsToken.ID], ONNXTensorView<Float>
+        >
+      )? = nil,
+      maxTokens: Int? = 1024,
+      toolCallRange: GrammarToolCallRange = .unbounded(minimum: 0)
+    ) {
+      self.sampler = sampler
+      self.processor = processor
+      self.maxTokens = maxTokens
+      self.toolCallRange = toolCallRange
+    }
+  }
+
   // MARK: - NeedleONNXModel
 
   public struct NeedleONNXModel<Runtime: ONNXRuntime> {
     public typealias ModelConfiguration = NeedleModelConfiguration
-    public typealias Prompt = NeedlePrompt
-    public typealias ToolCallParser = NeedleToolCallParser
 
     private struct EncoderOutputs {
       let crossAttentionMask: Runtime.Tensor
@@ -59,13 +85,6 @@
       self.runtime = runtime
       self.encoderSession = encoderSession
       self.decoderSession = decoderSession
-    }
-
-    public func grammar(
-      tools: [EdgeToolDefinition],
-      range: GrammarToolCallRange
-    ) throws -> XGRGrammar {
-      try XGRGrammar.needle(tools: tools, range: range)
     }
 
     private nonisolated(nonsending) mutating func startGeneration(
@@ -366,11 +385,11 @@
     }
   }
 
-  // MARK: - EdgeToolsModel
+  // MARK: - NeedleModel
 
-  extension NeedleONNXModel: EdgeToolsModel {
+  extension NeedleONNXModel: NeedleModel {
     public typealias Input = [EdgeToolsToken.ID]
-    public typealias GenerateParameters = ONNXGenerateParameters
+    public typealias GenerateParameters = NeedleONNXGenerateParameters
 
     public func input(
       prompt: NeedlePrompt,
@@ -383,7 +402,7 @@
 
     public nonisolated(nonsending) mutating func prepare(
       input: [EdgeToolsToken.ID],
-      parameters: ONNXGenerateParameters
+      parameters: NeedleONNXGenerateParameters
     ) async throws -> EdgeToolsModelPreparation {
       let clock = ContinuousClock()
       let start = clock.now
@@ -399,7 +418,7 @@
 
     public nonisolated(nonsending) mutating func decode(
       bitmask: GrammarBitmask,
-      parameters: ONNXGenerateParameters
+      parameters: NeedleONNXGenerateParameters
     ) async throws -> EdgeToolsModelSample {
       if let pendingTokenId = self.generation?.pendingTokenId {
         try await self.runDecoder(tokenID: pendingTokenId)

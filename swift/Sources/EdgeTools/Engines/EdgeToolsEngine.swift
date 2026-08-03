@@ -43,6 +43,8 @@ public struct EdgeToolsEnginePrefill: Sendable {
 
 public protocol EdgeToolsEngineGenerateParameters {
   static var `default`: Self { get }
+
+  var maxTokens: Int? { get }
 }
 
 // MARK: - EdgeToolsEngineGenerationTask
