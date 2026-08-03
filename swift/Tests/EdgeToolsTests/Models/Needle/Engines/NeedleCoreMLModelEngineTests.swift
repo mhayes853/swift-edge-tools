@@ -306,9 +306,8 @@
       self.counts.withLock { $0.prompt += 1 }
     }
 
-    func process(logits: inout MLTensor) async throws -> MLTensor {
+    func process(logits: inout MLTensor) async throws {
       self.counts.withLock { $0.process += 1 }
-      return logits
     }
 
     func didSample(tokenId: EdgeToolsToken.ID) {

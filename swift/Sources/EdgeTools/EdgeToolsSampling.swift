@@ -13,9 +13,11 @@
 // MARK: - EdgeToolsSampler
 
 public protocol EdgeToolsSampler<Logits> {
-  associatedtype Logits
+  associatedtype Logits: ~Copyable & ~Escapable
 
-  nonisolated(nonsending) func sample(logits: Logits) async throws -> EdgeToolsToken.ID
+  nonisolated(nonsending) func sample(
+    logits: borrowing Logits
+  ) async throws -> EdgeToolsToken.ID
 }
 
 // MARK: - Argmax
@@ -125,15 +127,13 @@ func argmaxScalar(
 // MARK: - ONNX
 
 #if ONNXCore
-  public protocol ONNXSampler {
-    func sample(logits: Span<Float>) throws -> EdgeToolsToken.ID
-  }
-
-  public struct ONNXArgmaxSampler: ONNXSampler {
+  public struct ONNXArgmaxSampler: EdgeToolsSampler {
     public init() {}
 
-    public func sample(logits: Span<Float>) -> EdgeToolsToken.ID {
-      logits.withUnsafeBufferPointer { argmaxContiguous($0) }
+    public func sample(
+      logits: borrowing ONNXTensorView<Float>
+    ) -> EdgeToolsToken.ID {
+      logits.span.withUnsafeBufferPointer { argmaxContiguous($0) }
     }
   }
 #endif
@@ -145,7 +145,7 @@ func argmaxScalar(
   public struct CoreAIArgmaxSampler: EdgeToolsSampler {
     public init() {}
 
-    public func sample(logits: NDArray) -> EdgeToolsToken.ID {
+    public func sample(logits: borrowing NDArray) -> EdgeToolsToken.ID {
       let view = logits.view(as: Float.self)
       let vocabularySize = view.shape[1]
       guard vocabularySize > 0 else { return 0 }
@@ -168,7 +168,7 @@ func argmaxScalar(
   public struct CoreMLArgmaxSampler: EdgeToolsSampler {
     public init() {}
 
-    public func sample(logits: MLTensor) async -> EdgeToolsToken.ID {
+    public func sample(logits: borrowing MLTensor) async -> EdgeToolsToken.ID {
       let indices = await logits.argmax(alongAxis: 1).shapedArray(of: Int32.self).scalars
       return EdgeToolsToken.ID(indices.first ?? 0)
     }

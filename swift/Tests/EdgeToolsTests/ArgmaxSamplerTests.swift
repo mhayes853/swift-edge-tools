@@ -57,8 +57,14 @@ private func argmaxValues(count: Int, maximumAt index: Int) -> [Float] {
       ]
     )
     func `Samples Expected Token`(values: [Float], expectedToken: EdgeToolsToken.ID) {
-      let token = values.withUnsafeBufferPointer {
-        ONNXArgmaxSampler().sample(logits: Span(_unsafeElements: $0))
+      var values = values
+      let count = values.count
+      let token = values.withUnsafeMutableBufferPointer {
+        let view = ONNXTensorView(
+          unsafelyWrapping: $0.baseAddress,
+          shape: [count]
+        )
+        return ONNXArgmaxSampler().sample(logits: view)
       }
 
       expectNoDifference(token, expectedToken)
@@ -69,8 +75,13 @@ private func argmaxValues(count: Int, maximumAt index: Int) -> [Float] {
       var values = Array(repeating: Float(-1), count: 67)
       values[66] = 1
 
-      let token = values.withUnsafeBufferPointer {
-        ONNXArgmaxSampler().sample(logits: Span(_unsafeElements: $0))
+      let count = values.count
+      let token = values.withUnsafeMutableBufferPointer {
+        let view = ONNXTensorView(
+          unsafelyWrapping: $0.baseAddress,
+          shape: [count]
+        )
+        return ONNXArgmaxSampler().sample(logits: view)
       }
 
       expectNoDifference(token, 66)

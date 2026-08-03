@@ -416,19 +416,20 @@
     return destination
   }
 
-  private struct SuppressingTokenONNXLogitsProcessor: ONNXLogitsProcessor, Sendable {
+  private struct SuppressingTokenONNXLogitsProcessor: EdgeToolsLogitsProcessor, Sendable {
     let tokenID: EdgeToolsToken.ID
 
     func prompt(_ prompt: [EdgeToolsToken.ID]) {}
 
-    func process(logits: inout MutableSpan<Float>) {
-      logits[self.tokenID] = -.infinity
+    func process(logits: inout ONNXTensorView<Float>) {
+      var span = logits.mutableSpan
+      span[self.tokenID] = -.infinity
     }
 
     func didSample(tokenId: EdgeToolsToken.ID) {}
   }
 
-  private final class CountingONNXLogitsProcessor: ONNXLogitsProcessor, Sendable {
+  private final class CountingONNXLogitsProcessor: EdgeToolsLogitsProcessor, Sendable {
     private struct Counts: Hashable, Sendable {
       var prompt = 0
       var process = 0
@@ -445,7 +446,7 @@
       self.counts.withLock { $0.prompt += 1 }
     }
 
-    func process(logits: inout MutableSpan<Float>) {
+    func process(logits: inout ONNXTensorView<Float>) {
       self.counts.withLock { $0.process += 1 }
     }
 

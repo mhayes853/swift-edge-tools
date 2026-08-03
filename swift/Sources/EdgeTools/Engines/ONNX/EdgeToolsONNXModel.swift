@@ -8,14 +8,19 @@
   public struct ONNXGenerateParameters: EdgeToolsModelEngineGenerateParameters {
     public static var `default`: Self { Self() }
 
-    public var sampler: any ONNXSampler
-    public var processor: (any ONNXLogitsProcessor)?
+    public var sampler: any EdgeToolsSampler<ONNXTensorView<Float>>
+    public var processor:
+      (any EdgeToolsLogitsProcessor<[EdgeToolsToken.ID], ONNXTensorView<Float>>)?
     public var constraint: EdgeToolsXGRGenerationConstraint
     public var maxTokens: Int?
 
     public init(
-      sampler: any ONNXSampler = ONNXArgmaxSampler(),
-      processor: (any ONNXLogitsProcessor)? = nil,
+      sampler: any EdgeToolsSampler<ONNXTensorView<Float>> = ONNXArgmaxSampler(),
+      processor: (
+        any EdgeToolsLogitsProcessor<
+          [EdgeToolsToken.ID], ONNXTensorView<Float>
+        >
+      )? = nil,
       constraint: EdgeToolsXGRGenerationConstraint = .tools,
       maxTokens: Int? = 1024
     ) {

@@ -326,9 +326,8 @@
       self.counts.withLock { $0.prompt += 1 }
     }
 
-    func process(logits: inout NDArray) -> NDArray {
+    func process(logits: inout NDArray) {
       self.counts.withLock { $0.process += 1 }
-      return logits
     }
 
     func didSample(tokenId: EdgeToolsToken.ID) {

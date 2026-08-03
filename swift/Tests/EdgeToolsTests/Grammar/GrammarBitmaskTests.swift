@@ -101,7 +101,7 @@ struct GrammarBitmaskConsolidatedTests {
           var logits = (0..<64).map(Float.init)
           logits.withUnsafeMutableBufferPointer {
             var span = MutableSpan(_unsafeElements: $0)
-            applyBitmaskONNX(logits: &span, mask: mask)
+            applyBitmask(logits: &span, mask: mask)
           }
           let filtered = (0..<logits.count)
             .filter { logits[$0] == -.infinity }
@@ -116,7 +116,7 @@ struct GrammarBitmaskConsolidatedTests {
         func `Core AI Filters Masked Tokens`() {
           let mask = Self.mask()
           var initialLogits = NDArray(scalars: (0..<64).map(Float.init), shape: [1, 64])
-          let logits = applyBitmaskCoreAI(logits: &initialLogits, mask: mask)
+          let logits = applyBitmask(logits: &initialLogits, mask: mask)
           let view = logits.view(as: Float.self)
           let filtered = (0..<64)
             .compactMap { index in

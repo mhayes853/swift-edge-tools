@@ -324,11 +324,9 @@
         generation.logits = try self.stepLogits(from: decoderLogits)
         generation.position += 1
       }
-      let processedLogits =
-        try await parameters.processor?.process(logits: &generation.logits)
-        ?? generation.logits
-      var maskedLogits = processedLogits
-      applyBitmaskCoreAI(logits: &maskedLogits, mask: bitmask)
+      try await parameters.processor?.process(logits: &generation.logits)
+      var maskedLogits = generation.logits
+      applyBitmask(logits: &maskedLogits, mask: bitmask)
       let confidence = try tokenConfidenceCoreAI(logits: maskedLogits)
       let tokenId = try await parameters.sampler.sample(logits: maskedLogits)
       parameters.processor?.didSample(tokenId: tokenId)

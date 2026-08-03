@@ -236,10 +236,8 @@
         generation.position += 1
       }
       var stepLogits = generation.logits.squeezingShape(at: 1)
-      let processedLogits =
-        try await parameters.processor?.process(logits: &stepLogits)
-        ?? stepLogits
-      let maskedLogits = applyBitmaskCoreML(logits: processedLogits, mask: bitmask)
+      try await parameters.processor?.process(logits: &stepLogits)
+      let maskedLogits = applyBitmaskCoreML(logits: stepLogits, mask: bitmask)
       let confidence = await tokenConfidenceCoreML(logits: maskedLogits)
       let tokenId = try await parameters.sampler.sample(logits: maskedLogits)
       parameters.processor?.didSample(tokenId: tokenId)

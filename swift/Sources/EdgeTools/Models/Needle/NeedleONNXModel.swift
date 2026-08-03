@@ -408,7 +408,7 @@
         throw EdgeToolsError.modelNotPrepared
       }
       let vocabularySize = self.vocabularySize
-      let (tokenId, confidence) = try await logitsTensor.withUnsafeMutableBufferPointer(
+      let (tokenId, confidence) = try await logitsTensor.withMutableView(
         as: Float.self
       ) { logits -> (EdgeToolsToken.ID, Float) in
         guard logits.count == vocabularySize else {
@@ -417,11 +417,11 @@
             message: "Expected \(vocabularySize) logits, got \(logits.count)."
           )
         }
-        var span = MutableSpan(_unsafeElements: logits)
-        try parameters.processor?.process(logits: &span)
-        applyBitmaskONNX(logits: &span, mask: bitmask)
-        let confidence = tokenConfidenceONNX(logits: Span(_unsafeElements: logits))
-        let tokenId = try parameters.sampler.sample(logits: Span(_unsafeElements: logits))
+        try await parameters.processor?.process(logits: &logits)
+        var span = logits.mutableSpan
+        applyBitmask(logits: &span, mask: bitmask)
+        let confidence = tokenConfidenceONNX(logits: logits.span)
+        let tokenId = try await parameters.sampler.sample(logits: logits)
         return (tokenId, confidence)
       }
       parameters.processor?.didSample(tokenId: tokenId)

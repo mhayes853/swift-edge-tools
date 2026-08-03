@@ -112,24 +112,24 @@ extension GrammarBitmask: RandomAccessCollection {}
 #if swift(>=6.4) && CoreAI && canImport(CoreAI)
   @discardableResult
   @available(anyAppleOS 27.0, *)
-  public func applyBitmaskCoreAI(logits: inout NDArray, mask: GrammarBitmask) -> NDArray {
+  public func applyBitmask(logits: inout NDArray, mask: GrammarBitmask) -> NDArray {
     var logitsView = logits.mutableView(as: Float.self)
     let rowCount = logitsView.shape[0]
     let vocabularySize = logitsView.shape[1]
     validateBitmaskCoverage(mask: mask, vocabularySize: vocabularySize)
-    mask.storage.withUnsafeBytes { bytes in
-      let maskBytes = bytes.bindMemory(to: UInt8.self)
-      if logitsView.isContiguous {
-        logitsView.withUnsafeMutablePointer { logitsPointer, _, _ in
-          for rowIndex in 0..<rowCount {
-            applyBitmaskSIMDRow(
-              logits: logitsPointer.advanced(by: rowIndex * vocabularySize),
-              vocabularySize: vocabularySize,
-              maskBytes: maskBytes
-            )
-          }
+    if logitsView.isContiguous {
+      logitsView.withUnsafeMutablePointer { logitsPointer, _, _ in
+        for rowIndex in 0..<rowCount {
+          var logits = MutableSpan(
+            _unsafeStart: logitsPointer.advanced(by: rowIndex * vocabularySize),
+            count: vocabularySize
+          )
+          applyBitmask(logits: &logits, mask: mask)
         }
-      } else {
+      }
+    } else {
+      mask.storage.withUnsafeBytes { bytes in
+        let maskBytes = bytes.bindMemory(to: UInt8.self)
         for rowIndex in 0..<rowCount {
           for columnIndex in 0..<vocabularySize {
             let value = bitmaskValue(maskBytes: maskBytes, index: columnIndex)
@@ -143,26 +143,24 @@ extension GrammarBitmask: RandomAccessCollection {}
 
 #endif
 
-// MARK: - ONNX
+// MARK: - Contiguous Storage
 
-#if ONNXCore
-  public func applyBitmaskONNX(
-    logits: inout MutableSpan<Float>,
-    mask: GrammarBitmask
-  ) {
-    validateBitmaskCoverage(mask: mask, vocabularySize: logits.count)
-    mask.storage.withUnsafeBufferPointer { maskBytes in
-      logits.withUnsafeMutableBufferPointer { buffer in
-        guard let baseAddress = buffer.baseAddress else { return }
-        applyBitmaskSIMDRow(
-          logits: baseAddress,
-          vocabularySize: buffer.count,
-          maskBytes: maskBytes
-        )
-      }
+public func applyBitmask(
+  logits: inout MutableSpan<Float>,
+  mask: GrammarBitmask
+) {
+  validateBitmaskCoverage(mask: mask, vocabularySize: logits.count)
+  mask.storage.withUnsafeBufferPointer { maskBytes in
+    logits.withUnsafeMutableBufferPointer { buffer in
+      guard let baseAddress = buffer.baseAddress else { return }
+      applyBitmaskSIMDRow(
+        logits: baseAddress,
+        vocabularySize: buffer.count,
+        maskBytes: maskBytes
+      )
     }
   }
-#endif
+}
 
 @inline(always)
 private func applyBitmaskSIMDRow(

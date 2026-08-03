@@ -229,7 +229,7 @@
         )
         return self.baseAddress![index]
       }
-      nonmutating set {
+      mutating set {
         let index = edgeToolsONNXFlatIndex(
           shape: self.shape,
           strides: self.strides,
@@ -244,7 +244,7 @@
       borrowing get {
         self[scalarAt: indices.span.withUnsafeBufferPointer { Array($0) }]
       }
-      nonmutating set {
+      mutating set {
         self[scalarAt: indices.span.withUnsafeBufferPointer { Array($0) }] = newValue
       }
     }
@@ -302,14 +302,6 @@
         return MutableSpan(_unsafeStart: self.baseAddress!, count: self.count)
       }
     }
-  }
-
-  // MARK: - ONNXLogitsProcessor
-
-  public protocol ONNXLogitsProcessor {
-    func prompt(_ prompt: [EdgeToolsToken.ID])
-    func process(logits: inout MutableSpan<Float>) throws
-    func didSample(tokenId: EdgeToolsToken.ID)
   }
 
   // MARK: - ONNXGraphOptimizationLevel
