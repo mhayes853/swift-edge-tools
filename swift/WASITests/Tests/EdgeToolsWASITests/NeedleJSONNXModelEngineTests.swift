@@ -69,7 +69,7 @@ struct `Needle JSONNX model engine tests` {
     let tokenizer = try NeedleSPTokenizer(data: tokenizerData)
     let encoderData = try Self.file(named: "encoder.onnx.data", in: fixture)
     let decoderData = try Self.file(named: "decoder.onnx.data", in: fixture)
-    return try await NeedleJSONNXModelEngine(
+    let engine = try await NeedleJSONNXModelEngine(
       onnxRuntime: namespace,
       configuration: NeedleModelConfiguration(dtype: "float32"),
       tokenizer: tokenizer,
@@ -88,6 +88,12 @@ struct `Needle JSONNX model engine tests` {
         data: decoderData
       )
     )
+    let runtime = try #require(JSObject.global["edgeToolsONNXRuntime"].object)
+    if runtime["env"].object?["versions"].object?["web"].string != nil {
+      let threadCount = runtime["env"].object?["wasm"].object?["numThreads"].number
+      #expect(threadCount == 4)
+    }
+    return engine
   }
 
   private static func configuration(

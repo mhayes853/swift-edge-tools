@@ -558,6 +558,7 @@
         encoderConfiguration: JSONNXRuntime.Configuration = JSONNXRuntime.Configuration(),
         decoderConfiguration: JSONNXRuntime.Configuration = JSONNXRuntime.Configuration()
       ) async throws {
+        configureNeedleBrowserWasmThreads(onnxRuntime: onnxRuntime)
         let runtime = try JSONNXRuntime(onnxRuntime: onnxRuntime)
         let encoderSession = try await runtime.session(
           model: encoderModel,
@@ -575,6 +576,16 @@
         )
         try self.init(model: consume model, tokenizer: tokenizer)
       }
+    }
+
+    private func configureNeedleBrowserWasmThreads(onnxRuntime: JSObject) {
+      let object = onnxRuntime["default"].object ?? onnxRuntime
+      guard
+        let environment = object["env"].object,
+        environment["versions"].object?["web"].string != nil,
+        let wasm = environment["wasm"].object
+      else { return }
+      wasm["numThreads"] = .number(4)
     }
   #endif
 

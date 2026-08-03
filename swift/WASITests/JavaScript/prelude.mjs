@@ -5,8 +5,13 @@ import { fileURLToPath } from "node:url";
 
 const packageName = process.env.EDGE_TOOLS_ONNX_PACKAGE ?? "onnxruntime-node";
 const importedRuntime = await import(packageName);
+const importedWebRuntime =
+	packageName === "onnxruntime-web"
+		? importedRuntime
+		: await import("onnxruntime-web");
 
 globalThis.edgeToolsONNXRuntime = importedRuntime;
+globalThis.edgeToolsWebONNXRuntime = importedWebRuntime;
 globalThis.edgeToolsRejectedONNXRuntime = {
 	InferenceSession: {
 		create() {
