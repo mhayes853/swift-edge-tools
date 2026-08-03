@@ -10,6 +10,7 @@ filter="${SWIFT_TEST_FILTER:-CONNXRuntime tests}"
 cache_volume="${SWIFT_DOCKER_CACHE_VOLUME:-swift-edge-tools-linux-build}"
 build_only=0
 disable_default_traits=1
+install_python_venv=0
 extra_arguments=()
 
 usage() {
@@ -23,6 +24,7 @@ Options:
   --traits TRAITS           Swift package traits (default: ONNX).
   --filter FILTER           Test filter or suite pattern (default: CONNXRuntime tests).
   --all-tests               Run all tests instead of applying a filter.
+  --python-venv             Install the Python package into python/.venv.
   --default-traits          Keep the package's default traits enabled.
   --image IMAGE             Docker image (default: swift:6.3.2-jammy).
   --cache-volume NAME       Docker build-cache volume.
@@ -37,7 +39,7 @@ Examples:
   scripts/test-linux.sh
   scripts/test-linux.sh --traits ONNXCore --build-only
   scripts/test-linux.sh --traits ONNX --filter 'CONNXRuntime tests|NeedleONNXModelEngine tests'
-  scripts/test-linux.sh --traits ONNX --all-tests -- --configuration release
+  scripts/test-linux.sh --traits ONNX --all-tests --python-venv
 EOF
 }
 
@@ -57,6 +59,10 @@ while (($# > 0)); do
 		;;
 	--all-tests)
 		filter=""
+		shift
+		;;
+	--python-venv)
+		install_python_venv=1
 		shift
 		;;
 	--default-traits)
@@ -144,5 +150,17 @@ restore_resolved() {
 }
 trap restore_resolved EXIT
 
-echo "+ docker ${docker_arguments[*]} $image swift ${swift_arguments[*]}"
-docker "${docker_arguments[@]}" "$image" swift "${swift_arguments[@]}"
+if ((install_python_venv)); then
+	setup_script='set -euo pipefail
+apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install -y python3-venv
+python3 -m venv /workspace/python/.venv
+/workspace/python/.venv/bin/python -m pip install -e /workspace/python
+exec "$@"'
+	echo "+ docker ${docker_arguments[*]} $image bash -c <python-setup> swift ${swift_arguments[*]}"
+	docker "${docker_arguments[@]}" "$image" \
+		bash -c "$setup_script" bash swift "${swift_arguments[@]}"
+else
+	echo "+ docker ${docker_arguments[*]} $image swift ${swift_arguments[*]}"
+	docker "${docker_arguments[@]}" "$image" swift "${swift_arguments[@]}"
+fi

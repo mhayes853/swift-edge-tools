@@ -9,8 +9,8 @@ struct `Needle JSONNX model engine tests` {
     let engine = try await Self.engine()
     let session = EdgeToolsSession(engine: engine, tools: [SendEmailTool()])
     let parameters = NeedleJSONNXModelEngine.GenerateParameters(
-      constraint: .toolsWithGrammar(range: .exact(1)),
-      maxTokens: 96
+      maxTokens: 96,
+      toolCallRange: .exact(1)
     )
     let generation = try await session.generate(
       prompt: NeedlePrompt(
@@ -33,7 +33,7 @@ struct `Needle JSONNX model engine tests` {
     #expect(input.body.lowercased().contains("adventure"))
     #expect(
       generation.response
-        == generation.engineGeneration.tokens.map(\.stringValue).joined()
+        == generation.engineGeneration.tokens.map { $0.stringValue }.joined()
     )
   }
 

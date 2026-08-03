@@ -87,7 +87,22 @@
         let name: String
         let schema: EdgeToolsGenerationSchema
         let expectedFragments: [String]
+        let alternativeExpectedFragmentSets: [[String]]
         let isSupported: Bool
+
+        init(
+          name: String,
+          schema: EdgeToolsGenerationSchema,
+          expectedFragments: [String],
+          alternativeExpectedFragmentSets: [[String]] = [],
+          isSupported: Bool
+        ) {
+          self.name = name
+          self.schema = schema
+          self.expectedFragments = expectedFragments
+          self.alternativeExpectedFragmentSets = alternativeExpectedFragmentSets
+          self.isSupported = isSupported
+        }
       }
 
       @Test(arguments: [
@@ -95,6 +110,9 @@
           name: "StringValue",
           schema: EdgeToolsGenerationSchema(.string, .enum(["a", "b"])),
           expectedFragments: [#""enum":["a","b"]"#],
+          alternativeExpectedFragmentSets: [
+            [#""enum":["a"]"#, #""enum":["b"]"#]
+          ],
           isSupported: true
         ),
         TestCase(
@@ -168,9 +186,13 @@
           let data = try encoder.encode(schema)
           let json = try #require(String(data: data, encoding: .utf8))
 
-          for fragment in testCase.expectedFragments {
-            #expect(json.contains(fragment))
-          }
+          let expectedFragmentSets =
+            [testCase.expectedFragments] + testCase.alternativeExpectedFragmentSets
+          #expect(
+            expectedFragmentSets.contains { fragments in
+              fragments.allSatisfy { json.contains($0) }
+            }
+          )
         } else {
           #expect(throws: EdgeToolsFMError.self) {
             try DynamicGenerationSchema(

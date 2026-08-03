@@ -30,6 +30,16 @@ jobs:
           submodules: recursive
       - name: Select Xcode 26.4
         run: sudo xcode-select -s /Applications/Xcode_26.4.app
+      - name: Set up Python 3.12
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: python/pyproject.toml
+      - name: Install Python exporter
+        run: |
+          python3 -m venv python/.venv
+          python/.venv/bin/python -m pip install -e python
       - name: Run tests
         run: >
           swift test --disable-experimental-prebuilts --enable-all-traits
@@ -67,7 +77,8 @@ jobs:
           persist-credentials: false
           submodules: recursive
       - name: Run tests
-        run: scripts/test-linux.sh --traits ONNX --all-tests
+        run: >
+          scripts/test-linux.sh --traits ONNX --all-tests --python-venv
 
   android:
     name: Android Build
@@ -80,17 +91,19 @@ jobs:
           persist-credentials: false
           submodules: recursive
       - name: Build Swift package for Android
-        uses: "swift-android-sdk/swift-android-action@2044b79660f201ccef8cbce62877e4ec5409f9c8"
+        uses: "swift-android-sdk/swift-android-action@\
+          2044b79660f201ccef8cbce62877e4ec5409f9c8"
         with:
           swift-version: 6.3
           swift-build-flags: >
             --disable-experimental-prebuilts
             --disable-default-traits
             --traits ONNX
+          build-tests: false
           run-tests: false
 
   windows:
-    name: Windows Build
+    name: Windows ONNXCore Build
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
@@ -108,7 +121,7 @@ jobs:
       - name: Build Swift package
         run: >
           swift build --disable-experimental-prebuilts
-          --disable-default-traits --traits ONNX
+          --disable-default-traits --traits ONNXCore
 
   wasm:
     name: WebAssembly Tests (${{ matrix.onnx-package }})
@@ -127,7 +140,8 @@ jobs:
           persist-credentials: false
           submodules: recursive
       - name: Install Swift 6.3.2
-        uses: "swift-actions/setup-swift@364295d9c23900ce04d4e5cc708387921b4e50f9"
+        uses: "swift-actions/setup-swift@\
+          364295d9c23900ce04d4e5cc708387921b4e50f9"
         with:
           swift-version: "6.3.2"
           skip-verify-signature: true
