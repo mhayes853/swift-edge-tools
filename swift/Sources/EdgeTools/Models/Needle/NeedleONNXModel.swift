@@ -483,7 +483,9 @@
             modelPath: directoryURL.appending(path: "decoder.onnx").path(),
             configuration: CONNXRuntime.Configuration(
               configureSessionOptions: { runtime, handle in
-                _ = runtime.api.pointee.SetIntraOpNumThreads(handle, 1)
+                runtime.withUnsafeAPIPointer {
+                  _ = $0.pointee.SetIntraOpNumThreads(handle, 1)
+                }
               }
             )
           )

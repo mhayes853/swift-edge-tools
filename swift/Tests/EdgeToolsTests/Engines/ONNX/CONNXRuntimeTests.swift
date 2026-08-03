@@ -78,10 +78,6 @@
       expectNoDifference(session.outputNames, ["sum"])
       expectNoDifference(tensor.dtype, .float)
       expectNoDifference(tensor.shape, [1, 3])
-      _ = runtime.api
-      _ = runtime.environment
-      _ = session.handle
-      _ = tensor.handle
     }
 
     @Test
