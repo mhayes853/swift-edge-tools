@@ -1,12 +1,29 @@
 // MARK: - EdgeToolsLogitsProcessor
 
-public protocol EdgeToolsLogitsProcessor<Prompt, Logits> {
-  associatedtype Prompt
-  associatedtype Logits: ~Copyable & ~Escapable
+public struct EdgeToolsLogitsProcessor<Prompt, Logits: ~Copyable & ~Escapable> {
+  private let promptBody: (Prompt) -> Void
+  private let processBody: nonisolated(nonsending) (inout Logits) async throws -> Void
+  private let didSampleBody: (EdgeToolsToken.ID) -> Void
 
-  func prompt(_ prompt: Prompt)
+  public init(
+    prompt: @escaping (Prompt) -> Void = { _ in },
+    process: nonisolated(nonsending) @escaping (inout Logits) async throws -> Void,
+    didSample: @escaping (EdgeToolsToken.ID) -> Void = { _ in }
+  ) {
+    self.promptBody = prompt
+    self.processBody = process
+    self.didSampleBody = didSample
+  }
 
-  nonisolated(nonsending) func process(logits: inout Logits) async throws
+  public func prompt(_ prompt: Prompt) {
+    self.promptBody(prompt)
+  }
 
-  func didSample(tokenId: EdgeToolsToken.ID)
+  public nonisolated(nonsending) func process(logits: inout Logits) async throws {
+    try await self.processBody(&logits)
+  }
+
+  public func didSample(tokenId: EdgeToolsToken.ID) {
+    self.didSampleBody(tokenId)
+  }
 }

@@ -249,7 +249,7 @@
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
         tools: NeedlePrompt.sendAdventureEmailDefinitions,
-        parameters: NeedleCoreAIModel.GenerateParameters(processor: processor),
+        parameters: NeedleCoreAIModel.GenerateParameters(processor: processor.value),
         channel: EdgeToolsGenerationChannel()
       )
       _ = try await generationTask.value
@@ -309,7 +309,7 @@
   }
 
   @available(anyAppleOS 27.0, *)
-  final class CountingLogitsProcessor: EdgeToolsLogitsProcessor, Sendable {
+  final class CountingLogitsProcessor: Sendable {
     private struct Counts: Hashable, Sendable {
       var prompt = 0
       var process = 0
@@ -321,6 +321,14 @@
     var promptCalls: Int { self.counts.withLock { $0.prompt } }
     var processCalls: Int { self.counts.withLock { $0.process } }
     var didSampleCalls: Int { self.counts.withLock { $0.didSample } }
+
+    var value: EdgeToolsLogitsProcessor<NDArray, NDArray> {
+      EdgeToolsLogitsProcessor(
+        prompt: { self.prompt($0) },
+        process: { self.process(logits: &$0) },
+        didSample: { self.didSample(tokenId: $0) }
+      )
+    }
 
     func prompt(_ prompt: NDArray) {
       self.counts.withLock { $0.prompt += 1 }

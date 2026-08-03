@@ -11,15 +11,15 @@
     public struct GenerateParameters: NeedleGenerateParameters {
       public static var `default`: Self { Self() }
 
-      public var sampler: any EdgeToolsSampler<NDArray>
-      public var processor: (any EdgeToolsLogitsProcessor<NDArray, NDArray>)?
+      public var sampler: EdgeToolsSampler<NDArray>
+      public var processor: EdgeToolsLogitsProcessor<NDArray, NDArray>?
       public var computeStream: ComputeStream?
       public var maxTokens: Int?
       public var toolCallRange: GrammarToolCallRange
 
       public init(
-        sampler: any EdgeToolsSampler<NDArray> = CoreAIArgmaxSampler(),
-        processor: (any EdgeToolsLogitsProcessor<NDArray, NDArray>)? = nil,
+        sampler: EdgeToolsSampler<NDArray> = .argmax,
+        processor: EdgeToolsLogitsProcessor<NDArray, NDArray>? = nil,
         computeStream: ComputeStream? = nil,
         maxTokens: Int? = 1024,
         toolCallRange: GrammarToolCallRange = .unbounded(minimum: 0)

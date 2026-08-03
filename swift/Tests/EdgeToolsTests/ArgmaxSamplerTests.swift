@@ -56,32 +56,35 @@ private func argmaxValues(count: Int, maximumAt index: Int) -> [Float] {
         (Array(repeating: -Float.infinity, count: 33), 0)
       ]
     )
-    func `Samples Expected Token`(values: [Float], expectedToken: EdgeToolsToken.ID) {
+    func `Samples Expected Token`(
+      values: [Float],
+      expectedToken: EdgeToolsToken.ID
+    ) async throws {
       var values = values
       let count = values.count
-      let token = values.withUnsafeMutableBufferPointer {
+      let token = try await values.withUnsafeMutableBufferPointer {
         let view = ONNXTensorView(
           unsafelyWrapping: $0.baseAddress,
           shape: [count]
         )
-        return ONNXArgmaxSampler().sample(logits: view)
+        return try await EdgeToolsSampler<ONNXTensorView<Float>>.argmax.sample(logits: view)
       }
 
       expectNoDifference(token, expectedToken)
     }
 
     @Test
-    func `Samples Tail Token`() {
+    func `Samples Tail Token`() async throws {
       var values = Array(repeating: Float(-1), count: 67)
       values[66] = 1
 
       let count = values.count
-      let token = values.withUnsafeMutableBufferPointer {
+      let token = try await values.withUnsafeMutableBufferPointer {
         let view = ONNXTensorView(
           unsafelyWrapping: $0.baseAddress,
           shape: [count]
         )
-        return ONNXArgmaxSampler().sample(logits: view)
+        return try await EdgeToolsSampler<ONNXTensorView<Float>>.argmax.sample(logits: view)
       }
 
       expectNoDifference(token, 66)
@@ -101,33 +104,36 @@ private func argmaxValues(count: Int, maximumAt index: Int) -> [Float] {
       ]
     )
     @available(anyAppleOS 27.0, *)
-    func `Samples Expected Token`(values: [Float], expectedToken: EdgeToolsToken.ID) {
+    func `Samples Expected Token`(
+      values: [Float],
+      expectedToken: EdgeToolsToken.ID
+    ) async throws {
       let logits = NDArray(scalars: values, shape: [1, values.count])
-      let token = CoreAIArgmaxSampler().sample(logits: logits)
+      let token = try await EdgeToolsSampler<NDArray>.argmax.sample(logits: logits)
 
       expectNoDifference(token, expectedToken)
     }
 
     @Test
     @available(anyAppleOS 27.0, *)
-    func `Samples Tail Token`() {
+    func `Samples Tail Token`() async throws {
       var values = Array(repeating: Float(-1), count: 67)
       values[66] = 1
       let logits = NDArray(scalars: values, shape: [1, values.count])
 
-      let token = CoreAIArgmaxSampler().sample(logits: logits)
+      let token = try await EdgeToolsSampler<NDArray>.argmax.sample(logits: logits)
 
       expectNoDifference(token, 66)
     }
 
     @Test
     @available(anyAppleOS 27.0, *)
-    func `Samples Token From Two Hundred Fifty Six Thousand Vocabulary`() {
+    func `Samples Token From Two Hundred Fifty Six Thousand Vocabulary`() async throws {
       var values = Array(repeating: Float(-1), count: 256 * 1024)
       values[values.count - 17] = 1
       let logits = NDArray(scalars: values, shape: [1, values.count])
 
-      let token = CoreAIArgmaxSampler().sample(logits: logits)
+      let token = try await EdgeToolsSampler<NDArray>.argmax.sample(logits: logits)
 
       expectNoDifference(token, values.count - 17)
     }

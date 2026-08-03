@@ -12,12 +12,24 @@
 
 // MARK: - EdgeToolsSampler
 
-public protocol EdgeToolsSampler<Logits> {
-  associatedtype Logits: ~Copyable & ~Escapable
-
-  nonisolated(nonsending) func sample(
-    logits: borrowing Logits
+public struct EdgeToolsSampler<Logits: ~Copyable & ~Escapable> {
+  private let body: nonisolated(nonsending) (
+    borrowing Logits
   ) async throws -> EdgeToolsToken.ID
+
+  public init(
+    _ body: nonisolated(nonsending) @escaping (
+      borrowing Logits
+    ) async throws -> EdgeToolsToken.ID
+  ) {
+    self.body = body
+  }
+
+  public nonisolated(nonsending) func sample(
+    logits: borrowing Logits
+  ) async throws -> EdgeToolsToken.ID {
+    try await self.body(logits)
+  }
 }
 
 // MARK: - Argmax
@@ -127,13 +139,11 @@ func argmaxScalar(
 // MARK: - ONNX
 
 #if ONNXCore
-  public struct ONNXArgmaxSampler: EdgeToolsSampler {
-    public init() {}
-
-    public func sample(
-      logits: borrowing ONNXTensorView<Float>
-    ) -> EdgeToolsToken.ID {
-      logits.span.withUnsafeBufferPointer { argmaxContiguous($0) }
+  extension EdgeToolsSampler where Logits == ONNXTensorView<Float> {
+    public static var argmax: Self {
+      EdgeToolsSampler { logits in
+        logits.span.withUnsafeBufferPointer { argmaxContiguous($0) }
+      }
     }
   }
 #endif
@@ -142,20 +152,20 @@ func argmaxScalar(
 
 #if swift(>=6.4) && CoreAI && canImport(CoreAI)
   @available(anyAppleOS 27.0, *)
-  public struct CoreAIArgmaxSampler: EdgeToolsSampler {
-    public init() {}
+  extension EdgeToolsSampler where Logits == NDArray {
+    public static var argmax: Self {
+      EdgeToolsSampler { logits in
+        let view = logits.view(as: Float.self)
+        let vocabularySize = view.shape[1]
+        guard vocabularySize > 0 else { return 0 }
 
-    public func sample(logits: borrowing NDArray) -> EdgeToolsToken.ID {
-      let view = logits.view(as: Float.self)
-      let vocabularySize = view.shape[1]
-      guard vocabularySize > 0 else { return 0 }
-
-      if view.isContiguous {
-        return view.withUnsafePointer { pointer, _, _ in
-          argmaxContiguous(UnsafeBufferPointer(start: pointer, count: vocabularySize))
+        if view.isContiguous {
+          return view.withUnsafePointer { pointer, _, _ in
+            argmaxContiguous(UnsafeBufferPointer(start: pointer, count: vocabularySize))
+          }
+        } else {
+          return argmaxScalar(count: vocabularySize) { view[scalarAt: [0, $0]] }
         }
-      } else {
-        return argmaxScalar(count: vocabularySize) { view[scalarAt: [0, $0]] }
       }
     }
   }
@@ -165,12 +175,12 @@ func argmaxScalar(
 
 #if CoreML && canImport(CoreML)
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-  public struct CoreMLArgmaxSampler: EdgeToolsSampler {
-    public init() {}
-
-    public func sample(logits: borrowing MLTensor) async -> EdgeToolsToken.ID {
-      let indices = await logits.argmax(alongAxis: 1).shapedArray(of: Int32.self).scalars
-      return EdgeToolsToken.ID(indices.first ?? 0)
+  extension EdgeToolsSampler where Logits == MLTensor {
+    public static var argmax: Self {
+      EdgeToolsSampler { logits in
+        let indices = await logits.argmax(alongAxis: 1).shapedArray(of: Int32.self).scalars
+        return EdgeToolsToken.ID(indices.first ?? 0)
+      }
     }
   }
 #endif

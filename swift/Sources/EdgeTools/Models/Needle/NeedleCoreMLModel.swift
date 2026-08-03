@@ -11,14 +11,14 @@
     public struct GenerateParameters: NeedleGenerateParameters {
       public static var `default`: Self { Self() }
 
-      public var sampler: any EdgeToolsSampler<MLTensor>
-      public var processor: (any EdgeToolsLogitsProcessor<MLTensor, MLTensor>)?
+      public var sampler: EdgeToolsSampler<MLTensor>
+      public var processor: EdgeToolsLogitsProcessor<MLTensor, MLTensor>?
       public var maxTokens: Int?
       public var toolCallRange: GrammarToolCallRange
 
       public init(
-        sampler: any EdgeToolsSampler<MLTensor> = CoreMLArgmaxSampler(),
-        processor: (any EdgeToolsLogitsProcessor<MLTensor, MLTensor>)? = nil,
+        sampler: EdgeToolsSampler<MLTensor> = .argmax,
+        processor: EdgeToolsLogitsProcessor<MLTensor, MLTensor>? = nil,
         maxTokens: Int? = 1024,
         toolCallRange: GrammarToolCallRange = .unbounded(minimum: 0)
       ) {

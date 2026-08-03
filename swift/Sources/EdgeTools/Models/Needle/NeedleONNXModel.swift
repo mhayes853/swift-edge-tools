@@ -20,19 +20,17 @@
   public struct NeedleONNXGenerateParameters: NeedleGenerateParameters {
     public static var `default`: Self { Self() }
 
-    public var sampler: any EdgeToolsSampler<ONNXTensorView<Float>>
+    public var sampler: EdgeToolsSampler<ONNXTensorView<Float>>
     public var processor:
-      (any EdgeToolsLogitsProcessor<[EdgeToolsToken.ID], ONNXTensorView<Float>>)?
+      EdgeToolsLogitsProcessor<[EdgeToolsToken.ID], ONNXTensorView<Float>>?
     public var maxTokens: Int?
     public var toolCallRange: GrammarToolCallRange
 
     public init(
-      sampler: any EdgeToolsSampler<ONNXTensorView<Float>> = ONNXArgmaxSampler(),
-      processor: (
-        any EdgeToolsLogitsProcessor<
-          [EdgeToolsToken.ID], ONNXTensorView<Float>
-        >
-      )? = nil,
+      sampler: EdgeToolsSampler<ONNXTensorView<Float>> = .argmax,
+      processor: EdgeToolsLogitsProcessor<
+        [EdgeToolsToken.ID], ONNXTensorView<Float>
+      >? = nil,
       maxTokens: Int? = 1024,
       toolCallRange: GrammarToolCallRange = .unbounded(minimum: 0)
     ) {
@@ -350,7 +348,7 @@
       tokenIDs: [EdgeToolsToken.ID]
     ) async throws -> EncoderOutputs {
       let runtime = self.runtime
-      var tokens = tokenIDs.map(Int64.init)
+      let tokens = tokenIDs.map(Int64.init)
       let inputIDs = try runtime.tensor(values: tokens, shape: [1, tokens.count])
       var outputs = try await self.encoderSession.run(
         inputs: [NeedleExportTensorName.inputIDs: inputIDs],

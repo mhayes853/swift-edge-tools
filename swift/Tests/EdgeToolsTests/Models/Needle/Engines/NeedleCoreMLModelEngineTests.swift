@@ -257,7 +257,7 @@
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
         tools: NeedlePrompt.sendAdventureEmailDefinitions,
-        parameters: NeedleCoreMLModel.GenerateParameters(processor: processor),
+        parameters: NeedleCoreMLModel.GenerateParameters(processor: processor.value),
         channel: EdgeToolsGenerationChannel()
       )
       _ = try await generationTask.value
@@ -289,7 +289,7 @@
   }
 
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-  final class CountingCoreMLLogitsProcessor: EdgeToolsLogitsProcessor, Sendable {
+  final class CountingCoreMLLogitsProcessor: Sendable {
     private struct Counts: Hashable, Sendable {
       var prompt = 0
       var process = 0
@@ -301,6 +301,14 @@
     var promptCalls: Int { self.counts.withLock { $0.prompt } }
     var processCalls: Int { self.counts.withLock { $0.process } }
     var didSampleCalls: Int { self.counts.withLock { $0.didSample } }
+
+    var value: EdgeToolsLogitsProcessor<MLTensor, MLTensor> {
+      EdgeToolsLogitsProcessor(
+        prompt: { self.prompt($0) },
+        process: { try await self.process(logits: &$0) },
+        didSample: { self.didSample(tokenId: $0) }
+      )
+    }
 
     func prompt(_ prompt: MLTensor) {
       self.counts.withLock { $0.prompt += 1 }

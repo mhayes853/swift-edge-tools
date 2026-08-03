@@ -79,7 +79,7 @@
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
         tools: NeedlePrompt.sendAdventureEmailDefinitions,
-        parameters: NeedleONNXGenerateParameters(processor: processor),
+        parameters: NeedleONNXGenerateParameters(processor: processor.value),
         channel: EdgeToolsGenerationChannel()
       )
       let generation = try await generationTask.value
@@ -308,7 +308,7 @@
     return destination
   }
 
-  private final class CountingONNXLogitsProcessor: EdgeToolsLogitsProcessor, Sendable {
+  private final class CountingONNXLogitsProcessor: Sendable {
     private struct Counts: Hashable, Sendable {
       var prompt = 0
       var process = 0
@@ -320,6 +320,16 @@
     var promptCalls: Int { self.counts.withLock { $0.prompt } }
     var processCalls: Int { self.counts.withLock { $0.process } }
     var didSampleCalls: Int { self.counts.withLock { $0.didSample } }
+
+    var value: EdgeToolsLogitsProcessor<
+      [EdgeToolsToken.ID], ONNXTensorView<Float>
+    > {
+      EdgeToolsLogitsProcessor(
+        prompt: { self.prompt($0) },
+        process: { self.process(logits: &$0) },
+        didSample: { self.didSample(tokenId: $0) }
+      )
+    }
 
     func prompt(_ prompt: [EdgeToolsToken.ID]) {
       self.counts.withLock { $0.prompt += 1 }
