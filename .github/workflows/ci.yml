@@ -138,7 +138,15 @@ jobs:
           ./swiftly init --quiet-shell-followup --assume-yes --skip-install
           # shellcheck source=/dev/null
           . "$HOME/.local/share/swiftly/env.sh"
-          swiftly install "${{ steps.snapshot.outputs.toolchain }}"
+          swiftly install "${{ steps.snapshot.outputs.toolchain }}" \
+            --post-install-file "$HOME/.local/share/swiftly/post-install.sh"
+      - name: Install Swift system dependencies
+        run: |
+          set -euo pipefail
+          post_install="$HOME/.local/share/swiftly/post-install.sh"
+          if [[ -s "$post_install" ]]; then
+            sudo bash "$post_install"
+          fi
       - name: Select the Swift toolchain
         run: |
           set -euo pipefail
