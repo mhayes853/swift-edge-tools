@@ -3,7 +3,9 @@
 #endif
 
 #if $Embedded
-  #if _runtime(_multithreaded)
+  #if canImport(wasi_pthread)
+    import wasi_pthread
+  #elseif _runtime(_multithreaded)
     import Synchronization
   #endif
 #elseif canImport(Synchronization)
@@ -12,8 +14,9 @@
 
 package struct Lock<Value: ~Copyable>: ~Copyable {
   #if $Embedded
-    #if _runtime(_multithreaded)
-      // TODO: - Do we need to do a spin lock here?
+    #if canImport(wasi_pthread)
+      private let mutex: UnsafeMutablePointer<pthread_mutex_t>
+    #elseif _runtime(_multithreaded)
       private let lock = Atomic<Bool>(false)
     #endif
     private var value: UnsafeMutablePointer<Value>
@@ -31,6 +34,9 @@ package struct Lock<Value: ~Copyable>: ~Copyable {
     #else
       self.lock = Mutex(value)
     #endif
+    #if $Embedded && canImport(wasi_pthread)
+      self.mutex = makeEmbeddedMutex()
+    #endif
   }
 
   package init<E: Error>(_ makeValue: () throws(E) -> Value) throws(E) {
@@ -41,12 +47,19 @@ package struct Lock<Value: ~Copyable>: ~Copyable {
     #else
       self.lock = Mutex(try makeValue())
     #endif
+    #if $Embedded && canImport(wasi_pthread)
+      self.mutex = makeEmbeddedMutex()
+    #endif
   }
 
   deinit {
     #if $Embedded || (canImport(Darwin) && canImport(os))
       self.value.deinitialize(count: 1)
       self.value.deallocate()
+    #endif
+    #if $Embedded && canImport(wasi_pthread)
+      pthread_mutex_destroy(self.mutex)
+      self.mutex.deallocate()
     #endif
   }
 
@@ -84,10 +97,16 @@ package struct Lock<Value: ~Copyable>: ~Copyable {
       }
     #endif
   }
+}
 
-  #if $Embedded
+// MARK: - Embedded Locking
+
+#if $Embedded
+  extension Lock where Value: ~Copyable {
     private borrowing func acquire() {
-      #if _runtime(_multithreaded)
+      #if canImport(wasi_pthread)
+        pthread_mutex_lock(self.mutex)
+      #elseif _runtime(_multithreaded)
         while !self.lock.compareExchange(
           expected: false,
           desired: true,
@@ -97,11 +116,22 @@ package struct Lock<Value: ~Copyable>: ~Copyable {
     }
 
     private borrowing func release() {
-      #if _runtime(_multithreaded)
+      #if canImport(wasi_pthread)
+        pthread_mutex_unlock(self.mutex)
+      #elseif _runtime(_multithreaded)
         self.lock.store(false, ordering: .releasing)
       #endif
     }
-  #endif
-}
+  }
+#endif
 
 extension Lock: @unchecked Sendable where Value: ~Copyable {}
+
+#if $Embedded && canImport(wasi_pthread)
+  private func makeEmbeddedMutex() -> UnsafeMutablePointer<pthread_mutex_t> {
+    let mutex = UnsafeMutablePointer<pthread_mutex_t>.allocate(capacity: 1)
+    mutex.initialize(to: pthread_mutex_t())
+    pthread_mutex_init(mutex, nil)
+    return mutex
+  }
+#endif

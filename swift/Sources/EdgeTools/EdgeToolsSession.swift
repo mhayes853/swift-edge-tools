@@ -181,30 +181,6 @@ public struct EdgeToolsSessionGeneration: Sendable {
   }
 }
 
-// MARK: - EdgeToolsSubscription
-
-/// A handle representing an active subscription to an ``EdgeToolsSessionStream``.
-///
-/// The subscription is cancelled when the handle is deallocated, so it must be held for as long
-/// as its callbacks are needed.
-public final class EdgeToolsSubscription: Sendable {
-  private let cancellation: Lock<(@Sendable () -> Void)?>
-
-  fileprivate init(_ cancellation: @escaping @Sendable () -> Void) {
-    self.cancellation = Lock(cancellation)
-  }
-
-  deinit { self.cancel() }
-
-  public func cancel() {
-    let cancellation = self.cancellation.withLock { cancellation in
-      defer { cancellation = nil }
-      return cancellation
-    }
-    cancellation?()
-  }
-}
-
 // MARK: - Stream
 
 public final class EdgeToolsSessionStream: Sendable, Identifiable {
