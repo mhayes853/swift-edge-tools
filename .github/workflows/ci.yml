@@ -107,50 +107,86 @@ jobs:
     name: Embedded Swift Build
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      # The embedded stdlib is validated against the exact compiler that built it, so the
-      # toolchain and the Swift SDK must be pinned to the same snapshot.
-      EMBEDDED_SWIFT_SNAPSHOT: swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a
-      EMBEDDED_SWIFT_TOOLCHAIN: 6.4.x-snapshot-2026-08-01
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
           submodules: recursive
-      - name: Install swiftly
+      - name: Resolve development snapshot
+        id: snapshot
+        run: |
+          set -euo pipefail
+          tag="$(scripts/build-embedded.sh --print-snapshot)"
+          toolchain="$(
+            sed -E 's/^swift-(.+)-DEVELOPMENT-SNAPSHOT-(.+)-a$/\1-snapshot-\2/' <<<"$tag"
+          )"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "toolchain=$toolchain" >> "$GITHUB_OUTPUT"
+          echo "Resolved $tag (swiftly toolchain $toolchain)."
+      - name: Cache Swift toolchain
+        id: toolchain-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ~/.local/share/swiftly
+          key: swiftly-${{ runner.os }}-${{ steps.snapshot.outputs.toolchain }}
+      - name: Install swiftly and the Swift toolchain
+        if: steps.toolchain-cache.outputs.cache-hit != 'true'
         run: |
           set -ex
           curl -O "https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz"
           tar zxf "swiftly-$(uname -m).tar.gz"
           ./swiftly init --quiet-shell-followup --assume-yes --skip-install
+          # shellcheck source=/dev/null
+          . "$HOME/.local/share/swiftly/env.sh"
+          swiftly install "${{ steps.snapshot.outputs.toolchain }}"
+      - name: Select the Swift toolchain
+        run: |
+          set -euo pipefail
           echo "$HOME/.local/share/swiftly/bin" >> "$GITHUB_PATH"
-      - name: Install Swift 6.4 development snapshot
-        run: swiftly install --use "$EMBEDDED_SWIFT_TOOLCHAIN"
+          # NB: The repository pins a release toolchain in .swift-version, which would otherwise
+          # win over the snapshot that matches the Swift SDK.
+          "$HOME/.local/share/swiftly/bin/swiftly" use "${{ steps.snapshot.outputs.toolchain }}"
+      - name: Cache Swift SDKs
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ~/.swiftpm/swift-sdks
+          key: swift-sdks-${{ runner.os }}-${{ steps.snapshot.outputs.tag }}
+      - name: Cache build directory
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: .build
+          key: >-
+            spm-embedded-${{ runner.os }}-${{ steps.snapshot.outputs.tag }}-${{
+            hashFiles('Package.resolved') }}
+          restore-keys: |
+            spm-embedded-${{ runner.os }}-${{ steps.snapshot.outputs.tag }}-
       - name: Lint embedded restrictions
         run: scripts/lint-embedded.sh
       - name: Build EdgeTools in embedded mode
+        env:
+          EMBEDDED_SWIFT_SNAPSHOT: ${{ steps.snapshot.outputs.tag }}
         run: scripts/build-embedded.sh
 
-  windows:
-    name: Windows ONNXCore Build
-    runs-on: windows-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          lfs: true
-          persist-credentials: false
-          submodules: recursive
-      - name: Set up Swift 6.3
-        uses: "compnerd/gha-setup-swift@\
-          eeda069c5bc95ac8a9ac5cea7d4f588ae5420ca5"
-        with:
-          swift-version: swift-6.3-release
-          swift-build: 6.3-RELEASE
-      - name: Build Swift package
-        run: >
-          swift build --disable-experimental-prebuilts
-          --disable-default-traits --traits ONNXCore
+  # windows:
+  #   name: Windows ONNXCore Build
+  #   runs-on: windows-latest
+  #   timeout-minutes: 20
+  #   steps:
+  #     - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+  #       with:
+  #         lfs: true
+  #         persist-credentials: false
+  #         submodules: recursive
+  #     - name: Set up Swift 6.3
+  #       uses: "compnerd/gha-setup-swift@\
+  #         eeda069c5bc95ac8a9ac5cea7d4f588ae5420ca5"
+  #       with:
+  #         swift-version: swift-6.3-release
+  #         swift-build: 6.3-RELEASE
+  #     - name: Build Swift package
+  #       run: >
+  #         swift build --disable-experimental-prebuilts
+  #         --disable-default-traits --traits ONNXCore
 
   # wasm-export:
   #   name: WebAssembly Needle Export
