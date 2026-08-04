@@ -119,7 +119,7 @@ package func updateTop2(top1: inout Float, top2: inout Float, with value: Float)
 func tokenConfidence(top1: Float, top2: Float) -> Float {
   let margin = top1 - top2
   guard !margin.isNaN else { return 0 }
-  return Float(1 / (1 + exp(-Swift.min(Swift.max(margin, -60), 60))))
+  return Float(1 / (1 + exp(Double(-Swift.min(Swift.max(margin, -60), 60)))))
 }
 
 @inline(always)
