@@ -47,7 +47,7 @@ public struct QwenJSONToolCallParser: EdgeToolCallParser, Sendable {
   public mutating func accept(token: EdgeToolsToken) -> EdgeRawToolCall? {
     self.block.append(token)
     while let payload = self.block.nextPayload(respectingJSONStringBoundaries: true) {
-      if let value = try? EdgeToolsJSONDecoder().decode(EdgeToolsValue.self, from: payload),
+      if let value = try? EdgeToolsValue(json: payload),
         let call = EdgeRawToolCall(jsonValue: value)
       {
         return call

@@ -103,6 +103,34 @@ jobs:
   #         build-tests: false
   #         run-tests: false
 
+  embedded:
+    name: Embedded Swift Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # The embedded stdlib is validated against the exact compiler that built it, so the
+      # toolchain and the Swift SDK must be pinned to the same snapshot.
+      EMBEDDED_SWIFT_SNAPSHOT: swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a
+      EMBEDDED_SWIFT_TOOLCHAIN: 6.4.x-snapshot-2026-08-01
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - name: Install swiftly
+        run: |
+          set -ex
+          curl -O "https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz"
+          tar zxf "swiftly-$(uname -m).tar.gz"
+          ./swiftly init --quiet-shell-followup --assume-yes --skip-install
+          echo "$HOME/.local/share/swiftly/bin" >> "$GITHUB_PATH"
+      - name: Install Swift 6.4 development snapshot
+        run: swiftly install --use "$EMBEDDED_SWIFT_TOOLCHAIN"
+      - name: Lint embedded restrictions
+        run: scripts/lint-embedded.sh
+      - name: Build EdgeTools in embedded mode
+        run: scripts/build-embedded.sh
+
   windows:
     name: Windows ONNXCore Build
     runs-on: windows-latest

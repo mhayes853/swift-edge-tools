@@ -96,7 +96,7 @@
     }
 
     public static func schema(_ schema: EdgeToolsGenerationSchema) -> XGRGrammar {
-      guard let grammar = try? Self.jsonSchema(schema.orderedKeyEncoded()) else {
+      guard let grammar = try? Self.jsonSchema(schema.orderedJSONString()) else {
         preconditionFailure("EdgeTools generation schemas must produce a valid XGrammar grammar.")
       }
       return grammar
@@ -362,7 +362,7 @@
     static func strictJSONArguments(for tool: EdgeToolDefinition) -> XGRGrammar {
       guard
         let grammar = try? XGRGrammar.jsonSchema(
-          tool.arguments.orderedKeyEncoded(),
+          tool.arguments.orderedJSONString(),
           configuration: JSONSchemaConfiguration(
             anyWhitespace: false,
             separators: .init(comma: ",", colon: ":"),
@@ -376,7 +376,7 @@
     }
 
     static func qwenXMLArguments(for tool: EdgeToolDefinition) -> XGRGrammar {
-      let schema = tool.arguments.orderedKeyEncoded()
+      let schema = tool.arguments.orderedJSONString()
       let structuralTag =
         #"{"type":"structural_tag","format":{"type":"json_schema","json_schema":\#(schema),"style":"qwen_xml","any_order":false}}"#
       guard let grammar = try? XGRGrammar.structuralTagJSON(structuralTag) else {

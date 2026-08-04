@@ -220,7 +220,9 @@ extension Array: ConvertibleFromEdgeToolsValue where Element: ConvertibleFromEdg
 }
 
 extension Array: ConvertibleToEdgeToolsValue where Element: ConvertibleToEdgeToolsValue {
-  public var edgeToolsValue: EdgeToolsValue { .array(self.map(\.edgeToolsValue)) }
+  public var edgeToolsValue: EdgeToolsValue {
+    .array(self.map { $0.edgeToolsValue })
+  }
 }
 
 extension Dictionary: EdgeToolsGenerable
@@ -331,4 +333,3 @@ extension FixedWidthInteger {
     return value
   }
 }
-
