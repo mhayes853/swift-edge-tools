@@ -5,7 +5,7 @@
   import SnapshotTesting
   import Testing
 
-  @Suite(.serialized)
+  @Suite(.serialized, .extendedNeedleInference())
   struct `NeedleONNXModelEngine tests` {
     @Test
     func `Generate Basics With CPU Execution Provider`() async throws {

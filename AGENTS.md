@@ -59,7 +59,7 @@ Try not to be overly verbose, focus on making things condensed.
 
 Private helper functions should go at the bottom of the file, not the top.
 
-DO NOT ASSUME WASI IS A SINGLE THREADED ENVIRONMENT. It is not ok to conform types to `@unchecked Sendable` just because they have a member variable that uses a type from `JavaScriptKit`, and because "WASM is single-threaded". `JavaScriptKit` does not conform most of its types to Sendable because Swift WASM supports sdks that enable multithreading.
+DO NOT ASSUME WASI IS A SINGLE THREADED ENVIRONMENT. It is not ok to conform types to `@unchecked Sendable` just because they have a member variable that uses a type from `JavaScriptKit`, and because "JS is single-threaded". `JavaScriptKit` does not conform most of its types to Sendable because Swift WASM supports sdks that enable multithreading through web workers or other means.
 
 ## Testing
 Generally, focus tests only on the public API (try to avoid anything not marked as public), and follow the conventions in the existing test suite. The following are generally mistakes that previous agents have made.
@@ -68,8 +68,10 @@ Do not test obvious functionallity like "member-wise initializers init properly"
 
 The highest levels of the framework (eg. `EdgeToolsSession`, etc.) should be tested in a manner that is not tied to any specific engine or model. This ensures the framework itself works no matter what engine is powering the session.
 
-The most important tests besides the general framework tests are the engine generation tests and the snapshots they produce. Everything else is trivial by comparison.
+The most important tests besides the general framework tests are the engine generation tests and the snapshots they produce. Everything else is trivial by comparison. Most engine generation tests record snapshots with `withKnownIssue`, this makes them robust to non-deterministic model outputs, but requires manual validation of the snapshot. As an agent, you should be able to perform such validation yourself.
 
 MLX tests an only be ran through via Xcode and not through `swift test`.
+
+Make sure to prefer using `expectNoDifference` over `#expect` for assertions. The only times where `#expect` are preferred are for `#expect(throws:)` and for `WASITests` (`expectNoDifference` doesn't work properly on WASI). For assertions on boolean expressions, you can do `expectNoDifference(myConditionExpression, true)` or `expectNoDifference(myConditionExpression, false)`.
 
 `test_wasm.sh` and `test_linux.sh` can be used to run WASM and Linux tests on macOS.

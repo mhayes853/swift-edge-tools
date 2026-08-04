@@ -7,7 +7,7 @@
   import MLX
   import MLXLMCommon
 
-  @Suite(.serialized, .enabledIfXcode())
+  @Suite(.serialized, .enabledIfXcode(), .extendedNeedleInference())
   struct `NeedleMLXModelEngine tests` {
     private typealias Engine = NeedleMLXModelEngine
 

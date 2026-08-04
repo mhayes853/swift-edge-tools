@@ -12,32 +12,15 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from coreai.runtime import AIModelAssetMetadata
-from coreai_opt.palettization import (
-    KMeansPalettizerConfig,
-    ModuleKMeansPalettizerConfig,
-    PalettizationSpec,
-)
-from coreai_opt.quantization import QuantizerConfig
 
-from needle.decoder_strategy import (  # pyright: ignore[reportMissingImports]
-    AttentionImplementation,
-    DecoderExportStrategy,
-)
-from needle.export.compression import (
-    CoreAIQuantizerCompressor,
-    CoreMLQuantizerCompressor,
-    NeedleCompressor,
-)
-from needle.export.coreai import export_needle_coreai
-from needle.export.coreml import CoreMLComputeUnits, export_needle_coreml
-from needle.export.helpers import DEFAULT_SOURCE
+from needle.decoder_strategy import AttentionImplementation, DecoderExportStrategy
+from needle.export.helpers import DEFAULT_SOURCE, NeedleCompressor
 from needle.export.onnx import export_needle_onnx
 from needle.export.onnx_compression import MatMulNBitsONNXCompressor, ONNXCompressor
 
 _QUANTIZER_PRESETS = ("w4", "w4_per_block", "w8")
 _PALETTIZER_N_BITS = (1, 2, 3, 4, 6, 8)
-_COMPUTE_UNITS = tuple(compute_units.value for compute_units in CoreMLComputeUnits)
+_COMPUTE_UNITS = ("all", "cpu-only", "cpu-and-gpu", "cpu-and-ne")
 
 
 class CLIBackend(Enum):
@@ -53,10 +36,22 @@ _BACKENDS = {
 }
 
 
+def export_needle_coreai(*args: Any, **kwargs: Any) -> Path:
+    from needle.export.coreai import export_needle_coreai as export
+
+    return export(*args, **kwargs)
+
+
+def export_needle_coreml(*args: Any, **kwargs: Any) -> Path:
+    from needle.export.coreml import export_needle_coreml as export
+
+    return export(*args, **kwargs)
+
+
 @dataclass(frozen=True)
 class CompressionConfig:
-    quantizer: QuantizerConfig | None = None
-    palettizer: KMeansPalettizerConfig | None = None
+    quantizer: Any | None = None
+    palettizer: Any | None = None
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -78,12 +73,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--encoder-compute-units",
         choices=_COMPUTE_UNITS,
-        default=CoreMLComputeUnits.CPU_AND_NE.value,
+        default="cpu-and-ne",
     )
     parser.add_argument(
         "--decoder-compute-units",
         choices=_COMPUTE_UNITS,
-        default=CoreMLComputeUnits.CPU_AND_GPU.value,
+        default="cpu-and-gpu",
     )
     decoder_experiments = parser.add_argument_group("decoder experiments")
     decoder_experiments.add_argument(
@@ -166,9 +161,7 @@ def _parse_key_value_flag(value: str, *, flag_name: str) -> tuple[str, str]:
     return key, raw_value
 
 
-def _build_authoring_metadata(
-    parsed: argparse.Namespace,
-) -> AIModelAssetMetadata | None:
+def _build_authoring_metadata(parsed: argparse.Namespace) -> Any | None:
     has_metadata_inputs = any(
         [
             parsed.authoring_metadata,
@@ -180,6 +173,8 @@ def _build_authoring_metadata(
     )
     if not has_metadata_inputs:
         return None
+
+    from coreai.runtime import AIModelAssetMetadata
 
     metadata = AIModelAssetMetadata()
     if parsed.authoring_metadata:
@@ -200,10 +195,7 @@ def _build_authoring_metadata(
     return metadata
 
 
-def _apply_metadata_mapping(
-    metadata: AIModelAssetMetadata,
-    data: dict[str, Any],
-) -> None:
+def _apply_metadata_mapping(metadata: Any, data: dict[str, Any]) -> None:
     supported_keys = {
         "author",
         "model_description",
@@ -264,7 +256,9 @@ def _build_compression_config(parsed: argparse.Namespace) -> CompressionConfig |
     )
 
 
-def _parse_compute_units(value: str) -> CoreMLComputeUnits:
+def _parse_compute_units(value: str) -> Any:
+    from needle.export.coreml import CoreMLComputeUnits
+
     return CoreMLComputeUnits(value)
 
 
@@ -281,6 +275,11 @@ def _build_compressor(parsed: argparse.Namespace) -> NeedleCompressor | None:
     if compression_config is None:
         return None
     backend = _parse_backend(parsed.backend)
+    from needle.export.compression import (
+        CoreAIQuantizerCompressor,
+        CoreMLQuantizerCompressor,
+    )
+
     if backend == CLIBackend.COREAI:
         return CoreAIQuantizerCompressor(
             compression_config.quantizer,
@@ -306,7 +305,9 @@ def _build_onnx_compressor(parsed: argparse.Namespace) -> ONNXCompressor | None:
     return MatMulNBitsONNXCompressor.int8()
 
 
-def _build_quantizer_config(parsed: argparse.Namespace) -> QuantizerConfig:
+def _build_quantizer_config(parsed: argparse.Namespace) -> Any:
+    from coreai_opt.quantization import QuantizerConfig
+
     if parsed.quantizer_config:
         config = _load_compression_config(parsed.quantizer_config, QuantizerConfig)
     elif parsed.quantizer_preset:
@@ -319,7 +320,13 @@ def _build_quantizer_config(parsed: argparse.Namespace) -> QuantizerConfig:
     return config
 
 
-def _build_palettizer_config(parsed: argparse.Namespace) -> KMeansPalettizerConfig:
+def _build_palettizer_config(parsed: argparse.Namespace) -> Any:
+    from coreai_opt.palettization import (
+        KMeansPalettizerConfig,
+        ModuleKMeansPalettizerConfig,
+        PalettizationSpec,
+    )
+
     if parsed.palettizer_config:
         return _load_compression_config(
             parsed.palettizer_config,
@@ -360,10 +367,10 @@ def _export_for_backend(
     compressor: NeedleCompressor | None = None,
     onnx_compressor: ONNXCompressor | None = None,
     onnx_dtype: str = "float32",
-    model_metadata: AIModelAssetMetadata | None = None,
-    compute_units: CoreMLComputeUnits | None = None,
-    encoder_compute_units: CoreMLComputeUnits = CoreMLComputeUnits.CPU_AND_NE,
-    decoder_compute_units: CoreMLComputeUnits = CoreMLComputeUnits.CPU_AND_GPU,
+    model_metadata: Any | None = None,
+    compute_units: Any | None = None,
+    encoder_compute_units: Any = "cpu-and-ne",
+    decoder_compute_units: Any = "cpu-and-gpu",
     decoder_use_native_sdpa: bool | None = None,
     decoder_profile: str = "default",
     experimental_coreml_dynamic_cache: bool = False,
@@ -431,10 +438,10 @@ def _export_needle_coreml(
     output: str,
     *,
     compressor: NeedleCompressor | None = None,
-    model_metadata: AIModelAssetMetadata | None = None,
-    compute_units: CoreMLComputeUnits | None = None,
-    encoder_compute_units: CoreMLComputeUnits = CoreMLComputeUnits.CPU_AND_NE,
-    decoder_compute_units: CoreMLComputeUnits = CoreMLComputeUnits.CPU_AND_GPU,
+    model_metadata: Any | None = None,
+    compute_units: Any | None = None,
+    encoder_compute_units: Any = "cpu-and-ne",
+    decoder_compute_units: Any = "cpu-and-gpu",
     decoder_strategy: DecoderExportStrategy | None = None,
     compile_platforms: Sequence[str] = (),
 ) -> Path:
@@ -459,13 +466,17 @@ def main(arguments: Sequence[str] | None = None) -> int:
         compressor = _build_compressor(parsed)
         onnx_compressor = _build_onnx_compressor(parsed)
         model_metadata = _build_authoring_metadata(parsed)
-        compute_units = (
-            _parse_compute_units(parsed.compute_units)
-            if parsed.compute_units is not None
-            else None
-        )
-        encoder_compute_units = _parse_compute_units(parsed.encoder_compute_units)
-        decoder_compute_units = _parse_compute_units(parsed.decoder_compute_units)
+        compute_units = None
+        encoder_compute_units: Any = parsed.encoder_compute_units
+        decoder_compute_units: Any = parsed.decoder_compute_units
+        if backend == CLIBackend.COREML:
+            compute_units = (
+                _parse_compute_units(parsed.compute_units)
+                if parsed.compute_units is not None
+                else None
+            )
+            encoder_compute_units = _parse_compute_units(parsed.encoder_compute_units)
+            decoder_compute_units = _parse_compute_units(parsed.decoder_compute_units)
         decoder_use_native_sdpa = {
             "automatic": None,
             "native": True,

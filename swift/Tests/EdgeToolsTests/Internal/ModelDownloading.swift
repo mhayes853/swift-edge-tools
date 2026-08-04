@@ -50,13 +50,13 @@ extension URL {
   static let swiftEdgeToolsTestsDirectory = {
     #if os(macOS) || os(Linux)
       URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-        .appendingPathComponent(".swift-needle-tests")
+        .appendingPathComponent(".edge-tools-tests")
     #elseif canImport(Darwin)
       URL.documentsDirectory
-        .appendingPathComponent(".swift-needle-tests")
+        .appendingPathComponent(".edge-tools-tests")
     #else
       FileManager.default.temporaryDirectory
-        .appendingPathComponent(".swift-needle-tests")
+        .appendingPathComponent(".edge-tools-tests")
     #endif
   }()
 }

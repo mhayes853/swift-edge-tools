@@ -5,10 +5,9 @@ import shutil
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, Protocol, TypeVar
 
 import torch
-from coreai_torch import get_decomp_table
 from huggingface_hub import snapshot_download
 
 from ..cache_layout import decoder_state_names
@@ -16,7 +15,18 @@ from ..decoder_strategy import DecoderExportStrategy
 from ..needle_configuration import NeedleModelConfiguation
 from ..needle_torch import Needle
 from ..torch_utils import load_state_dict, torch_dtype
-from .compression import NeedleCompressor
+
+
+class NeedleCompressor(Protocol):
+    def compress(
+        self,
+        module: torch.nn.Module,
+        sample_args: tuple[torch.Tensor, ...],
+        *,
+        dynamic_shapes: dict[str, Any] | tuple[Any, ...] | list[Any] | None = None,
+    ) -> torch.nn.Module:
+        return module
+
 
 DEFAULT_SOURCE = "Cactus-Compute/needle"
 CONFIG_FILENAMES = ("configuration.json", "config.json")
@@ -403,5 +413,5 @@ def export_program(
         strict=False,
     )
     if decomposition_table is None:
-        decomposition_table = get_decomp_table()
+        decomposition_table = torch.export.default_decompositions()
     return exported_program.run_decompositions(decomposition_table)

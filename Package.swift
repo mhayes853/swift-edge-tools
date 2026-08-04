@@ -128,7 +128,11 @@ let package = Package(
         .product(
           name: "Tokenizers",
           package: "swift-transformers",
-          condition: .when(traits: ["Transformers"])
+          condition: .when(
+            // TODO: - watchOS has compilation issues in Hub https://github.com/huggingface/swift-huggingface/pull/58
+            platforms: [.macOS, .iOS, .tvOS, .visionOS, .linux],
+            traits: ["Transformers"]
+          )
         )
       ],
       path: "swift/Sources/EdgeTools",

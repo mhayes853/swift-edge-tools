@@ -18,7 +18,7 @@ from ..decoder_strategy import DecoderExportStrategy
 from ..needle_configuration import NeedleModelConfiguation
 from ..needle_torch import Needle
 from . import helpers
-from .compression import NeedleCompressor
+from .helpers import NeedleCompressor
 
 _COREML_COMPILE_PLATFORMS = {
     "macos": "macOS",

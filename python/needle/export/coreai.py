@@ -7,14 +7,14 @@ from pathlib import Path
 import torch
 from coreai.authoring.asset import AIProgram
 from coreai.runtime import AIModelAssetMetadata
-from coreai_torch import TorchConverter
+from coreai_torch import TorchConverter, get_decomp_table
 
 from ..cache_layout import empty_decoder_caches
 from ..decoder_strategy import DecoderExportStrategy
 from ..needle_configuration import NeedleModelConfiguation
 from ..needle_torch import Needle
 from . import helpers
-from .compression import NeedleCompressor
+from .helpers import NeedleCompressor
 
 
 class _CoreAIEncoder(torch.nn.Module):
@@ -170,6 +170,7 @@ def convert_needle_coreai_programs(
                 module,
                 encoder_sample,
                 dynamic_shapes=encoder_spec.dynamic_shapes,
+                decomposition_table=get_decomp_table(),
             ),
             input_names=encoder_spec.input_names,
             output_names=encoder_spec.output_names,
@@ -197,6 +198,7 @@ def convert_needle_coreai_programs(
                 module,
                 decoder_sample,
                 dynamic_shapes=decoder_spec.dynamic_shapes,
+                decomposition_table=get_decomp_table(),
             ),
             input_names=decoder_spec.input_names,
             output_names=decoder_spec.output_names,

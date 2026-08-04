@@ -202,7 +202,8 @@ private enum NeedleTestModelExport {
   func makeNeedleCoreMLModelEngine(
     quantizerPreset: String? = nil,
     palettizerBits: Int? = nil,
-    compilePlatforms: [String] = []
+    compilePlatforms: [String] = [],
+    computeUnits: MLComputeUnits = .cpuAndGPU
   ) async throws -> NeedleCoreMLModelEngine {
     var arguments = quantizerPreset.map { ["--quantizer-preset", $0] } ?? []
     arguments += palettizerBits.map { ["--palettizer-n-bits", String($0)] } ?? []
@@ -216,7 +217,7 @@ private enum NeedleTestModelExport {
       compilePlatforms: compilePlatforms
     )
     let configuration = MLModelConfiguration()
-    configuration.computeUnits = .cpuAndGPU
+    configuration.computeUnits = computeUnits
     return try await NeedleCoreMLModelEngine(
       modelDirectoryURL: directory,
       modelConfiguration: configuration

@@ -52,7 +52,7 @@ extension EdgeToolsError {
       details.append("tokenizer.model was not found.")
     }
 
-    #if Transformers
+    #if Transformers && canImport(Tokenizers)
       if hasTransformersTokenizer {
         details.append("tokenizer.json is not a supported Transformers tokenizer.")
       } else {

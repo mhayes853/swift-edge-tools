@@ -76,8 +76,21 @@ if [ -n "$prepend_include" ]; then
 		*.c | *.cc | *.cpp | *.cxx)
 			output_path="$output_root/$relative_path"
 			temporary_path="$output_path.prepending"
+			source_directory=$(dirname "$relative_path")
+			case "$source_directory" in
+			cpp)
+				include_path=${prepend_include#cpp/}
+				;;
+			cpp/support)
+				include_path=${prepend_include#cpp/support/}
+				;;
+			*)
+				echo "error: unsupported source directory for prepended include: $source_directory" >&2
+				exit 65
+				;;
+			esac
 			{
-				printf '#include "%s/%s"\n\n' "$output_root" "$prepend_include"
+				printf '#include "%s"\n\n' "$include_path"
 				cat "$output_path"
 			} >"$temporary_path"
 			mv "$temporary_path" "$output_path"

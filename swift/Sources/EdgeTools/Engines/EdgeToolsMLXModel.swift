@@ -8,7 +8,7 @@
   import MLXLLM
   import MLXLMCommon
 
-  #if Transformers
+  #if Transformers && canImport(Tokenizers)
     import Tokenizers
   #endif
 
@@ -158,7 +158,7 @@
 
   // MARK: - Prompt Conversion
 
-  #if Transformers
+  #if Transformers && canImport(Tokenizers)
     extension EdgeToolsMLXModel
     where Self: LLMModel, Prompt == EdgeToolsLLMPrompt {
       public func input(

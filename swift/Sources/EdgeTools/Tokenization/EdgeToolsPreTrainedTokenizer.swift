@@ -6,13 +6,13 @@
   import _EdgeToolsFoundation
 #endif
 
-#if Transformers
+#if Transformers && canImport(Tokenizers)
   import Tokenizers
 #endif
 
 // MARK: - EdgeToolsPreTrainedTokenizer
 
-#if Transformers
+#if Transformers && canImport(Tokenizers)
   public struct EdgeToolsPreTrainedTokenizer: EdgeToolsTokenizer {
     public let tokenizer: PreTrainedTokenizer
     public let backendJSON: String

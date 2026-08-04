@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Protocol, cast
+from typing import Any, cast
 
 import torch
 from coreai_opt import ExportBackend
@@ -11,17 +11,6 @@ from coreai_opt.palettization import (
     PalettizationSpec,
 )
 from coreai_opt.quantization import QuantizationSpec, Quantizer, QuantizerConfig
-
-
-class NeedleCompressor(Protocol):
-    def compress(
-        self,
-        module: torch.nn.Module,
-        sample_args: tuple[torch.Tensor, ...],
-        *,
-        dynamic_shapes: dict[str, Any] | tuple[Any, ...] | list[Any] | None = None,
-    ) -> torch.nn.Module:
-        return module
 
 
 @dataclass(frozen=True)

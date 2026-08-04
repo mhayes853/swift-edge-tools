@@ -4,7 +4,12 @@ import Testing
 
 @Suite(.serialized)
 struct `Needle JSONNX model engine tests` {
-  @Test
+  @Test(
+    .enabled(
+      if: JSObject.global["edgeToolsNeedleFixture"].object != nil,
+      "Requires an exported Needle ONNX fixture."
+    )
+  )
   func `Generates Real Tool Call`() async throws {
     let engine = try await Self.engine()
     let session = EdgeToolsSession(engine: engine, tools: [SendEmailTool()])

@@ -2,7 +2,7 @@
   import _EdgeToolsFoundation
 #endif
 
-#if Transformers
+#if Transformers && canImport(Tokenizers)
   import Tokenizers
 #endif
 
@@ -28,7 +28,7 @@
       }
     }
 
-    #if Transformers
+    #if Transformers && canImport(Tokenizers)
       if hasTransformersTokenizer {
         do {
           return try await loadTransformersTokenizer(
@@ -50,7 +50,7 @@
   }
 #endif
 
-#if Transformers && Foundation
+#if Transformers && Foundation && canImport(Tokenizers)
   private func loadTransformersTokenizer(
     from directoryURL: URL,
     tokenizerURL: URL

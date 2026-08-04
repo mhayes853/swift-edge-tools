@@ -5,12 +5,12 @@
   import SnapshotTesting
   import Testing
 
-  @Suite(.serialized, .experimental())
+  @Suite(.serialized, .experimental(), .extendedNeedleInference())
   struct `NeedleCoreMLModelEngine tests` {
     @Test
     @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
     func `Generate Basics`() async throws {
-      let engine = try await makeNeedleCoreMLModelEngine()
+      let engine = try await makeNeedleCoreMLModelEngine(computeUnits: .cpuOnly)
       let tokens = LockBox([EdgeToolsToken]())
       let generationTask = try engine.generate(
         prompt: .sendAdventureEmail,
