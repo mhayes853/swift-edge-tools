@@ -6,6 +6,10 @@
   import Musl
 #elseif canImport(WASILibc)
   import WASILibc
+#elseif canImport(Android)
+  import Android
+#elseif canImport(ucrt)
+  import ucrt
 #endif
 
 #if canImport(simd)

@@ -6,13 +6,7 @@ import PackageDescription
 
 let package = Package(
   name: "swift-edge-tools",
-  platforms: [
-    .macOS(.v14),
-    .iOS(.v17),
-    .tvOS(.v17),
-    .watchOS(.v10),
-    .visionOS(.v1)
-  ],
+  platforms: [.macOS(.v14), .iOS(.v17), .tvOS(.v17), .watchOS(.v10), .visionOS(.v1)],
   products: [
     .library(name: "EdgeTools", targets: ["EdgeTools"]),
     .library(name: "EdgeToolsXGrammar", targets: ["EdgeToolsXGrammar"])
@@ -74,12 +68,7 @@ let package = Package(
     .package(
       url: "https://github.com/ibireme/yyjson.git",
       revision: "de3700ab1778e236a8a571058463b6a5888cf262",
-      traits: [
-        "noIncrementalReader",
-        "noUtilities",
-        "noFastFloatingPoint",
-        "strictStandardJSON"
-      ]
+      traits: ["noIncrementalReader", "noUtilities", "noFastFloatingPoint", "strictStandardJSON"]
     ),
     .package(url: "https://github.com/apple/swift-collections", from: "1.2.1"),
     .package(url: "https://github.com/apple/swift-atomics", from: "1.3.0"),
@@ -120,10 +109,7 @@ let package = Package(
         .target(name: "EdgeToolsXGrammar", condition: .when(traits: ["XGrammar"])),
         .target(
           name: "COnnxRuntime",
-          condition: .when(
-            platforms: [.macOS, .iOS, .linux, .android],
-            traits: ["ONNXCore"]
-          )
+          condition: .when(platforms: [.macOS, .iOS, .linux, .android], traits: ["ONNXCore"])
         ),
         .product(
           name: "Tokenizers",
@@ -140,12 +126,7 @@ let package = Package(
         .enableExperimentalFeature("Lifetimes"),
         .enableExperimentalFeature("AddressableTypes")
       ],
-      linkerSettings: [
-        .linkedFramework(
-          "CoreML",
-          .when(platforms: [.macOS, .iOS], traits: ["ONNX"])
-        )
-      ]
+      linkerSettings: [.linkedFramework("CoreML", .when(platforms: [.macOS, .iOS], traits: ["ONNX"]))]
     ),
     .target(
       name: "_EdgeToolsFoundation",
@@ -195,29 +176,13 @@ let package = Package(
         .headerSearchPath("xgrammar/3rdparty/picojson"),
         .define("XGRAMMAR_ENABLE_LOG_DEBUG", to: "0"),
         .define("XGRAMMAR_ENABLE_CPPTRACE", to: "0"),
-        .define(
-          "XGRAMMAR_CXX_EXCEPTIONS_ENABLED",
-          to: "0",
-          .when(platforms: [.wasi])
-        ),
-        .define(
-          "PICOJSON_DISABLE_EXCEPTION",
-          to: "1",
-          .when(platforms: [.wasi])
-        ),
-        .define(
-          "XGRAMMAR_LOG_CUSTOMIZE",
-          to: "1",
-          .when(platforms: [.wasi])
-        )
+        .define("XGRAMMAR_CXX_EXCEPTIONS_ENABLED", to: "0", .when(platforms: [.wasi])),
+        .define("PICOJSON_DISABLE_EXCEPTION", to: "1", .when(platforms: [.wasi])),
+        .define("XGRAMMAR_LOG_CUSTOMIZE", to: "1", .when(platforms: [.wasi]))
       ],
       plugins: [.plugin(name: "PatchPlugin")]
     ),
-    .plugin(
-      name: "PatchPlugin",
-      capability: .buildTool(),
-      path: "swift/Plugins/PatchPlugin"
-    ),
+    .plugin(name: "PatchPlugin", capability: .buildTool(), path: "swift/Plugins/PatchPlugin"),
     .macro(
       name: "EdgeToolsMacros",
       dependencies: [
@@ -243,18 +208,11 @@ let package = Package(
         "EdgeTools",
         .target(
           name: "COnnxRuntime",
-          condition: .when(
-            platforms: [.macOS, .iOS, .linux, .android],
-            traits: ["ONNX"]
-          )
+          condition: .when(platforms: [.macOS, .iOS, .linux, .android], traits: ["ONNX"])
         ),
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
         .product(name: "CustomDump", package: "swift-custom-dump"),
-        .product(
-          name: "Hub",
-          package: "swift-transformers",
-          condition: .when(traits: ["MLX"])
-        )
+        .product(name: "Hub", package: "swift-transformers", condition: .when(traits: ["MLX"]))
       ],
       path: "swift/Tests/EdgeToolsTests",
       exclude: [

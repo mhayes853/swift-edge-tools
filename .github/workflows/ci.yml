@@ -75,6 +75,8 @@ jobs:
           lfs: true
           persist-credentials: false
           submodules: recursive
+      - name: Check disk space
+        run: df -h
       - name: Run tests
         run: >
           scripts/test-linux.sh --traits ONNX --all-tests --python-venv

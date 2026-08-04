@@ -155,7 +155,9 @@ if ((install_python_venv)); then
 apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get install -y python3-venv
 python3 -m venv /workspace/python/.venv
-/workspace/python/.venv/bin/python -m pip install -e /workspace/python
+/workspace/python/.venv/bin/python -m pip install --no-cache-dir \
+  --index-url https://download.pytorch.org/whl/cpu torch==2.11.0
+/workspace/python/.venv/bin/python -m pip install --no-cache-dir -e /workspace/python
 exec "$@"'
 	echo "+ docker ${docker_arguments[*]} $image bash -c <python-setup> swift ${swift_arguments[*]}"
 	docker "${docker_arguments[@]}" "$image" \
