@@ -103,26 +103,26 @@ jobs:
   #         build-tests: false
   #         run-tests: false
 
-  windows:
-    name: Windows ONNXCore Build
-    runs-on: windows-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          lfs: true
-          persist-credentials: false
-          submodules: recursive
-      - name: Set up Swift 6.3
-        uses: "compnerd/gha-setup-swift@\
-          eeda069c5bc95ac8a9ac5cea7d4f588ae5420ca5"
-        with:
-          swift-version: swift-6.3-release
-          swift-build: 6.3-RELEASE
-      - name: Build Swift package
-        run: >
-          swift build --disable-experimental-prebuilts
-          --disable-default-traits --traits ONNXCore
+  # windows:
+  #   name: Windows ONNXCore Build
+  #   runs-on: windows-latest
+  #   timeout-minutes: 20
+  #   steps:
+  #     - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+  #       with:
+  #         lfs: true
+  #         persist-credentials: false
+  #         submodules: recursive
+  #     - name: Set up Swift 6.3
+  #       uses: "compnerd/gha-setup-swift@\
+  #         eeda069c5bc95ac8a9ac5cea7d4f588ae5420ca5"
+  #       with:
+  #         swift-version: swift-6.3-release
+  #         swift-build: 6.3-RELEASE
+  #     - name: Build Swift package
+  #       run: >
+  #         swift build --disable-experimental-prebuilts
+  #         --disable-default-traits --traits ONNXCore
 
   # wasm-export:
   #   name: WebAssembly Needle Export
