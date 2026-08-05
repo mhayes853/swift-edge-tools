@@ -1,5 +1,6 @@
 #if XGrammar
   import EdgeToolsXGrammar
+  import OrderedCollections
 
   /// EdgeTools-specific XGrammar error codes.
   public struct EdgeToolsXGRError {
@@ -49,11 +50,7 @@
     ) throws -> XGRTokenizerInfo {
       let metadata = try Self.metadata(huggingFaceBackendJSON: backendJSON)
       guard
-        case .object(let decodedMetadata) = try EdgeToolsJSONDecoder()
-          .decode(
-            EdgeToolsValue.self,
-            from: Array(metadata.utf8)
-          ),
+        case .object(let decodedMetadata) = try EdgeToolsValue(json: Array(metadata.utf8)),
         case .integer(let vocabularyTypeValue) = decodedMetadata["vocab_type"],
         case .boolean(let addPrefixSpace) = decodedMetadata["add_prefix_space"]
       else { throw XGRError.invalidHuggingFaceMetadata }
@@ -120,7 +117,6 @@
 
   // MARK: - EdgeToolsXGRGenerationConstraint
 
-  /// Selects the grammar used to constrain an engine generation.
   public struct EdgeToolsXGRGenerationConstraint: Sendable {
     private enum Kind: Sendable {
       case unconstrained
@@ -133,15 +129,12 @@
 
     private let kind: Kind
 
-    /// Allows arbitrary text output.
     public static let unconstrained = Self(kind: .unconstrained)
 
-    /// Uses the supplied grammar directly.
     public static func grammar(_ grammar: XGRGrammar) -> Self {
       Self(kind: .grammar(grammar))
     }
 
-    /// Uses the engine's model-specific tool-call grammar.
     public static func toolsWithGrammar(
       range: GrammarToolCallRange = .unbounded(minimum: 0),
       grammar: (@Sendable (XGRGrammar, XGRTokenizerInfo) throws -> XGRGrammar)? = nil
@@ -149,14 +142,8 @@
       Self(kind: .toolsWithGrammar(range: range, grammar: grammar))
     }
 
-    /// The default tool-call constraint.
     public static let tools = Self.toolsWithGrammar()
 
-    /// Uses either the engine's model-specific tool-call grammar or the supplied grammar.
-    ///
-    /// The engine builds its model-specific tool-call grammar, then optionally transforms it with
-    /// ``transform`` (mirroring ``toolsWithGrammar(range:grammar:)``), and finally unions the
-    /// result with ``userGrammar``.
     public static func toolsOrGrammar(
       _ userGrammar: XGRGrammar,
       range: GrammarToolCallRange = .unbounded(minimum: 0),
@@ -170,6 +157,10 @@
           return try resolvedToolsGrammar.union(userGrammar)
         }
       )
+    }
+
+    public static func schema(_ type: (some EdgeToolsGenerable).Type) -> Self {
+      Self.grammar(.schema(type))
     }
 
     func resolveGrammar(
@@ -186,11 +177,6 @@
         return try transform?(grammar, tokenizerInfo) ?? grammar
       }
     }
-
-    /// Constrains output to a value described by an EdgeTools generation schema.
-    public static func schema(_ type: (some EdgeToolsGenerable).Type) -> Self {
-      Self.grammar(.schema(type))
-    }
   }
 
   // MARK: - EBNF
@@ -206,7 +192,7 @@
     init(_ source: String) throws {
       var rules = [Rule]()
       for line in source.split(separator: "\n", omittingEmptySubsequences: false) {
-        if let separator = line.firstRange(of: "::=") {
+        if let separator = "::=".firstRange(in: line) {
           let name = line[..<separator.lowerBound].trimmingWhitespace
           let body = line[separator.upperBound...].trimmingWhitespace
           guard !name.isEmpty else { throw XGRError.unsupportedToolSchema }
@@ -270,38 +256,28 @@
       var output = ""
       var outputStart = source.startIndex
 
-      for match in source.matches(of: literalRegex) {
-        let literalRange = match.output.1.startIndex..<match.output.1.endIndex
-        output.append(contentsOf: source[outputStart..<literalRange.lowerBound])
-        let encodedValue = source[literalRange].dropFirst().dropLast()
+      for token in source.ebnfTokens where token.kind == .literal {
+        output.append(contentsOf: source[outputStart..<token.range.lowerBound])
+        let encodedValue = source[token.range].dropFirst().dropLast()
         let value = Self.decodeLiteral(encodedValue)
-        let transformed = transform(value, source[literalRange.upperBound...])
+        let transformed = transform(value, source[token.range.upperBound...])
         output.append("\"")
         output.append(contentsOf: Self.escapeLiteral(transformed))
         output.append("\"")
-        outputStart = literalRange.upperBound
+        outputStart = token.range.upperBound
       }
       output.append(contentsOf: source[outputStart...])
       return output
     }
 
-    private static func replacingRuleReferences(
-      in source: String,
-      aliases: [String: String]
-    ) -> String {
-      let literalRanges = source.matches(of: literalRegex)
-        .map { $0.output.1.startIndex..<$0.output.1.endIndex }
+    private static func replacingRuleReferences(in source: String, aliases: [String: String]) -> String {
       var output = ""
       var outputStart = source.startIndex
-      for match in source.matches(of: ruleReferenceRegex) {
-        let range = match.range
-        let isInsideLiteral = literalRanges.contains {
-          $0.lowerBound <= range.lowerBound && range.upperBound <= $0.upperBound
-        }
-        guard !isInsideLiteral, let replacement = aliases[String(source[range])] else { continue }
-        output.append(contentsOf: source[outputStart..<range.lowerBound])
+      for token in source.ebnfTokens where token.kind == .identifier {
+        guard let replacement = aliases[String(source[token.range])] else { continue }
+        output.append(contentsOf: source[outputStart..<token.range.lowerBound])
         output.append(replacement)
-        outputStart = range.upperBound
+        outputStart = token.range.upperBound
       }
       output.append(contentsOf: source[outputStart...])
       return output
@@ -345,16 +321,11 @@
 
   extension Substring {
     var hasToolCallContinuationReference: Bool {
-      self.contains(toolCallContinuationReferenceRegex)
+      self.ebnfTokens.contains { token in
+        token.kind == .identifier && self[token.range].isToolCallContinuationName
+      }
     }
   }
-
-  nonisolated(unsafe) private let literalRegex = /(?:^|[^\\])(\"(?:\\.|[^\"\\])*\")/
-
-  nonisolated(unsafe) private let toolCallContinuationReferenceRegex =
-    /\b(?:root(?:_[A-Za-z0-9]+)*|xml_object(?:_[A-Za-z0-9]+)*)\b/
-
-  nonisolated(unsafe) private let ruleReferenceRegex = /\b[A-Za-z_][A-Za-z0-9_]*\b/
 
   // MARK: - Tool Call Building
 
@@ -513,6 +484,98 @@
       self.entries[key] = cached
       self.order.append(key)
       return cached.fork()
+    }
+  }
+
+  // MARK: - EBNF Scanning
+
+  private struct EBNFToken {
+    enum Kind {
+      case literal
+      case identifier
+    }
+
+    let kind: Kind
+    let range: Range<String.Index>
+  }
+
+  // NB: A single scan replaces the regexes this used to use, both because embedded Swift ships
+  // no _StringProcessing and because rule references inside string literals must not be treated
+  // as references. Tracking literals inline is what makes that distinction reliable.
+  extension StringProtocol where Index == String.Index, SubSequence == Substring {
+    fileprivate var ebnfTokens: [EBNFToken] {
+      var tokens = [EBNFToken]()
+      var index = self.startIndex
+      while index < self.endIndex {
+        let character = self[index]
+        if character == "\"" {
+          var end = self.index(after: index)
+          var isTerminated = false
+          while end < self.endIndex {
+            if self[end] == "\\" {
+              end = self.index(after: end)
+              guard end < self.endIndex else { break }
+            } else if self[end] == "\"" {
+              isTerminated = true
+              end = self.index(after: end)
+              break
+            }
+            end = self.index(after: end)
+          }
+          if isTerminated {
+            tokens.append(EBNFToken(kind: .literal, range: index..<end))
+          }
+          index = end
+        } else if character.isEBNFWordCharacter {
+          var end = index
+          while end < self.endIndex, self[end].isEBNFWordCharacter {
+            end = self.index(after: end)
+          }
+          // NB: A digit-led run is a whole word, so an identifier can never start part way into it.
+          if character.isEBNFIdentifierStart {
+            tokens.append(EBNFToken(kind: .identifier, range: index..<end))
+          }
+          index = end
+        } else {
+          // NB: Character classes such as [^\0-\x1f\"\\] contain escaped quotes, so a backslash has
+          // to consume the character after it or an escaped quote would open a bogus literal.
+          if character == "\\" {
+            index = self.index(after: index)
+            guard index < self.endIndex else { break }
+          }
+          index = self.index(after: index)
+        }
+      }
+      return tokens
+    }
+
+    fileprivate var isToolCallContinuationName: Bool {
+      var suffix: Substring
+      if self.starts(with: "xml_object") {
+        suffix = self.dropFirst("xml_object".count)
+      } else if self.starts(with: "root") {
+        suffix = self.dropFirst("root".count)
+      } else {
+        return false
+      }
+      while !suffix.isEmpty {
+        guard suffix.first == "_" else { return false }
+        suffix = suffix.dropFirst()
+        let segment = suffix.prefix { $0.isASCII && ($0.isLetter || $0.isNumber) }
+        guard !segment.isEmpty else { return false }
+        suffix = suffix[segment.endIndex...]
+      }
+      return true
+    }
+  }
+
+  extension Character {
+    fileprivate var isEBNFIdentifierStart: Bool {
+      self == "_" || (self.isASCII && self.isLetter)
+    }
+
+    fileprivate var isEBNFWordCharacter: Bool {
+      self.isEBNFIdentifierStart || (self.isASCII && self.isNumber)
     }
   }
 #endif

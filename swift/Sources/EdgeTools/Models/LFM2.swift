@@ -331,7 +331,7 @@ private struct PythonCallReader: ToolCallValueReader {
         if value == "{" || value == "}" { return "" }
         if value == ":" { return "=" }
         if value.count >= 2, value.first == "\"", value.last == "\"",
-          suffix.contains(#"":""#)
+          #"":""#.firstRange(in: suffix) != nil
         {
           return String(value.dropFirst().dropLast())
         }
@@ -345,10 +345,11 @@ private struct PythonCallReader: ToolCallValueReader {
     }
 
     private static func isLFMTopLevelArgumentRule(_ name: String) -> Bool {
-      name == "root" || name.wholeMatch(of: lfmTopLevelArgumentRuleRegex) != nil
+      guard name != "root" else { return true }
+      guard name.starts(with: "root_") else { return false }
+      var digits = name.dropFirst("root_".count)
+      if digits.starts(with: "part_") { digits = digits.dropFirst("part_".count) }
+      return !digits.isEmpty && digits.allSatisfy { $0.isASCII && $0.isNumber }
     }
   }
-
-  nonisolated(unsafe) private let lfmTopLevelArgumentRuleRegex =
-    /root_(?:[0-9]+|part_[0-9]+)/
 #endif
