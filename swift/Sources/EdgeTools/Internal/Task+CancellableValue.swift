@@ -3,7 +3,7 @@ import _Concurrency
 #if $Embedded
   extension Task where Success == Never, Failure == Never {
     package static func checkCancellation() throws {
-      if Task.isCancelled { throw CancellationError() }
+      if Task.isCancelled { throw _Concurrency.CancellationError() }
     }
   }
 #endif

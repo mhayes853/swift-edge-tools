@@ -186,6 +186,13 @@ public struct EdgeToolsSessionGeneration: Sendable {
 public final class EdgeToolsSessionStream: Sendable, Identifiable {
   public typealias Element = EdgeToolCallCollection.Element
 
+  @nonexhaustive
+  public enum Event: Sendable {
+    case token(EdgeToolsToken)
+    case toolCall(Element)
+    case finish(Result<EdgeToolsSessionGeneration, any Error>)
+  }
+
   private struct State {
     var task: Task<EdgeToolsSessionGeneration, any Error>?
     var hasStarted = false
@@ -193,11 +200,8 @@ public final class EdgeToolsSessionStream: Sendable, Identifiable {
     var wasStoppedBeforeGeneration = false
     var stop: (@Sendable () -> Void)?
     var toolCalls = EdgeToolCallCollection()
-    var tokens = [EdgeToolsToken]()
-    var tokenSubscribers = [Int: @Sendable (EdgeToolsToken) -> Void]()
-    var callSubscribers = [Int: @Sendable (Element) -> Void]()
-    var finishSubscribers =
-      [Int: @Sendable (Result<EdgeToolsSessionGeneration, any Error>) -> Void]()
+    var events = [Event]()
+    var eventSubscribers = [Int: @Sendable (Event) -> Void]()
     var onFinish: (@Sendable () -> Void)?
     var nextID = 0
   }
@@ -255,48 +259,113 @@ public final class EdgeToolsSessionStream: Sendable, Identifiable {
 // MARK: - Subscribing
 
 extension EdgeToolsSessionStream {
+  public func onEvent(
+    _ body: @escaping @Sendable (Event) -> Void
+  ) -> EdgeToolsSubscription {
+    self.subscribe(onEvent: body)
+  }
+
   public func onToken(
     _ body: @escaping @Sendable (EdgeToolsToken) -> Void
   ) -> EdgeToolsSubscription {
-    self.subscribe(onToken: body, onToolCall: nil, onFinish: nil)
+    self.onEvent {
+      guard case .token(let token) = $0 else { return }
+      body(token)
+    }
   }
 
   public func onToolCall(
     _ body: @escaping @Sendable (Element) -> Void
   ) -> EdgeToolsSubscription {
-    self.subscribe(onToken: nil, onToolCall: body, onFinish: nil)
+    self.onEvent {
+      guard case .toolCall(let call) = $0 else { return }
+      body(call)
+    }
   }
 
   public func onFinish(
     _ body: @escaping @Sendable (Result<EdgeToolsSessionGeneration, any Error>) -> Void
   ) -> EdgeToolsSubscription {
-    self.subscribe(onToken: nil, onToolCall: nil, onFinish: body)
+    self.onEvent {
+      guard case .finish(let result) = $0 else { return }
+      body(result)
+    }
   }
 
   private func subscribe(
-    onToken: (@Sendable (EdgeToolsToken) -> Void)?,
-    onToolCall: (@Sendable (Element) -> Void)?,
-    onFinish: (@Sendable (Result<EdgeToolsSessionGeneration, any Error>) -> Void)?
+    onEvent: @escaping @Sendable (Event) -> Void
   ) -> EdgeToolsSubscription {
-    let (id, tokens, calls, result) = self.state.withLock { state in
+    let buffer = EventBuffer(deliver: onEvent)
+    let (id, replayedEvents) = self.state.withLock { state in
       let id = state.nextID
       state.nextID += 1
-      guard state.result == nil else {
-        return (id, state.tokens, state.toolCalls, state.result)
-      }
-      if let onToken { state.tokenSubscribers[id] = onToken }
-      if let onToolCall { state.callSubscribers[id] = onToolCall }
-      if let onFinish { state.finishSubscribers[id] = onFinish }
-      return (id, state.tokens, state.toolCalls, nil)
+      guard state.result == nil else { return (id, state.events) }
+      state.eventSubscribers[id] = { event in buffer.append(event) }
+      return (id, state.events)
     }
-    if let onToken { for token in tokens { onToken(token) } }
-    if let onToolCall { for call in calls { onToolCall(call) } }
-    if let result { onFinish?(result) }
+    buffer.replay(replayedEvents)
     return EdgeToolsSubscription { [self] in
+      _ = self.state.withLock { subscribers in
+        subscribers.eventSubscribers.removeValue(forKey: id)
+      }
+    }
+  }
+
+  private final class EventBuffer: Sendable {
+    private struct State {
+      var isReplaying = true
+      var isDelivering = false
+      var pending = [Event]()
+    }
+
+    private let state = Lock(State())
+    private let deliver: @Sendable (Event) -> Void
+
+    init(deliver: @escaping @Sendable (Event) -> Void) {
+      self.deliver = deliver
+    }
+
+    func append(_ event: Event) {
+      let shouldDrain = self.state.withLock { state in
+        state.pending.append(event)
+        guard !state.isReplaying, !state.isDelivering else { return false }
+        state.isDelivering = true
+        return true
+      }
+      if shouldDrain {
+        self.drain()
+      }
+    }
+
+    func replay(_ events: [Event]) {
+      for event in events {
+        self.deliver(event)
+      }
+
+      let shouldDrain = self.state.withLock { state in
+        state.isReplaying = false
+        guard !state.isDelivering, !state.pending.isEmpty else { return false }
+        state.isDelivering = true
+        return true
+      }
+      if shouldDrain {
+        self.drain()
+      }
+    }
+
+    private func drain() {
+      while let event = self.dequeue() {
+        self.deliver(event)
+      }
+    }
+
+    private func dequeue() -> Event? {
       self.state.withLock { state in
-        state.tokenSubscribers.removeValue(forKey: id)
-        state.callSubscribers.removeValue(forKey: id)
-        state.finishSubscribers.removeValue(forKey: id)
+        guard !state.pending.isEmpty else {
+          state.isDelivering = false
+          return nil
+        }
+        return state.pending.removeFirst()
       }
     }
   }
@@ -404,39 +473,42 @@ extension EdgeToolsSessionStream {
   }
 
   private func emit(token: EdgeToolsToken) {
+    let event = Event.token(token)
     let subscribers = self.state.withLock { state in
-      state.tokens.append(token)
-      return Array(state.tokenSubscribers.values)
+      state.events.append(event)
+      return Array(state.eventSubscribers.values)
     }
     for subscriber in subscribers {
-      subscriber(token)
+      subscriber(event)
     }
   }
 
   private func emit(rawCall: EdgeRawToolCall) {
     guard let call = self.resolve(rawCall) else { return }
+    let event = Event.toolCall(call)
     let subscribers = self.withMutation(of: .toolCalls) {
       self.state.withLock { state in
         state.toolCalls.append(call)
-        return Array(state.callSubscribers.values)
+        state.events.append(event)
+        return Array(state.eventSubscribers.values)
       }
     }
     if self.shouldInvokeTools(call) {
       _ = Task { _ = try await call.output }
     }
     for subscriber in subscribers {
-      subscriber(call)
+      subscriber(event)
     }
   }
 
   private func finish(with result: Result<EdgeToolsSessionGeneration, any Error>) {
+    let event = Event.finish(result)
     let completion = self.withMutation(of: .result) {
       self.state.withLock { state in
         state.result = result
-        let completion = (state.onFinish, Array(state.finishSubscribers.values))
-        state.tokenSubscribers.removeAll()
-        state.callSubscribers.removeAll()
-        state.finishSubscribers.removeAll()
+        state.events.append(event)
+        let completion = (state.onFinish, Array(state.eventSubscribers.values))
+        state.eventSubscribers.removeAll()
         state.stop = nil
         // NB: Cleared so that the retain cycle through the session is broken deterministically.
         state.onFinish = nil
@@ -444,7 +516,9 @@ extension EdgeToolsSessionStream {
       }
     }
     completion.0?()
-    for subscriber in completion.1 { subscriber(result) }
+    for subscriber in completion.1 {
+      subscriber(event)
+    }
   }
 
   private func resolve(_ rawCall: EdgeRawToolCall) -> AnyEdgeToolCall? {
@@ -489,32 +563,36 @@ extension EdgeToolsSessionStream {
 
     public func makeAsyncIterator() -> AsyncIterator {
       let (stream, continuation) = AsyncThrowingStream<Element, any Error>.makeStream()
-      let subscription = self.subscribe(
-        onToken: nil,
-        onToolCall: { continuation.yield($0) },
-        onFinish: { result in
+      let subscription = self.onEvent { event in
+        switch event {
+        case .token: break
+        case .toolCall(let call): continuation.yield(call)
+        case .finish(let result):
           switch result {
           case .success: continuation.finish()
           case .failure(let error): continuation.finish(throwing: error)
           }
+        @unknown default: break
         }
-      )
+      }
       continuation.onTermination = { _ in subscription.cancel() }
       return AsyncIterator(base: stream.makeAsyncIterator())
     }
 
     private func makeTokenIterator() -> EdgeToolsSessionTokens.AsyncIterator {
       let (stream, continuation) = AsyncThrowingStream<EdgeToolsToken, any Error>.makeStream()
-      let subscription = self.subscribe(
-        onToken: { continuation.yield($0) },
-        onToolCall: nil,
-        onFinish: { result in
+      let subscription = self.onEvent { event in
+        switch event {
+        case .token(let token): continuation.yield(token)
+        case .toolCall: break
+        case .finish(let result):
           switch result {
           case .success: continuation.finish()
           case .failure(let error): continuation.finish(throwing: error)
           }
+        @unknown default: break
         }
-      )
+      }
       continuation.onTermination = { _ in subscription.cancel() }
       return EdgeToolsSessionTokens.AsyncIterator(base: stream.makeAsyncIterator())
     }

@@ -228,6 +228,44 @@ struct `EdgeToolsSession tests` {
   }
 
   @Test
+  func `Subscription Replay Precedes Reentrant Token Delivery`() async throws {
+    let firstToken = EdgeToolsToken(id: 1, stringValue: "first")
+    let secondToken = EdgeToolsToken(id: 2, stringValue: "second")
+    let engine = ReentrantMockEngine()
+    let session = EdgeToolsSession(engine: engine)
+    let stream = session.stream(prompt: ReentrantMockEngine.Prompt())
+    await engine.waitUntilReady()
+
+    engine.emit(firstToken)
+
+    let events = Lock([String]())
+    let replayFinished = Lock(false)
+    let tokenWasDeliveredDuringReplay = Lock(false)
+    let subscription = stream.onEvent { event in
+      switch event {
+      case .token(let token):
+        events.withLock { $0.append(token.stringValue) }
+        if token == firstToken {
+          engine.emit(secondToken)
+          replayFinished.withLock { $0 = true }
+        } else if token == secondToken {
+          tokenWasDeliveredDuringReplay.withLock { $0 = !replayFinished.withLock { $0 } }
+        }
+      case .toolCall: break
+      case .finish: events.withLock { $0.append("finish") }
+      @unknown default: break
+      }
+    }
+    defer { subscription.cancel() }
+
+    engine.finish()
+    _ = try await stream.finalGeneration
+
+    expectNoDifference(tokenWasDeliveredDuringReplay.withLock { $0 }, false)
+    events.withLock { expectNoDifference($0, ["first", "second", "finish"]) }
+  }
+
+  @Test
   func `Cancelled Subscriptions Stop Receiving Tokens`() async throws {
     let tokenizer = try testTokenizer()
     let tokens = "abc".tokenize(using: tokenizer)
@@ -791,6 +829,77 @@ private struct GetWeatherTool: EdgeTool {
   let description = ""
 
   func invoke(input: String) async throws -> sending String { "" }
+}
+
+// MARK: - Reentrant Mock Engine
+
+private final class ReentrantMockEngine: EdgeToolsEngine {
+  struct Prompt: Sendable {}
+
+  struct GenerateParameters: EdgeToolsEngineGenerateParameters {
+    static let `default` = GenerateParameters()
+
+    var maxTokens: Int? { nil }
+  }
+
+  final class GenerationTask: EdgeToolsEngineGenerationTask {
+    private let stream: AsyncStream<EdgeToolsEngineGeneration>
+    private let continuation: AsyncStream<EdgeToolsEngineGeneration>.Continuation
+
+    init() {
+      let stream = AsyncStream<EdgeToolsEngineGeneration>.makeStream()
+      self.stream = stream.stream
+      self.continuation = stream.continuation
+    }
+
+    var value: EdgeToolsEngineGeneration {
+      get async throws {
+        for await generation in self.stream { return generation }
+        return .empty
+      }
+    }
+
+    func finish() {
+      self.continuation.yield(.empty)
+      self.continuation.finish()
+    }
+
+    func stop() {
+      self.continuation.finish()
+    }
+  }
+
+  private let channel = Lock<EdgeToolsGenerationChannel?>(nil)
+  private let task = GenerationTask()
+  private let ready = AsyncStream<Void>.makeStream()
+
+  func tokenize(prompt: Prompt, tools: [EdgeToolDefinition]) async throws -> [EdgeToolsToken] {
+    []
+  }
+
+  func generate(
+    prompt: Prompt,
+    tools: [EdgeToolDefinition],
+    parameters: GenerateParameters,
+    channel: EdgeToolsGenerationChannel
+  ) throws -> GenerationTask {
+    self.channel.withLock { $0 = channel }
+    self.ready.continuation.yield()
+    self.ready.continuation.finish()
+    return self.task
+  }
+
+  func emit(_ token: EdgeToolsToken) {
+    self.channel.withLock { $0?.emit(token: token) }
+  }
+
+  func finish() {
+    self.task.finish()
+  }
+
+  func waitUntilReady() async {
+    for await _ in self.ready.stream { return }
+  }
 }
 
 // MARK: - Identical Snake Case Tool
