@@ -347,11 +347,11 @@ public final class XGRGrammar: @unchecked Sendable {
     tokenizerInfo: XGRTokenizerInfo? = nil,
     namedGrammars: [XGRNamedGrammar] = []
   ) throws -> XGRGrammar {
-    let names = namedGrammars.map(\.name)
+    let names = namedGrammars.map { $0.name }
     let sources = namedGrammars.map { namedGrammar in
       if case .lark(let source) = namedGrammar.grammar { source } else { "" }
     }
-    let descriptors = namedGrammars.map(\.rawValue)
+    let descriptors = namedGrammars.map { $0.rawValue }
     let handle = try withCopiedCStringPointerBuffer(names) { names in
       try withCopiedCStringPointerBuffer(sources) { sources in
         var descriptors = descriptors
@@ -531,7 +531,7 @@ public final class XGRGrammar: @unchecked Sendable {
   ///   - grammars: The other grammars, matched in order after this grammar.
   /// - Returns: An ``XGRGrammar``.
   public func concatenate(_ grammars: some Sequence<XGRGrammar>) throws -> XGRGrammar {
-    try concatenatedGrammar(handles: [self.handle] + grammars.map(\.handle))
+    try concatenatedGrammar(handles: [self.handle] + grammars.map { $0.handle })
   }
 
   /// Produces a unioned grammar with this grammar and another grammar.
@@ -558,7 +558,7 @@ public final class XGRGrammar: @unchecked Sendable {
   ///   - grammars: The other accepted alternatives.
   /// - Returns: An ``XGRGrammar``.
   public func union(_ grammars: some Sequence<XGRGrammar>) throws -> XGRGrammar {
-    try unionedGrammar(handles: [self.handle] + grammars.map(\.handle))
+    try unionedGrammar(handles: [self.handle] + grammars.map { $0.handle })
   }
 
   /// Concatenates two grammars.
@@ -987,7 +987,7 @@ public func concatenate(_ grammars: XGRGrammar...) throws -> XGRGrammar {
 ///   - grammars: The grammars to concatenate, in matching order.
 /// - Returns: A grammar representing the concatenation.
 public func concatenate(_ grammars: some Sequence<XGRGrammar>) throws -> XGRGrammar {
-  try concatenatedGrammar(handles: grammars.map(\.handle))
+  try concatenatedGrammar(handles: grammars.map { $0.handle })
 }
 
 /// Creates a grammar accepting either of two grammars.
@@ -1015,7 +1015,7 @@ public func union(_ grammars: XGRGrammar...) throws -> XGRGrammar {
 ///   - grammars: The accepted alternatives.
 /// - Returns: A grammar representing the union of all alternatives.
 public func union(_ grammars: some Sequence<XGRGrammar>) throws -> XGRGrammar {
-  try unionedGrammar(handles: grammars.map(\.handle))
+  try unionedGrammar(handles: grammars.map { $0.handle })
 }
 
 private func concatenatedGrammar(handles: [xgrammar_grammar_t?]) throws -> XGRGrammar {

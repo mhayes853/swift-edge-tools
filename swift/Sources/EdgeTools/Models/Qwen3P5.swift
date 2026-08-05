@@ -66,9 +66,9 @@ public struct QwenXMLToolCallParser: EdgeToolCallParser, Sendable {
   }
 
   private static func parse(_ payload: String) -> EdgeRawToolCall? {
-    guard let functionStart = payload[...].firstRange(of: "<function=") else { return nil }
+    guard let functionStart = "<function=".firstRange(in: payload[...]) else { return nil }
     guard let nameEnd = payload[functionStart.upperBound...].firstIndex(of: ">") else { return nil }
-    guard let functionEnd = payload[nameEnd...].firstRange(of: "</function>") else { return nil }
+    guard let functionEnd = "</function>".firstRange(in: payload[nameEnd...]) else { return nil }
 
     let name = payload[functionStart.upperBound..<nameEnd].trimmingWhitespace
     guard !name.isEmpty else { return nil }
@@ -85,11 +85,11 @@ public struct QwenXMLToolCallParser: EdgeToolCallParser, Sendable {
     var arguments = OrderedDictionary<String, EdgeToolsValue>()
     var searchStart = body.startIndex
 
-    while let parameterStart = body[searchStart...].firstRange(of: "<parameter=") {
+    while let parameterStart = "<parameter=".firstRange(in: body[searchStart...]) {
       guard let nameEnd = body[parameterStart.upperBound...].firstIndex(of: ">") else { return nil }
       let valueStart = body.index(after: nameEnd)
       guard
-        let parameterEnd = body[valueStart...].firstRange(of: "</parameter>")
+        let parameterEnd = "</parameter>".firstRange(in: body[valueStart...])
       else { return nil }
 
       let name = body[parameterStart.upperBound..<nameEnd].trimmingWhitespace
@@ -107,8 +107,7 @@ public struct QwenXMLToolCallParser: EdgeToolCallParser, Sendable {
     case "False": return false
     case "None": return nil
     default:
-      return (try? EdgeToolsJSONDecoder().decode(EdgeToolsValue.self, from: Array(source.utf8)))
-        ?? .string(source)
+      return (try? EdgeToolsValue(json: source)) ?? .string(source)
     }
   }
 }

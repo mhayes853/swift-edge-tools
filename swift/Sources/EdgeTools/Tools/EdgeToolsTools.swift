@@ -1,8 +1,9 @@
-import Observation
+import OrderedCollections
+import _Concurrency
 
 // MARK: - EdgeRawToolCall
 
-public struct EdgeRawToolCall: Hashable, Sendable, Codable {
+public struct EdgeRawToolCall: Hashable, Sendable {
   public let name: String
   public let arguments: EdgeToolsValue
 
@@ -20,6 +21,10 @@ public struct EdgeRawToolCall: Hashable, Sendable, Codable {
     self.init(name: name, arguments: arguments)
   }
 }
+
+#if !$Embedded
+  import Observation
+#endif
 
 // MARK: - EdgeTool
 
@@ -57,7 +62,7 @@ extension EdgeTool {
 
 // MARK: - EdgeToolDefinition
 
-public struct EdgeToolDefinition: Hashable, Sendable, Codable {
+public struct EdgeToolDefinition: Hashable, Sendable {
   public var name: String
   public var description: String
   public var arguments: EdgeToolsGenerationSchema
@@ -78,9 +83,7 @@ public struct EdgeToolDefinition: Hashable, Sendable, Codable {
 
 // MARK: - EdgeToolCallID
 
-public struct EdgeToolCallID:
-  Hashable, Sendable, RawRepresentable, Codable, ExpressibleByStringLiteral
-{
+public struct EdgeToolCallID: Hashable, Sendable, RawRepresentable, ExpressibleByStringLiteral {
   public var rawValue: String
 
   public init(rawValue: String) {
@@ -94,20 +97,27 @@ public struct EdgeToolCallID:
     self.init(rawValue: makeEdgeToolCallID(using: &randomNumberGenerator))
   }
 
-  public init(stringLiteral value: StringLiteralType) {
+  public init(stringLiteral value: String) {
     self.init(rawValue: value)
   }
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.singleValueContainer()
-    self.rawValue = try container.decode(String.self)
-  }
-
-  public func encode(to encoder: Encoder) throws {
-    var container = encoder.singleValueContainer()
-    try container.encode(self.rawValue)
-  }
 }
+
+#if !$Embedded
+  extension EdgeRawToolCall: Codable {}
+  extension EdgeToolDefinition: Codable {}
+
+  extension EdgeToolCallID: Codable {
+    public init(from decoder: any Decoder) throws {
+      let container = try decoder.singleValueContainer()
+      self.rawValue = try container.decode(String.self)
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+      var container = encoder.singleValueContainer()
+      try container.encode(self.rawValue)
+    }
+  }
+#endif
 
 private func makeEdgeToolCallID(using generator: inout some RandomNumberGenerator) -> String {
   var bytes = (0..<16).map { _ in UInt8.random(in: .min ... .max, using: &generator) }
@@ -127,7 +137,7 @@ private func makeEdgeToolCallID(using generator: inout some RandomNumberGenerato
 
 // MARK: - EdgeToolCall
 
-public final class EdgeToolCall<Tool: EdgeTool>: Sendable, Observable, Identifiable {
+public final class EdgeToolCall<Tool: EdgeTool>: Sendable, Identifiable {
   private enum Status {
     case idle
     case running(Task<Result<Tool.Output, Tool.Failure>, Never>)
@@ -144,7 +154,7 @@ public final class EdgeToolCall<Tool: EdgeTool>: Sendable, Observable, Identifia
   }
 
   private let state: Lock<State>
-  private let registrar = ObservationRegistrar()
+  private let registrar = _ObservationRegistrar()
 
   public let rawValue: EdgeRawToolCall
   public let input: Tool.Input
@@ -152,7 +162,7 @@ public final class EdgeToolCall<Tool: EdgeTool>: Sendable, Observable, Identifia
   public let tool: Tool
 
   public var status: EdgeToolCallStatus<Tool.Output, Tool.Failure> {
-    self.registrar.access(self, keyPath: \.status)
+    self.accessStatus()
     return self.state.withLock {
       switch $0.status {
       case .idle: .idle
@@ -167,14 +177,8 @@ public final class EdgeToolCall<Tool: EdgeTool>: Sendable, Observable, Identifia
       let action: InvokeAction = self.state.withLock { state in
         switch state.status {
         case .idle:
-          let task: Task<Result<Tool.Output, Tool.Failure>, Never> = Task {
-            do {
-              return .success(try await self.run())
-            } catch {
-              return .failure(error as! Tool.Failure)
-            }
-          }
-          self.registrar.withMutation(of: self, keyPath: \.status) {
+          let task = Task { await self.runResult() }
+          self.withStatusMutation {
             state.status = .running(task)
           }
           return .awaitTask(task)
@@ -225,15 +229,23 @@ public final class EdgeToolCall<Tool: EdgeTool>: Sendable, Observable, Identifia
     }
   }
 
+  private func runResult() async -> Result<Tool.Output, Tool.Failure> {
+    do {
+      return .success(try await self.run())
+    } catch {
+      return .failure(error)
+    }
+  }
+
   private func run() async throws(Tool.Failure) -> Tool.Output {
     do {
       let output = try await self.tool.invoke(input: self.input)
-      self.registrar.withMutation(of: self, keyPath: \.status) {
+      self.withStatusMutation {
         self.state.withLock { $0.status = .finished(.success(output)) }
       }
       return output
     } catch {
-      self.registrar.withMutation(of: self, keyPath: \.status) {
+      self.withStatusMutation {
         self.state.withLock { $0.status = .finished(.failure(error)) }
       }
       throw error
@@ -243,7 +255,7 @@ public final class EdgeToolCall<Tool: EdgeTool>: Sendable, Observable, Identifia
 
 // MARK: - AnyEdgeToolCall
 
-public final class AnyEdgeToolCall: Sendable, Observable, Identifiable {
+public final class AnyEdgeToolCall: Sendable, Identifiable {
   public var tool: any EdgeTool {
     self.base.erasedTool
   }
@@ -268,10 +280,14 @@ public final class AnyEdgeToolCall: Sendable, Observable, Identifiable {
     get async throws { try await self.base.erasedOutput }
   }
 
-  private let base: _AnyEdgeToolCall
+  private let base: any _AnyEdgeToolCall
 
-  public init(_ toolCall: EdgeToolCall<some EdgeTool>) {
-    self.base = toolCall
+  private init(base: any _AnyEdgeToolCall) {
+    self.base = base
+  }
+
+  public static func erasing<Tool: EdgeTool>(_ toolCall: EdgeToolCall<Tool>) -> AnyEdgeToolCall {
+    AnyEdgeToolCall(base: toolCall)
   }
 
   public func `as`<Tool: EdgeTool>(_: Tool.Type) -> EdgeToolCall<Tool>? {
@@ -279,7 +295,15 @@ public final class AnyEdgeToolCall: Sendable, Observable, Identifiable {
   }
 }
 
-private protocol _AnyEdgeToolCall: Sendable {
+#if !$Embedded
+  extension AnyEdgeToolCall {
+    public convenience init(_ toolCall: EdgeToolCall<some EdgeTool>) {
+      self.init(base: toolCall)
+    }
+  }
+#endif
+
+private protocol _AnyEdgeToolCall: AnyObject, Sendable {
   var erasedID: EdgeToolCallID { get }
   var erasedTool: any EdgeTool { get }
   var erasedRawValue: EdgeRawToolCall { get }
@@ -305,6 +329,29 @@ extension EdgeToolCall: _AnyEdgeToolCall {
     get async throws { try await self.output }
   }
 }
+
+// MARK: - Observation
+
+extension EdgeToolCall {
+  fileprivate func accessStatus() {
+    #if !$Embedded
+      self.registrar.access(self, keyPath: \.status)
+    #endif
+  }
+
+  fileprivate func withStatusMutation<Result>(_ body: () -> Result) -> Result {
+    #if !$Embedded
+      self.registrar.withMutation(of: self, keyPath: \.status, body)
+    #else
+      body()
+    #endif
+  }
+}
+
+#if !$Embedded
+  extension EdgeToolCall: Observable {}
+  extension AnyEdgeToolCall: Observable {}
+#endif
 
 // MARK: - EdgeToolCallStatus
 
@@ -336,7 +383,6 @@ public enum EdgeToolCallStatus<Output, Failure: Error> {
     case .finished(.failure(let error)): .finished(.failure(error))
     }
   }
-
 }
 
 extension EdgeToolCallStatus where Output: Sendable {
@@ -387,34 +433,31 @@ public struct EdgeToolCallCollection: Sendable, RangeReplaceableCollection {
   }
 
   public mutating func append<Tool: EdgeTool>(_ toolCall: EdgeToolCall<Tool>) {
-    self.append(AnyEdgeToolCall(toolCall))
+    self.append(.erasing(toolCall))
   }
 
   public mutating func append<Tool: EdgeTool>(
     contentsOf toolCalls: some Collection<EdgeToolCall<Tool>>
   ) {
-    self.append(contentsOf: toolCalls.lazy.map(AnyEdgeToolCall.init))
+    self.append(contentsOf: toolCalls.map { .erasing($0) })
   }
 
-  public mutating func insert<Tool: EdgeTool>(
-    _ toolCall: EdgeToolCall<Tool>,
-    at index: Int
-  ) {
-    self.insert(AnyEdgeToolCall(toolCall), at: index)
+  public mutating func insert<Tool: EdgeTool>(_ toolCall: EdgeToolCall<Tool>, at index: Int) {
+    self.insert(.erasing(toolCall), at: index)
   }
 
   public mutating func insert<Tool: EdgeTool>(
     contentsOf toolCalls: some Collection<EdgeToolCall<Tool>>,
     at index: Int
   ) {
-    self.insert(contentsOf: toolCalls.lazy.map(AnyEdgeToolCall.init), at: index)
+    self.insert(contentsOf: toolCalls.map { .erasing($0) }, at: index)
   }
 
   public mutating func replaceSubrange<Tool: EdgeTool>(
     _ subrange: Range<Int>,
     with toolCalls: some Collection<EdgeToolCall<Tool>>
   ) {
-    self.replaceSubrange(subrange, with: toolCalls.lazy.map(AnyEdgeToolCall.init))
+    self.replaceSubrange(subrange, with: toolCalls.map { .erasing($0) })
   }
 }
 

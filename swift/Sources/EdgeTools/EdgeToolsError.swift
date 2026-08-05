@@ -86,6 +86,16 @@ extension EdgeToolsError {
   static let emptyJSONInput = Self(code: .emptyJSONInput, message: "Expected JSON input.")
   static let invalidJSONValue = Self(code: .invalidJSONValue, message: "Invalid JSON value.")
 
+  static let jsonIntegerOutOfRange = Self(
+    code: .jsonIntegerOutOfRange,
+    message: "A JSON integer was out of the representable range."
+  )
+
+  static let nonFiniteJSONNumber = Self(
+    code: .nonFiniteJSONNumber,
+    message: "A JSON number was not finite."
+  )
+
   static func contextLengthExceeded(tokens: Int, maximum: Int) -> Self {
     Self(
       code: .contextLengthExceeded,

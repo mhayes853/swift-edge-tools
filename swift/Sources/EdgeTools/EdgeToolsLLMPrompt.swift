@@ -57,7 +57,6 @@ public struct EdgeToolsMIMEType:
   RawRepresentable,
   Hashable,
   Sendable,
-  Codable,
   ExpressibleByStringLiteral
 {
   public var rawValue: String
@@ -66,7 +65,7 @@ public struct EdgeToolsMIMEType:
     self.rawValue = rawValue
   }
 
-  public init(stringLiteral value: StringLiteralType) {
+  public init(stringLiteral value: String) {
     self.init(rawValue: value)
   }
 
@@ -106,6 +105,10 @@ public struct EdgeToolsMIMEType:
   public static let wav = Self(rawValue: "audio/wav")
   public static let webP = Self(rawValue: "image/webp")
 }
+
+#if !$Embedded
+  extension EdgeToolsMIMEType: Codable {}
+#endif
 
 private func inferredPathExtension(from path: String) -> String? {
   let path =
