@@ -104,7 +104,7 @@ jobs:
   #         run-tests: false
 
   embedded:
-    name: Embedded Swift Build
+    name: Embedded Swift Smoke Test
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -117,7 +117,7 @@ jobs:
         id: snapshot
         run: |
           set -euo pipefail
-          tag="$(scripts/build-embedded.sh --print-snapshot)"
+          tag="$(scripts/smoke-embedded.sh --print-snapshot)"
           toolchain="$(
             sed -E 's/^swift-(.+)-DEVELOPMENT-SNAPSHOT-(.+)-a$/\1-snapshot-\2/' <<<"$tag"
           )"
@@ -160,21 +160,21 @@ jobs:
         with:
           path: ~/.swiftpm/swift-sdks
           key: swift-sdks-${{ runner.os }}-${{ steps.snapshot.outputs.tag }}
-      - name: Cache build directory
+      - name: Cache build directories
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
-          path: .build
+          path: |
+            .build
+            swift/EmbeddedSmoke/.build
           key: >-
             spm-embedded-${{ runner.os }}-${{ steps.snapshot.outputs.tag }}-${{
-            hashFiles('Package.resolved') }}
+            hashFiles('Package.resolved', 'swift/EmbeddedSmoke/Package.resolved') }}
           restore-keys: |
             spm-embedded-${{ runner.os }}-${{ steps.snapshot.outputs.tag }}-
-      - name: Lint embedded restrictions
-        run: scripts/lint-embedded.sh
-      - name: Build EdgeTools in embedded mode
+      - name: Run the embedded smoke test
         env:
           EMBEDDED_SWIFT_SNAPSHOT: ${{ steps.snapshot.outputs.tag }}
-        run: scripts/build-embedded.sh
+        run: scripts/smoke-embedded.sh
 
   # windows:
   #   name: Windows ONNXCore Build

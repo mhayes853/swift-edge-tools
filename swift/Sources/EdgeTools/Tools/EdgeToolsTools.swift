@@ -177,13 +177,7 @@ public final class EdgeToolCall<Tool: EdgeTool>: Sendable, Identifiable {
       let action: InvokeAction = self.state.withLock { state in
         switch state.status {
         case .idle:
-          let task: Task<Result<Tool.Output, Tool.Failure>, Never> = Task {
-            do {
-              return .success(try await self.run())
-            } catch {
-              return .failure(error as! Tool.Failure)
-            }
-          }
+          let task = Task { await self.runResult() }
           self.withStatusMutation {
             state.status = .running(task)
           }
@@ -232,6 +226,14 @@ public final class EdgeToolCall<Tool: EdgeTool>: Sendable, Identifiable {
         task.cancel()
       }
     case .returnResult(let result): result
+    }
+  }
+
+  private func runResult() async -> Result<Tool.Output, Tool.Failure> {
+    do {
+      return .success(try await self.run())
+    } catch {
+      return .failure(error)
     }
   }
 
