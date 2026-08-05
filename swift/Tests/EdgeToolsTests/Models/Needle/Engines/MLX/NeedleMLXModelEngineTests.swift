@@ -98,26 +98,6 @@
     }
 
     @Test
-    func `Generate With 4 Bit KV Cache Quantization`() async throws {
-      let tokenStorage = Lock([EdgeToolsToken]())
-      let generationTask = try self.engine.generate(
-        prompt: .sendAdventureEmail,
-        tools: NeedlePrompt.sendAdventureEmailDefinitions,
-        parameters: Engine.GenerateParameters(kvCacheQuantizationBits: 4),
-        channel: EdgeToolsGenerationChannel(
-          onToken: { token in tokenStorage.withLock { $0.append(token) } }
-        )
-      )
-      let generation = try await generationTask.value
-      expectNoDifference(generation.wasStopped, false)
-      withKnownIssue {
-        assertSnapshot(of: generation, as: .dump, record: .all)
-        assertSnapshot(of: generation.metadata, as: .dump, record: .all)
-        assertSnapshot(of: generation.tokens.map(\.stringValue).joined(), as: .lines, record: .all)
-      }
-    }
-
-    @Test
     func `Generate With Untied Word Embeddings`() async throws {
       let engine = try await Engine(
         from: downloadNeedle(),

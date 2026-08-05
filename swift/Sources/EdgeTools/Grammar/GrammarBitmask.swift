@@ -84,8 +84,13 @@ extension GrammarBitmask: RandomAccessCollection {}
   public func applyBitmaskMLX(logits: MLXArray, mask: GrammarBitmask) -> MLXArray {
     let vocabularySize = logits.dim(1)
     validateBitmaskCoverage(mask: mask, vocabularySize: vocabularySize)
-    let table = MLXArray(bitmaskTable, [256, 8]).asType(logits.dtype)
     let mask = mask.storage.withUnsafeBytes { MLXArray($0)[.newAxis, 0...] }
+    return compiledApplyBitmaskMLX(logits, mask)
+  }
+
+  private let compiledApplyBitmaskMLX = compile { logits, mask in
+    let vocabularySize = logits.dim(1)
+    let table = MLXArray(bitmaskTable, [256, 8]).asType(logits.dtype)
     return logits[0..., 0..<vocabularySize]
       + table[mask].flattened(start: -2)[0..., 0..<vocabularySize]
   }

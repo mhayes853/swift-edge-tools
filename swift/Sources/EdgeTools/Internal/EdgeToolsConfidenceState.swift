@@ -16,10 +16,6 @@
   import simd
 #endif
 
-#if MLX && canImport(MLX)
-  import MLX
-#endif
-
 #if CoreML && canImport(CoreML)
   import CoreML
 #endif
@@ -135,14 +131,6 @@ func tokenConfidence(unorderedPair values: some Collection<Float>) -> Float {
   func tokenConfidenceONNX(logits: Span<Float>) -> Float {
     let top = logits.withUnsafeBufferPointer { top2SIMD($0) }
     return tokenConfidence(top1: top.top1, top2: top.top2)
-  }
-#endif
-
-// MARK: - MLX
-
-#if MLX && canImport(MLX)
-  func tokenConfidenceMLX(logits: MLXArray) -> Float {
-    tokenConfidence(unorderedPair: top(logits.flattened(), k: 2).asArray(Float.self))
   }
 #endif
 
