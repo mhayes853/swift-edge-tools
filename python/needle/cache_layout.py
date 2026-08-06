@@ -21,19 +21,6 @@ def self_attention_state_names(
     )
 
 
-def cross_attention_state_names(
-    configuration: NeedleModelConfiguation,
-) -> tuple[str, ...]:
-    return tuple(
-        name
-        for index in range(configuration.decoder_layers)
-        for name in (
-            f"cross_attention_key_cache_{index}",
-            f"cross_attention_value_cache_{index}",
-        )
-    )
-
-
 def decoder_state_names(
     configuration: NeedleModelConfiguation,
     strategy: DecoderExportStrategy,

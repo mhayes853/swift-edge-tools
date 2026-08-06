@@ -13,8 +13,6 @@ ONNX export workflows.
 - `onnxruntime`
 - `onnxscript`
 - `safetensors`
-- `sentencepiece`
-- `tokenizers`
 
 Install dependencies from this directory:
 
