@@ -762,7 +762,8 @@
     func apply(to input: MLXArray) -> MLXArray {
       let (firstHalf, secondHalf) = input.split(axis: -1)
       let rotated = concatenated([-secondHalf, firstHalf], axis: -1)
-      return compiledApplyRoPE(input, rotated, self.sin, self.cos)
+      return (input * expandedDimensions(self.cos, axis: 1))
+        + (rotated * expandedDimensions(self.sin, axis: 1))
     }
   }
 
@@ -928,19 +929,6 @@
 
   // MARK: - Helpers
 
-  private let compiledApplyRoPE = compile(shapeless: true) { input, rotated, sin, cos in
-    (input * expandedDimensions(cos, axis: 1))
-      + (rotated * expandedDimensions(sin, axis: 1))
-  }
-
-  private let compiledGatedResidual = compile(shapeless: true) { input, gate, sublayer in
-    clip(
-      input + sigmoid(gate).asType(sublayer.dtype) * sublayer,
-      min: -NeedleNumerics.float16ClippingMagnitude,
-      max: NeedleNumerics.float16ClippingMagnitude
-    )
-  }
-
   private func fuseNeedleAttentionWeights(_ weights: inout [String: MLXArray]) {
     for queryKey in Array(weights.keys) where queryKey.contains(".self_attn.q_proj.") {
       let keyKey = queryKey.replacingOccurrences(of: ".q_proj.", with: ".k_proj.")
@@ -973,7 +961,11 @@
     gate: MLXArray,
     sublayer: MLXArray
   ) -> MLXArray {
-    compiledGatedResidual(input, gate, sublayer)
+    clip(
+      input + sigmoid(gate).asType(sublayer.dtype) * sublayer,
+      min: -NeedleNumerics.float16ClippingMagnitude,
+      max: NeedleNumerics.float16ClippingMagnitude
+    )
   }
 
   private func paddingMask(inputIds: MLXArray, padTokenId: Int) -> MLXArray {
