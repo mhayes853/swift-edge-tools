@@ -175,13 +175,14 @@
       prompt: Model.Prompt,
       tools: [EdgeToolDefinition] = [],
       parameters: sending Model.GenerateParameters,
-      channel: EdgeToolsGenerationChannel
+      channel: sending EdgeToolsGenerationChannel
     ) throws -> some EdgeToolsEngineGenerationTask {
       let isStopped = ManagedAtomic(false)
 
-      // NB: Compiler region isolation checker limitation, this is safe because params are not
-      // accessed after being sent to generate.
+      // NB: Compiler region isolation checker limitation, these are safe because neither value
+      // is accessed after being sent to the generation task.
       nonisolated(unsafe) let parameters = parameters
+      nonisolated(unsafe) let channel = channel
       let task = Task {
         await self.generationGate.acquire()
         do {
@@ -206,7 +207,7 @@
       prompt: Model.Prompt,
       tools: [EdgeToolDefinition],
       parameters: sending Model.GenerateParameters,
-      channel: EdgeToolsGenerationChannel,
+      channel: sending EdgeToolsGenerationChannel,
       isStopped: ManagedAtomic<Bool>
     ) async throws -> EdgeToolsEngineGeneration {
       var model = self.model
@@ -233,9 +234,8 @@
       prompt: Model.Prompt,
       tools: [EdgeToolDefinition],
       parameters: sending Model.GenerateParameters,
-      channel: EdgeToolsGenerationChannel,
+      channel: sending EdgeToolsGenerationChannel,
       isStopped: ManagedAtomic<Bool>,
-      // swiftlint:disable:next identifier_name
       model: inout Model
     ) async throws -> EdgeToolsEngineGeneration {
       try Task.checkCancellation()

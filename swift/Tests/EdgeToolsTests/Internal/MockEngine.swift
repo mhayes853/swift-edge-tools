@@ -228,7 +228,7 @@ final class MockEngine: EdgeToolsPrefillableEngine, Sendable {
     prompt: NeedlePrompt,
     tools: [EdgeToolDefinition] = [],
     parameters: GenerateParameters,
-    channel: EdgeToolsGenerationChannel
+    channel: sending EdgeToolsGenerationChannel
   ) throws -> GenerationTask {
     self._generateCallCount.withLock { $0 += 1 }
     self._generationTools.withLock { $0.append(tools) }

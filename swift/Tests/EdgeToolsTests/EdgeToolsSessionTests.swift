@@ -869,7 +869,7 @@ private final class ReentrantMockEngine: EdgeToolsEngine {
     }
   }
 
-  private let channel = Lock<EdgeToolsGenerationChannel?>(nil)
+  private let channel = Lock<ReentrantChannelStorage?>(nil)
   private let task = GenerationTask()
   private let ready = AsyncStream<Void>.makeStream()
 
@@ -881,9 +881,10 @@ private final class ReentrantMockEngine: EdgeToolsEngine {
     prompt: Prompt,
     tools: [EdgeToolDefinition],
     parameters: GenerateParameters,
-    channel: EdgeToolsGenerationChannel
+    channel: sending EdgeToolsGenerationChannel
   ) throws -> GenerationTask {
-    self.channel.withLock { $0 = channel }
+    let channelStorage = ReentrantChannelStorage(channel: channel)
+    self.channel.withLock { $0 = channelStorage }
     self.ready.continuation.yield()
     self.ready.continuation.finish()
     return self.task
@@ -894,11 +895,33 @@ private final class ReentrantMockEngine: EdgeToolsEngine {
   }
 
   func finish() {
+    self.channel.withLock { storage in
+      storage?.finish()
+      storage = nil
+    }
     self.task.finish()
   }
 
   func waitUntilReady() async {
     for await _ in self.ready.stream { return }
+  }
+}
+
+// MARK: - Reentrant Channel Storage
+
+private final class ReentrantChannelStorage: Sendable {
+  private let channel: Lock<EdgeToolsGenerationChannel?>
+
+  init(channel: sending EdgeToolsGenerationChannel) {
+    self.channel = Lock(channel)
+  }
+
+  func emit(token: EdgeToolsToken) {
+    self.channel.withLock { $0?.emit(token: token) }
+  }
+
+  func finish() {
+    self.channel.withLock { $0 = nil }
   }
 }
 
