@@ -238,52 +238,50 @@ public struct NeedleToolCallParser: EdgeToolCallParser, Sendable {
 
 // MARK: - NeedleGenerateParameters
 
-#if XGrammar
-  public protocol NeedleGenerateParameters: EdgeToolsEngineGenerateParameters {
-    var toolCallRange: GrammarToolCallRange { get }
-  }
+public protocol NeedleGenerateParameters: EdgeToolsEngineGenerateParameters {
+  var toolCallRange: GrammarToolCallRange { get }
+}
 
+#if XGrammar
   // MARK: - NeedleModel
 
-  #if Atomics
     public protocol NeedleModel: EdgeToolsModel
     where
-      Prompt == NeedlePrompt,
-      GenerateParameters: NeedleGenerateParameters,
-      ToolCallParser == NeedleToolCallParser,
-      GrammarCompiler == XGRCompiler,
-      GrammarContext == XGRGrammarContext
+        Prompt == NeedlePrompt,
+        GenerateParameters: NeedleGenerateParameters,
+        ToolCallParser == NeedleToolCallParser,
+        GrammarCompiler == XGRCompiler,
+        GrammarContext == XGRGrammarContext
     {}
 
     extension NeedleModel {
-      public func grammarContext(tokenizer: any EdgeToolsTokenizer) throws -> XGRGrammarContext {
+        public func grammarContext(tokenizer: any EdgeToolsTokenizer) throws -> XGRGrammarContext {
         guard let tokenizer = tokenizer as? any EdgeToolsXGRTokenizer else {
-          throw EdgeToolsError.unsupportedTokenizer
+            throw EdgeToolsError.unsupportedTokenizer
         }
-        let tokenizerInfo = tokenizer.tokenizerInfo(modelVocabularySize: self.vocabularySize)
-        return try XGRGrammarContext(tokenizerInfo: tokenizerInfo)
-      }
+        let tokenizerInfo = try tokenizer.tokenizerInfo(modelVocabularySize: self.vocabularySize)
+        return XGRGrammarContext(tokenizerInfo: tokenizerInfo)
+        }
 
-      public func grammarCompiler(context: borrowing XGRGrammarContext) throws -> XGRCompiler {
+        public func grammarCompiler(context: borrowing XGRGrammarContext) throws -> XGRCompiler {
         try XGRCompiler(tokenizerInfo: context.tokenizerInfo)
-      }
+        }
 
-      public func grammar(
+        public func grammar(
         tools: [EdgeToolDefinition],
         parameters: GenerateParameters,
         context _: XGRGrammarContext
-      ) throws -> XGRGrammar {
+        ) throws -> XGRGrammar {
         try self.toolCallGrammar(tools: tools, range: parameters.toolCallRange)
-      }
+        }
 
-      public func toolCallGrammar(
+        public func toolCallGrammar(
         tools: [EdgeToolDefinition],
         range: GrammarToolCallRange
-      ) throws -> XGRGrammar {
+        ) throws -> XGRGrammar {
         try XGRGrammar.needle(tools: tools, range: range)
-      }
+        }
     }
-  #endif
 
   // MARK: - XGRTokenizerInfo
 

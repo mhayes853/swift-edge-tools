@@ -272,43 +272,47 @@
 
   // MARK: - EdgeToolsMLXModel
 
-  extension NeedleMLXModel: EdgeToolsMLXModel {
-    public typealias ModelConfiguration = NeedleModelConfiguration
-    public typealias Prompt = NeedlePrompt
-    public typealias GenerateParameters = NeedleMLXGenerateParameters
-    public typealias ToolCallParser = NeedleToolCallParser
+  #if XGrammar
+    extension NeedleMLXModel: EdgeToolsMLXModel {
+      public typealias ModelConfiguration = NeedleModelConfiguration
+      public typealias Prompt = NeedlePrompt
+      public typealias GenerateParameters = NeedleMLXGenerateParameters
+      public typealias ToolCallParser = NeedleToolCallParser
+      public typealias GrammarCompiler = XGRCompiler
+      public typealias GrammarContext = XGRGrammarContext
 
-    public func grammar(
-      tools: [EdgeToolDefinition],
-      parameters: NeedleMLXGenerateParameters,
-      context _: XGRGrammarContext
-    ) throws -> XGRGrammar {
-      try self.toolCallGrammar(tools: tools, range: parameters.toolCallRange)
+      public func grammar(
+        tools: [EdgeToolDefinition],
+        parameters: NeedleMLXGenerateParameters,
+        context _: XGRGrammarContext
+      ) throws -> XGRGrammar {
+        try self.toolCallGrammar(tools: tools, range: parameters.toolCallRange)
+      }
+
+      public func toolCallGrammar(
+        tools: [EdgeToolDefinition],
+        range: GrammarToolCallRange
+      ) throws -> XGRGrammar {
+        try XGRGrammar.needle(tools: tools, range: range)
+      }
+
+      public func input(
+        prompt: NeedlePrompt,
+        tools: [EdgeToolDefinition],
+        tokenizer: any EdgeToolsTokenizer
+      ) throws -> LMInput {
+        try LMInput.needle(prompt: prompt, tools: tools, using: tokenizer)
+      }
     }
 
-    public func toolCallGrammar(
-      tools: [EdgeToolDefinition],
-      range: GrammarToolCallRange
-    ) throws -> XGRGrammar {
-      try XGRGrammar.needle(tools: tools, range: range)
-    }
+    public typealias NeedleMLXModelEngine = EdgeToolsMLXEngine<NeedleMLXModel>
 
-    public func input(
-      prompt: NeedlePrompt,
-      tools: [EdgeToolDefinition],
-      tokenizer: any EdgeToolsTokenizer
-    ) throws -> LMInput {
-      try LMInput.needle(prompt: prompt, tools: tools, using: tokenizer)
+    extension NeedleMLXModelEngine {
+      public init(from directoryURL: URL) async throws {
+        try await self.init(from: directoryURL, model: NeedleMLXModel.init(configuration:))
+      }
     }
-  }
-
-  public typealias NeedleMLXModelEngine = EdgeToolsMLXEngine<NeedleMLXModel>
-
-  extension NeedleMLXModelEngine {
-    public init(from directoryURL: URL) async throws {
-      try await self.init(from: directoryURL, model: NeedleMLXModel.init(configuration:))
-    }
-  }
+  #endif
 
   // MARK: - SimpleAttentionNetwork
 

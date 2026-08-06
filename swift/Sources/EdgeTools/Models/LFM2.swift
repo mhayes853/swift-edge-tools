@@ -4,7 +4,7 @@ import OrderedCollections
   import EdgeToolsXGrammar
 #endif
 
-#if MLX && Transformers && canImport(MLX)
+#if MLX && XGrammar && Transformers && canImport(MLX)
   import _EdgeToolsFoundation
   import MLX
   import MLXLLM
@@ -16,6 +16,9 @@ import OrderedCollections
     public typealias ModelConfiguration = LFM2Configuration
     public typealias Prompt = EdgeToolsLLMPrompt
     public typealias ToolCallParser = LFM2ToolCallParser
+    public typealias GenerateParameters = DefaultEdgeToolsMLXGenerateParameters
+    public typealias GrammarCompiler = XGRCompiler
+    public typealias GrammarContext = XGRGrammarContext
 
     public func toolCallGrammar(
       tools: [EdgeToolDefinition],

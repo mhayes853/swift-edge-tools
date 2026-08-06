@@ -29,7 +29,7 @@ let package = Package(
     .trait(
       name: "MLX",
       description: "MLX model support.",
-      enabledTraits: ["XGrammar", "Transformers", "Foundation", "Atomics"]
+      enabledTraits: ["Transformers", "Foundation", "Atomics"]
     ),
     .trait(
       name: "CoreAI",

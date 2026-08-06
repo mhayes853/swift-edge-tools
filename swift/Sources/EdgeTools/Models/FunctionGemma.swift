@@ -2,7 +2,7 @@
   import EdgeToolsXGrammar
 #endif
 
-#if MLX && Transformers && canImport(MLX)
+#if MLX && XGrammar && Transformers && canImport(MLX)
   import _EdgeToolsFoundation
   import MLX
   import MLXLLM
@@ -14,6 +14,9 @@
     public typealias ModelConfiguration = MLXLLM.Gemma3TextConfiguration
     public typealias Prompt = EdgeToolsLLMPrompt
     public typealias ToolCallParser = FunctionGemmaToolCallParser
+    public typealias GenerateParameters = DefaultEdgeToolsMLXGenerateParameters
+    public typealias GrammarCompiler = XGRCompiler
+    public typealias GrammarContext = XGRGrammarContext
 
     public func toolCallGrammar(
       tools: [EdgeToolDefinition],

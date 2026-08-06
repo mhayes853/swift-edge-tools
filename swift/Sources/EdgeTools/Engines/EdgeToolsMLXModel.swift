@@ -17,22 +17,27 @@
   public protocol EdgeToolsMLXModel: LanguageModel, SendableMetatype {
     associatedtype ModelConfiguration: Decodable
     associatedtype Prompt: Sendable
-    associatedtype GenerateParameters: EdgeToolsMLXGenerateParameters =
-      DefaultEdgeToolsMLXGenerateParameters
+    associatedtype GenerateParameters: EdgeToolsMLXGenerateParameters
     associatedtype ToolCallParser: EdgeToolCallParser
+    associatedtype GrammarContext = Void
+    associatedtype GrammarCompiler: EdgeToolsGrammarCompiler, ~Copyable
+    where GrammarCompiler.Context == GrammarContext
 
     var vocabularySize: Int { get }
+
+    func grammarContext(tokenizer: any EdgeToolsTokenizer) throws -> GrammarContext
+    func grammarCompiler(context: borrowing GrammarContext) throws -> GrammarCompiler
 
     func grammar(
       tools: [EdgeToolDefinition],
       parameters: GenerateParameters,
-      context: XGRGrammarContext
-    ) throws -> XGRGrammar
+      context: GrammarContext
+    ) throws -> GrammarCompiler.Grammar
 
     func toolCallGrammar(
       tools: [EdgeToolDefinition],
       range: GrammarToolCallRange
-    ) throws -> XGRGrammar
+    ) throws -> GrammarCompiler.Grammar
 
     func input(
       prompt: Prompt,
@@ -44,14 +49,14 @@
   extension EdgeToolsMLXModel
   where
     GenerateParameters: EdgeToolsConstrainedGenerateParameters,
-    GenerateParameters.Constraint.Grammar == XGRGrammar,
-    GenerateParameters.Constraint.Context == XGRGrammarContext
+    GenerateParameters.Constraint.Grammar == GrammarCompiler.Grammar,
+    GenerateParameters.Constraint.Context == GrammarContext
   {
     public func grammar(
       tools: [EdgeToolDefinition],
       parameters: GenerateParameters,
-      context: XGRGrammarContext
-    ) throws -> XGRGrammar {
+      context: GrammarContext
+    ) throws -> GrammarCompiler.Grammar {
       let constraint = parameters.constraint
       let toolCallGrammar = try constraint.toolCallRange.map {
         try self.toolCallGrammar(tools: tools, range: $0)
@@ -121,41 +126,63 @@
     var synchronizeStreamForMemorySnapshots: Bool { get }
   }
 
-  public struct DefaultEdgeToolsMLXGenerateParameters:
-    EdgeToolsMLXGenerateParameters,
-    EdgeToolsConstrainedGenerateParameters
-  {
-    public static var `default`: Self { Self() }
+  // MARK: - DefaultEdgeToolsMLXGenerateParameters
 
-    public var sampler: any LogitSampler
-    public var processor: (any LogitProcessor)?
-    public var constraint: EdgeToolsXGRGenerationConstraint
-    public var maxTokens: Int?
-    public var kvCacheQuantizationBits: Int?
-    public var kvCacheQuantizationGroupSize: Int
-    public var quantizedKVStart: Int
-    public var synchronizeStreamForMemorySnapshots: Bool
+  #if XGrammar
+    public struct DefaultEdgeToolsMLXGenerateParameters:
+      EdgeToolsMLXGenerateParameters,
+      EdgeToolsConstrainedGenerateParameters
+    {
+      public static var `default`: Self { Self() }
 
-    public init(
-      sampler: any LogitSampler = CategoricalSampler(temperature: 0.6),
-      processor: (any LogitProcessor)? = nil,
-      constraint: EdgeToolsXGRGenerationConstraint = .unconstrained,
-      maxTokens: Int? = 1024,
-      kvCacheQuantizationBits: Int? = nil,
-      kvCacheQuantizationGroupSize: Int = 64,
-      quantizedKVStart: Int = 0,
-      synchronizeStreamForMemorySnapshots: Bool = true
-    ) {
-      self.sampler = sampler
-      self.processor = processor
-      self.constraint = constraint
-      self.maxTokens = maxTokens
-      self.kvCacheQuantizationBits = kvCacheQuantizationBits
-      self.kvCacheQuantizationGroupSize = kvCacheQuantizationGroupSize
-      self.quantizedKVStart = quantizedKVStart
-      self.synchronizeStreamForMemorySnapshots = synchronizeStreamForMemorySnapshots
+      public var sampler: any LogitSampler
+      public var processor: (any LogitProcessor)?
+      public var constraint: EdgeToolsXGRGenerationConstraint
+      public var maxTokens: Int?
+      public var kvCacheQuantizationBits: Int?
+      public var kvCacheQuantizationGroupSize: Int
+      public var quantizedKVStart: Int
+      public var synchronizeStreamForMemorySnapshots: Bool
+
+      public init(
+        sampler: any LogitSampler = CategoricalSampler(temperature: 0.6),
+        processor: (any LogitProcessor)? = nil,
+        constraint: EdgeToolsXGRGenerationConstraint = .unconstrained,
+        maxTokens: Int? = 1024,
+        kvCacheQuantizationBits: Int? = nil,
+        kvCacheQuantizationGroupSize: Int = 64,
+        quantizedKVStart: Int = 0,
+        synchronizeStreamForMemorySnapshots: Bool = true
+      ) {
+        self.sampler = sampler
+        self.processor = processor
+        self.constraint = constraint
+        self.maxTokens = maxTokens
+        self.kvCacheQuantizationBits = kvCacheQuantizationBits
+        self.kvCacheQuantizationGroupSize = kvCacheQuantizationGroupSize
+        self.quantizedKVStart = quantizedKVStart
+        self.synchronizeStreamForMemorySnapshots = synchronizeStreamForMemorySnapshots
+      }
     }
-  }
+
+    // MARK: - EdgeToolsMLXModel + XGrammar
+
+    extension EdgeToolsMLXModel
+    where GrammarCompiler == XGRCompiler, GrammarContext == XGRGrammarContext {
+      public func grammarContext(tokenizer: any EdgeToolsTokenizer) throws -> XGRGrammarContext {
+        guard let tokenizer = tokenizer as? any EdgeToolsXGRTokenizer else {
+          throw EdgeToolsError.unsupportedTokenizer
+        }
+        return try XGRGrammarContext(
+          tokenizerInfo: tokenizer.tokenizerInfo(modelVocabularySize: self.vocabularySize)
+        )
+      }
+
+      public func grammarCompiler(context: borrowing XGRGrammarContext) throws -> XGRCompiler {
+        try XGRCompiler(tokenizerInfo: context.tokenizerInfo)
+      }
+    }
+  #endif
 
   // MARK: - EdgeToolsMLXEngine
 
@@ -277,14 +304,13 @@
 
   // MARK: - EdgeToolsMLXModel Adapter
 
-  // swiftlint:disable:next type_name
   public struct _EdgeToolsMLXModel<Model: EdgeToolsMLXModel>: EdgeToolsModel {
     public typealias Prompt = Model.Prompt
     public typealias Input = LMInput
     public typealias GenerateParameters = Model.GenerateParameters
     public typealias ToolCallParser = Model.ToolCallParser
-    public typealias GrammarCompiler = XGRCompiler
-    public typealias GrammarContext = XGRGrammarContext
+    public typealias GrammarCompiler = Model.GrammarCompiler
+    public typealias GrammarContext = Model.GrammarContext
 
     private struct CachedPrefill {
       let tokenIds: [EdgeToolsToken.ID]
@@ -313,31 +339,28 @@
 
     public var vocabularySize: Int { self.model.vocabularySize }
 
-    public func grammarContext(tokenizer: any EdgeToolsTokenizer) throws -> XGRGrammarContext {
-      guard let tokenizer = tokenizer as? any EdgeToolsXGRTokenizer else {
-        throw EdgeToolsError.unsupportedTokenizer
-      }
-      return try XGRGrammarContext(
-        tokenizerInfo: tokenizer.tokenizerInfo(modelVocabularySize: self.vocabularySize)
-      )
+    public func grammarContext(tokenizer: any EdgeToolsTokenizer) throws -> Model.GrammarContext {
+      try self.model.grammarContext(tokenizer: tokenizer)
     }
 
-    public func grammarCompiler(context: borrowing XGRGrammarContext) throws -> XGRCompiler {
-      try XGRCompiler(tokenizerInfo: context.tokenizerInfo)
+    public func grammarCompiler(
+      context: borrowing Model.GrammarContext
+    ) throws -> Model.GrammarCompiler {
+      try self.model.grammarCompiler(context: context)
     }
 
     public func grammar(
       tools: [EdgeToolDefinition],
       parameters: Model.GenerateParameters,
-      context: XGRGrammarContext
-    ) throws -> XGRGrammar {
+      context: Model.GrammarContext
+    ) throws -> Model.GrammarCompiler.Grammar {
       try self.model.grammar(tools: tools, parameters: parameters, context: context)
     }
 
     public func toolCallGrammar(
       tools: [EdgeToolDefinition],
       range: GrammarToolCallRange
-    ) throws -> XGRGrammar {
+    ) throws -> Model.GrammarCompiler.Grammar {
       try self.model.toolCallGrammar(tools: tools, range: range)
     }
 
