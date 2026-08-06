@@ -511,7 +511,7 @@
       var values = MutableSpan<UInt16>(mutableBytes: rawView.mutableBytes)
       for index in 0..<maxLength {
         values[index] =
-          index <= step ? 0 : Float16(NeedleNumerics.maskedAttentionScore).bitPattern
+          index <= step ? 0 : Float16(-Float.needleClippingMagnitude).bitPattern
       }
       return mask
     }

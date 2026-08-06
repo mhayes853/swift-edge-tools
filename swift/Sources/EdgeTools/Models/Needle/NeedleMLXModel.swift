@@ -38,6 +38,7 @@
     private var crossAttentionMask: MLXArray?
     private var crossAttentionKV: [ProjectedAttentionKV]?
     private var encoderOutput: MLXArray?
+    private var compiledDecoderFunction: (@Sendable ([MLXArray]) -> [MLXArray])?
 
     private var defaultEncoderOutput: MLXArray {
       .zeros([1, 0, self.configuration.dimensions])
@@ -52,6 +53,13 @@
           embeddingCount: configuration.vocabularySize,
           dimensions: configuration.dimensions
         )
+      }
+    }
+
+    public func newCache(parameters _: MLXLMCommon.GenerateParameters?) -> [any KVCache] {
+      (0..<self.configuration.decoderLayers).map { _ in
+        let dtype = self.model.embedding.weight.dtype
+        return NeedleKVCache(configuration: self.configuration, dtype: dtype)
       }
     }
 
@@ -93,16 +101,17 @@
       self.crossAttentionKV = crossAttentionKV
       self.encoderOutput = encoderOutput
 
-      let output = self.model.decode(
+      let output = self.decode(
         MLXArray([self.configuration.decoderStartTokenId])[.newAxis, 0...],
         crossAttentionMask: encoderMask,
         precomputedCrossAttention: crossAttentionKV,
-        caches: cache
+        caches: self.caches(from: cache),
+        encoderOutput: encoderOutput
       )
 
       try Task.checkCancellation()
       eval(cache)
-      return self.finalOutput(from: output, encoderOutput: encoderOutput)
+      return output
     }
 
     public func callAsFunction(
@@ -110,17 +119,19 @@
       cache: [any KVCache]?,
       state: LMOutput.State?
     ) -> LMOutput {
+      precondition(input.tokens.dim(1) == 1, "Needle decoding requires exactly one token.")
+      guard let crossAttentionMask, let crossAttentionKV else {
+        preconditionFailure("Needle must be prepared before decoding.")
+      }
       let encoderOutput =
         state?.crossAttentionStates ?? self.encoderOutput ?? self.defaultEncoderOutput
-      let precomputedCrossAttention =
-        self.crossAttentionKV ?? self.model.precomputeCrossAttention(encoderOutput: encoderOutput)
-      let output = self.model.decode(
+      return self.decode(
         input.tokens,
-        crossAttentionMask: self.crossAttentionMask,
-        precomputedCrossAttention: precomputedCrossAttention,
-        caches: cache
+        crossAttentionMask: crossAttentionMask,
+        precomputedCrossAttention: crossAttentionKV,
+        caches: self.caches(from: cache),
+        encoderOutput: encoderOutput
       )
-      return self.finalOutput(from: output, encoderOutput: encoderOutput)
     }
 
     public func loadWeights(from url: URL) throws {
@@ -132,6 +143,7 @@
     }
 
     public func loadWeights(weights: [String: MLXArray]) throws {
+      self.compiledDecoderFunction = nil
       try self.update(
         parameters: ModuleParameters.unflattened(self.sanitize(weights: weights)),
         verify: .all
@@ -140,6 +152,7 @@
 
     public func sanitize(weights: [String: MLXArray]) -> [String: MLXArray] {
       var weights = weights
+      fuseNeedleAttentionWeights(&weights)
       if self.configuration.tieWordEmbeddings {
         weights.removeValue(forKey: "lm_head.weight")
       }
@@ -152,11 +165,77 @@
       self.crossAttentionMask = nil
     }
 
-    private func finalOutput(from output: MLXArray, encoderOutput: MLXArray) -> LMOutput {
-      LMOutput(
-        logits: (self.lmHead ?? self.model.embedding).asLinear(output),
-        state: LMOutput.State(crossAttentionStates: encoderOutput)
-      )
+    private func decode(
+      _ input: MLXArray,
+      crossAttentionMask: MLXArray,
+      precomputedCrossAttention: [ProjectedAttentionKV],
+      caches: [NeedleKVCache],
+      encoderOutput: MLXArray
+    ) -> LMOutput {
+      let offset = caches[0].offset
+      let dtype = self.model.embedding.weight.dtype
+      let cacheStates = caches.map { $0.fullState(dtype: dtype) }
+      let inputs =
+        [input, MLXArray([Int32(offset)]), crossAttentionMask]
+        + precomputedCrossAttention.map(\.keys)
+        + precomputedCrossAttention.map(\.values)
+        + cacheStates.map(\.keys)
+        + cacheStates.map(\.values)
+      let outputs = self.compiledDecoder()(inputs)
+      let layerCount = self.configuration.decoderLayers
+      for index in 0..<layerCount {
+        caches[index].replace(
+          state: NeedleKVCache.State(
+            keys: outputs[1 + index],
+            values: outputs[1 + layerCount + index]
+          ),
+          offset: offset + 1
+        )
+      }
+      let state = LMOutput.State(crossAttentionStates: encoderOutput)
+      return LMOutput(logits: outputs[0], state: state)
+    }
+
+    private func caches(from caches: [any KVCache]?) -> [NeedleKVCache] {
+      guard let caches = caches as? [NeedleKVCache],
+        caches.count == self.configuration.decoderLayers,
+        let offset = caches.first?.offset
+      else {
+        preconditionFailure("Needle requires one cache per decoder layer from NeedleMLXModel.")
+      }
+      precondition(caches.allSatisfy { $0.offset == offset }, "Needle KV cache offsets must match.")
+      return caches
+    }
+
+    private func compiledDecoder() -> @Sendable ([MLXArray]) -> [MLXArray] {
+      if let compiledDecoderFunction {
+        return compiledDecoderFunction
+      }
+      let layerCount = self.configuration.decoderLayers
+      let model = self.model
+      let outputProjection = self.lmHead ?? self.model.embedding
+      let compiledDecoderFunction = compile { inputs in
+        let crossAttention = zip(
+          inputs[3..<(3 + layerCount)],
+          inputs[(3 + layerCount)..<(3 + (2 * layerCount))]
+        ).map { ProjectedAttentionKV(keys: $0, values: $1) }
+        let caches = zip(
+          inputs[(3 + (2 * layerCount))..<(3 + (3 * layerCount))],
+          inputs[(3 + (3 * layerCount))..<(3 + (4 * layerCount))]
+        ).map { NeedleKVCache.State(keys: $0, values: $1) }
+        let output = model.decode(
+          inputs[0],
+          position: inputs[1],
+          crossAttentionMask: inputs[2],
+          precomputedCrossAttention: crossAttention,
+          caches: caches
+        )
+        return [outputProjection.asLinear(output.output)]
+          + output.caches.map(\.keys)
+          + output.caches.map(\.values)
+      }
+      self.compiledDecoderFunction = compiledDecoderFunction
+      return compiledDecoderFunction
     }
   }
 
@@ -171,28 +250,22 @@
     public var processor: (any LogitProcessor)?
     public var maxTokens: Int?
     public var toolCallRange: GrammarToolCallRange
-    public var kvCacheQuantizationBits: Int?
-    public var kvCacheQuantizationGroupSize: Int
-    public var quantizedKVStart: Int
     public var synchronizeStreamForMemorySnapshots: Bool
+    public var kvCacheQuantizationBits: Int? { nil }
+    public var kvCacheQuantizationGroupSize: Int { 64 }
+    public var quantizedKVStart: Int { 0 }
 
     public init(
       sampler: any LogitSampler = ArgMaxSampler(),
       processor: (any LogitProcessor)? = nil,
       maxTokens: Int? = 1024,
       toolCallRange: GrammarToolCallRange = .unbounded(minimum: 0),
-      kvCacheQuantizationBits: Int? = nil,
-      kvCacheQuantizationGroupSize: Int = 64,
-      quantizedKVStart: Int = 0,
       synchronizeStreamForMemorySnapshots: Bool = true
     ) {
       self.sampler = sampler
       self.processor = processor
       self.maxTokens = maxTokens
       self.toolCallRange = toolCallRange
-      self.kvCacheQuantizationBits = kvCacheQuantizationBits
-      self.kvCacheQuantizationGroupSize = kvCacheQuantizationGroupSize
-      self.quantizedKVStart = quantizedKVStart
       self.synchronizeStreamForMemorySnapshots = synchronizeStreamForMemorySnapshots
     }
   }
@@ -261,20 +334,21 @@
     }
 
     func encode(_ input: MLXArray, previous: MLXArray, mask: MLXArray) -> MLXArray {
-      let encoded = self.encoder(self.embedding(input) * self.embedScale, mask: .array(mask))
+      let encoded = self.encoder(self.embedding(input) * self.embedScale, mask: mask)
       return concatenated([previous, encoded], axis: 1)
     }
 
     func decode(
       _ input: MLXArray,
-      crossAttentionMask: MLXArray?,
+      position: MLXArray,
+      crossAttentionMask: MLXArray,
       precomputedCrossAttention: [ProjectedAttentionKV],
-      caches: [any KVCache]?
-    ) -> MLXArray {
+      caches: [NeedleKVCache.State]
+    ) -> (output: MLXArray, caches: [NeedleKVCache.State]) {
       self.decoder(
         self.embedding(input) * self.embedScale,
-        selfMask: .causal,
-        crossMask: crossAttentionMask.map { .array($0) } ?? .none,
+        position: position,
+        crossMask: crossAttentionMask,
         precomputedCrossAttention: precomputedCrossAttention,
         caches: caches
       )
@@ -302,10 +376,7 @@
       )
     }
 
-    func callAsFunction(
-      _ input: MLXArray,
-      mask: MLXFast.ScaledDotProductAttentionMaskMode
-    ) -> MLXArray {
+    func callAsFunction(_ input: MLXArray, mask: MLXArray) -> MLXArray {
       let ropeFrequencies = RoPEFrequencies(
         inverse: self._inverseRope,
         sequenceLength: input.dim(1),
@@ -321,29 +392,28 @@
 
   private final class NeedleEncoderBlock: Module {
     @ModuleInfo(key: "input_layernorm") private var inputLayerNorm: ZCRMSNorm
-    @ModuleInfo(key: "self_attn") private var attention: NeedleAttention
+    @ModuleInfo(key: "self_attn") private var attention: NeedleSelfAttention
     @ParameterInfo(key: "attn_gate") private var attentionGate: MLXArray
 
     init(configuration: NeedleModelConfiguration) {
       self._inputLayerNorm.wrappedValue = ZCRMSNorm(configuration: configuration)
-      self._attention.wrappedValue = NeedleAttention(configuration: configuration)
+      self._attention.wrappedValue = NeedleSelfAttention(configuration: configuration)
       self._attentionGate.wrappedValue = MLXArray([0])
     }
 
     func callAsFunction(
       _ input: MLXArray,
-      mask: MLXFast.ScaledDotProductAttentionMaskMode,
+      mask: MLXArray,
       ropeFrequencies: RoPEFrequencies
     ) -> MLXArray {
-      let normed = self.inputLayerNorm(input)
       let attention = self.attention(
-        q: normed,
-        kv: normed,
+        self.inputLayerNorm(input),
         mask: mask,
         ropeFrequencies: ropeFrequencies,
-        cache: nil
+        cache: nil,
+        position: nil
       )
-      return gatedResidual(input, gate: self.attentionGate, sublayer: attention)
+      return gatedResidual(input, gate: self.attentionGate, sublayer: attention.output)
     }
   }
 
@@ -370,110 +440,114 @@
 
     func callAsFunction(
       _ input: MLXArray,
-      selfMask: MLXFast.ScaledDotProductAttentionMaskMode,
-      crossMask: MLXFast.ScaledDotProductAttentionMaskMode,
+      position: MLXArray,
+      crossMask: MLXArray,
       precomputedCrossAttention: [ProjectedAttentionKV],
-      caches: [any KVCache]?,
-    ) -> MLXArray {
+      caches: [NeedleKVCache.State]
+    ) -> (output: MLXArray, caches: [NeedleKVCache.State]) {
       let ropeFrequencies = RoPEFrequencies.fromTable(
         self._ropeTable,
-        offset: caches?.first?.offset ?? 0,
-        sequenceLength: input.dim(1),
+        position: position,
         dtype: input.dtype
       )
+      let keyPositions = MLXArray(Int32(0)..<Int32(caches[0].keys.dim(2)))
+      let selfMask = (keyPositions .<= position)[.newAxis, .newAxis, .newAxis, 0...]
       var hiddenStates = input
-      let optionalCaches = caches?.map { $0 as (any KVCache)? }
-      let caches = optionalCaches ?? Array(repeating: nil, count: self.layers.count)
-      for (index, (layer, caches)) in zip(self.layers, caches).enumerated() {
-        hiddenStates = layer(
+      var updatedCaches = [NeedleKVCache.State]()
+      updatedCaches.reserveCapacity(self.layers.count)
+
+      for index in self.layers.indices {
+        let output = self.layers[index](
           hiddenStates,
           selfMask: selfMask,
           crossMask: crossMask,
           precomputedCrossAttention: precomputedCrossAttention[index],
+          cache: caches[index],
           ropeFrequencies: ropeFrequencies,
-          cache: caches
+          position: position
         )
+        hiddenStates = output.output
+        updatedCaches.append(output.cache)
       }
-      return self.finalNorm(hiddenStates)
+      return (self.finalNorm(hiddenStates), updatedCaches)
     }
   }
 
   private final class NeedleDecoderBlock: Module {
     @ModuleInfo(key: "input_layernorm") var inputLayerNorm: ZCRMSNorm
-    @ModuleInfo(key: "self_attn") var selfAttention: NeedleAttention
+    @ModuleInfo(key: "self_attn") var selfAttention: NeedleSelfAttention
     @ParameterInfo(key: "self_attn_gate") var selfAttentionGate: MLXArray
     @ModuleInfo(key: "encoder_attn_layer_norm") var crossAttentionNorm: ZCRMSNorm
-    @ModuleInfo(key: "encoder_attn") var crossAttention: NeedleAttention
+    @ModuleInfo(key: "encoder_attn") var crossAttention: NeedleCrossAttention
     @ParameterInfo(key: "cross_attn_gate") var crossAttentionGate: MLXArray
 
     init(configuration: NeedleModelConfiguration) {
       self._inputLayerNorm.wrappedValue = ZCRMSNorm(configuration: configuration)
-      self._selfAttention.wrappedValue = NeedleAttention(configuration: configuration)
+      self._selfAttention.wrappedValue = NeedleSelfAttention(configuration: configuration)
       self._selfAttentionGate.wrappedValue = MLXArray([0])
       self._crossAttentionNorm.wrappedValue = ZCRMSNorm(configuration: configuration)
-      self._crossAttention.wrappedValue = NeedleAttention(configuration: configuration)
+      self._crossAttention.wrappedValue = NeedleCrossAttention(configuration: configuration)
       self._crossAttentionGate.wrappedValue = MLXArray([0])
     }
 
     func callAsFunction(
       _ input: MLXArray,
-      selfMask: MLXFast.ScaledDotProductAttentionMaskMode,
-      crossMask: MLXFast.ScaledDotProductAttentionMaskMode,
+      selfMask: MLXArray,
+      crossMask: MLXArray,
       precomputedCrossAttention: ProjectedAttentionKV,
+      cache: NeedleKVCache.State,
       ropeFrequencies: RoPEFrequencies,
-      cache: (any KVCache)?
-    ) -> MLXArray {
-      let selfNormed = self.inputLayerNorm(input)
+      position: MLXArray
+    ) -> (output: MLXArray, cache: NeedleKVCache.State) {
       let selfAttention = self.selfAttention(
-        q: selfNormed,
-        kv: selfNormed,
+        self.inputLayerNorm(input),
         mask: selfMask,
         ropeFrequencies: ropeFrequencies,
-        cache: cache
+        cache: cache,
+        position: position
       )
-
       let gatedSelfAttention = gatedResidual(
         input,
         gate: self.selfAttentionGate,
-        sublayer: selfAttention
+        sublayer: selfAttention.output
       )
-      let crossNormed = self.crossAttentionNorm(gatedSelfAttention)
       let crossAttention = self.crossAttention(
-        q: crossNormed,
+        self.crossAttentionNorm(gatedSelfAttention),
         projectedKV: precomputedCrossAttention,
-        mask: crossMask,
-        ropeFrequencies: nil,
-        cache: nil
+        mask: crossMask
       )
-      return gatedResidual(
-        gatedSelfAttention,
-        gate: self.crossAttentionGate,
-        sublayer: crossAttention
+      return (
+        gatedResidual(
+          gatedSelfAttention,
+          gate: self.crossAttentionGate,
+          sublayer: crossAttention
+        ),
+        selfAttention.cache
       )
     }
   }
 
   // MARK: - Attention
 
-  private final class NeedleAttention: Module {
+  private final class NeedleSelfAttention: Module {
     let heads: Int
     let kvHeads: Int
     let headDimensions: Int
+    let queryDimensions: Int
+    let kvDimensions: Int
     let scale: Float
     @ModuleInfo(key: "q_norm") var queryNorm: ZCRMSNorm
     @ModuleInfo(key: "k_norm") var keyNorm: ZCRMSNorm
-
-    @ModuleInfo(key: "q_proj") var queryProjection: Linear
-    @ModuleInfo(key: "k_proj") var keyProjection: Linear
-    @ModuleInfo(key: "v_proj") var valueProjection: Linear
+    @ModuleInfo(key: "qkv_proj") var queryKeyValueProjection: Linear
     @ModuleInfo(key: "out_proj") var outProjection: Linear
 
     init(configuration: NeedleModelConfiguration) {
       self.heads = configuration.attentionHeads
       self.kvHeads = configuration.kvHeads
       self.headDimensions = configuration.attentionHeadDimensions
+      self.queryDimensions = configuration.hiddenDimensions
+      self.kvDimensions = configuration.kvDimensions
       self.scale = sqrt(1.0 / Float(configuration.attentionHeadDimensions))
-
       self._queryNorm.wrappedValue = ZCRMSNorm(
         dimensions: configuration.attentionHeadDimensions,
         eps: configuration.rmsNormEps
@@ -482,20 +556,9 @@
         dimensions: configuration.attentionHeadDimensions,
         eps: configuration.rmsNormEps
       )
-
-      self._queryProjection.wrappedValue = Linear(
+      self._queryKeyValueProjection.wrappedValue = Linear(
         inputDimensions: configuration.hiddenDimensions,
-        outputDimensions: configuration.hiddenDimensions,
-        bias: false
-      )
-      self._keyProjection.wrappedValue = Linear(
-        inputDimensions: configuration.hiddenDimensions,
-        outputDimensions: configuration.kvDimensions,
-        bias: false
-      )
-      self._valueProjection.wrappedValue = Linear(
-        inputDimensions: configuration.hiddenDimensions,
-        outputDimensions: configuration.kvDimensions,
+        outputDimensions: configuration.hiddenDimensions + (2 * configuration.kvDimensions),
         bias: false
       )
       self._outProjection.wrappedValue = Linear(
@@ -506,66 +569,130 @@
     }
 
     func callAsFunction(
-      q query: MLXArray,
-      kv: MLXArray,
-      mask: MLXFast.ScaledDotProductAttentionMaskMode,
-      ropeFrequencies: RoPEFrequencies?,
-      cache: (any KVCache)?
-    ) -> MLXArray {
-      var projectedKV = self.project(kv: kv)
-
-      if let ropeFrequencies {
-        projectedKV = ProjectedAttentionKV(
-          keys: ropeFrequencies.apply(to: projectedKV.keys),
-          values: projectedKV.values
+      _ input: MLXArray,
+      mask: MLXArray,
+      ropeFrequencies: RoPEFrequencies,
+      cache: NeedleKVCache.State?,
+      position: MLXArray?
+    ) -> (output: MLXArray, cache: NeedleKVCache.State) {
+      let (queries, keys, values) = self.project(input, ropeFrequencies: ropeFrequencies)
+      let attention: NeedleKVCache.State
+      if let cache, let position {
+        let indices = broadcast(position.reshaped([1, 1, 1, 1]), to: keys.shape)
+        attention = NeedleKVCache.State(
+          keys: putAlong(cache.keys, indices, values: keys, axis: 2),
+          values: putAlong(cache.values, indices, values: values, axis: 2)
         )
+      } else {
+        attention = NeedleKVCache.State(keys: keys, values: values)
       }
-
-      return self.callAsFunction(
-        q: query,
-        projectedKV: projectedKV,
-        mask: mask,
-        ropeFrequencies: ropeFrequencies,
-        cache: cache
+      let output = MLXFast.scaledDotProductAttention(
+        queries: queries,
+        keys: attention.keys,
+        values: attention.values,
+        scale: self.scale,
+        mask: .array(mask)
+      )
+      return (
+        self.outProjection(output.transposed(0, 2, 1, 3).flattened(start: -2, end: -1)),
+        attention
       )
     }
 
-    func project(kv: MLXArray) -> ProjectedAttentionKV {
-      var keys = self.keyProjection(kv)
-      var values = self.valueProjection(kv)
+    private func project(
+      _ input: MLXArray,
+      ropeFrequencies: RoPEFrequencies
+    ) -> (queries: MLXArray, keys: MLXArray, values: MLXArray) {
+      let projected = self.queryKeyValueProjection(input)
+      var queries = projected[.ellipsis, ..<self.queryDimensions]
+      var keys = projected[
+        .ellipsis,
+        self.queryDimensions..<(self.queryDimensions + self.kvDimensions)
+      ]
+      var values = projected[.ellipsis, (self.queryDimensions + self.kvDimensions)...]
 
+      queries = unflatten(queries, axis: -1, shape: [self.heads, self.headDimensions])
+        .transposed(0, 2, 1, 3)
       keys = unflatten(keys, axis: -1, shape: [self.kvHeads, self.headDimensions])
         .transposed(0, 2, 1, 3)
       values = unflatten(values, axis: -1, shape: [self.kvHeads, self.headDimensions])
         .transposed(0, 2, 1, 3)
-      keys = self.keyNorm(keys)
+      queries = ropeFrequencies.apply(to: self.queryNorm(queries))
+      keys = ropeFrequencies.apply(to: self.keyNorm(keys))
+      return (queries, keys, values)
+    }
+  }
 
-      return ProjectedAttentionKV(keys: keys, values: values)
+  private final class NeedleCrossAttention: Module {
+    let heads: Int
+    let kvHeads: Int
+    let headDimensions: Int
+    let kvDimensions: Int
+    let scale: Float
+    @ModuleInfo(key: "q_norm") var queryNorm: ZCRMSNorm
+    @ModuleInfo(key: "k_norm") var keyNorm: ZCRMSNorm
+    @ModuleInfo(key: "q_proj") var queryProjection: Linear
+    @ModuleInfo(key: "kv_proj") var keyValueProjection: Linear
+    @ModuleInfo(key: "out_proj") var outProjection: Linear
+
+    init(configuration: NeedleModelConfiguration) {
+      self.heads = configuration.attentionHeads
+      self.kvHeads = configuration.kvHeads
+      self.headDimensions = configuration.attentionHeadDimensions
+      self.kvDimensions = configuration.kvDimensions
+      self.scale = sqrt(1.0 / Float(configuration.attentionHeadDimensions))
+      self._queryNorm.wrappedValue = ZCRMSNorm(
+        dimensions: configuration.attentionHeadDimensions,
+        eps: configuration.rmsNormEps
+      )
+      self._keyNorm.wrappedValue = ZCRMSNorm(
+        dimensions: configuration.attentionHeadDimensions,
+        eps: configuration.rmsNormEps
+      )
+      self._queryProjection.wrappedValue = Linear(
+        inputDimensions: configuration.hiddenDimensions,
+        outputDimensions: configuration.hiddenDimensions,
+        bias: false
+      )
+      self._keyValueProjection.wrappedValue = Linear(
+        inputDimensions: configuration.hiddenDimensions,
+        outputDimensions: 2 * configuration.kvDimensions,
+        bias: false
+      )
+      self._outProjection.wrappedValue = Linear(
+        inputDimensions: configuration.hiddenDimensions,
+        outputDimensions: configuration.hiddenDimensions,
+        bias: false
+      )
+    }
+
+    func project(kv: MLXArray) -> ProjectedAttentionKV {
+      let projected = self.keyValueProjection(kv)
+      var keys = projected[.ellipsis, ..<self.kvDimensions]
+      var values = projected[.ellipsis, self.kvDimensions...]
+      keys = unflatten(keys, axis: -1, shape: [self.kvHeads, self.headDimensions])
+        .transposed(0, 2, 1, 3)
+      values = unflatten(values, axis: -1, shape: [self.kvHeads, self.headDimensions])
+        .transposed(0, 2, 1, 3)
+      return ProjectedAttentionKV(keys: self.keyNorm(keys), values: values)
     }
 
     func callAsFunction(
-      q query: MLXArray,
+      _ input: MLXArray,
       projectedKV: ProjectedAttentionKV,
-      mask: MLXFast.ScaledDotProductAttentionMaskMode,
-      ropeFrequencies: RoPEFrequencies?,
-      cache: (any KVCache)?
+      mask: MLXArray
     ) -> MLXArray {
-      var queries = self.queryProjection(query)
+      var queries = self.queryProjection(input)
       queries = unflatten(queries, axis: -1, shape: [self.heads, self.headDimensions])
         .transposed(0, 2, 1, 3)
       queries = self.queryNorm(queries)
 
-      if let ropeFrequencies {
-        queries = ropeFrequencies.apply(to: queries)
-      }
-
-      let output = attentionWithCacheUpdate(
+      let output = MLXFast.scaledDotProductAttention(
         queries: queries,
         keys: projectedKV.keys,
         values: projectedKV.values,
-        cache: cache,
         scale: self.scale,
-        mask: mask
+        mask: .array(mask)
       )
       return self.outProjection(output.transposed(0, 2, 1, 3).flattened(start: -2, end: -1))
     }
@@ -620,17 +747,9 @@
       self.cos = expandedDimensions(MLX.cos(embeddings), axis: 0).asType(dtype)
     }
 
-    static func fromTable(
-      _ table: MLXArray,
-      offset: Int,
-      sequenceLength: Int,
-      dtype: DType
-    ) -> Self {
-      let positions = offset..<(offset + sequenceLength)
-      return Self(
-        sin: table[0..<1, positions, 0...].asType(dtype),
-        cos: table[1..<2, positions, 0...].asType(dtype)
-      )
+    static func fromTable(_ table: MLXArray, position: MLXArray, dtype: DType) -> Self {
+      let frequencies = table.take(position, axis: 1).asType(dtype)
+      return Self(sin: frequencies[0..<1, 0..., 0...], cos: frequencies[1..<2, 0..., 0...])
     }
 
     private init(sin: MLXArray, cos: MLXArray) {
@@ -639,29 +758,204 @@
     }
 
     func apply(to input: MLXArray) -> MLXArray {
-      let sin = expandedDimensions(self.sin, axis: 1)
-      let cos = expandedDimensions(self.cos, axis: 1)
-      let half = input.dim(-1) / 2
-      let rotated = concatenated(
-        [-input[.ellipsis, half...], input[.ellipsis, ..<half]],
-        axis: -1
+      let (firstHalf, secondHalf) = input.split(axis: -1)
+      let rotated = concatenated([-secondHalf, firstHalf], axis: -1)
+      return (input * expandedDimensions(self.cos, axis: 1))
+        + (rotated * expandedDimensions(self.sin, axis: 1))
+    }
+  }
+
+  // MARK: - KVCache
+
+  private final class NeedleKVCache: KVCache {
+    struct State {
+      let keys: MLXArray
+      let values: MLXArray
+    }
+
+    var offset = 0
+    let kvHeads: Int
+    let headDimensions: Int
+    let initialCapacity: Int
+    let maximumCapacity: Int
+    private(set) var capacity: Int
+    private var keys: MLXArray
+    private var values: MLXArray
+
+    var maxSize: Int? { self.maximumCapacity }
+
+    init(configuration: NeedleModelConfiguration, dtype: DType) {
+      let capacity = min(128, configuration.decoderMaxLength)
+      let shape = [1, configuration.kvHeads, capacity, configuration.attentionHeadDimensions]
+      self.kvHeads = configuration.kvHeads
+      self.headDimensions = configuration.attentionHeadDimensions
+      self.initialCapacity = capacity
+      self.maximumCapacity = configuration.decoderMaxLength
+      self.capacity = capacity
+      self.keys = MLXArray.zeros(shape, dtype: dtype)
+      self.values = MLXArray.zeros(shape, dtype: dtype)
+    }
+
+    func innerState() -> [MLXArray] {
+      [self.keys, self.values]
+    }
+
+    func update(keys: MLXArray, values: MLXArray) -> (MLXArray, MLXArray) {
+      let newOffset = self.offset + keys.dim(2)
+      self.ensureCapacity(required: newOffset, dtype: keys.dtype)
+      self.keys[.ellipsis, self.offset..<newOffset, 0...] = keys
+      self.values[.ellipsis, self.offset..<newOffset, 0...] = values
+      self.offset = newOffset
+      let keys = self.keys[.ellipsis, ..<self.offset, 0...]
+      let values = self.values[.ellipsis, ..<self.offset, 0...]
+      return (keys, values)
+    }
+
+    var state: [MLXArray] {
+      get {
+        [self.keys[.ellipsis, ..<self.offset, 0...], self.values[.ellipsis, ..<self.offset, 0...]]
+      }
+      set {
+        precondition(newValue.count == 2, "NeedleKVCache state must contain keys and values.")
+        self.offset = newValue[0].dim(2)
+        precondition(self.offset <= self.maximumCapacity, "Needle KV cache capacity exceeded.")
+        self.capacity = self.initialCapacity
+        while self.capacity < self.offset {
+          self.capacity = min(self.maximumCapacity, self.capacity * 2)
+        }
+        self.keys = self.padded(newValue[0], capacity: self.capacity)
+        self.values = self.padded(newValue[1], capacity: self.capacity)
+      }
+    }
+
+    var metaState: [String] {
+      get { [""] }
+      set {}
+    }
+
+    var isTrimmable: Bool { true }
+
+    @discardableResult
+    func trim(_ n: Int) -> Int {
+      let trimmed = min(self.offset, n)
+      self.offset -= trimmed
+      return trimmed
+    }
+
+    func copy() -> any KVCache {
+      NeedleKVCache(
+        kvHeads: self.kvHeads,
+        headDimensions: self.headDimensions,
+        initialCapacity: self.initialCapacity,
+        maximumCapacity: self.maximumCapacity,
+        capacity: self.capacity,
+        offset: self.offset,
+        keys: self.keys[.ellipsis],
+        values: self.values[.ellipsis]
       )
-      return (input * cos) + (rotated * sin)
+    }
+
+    func makeMask(
+      n: Int,
+      windowSize: Int?,
+      returnArray _: Bool
+    ) -> MLXFast.ScaledDotProductAttentionMaskMode {
+      n == 1 ? .none : .array(createCausalMask(n: n, offset: self.offset, windowSize: windowSize))
+    }
+
+    func ensureCapacity(required: Int, dtype: DType) {
+      precondition(required <= self.maximumCapacity, "Needle KV cache capacity exceeded.")
+      while self.capacity < required {
+        self.capacity = min(self.maximumCapacity, self.capacity * 2)
+      }
+      guard self.keys.dim(2) != self.capacity else { return }
+
+      let added = self.capacity - self.keys.dim(2)
+      let newKeys = MLXArray.zeros([1, self.kvHeads, added, self.headDimensions], dtype: dtype)
+      self.keys = concatenated([self.keys,newKeys], axis: 2)
+
+      let newValues = MLXArray.zeros([1, self.kvHeads, added, self.headDimensions], dtype: dtype)
+      self.values = concatenated([self.values, newValues], axis: 2)
+    }
+
+    func fullState(dtype: DType) -> State {
+      self.ensureCapacity(required: self.offset + 1, dtype: dtype)
+      return State(keys: self.keys, values: self.values)
+    }
+
+    func replace(state: State, offset: Int) {
+      self.keys = state.keys
+      self.values = state.values
+      self.offset = offset
+      self.capacity = state.keys.dim(2)
+    }
+
+    private init(
+      kvHeads: Int,
+      headDimensions: Int,
+      initialCapacity: Int,
+      maximumCapacity: Int,
+      capacity: Int,
+      offset: Int,
+      keys: MLXArray,
+      values: MLXArray
+    ) {
+      self.kvHeads = kvHeads
+      self.headDimensions = headDimensions
+      self.initialCapacity = initialCapacity
+      self.maximumCapacity = maximumCapacity
+      self.capacity = capacity
+      self.offset = offset
+      self.keys = keys
+      self.values = values
+    }
+
+    private func padded(_ array: MLXArray, capacity: Int) -> MLXArray {
+      guard array.dim(2) < capacity else { return array }
+      let padding = MLXArray.zeros(
+        [array.dim(0), array.dim(1), capacity - array.dim(2), array.dim(3)],
+        dtype: array.dtype
+      )
+      return concatenated([array, padding], axis: 2)
     }
   }
 
   // MARK: - Helpers
+
+  private func fuseNeedleAttentionWeights(_ weights: inout [String: MLXArray]) {
+    for queryKey in Array(weights.keys) where queryKey.contains(".self_attn.q_proj.") {
+      let keyKey = queryKey.replacingOccurrences(of: ".q_proj.", with: ".k_proj.")
+      let valueKey = queryKey.replacingOccurrences(of: ".q_proj.", with: ".v_proj.")
+      guard let query = weights[queryKey],
+        let key = weights[keyKey],
+        let value = weights[valueKey]
+      else { continue }
+
+      let fusedKey = queryKey.replacingOccurrences(of: ".q_proj.", with: ".qkv_proj.")
+      weights[fusedKey] = concatenated([query, key, value], axis: 0)
+      weights.removeValue(forKey: queryKey)
+      weights.removeValue(forKey: keyKey)
+      weights.removeValue(forKey: valueKey)
+    }
+
+    for keyKey in Array(weights.keys) where keyKey.contains(".encoder_attn.k_proj.") {
+      let valueKey = keyKey.replacingOccurrences(of: ".k_proj.", with: ".v_proj.")
+      guard let key = weights[keyKey], let value = weights[valueKey] else { continue }
+
+      let fusedKey = keyKey.replacingOccurrences(of: ".k_proj.", with: ".kv_proj.")
+      weights[fusedKey] = concatenated([key, value], axis: 0)
+      weights.removeValue(forKey: keyKey)
+      weights.removeValue(forKey: valueKey)
+    }
+  }
 
   private func gatedResidual(
     _ input: MLXArray,
     gate: MLXArray,
     sublayer: MLXArray
   ) -> MLXArray {
-    clip(
-      input + sigmoid(gate).asType(sublayer.dtype) * sublayer,
-      min: -NeedleNumerics.float16ClippingMagnitude,
-      max: NeedleNumerics.float16ClippingMagnitude
-    )
+    let residual = input + sigmoid(gate).asType(sublayer.dtype) * sublayer
+    return clip(residual, min: -.needleClippingMagnitude, max: .needleClippingMagnitude)
   }
 
   private func paddingMask(inputIds: MLXArray, padTokenId: Int) -> MLXArray {

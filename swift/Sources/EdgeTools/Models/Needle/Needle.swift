@@ -118,9 +118,8 @@ public struct NeedleModelConfiguration: Hashable, Sendable {
 
 // MARK: - NeedleNumerics
 
-enum NeedleNumerics {
-  static let float16ClippingMagnitude: Float = 65_500
-  static let maskedAttentionScore = -Self.float16ClippingMagnitude
+extension Float {
+  static let needleClippingMagnitude: Self = 65_500
 }
 
 // MARK: - Loading
@@ -235,18 +234,16 @@ public struct NeedleToolCallParser: EdgeToolCallParser, Sendable {
   }
 }
 
-// MARK: - Needle Grammar
+// MARK: - NeedleGenerateParameters
 
 #if XGrammar
-  // MARK: - NeedleGenerateParameters
-
   public protocol NeedleGenerateParameters: EdgeToolsEngineGenerateParameters {
     var toolCallRange: GrammarToolCallRange { get }
   }
 
-  #if Atomics
-    // MARK: - NeedleModel
+  // MARK: - NeedleModel
 
+  #if Atomics
     public protocol NeedleModel: EdgeToolsModel
     where
       Prompt == NeedlePrompt,
@@ -272,7 +269,7 @@ public struct NeedleToolCallParser: EdgeToolCallParser, Sendable {
     }
   #endif
 
-  // MARK: - XGR Tokenizer Info
+  // MARK: - XGRTokenizerInfo
 
   extension XGRTokenizerInfo {
     public static func needle(

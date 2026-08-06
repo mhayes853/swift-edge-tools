@@ -394,9 +394,13 @@
       var stepLogits = generation.logits[0..., -1, 0...]
       stepLogits = generation.processor?.process(logits: stepLogits) ?? stepLogits
       let maskedLogits = applyBitmaskMLX(logits: stepLogits, mask: bitmask)
-      let confidence = tokenConfidenceMLX(logits: maskedLogits)
-      let tokenId = parameters.sampler.sample(logits: maskedLogits).item(EdgeToolsToken.ID.self)
-      generation.processor?.didSample(token: MLXArray([tokenId]))
+      let confidenceValues = top(maskedLogits.flattened(), k: 2)
+      let token = parameters.sampler.sample(logits: maskedLogits)
+      eval(confidenceValues, token)
+
+      let confidence = tokenConfidence(unorderedPair: confidenceValues.asArray(Float.self))
+      let tokenId = token.item(EdgeToolsToken.ID.self)
+      generation.processor?.didSample(token: token)
       generation.pendingTokenId = tokenId
       self.generation = generation
       return EdgeToolsModelSample(tokenId: tokenId, confidence: confidence)
@@ -523,5 +527,4 @@
       try self.init(model: _EdgeToolsMLXModel(model: model), tokenizer: tokenizer)
     }
   }
-
 #endif
