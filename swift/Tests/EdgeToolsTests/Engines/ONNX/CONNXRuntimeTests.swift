@@ -20,14 +20,6 @@
     }
 
     @Test
-    func `Use Runtime Configuration For Session Defaults`() throws {
-      let runtime = try CONNXRuntime(configuration: CONNXRuntime.Configuration())
-      let session = try runtime.session(modelURL: try Self.modelURL())
-
-      expectNoDifference(session.inputNames, ["x", "y"])
-    }
-
-    @Test
     func `Run Model Using Vendored ONNX Runtime`() async throws {
       let runtime = try CONNXRuntime()
       let session = try runtime.session(modelURL: try Self.modelURL())

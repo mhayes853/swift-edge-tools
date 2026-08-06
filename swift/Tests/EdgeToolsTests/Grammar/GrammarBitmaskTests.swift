@@ -13,7 +13,7 @@ import Testing
 #endif
 
 @Suite
-struct GrammarBitmaskConsolidatedTests {
+struct `GrammarBitmaskAllPlatforms tests` {
   @Suite
   struct `GrammarBitmask tests` {
     @Test

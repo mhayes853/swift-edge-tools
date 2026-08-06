@@ -141,7 +141,7 @@
     }
 
     @Suite(.serialized)
-    struct `Memory usage tests`: ~Copyable {
+    struct `MemoryUsage tests`: ~Copyable {
       private let engine: XGRCompiler
       private let tokenizer: NeedleSPTokenizer
 
@@ -187,7 +187,7 @@
     }
 
     @Suite
-    struct `XGR serialization tests` {
+    struct `XGRSerialization tests` {
       @Test
       func `Tokenizer Info Round Trips Through JSON`() throws {
         let tokenizerInfo = try XGRTokenizerInfo(

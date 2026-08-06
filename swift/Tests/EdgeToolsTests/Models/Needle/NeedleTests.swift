@@ -359,7 +359,7 @@ struct `Needle tests` {
 
   #if XGrammar
     @Suite
-    struct `Needle XGR matcher tests`: ~Copyable {
+    struct `NeedleXGRMatcher tests`: ~Copyable {
       private let engine: XGRCompiler
       private let tokenizer: NeedleSPTokenizer
       private let eosToken: EdgeToolsToken.ID

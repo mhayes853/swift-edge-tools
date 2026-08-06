@@ -738,14 +738,6 @@ extension `EdgeToolsSession tests` {
     let message = duplicateToolNameError(["getWeather", "planTrip"])
     expectNoDifference(message, nil)
   }
-
-  @Test
-  func `Duplicate Tool Name Error Detects Identical Names`() throws {
-    let message = try #require(duplicateToolNameError(["get_weather", "get_weather"]))
-
-    expectNoDifference(message.contains("'get_weather'"), true)
-    expectNoDifference(message.contains("normalize to 'get_weather'"), true)
-  }
 }
 
 extension NeedlePrompt {

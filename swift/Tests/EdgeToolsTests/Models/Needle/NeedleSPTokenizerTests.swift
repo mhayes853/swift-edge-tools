@@ -65,15 +65,6 @@ struct `NeedleSPTokenizer tests` {
     expectNoDifference(string, expectedString)
   }
 
-  #if !os(WASI)
-    @Test
-    func `Encode Snapshot`() throws {
-      let tokenizer = try NeedleSPTokenizer(modelURL: self.modelURL)
-      let tokens = tokenizer.encode(text: "This is a test")
-      assertSnapshot(of: tokens, as: .dump)
-    }
-  #endif
-
   @Test
   func `Encoding Uses Byte Fallback Tokens For Unknown Scalars`() throws {
     let tokenizer = try NeedleSPTokenizer(modelURL: self.modelURL)

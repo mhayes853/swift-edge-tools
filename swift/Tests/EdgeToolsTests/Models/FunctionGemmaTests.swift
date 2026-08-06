@@ -10,7 +10,7 @@ import Testing
 struct `FunctionGemma tests` {
   #if MLX && XGrammar && canImport(MLX) && !os(WASI)
     @Suite(.serialized, .enabledIfXcode())
-    struct `FunctionGemma MLX model engine tests` {
+    struct `FunctionGemmaMLXModelEngine tests` {
       @Test
       func `Completes Tool Turn Snapshot`() async throws {
         let engine = try await FunctionGemmaMLXModelEngine(from: downloadFunctionGemma())

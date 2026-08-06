@@ -5,7 +5,7 @@
   import Testing
 
   @Suite
-  struct `EdgeToolsTokenizer Loading tests` {
+  struct `EdgeToolsTokenizerLoading tests` {
     @Test
     func `Missing Tokenizer Describes Available Options`() async {
       let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
@@ -30,7 +30,9 @@
         to: directory.appending(path: "tokenizer.model")
       )
 
-      _ = try await loadEdgeToolsTokenizer(from: directory)
+      await #expect(throws: Never.self) {
+        _ = try await loadEdgeToolsTokenizer(from: directory)
+      }
     }
 
     #if Transformers

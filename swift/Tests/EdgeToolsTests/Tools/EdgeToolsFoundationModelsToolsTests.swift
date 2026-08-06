@@ -6,7 +6,7 @@
   import Testing
 
   @Suite
-  struct EdgeToolsFoundationModelsToolsConsolidatedTests {
+  struct `EdgeToolsFoundationModelsTools tests` {
     @Suite
     struct `EdgeToolsFMTool tests` {
       @Test

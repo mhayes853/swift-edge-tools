@@ -6,9 +6,9 @@
   import Testing
 
   @Suite
-  struct EdgeToolsFoundationModelsSchemaConsolidatedTests {
-    @Suite("EdgeToolsValue FoundationModels tests")
-    struct EdgeToolsValueFMTests {
+  struct `EdgeToolsFoundationModelsSchema tests` {
+    @Suite
+    struct `EdgeToolsValueFoundationModels tests` {
       @Test
       @available(iOS 26.0, macOS 26.0, watchOS 27.0, tvOS 26.0, visionOS 26.0, *)
       func `Converts Generated Content In Both Directions`() throws {
@@ -39,8 +39,8 @@
       }
     }
 
-    @Suite("EdgeToolsGenerationSchema FoundationModels tests")
-    struct EdgeToolsGenerationSchemaFMTests {
+    @Suite
+    struct `EdgeToolsGenerationSchemaFoundationModels tests` {
       @Test
       @available(iOS 26.0, macOS 26.0, watchOS 27.0, tvOS 26.0, visionOS 26.0, *)
       func `Converts Generation Schema In Both Directions`() throws {

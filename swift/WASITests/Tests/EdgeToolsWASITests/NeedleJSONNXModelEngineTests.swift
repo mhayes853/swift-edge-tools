@@ -3,7 +3,7 @@ import JavaScriptKit
 import Testing
 
 @Suite(.serialized)
-struct `Needle JSONNX model engine tests` {
+struct `NeedleJSONNXModelEngine tests` {
   @Test(
     .enabled(
       if: JSObject.global["edgeToolsNeedleFixture"].object != nil,

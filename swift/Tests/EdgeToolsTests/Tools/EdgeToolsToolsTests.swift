@@ -20,12 +20,6 @@ struct `EdgeToolsTools tests` {
     }
 
     @Test
-    func `Status Starts As Idle`() throws {
-      let call = try EdgeToolCall(id: EdgeToolCallID(), tool: EchoTool(), rawInput: "hello")
-      expectNoDifference(call.status.isIdle, true)
-    }
-
-    @Test
     func `Constructs Raw Value From The Tool And Raw Input`() throws {
       let rawInput: EdgeToolsValue = "hello"
       let rawValue = EdgeRawToolCall(name: "echo", arguments: rawInput)

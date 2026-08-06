@@ -2,7 +2,7 @@ import EdgeToolsMacros
 import MacroTesting
 import Testing
 
-extension BaseTestSuite {
+extension `EdgeToolsMacros tests` {
   @Suite
   struct `EdgeToolsGenerableMacro tests` {
     @Test

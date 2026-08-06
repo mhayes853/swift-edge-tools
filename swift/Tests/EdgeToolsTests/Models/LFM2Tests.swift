@@ -23,7 +23,7 @@ struct `LFM2 tests` {
 
   #if MLX && XGrammar && canImport(MLX) && !os(WASI)
     @Suite(.serialized, .enabledIfXcode())
-    struct `LFM2 MLX model engine tests` {
+    struct `LFM2MLXModelEngine tests` {
       @Test
       func `Completes Tool Turn Snapshot`() async throws {
         let engine = try await LFM2MLXModelEngine(from: downloadLFM2())
@@ -36,7 +36,7 @@ struct `LFM2 tests` {
 
   #if XGrammar
     @Suite(.serialized)
-    struct `LFM2 XGRCompiler tests`: ~Copyable {
+    struct `LFM2XGRCompiler tests`: ~Copyable {
       private let compiler: XGRCompiler
       private let tokenizer: NeedleSPTokenizer
       private let eosToken: EdgeToolsToken.ID

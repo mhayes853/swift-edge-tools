@@ -1,10 +1,13 @@
 # Swift Edge Tools
-You are working inside a Swift framework for deploying small on-device models that are capable of making tool calls. The framework is designed to run absolutely everywhere Swift supports, including WASM, Linux, Windows, Android, and even allocating-embedded Swift. 
+
+You are working inside a Swift framework for deploying small on-device models that are capable of making tool calls. The framework is designed to run absolutely everywhere Swift supports, including WASM, Linux, Windows, Android, and even allocating-embedded Swift.
 
 Our primary goal is to enable tiny models to run anywhere in the Swift ecosystem, and to be the most flexible framework for interacting with tool-calling capable language models. While Apple frameworks like FoundationModels support the E2E conversational use-case, the job of EdgeTools is to fit anywhere and be complementary to conversational frameworks like FoundationModels.
 
 ## Differences from other Frameworks
+
 To understand the differences between this framework, and similar frameworks for working with LLMs in Swift, refer to this table.
+
 | Category          | Edge Tools                                                   | Others (eg. FoundationModels, swift-transformers, etc.)      |
 |-------------------|--------------------------------------------------------------|--------------------------------------------------------------|
 | Model Support     | Primarily tiny on-device models (<1B parameters) with support for various architectures (Simple Attention Networks, Seq2Seq, Decoder-only, Encoder-only, etc) that are capable of making tool calls. | Any model capable of chatting, which includes frontier models. Primarily limited to autoregressive decoder-only models. |
@@ -14,20 +17,23 @@ To understand the differences between this framework, and similar frameworks for
 | Optimizations     | Certain models that fit the ideals of the framework (tiny, tool-calling capable) best will often have dedicated optimzations. This requires more work/complexity, but leads to better overall performance. | All models are treated equal. Less model-specific complexity, but comes at the cost of obtaining maximum performance. |
 
 ## Files + Layout
-The framework is organized into a `swift` and `python` directories. 
 
-The `swift` side contains the actual Swift framework, as well as other products that can be consumed by end-users. 
+The framework is organized into a `swift` and `python` directories.
+
+The `swift` side contains the actual Swift framework, as well as other products that can be consumed by end-users.
 
 The `python` side contains python code for handling modeling and exporting of various models that the framework optimizes for. It is generally split into sub-directories by model-type with a single file to run a basic CLI at the root.
 
 The `swift` side also may contain patch files that are applied through a custom build plugin. Feel free to add patches to any third-party libraries provided they aren't excessive changes.
 
 ## Framework Basics
-On the Swift side, `EdgeToolsSession` is currently the primary way to interact with a model. It manages active generation streams on the model, but unlike other frameworks does not hold onto conversation history (the user passes that through the session). It conforms to `Observable`, and so does the streams it manages. 
+
+On the Swift side, `EdgeToolsSession` is currently the primary way to interact with a model. It manages active generation streams on the model, but unlike other frameworks does not hold onto conversation history (the user passes that through the session). It conforms to `Observable`, and so does the streams it manages.
 
 The session also consumes a generic `EdgeToolsEngine`, which is the underlying protocol for handling generation. Most engine conformances share the same logic for the overall generation loop and grammar constraints, and build on top of `EdgeToolsModelActorEngine`. However, other future engines may implement the generation loop themselves, in which case it would be more correct to conform to `EdgeToolsEngine` directly.
 
 Engines generally handle the following responsibilities:
+
 - Grammar constraints (typically using XGrammar).
 - Tool call parsing.
   - Tool call parsing is done incrementally, meaning that the moment enough tokens have been emitted to parse the information for a single tool call, we immediately publish it through the generation channel. This allows decoding to continue while the tool call is invoked by the session in the background.
@@ -36,6 +42,7 @@ Engines generally handle the following responsibilities:
   - Certain engines may want to have general implementations for this protocol for LLM-based models that support simple conversational workflows (eg. Qwen, Gemma, etc). This is because those models generally function the same architecturally.
 
 A `Model` protocol generally consists of:
+
 - A model-specific tool call grammar.
 - A model-specific tool call parser.
 - A preparation step that runs before generation.
@@ -49,6 +56,7 @@ The session represents generally collects tool calls into an `EdgeToolsToolCallC
 Grammar constraints and tool argument parsing are generally represented through the `EdgeToolsGenerationSchema` struct and associated conversion protocols. The schema struct represents a valid JSON schema object under the hood. Generally, a user doesn't need to create generation schema's by hand because the `@EdgeToolsGenerable` macro can be applied to any struct. This macro will create a schema for the type, and conform the type to various protocols that use the schema.
 
 ## Code Conventions
+
 Generally speaking, follow the patterns you see already for the most part. The following are generally mistakes that previous agents have made.
 
 Avoid using things like `.init` or making excessive amounts of static functions. If a function doesn't reasonably belong on a type, feel free to make it a global function.
@@ -62,9 +70,12 @@ Private helper functions should go at the bottom of the file, not the top.
 DO NOT ASSUME WASI IS A SINGLE THREADED ENVIRONMENT. It is not ok to conform types to `@unchecked Sendable` just because they have a member variable that uses a type from `JavaScriptKit`, and because "JS is single-threaded". `JavaScriptKit` does not conform most of its types to Sendable because Swift WASM supports sdks that enable multithreading through web workers or other means.
 
 ## Testing
+
 Generally, focus tests only on the public API (try to avoid anything not marked as public), and follow the conventions in the existing test suite. The following are generally mistakes that previous agents have made.
 
 Do not test obvious functionallity like "member-wise initializers init properly" or "synthesized codable works properly". Avoid explicitly testing anything that is tautological (ie. where the assertion is close to the implementation code).
+
+Test suite names must use the `PascalCase tests` convention, with no spaces within the PascalCase portion (for example, `MySuite tests`). Do not use "Consolidated" in test suite names.
 
 The highest levels of the framework (eg. `EdgeToolsSession`, etc.) should be tested in a manner that is not tied to any specific engine or model. This ensures the framework itself works no matter what engine is powering the session.
 

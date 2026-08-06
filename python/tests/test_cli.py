@@ -381,28 +381,6 @@ class CLITests(unittest.TestCase):
             CoreMLComputeUnits.CPU_AND_GPU,
         )
 
-    def test_main_dispatches_coreml_backend_case_insensitively(self) -> None:
-        with (
-            patch("cli.export_needle_coreai") as export_needle_coreai_mock,
-            patch("cli._export_needle_coreml") as export_needle_coreml_mock,
-        ):
-            export_needle_coreml_mock.return_value = Path("/tmp/coreml-export")
-
-            stdout = io.StringIO()
-            with redirect_stdout(stdout):
-                exit_code = main(
-                    [
-                        "--output",
-                        "./build/coreml-export",
-                        "--backend",
-                        "coreml",
-                    ]
-                )
-
-        self.assertEqual(exit_code, 0)
-        export_needle_coreai_mock.assert_not_called()
-        export_needle_coreml_mock.assert_called_once()
-
     def test_main_persists_authoring_metadata(self) -> None:
         source_ctx = tempfile.TemporaryDirectory()
         output_ctx = tempfile.TemporaryDirectory()

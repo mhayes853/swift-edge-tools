@@ -23,7 +23,7 @@ struct `Qwen3 tests` {
 
   #if MLX && XGrammar && canImport(MLX) && !os(WASI)
     @Suite(.serialized, .enabledIfXcode())
-    struct `Qwen3 MLX model engine tests` {
+    struct `Qwen3MLXModelEngine tests` {
       @Test
       func `Completes Tool Turn Snapshot`() async throws {
         let engine = try await Qwen3MLXModelEngine(from: downloadQwen3())

@@ -2,7 +2,7 @@ import EdgeTools
 import Testing
 
 @Suite
-struct `XGrammar WASI tests` {
+struct `XGrammarWASI tests` {
   @Test
   func `Creates Builtin JSON Grammar`() {
     let grammar = XGRGrammar.builtinJSONGrammar()

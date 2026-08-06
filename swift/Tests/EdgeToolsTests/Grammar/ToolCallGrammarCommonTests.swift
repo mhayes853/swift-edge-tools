@@ -4,7 +4,7 @@
   import Testing
 
   @Suite
-  struct `Tool call grammar common tests`: ~Copyable {
+  struct `ToolCallGrammarCommon tests`: ~Copyable {
     private let compiler: XGRCompiler
     private let tokenizer: NeedleSPTokenizer
     private let eosToken: EdgeToolsToken.ID

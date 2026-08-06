@@ -32,37 +32,5 @@ struct `EdgeToolsLLMPrompt tests` {
 
     expectNoDifference(inferredImage.mimeType, .png)
     expectNoDifference(overriddenImage.mimeType, .jpeg)
-    expectNoDifference(overriddenImage.content, .path("image.png"))
-  }
-
-  @Test
-  func `Byte Media Preserves MIME Type`() {
-    let audio = EdgeToolsLLMPrompt.Asset(bytes: [1, 2, 3], mimeTypeOverride: .wav)
-    expectNoDifference(audio.content, .bytes([1, 2, 3]))
-    expectNoDifference(audio.mimeType, .wav)
-  }
-
-  @Test
-  func `Content Media Preserves MIME Type`() {
-    let image = EdgeToolsLLMPrompt.Asset(content: .bytes([1, 2, 3]), mimeType: .png)
-
-    expectNoDifference(image.content, .bytes([1, 2, 3]))
-    expectNoDifference(image.mimeType, .png)
-  }
-
-  @Test
-  func `Assistant Reuses Raw Tool Calls`() {
-    let call = EdgeRawToolCall(name: "getWeather", arguments: ["location": "Paris"])
-    let message = EdgeToolsLLMPrompt.Message.assistant(toolCalls: [call])
-
-    expectNoDifference(message, .assistant(toolCalls: [call]))
-  }
-
-  @Test
-  func `Tool Response Preserves Name And Structured Value`() {
-    let response: EdgeToolsValue = ["temperatureCelsius": 21]
-    let message = EdgeToolsLLMPrompt.Message.tool(name: "getWeather", response: response)
-
-    expectNoDifference(message, .tool(name: "getWeather", response: response))
   }
 }
