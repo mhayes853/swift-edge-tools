@@ -67,7 +67,7 @@ public struct NeedleSPTokenizer: Sendable {
         .filter { $0.type == .userDefined }
         .map { Array($0.text.utf8) }
         .sorted { $0.count > $1.count }
-      guard !userDefinedPieces.contains(where: \.isEmpty) else {
+      guard !userDefinedPieces.contains(where: { $0.isEmpty }) else {
         throw NeedleSPTokenizerError(
           code: .emptyUserDefinedPiece,
           message: "SentencePiece model contains an empty user-defined piece."

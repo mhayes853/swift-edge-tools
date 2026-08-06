@@ -7,14 +7,14 @@ import OrderedCollections
 /// A valid generation schema is either an object or a boolean.
 public enum EdgeToolsGenerationSchema: Hashable, Sendable {
   /// A schema key.
-  public struct Key: RawRepresentable, ExpressibleByStringLiteral, Hashable, Sendable, Codable {
+  public struct Key: RawRepresentable, ExpressibleByStringLiteral, Hashable, Sendable {
     public let rawValue: String
 
     public init(rawValue: String) {
       self.rawValue = rawValue
     }
 
-    public init(stringLiteral value: StringLiteralType) {
+    public init(stringLiteral value: String) {
       self.init(rawValue: value)
     }
   }
@@ -75,40 +75,44 @@ public enum EdgeToolsGenerationSchema: Hashable, Sendable {
 
 // MARK: - Codable
 
-extension EdgeToolsGenerationSchema: Encodable {
-  public func encode(to encoder: any Encoder) throws {
-    switch self {
-    case .boolean(let value):
-      var container = encoder.singleValueContainer()
-      try container.encode(value)
-    case .object(let object):
-      var container = encoder.container(keyedBy: DynamicCodingKey.self)
-      for (key, value) in object {
-        try container.encode(value, forKey: DynamicCodingKey(key.rawValue))
+#if !$Embedded
+  extension EdgeToolsGenerationSchema.Key: Codable {}
+
+  extension EdgeToolsGenerationSchema: Encodable {
+    public func encode(to encoder: any Encoder) throws {
+      switch self {
+      case .boolean(let value):
+        var container = encoder.singleValueContainer()
+        try container.encode(value)
+      case .object(let object):
+        var container = encoder.container(keyedBy: DynamicCodingKey.self)
+        for (key, value) in object {
+          try container.encode(value, forKey: DynamicCodingKey(key.rawValue))
+        }
       }
     }
   }
-}
 
-extension EdgeToolsGenerationSchema: Decodable {
-  public init(from decoder: any Decoder) throws {
-    let container = try decoder.singleValueContainer()
-    if let bool = try? container.decode(Bool.self) {
-      self = .boolean(bool)
-      return
-    }
+  extension EdgeToolsGenerationSchema: Decodable {
+    public init(from decoder: any Decoder) throws {
+      let container = try decoder.singleValueContainer()
+      if let bool = try? container.decode(Bool.self) {
+        self = .boolean(bool)
+        return
+      }
 
-    let keyedContainer = try decoder.container(keyedBy: DynamicCodingKey.self)
-    var object = OrderedDictionary<Key, EdgeToolsValue>()
-    for key in keyedContainer.allKeys {
-      object[Key(rawValue: key.stringValue)] = try keyedContainer.decode(
-        EdgeToolsValue.self,
-        forKey: key
-      )
+      let keyedContainer = try decoder.container(keyedBy: DynamicCodingKey.self)
+      var object = OrderedDictionary<Key, EdgeToolsValue>()
+      for key in keyedContainer.allKeys {
+        object[Key(rawValue: key.stringValue)] = try keyedContainer.decode(
+          EdgeToolsValue.self,
+          forKey: key
+        )
+      }
+      self = .object(object)
     }
-    self = .object(object)
   }
-}
+#endif
 
 // MARK: - Literals
 
@@ -132,7 +136,7 @@ extension EdgeToolsGenerationSchema: ExpressibleByDictionaryLiteral {
 
 // MARK: - Raw helpers
 
-extension EdgeToolsGenerationSchema {
+extension EdgeToolsGenerationSchema: ConvertibleToEdgeToolsValue {
   public static func raw(_ key: Key, _ value: EdgeToolsValue) -> Self {
     Self([key: value])
   }
@@ -147,7 +151,7 @@ extension EdgeToolsGenerationSchema {
   }
 
   static func schemaArrayValue(_ schemas: [Self]) -> EdgeToolsValue {
-    .array(schemas.map(\.edgeToolsValue))
+    .array(schemas.map { $0.edgeToolsValue })
   }
 
   static func schemaObjectValue(
@@ -516,14 +520,6 @@ extension EdgeToolsGenerationSchema {
   }
 }
 
-// MARK: - Ordered key encoding
-
-extension EdgeToolsGenerationSchema {
-  public func orderedKeyEncoded() -> String {
-    OrderedKeyJSONWriter.encode(self.edgeToolsValue)
-  }
-}
-
 // MARK: - ValueType
 
 extension EdgeToolsGenerationSchema {
@@ -577,22 +573,27 @@ extension EdgeToolsGenerationSchema.ValueType: ExpressibleByArrayLiteral {
   }
 }
 
-extension EdgeToolsGenerationSchema.ValueType: Encodable {
-  public func encode(to encoder: any Encoder) throws {
-    try self.edgeToolsValue.encode(to: encoder)
-  }
-}
-
-extension EdgeToolsGenerationSchema.ValueType: Decodable {
-  public init(from decoder: any Decoder) throws {
-    let value = try EdgeToolsValue(from: decoder)
-    guard let type = EdgeToolsGenerationSchema.valueType(from: value) else {
-      let container = try decoder.singleValueContainer()
-      throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid schema type")
+#if !$Embedded
+  extension EdgeToolsGenerationSchema.ValueType: Encodable {
+    public func encode(to encoder: any Encoder) throws {
+      try self.edgeToolsValue.encode(to: encoder)
     }
-    self = type
   }
-}
+
+  extension EdgeToolsGenerationSchema.ValueType: Decodable {
+    public init(from decoder: any Decoder) throws {
+      let value = try EdgeToolsValue(from: decoder)
+      guard let type = EdgeToolsGenerationSchema.valueType(from: value) else {
+        let container = try decoder.singleValueContainer()
+        throw DecodingError.dataCorruptedError(
+          in: container,
+          debugDescription: "Invalid schema type"
+        )
+      }
+      self = type
+    }
+  }
+#endif
 
 extension EdgeToolsGenerationSchema.ValueType {
   var canonicalName: String {

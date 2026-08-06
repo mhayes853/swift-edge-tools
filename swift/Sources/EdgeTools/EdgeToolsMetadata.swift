@@ -4,34 +4,29 @@
 
 // MARK: - EdgeToolsMetadataKey
 
-public struct EdgeToolsMetadataKey: Hashable, Sendable, RawRepresentable, ExpressibleByStringLiteral
-{
+public struct EdgeToolsMetadataKey:
+    Hashable, Sendable, RawRepresentable, ExpressibleByStringLiteral {
   public var rawValue: String
 
   public init(rawValue: String) {
     self.rawValue = rawValue
   }
 
-  public init(stringLiteral value: StringLiteralType) {
+  public init(stringLiteral value: String) {
     self.init(rawValue: value)
   }
-}
-
-// MARK: - EdgeToolsMetadataKey + Confidence
-
-extension EdgeToolsMetadataKey {
-  public static let generationConfidence =
-    EdgeToolsMetadataKey(rawValue: "GenerationConfidence")
-
-  public static let perTokenConfidences =
-    EdgeToolsMetadataKey(rawValue: "PerTokenConfidences")
 }
 
 // MARK: - EdgeToolsMetadata
 
 public typealias EdgeToolsMetadata = [EdgeToolsMetadataKey: any Sendable]
 
-// MARK: - EdgeToolsMetadata + Confidence
+// MARK: - Confidence
+
+extension EdgeToolsMetadataKey {
+  public static let generationConfidence = Self(rawValue: "GenerationConfidence")
+  public static let perTokenConfidences = Self(rawValue: "PerTokenConfidences")
+}
 
 extension EdgeToolsMetadata {
   public var generationConfidence: Float? {
@@ -45,21 +40,19 @@ extension EdgeToolsMetadata {
   }
 }
 
-#if MLX && canImport(MLX)
-  // MARK: - EdgeToolsMetadataKey + MLX
+// MARK: - MLX
 
+#if MLX && canImport(MLX)
   extension EdgeToolsMetadataKey {
     public static let mlxEngineGenerationStartMemorySnapshot =
-      EdgeToolsMetadataKey(rawValue: "MLXEngineGenerationStartMemorySnapshot")
+      Self(rawValue: "MLXEngineGenerationStartMemorySnapshot")
 
     public static let mlxEnginePostPrefillMemorySnapshot =
-      EdgeToolsMetadataKey(rawValue: "MLXEnginePostPrefillMemorySnapshot")
+      Self(rawValue: "MLXEnginePostPrefillMemorySnapshot")
 
     public static let mlxEnginePostDecodeMemorySnapshot =
-      EdgeToolsMetadataKey(rawValue: "MLXEnginePostDecodeMemorySnapshot")
+      Self(rawValue: "MLXEnginePostDecodeMemorySnapshot")
   }
-
-  // MARK: - EdgeToolsMetadata + MLX
 
   extension EdgeToolsMetadata {
     public var mlxEngineGenerationStartMemorySnapshot: Memory.Snapshot? {

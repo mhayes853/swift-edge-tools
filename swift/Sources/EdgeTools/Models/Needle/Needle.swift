@@ -8,7 +8,7 @@
 
 // MARK: - NeedleModelConfiguration
 
-public struct NeedleModelConfiguration: Hashable, Sendable, Codable {
+public struct NeedleModelConfiguration: Hashable, Sendable {
   public var vocabularySize: Int = 8192
   public var dimensions: Int = 512
   public var hiddenDimensions: Int = 512
@@ -89,29 +89,34 @@ public struct NeedleModelConfiguration: Hashable, Sendable, Codable {
     self.torchDTypeValue = nil
   }
 
-  private enum CodingKeys: String, CodingKey {
-    case vocabularySize = "vocab_size"
-    case dimensions = "d_model"
-    case hiddenDimensions = "hidden_size"
-    case attentionHeads = "num_attention_heads"
-    case encoderLayers = "num_encoder_layers"
-    case decoderLayers = "num_decoder_layers"
-    case hiddenLayers = "num_hidden_layers"
-    case kvHeads = "num_kv_heads"
-    case ropeTheta = "rope_theta"
-    case rmsNormEps = "rms_norm_eps"
-    case padTokenId = "pad_token_id"
-    case decoderStartTokenId = "decoder_start_token_id"
-    case tieWordEmbeddings = "tie_word_embeddings"
-    case maxSeqLen = "max_seq_len"
-    case maxPositionEmbeddings = "max_position_embeddings"
-    case decoderMaxLengthValue = "decoder_max_length"
-    case dtypeValue = "dtype"
-    case torchDTypeValue = "torch_dtype"
-  }
 }
 
-// MARK: - Float
+#if !$Embedded
+  extension NeedleModelConfiguration: Codable {
+    private enum CodingKeys: String, CodingKey {
+      case vocabularySize = "vocab_size"
+      case dimensions = "d_model"
+      case hiddenDimensions = "hidden_size"
+      case attentionHeads = "num_attention_heads"
+      case encoderLayers = "num_encoder_layers"
+      case decoderLayers = "num_decoder_layers"
+      case hiddenLayers = "num_hidden_layers"
+      case kvHeads = "num_kv_heads"
+      case ropeTheta = "rope_theta"
+      case rmsNormEps = "rms_norm_eps"
+      case padTokenId = "pad_token_id"
+      case decoderStartTokenId = "decoder_start_token_id"
+      case tieWordEmbeddings = "tie_word_embeddings"
+      case maxSeqLen = "max_seq_len"
+      case maxPositionEmbeddings = "max_position_embeddings"
+      case decoderMaxLengthValue = "decoder_max_length"
+      case dtypeValue = "dtype"
+      case torchDTypeValue = "torch_dtype"
+    }
+  }
+#endif
+
+// MARK: - NeedleNumerics
 
 extension Float {
   static let needleClippingMagnitude: Self = 65_500
@@ -164,7 +169,7 @@ extension NeedlePrompt {
     let separator = self.system.isEmpty || self.user.isEmpty ? "" : "\n\n"
     let toolsSchema =
       try tools
-      .filter(\.includesSchemaInInstructions)
+      .filter { $0.includesSchemaInInstructions }
       .map { $0.needleNormalized() }
       .needlePromptEncoded()
     return "\(self.system)\(separator)\(self.user)<tools>\(toolsSchema)"
@@ -197,7 +202,7 @@ extension EdgeToolDefinition {
   fileprivate func needlePromptEncoded() throws -> String {
     let name = OrderedKeyJSONWriter.encode(.string(self.name))
     let description = OrderedKeyJSONWriter.encode(.string(self.description))
-    let arguments = self.arguments.orderedKeyEncoded()
+    let arguments = self.arguments.orderedJSONString()
     return #"{"name":\#(name),"description":\#(description),"arguments":\#(arguments)}"#
   }
 }
@@ -219,7 +224,7 @@ public struct NeedleToolCallParser: EdgeToolCallParser, Sendable {
   public mutating func accept(token: EdgeToolsToken) -> EdgeRawToolCall? {
     self.list.append(token)
     while let objectData = self.list.nextItem(findRange: { $0.firstCompleteJSONObjectRange() }) {
-      if let value = try? EdgeToolsJSONDecoder().decode(EdgeToolsValue.self, from: objectData),
+      if let value = try? EdgeToolsValue(json: objectData),
         let call = EdgeRawToolCall(jsonValue: value)
       {
         return call
@@ -330,7 +335,7 @@ public struct NeedleToolCallParser: EdgeToolCallParser, Sendable {
     }
 
     private static func needleCall(_ tool: EdgeToolDefinition) throws -> XGRGrammar {
-      let schema = tool.arguments.orderedKeyEncoded()
+      let schema = tool.arguments.orderedJSONString()
       let arguments = try XGRGrammar.jsonSchema(
         schema,
         configuration: JSONSchemaConfiguration(

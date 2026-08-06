@@ -312,7 +312,7 @@ struct ToolCallStringCursor: Hashable, Sendable {
   }
 
   mutating func read(until delimiter: String) -> String? {
-    guard let range = self.source[self.index...].firstRange(of: delimiter) else { return nil }
+    guard let range = delimiter.firstRange(in: self.source[self.index...]) else { return nil }
     let result = String(self.source[self.index..<range.lowerBound])
     self.index = range.lowerBound
     return result

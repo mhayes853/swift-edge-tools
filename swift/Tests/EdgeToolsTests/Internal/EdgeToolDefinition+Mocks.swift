@@ -33,6 +33,17 @@ extension EdgeToolDefinition {
     includesSchemaInInstructions: true
   )
 
+  static let ruleNamedTool = Self(
+    name: "ruleNamedTool",
+    description: "Accepts parameters named after grammar rules.",
+    arguments: EdgeToolsGenerationSchema(
+      .type(.object),
+      .properties(["root": .string, "xml_object": .string]),
+      .required(["root", "xml_object"]),
+      .additionalProperties(false)
+    )
+  )
+
   static let integerTool = Self(
     name: "integerTool",
     description: "Accepts an integer.",

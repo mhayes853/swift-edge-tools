@@ -98,6 +98,21 @@
     }
 
     @Test
+    func `All Grammars Accept Tools Whose Parameters Are Named After Grammar Rules`() throws {
+      for fixture in toolCallGrammarTestFixtures {
+        let matcher = try self.compiler.makeMatcher(
+          try fixture.makeGrammar([.ruleNamedTool], .exact(1))
+        )
+        assertGrammarAccepts(
+          fixture.ruleNamedCall,
+          matcher: matcher,
+          tokenizer: self.tokenizer,
+          eosToken: self.eosToken
+        )
+      }
+    }
+
+    @Test
     func `All Grammars Enforce Tool Call Ranges`() throws {
       for fixture in toolCallGrammarTestFixtures {
         let acceptingMatcher = try self.compiler.makeMatcher(
@@ -134,6 +149,7 @@
     let unknownToolCall: String
     let wrongTypeCall: String
     let complexCall: String
+    let ruleNamedCall: String
 
     var description: String { self.name }
   }
@@ -159,7 +175,9 @@
         "mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{\
         "ALPHA":1,"BETA_LABEL":2},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":[\
         "a","b"],"config":{"threshold":0.75,"flags":[true,false]}}}]
-        """
+        """,
+      ruleNamedCall:
+        #"<tool_call> [{"name":"rule_named_tool","arguments":{"root":"a","xml_object":"b"}}]"#
     ),
     ToolCallGrammarTestFixture(
       name: "Qwen JSON",
@@ -182,6 +200,11 @@
         "execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{"ALPHA":1,\
         "BETA_LABEL":2},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":["a","b"],\
         "config":{"threshold":0.75,"flags":[true,false]}}}</tool_call>
+        """,
+      ruleNamedCall:
+        """
+        <tool_call>{"name":"ruleNamedTool","arguments":{"root":"a","xml_object":"b"}}\
+        </tool_call>
         """
     ),
     ToolCallGrammarTestFixture(
@@ -211,6 +234,11 @@
         <parameter=window>3</parameter><parameter=tuple_args>["alpha",2,true]</parameter>\
         <parameter=optional_note>null</parameter><parameter=tags>["a","b"]</parameter>\
         <parameter=config>{"threshold":0.75,"flags":[true,false]}</parameter></function></tool_call>
+        """,
+      ruleNamedCall:
+        """
+        <tool_call><function=ruleNamedTool><parameter=root>a</parameter>\
+        <parameter=xml_object>b</parameter></function></tool_call>
         """
     ),
     ToolCallGrammarTestFixture(
@@ -239,6 +267,11 @@
         tuple_args:<escape>["alpha",2,true]<escape>,optional_note:<escape>null<escape>,\
         tags:<escape>["a","b"]<escape>,\
         config:<escape>{"threshold":0.75,"flags":[true,false]}<escape>}<end_function_call>
+        """,
+      ruleNamedCall:
+        """
+        <start_function_call>call:ruleNamedTool{root:<escape>a<escape>,\
+        xml_object:<escape>b<escape>}<end_function_call>
         """
     ),
     ToolCallGrammarTestFixture(
@@ -262,7 +295,9 @@
         labels={"ALPHA":1,"BETA_LABEL":2},window=3,tuple_args=["alpha",2,True],\
         optional_note=None,tags=["a","b"],config={"threshold":0.75,"flags":[True,False]})]\
         <|tool_call_end|>
-        """
+        """,
+      ruleNamedCall:
+        #"<|tool_call_start|>[ruleNamedTool(root="a",xml_object="b")]<|tool_call_end|>"#
     )
   ]
 #endif
