@@ -49,7 +49,7 @@ public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable {
 
   public convenience init(
     engine: sending Engine,
-    @EdgeToolsBuilder tools: () -> [EdgeToolsSessionTool]
+    @EdgeToolsToolBuilder tools: () -> [EdgeToolsSessionTool]
   ) {
     self.init(engine: engine, tools: tools())
   }
@@ -87,16 +87,14 @@ extension EdgeToolsSession where Engine: EdgeToolsPrefillableEngine {
 
 // MARK: - EdgeToolsSessionTool
 
-// NB: Every requirement is non-generic so that it stays callable through the existential.
-// Embedded Swift cannot open an existential back into a generic context.
-private protocol _EdgeToolsSessionTool: AnyObject, Sendable {
+private protocol _SessionTool: AnyObject, Sendable {
   var erasedTool: any EdgeTool { get }
   var erasedName: String { get }
   var erasedDefinition: EdgeToolDefinition { get }
-  func makeCall(id: EdgeToolCallID, rawInput: EdgeToolsValue) -> AnyEdgeToolCall?
+  func call(id: EdgeToolCallID, rawInput: EdgeToolsValue) -> AnyEdgeToolCall?
 }
 
-private final class EdgeToolsSessionToolBox<Tool: EdgeTool>: _EdgeToolsSessionTool {
+private final class SessionToolBox<Tool: EdgeTool>: _SessionTool {
   let tool: Tool
 
   var erasedTool: any EdgeTool { self.tool }
@@ -107,7 +105,7 @@ private final class EdgeToolsSessionToolBox<Tool: EdgeTool>: _EdgeToolsSessionTo
     self.tool = tool
   }
 
-  func makeCall(id: EdgeToolCallID, rawInput: EdgeToolsValue) -> AnyEdgeToolCall? {
+  func call(id: EdgeToolCallID, rawInput: EdgeToolsValue) -> AnyEdgeToolCall? {
     guard let call = try? EdgeToolCall(id: id, tool: self.tool, rawInput: rawInput) else {
       return nil
     }
@@ -116,25 +114,25 @@ private final class EdgeToolsSessionToolBox<Tool: EdgeTool>: _EdgeToolsSessionTo
 }
 
 public struct EdgeToolsSessionTool: Sendable {
-  private let base: any _EdgeToolsSessionTool
+  private let base: any _SessionTool
 
   public var tool: any EdgeTool { self.base.erasedTool }
   public var name: String { self.base.erasedName }
   public var definition: EdgeToolDefinition { self.base.erasedDefinition }
 
   public init(_ tool: some EdgeTool) {
-    self.base = EdgeToolsSessionToolBox(tool)
+    self.base = SessionToolBox(tool)
   }
 
-  func makeCall(id: EdgeToolCallID, rawInput: EdgeToolsValue) -> AnyEdgeToolCall? {
-    self.base.makeCall(id: id, rawInput: rawInput)
+  func call(id: EdgeToolCallID, rawInput: EdgeToolsValue) -> AnyEdgeToolCall? {
+    self.base.call(id: id, rawInput: rawInput)
   }
 }
 
-// MARK: - EdgeToolsBuilder
+// MARK: - EdgeToolsToolBuilder
 
 @resultBuilder
-public enum EdgeToolsBuilder {
+public enum EdgeToolsToolBuilder {
   public static func buildExpression(_ tool: some EdgeTool) -> EdgeToolsSessionTool {
     EdgeToolsSessionTool(tool)
   }
@@ -523,7 +521,7 @@ extension EdgeToolsSessionStream {
 
   private func resolve(_ rawCall: EdgeRawToolCall) -> AnyEdgeToolCall? {
     self.toolsByName[rawCall.name.snakeCased()]?
-      .makeCall(id: EdgeToolCallID(), rawInput: rawCall.arguments)
+      .call(id: EdgeToolCallID(), rawInput: rawCall.arguments)
   }
 }
 

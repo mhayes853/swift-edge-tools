@@ -42,7 +42,7 @@
         defer { try? FileManager.default.removeItem(at: directory) }
 
         let tokenizer = try await loadEdgeToolsTokenizer(from: directory)
-        let preTrainedTokenizer = try #require(tokenizer as? EdgeToolsPreTrainedTokenizer)
+        let preTrainedTokenizer = try #require(tokenizer as? TransformersTokenizer)
         let tokenIDs = (
           preTrainedTokenizer.bosTokenId,
           preTrainedTokenizer.eosTokenId,

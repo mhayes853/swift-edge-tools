@@ -10,11 +10,11 @@
 
   // MARK: - FunctionGemma Model
 
-  extension MLXLLM.Gemma3TextModel: EdgeToolsMLXModel {
+  extension MLXLLM.Gemma3TextModel: MLXModel {
     public typealias ModelConfiguration = MLXLLM.Gemma3TextConfiguration
     public typealias Prompt = EdgeToolsLLMPrompt
     public typealias ToolCallParser = FunctionGemmaToolCallParser
-    public typealias GenerateParameters = DefaultEdgeToolsMLXGenerateParameters
+    public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarCompiler = XGRCompiler
     public typealias GrammarContext = XGRGrammarContext
 
@@ -27,9 +27,7 @@
   }
 
   public typealias FunctionGemmaMLXModel = MLXLLM.Gemma3TextModel
-
-  public typealias FunctionGemmaMLXModelEngine =
-    EdgeToolsMLXEngine<MLXLLM.Gemma3TextModel>
+  public typealias FunctionGemmaMLXModelEngine = MLXEngine<MLXLLM.Gemma3TextModel>
 
   extension FunctionGemmaMLXModelEngine {
     public init(from directoryURL: URL) async throws {

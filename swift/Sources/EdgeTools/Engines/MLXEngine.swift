@@ -12,12 +12,12 @@
     import Tokenizers
   #endif
 
-  // MARK: - EdgeTools MLX Model
+  // MARK: - MLXModel
 
-  public protocol EdgeToolsMLXModel: LanguageModel, SendableMetatype {
+  public protocol MLXModel: LanguageModel, SendableMetatype {
     associatedtype ModelConfiguration: Decodable
     associatedtype Prompt: Sendable
-    associatedtype GenerateParameters: EdgeToolsMLXGenerateParameters
+    associatedtype GenerateParameters: MLXGenerateParameters
     associatedtype ToolCallParser: EdgeToolCallParser
     associatedtype GrammarContext = Void
     associatedtype GrammarCompiler: EdgeToolsGrammarCompiler, ~Copyable
@@ -46,7 +46,7 @@
     ) throws -> LMInput
   }
 
-  extension EdgeToolsMLXModel
+  extension MLXModel
   where
     GenerateParameters: EdgeToolsConstrainedGenerateParameters,
     GenerateParameters.Constraint.Grammar == GrammarCompiler.Grammar,
@@ -68,7 +68,7 @@
     }
   }
 
-  extension EdgeToolsMLXModel {
+  extension MLXModel {
     package static func loadEdgeToolsLanguageModel(
       from directoryURL: URL,
       model makeModel: @Sendable (ModelConfiguration) throws -> Self
@@ -95,7 +95,7 @@
     }
   }
 
-  public struct EdgeToolsMLXError: Hashable, Sendable, Error {
+  public struct MLXEngineError: Hashable, Sendable, Error {
     public struct Code: RawRepresentable, Hashable, Sendable {
       public let rawValue: String
 
@@ -115,9 +115,9 @@
     }
   }
 
-  // MARK: - EdgeToolsMLXGenerateParameters
+  // MARK: - MLXGenerateParameters
 
-  public protocol EdgeToolsMLXGenerateParameters: EdgeToolsEngineGenerateParameters {
+  public protocol MLXGenerateParameters: EdgeToolsEngineGenerateParameters {
     var sampler: any LogitSampler { get }
     var processor: (any LogitProcessor)? { get }
     var kvCacheQuantizationBits: Int? { get }
@@ -126,18 +126,18 @@
     var synchronizeStreamForMemorySnapshots: Bool { get }
   }
 
-  // MARK: - DefaultEdgeToolsMLXGenerateParameters
+  // MARK: - DefaultMLXGenerateParameters
 
   #if XGrammar
-    public struct DefaultEdgeToolsMLXGenerateParameters:
-      EdgeToolsMLXGenerateParameters,
+    public struct DefaultMLXGenerateParameters:
+      MLXGenerateParameters,
       EdgeToolsConstrainedGenerateParameters
     {
       public static var `default`: Self { Self() }
 
       public var sampler: any LogitSampler
       public var processor: (any LogitProcessor)?
-      public var constraint: EdgeToolsXGRGenerationConstraint
+      public var constraint: XGRGenerationConstraint
       public var maxTokens: Int?
       public var kvCacheQuantizationBits: Int?
       public var kvCacheQuantizationGroupSize: Int
@@ -147,7 +147,7 @@
       public init(
         sampler: any LogitSampler = CategoricalSampler(temperature: 0.6),
         processor: (any LogitProcessor)? = nil,
-        constraint: EdgeToolsXGRGenerationConstraint = .unconstrained,
+        constraint: XGRGenerationConstraint = .unconstrained,
         maxTokens: Int? = 1024,
         kvCacheQuantizationBits: Int? = nil,
         kvCacheQuantizationGroupSize: Int = 64,
@@ -165,12 +165,12 @@
       }
     }
 
-    // MARK: - EdgeToolsMLXModel + XGrammar
+    // MARK: - MLXModel + XGrammar
 
-    extension EdgeToolsMLXModel
+    extension MLXModel
     where GrammarCompiler == XGRCompiler, GrammarContext == XGRGrammarContext {
       public func grammarContext(tokenizer: any EdgeToolsTokenizer) throws -> XGRGrammarContext {
-        guard let tokenizer = tokenizer as? any EdgeToolsXGRTokenizer else {
+        guard let tokenizer = tokenizer as? any XGRTokenizer else {
           throw EdgeToolsError.unsupportedTokenizer
         }
         return try XGRGrammarContext(
@@ -184,22 +184,22 @@
     }
   #endif
 
-  // MARK: - EdgeToolsMLXEngine
+  // MARK: - MLXEngine
 
-  public typealias EdgeToolsMLXEngine<Model: EdgeToolsMLXModel> =
+  public typealias MLXEngine<Model: MLXModel> =
     EdgeToolsModelEngine<_EdgeToolsMLXModel<Model>>
 
   // MARK: - Prompt Conversion
 
   #if Transformers && canImport(Tokenizers)
-    extension EdgeToolsMLXModel
+    extension MLXModel
     where Self: LLMModel, Prompt == EdgeToolsLLMPrompt {
       public func input(
         prompt: EdgeToolsLLMPrompt,
         tools: [EdgeToolDefinition],
         tokenizer: any EdgeToolsTokenizer
       ) throws -> LMInput {
-        guard let tokenizer = tokenizer as? EdgeToolsPreTrainedTokenizer else {
+        guard let tokenizer = tokenizer as? TransformersTokenizer else {
           throw EdgeToolsError.unsupportedTokenizer
         }
         let tokenIds = try tokenizer.tokenizer.applyChatTemplate(
@@ -302,9 +302,9 @@
 
   #endif
 
-  // MARK: - EdgeToolsMLXModel Adapter
+  // MARK: - MLXModel Adapter
 
-  public struct _EdgeToolsMLXModel<Model: EdgeToolsMLXModel>: EdgeToolsModel {
+  public struct _EdgeToolsMLXModel<Model: MLXModel>: EdgeToolsModel {
     public typealias Prompt = Model.Prompt
     public typealias Input = LMInput
     public typealias GenerateParameters = Model.GenerateParameters
@@ -469,7 +469,7 @@
       let tokenIds = input.text.tokens.asArray(EdgeToolsToken.ID.self)
       let cache = self.model.newCache(parameters: nil)
       let start = clock.now
-      let output = try self.edgeToolsPrepare(input: input, cache: cache)
+      let output = try self.prepareModelOutput(input: input, cache: cache)
       eval(output.logits)
       eval(cache)
       self.cachedPrefill = CachedPrefill(
@@ -497,7 +497,7 @@
         tokenIds.starts(with: cachedPrefill.tokenIds)
       else {
         let cache = self.model.newCache(parameters: nil)
-        return (try self.edgeToolsPrepare(input: input, cache: cache), cache, tokenIds.count)
+        return (try self.prepareModelOutput(input: input, cache: cache), cache, tokenIds.count)
       }
       let suffixCount = tokenIds.count - cachedPrefill.tokenIds.count
       let cache = cachedPrefill.cache.map { $0.copy() }
@@ -514,13 +514,13 @@
       return (output, cache, suffixCount)
     }
 
-    private func edgeToolsPrepare(input: LMInput, cache: [any KVCache]) throws -> LMOutput {
+    private func prepareModelOutput(input: LMInput, cache: [any KVCache]) throws -> LMOutput {
       switch try self.model.prepare(input, cache: cache, windowSize: nil) {
       case .logits(let output):
         return output
       case .tokens(let tokens):
         guard tokens.tokens.size > 0 else {
-          throw EdgeToolsMLXError(code: .emptyInput, message: "Model received empty input.")
+          throw MLXEngineError(code: .emptyInput, message: "Model received empty input.")
         }
         return self.model(tokens[text: .newAxis], cache: cache.isEmpty ? nil : cache, state: nil)
       }
@@ -537,27 +537,27 @@
   extension _EdgeToolsMLXModel: EdgeToolsPrefillableModel {}
 
   extension EdgeToolsModelEngine {
-    public init<MLXModel: EdgeToolsMLXModel>(
-      model: sending MLXModel,
+    public init<Base: MLXModel>(
+      model: sending Base,
       tokenizer: sending any EdgeToolsTokenizer
-    ) throws where Model == _EdgeToolsMLXModel<MLXModel> {
+    ) throws where Model == _EdgeToolsMLXModel<Base> {
       try self.init(model: _EdgeToolsMLXModel(model: model), tokenizer: tokenizer)
     }
 
-    public init<MLXModel: EdgeToolsMLXModel>(
+    public init<Base: MLXModel>(
       from directoryURL: URL,
-      model makeModel: @Sendable (MLXModel.ModelConfiguration) throws -> MLXModel
-    ) async throws where Model == _EdgeToolsMLXModel<MLXModel> {
-      try await self.init(loading: MLXModel.self, from: directoryURL, model: makeModel)
+      model makeModel: @Sendable (Base.ModelConfiguration) throws -> Base
+    ) async throws where Model == _EdgeToolsMLXModel<Base> {
+      try await self.init(loading: Base.self, from: directoryURL, model: makeModel)
     }
 
-    private init<MLXModel: EdgeToolsMLXModel>(
-      loading modelType: MLXModel.Type,
+    private init<Base: MLXModel>(
+      loading modelType: Base.Type,
       from directoryURL: URL,
-      model makeModel: @Sendable (MLXModel.ModelConfiguration) throws -> MLXModel
-    ) async throws where Model == _EdgeToolsMLXModel<MLXModel> {
+      model makeModel: @Sendable (Base.ModelConfiguration) throws -> Base
+    ) async throws where Model == _EdgeToolsMLXModel<Base> {
       let tokenizer = try await loadEdgeToolsTokenizer(from: directoryURL)
-      let model = try MLXModel.loadEdgeToolsLanguageModel(from: directoryURL, model: makeModel)
+      let model = try Base.loadEdgeToolsLanguageModel(from: directoryURL, model: makeModel)
       try self.init(model: _EdgeToolsMLXModel(model: model), tokenizer: tokenizer)
     }
   }

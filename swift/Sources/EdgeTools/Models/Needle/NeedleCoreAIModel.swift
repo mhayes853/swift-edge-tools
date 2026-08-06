@@ -135,14 +135,15 @@
         scalars = (0..<vocabularySize).map { Float(bfloat16Bits: view[offset + $0]) }
       case .float16:
         let view = Span<UInt16>(viewing: logits.rawView().bytes)
-        scalars = (0..<vocabularySize).map {
-          Float(Float16(bitPattern: view[offset + $0]))
-        }
+        scalars = (0..<vocabularySize)
+          .map {
+            Float(Float16(bitPattern: view[offset + $0]))
+          }
       case .float32:
         let view = Span<Float>(viewing: logits.rawView().bytes)
         scalars = (0..<vocabularySize).map { view[offset + $0] }
       default:
-        throw EdgeToolsCoreAIError(
+        throw NeedleCoreAIError(
           code: .unsupportedLogitsScalarType,
           message: "Unsupported logits scalar type: \(logits.scalarType)."
         )
@@ -164,7 +165,7 @@
       from model: AIModel
     ) throws -> InferenceFunction {
       guard let function = try model.loadFunction(named: name) else {
-        throw EdgeToolsCoreAIError(
+        throw NeedleCoreAIError(
           code: .failedToLoadFunction,
           message: "Could not load CoreAI function named \(name)."
         )
@@ -397,10 +398,10 @@
     }
   }
 
-  // MARK: - EdgeToolsCoreAIError
+  // MARK: - NeedleCoreAIError
 
   @available(anyAppleOS 27.0, *)
-  public struct EdgeToolsCoreAIError: Hashable, Sendable, Error {
+  public struct NeedleCoreAIError: Hashable, Sendable, Error {
     public struct Code: RawRepresentable, Hashable, Sendable {
       public let rawValue: String
 
@@ -462,14 +463,15 @@
       descriptor: InferenceFunctionDescriptor,
       configuration: NeedleModelConfiguration
     ) throws -> InferenceFunctionState {
-      let names = (0..<configuration.decoderLayers).flatMap { layer in
-        [
-          NeedleExportTensorName.selfAttentionKeyCache(layer: layer),
-          NeedleExportTensorName.selfAttentionValueCache(layer: layer)
-        ]
-      }
+      let names = (0..<configuration.decoderLayers)
+        .flatMap { layer in
+          [
+            NeedleExportTensorName.selfAttentionKeyCache(layer: layer),
+            NeedleExportTensorName.selfAttentionValueCache(layer: layer)
+          ]
+        }
       guard Set(descriptor.stateNames) == Set(names) else {
-        throw EdgeToolsCoreAIError(
+        throw NeedleCoreAIError(
           code: .missingModelStateDescriptors,
           message: "Expected CoreAI decoder states \(names), got \(descriptor.stateNames)."
         )
@@ -479,7 +481,7 @@
           let descriptor = descriptor.stateDescriptor(of: name),
           case .ndArray(let arrayDescriptor) = descriptor
         else {
-          throw EdgeToolsCoreAIError(
+          throw NeedleCoreAIError(
             code: .missingModelStateDescriptors,
             message: "CoreAI decoder did not expose an array state named \(name)."
           )
@@ -490,7 +492,7 @@
           configuration.attentionHeadDimensions
         ]
         guard arrayDescriptor.shape == expectedShape else {
-          throw EdgeToolsCoreAIError(
+          throw NeedleCoreAIError(
             code: .invalidStateShape,
             message: "Expected state shape \(expectedShape), got \(arrayDescriptor.shape)."
           )

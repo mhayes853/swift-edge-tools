@@ -162,7 +162,7 @@
 
   // MARK: - Validation Helpers
 
-  func edgeToolsONNXElementCount(for shape: [Int]) throws -> Int {
+  func onnxTensorElementCount(for shape: [Int]) throws -> Int {
     try shape.reduce(1) { count, dimension in
       guard dimension >= 0 else {
         throw ONNXRuntimeError(
@@ -181,8 +181,8 @@
     }
   }
 
-  func edgeToolsONNXValidateValueCount(_ count: Int, shape: [Int]) throws {
-    let expectedCount = try edgeToolsONNXElementCount(for: shape)
+  func validateONNXTensorValueCount(_ count: Int, shape: [Int]) throws {
+    let expectedCount = try onnxTensorElementCount(for: shape)
     guard count == expectedCount else {
       throw ONNXRuntimeError(
         code: .invalidTensorValueCount,
@@ -191,7 +191,7 @@
     }
   }
 
-  func edgeToolsONNXValidateOutputNames(_ names: [String]) throws {
+  func validateONNXOutputNames(_ names: [String]) throws {
     guard Set(names).count == names.count else {
       throw ONNXRuntimeError(
         code: .duplicateOutputName,
@@ -218,11 +218,11 @@
 
     public var rank: Int { self.shape.count }
 
-    public var strides: [Int] { edgeToolsONNXRowMajorStrides(for: self.shape) }
+    public var strides: [Int] { rowMajorStrides(for: self.shape) }
 
     public subscript(scalarAt indices: [Int]) -> Element {
       borrowing get {
-        let index = edgeToolsONNXFlatIndex(
+        let index = flatIndex(
           shape: self.shape,
           strides: self.strides,
           indices: indices
@@ -230,7 +230,7 @@
         return self.baseAddress![index]
       }
       mutating set {
-        let index = edgeToolsONNXFlatIndex(
+        let index = flatIndex(
           shape: self.shape,
           strides: self.strides,
           indices: indices
@@ -251,7 +251,7 @@
 
     @_lifetime(borrow self)
     public borrowing func slice(at leadingIndices: [Int]) -> ONNXTensorView<Element> {
-      let (offset, slicedShape) = edgeToolsONNXAxisSliceOffset(
+      let (offset, slicedShape) = axisSliceOffset(
         shape: self.shape,
         strides: self.strides,
         leadingIndices: leadingIndices
@@ -343,7 +343,9 @@
     }
 
     public nonisolated(nonsending) func withMutableView<
-      Source: ONNXElement, Materialized: BitwiseCopyable, Result
+      Source: ONNXElement,
+      Materialized: BitwiseCopyable,
+      Result
     >(
       as sourceType: Source.Type,
       materializing materializedType: Materialized.Type,
@@ -351,7 +353,7 @@
       _ body: nonisolated(nonsending) (inout ONNXTensorView<Materialized>) async throws -> Result
     ) async throws -> Result {
       try await self.withUnsafeMutableBufferPointer(as: sourceType) { buffer in
-        let materializedCount = try edgeToolsONNXElementCount(for: shape)
+        let materializedCount = try onnxTensorElementCount(for: shape)
         let byteCount = buffer.count * MemoryLayout<Source>.stride
         let materializedByteCount = materializedCount * MemoryLayout<Materialized>.stride
         guard byteCount == materializedByteCount else {
@@ -373,12 +375,15 @@
     }
 
     public nonisolated(nonsending) func withView<
-      Source: ONNXElement, Materialized: BitwiseCopyable, Result
+      Source: ONNXElement,
+      Materialized: BitwiseCopyable,
+      Result
     >(
       as sourceType: Source.Type,
       materializing materializedType: Materialized.Type,
       shape: [Int],
-      _ body: nonisolated(nonsending) (borrowing ONNXTensorView<Materialized>) async throws -> Result
+      _ body:
+        nonisolated(nonsending) (borrowing ONNXTensorView<Materialized>) async throws -> Result
     ) async throws -> Result {
       try await self.withMutableView(
         as: sourceType,
@@ -442,7 +447,7 @@
 
   // MARK: - Axis Helpers
 
-  private func edgeToolsONNXRowMajorStrides(for shape: [Int]) -> [Int] {
+  private func rowMajorStrides(for shape: [Int]) -> [Int] {
     guard !shape.isEmpty else { return [] }
     return Array(
       shape.dropFirst().reversed()
@@ -453,7 +458,7 @@
     )
   }
 
-  private func edgeToolsONNXFlatIndex(shape: [Int], strides: [Int], indices: [Int]) -> Int {
+  private func flatIndex(shape: [Int], strides: [Int], indices: [Int]) -> Int {
     precondition(
       indices.count == shape.count,
       "Expected \(shape.count) indices for tensor shape \(shape), got \(indices.count)."
@@ -469,7 +474,7 @@
       }
   }
 
-  private func edgeToolsONNXAxisSliceOffset(
+  private func axisSliceOffset(
     shape: [Int],
     strides: [Int],
     leadingIndices: [Int]

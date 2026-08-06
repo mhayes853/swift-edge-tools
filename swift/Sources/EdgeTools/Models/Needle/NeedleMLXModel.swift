@@ -57,10 +57,11 @@
     }
 
     public func newCache(parameters _: MLXLMCommon.GenerateParameters?) -> [any KVCache] {
-      (0..<self.configuration.decoderLayers).map { _ in
-        let dtype = self.model.embedding.weight.dtype
-        return NeedleKVCache(configuration: self.configuration, dtype: dtype)
-      }
+      (0..<self.configuration.decoderLayers)
+        .map { _ in
+          let dtype = self.model.embedding.weight.dtype
+          return NeedleKVCache(configuration: self.configuration, dtype: dtype)
+        }
     }
 
     public func prepare(
@@ -184,13 +185,14 @@
       let outputs = self.compiledDecoder()(inputs)
       let layerCount = self.configuration.decoderLayers
       for index in 0..<layerCount {
-        caches[index].replace(
-          state: NeedleKVCache.State(
-            keys: outputs[1 + index],
-            values: outputs[1 + layerCount + index]
-          ),
-          offset: offset + 1
-        )
+        caches[index]
+          .replace(
+            state: NeedleKVCache.State(
+              keys: outputs[1 + index],
+              values: outputs[1 + layerCount + index]
+            ),
+            offset: offset + 1
+          )
       }
       let state = LMOutput.State(crossAttentionStates: encoderOutput)
       return LMOutput(logits: outputs[0], state: state)
@@ -218,11 +220,13 @@
         let crossAttention = zip(
           inputs[3..<(3 + layerCount)],
           inputs[(3 + layerCount)..<(3 + (2 * layerCount))]
-        ).map { ProjectedAttentionKV(keys: $0, values: $1) }
+        )
+        .map { ProjectedAttentionKV(keys: $0, values: $1) }
         let caches = zip(
           inputs[(3 + (2 * layerCount))..<(3 + (3 * layerCount))],
           inputs[(3 + (3 * layerCount))..<(3 + (4 * layerCount))]
-        ).map { NeedleKVCache.State(keys: $0, values: $1) }
+        )
+        .map { NeedleKVCache.State(keys: $0, values: $1) }
         let output = model.decode(
           inputs[0],
           position: inputs[1],
@@ -242,8 +246,9 @@
   // MARK: - NeedleMLXGenerateParameters
 
   public struct NeedleMLXGenerateParameters:
-    EdgeToolsMLXGenerateParameters,
-    NeedleGenerateParameters {
+    MLXGenerateParameters,
+    NeedleGenerateParameters
+  {
     public static var `default`: Self { Self() }
 
     public var sampler: any LogitSampler
@@ -270,10 +275,10 @@
     }
   }
 
-  // MARK: - EdgeToolsMLXModel
+  // MARK: - MLXModel
 
   #if XGrammar
-    extension NeedleMLXModel: EdgeToolsMLXModel {
+    extension NeedleMLXModel: MLXModel {
       public typealias ModelConfiguration = NeedleModelConfiguration
       public typealias Prompt = NeedlePrompt
       public typealias GenerateParameters = NeedleMLXGenerateParameters
@@ -305,7 +310,7 @@
       }
     }
 
-    public typealias NeedleMLXModelEngine = EdgeToolsMLXEngine<NeedleMLXModel>
+    public typealias NeedleMLXModelEngine = MLXEngine<NeedleMLXModel>
 
     extension NeedleMLXModelEngine {
       public init(from directoryURL: URL) async throws {
@@ -461,15 +466,16 @@
       updatedCaches.reserveCapacity(self.layers.count)
 
       for index in self.layers.indices {
-        let output = self.layers[index](
-          hiddenStates,
-          selfMask: selfMask,
-          crossMask: crossMask,
-          precomputedCrossAttention: precomputedCrossAttention[index],
-          cache: caches[index],
-          ropeFrequencies: ropeFrequencies,
-          position: position
-        )
+        let output =
+          self.layers[index](
+            hiddenStates,
+            selfMask: selfMask,
+            crossMask: crossMask,
+            precomputedCrossAttention: precomputedCrossAttention[index],
+            cache: caches[index],
+            ropeFrequencies: ropeFrequencies,
+            position: position
+          )
         hiddenStates = output.output
         updatedCaches.append(output.cache)
       }
@@ -878,7 +884,7 @@
 
       let added = self.capacity - self.keys.dim(2)
       let newKeys = MLXArray.zeros([1, self.kvHeads, added, self.headDimensions], dtype: dtype)
-      self.keys = concatenated([self.keys,newKeys], axis: 2)
+      self.keys = concatenated([self.keys, newKeys], axis: 2)
 
       let newValues = MLXArray.zeros([1, self.kvHeads, added, self.headDimensions], dtype: dtype)
       self.values = concatenated([self.values, newValues], axis: 2)

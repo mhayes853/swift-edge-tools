@@ -12,11 +12,11 @@ import OrderedCollections
 
   // MARK: - Qwen3P5 Model
 
-  extension Qwen35Model: EdgeToolsMLXModel {
+  extension Qwen35Model: MLXModel {
     public typealias ModelConfiguration = Qwen35Configuration
     public typealias Prompt = EdgeToolsLLMPrompt
     public typealias ToolCallParser = Qwen3P5ToolCallParser
-    public typealias GenerateParameters = DefaultEdgeToolsMLXGenerateParameters
+    public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarCompiler = XGRCompiler
     public typealias GrammarContext = XGRGrammarContext
 
@@ -28,8 +28,8 @@ import OrderedCollections
     }
   }
 
-  public typealias Qwen35MLXModelEngine = EdgeToolsMLXEngine<Qwen35Model>
-  public typealias Qwen3P5MLXModelEngine = EdgeToolsMLXEngine<Qwen35Model>
+  public typealias Qwen35MLXModelEngine = MLXEngine<Qwen35Model>
+  public typealias Qwen3P5MLXModelEngine = MLXEngine<Qwen35Model>
 
   extension Qwen3P5MLXModelEngine {
     public init(from directoryURL: URL) async throws {

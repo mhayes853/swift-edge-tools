@@ -64,7 +64,7 @@
     }
     let backendJSON = try loadHuggingFaceBackendJSON(from: tokenizerURL)
 
-    return EdgeToolsPreTrainedTokenizer(
+    return TransformersTokenizer(
       tokenizer: tokenizer,
       backendJSON: backendJSON
     )

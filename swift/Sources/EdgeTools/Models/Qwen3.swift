@@ -10,11 +10,11 @@
 
   // MARK: - Qwen3 Model
 
-  extension Qwen3Model: EdgeToolsMLXModel {
+  extension Qwen3Model: MLXModel {
     public typealias ModelConfiguration = Qwen3Configuration
     public typealias Prompt = EdgeToolsLLMPrompt
     public typealias ToolCallParser = Qwen3ToolCallParser
-    public typealias GenerateParameters = DefaultEdgeToolsMLXGenerateParameters
+    public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarCompiler = XGRCompiler
     public typealias GrammarContext = XGRGrammarContext
 
@@ -26,7 +26,7 @@
     }
   }
 
-  public typealias Qwen3MLXModelEngine = EdgeToolsMLXEngine<Qwen3Model>
+  public typealias Qwen3MLXModelEngine = MLXEngine<Qwen3Model>
 
   // MARK: - Model Engine Loading
 

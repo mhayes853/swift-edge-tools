@@ -33,7 +33,7 @@
           using: tokenizer
         ),
         model: model,
-        processor: EdgeToolsApplyBitmaskProcessorMLX(matcher: matcher),
+        processor: MLXBitmaskProcessor(matcher: matcher),
         sampler: ArgMaxSampler()
       )
 

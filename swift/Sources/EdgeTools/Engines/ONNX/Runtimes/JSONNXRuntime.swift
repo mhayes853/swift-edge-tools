@@ -68,7 +68,7 @@
       shape: [Int]
     ) throws -> JSONNXTensor where Values.Element: ONNXElement {
       let values = ContiguousArray(values)
-      try edgeToolsONNXValidateValueCount(values.count, shape: shape)
+      try validateONNXTensorValueCount(values.count, shape: shape)
       let dtype = Values.Element.onnxDType
       let bytes = values.withUnsafeBytes {
         JSUint8Array(buffer: $0.bindMemory(to: UInt8.self)).jsObject
@@ -186,7 +186,7 @@
       inputs: [String: JSONNXTensor],
       outputNames: [String]
     ) async throws -> [String: JSONNXTensor] {
-      try edgeToolsONNXValidateOutputNames(outputNames)
+      try validateONNXOutputNames(outputNames)
       let feeds = JSObject()
       for (name, tensor) in inputs {
         feeds[name] = tensor.object.jsValue
@@ -261,7 +261,10 @@
       _ = try? dispose.throws(this: self.object)
     }
 
-    nonisolated(nonsending) public func withUnsafeMutableBufferPointer<Element: ONNXElement, Result>(
+    nonisolated(nonsending) public func withUnsafeMutableBufferPointer<
+      Element: ONNXElement,
+      Result
+    >(
       as type: Element.Type,
       _ body: nonisolated(nonsending) (UnsafeMutableBufferPointer<Element>) async throws -> Result
     ) async throws -> Result {
@@ -280,7 +283,7 @@
         throw JSONNXRuntimeError(code: .invalidJSValue, message: "Unexpected JS typed array.")
       }
 
-      let count = try edgeToolsONNXElementCount(for: self.shape)
+      let count = try onnxTensorElementCount(for: self.shape)
       let byteCount = count * MemoryLayout<Element>.stride
       guard
         let buffer = object["buffer"].object,

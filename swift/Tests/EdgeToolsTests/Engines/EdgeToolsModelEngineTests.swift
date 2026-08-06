@@ -40,7 +40,7 @@
         tokenizer: tokenizer
       )
       let range = GrammarToolCallRange.exact(1)
-      let constraint = EdgeToolsXGRGenerationConstraint.toolsWithGrammar(
+      let constraint = XGRGenerationConstraint.toolsWithGrammar(
         range: range,
         grammar: { toolsGrammar, tokenizerInfo in
           observation.recordTransform(tokenizerInfo: tokenizerInfo)
@@ -75,7 +75,7 @@
       )
       let range = GrammarToolCallRange.exact(1)
       let userGrammar = try XGRGrammar.literal("USER")
-      let constraint = EdgeToolsXGRGenerationConstraint.toolsOrGrammar(
+      let constraint = XGRGenerationConstraint.toolsOrGrammar(
         userGrammar,
         range: range,
         transform: { toolsGrammar, tokenizerInfo in
@@ -188,7 +188,7 @@
 
       var tokenIds: [EdgeToolsToken.ID]
       var preparationDelay = Duration.zero
-      var constraint = EdgeToolsXGRGenerationConstraint.unconstrained
+      var constraint = XGRGenerationConstraint.unconstrained
       var maxTokens: Int? = 32
     }
 
@@ -205,7 +205,7 @@
     var vocabularySize: Int { .needleVocabularySize }
 
     func grammarContext(tokenizer: any EdgeToolsTokenizer) throws -> XGRGrammarContext {
-      guard let tokenizer = tokenizer as? any EdgeToolsXGRTokenizer else {
+      guard let tokenizer = tokenizer as? any XGRTokenizer else {
         throw XGRError(
           code: .invalidTokenizerInfo,
           message: "The test model requires an XGrammar tokenizer."

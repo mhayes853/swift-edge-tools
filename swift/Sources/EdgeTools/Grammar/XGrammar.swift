@@ -2,26 +2,25 @@
   import EdgeToolsXGrammar
   import OrderedCollections
 
-  /// EdgeTools-specific XGrammar error codes.
-  public struct EdgeToolsXGRError {
+  extension XGRError.Code {
     /// An invalid ``GrammarToolCallRange`` for generation.
-    public static let invalidToolInvocationRange = XGRError.Code(
+    public static let invalidToolInvocationRange = Self(
       rawValue: "invalid-tool-invocation-range"
     )
 
     /// An empty tool collection for generation.
-    public static let emptyToolCollection = XGRError.Code(rawValue: "empty-tool-collection")
+    public static let emptyToolCollection = Self(rawValue: "empty-tool-collection")
 
     /// An unsupported tool schema for generation.
-    public static let unsupportedToolSchema = XGRError.Code(rawValue: "unsupported-tool-schema")
+    public static let unsupportedToolSchema = Self(rawValue: "unsupported-tool-schema")
 
     /// An incompatible tokenizer vocabulary for generation.
-    public static let incompatibleTokenizerVocabulary = XGRError.Code(
+    public static let incompatibleTokenizerVocabulary = Self(
       rawValue: "incompatible-tokenizer-vocabulary"
     )
 
     /// An invalid Needle tokenizer for generation.
-    public static let invalidNeedleTokenizer = XGRError.Code(rawValue: "invalid-needle-tokenizer")
+    public static let invalidNeedleTokenizer = Self(rawValue: "invalid-needle-tokenizer")
   }
 
   extension XGRError {
@@ -30,11 +29,11 @@
       message: "Invalid Hugging Face tokenizer metadata."
     )
     static let invalidToolInvocationRange = Self(
-      code: EdgeToolsXGRError.invalidToolInvocationRange,
+      code: XGRError.Code.invalidToolInvocationRange,
       message: "Tool invocation ranges cannot have a negative lower bound."
     )
     static let unsupportedToolSchema = Self(
-      code: EdgeToolsXGRError.unsupportedToolSchema,
+      code: XGRError.Code.unsupportedToolSchema,
       message: "The tool definition has an unsupported schema."
     )
   }
@@ -157,9 +156,9 @@
     }
   }
 
-  // MARK: - EdgeToolsXGRGenerationConstraint
+  // MARK: - XGRGenerationConstraint
 
-  public struct EdgeToolsXGRGenerationConstraint: Sendable {
+  public struct XGRGenerationConstraint: Sendable {
     private enum Kind: Sendable {
       case unconstrained
       case grammar(XGRGrammar)
@@ -206,7 +205,7 @@
     }
   }
 
-  extension EdgeToolsXGRGenerationConstraint: EdgeToolsGenerationConstraint {
+  extension XGRGenerationConstraint: EdgeToolsGenerationConstraint {
     public typealias Context = XGRGrammarContext
 
     public var toolCallRange: GrammarToolCallRange? {
@@ -321,7 +320,9 @@
       return output
     }
 
-    private static func replacingRuleReferences(in source: String, aliases: [String: String]) -> String {
+    private static func replacingRuleReferences(in source: String, aliases: [String: String])
+      -> String
+    {
       var output = ""
       var outputStart = source.startIndex
       for token in source.ebnfTokens where token.kind == .identifier {
@@ -417,7 +418,7 @@
       guard let firstTool = tools.first else {
         guard range.lowerBound == 0 else {
           throw XGRError(
-            code: EdgeToolsXGRError.emptyToolCollection,
+            code: XGRError.Code.emptyToolCollection,
             message: "A nonzero tool invocation range requires at least one tool."
           )
         }

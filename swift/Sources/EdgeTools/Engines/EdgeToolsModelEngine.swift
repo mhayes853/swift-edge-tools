@@ -141,17 +141,14 @@
     public typealias Prompt = Model.Prompt
     public typealias GenerateParameters = Model.GenerateParameters
 
-    private let generationGate = EdgeToolsModelGenerationGate()
+    private let generationGate = ModelGenerationGate()
     private var grammarCompiler: Model.GrammarCompiler
     private let grammarContext: Model.GrammarContext
     private var model: Model
     private let tokenizer: any EdgeToolsTokenizer
     private let clock = ContinuousClock()
 
-    public init(
-      model: sending Model,
-      tokenizer: sending any EdgeToolsTokenizer
-    ) throws {
+    public init(model: sending Model, tokenizer: sending any EdgeToolsTokenizer) throws {
       let grammarContext = try model.grammarContext(tokenizer: tokenizer)
       self.grammarCompiler = try model.grammarCompiler(context: grammarContext)
       self.grammarContext = grammarContext
@@ -254,7 +251,7 @@
       var parser = Model.ToolCallParser()
       var generatedTokens = [EdgeToolsToken]()
       var toolCalls = [EdgeRawToolCall]()
-      var confidence = EdgeToolsConfidenceState()
+      var confidence = ConfidenceState()
       var durationToFirstToken: Duration?
       let maximumTokenCount = parameters.maxTokens ?? .max
 
@@ -262,7 +259,8 @@
       if !matcher.isTerminated,
         !isStopped.load(ordering: .relaxed),
         generatedTokens.count < maximumTokenCount,
-        generatedTokens.last?.id != self.tokenizer.eosTokenId {
+        generatedTokens.last?.id != self.tokenizer.eosTokenId
+      {
         try Task.checkCancellation()
         bitmask = matcher.bitmask()
       }
@@ -294,7 +292,8 @@
         if !matcher.isTerminated,
           !isStopped.load(ordering: .relaxed),
           generatedTokens.count < maximumTokenCount,
-          generatedTokens.last?.id != self.tokenizer.eosTokenId {
+          generatedTokens.last?.id != self.tokenizer.eosTokenId
+        {
           try Task.checkCancellation()
           bitmask = matcher.bitmask()
         }
@@ -371,9 +370,9 @@
     }
   }
 
-  // MARK: - EdgeToolsModelGenerationGate
+  // MARK: - ModelGenerationGate
 
-  private actor EdgeToolsModelGenerationGate {
+  private actor ModelGenerationGate {
     private var isAcquired = false
     private var waiters = [UnsafeContinuation<Void, Never>]()
 

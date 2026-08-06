@@ -48,10 +48,10 @@ extension EdgeToolsTokenizer {
   }
 }
 
-// MARK: - EdgeToolsXGRTokenizer
+// MARK: - XGRTokenizer
 
 #if XGrammar
-  public protocol EdgeToolsXGRTokenizer: EdgeToolsTokenizer {
+  public protocol XGRTokenizer: EdgeToolsTokenizer {
     func tokenizerInfo(modelVocabularySize: Int?) throws -> XGRTokenizerInfo
   }
 #endif

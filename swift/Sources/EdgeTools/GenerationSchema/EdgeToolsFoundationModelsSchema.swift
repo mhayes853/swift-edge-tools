@@ -7,7 +7,7 @@
 // MARK: - Foundation Models Conversion Errors
 
 #if FoundationModels && canImport(FoundationModels)
-  public struct EdgeToolsFMError: Error, Hashable, Sendable {
+  public struct FMConversionError: Error, Hashable, Sendable {
     public struct Code: RawRepresentable, Hashable, Sendable {
       public let rawValue: String
 
@@ -81,7 +81,7 @@
           )
         )
       @unknown default:
-        throw EdgeToolsFMError.malformedSchema(
+        throw FMConversionError.malformedSchema(
           path: "$",
           description: "Unsupported generated content kind."
         )
@@ -106,7 +106,7 @@
           if value.isFinite {
             .number(value)
           } else {
-            throw EdgeToolsFMError(
+            throw FMConversionError(
               code: .nonFiniteNumber,
               message: "FoundationModels cannot represent the nonfinite number \(value)."
             )
@@ -142,7 +142,7 @@
         let data = try JSONEncoder().encode(generationSchema)
         self = try JSONDecoder().decode(Self.self, from: data)
       } catch {
-        throw EdgeToolsFMError.invalidGenerationSchema(
+        throw FMConversionError.invalidGenerationSchema(
           description: String(describing: error)
         )
       }
@@ -158,10 +158,10 @@
         let schema = try edgeToolsGenerationSchema.foundationModelsNormalized()
         let data = try JSONEncoder().encode(schema)
         self = try JSONDecoder().decode(Self.self, from: data)
-      } catch let error as EdgeToolsFMError {
+      } catch let error as FMConversionError {
         throw error
       } catch {
-        throw EdgeToolsFMError.invalidGenerationSchema(
+        throw FMConversionError.invalidGenerationSchema(
           description: String(describing: error)
         )
       }
@@ -174,7 +174,7 @@
   extension EdgeToolsGenerationSchema {
     fileprivate func foundationModelsNormalized(path: String = "$") throws -> Self {
       guard case .object(var object) = self else {
-        throw EdgeToolsFMError.unsupportedDynamicSchema(
+        throw FMConversionError.unsupportedDynamicSchema(
           path: path,
           keyword: "boolean schema"
         )
@@ -198,7 +198,7 @@
     ) throws {
       guard case .array(let types)? = object[.type] else { return }
       guard object[.anyOf] == nil else {
-        throw EdgeToolsFMError.malformedSchema(
+        throw FMConversionError.malformedSchema(
           path: path,
           description: "A schema cannot combine a type union with anyOf."
         )
@@ -277,7 +277,7 @@
           )
         )
       default:
-        throw EdgeToolsFMError.malformedSchema(
+        throw FMConversionError.malformedSchema(
           path: path,
           description: "Expected a schema object."
         )
@@ -371,7 +371,7 @@
       case .array: try self.array(node: node)
       case .object: try self.object(node: node, name: name)
       default:
-        throw EdgeToolsFMError.malformedSchema(
+        throw FMConversionError.malformedSchema(
           path: node.path,
           description: "Expected exactly one supported JSON schema type."
         )
@@ -385,7 +385,7 @@
       path: String
     ) throws -> DynamicGenerationSchema {
       guard !choices.isEmpty else {
-        throw EdgeToolsFMError.malformedSchema(
+        throw FMConversionError.malformedSchema(
           path: path,
           description: "A dynamic schema must declare a type or anyOf choices."
         )
@@ -418,7 +418,7 @@
           do {
             return GenerationGuide<String>.pattern(try Regex(pattern))
           } catch {
-            throw EdgeToolsFMError.malformedSchema(
+            throw FMConversionError.malformedSchema(
               path: "\(node.path).pattern",
               description: String(describing: error)
             )
@@ -494,7 +494,7 @@
 
     init(schema: EdgeToolsGenerationSchema, path: String) throws {
       guard case .object(let object) = schema else {
-        throw EdgeToolsFMError.unsupportedDynamicSchema(
+        throw FMConversionError.unsupportedDynamicSchema(
           path: path,
           keyword: "boolean schema"
         )
@@ -509,7 +509,7 @@
 
     func name(overriding name: String?) throws -> String {
       guard let name = name ?? self.string(for: .title) else {
-        throw EdgeToolsFMError(
+        throw FMConversionError(
           code: .missingSchemaName,
           message: "A FoundationModels schema at \(self.path) requires a name."
         )
@@ -520,7 +520,7 @@
     func types() throws -> [EdgeToolsGenerationSchema.ValueType] {
       guard let value = self.object[.type] else { return [] }
       guard let types = EdgeToolsGenerationSchema.valueType(from: value) else {
-        throw EdgeToolsFMError.malformedSchema(
+        throw FMConversionError.malformedSchema(
           path: "\(self.path).type",
           description: "Invalid JSON schema type."
         )
@@ -530,7 +530,7 @@
 
     func schema(for key: EdgeToolsGenerationSchema.Key) throws -> EdgeToolsGenerationSchema {
       guard let value = self.object[key] else {
-        throw EdgeToolsFMError.malformedSchema(
+        throw FMConversionError.malformedSchema(
           path: "\(self.path).\(key.rawValue)",
           description: "Expected a schema."
         )
@@ -546,7 +546,7 @@
     ) throws -> [EdgeToolsGenerationSchema]? {
       guard let value = self.object[key] else { return nil }
       guard case .array(let values) = value else {
-        throw EdgeToolsFMError.malformedSchema(
+        throw FMConversionError.malformedSchema(
           path: "\(self.path).\(key.rawValue)",
           description: "Expected an array of schemas."
         )
@@ -563,7 +563,7 @@
     func properties() throws -> OrderedDictionary<String, EdgeToolsGenerationSchema> {
       guard let value = self.object[.properties] else { return [:] }
       guard case .object(let properties) = value else {
-        throw EdgeToolsFMError.malformedSchema(
+        throw FMConversionError.malformedSchema(
           path: "\(self.path).properties",
           description: "Expected an object."
         )
@@ -584,7 +584,7 @@
     func requiredKeys() throws -> Set<String> {
       guard let value = self.object[.required] else { return [] }
       guard case .array(let values) = value else {
-        throw EdgeToolsFMError.malformedSchema(
+        throw FMConversionError.malformedSchema(
           path: "\(self.path).required",
           description: "Expected an array of property names."
         )
@@ -592,7 +592,7 @@
       return try Set(
         values.map { value in
           guard case .string(let key) = value else {
-            throw EdgeToolsFMError.malformedSchema(
+            throw FMConversionError.malformedSchema(
               path: "\(self.path).required",
               description: "Expected an array of property names."
             )
@@ -605,14 +605,14 @@
     func strings(for key: EdgeToolsGenerationSchema.Key) throws -> [String]? {
       guard let value = self.object[key] else { return nil }
       guard case .array(let values) = value else {
-        throw EdgeToolsFMError.malformedSchema(
+        throw FMConversionError.malformedSchema(
           path: "\(self.path).\(key.rawValue)",
           description: "Expected an array of strings."
         )
       }
       return try values.map { value in
         guard case .string(let string) = value else {
-          throw EdgeToolsFMError.unsupportedDynamicSchema(
+          throw FMConversionError.unsupportedDynamicSchema(
             path: "\(self.path).\(key.rawValue)",
             keyword: key.rawValue
           )
@@ -633,7 +633,7 @@
       case .number(let value):
         try Int(exactly: value).fmUnwrapped(path: "\(self.path).\(key.rawValue)", type: "integer")
       default:
-        throw EdgeToolsFMError.malformedSchema(
+        throw FMConversionError.malformedSchema(
           path: "\(self.path).\(key.rawValue)",
           description: "Expected an integer."
         )
@@ -646,7 +646,7 @@
       case .integer(let value): Double(value)
       case .number(let value): value
       default:
-        throw EdgeToolsFMError.malformedSchema(
+        throw FMConversionError.malformedSchema(
           path: "\(self.path).\(key.rawValue)",
           description: "Expected a number."
         )
@@ -655,7 +655,7 @@
 
     func validateAdditionalProperties() throws {
       guard let value = self.object[.additionalProperties], value != .boolean(false) else { return }
-      throw EdgeToolsFMError.unsupportedDynamicSchema(
+      throw FMConversionError.unsupportedDynamicSchema(
         path: "\(self.path).additionalProperties",
         keyword: "additionalProperties"
       )
@@ -669,7 +669,7 @@
         .maxLength, .multipleOf, .exclusiveMinimum, .exclusiveMaximum
       ]
       if let key = unsupported.first(where: { self.object[$0] != nil }) {
-        throw EdgeToolsFMError.unsupportedDynamicSchema(
+        throw FMConversionError.unsupportedDynamicSchema(
           path: self.path,
           keyword: key.rawValue
         )
@@ -683,7 +683,7 @@
   extension Optional {
     fileprivate func fmUnwrapped(path: String, type: String) throws -> Wrapped {
       guard let value = self else {
-        throw EdgeToolsFMError.malformedSchema(
+        throw FMConversionError.malformedSchema(
           path: path,
           description: "Expected an \(type)."
         )

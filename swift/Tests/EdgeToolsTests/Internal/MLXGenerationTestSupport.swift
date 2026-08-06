@@ -11,13 +11,14 @@
   ) async throws -> EdgeToolsLLMPrompt
   where
     Engine.Prompt == EdgeToolsLLMPrompt,
-    Engine.GenerateParameters == DefaultEdgeToolsMLXGenerateParameters {
+    Engine.GenerateParameters == DefaultMLXGenerateParameters
+  {
     var transcript = EdgeToolsLLMPrompt.weatherTest
-    let toolParameters = DefaultEdgeToolsMLXGenerateParameters(
+    let toolParameters = DefaultMLXGenerateParameters(
       constraint: .toolsWithGrammar(range: .exact(1)),
       maxTokens: 256
     )
-    let responseParameters = DefaultEdgeToolsMLXGenerateParameters(
+    let responseParameters = DefaultMLXGenerateParameters(
       constraint: .unconstrained,
       maxTokens: 64
     )

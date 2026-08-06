@@ -1,8 +1,8 @@
+import HeapModule
+
 #if XGrammar
   import EdgeToolsXGrammar
 #endif
-
-import HeapModule
 
 #if Foundation
   import _EdgeToolsFoundation
@@ -240,7 +240,7 @@ public struct NeedleSPTokenizer: Sendable {
 extension NeedleSPTokenizer: EdgeToolsTokenizer {}
 
 #if XGrammar
-  extension NeedleSPTokenizer: EdgeToolsXGRTokenizer {
+  extension NeedleSPTokenizer: XGRTokenizer {
     public func tokenizerInfo(modelVocabularySize: Int? = nil) throws -> XGRTokenizerInfo {
       let vocabularySize = modelVocabularySize ?? self.vocabularySize
       return try XGRTokenizerInfo.needle(tokenizer: self, vocabularySize: vocabularySize)

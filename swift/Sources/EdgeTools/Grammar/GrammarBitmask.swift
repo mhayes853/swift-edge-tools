@@ -61,9 +61,8 @@ extension GrammarBitmask: RandomAccessCollection {}
 // MARK: - MLX
 
 #if MLX && canImport(MLX)
-  public final class EdgeToolsApplyBitmaskProcessorMLX<
-    Matcher: EdgeToolsGrammarMatcher
-  >: LogitProcessor {
+  public final class MLXBitmaskProcessor<Matcher: ~Copyable>: LogitProcessor
+  where Matcher: EdgeToolsGrammarMatcher {
     public private(set) var matcher: Matcher
 
     public init(matcher: consuming Matcher) {
@@ -154,10 +153,7 @@ extension GrammarBitmask: RandomAccessCollection {}
 
 // MARK: - Contiguous Storage
 
-public func applyBitmask(
-  logits: inout MutableSpan<Float>,
-  mask: GrammarBitmask
-) {
+public func applyBitmask(logits: inout MutableSpan<Float>, mask: GrammarBitmask) {
   validateBitmaskCoverage(mask: mask, vocabularySize: logits.count)
   mask.storage.withUnsafeBufferPointer { maskBytes in
     logits.withUnsafeMutableBufferPointer { buffer in

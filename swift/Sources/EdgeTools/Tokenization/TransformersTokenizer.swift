@@ -10,10 +10,10 @@
   import Tokenizers
 #endif
 
-// MARK: - EdgeToolsPreTrainedTokenizer
+// MARK: - TransformersTokenizer
 
 #if Transformers && canImport(Tokenizers)
-  public struct EdgeToolsPreTrainedTokenizer: EdgeToolsTokenizer {
+  public struct TransformersTokenizer: EdgeToolsTokenizer {
     public let tokenizer: PreTrainedTokenizer
     public let backendJSON: String
 
@@ -44,7 +44,7 @@
   }
 
   #if XGrammar
-    extension EdgeToolsPreTrainedTokenizer: EdgeToolsXGRTokenizer {
+    extension TransformersTokenizer: XGRTokenizer {
       public func tokenizerInfo(modelVocabularySize: Int? = nil) throws -> XGRTokenizerInfo {
         var vocabulary = [String]()
         while let token = self.convertIdToToken(vocabulary.count) {
@@ -66,9 +66,10 @@
 
 #if Foundation
   package func loadHuggingFaceBackendJSON(from tokenizerURL: URL) throws -> String {
-    try Data(contentsOf: tokenizerURL).withUnsafeBytes { buffer in
-      try huggingFaceBackendJSON(from: buffer.bindMemory(to: UInt8.self))
-    }
+    try Data(contentsOf: tokenizerURL)
+      .withUnsafeBytes { buffer in
+        try huggingFaceBackendJSON(from: buffer.bindMemory(to: UInt8.self))
+      }
   }
 #endif
 

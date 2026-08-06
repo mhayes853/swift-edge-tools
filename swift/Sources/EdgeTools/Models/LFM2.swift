@@ -12,11 +12,11 @@ import OrderedCollections
 
   // MARK: - LFM2 Model
 
-  extension LFM2Model: EdgeToolsMLXModel {
+  extension LFM2Model: MLXModel {
     public typealias ModelConfiguration = LFM2Configuration
     public typealias Prompt = EdgeToolsLLMPrompt
     public typealias ToolCallParser = LFM2ToolCallParser
-    public typealias GenerateParameters = DefaultEdgeToolsMLXGenerateParameters
+    public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarCompiler = XGRCompiler
     public typealias GrammarContext = XGRGrammarContext
 
@@ -28,8 +28,8 @@ import OrderedCollections
     }
   }
 
-  public typealias LFM2MLXModelEngine = EdgeToolsMLXEngine<LFM2Model>
-  public typealias LFM2P5MLXModelEngine = EdgeToolsMLXEngine<LFM2Model>
+  public typealias LFM2MLXModelEngine = MLXEngine<LFM2Model>
+  public typealias LFM2P5MLXModelEngine = MLXEngine<LFM2Model>
 
   extension LFM2MLXModelEngine {
     public init(from directoryURL: URL) async throws {

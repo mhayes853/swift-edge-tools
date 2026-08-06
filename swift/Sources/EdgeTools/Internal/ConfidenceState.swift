@@ -24,9 +24,9 @@
   import CoreAI
 #endif
 
-// MARK: - EdgeToolsConfidenceState
+// MARK: - ConfidenceState
 
-struct EdgeToolsConfidenceState {
+struct ConfidenceState {
   private(set) var perTokenConfidences = [Float]()
   private var totalSum = Float(0)
 

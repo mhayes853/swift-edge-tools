@@ -291,7 +291,7 @@
       }
 
       #if os(watchOS)
-        throw EdgeToolsCoreMLError(
+        throw NeedleCoreMLError(
           code: .missingAOTModel,
           message:
             "Could not find a precompiled CoreML model at compiled/\(Self.coreMLPlatform)/\(name).mlmodelc. "
@@ -409,7 +409,7 @@
             configuration.attentionHeadDimensions
           ]
           guard stateShape == expectedStateShape else {
-            throw EdgeToolsCoreMLError(
+            throw NeedleCoreMLError(
               code: .invalidStateShape,
               message: "Expected state shape \(expectedStateShape), got \(stateShape)."
             )
@@ -440,7 +440,7 @@
           headDimensions
         ]
         guard projected.shape == expectedShape else {
-          throw EdgeToolsCoreMLError(
+          throw NeedleCoreMLError(
             code: .invalidStateShape,
             message: "Expected projected encoder shape \(expectedShape), got \(projected.shape)."
           )
@@ -452,7 +452,7 @@
             let stateShape = array.shape.map(\.intValue)
             let expectedStateShape = [1, kvHeads, encoderLength, headDimensions]
             guard stateShape == expectedStateShape else {
-              throw EdgeToolsCoreMLError(
+              throw NeedleCoreMLError(
                 code: .invalidStateShape,
                 message: "Expected state shape \(expectedStateShape), got \(stateShape)."
               )
@@ -479,10 +479,10 @@
     }
   }
 
-  // MARK: - EdgeToolsCoreMLError
+  // MARK: - NeedleCoreMLError
 
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-  public struct EdgeToolsCoreMLError: Hashable, Sendable, Error {
+  public struct NeedleCoreMLError: Hashable, Sendable, Error {
     public struct Code: RawRepresentable, Hashable, Sendable {
       public let rawValue: String
 
@@ -527,9 +527,10 @@
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
   extension NeedleCoreMLModel {
     private static func selfAttentionMask(step: Int, maxLength: Int) -> MLTensor {
-      let scalars = (0..<maxLength).map {
-        $0 <= step ? Float16.zero : Float16(-Float.needleClippingMagnitude)
-      }
+      let scalars = (0..<maxLength)
+        .map {
+          $0 <= step ? Float16.zero : Float16(-Float.needleClippingMagnitude)
+        }
       return MLTensor(shape: [1, 1, 1, maxLength], scalars: scalars)
     }
   }

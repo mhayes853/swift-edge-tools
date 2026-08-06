@@ -245,49 +245,49 @@ public protocol NeedleGenerateParameters: EdgeToolsEngineGenerateParameters {
 #if XGrammar
   // MARK: - NeedleModel
 
-    public protocol NeedleModel: EdgeToolsModel
-    where
-        Prompt == NeedlePrompt,
-        GenerateParameters: NeedleGenerateParameters,
-        ToolCallParser == NeedleToolCallParser,
-        GrammarCompiler == XGRCompiler,
-        GrammarContext == XGRGrammarContext
-    {}
+  public protocol NeedleModel: EdgeToolsModel
+  where
+    Prompt == NeedlePrompt,
+    GenerateParameters: NeedleGenerateParameters,
+    ToolCallParser == NeedleToolCallParser,
+    GrammarCompiler == XGRCompiler,
+    GrammarContext == XGRGrammarContext
+  {}
 
-    extension NeedleModel {
-        public func grammarContext(tokenizer: any EdgeToolsTokenizer) throws -> XGRGrammarContext {
-        guard let tokenizer = tokenizer as? any EdgeToolsXGRTokenizer else {
-            throw EdgeToolsError.unsupportedTokenizer
-        }
-        let tokenizerInfo = try tokenizer.tokenizerInfo(modelVocabularySize: self.vocabularySize)
-        return XGRGrammarContext(tokenizerInfo: tokenizerInfo)
-        }
-
-        public func grammarCompiler(context: borrowing XGRGrammarContext) throws -> XGRCompiler {
-        try XGRCompiler(tokenizerInfo: context.tokenizerInfo)
-        }
-
-        public func grammar(
-        tools: [EdgeToolDefinition],
-        parameters: GenerateParameters,
-        context _: XGRGrammarContext
-        ) throws -> XGRGrammar {
-        try self.toolCallGrammar(tools: tools, range: parameters.toolCallRange)
-        }
-
-        public func toolCallGrammar(
-        tools: [EdgeToolDefinition],
-        range: GrammarToolCallRange
-        ) throws -> XGRGrammar {
-        try XGRGrammar.needle(tools: tools, range: range)
-        }
+  extension NeedleModel {
+    public func grammarContext(tokenizer: any EdgeToolsTokenizer) throws -> XGRGrammarContext {
+      guard let tokenizer = tokenizer as? any XGRTokenizer else {
+        throw EdgeToolsError.unsupportedTokenizer
+      }
+      let tokenizerInfo = try tokenizer.tokenizerInfo(modelVocabularySize: self.vocabularySize)
+      return XGRGrammarContext(tokenizerInfo: tokenizerInfo)
     }
+
+    public func grammarCompiler(context: borrowing XGRGrammarContext) throws -> XGRCompiler {
+      try XGRCompiler(tokenizerInfo: context.tokenizerInfo)
+    }
+
+    public func grammar(
+      tools: [EdgeToolDefinition],
+      parameters: GenerateParameters,
+      context _: XGRGrammarContext
+    ) throws -> XGRGrammar {
+      try self.toolCallGrammar(tools: tools, range: parameters.toolCallRange)
+    }
+
+    public func toolCallGrammar(
+      tools: [EdgeToolDefinition],
+      range: GrammarToolCallRange
+    ) throws -> XGRGrammar {
+      try XGRGrammar.needle(tools: tools, range: range)
+    }
+  }
 
   // MARK: - XGRTokenizerInfo
 
   extension XGRTokenizerInfo {
     public static func needle(
-      tokenizer: some EdgeToolsXGRTokenizer,
+      tokenizer: some XGRTokenizer,
       vocabularySize: Int = .needleVocabularySize
     ) throws -> XGRTokenizerInfo {
       try Self.needle(
@@ -304,7 +304,7 @@ public protocol NeedleGenerateParameters: EdgeToolsEngineGenerateParameters {
     ) throws -> XGRTokenizerInfo {
       guard let eosTokenID, vocabulary.allSatisfy({ $0 != nil }) else {
         throw XGRError(
-          code: EdgeToolsXGRError.invalidNeedleTokenizer,
+          code: XGRError.Code.invalidNeedleTokenizer,
           message: "Needle requires a tokenizer with an EOS token and full vocabulary."
         )
       }
