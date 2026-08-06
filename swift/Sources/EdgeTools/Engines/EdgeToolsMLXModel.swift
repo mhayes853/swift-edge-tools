@@ -281,7 +281,6 @@
   public struct _EdgeToolsMLXModel<Model: EdgeToolsMLXModel>: EdgeToolsModel {
     public typealias Prompt = Model.Prompt
     public typealias Input = LMInput
-    public typealias Tokenizer = AnyEdgeToolsXGRTokenizer
     public typealias GenerateParameters = Model.GenerateParameters
     public typealias ToolCallParser = Model.ToolCallParser
     public typealias GrammarCompiler = XGRCompiler
@@ -314,17 +313,16 @@
 
     public var vocabularySize: Int { self.model.vocabularySize }
 
-    public func grammarContext(
-      tokenizer: AnyEdgeToolsXGRTokenizer
-    ) throws -> XGRGrammarContext {
-      try XGRGrammarContext(
+    public func grammarContext(tokenizer: any EdgeToolsTokenizer) throws -> XGRGrammarContext {
+      guard let tokenizer = tokenizer as? any EdgeToolsXGRTokenizer else {
+        throw EdgeToolsError.unsupportedTokenizer
+      }
+      return try XGRGrammarContext(
         tokenizerInfo: tokenizer.tokenizerInfo(modelVocabularySize: self.vocabularySize)
       )
     }
 
-    public func grammarCompiler(
-      context: borrowing XGRGrammarContext
-    ) throws -> XGRCompiler {
+    public func grammarCompiler(context: borrowing XGRGrammarContext) throws -> XGRCompiler {
       try XGRCompiler(tokenizerInfo: context.tokenizerInfo)
     }
 
@@ -346,7 +344,7 @@
     public func input(
       prompt: Model.Prompt,
       tools: [EdgeToolDefinition],
-      tokenizer: AnyEdgeToolsXGRTokenizer
+      tokenizer: any EdgeToolsTokenizer
     ) throws -> EdgeToolsModelInput<LMInput> {
       let input = try self.model.input(prompt: prompt, tools: tools, tokenizer: tokenizer)
       return EdgeToolsModelInput(
@@ -518,23 +516,16 @@
   extension EdgeToolsModelEngine {
     public init<MLXModel: EdgeToolsMLXModel>(
       model: sending MLXModel,
-      tokenizer: sending any EdgeToolsXGRTokenizer
+      tokenizer: sending any EdgeToolsTokenizer
     ) throws where Model == _EdgeToolsMLXModel<MLXModel> {
-      try self.init(
-        model: _EdgeToolsMLXModel(model: model),
-        tokenizer: AnyEdgeToolsXGRTokenizer(tokenizer)
-      )
+      try self.init(model: _EdgeToolsMLXModel(model: model), tokenizer: tokenizer)
     }
 
     public init<MLXModel: EdgeToolsMLXModel>(
       from directoryURL: URL,
       model makeModel: @Sendable (MLXModel.ModelConfiguration) throws -> MLXModel
     ) async throws where Model == _EdgeToolsMLXModel<MLXModel> {
-      try await self.init(
-        loading: MLXModel.self,
-        from: directoryURL,
-        model: makeModel
-      )
+      try await self.init(loading: MLXModel.self, from: directoryURL, model: makeModel)
     }
 
     private init<MLXModel: EdgeToolsMLXModel>(
@@ -543,14 +534,8 @@
       model makeModel: @Sendable (MLXModel.ModelConfiguration) throws -> MLXModel
     ) async throws where Model == _EdgeToolsMLXModel<MLXModel> {
       let tokenizer = try await loadEdgeToolsTokenizer(from: directoryURL)
-      guard let tokenizer = tokenizer as? any EdgeToolsXGRTokenizer else {
-        throw EdgeToolsError.unsupportedTokenizer
-      }
       let model = try MLXModel.loadEdgeToolsLanguageModel(from: directoryURL, model: makeModel)
-      try self.init(
-        model: _EdgeToolsMLXModel(model: model),
-        tokenizer: AnyEdgeToolsXGRTokenizer(tokenizer)
-      )
+      try self.init(model: _EdgeToolsMLXModel(model: model), tokenizer: tokenizer)
     }
   }
 #endif

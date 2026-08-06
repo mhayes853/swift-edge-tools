@@ -255,16 +255,16 @@ public struct NeedleToolCallParser: EdgeToolCallParser, Sendable {
       GrammarContext == XGRGrammarContext
     {}
 
-    extension NeedleModel where Tokenizer == AnyEdgeToolsXGRTokenizer {
-      public func grammarContext(tokenizer: Tokenizer) throws -> XGRGrammarContext {
-        try XGRGrammarContext(
-          tokenizerInfo: tokenizer.tokenizerInfo(modelVocabularySize: self.vocabularySize)
-        )
+    extension NeedleModel {
+      public func grammarContext(tokenizer: any EdgeToolsTokenizer) throws -> XGRGrammarContext {
+        guard let tokenizer = tokenizer as? any EdgeToolsXGRTokenizer else {
+          throw EdgeToolsError.unsupportedTokenizer
+        }
+        let tokenizerInfo = tokenizer.tokenizerInfo(modelVocabularySize: self.vocabularySize)
+        return try XGRGrammarContext(tokenizerInfo: tokenizerInfo)
       }
 
-      public func grammarCompiler(
-        context: borrowing XGRGrammarContext
-      ) throws -> XGRCompiler {
+      public func grammarCompiler(context: borrowing XGRGrammarContext) throws -> XGRCompiler {
         try XGRCompiler(tokenizerInfo: context.tokenizerInfo)
       }
 

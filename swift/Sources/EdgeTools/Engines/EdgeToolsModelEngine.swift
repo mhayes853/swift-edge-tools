@@ -53,7 +53,6 @@
   public protocol EdgeToolsModel: SendableMetatype {
     associatedtype Prompt: Sendable
     associatedtype Input
-    associatedtype Tokenizer: EdgeToolsTokenizer
     associatedtype GenerateParameters: EdgeToolsEngineGenerateParameters
     associatedtype ToolCallParser: EdgeToolCallParser
     associatedtype GrammarContext = Void
@@ -62,7 +61,7 @@
 
     var vocabularySize: Int { get }
 
-    func grammarContext(tokenizer: Tokenizer) throws -> GrammarContext
+    func grammarContext(tokenizer: any EdgeToolsTokenizer) throws -> GrammarContext
     func grammarCompiler(context: borrowing GrammarContext) throws -> GrammarCompiler
 
     func grammar(
@@ -79,7 +78,7 @@
     func input(
       prompt: Prompt,
       tools: [EdgeToolDefinition],
-      tokenizer: Tokenizer
+      tokenizer: any EdgeToolsTokenizer
     ) throws -> EdgeToolsModelInput<Input>
 
     nonisolated(nonsending) mutating func prepare(
@@ -98,7 +97,7 @@
   }
 
   extension EdgeToolsModel where GrammarContext == Void {
-    public func grammarContext(tokenizer _: Tokenizer) throws {}
+    public func grammarContext(tokenizer _: any EdgeToolsTokenizer) throws {}
   }
 
   extension EdgeToolsModel {
@@ -146,12 +145,12 @@
     private var grammarCompiler: Model.GrammarCompiler
     private let grammarContext: Model.GrammarContext
     private var model: Model
-    private let tokenizer: Model.Tokenizer
+    private let tokenizer: any EdgeToolsTokenizer
     private let clock = ContinuousClock()
 
     public init(
       model: sending Model,
-      tokenizer: sending Model.Tokenizer
+      tokenizer: sending any EdgeToolsTokenizer
     ) throws {
       let grammarContext = try model.grammarContext(tokenizer: tokenizer)
       self.grammarCompiler = try model.grammarCompiler(context: grammarContext)
@@ -336,19 +335,6 @@
   }
 
   #if XGrammar
-    extension EdgeToolsModelEngine
-    where Model.Tokenizer == AnyEdgeToolsXGRTokenizer {
-      public init(
-        model: sending Model,
-        tokenizer: sending any EdgeToolsXGRTokenizer
-      ) throws {
-        try self.init(
-          model: model,
-          tokenizer: AnyEdgeToolsXGRTokenizer(tokenizer)
-        )
-      }
-    }
-
     extension EdgeToolsModelEngine
     where Model.GrammarCompiler == XGRCompiler, Model.GrammarContext == XGRGrammarContext {
       public func clearCaches() {

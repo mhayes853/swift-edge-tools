@@ -142,14 +142,13 @@
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
   extension NeedleCoreMLModel: NeedleModel {
     public typealias Input = NeedleModelInput
-    public typealias Tokenizer = AnyEdgeToolsXGRTokenizer
 
     public var vocabularySize: Int { self.configuration.vocabularySize }
 
     public func input(
       prompt: NeedlePrompt,
       tools: [EdgeToolDefinition],
-      tokenizer: AnyEdgeToolsXGRTokenizer
+      tokenizer: any EdgeToolsTokenizer
     ) throws -> EdgeToolsModelInput<NeedleModelInput> {
       let input = NeedleModelInput(
         prompt: prompt,
@@ -254,9 +253,6 @@
       editConfiguration: (inout NeedleModelConfiguration) -> Void = { _ in }
     ) async throws {
       let tokenizer = try await loadEdgeToolsTokenizer(from: modelDirectoryURL)
-      guard let tokenizer = tokenizer as? any EdgeToolsXGRTokenizer else {
-        throw EdgeToolsError.unsupportedTokenizer
-      }
       let model = try await NeedleCoreMLModel(
         modelDirectoryURL: modelDirectoryURL,
         modelConfiguration: modelConfiguration,

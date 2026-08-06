@@ -223,14 +223,13 @@
   @available(anyAppleOS 27.0, *)
   extension NeedleCoreAIModel: NeedleModel {
     public typealias Input = NeedleModelInput
-    public typealias Tokenizer = AnyEdgeToolsXGRTokenizer
 
     public var vocabularySize: Int { self.configuration.vocabularySize }
 
     public func input(
       prompt: NeedlePrompt,
       tools: [EdgeToolDefinition],
-      tokenizer: AnyEdgeToolsXGRTokenizer
+      tokenizer: any EdgeToolsTokenizer
     ) throws -> EdgeToolsModelInput<NeedleModelInput> {
       let input = NeedleModelInput(
         prompt: prompt,
@@ -346,9 +345,6 @@
       cachePolicy: AIModelCache.Policy = .default
     ) async throws {
       let tokenizer = try await loadEdgeToolsTokenizer(from: modelDirectoryURL)
-      guard let tokenizer = tokenizer as? any EdgeToolsXGRTokenizer else {
-        throw EdgeToolsError.unsupportedTokenizer
-      }
       let model = try await NeedleCoreAIModel(
         modelDirectoryURL: modelDirectoryURL,
         editConfiguration: editConfiguration,

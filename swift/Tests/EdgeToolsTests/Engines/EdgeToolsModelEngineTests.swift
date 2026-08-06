@@ -194,7 +194,6 @@
 
     typealias Prompt = NeedlePrompt
     typealias Input = [EdgeToolsToken.ID]
-    typealias Tokenizer = AnyEdgeToolsXGRTokenizer
     typealias GenerateParameters = Parameters
     typealias ToolCallParser = NeedleToolCallParser
     typealias GrammarContext = XGRGrammarContext
@@ -205,8 +204,14 @@
 
     var vocabularySize: Int { .needleVocabularySize }
 
-    func grammarContext(tokenizer: AnyEdgeToolsXGRTokenizer) throws -> XGRGrammarContext {
-      try XGRGrammarContext(
+    func grammarContext(tokenizer: any EdgeToolsTokenizer) throws -> XGRGrammarContext {
+      guard let tokenizer = tokenizer as? any EdgeToolsXGRTokenizer else {
+        throw XGRError(
+          code: .invalidTokenizerInfo,
+          message: "The test model requires an XGrammar tokenizer."
+        )
+      }
+      return try XGRGrammarContext(
         tokenizerInfo: tokenizer.tokenizerInfo(modelVocabularySize: self.vocabularySize)
       )
     }
@@ -226,7 +231,7 @@
     func input(
       prompt: NeedlePrompt,
       tools: [EdgeToolDefinition],
-      tokenizer: AnyEdgeToolsXGRTokenizer
+      tokenizer: any EdgeToolsTokenizer
     ) throws -> EdgeToolsModelInput<[EdgeToolsToken.ID]> {
       let tokenIds = tokenizer.encode(text: prompt.user)
       return EdgeToolsModelInput(value: tokenIds, tokenIds: tokenIds)

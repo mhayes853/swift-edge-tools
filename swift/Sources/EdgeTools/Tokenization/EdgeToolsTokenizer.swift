@@ -54,38 +54,4 @@ extension EdgeToolsTokenizer {
   public protocol EdgeToolsXGRTokenizer: EdgeToolsTokenizer {
     func tokenizerInfo(modelVocabularySize: Int?) throws -> XGRTokenizerInfo
   }
-
-  // MARK: - AnyEdgeToolsXGRTokenizer
-
-  public struct AnyEdgeToolsXGRTokenizer: EdgeToolsXGRTokenizer {
-    private let tokenizer: any EdgeToolsXGRTokenizer
-
-    public init(_ tokenizer: any EdgeToolsXGRTokenizer) {
-      self.tokenizer = tokenizer
-    }
-
-    public var unknownTokenId: EdgeToolsToken.ID? { self.tokenizer.unknownTokenId }
-    public var bosTokenId: EdgeToolsToken.ID? { self.tokenizer.bosTokenId }
-    public var eosTokenId: EdgeToolsToken.ID? { self.tokenizer.eosTokenId }
-
-    public func encode(text: String) -> [EdgeToolsToken.ID] {
-      self.tokenizer.encode(text: text)
-    }
-
-    public func decode(tokens: [EdgeToolsToken.ID]) -> String {
-      self.tokenizer.decode(tokens: tokens)
-    }
-
-    public func convertTokensToIds(_ tokens: [String]) -> [EdgeToolsToken.ID?] {
-      self.tokenizer.convertTokensToIds(tokens)
-    }
-
-    public func convertIdsToTokens(_ ids: [EdgeToolsToken.ID]) -> [String?] {
-      self.tokenizer.convertIdsToTokens(ids)
-    }
-
-    public func tokenizerInfo(modelVocabularySize: Int?) throws -> XGRTokenizerInfo {
-      try self.tokenizer.tokenizerInfo(modelVocabularySize: modelVocabularySize)
-    }
-  }
 #endif
