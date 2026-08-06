@@ -248,14 +248,28 @@ public struct NeedleToolCallParser: EdgeToolCallParser, Sendable {
     where
       Prompt == NeedlePrompt,
       GenerateParameters: NeedleGenerateParameters,
-      ToolCallParser == NeedleToolCallParser
+      ToolCallParser == NeedleToolCallParser,
+      GrammarCompiler == XGRCompiler,
+      GrammarContext == XGRGrammarContext
     {}
 
-    extension NeedleModel {
+    extension NeedleModel where Tokenizer == AnyEdgeToolsXGRTokenizer {
+      public func makeGrammarContext(tokenizer: Tokenizer) throws -> XGRGrammarContext {
+        try XGRGrammarContext(
+          tokenizerInfo: tokenizer.tokenizerInfo(modelVocabularySize: self.vocabularySize)
+        )
+      }
+
+      public func makeGrammarCompiler(
+        context: borrowing XGRGrammarContext
+      ) throws -> XGRCompiler {
+        try XGRCompiler(tokenizerInfo: context.tokenizerInfo)
+      }
+
       public func grammar(
         tools: [EdgeToolDefinition],
         parameters: GenerateParameters,
-        tokenizerInfo _: XGRTokenizerInfo
+        context _: XGRGrammarContext
       ) throws -> XGRGrammar {
         try self.toolCallGrammar(tools: tools, range: parameters.toolCallRange)
       }

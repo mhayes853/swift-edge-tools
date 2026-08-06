@@ -387,12 +387,13 @@
 
   extension NeedleONNXModel: NeedleModel {
     public typealias Input = [EdgeToolsToken.ID]
+    public typealias Tokenizer = AnyEdgeToolsXGRTokenizer
     public typealias GenerateParameters = NeedleONNXGenerateParameters
 
     public func input(
       prompt: NeedlePrompt,
       tools: [EdgeToolDefinition],
-      tokenizer: any EdgeToolsXGRTokenizer
+      tokenizer: AnyEdgeToolsXGRTokenizer
     ) throws -> EdgeToolsModelInput<[EdgeToolsToken.ID]> {
       let tokenIds = try tokenizer.encode(text: prompt.formatted(tools: tools))
       return EdgeToolsModelInput(value: tokenIds, tokenIds: tokenIds)

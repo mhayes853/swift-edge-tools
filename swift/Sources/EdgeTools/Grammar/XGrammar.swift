@@ -81,6 +81,48 @@
     }
   }
 
+  extension XGRMatcher: EdgeToolsGrammarMatcher {
+    public mutating func bitmask() -> GrammarBitmask {
+      self.grammarBitmask()
+    }
+  }
+
+  // MARK: - Grammar Context
+
+  public struct XGRGrammarContext {
+    public let tokenizerInfo: XGRTokenizerInfo
+
+    private let matcherPool = XGRToolCallMatcherPool()
+
+    public init(tokenizerInfo: XGRTokenizerInfo) {
+      self.tokenizerInfo = tokenizerInfo
+    }
+
+    fileprivate func matcher(
+      for grammar: XGRGrammar,
+      compiler: borrowing XGRCompiler
+    ) throws -> XGRMatcher {
+      let matcher = try self.matcherPool.matcher(grammar: grammar, compilingWith: compiler)
+      matcher.reset()
+      return matcher
+    }
+
+    func clearMatcherCache() {
+      self.matcherPool.clear()
+    }
+  }
+
+  extension XGRCompiler: EdgeToolsGrammarCompiler {
+    public typealias Context = XGRGrammarContext
+
+    public func matcher(
+      for grammar: XGRGrammar,
+      context: borrowing XGRGrammarContext
+    ) throws -> XGRMatcher {
+      try context.matcher(for: grammar, compiler: self)
+    }
+  }
+
   // MARK: - Grammar
 
   extension XGRGrammar {
@@ -162,19 +204,28 @@
     public static func schema(_ type: (some EdgeToolsGenerable).Type) -> Self {
       Self.grammar(.schema(type))
     }
+  }
 
-    func resolveGrammar(
-      tokenizerInfo: XGRTokenizerInfo,
-      toolCallGrammar: (GrammarToolCallRange) throws -> XGRGrammar
+  extension EdgeToolsXGRGenerationConstraint: EdgeToolsGenerationConstraint {
+    public typealias Context = XGRGrammarContext
+
+    public var toolCallRange: GrammarToolCallRange? {
+      guard case .toolsWithGrammar(let range, _) = self.kind else { return nil }
+      return range
+    }
+
+    public func grammar(
+      toolCallGrammar: XGRGrammar?,
+      context: XGRGrammarContext
     ) throws -> XGRGrammar {
       switch self.kind {
       case .unconstrained:
         return .universal
       case .grammar(let grammar):
         return grammar
-      case .toolsWithGrammar(let range, let transform):
-        let grammar = try toolCallGrammar(range)
-        return try transform?(grammar, tokenizerInfo) ?? grammar
+      case .toolsWithGrammar(_, let transform):
+        let grammar = toolCallGrammar ?? .universal
+        return try transform?(grammar, context.tokenizerInfo) ?? grammar
       }
     }
   }
@@ -499,9 +550,6 @@
     let range: Range<String.Index>
   }
 
-  // NB: A single scan replaces the regexes this used to use, both because embedded Swift ships
-  // no _StringProcessing and because rule references inside string literals must not be treated
-  // as references. Tracking literals inline is what makes that distinction reliable.
   extension StringProtocol where Index == String.Index, SubSequence == Substring {
     fileprivate var ebnfTokens: [EBNFToken] {
       var tokens = [EBNFToken]()

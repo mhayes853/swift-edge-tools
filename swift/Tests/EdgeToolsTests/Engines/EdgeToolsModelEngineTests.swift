@@ -42,8 +42,8 @@
       let range = GrammarToolCallRange.exact(1)
       let constraint = EdgeToolsXGRGenerationConstraint.toolsWithGrammar(
         range: range,
-        grammar: { toolsGrammar, _ in
-          observation.recordTransform()
+        grammar: { toolsGrammar, tokenizerInfo in
+          observation.recordTransform(tokenizerInfo: tokenizerInfo)
           return toolsGrammar
         }
       )
@@ -60,6 +60,7 @@
 
       expectNoDifference(observation.toolCallRange, range)
       expectNoDifference(observation.didTransform, true)
+      expectNoDifference(observation.didReceiveTokenizerInfo, true)
     }
 
     @Test
@@ -77,8 +78,8 @@
       let constraint = EdgeToolsXGRGenerationConstraint.toolsOrGrammar(
         userGrammar,
         range: range,
-        transform: { toolsGrammar, _ in
-          observation.recordTransform()
+        transform: { toolsGrammar, tokenizerInfo in
+          observation.recordTransform(tokenizerInfo: tokenizerInfo)
           return toolsGrammar
         }
       )
@@ -95,6 +96,7 @@
 
       expectNoDifference(observation.toolCallRange, range)
       expectNoDifference(observation.didTransform, true)
+      expectNoDifference(observation.didReceiveTokenizerInfo, true)
     }
 
     @Test
@@ -156,6 +158,7 @@
   private final class ConstraintObservation: Sendable {
     private let range = Lock<GrammarToolCallRange?>(nil)
     private let transformed = Lock(false)
+    private let tokenizerInfo = Lock<XGRTokenizerInfo?>(nil)
 
     var toolCallRange: GrammarToolCallRange? {
       self.range.withLock { $0 }
@@ -165,12 +168,17 @@
       self.transformed.withLock { $0 }
     }
 
+    var didReceiveTokenizerInfo: Bool {
+      self.tokenizerInfo.withLock { $0 != nil }
+    }
+
     func record(range: GrammarToolCallRange) {
       self.range.withLock { $0 = range }
     }
 
-    func recordTransform() {
+    func recordTransform(tokenizerInfo: XGRTokenizerInfo) {
       self.transformed.withLock { $0 = true }
+      self.tokenizerInfo.withLock { $0 = tokenizerInfo }
     }
   }
 
@@ -186,14 +194,26 @@
 
     typealias Prompt = NeedlePrompt
     typealias Input = [EdgeToolsToken.ID]
+    typealias Tokenizer = AnyEdgeToolsXGRTokenizer
     typealias GenerateParameters = Parameters
     typealias ToolCallParser = NeedleToolCallParser
+    typealias GrammarContext = XGRGrammarContext
 
     var assets: TestAssets?
     var constraintObservation: ConstraintObservation?
     var index = 0
 
     var vocabularySize: Int { 8192 }
+
+    func makeGrammarContext(tokenizer: AnyEdgeToolsXGRTokenizer) throws -> XGRGrammarContext {
+      try XGRGrammarContext(
+        tokenizerInfo: tokenizer.tokenizerInfo(modelVocabularySize: self.vocabularySize)
+      )
+    }
+
+    func makeGrammarCompiler(context: borrowing XGRGrammarContext) throws -> XGRCompiler {
+      try XGRCompiler(tokenizerInfo: context.tokenizerInfo)
+    }
 
     func toolCallGrammar(
       tools: [EdgeToolDefinition],
@@ -206,7 +226,7 @@
     func input(
       prompt: NeedlePrompt,
       tools: [EdgeToolDefinition],
-      tokenizer: any EdgeToolsXGRTokenizer
+      tokenizer: AnyEdgeToolsXGRTokenizer
     ) throws -> EdgeToolsModelInput<[EdgeToolsToken.ID]> {
       let tokenIds = tokenizer.encode(text: prompt.user)
       return EdgeToolsModelInput(value: tokenIds, tokenIds: tokenIds)

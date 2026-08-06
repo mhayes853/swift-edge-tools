@@ -223,13 +223,14 @@
   @available(anyAppleOS 27.0, *)
   extension NeedleCoreAIModel: NeedleModel {
     public typealias Input = NeedleModelInput
+    public typealias Tokenizer = AnyEdgeToolsXGRTokenizer
 
     public var vocabularySize: Int { self.configuration.vocabularySize }
 
     public func input(
       prompt: NeedlePrompt,
       tools: [EdgeToolDefinition],
-      tokenizer: any EdgeToolsXGRTokenizer
+      tokenizer: AnyEdgeToolsXGRTokenizer
     ) throws -> EdgeToolsModelInput<NeedleModelInput> {
       let input = NeedleModelInput(
         prompt: prompt,

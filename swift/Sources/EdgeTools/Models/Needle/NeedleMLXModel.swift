@@ -281,7 +281,7 @@
     public func grammar(
       tools: [EdgeToolDefinition],
       parameters: NeedleMLXGenerateParameters,
-      tokenizerInfo _: XGRTokenizerInfo
+      context _: XGRGrammarContext
     ) throws -> XGRGrammar {
       try self.toolCallGrammar(tools: tools, range: parameters.toolCallRange)
     }
@@ -830,14 +830,14 @@
 
     var metaState: [String] {
       get { [""] }
-      set {}
+      set { _ = newValue }
     }
 
     var isTrimmable: Bool { true }
 
     @discardableResult
-    func trim(_ n: Int) -> Int {
-      let trimmed = min(self.offset, n)
+    func trim(_ tokenCount: Int) -> Int {
+      let trimmed = min(self.offset, tokenCount)
       self.offset -= trimmed
       return trimmed
     }
@@ -856,11 +856,13 @@
     }
 
     func makeMask(
-      n: Int,
+      n tokenCount: Int,
       windowSize: Int?,
       returnArray _: Bool
     ) -> MLXFast.ScaledDotProductAttentionMaskMode {
-      n == 1 ? .none : .array(createCausalMask(n: n, offset: self.offset, windowSize: windowSize))
+      tokenCount == 1
+        ? .none
+        : .array(createCausalMask(n: tokenCount, offset: self.offset, windowSize: windowSize))
     }
 
     func ensureCapacity(required: Int, dtype: DType) {
@@ -955,7 +957,11 @@
     sublayer: MLXArray
   ) -> MLXArray {
     let residual = input + sigmoid(gate).asType(sublayer.dtype) * sublayer
-    return clip(residual, min: -.needleClippingMagnitude, max: .needleClippingMagnitude)
+    return clip(
+      residual,
+      min: -Float.needleClippingMagnitude,
+      max: Float.needleClippingMagnitude
+    )
   }
 
   private func paddingMask(inputIds: MLXArray, padTokenId: Int) -> MLXArray {

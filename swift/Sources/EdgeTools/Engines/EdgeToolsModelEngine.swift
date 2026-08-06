@@ -2,14 +2,8 @@
   import EdgeToolsXGrammar
 #endif
 
-#if XGrammar && Atomics
+#if Atomics
   import Atomics
-
-  // MARK: - EdgeToolsConstrainedGenerateParameters
-
-  public protocol EdgeToolsConstrainedGenerateParameters: EdgeToolsEngineGenerateParameters {
-    var constraint: EdgeToolsXGRGenerationConstraint { get }
-  }
 
   // MARK: - EdgeToolsModelInput
 
@@ -65,26 +59,36 @@
   public protocol EdgeToolsModel: SendableMetatype {
     associatedtype Prompt: Sendable
     associatedtype Input
+    associatedtype Tokenizer: EdgeToolsTokenizer
     associatedtype GenerateParameters: EdgeToolsEngineGenerateParameters
     associatedtype ToolCallParser: EdgeToolCallParser
+    associatedtype GrammarContext = Void
+    associatedtype GrammarCompiler: EdgeToolsGrammarCompiler, ~Copyable
+    where GrammarCompiler.Context == GrammarContext
 
     var vocabularySize: Int { get }
+
+    /// Creates model-specific context for constructing generation grammars and matchers.
+    func makeGrammarContext(tokenizer: Tokenizer) throws -> GrammarContext
+
+    /// Creates the grammar compiler used to constrain generation with `context`.
+    func makeGrammarCompiler(context: borrowing GrammarContext) throws -> GrammarCompiler
 
     func grammar(
       tools: [EdgeToolDefinition],
       parameters: GenerateParameters,
-      tokenizerInfo: XGRTokenizerInfo
-    ) throws -> XGRGrammar
+      context: GrammarContext
+    ) throws -> GrammarCompiler.Grammar
 
     func toolCallGrammar(
       tools: [EdgeToolDefinition],
       range: GrammarToolCallRange
-    ) throws -> XGRGrammar
+    ) throws -> GrammarCompiler.Grammar
 
     func input(
       prompt: Prompt,
       tools: [EdgeToolDefinition],
-      tokenizer: any EdgeToolsXGRTokenizer
+      tokenizer: Tokenizer
     ) throws -> EdgeToolsModelInput<Input>
 
     nonisolated(nonsending) mutating func prepare(
@@ -102,6 +106,10 @@
     mutating func resetGeneration()
   }
 
+  extension EdgeToolsModel where GrammarContext == Void {
+    public func makeGrammarContext(tokenizer _: Tokenizer) throws {}
+  }
+
   extension EdgeToolsModel {
     public func finish() -> EdgeToolsMetadata {
       EdgeToolsMetadata()
@@ -111,18 +119,21 @@
   }
 
   extension EdgeToolsModel
-  where GenerateParameters: EdgeToolsConstrainedGenerateParameters {
+  where
+    GenerateParameters: EdgeToolsConstrainedGenerateParameters,
+    GenerateParameters.Constraint.Grammar == GrammarCompiler.Grammar,
+    GenerateParameters.Constraint.Context == GrammarContext
+  {
     public func grammar(
       tools: [EdgeToolDefinition],
       parameters: GenerateParameters,
-      tokenizerInfo: XGRTokenizerInfo
-    ) throws -> XGRGrammar {
-      try parameters.constraint.resolveGrammar(
-        tokenizerInfo: tokenizerInfo,
-        toolCallGrammar: { range in
-          try self.toolCallGrammar(tools: tools, range: range)
-        }
-      )
+      context: GrammarContext
+    ) throws -> GrammarCompiler.Grammar {
+      let constraint = parameters.constraint
+      let toolCallGrammar = try constraint.toolCallRange.map {
+        try self.toolCallGrammar(tools: tools, range: $0)
+      }
+      return try constraint.grammar(toolCallGrammar: toolCallGrammar, context: context)
     }
   }
 
@@ -141,19 +152,19 @@
     public typealias GenerateParameters = Model.GenerateParameters
 
     private let generationGate = EdgeToolsModelGenerationGate()
-    private let grammarCompiler: XGRCompiler
-    private let matcherPool = XGRToolCallMatcherPool()
+    private var grammarCompiler: Model.GrammarCompiler
+    private let grammarContext: Model.GrammarContext
     private var model: Model
-    private let tokenizer: any EdgeToolsXGRTokenizer
+    private let tokenizer: Model.Tokenizer
     private let clock = ContinuousClock()
 
     public init(
       model: sending Model,
-      tokenizer: sending any EdgeToolsXGRTokenizer
+      tokenizer: sending Model.Tokenizer
     ) throws {
-      self.grammarCompiler = try XGRCompiler(
-        tokenizerInfo: tokenizer.tokenizerInfo(modelVocabularySize: model.vocabularySize)
-      )
+      let grammarContext = try model.makeGrammarContext(tokenizer: tokenizer)
+      self.grammarCompiler = try model.makeGrammarCompiler(context: grammarContext)
+      self.grammarContext = grammarContext
       self.model = model
       self.tokenizer = tokenizer
     }
@@ -168,11 +179,6 @@
         .compactMap { tokenId, token in
           token.map { EdgeToolsToken(id: tokenId, stringValue: $0) }
         }
-    }
-
-    public func clearCaches() {
-      self.matcherPool.clear()
-      self.grammarCompiler.clearCache()
     }
 
     public nonisolated func generate(
@@ -239,6 +245,7 @@
       parameters: sending Model.GenerateParameters,
       channel: EdgeToolsGenerationChannel,
       isStopped: ManagedAtomic<Bool>,
+      // swiftlint:disable:next identifier_name
       model: inout Model
     ) async throws -> EdgeToolsEngineGeneration {
       try Task.checkCancellation()
@@ -247,9 +254,9 @@
       let grammar = try model.grammar(
         tools: tools,
         parameters: parameters,
-        tokenizerInfo: self.grammarCompiler.tokenizerInfo
+        context: self.grammarContext
       )
-      let matcher = try self.matcher(grammar: grammar)
+      var matcher = try self.matcher(grammar: grammar)
       let generateStart = self.clock.now
       let input = try model.input(prompt: prompt, tools: tools, tokenizer: self.tokenizer)
       var preparation = try await model.prepare(input: input.value, parameters: parameters)
@@ -265,10 +272,9 @@
       if !matcher.isTerminated,
         !isStopped.load(ordering: .relaxed),
         generatedTokens.count < maximumTokenCount,
-        generatedTokens.last?.id != self.tokenizer.eosTokenId
-      {
+        generatedTokens.last?.id != self.tokenizer.eosTokenId {
         try Task.checkCancellation()
-        bitmask = matcher.grammarBitmask()
+        bitmask = matcher.bitmask()
       }
 
       while let currentBitmask = bitmask {
@@ -298,10 +304,9 @@
         if !matcher.isTerminated,
           !isStopped.load(ordering: .relaxed),
           generatedTokens.count < maximumTokenCount,
-          generatedTokens.last?.id != self.tokenizer.eosTokenId
-        {
+          generatedTokens.last?.id != self.tokenizer.eosTokenId {
           try Task.checkCancellation()
-          bitmask = matcher.grammarBitmask()
+          bitmask = matcher.bitmask()
         }
       }
 
@@ -332,15 +337,35 @@
       )
     }
 
-    private func matcher(grammar: XGRGrammar) throws -> XGRMatcher {
-      let matcher = try self.matcherPool.matcher(
-        grammar: grammar,
-        compilingWith: self.grammarCompiler
-      )
-      matcher.reset()
-      return matcher
+    private func matcher(
+      grammar: Model.GrammarCompiler.Grammar
+    ) throws -> Model.GrammarCompiler.Matcher {
+      try self.grammarCompiler.matcher(for: grammar, context: self.grammarContext)
     }
   }
+
+  #if XGrammar
+    extension EdgeToolsModelEngine
+    where Model.Tokenizer == AnyEdgeToolsXGRTokenizer {
+      public init(
+        model: sending Model,
+        tokenizer: sending any EdgeToolsXGRTokenizer
+      ) throws {
+        try self.init(
+          model: model,
+          tokenizer: AnyEdgeToolsXGRTokenizer(tokenizer)
+        )
+      }
+    }
+
+    extension EdgeToolsModelEngine
+    where Model.GrammarCompiler == XGRCompiler, Model.GrammarContext == XGRGrammarContext {
+      public func clearCaches() {
+        self.grammarContext.clearMatcherCache()
+        self.grammarCompiler.clearCache()
+      }
+    }
+  #endif
 
   extension EdgeToolsModelEngine: EdgeToolsPrefillableEngine
   where Model: EdgeToolsPrefillableModel {

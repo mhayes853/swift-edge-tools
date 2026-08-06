@@ -26,7 +26,7 @@
     func grammar(
       tools: [EdgeToolDefinition],
       parameters: GenerateParameters,
-      tokenizerInfo: XGRTokenizerInfo
+      context: XGRGrammarContext
     ) throws -> XGRGrammar
 
     func toolCallGrammar(
@@ -42,17 +42,23 @@
   }
 
   extension EdgeToolsMLXModel
-  where GenerateParameters: EdgeToolsConstrainedGenerateParameters {
+  where
+    GenerateParameters: EdgeToolsConstrainedGenerateParameters,
+    GenerateParameters.Constraint.Grammar == XGRGrammar,
+    GenerateParameters.Constraint.Context == XGRGrammarContext
+  {
     public func grammar(
       tools: [EdgeToolDefinition],
       parameters: GenerateParameters,
-      tokenizerInfo: XGRTokenizerInfo
+      context: XGRGrammarContext
     ) throws -> XGRGrammar {
-      try parameters.constraint.resolveGrammar(
-        tokenizerInfo: tokenizerInfo,
-        toolCallGrammar: { range in
-          try self.toolCallGrammar(tools: tools, range: range)
-        }
+      let constraint = parameters.constraint
+      let toolCallGrammar = try constraint.toolCallRange.map {
+        try self.toolCallGrammar(tools: tools, range: $0)
+      }
+      return try constraint.grammar(
+        toolCallGrammar: toolCallGrammar,
+        context: context
       )
     }
   }
@@ -271,11 +277,15 @@
 
   // MARK: - EdgeToolsMLXModel Adapter
 
+  // swiftlint:disable:next type_name
   public struct _EdgeToolsMLXModel<Model: EdgeToolsMLXModel>: EdgeToolsModel {
     public typealias Prompt = Model.Prompt
     public typealias Input = LMInput
+    public typealias Tokenizer = AnyEdgeToolsXGRTokenizer
     public typealias GenerateParameters = Model.GenerateParameters
     public typealias ToolCallParser = Model.ToolCallParser
+    public typealias GrammarCompiler = XGRCompiler
+    public typealias GrammarContext = XGRGrammarContext
 
     private struct CachedPrefill {
       let tokenIds: [EdgeToolsToken.ID]
@@ -304,16 +314,26 @@
 
     public var vocabularySize: Int { self.model.vocabularySize }
 
+    public func makeGrammarContext(
+      tokenizer: AnyEdgeToolsXGRTokenizer
+    ) throws -> XGRGrammarContext {
+      try XGRGrammarContext(
+        tokenizerInfo: tokenizer.tokenizerInfo(modelVocabularySize: self.vocabularySize)
+      )
+    }
+
+    public func makeGrammarCompiler(
+      context: borrowing XGRGrammarContext
+    ) throws -> XGRCompiler {
+      try XGRCompiler(tokenizerInfo: context.tokenizerInfo)
+    }
+
     public func grammar(
       tools: [EdgeToolDefinition],
       parameters: Model.GenerateParameters,
-      tokenizerInfo: XGRTokenizerInfo
+      context: XGRGrammarContext
     ) throws -> XGRGrammar {
-      try self.model.grammar(
-        tools: tools,
-        parameters: parameters,
-        tokenizerInfo: tokenizerInfo
-      )
+      try self.model.grammar(tools: tools, parameters: parameters, context: context)
     }
 
     public func toolCallGrammar(
@@ -326,7 +346,7 @@
     public func input(
       prompt: Model.Prompt,
       tools: [EdgeToolDefinition],
-      tokenizer: any EdgeToolsXGRTokenizer
+      tokenizer: AnyEdgeToolsXGRTokenizer
     ) throws -> EdgeToolsModelInput<LMInput> {
       let input = try self.model.input(prompt: prompt, tools: tools, tokenizer: tokenizer)
       return EdgeToolsModelInput(
@@ -500,7 +520,10 @@
       model: sending MLXModel,
       tokenizer: sending any EdgeToolsXGRTokenizer
     ) throws where Model == _EdgeToolsMLXModel<MLXModel> {
-      try self.init(model: _EdgeToolsMLXModel(model: model), tokenizer: tokenizer)
+      try self.init(
+        model: _EdgeToolsMLXModel(model: model),
+        tokenizer: AnyEdgeToolsXGRTokenizer(tokenizer)
+      )
     }
 
     public init<MLXModel: EdgeToolsMLXModel>(
@@ -524,7 +547,10 @@
         throw EdgeToolsError.unsupportedTokenizer
       }
       let model = try MLXModel.loadEdgeToolsLanguageModel(from: directoryURL, model: makeModel)
-      try self.init(model: _EdgeToolsMLXModel(model: model), tokenizer: tokenizer)
+      try self.init(
+        model: _EdgeToolsMLXModel(model: model),
+        tokenizer: AnyEdgeToolsXGRTokenizer(tokenizer)
+      )
     }
   }
 #endif
