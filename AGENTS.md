@@ -85,4 +85,6 @@ MLX tests an only be ran through via Xcode and not through `swift test`.
 
 Make sure to prefer using `expectNoDifference` over `#expect` for assertions. The only times where `#expect` are preferred are for `#expect(throws:)` and for `WASITests` (`expectNoDifference` doesn't work properly on WASI). For assertions on boolean expressions, you can do `expectNoDifference(myConditionExpression, true)` or `expectNoDifference(myConditionExpression, false)`.
 
+When snapshots update from new generation tests, don't delete or revert them. Leave them as is.
+
 `test_wasm.sh` and `test_linux.sh` can be used to run WASM and Linux tests on macOS.
