@@ -111,11 +111,10 @@ public struct NeedleModelConfiguration: Hashable, Sendable, Codable {
   }
 }
 
-// MARK: - NeedleNumerics
+// MARK: - Float
 
-enum NeedleNumerics {
-  static let float16ClippingMagnitude: Float = 65_500
-  static let maskedAttentionScore = -Self.float16ClippingMagnitude
+extension Float {
+  static let needleClippingMagnitude: Self = 65_500
 }
 
 // MARK: - Loading

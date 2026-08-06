@@ -379,7 +379,7 @@
     }
 
     private static func selfAttentionMask(step: Int, maxLength: Int) -> [Float] {
-      (0..<maxLength).map { $0 <= step ? 0 : NeedleNumerics.maskedAttentionScore }
+      (0..<maxLength).map { $0 <= step ? 0 : -.needleClippingMagnitude }
     }
   }
 

@@ -531,7 +531,7 @@
   extension NeedleCoreMLModel {
     private static func selfAttentionMask(step: Int, maxLength: Int) -> MLTensor {
       let scalars = (0..<maxLength).map {
-        $0 <= step ? Float16.zero : Float16(NeedleNumerics.maskedAttentionScore)
+        $0 <= step ? Float16.zero : Float16(-Float.needleClippingMagnitude)
       }
       return MLTensor(shape: [1, 1, 1, maxLength], scalars: scalars)
     }

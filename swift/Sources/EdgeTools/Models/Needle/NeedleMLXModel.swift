@@ -57,8 +57,10 @@
     }
 
     public func newCache(parameters _: MLXLMCommon.GenerateParameters?) -> [any KVCache] {
-      (0..<self.configuration.decoderLayers)
-        .map { _ in NeedleKVCache(configuration: self.configuration) }
+      (0..<self.configuration.decoderLayers).map { _ in
+        let dtype = self.model.embedding.weight.dtype
+        return NeedleKVCache(configuration: self.configuration, dtype: dtype)
+      }
     }
 
     public func prepare(
@@ -118,9 +120,7 @@
       state: LMOutput.State?
     ) -> LMOutput {
       precondition(input.tokens.dim(1) == 1, "Needle decoding requires exactly one token.")
-      guard let crossAttentionMask = self.crossAttentionMask,
-        let precomputedCrossAttention = self.crossAttentionKV
-      else {
+      guard let crossAttentionMask, let crossAttentionKV else {
         preconditionFailure("Needle must be prepared before decoding.")
       }
       let encoderOutput =
@@ -128,7 +128,7 @@
       return self.decode(
         input.tokens,
         crossAttentionMask: crossAttentionMask,
-        precomputedCrossAttention: precomputedCrossAttention,
+        precomputedCrossAttention: crossAttentionKV,
         caches: self.caches(from: cache),
         encoderOutput: encoderOutput
       )
@@ -192,10 +192,8 @@
           offset: offset + 1
         )
       }
-      return LMOutput(
-        logits: outputs[0],
-        state: LMOutput.State(crossAttentionStates: encoderOutput)
-      )
+      let state = LMOutput.State(crossAttentionStates: encoderOutput)
+      return LMOutput(logits: outputs[0], state: state)
     }
 
     private func caches(from caches: [any KVCache]?) -> [NeedleKVCache] {
@@ -781,42 +779,41 @@
     let initialCapacity: Int
     let maximumCapacity: Int
     private(set) var capacity: Int
-    private var keys: MLXArray?
-    private var values: MLXArray?
+    private var keys: MLXArray
+    private var values: MLXArray
 
     var maxSize: Int? { self.maximumCapacity }
 
-    init(configuration: NeedleModelConfiguration) {
+    init(configuration: NeedleModelConfiguration, dtype: DType) {
+      let capacity = min(128, configuration.decoderMaxLength)
+      let shape = [1, configuration.kvHeads, capacity, configuration.attentionHeadDimensions]
       self.kvHeads = configuration.kvHeads
       self.headDimensions = configuration.attentionHeadDimensions
-      self.initialCapacity = min(128, configuration.decoderMaxLength)
+      self.initialCapacity = capacity
       self.maximumCapacity = configuration.decoderMaxLength
-      self.capacity = self.initialCapacity
+      self.capacity = capacity
+      self.keys = MLXArray.zeros(shape, dtype: dtype)
+      self.values = MLXArray.zeros(shape, dtype: dtype)
     }
 
     func innerState() -> [MLXArray] {
-      [self.keys, self.values].compactMap { $0 }
+      [self.keys, self.values]
     }
 
     func update(keys: MLXArray, values: MLXArray) -> (MLXArray, MLXArray) {
       let newOffset = self.offset + keys.dim(2)
       self.ensureCapacity(required: newOffset, dtype: keys.dtype)
-      self.keys?[.ellipsis, self.offset..<newOffset, 0...] = keys
-      self.values?[.ellipsis, self.offset..<newOffset, 0...] = values
+      self.keys[.ellipsis, self.offset..<newOffset, 0...] = keys
+      self.values[.ellipsis, self.offset..<newOffset, 0...] = values
       self.offset = newOffset
-      return (
-        self.keys![.ellipsis, ..<self.offset, 0...],
-        self.values![.ellipsis, ..<self.offset, 0...]
-      )
+      let keys = self.keys[.ellipsis, ..<self.offset, 0...]
+      let values = self.values[.ellipsis, ..<self.offset, 0...]
+      return (keys, values)
     }
 
     var state: [MLXArray] {
       get {
-        guard let keys = self.keys, let values = self.values else { return [] }
-        return [
-          keys[.ellipsis, ..<self.offset, 0...],
-          values[.ellipsis, ..<self.offset, 0...],
-        ]
+        [self.keys[.ellipsis, ..<self.offset, 0...], self.values[.ellipsis, ..<self.offset, 0...]]
       }
       set {
         precondition(newValue.count == 2, "NeedleKVCache state must contain keys and values.")
@@ -846,17 +843,16 @@
     }
 
     func copy() -> any KVCache {
-      let copy = NeedleKVCache(
+      NeedleKVCache(
         kvHeads: self.kvHeads,
         headDimensions: self.headDimensions,
         initialCapacity: self.initialCapacity,
         maximumCapacity: self.maximumCapacity,
-        capacity: self.capacity
+        capacity: self.capacity,
+        offset: self.offset,
+        keys: self.keys[.ellipsis],
+        values: self.values[.ellipsis]
       )
-      copy.offset = self.offset
-      copy.keys = self.keys.map { $0[.ellipsis] }
-      copy.values = self.values.map { $0[.ellipsis] }
-      return copy
     }
 
     func makeMask(
@@ -872,28 +868,19 @@
       while self.capacity < required {
         self.capacity = min(self.maximumCapacity, self.capacity * 2)
       }
-      guard self.keys == nil || self.keys?.dim(2) != self.capacity else { return }
+      guard self.keys.dim(2) != self.capacity else { return }
 
-      if let keys = self.keys, let values = self.values {
-        let added = self.capacity - keys.dim(2)
-        self.keys = concatenated(
-          [keys, MLXArray.zeros([1, self.kvHeads, added, self.headDimensions], dtype: dtype)],
-          axis: 2
-        )
-        self.values = concatenated(
-          [values, MLXArray.zeros([1, self.kvHeads, added, self.headDimensions], dtype: dtype)],
-          axis: 2
-        )
-      } else {
-        let shape = [1, self.kvHeads, self.capacity, self.headDimensions]
-        self.keys = MLXArray.zeros(shape, dtype: dtype)
-        self.values = MLXArray.zeros(shape, dtype: dtype)
-      }
+      let added = self.capacity - self.keys.dim(2)
+      let newKeys = MLXArray.zeros([1, self.kvHeads, added, self.headDimensions], dtype: dtype)
+      self.keys = concatenated([self.keys,newKeys], axis: 2)
+
+      let newValues = MLXArray.zeros([1, self.kvHeads, added, self.headDimensions], dtype: dtype)
+      self.values = concatenated([self.values, newValues], axis: 2)
     }
 
     func fullState(dtype: DType) -> State {
       self.ensureCapacity(required: self.offset + 1, dtype: dtype)
-      return State(keys: self.keys!, values: self.values!)
+      return State(keys: self.keys, values: self.values)
     }
 
     func replace(state: State, offset: Int) {
@@ -908,13 +895,19 @@
       headDimensions: Int,
       initialCapacity: Int,
       maximumCapacity: Int,
-      capacity: Int
+      capacity: Int,
+      offset: Int,
+      keys: MLXArray,
+      values: MLXArray
     ) {
       self.kvHeads = kvHeads
       self.headDimensions = headDimensions
       self.initialCapacity = initialCapacity
       self.maximumCapacity = maximumCapacity
       self.capacity = capacity
+      self.offset = offset
+      self.keys = keys
+      self.values = values
     }
 
     private func padded(_ array: MLXArray, capacity: Int) -> MLXArray {
@@ -961,11 +954,8 @@
     gate: MLXArray,
     sublayer: MLXArray
   ) -> MLXArray {
-    clip(
-      input + sigmoid(gate).asType(sublayer.dtype) * sublayer,
-      min: -NeedleNumerics.float16ClippingMagnitude,
-      max: NeedleNumerics.float16ClippingMagnitude
-    )
+    let residual = input + sigmoid(gate).asType(sublayer.dtype) * sublayer
+    return clip(residual, min: -.needleClippingMagnitude, max: .needleClippingMagnitude)
   }
 
   private func paddingMask(inputIds: MLXArray, padTokenId: Int) -> MLXArray {
