@@ -23,6 +23,10 @@ import Foundation
     try await downloadModel(id: "LiquidAI/LFM2.5-230M-MLX-4bit")
   }
 
+  func downloadGraniteMoeHybrid() async throws -> URL {
+    try await downloadModel(id: "mlx-community/granite-4.0-h-350m-5bit")
+  }
+
   private func downloadModel(id: String) async throws -> URL {
     let hub = HubApi(downloadBase: URL.swiftEdgeToolsTestsDirectory)
     let repo = Hub.Repo(id: id, type: .models)
