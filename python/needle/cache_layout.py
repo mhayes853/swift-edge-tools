@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from .decoder_strategy import (  # pyright: ignore[reportMissingImports]
-    DecoderExportStrategy,
-)
+from .decoder_strategy import DecoderExportStrategy
 from .needle_configuration import NeedleModelConfiguation
 
 

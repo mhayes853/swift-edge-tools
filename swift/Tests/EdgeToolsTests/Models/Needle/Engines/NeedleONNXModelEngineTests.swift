@@ -26,6 +26,24 @@
     }
 
     @Test
+    func `Generation Grows Adaptive Cache Beyond Initial Capacity`() async throws {
+      let engine = try await makeNeedleONNXModelEngine()
+      let generationTask = try engine.generate(
+        prompt: .sendAdventureEmail,
+        tools: NeedlePrompt.sendAdventureEmailDefinitions,
+        parameters: NeedleONNXGenerateParameters(
+          maxTokens: 129,
+          toolCallRange: .exact(100)
+        ),
+        channel: EdgeToolsGenerationChannel()
+      )
+      let generation = try await generationTask.value
+
+      expectNoDifference(generation.tokens.count, 129)
+      expectNoDifference(generation.decodeMetrics.tokens, 129)
+    }
+
+    @Test
     func `Sequential Generations With CPU`() async throws {
       let engine = try await makeNeedleONNXModelEngine()
       let firstTask = try engine.generate(
