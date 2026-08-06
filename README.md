@@ -3,6 +3,51 @@
 A Swift runtime for local model tool calling, with built-in support for
 [Cactus Needle](https://github.com/cactus-compute/needle).
 
+## The `edge` CLI
+
+`edge` runs a prompt against a model and reports what it generated, which tool calls it
+made, and how fast it did so. It never invokes tools — it reports the calls the model
+produced.
+
+```sh
+source ./setup.sh
+```
+
+This builds `swift/CLI` and puts `edge` on your `PATH` for the current shell.
+
+```sh
+# a Hugging Face repo, cached under ${HF_HOME:-~/.cache/huggingface}
+edge Cactus-Compute/needle -p "Set a timer for 20 minutes" --tools my_tools.json
+
+# a local directory, such as a fresh export
+edge --path ./exports/needle-onnx-int4 -p "..." --tools my_tools.json
+
+# what model and engines were detected, without running anything
+edge info Cactus-Compute/needle
+
+# distribution of metrics across repeated runs
+edge bench Cactus-Compute/needle -p "..." --repeat-count 20 --warmup 3 --json
+```
+
+The model is detected from `config.json`, and the engine from the weights present in the
+directory (`.safetensors` for MLX, `.onnx`, `.mlmodelc`/`.mlpackage` for CoreML, and
+`.aimodel`/`.aimodelc` for CoreAI). CoreAI is experimental, needs Swift 6.4 to build and
+OS 27 to run, and is never selected automatically — pass `--engine coreai` to use it.
+Needle is currently the only model with a CoreAI export, produced by the Python CLI. Unrecognized architectures fall back to a generic MLX path, which has no
+tool call grammar or parser, so tool calls from those models are not parsed.
+
+`--tools` accepts OpenAI function-calling JSON. Without it, a built-in five-tool demo set
+(`send_email`, `set_timer`, `search_web`, `create_calendar_event`, `get_weather`) is used,
+covering strings, integers, booleans, enums and arrays. `--grammar` selects the generation
+constraint: `auto` (the model's tool call grammar), `unconstrained`, `json`, a grammar
+file (`.ebnf`, `.lark`, `.json`), or an inline `<format>:<value>` such as
+`regex:\d{4}-\d{2}-\d{2}`. A custom grammar replaces the tool call grammar rather than
+composing with it.
+
+Only models whose generate parameters expose a full generation constraint support
+`--grammar` beyond `auto`. Needle exposes only a tool call range, on every engine, so it
+is limited to `--grammar auto`.
+
 ## Package Traits
 
 `Foundation` is enabled by default and provides conveniences such as `URL`-based model
