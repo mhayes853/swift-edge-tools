@@ -5,14 +5,14 @@
   import Testing
 
   @Suite
-  struct `EdgeToolsTokenizerLoading tests` {
+  struct `EdgeToolsAutoTokenizer tests` {
     @Test
     func `Missing Tokenizer Describes Available Options`() async {
       let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
       defer { try? FileManager.default.removeItem(at: directory) }
 
       let error = await #expect(throws: EdgeToolsError.self) {
-        _ = try await loadEdgeToolsTokenizer(from: directory)
+        _ = try await EdgeToolsAutoTokenizer.from(modelDirectory: directory)
       }
       expectNoDifference(error?.code, .noCompatibleTokenizer)
       expectNoDifference(error?.message.contains("tokenizer.model"), true)
@@ -31,7 +31,7 @@
       )
 
       await #expect(throws: Never.self) {
-        _ = try await loadEdgeToolsTokenizer(from: directory)
+        _ = try await EdgeToolsAutoTokenizer.from(modelDirectory: directory)
       }
     }
 
@@ -41,7 +41,7 @@
         let directory = try self.makeTransformersTokenizerDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
 
-        let tokenizer = try await loadEdgeToolsTokenizer(from: directory)
+        let tokenizer = try await EdgeToolsAutoTokenizer.from(modelDirectory: directory)
         let preTrainedTokenizer = try #require(tokenizer as? TransformersTokenizer)
         let tokenIDs = (
           preTrainedTokenizer.bosTokenId,

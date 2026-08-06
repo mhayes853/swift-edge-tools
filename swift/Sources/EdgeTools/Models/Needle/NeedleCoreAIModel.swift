@@ -345,7 +345,7 @@
       modelCache: AIModelCache = .default,
       cachePolicy: AIModelCache.Policy = .default
     ) async throws {
-      let tokenizer = try await loadEdgeToolsTokenizer(from: modelDirectoryURL)
+      let tokenizer = try await EdgeToolsAutoTokenizer.from(modelDirectory: modelDirectoryURL)
       let model = try await NeedleCoreAIModel(
         modelDirectoryURL: modelDirectoryURL,
         editConfiguration: editConfiguration,

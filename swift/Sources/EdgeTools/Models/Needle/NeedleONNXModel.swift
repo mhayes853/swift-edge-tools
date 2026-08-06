@@ -467,7 +467,7 @@
           from directoryURL: URL,
           runtime: sending CONNXRuntime
         ) async throws {
-          let tokenizer = try await loadEdgeToolsTokenizer(from: directoryURL)
+          let tokenizer = try await EdgeToolsAutoTokenizer.from(modelDirectory: directoryURL)
           guard let configuration = try NeedleModelConfiguration.decode(in: directoryURL) else {
             throw EdgeToolsError.failedToLoadConfiguration
           }

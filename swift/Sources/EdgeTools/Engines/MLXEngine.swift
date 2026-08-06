@@ -556,7 +556,7 @@
       from directoryURL: URL,
       model makeModel: @Sendable (Base.ModelConfiguration) throws -> Base
     ) async throws where Model == _EdgeToolsMLXModel<Base> {
-      let tokenizer = try await loadEdgeToolsTokenizer(from: directoryURL)
+      let tokenizer = try await EdgeToolsAutoTokenizer.from(modelDirectory: directoryURL)
       let model = try Base.loadEdgeToolsLanguageModel(from: directoryURL, model: makeModel)
       try self.init(model: _EdgeToolsMLXModel(model: model), tokenizer: tokenizer)
     }

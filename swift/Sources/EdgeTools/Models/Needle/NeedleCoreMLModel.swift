@@ -252,7 +252,7 @@
       editModelConfiguration: (inout MLModelConfiguration) -> Void = { _ in },
       editConfiguration: (inout NeedleModelConfiguration) -> Void = { _ in }
     ) async throws {
-      let tokenizer = try await loadEdgeToolsTokenizer(from: modelDirectoryURL)
+      let tokenizer = try await EdgeToolsAutoTokenizer.from(modelDirectory: modelDirectoryURL)
       let model = try await NeedleCoreMLModel(
         modelDirectoryURL: modelDirectoryURL,
         modelConfiguration: modelConfiguration,
