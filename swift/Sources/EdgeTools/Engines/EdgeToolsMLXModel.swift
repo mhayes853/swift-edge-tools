@@ -37,7 +37,7 @@
     func input(
       prompt: Prompt,
       tools: [EdgeToolDefinition],
-      tokenizer: any EdgeToolsXGRTokenizer
+      tokenizer: any EdgeToolsTokenizer
     ) throws -> LMInput
   }
 
@@ -170,7 +170,7 @@
       public func input(
         prompt: EdgeToolsLLMPrompt,
         tools: [EdgeToolDefinition],
-        tokenizer: any EdgeToolsXGRTokenizer
+        tokenizer: any EdgeToolsTokenizer
       ) throws -> LMInput {
         guard let tokenizer = tokenizer as? EdgeToolsPreTrainedTokenizer else {
           throw EdgeToolsError.unsupportedTokenizer
@@ -314,7 +314,7 @@
 
     public var vocabularySize: Int { self.model.vocabularySize }
 
-    public func makeGrammarContext(
+    public func grammarContext(
       tokenizer: AnyEdgeToolsXGRTokenizer
     ) throws -> XGRGrammarContext {
       try XGRGrammarContext(
@@ -322,7 +322,7 @@
       )
     }
 
-    public func makeGrammarCompiler(
+    public func grammarCompiler(
       context: borrowing XGRGrammarContext
     ) throws -> XGRCompiler {
       try XGRCompiler(tokenizerInfo: context.tokenizerInfo)

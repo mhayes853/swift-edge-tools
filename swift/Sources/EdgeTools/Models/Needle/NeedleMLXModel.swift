@@ -15,7 +15,7 @@
     public static func needle(
       prompt: NeedlePrompt,
       tools: [EdgeToolDefinition],
-      using tokenizer: some EdgeToolsXGRTokenizer
+      using tokenizer: some EdgeToolsTokenizer
     ) throws -> Self {
       let tokens = tokenizer.encode(text: try prompt.formatted(tools: tools))
       return LMInput(text: LMInput.Text(tokens: MLXArray(tokens)))
@@ -296,7 +296,7 @@
     public func input(
       prompt: NeedlePrompt,
       tools: [EdgeToolDefinition],
-      tokenizer: any EdgeToolsXGRTokenizer
+      tokenizer: any EdgeToolsTokenizer
     ) throws -> LMInput {
       try LMInput.needle(prompt: prompt, tools: tools, using: tokenizer)
     }

@@ -9,7 +9,7 @@
 // MARK: - NeedleModelConfiguration
 
 public struct NeedleModelConfiguration: Hashable, Sendable {
-  public var vocabularySize: Int = 8192
+  public var vocabularySize: Int = .needleVocabularySize
   public var dimensions: Int = 512
   public var hiddenDimensions: Int = 512
   public var attentionHeads: Int = 8
@@ -51,7 +51,7 @@ public struct NeedleModelConfiguration: Hashable, Sendable {
   }
 
   public init(
-    vocabularySize: Int = 8192,
+    vocabularySize: Int = .needleVocabularySize,
     dimensions: Int = 512,
     hiddenDimensions: Int = 512,
     attentionHeads: Int = 8,
@@ -122,6 +122,10 @@ extension Float {
   static let needleClippingMagnitude: Self = 65_500
 }
 
+extension Int {
+  public static let needleVocabularySize: Self = 8192
+}
+
 // MARK: - Loading
 
 #if Foundation
@@ -175,19 +179,17 @@ extension NeedlePrompt {
     return "\(self.system)\(separator)\(self.user)<tools>\(toolsSchema)"
   }
 
-  #if XGrammar
-    public func tokenized(
-      tools: [EdgeToolDefinition],
-      using tokenizer: some EdgeToolsXGRTokenizer
-    ) throws -> [EdgeToolsToken] {
-      let tokenIds = tokenizer.encode(text: try self.formatted(tools: tools))
-      let tokens = tokenizer.convertIdsToTokens(tokenIds)
-      return zip(tokenIds, tokens)
-        .compactMap { (tokenId, token) in
-          token.map { EdgeToolsToken(id: tokenId, stringValue: $0) }
-        }
-    }
-  #endif
+  public func tokenized(
+    tools: [EdgeToolDefinition],
+    using tokenizer: some EdgeToolsTokenizer
+  ) throws -> [EdgeToolsToken] {
+    let tokenIds = tokenizer.encode(text: try self.formatted(tools: tools))
+    let tokens = tokenizer.convertIdsToTokens(tokenIds)
+    return zip(tokenIds, tokens)
+      .compactMap { (tokenId, token) in
+        token.map { EdgeToolsToken(id: tokenId, stringValue: $0) }
+      }
+  }
 }
 
 // MARK: - EdgeToolDefinition
@@ -254,13 +256,13 @@ public struct NeedleToolCallParser: EdgeToolCallParser, Sendable {
     {}
 
     extension NeedleModel where Tokenizer == AnyEdgeToolsXGRTokenizer {
-      public func makeGrammarContext(tokenizer: Tokenizer) throws -> XGRGrammarContext {
+      public func grammarContext(tokenizer: Tokenizer) throws -> XGRGrammarContext {
         try XGRGrammarContext(
           tokenizerInfo: tokenizer.tokenizerInfo(modelVocabularySize: self.vocabularySize)
         )
       }
 
-      public func makeGrammarCompiler(
+      public func grammarCompiler(
         context: borrowing XGRGrammarContext
       ) throws -> XGRCompiler {
         try XGRCompiler(tokenizerInfo: context.tokenizerInfo)
@@ -288,7 +290,7 @@ public struct NeedleToolCallParser: EdgeToolCallParser, Sendable {
   extension XGRTokenizerInfo {
     public static func needle(
       tokenizer: some EdgeToolsXGRTokenizer,
-      vocabularySize: Int = 8192
+      vocabularySize: Int = .needleVocabularySize
     ) throws -> XGRTokenizerInfo {
       try Self.needle(
         vocabulary: tokenizer.convertIdsToTokens(Array(0..<vocabularySize)),

@@ -50,12 +50,6 @@
 
   // MARK: - EdgeToolsModel
 
-  /// A model that drives a single generation at a time for ``EdgeToolsModelEngine``.
-  ///
-  /// A conformance owns both its global assets and the transient state of the generation that is
-  /// currently in flight. ``prepare(input:parameters:)`` starts a generation, each
-  /// ``decode(bitmask:parameters:)`` produces exactly one token, and ``resetGeneration()`` releases the
-  /// transient state once the generation succeeds, fails, or is cancelled.
   public protocol EdgeToolsModel: SendableMetatype {
     associatedtype Prompt: Sendable
     associatedtype Input
@@ -68,11 +62,8 @@
 
     var vocabularySize: Int { get }
 
-    /// Creates model-specific context for constructing generation grammars and matchers.
-    func makeGrammarContext(tokenizer: Tokenizer) throws -> GrammarContext
-
-    /// Creates the grammar compiler used to constrain generation with `context`.
-    func makeGrammarCompiler(context: borrowing GrammarContext) throws -> GrammarCompiler
+    func grammarContext(tokenizer: Tokenizer) throws -> GrammarContext
+    func grammarCompiler(context: borrowing GrammarContext) throws -> GrammarCompiler
 
     func grammar(
       tools: [EdgeToolDefinition],
@@ -107,7 +98,7 @@
   }
 
   extension EdgeToolsModel where GrammarContext == Void {
-    public func makeGrammarContext(tokenizer _: Tokenizer) throws {}
+    public func grammarContext(tokenizer _: Tokenizer) throws {}
   }
 
   extension EdgeToolsModel {
@@ -162,8 +153,8 @@
       model: sending Model,
       tokenizer: sending Model.Tokenizer
     ) throws {
-      let grammarContext = try model.makeGrammarContext(tokenizer: tokenizer)
-      self.grammarCompiler = try model.makeGrammarCompiler(context: grammarContext)
+      let grammarContext = try model.grammarContext(tokenizer: tokenizer)
+      self.grammarCompiler = try model.grammarCompiler(context: grammarContext)
       self.grammarContext = grammarContext
       self.model = model
       self.tokenizer = tokenizer

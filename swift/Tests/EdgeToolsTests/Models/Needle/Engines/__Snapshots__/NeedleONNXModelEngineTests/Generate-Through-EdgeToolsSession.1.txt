@@ -1,11 +1,11 @@
 ▿ EdgeToolsSessionGeneration
   ▿ engineGeneration: EdgeToolsEngineGeneration
     ▿ decodeMetrics: EdgeToolsDecodeMetrics
-      ▿ duration: 0.242092958 seconds
-        - _low: 242092958000000000
+      ▿ duration: 0.191967208 seconds
+        - _low: 191967208000000000
         - _high: 0
-      ▿ durationToFirstToken: 0.049808917 seconds
-        - _low: 49808917000000000
+      ▿ durationToFirstToken: 0.026147208 seconds
+        - _low: 26147208000000000
         - _high: 0
       - tokens: 46
     ▿ metadata: 2 key/value pairs
@@ -18,15 +18,15 @@
           - rawValue: "PerTokenConfidences"
         ▿ value: 46 elements
           - 1.0
-          - 0.9639591
-          - 0.9999988
+          - 0.96395904
+          - 0.99999887
+          - 0.99999994
+          - 0.9999997
           - 1.0
-          - 0.99999976
-          - 1.0
-          - 0.99999976
-          - 0.9999392
-          - 0.99998784
-          - 1.0
+          - 0.9999998
+          - 0.99993914
+          - 0.9999879
+          - 0.99999994
           - 0.9088199
           - 0.99997175
           - 0.58302176
@@ -37,35 +37,35 @@
           - 0.9999976
           - 1.0
           - 0.99997747
-          - 0.99999666
-          - 0.99999976
-          - 0.9982205
+          - 0.9999966
+          - 0.9999998
+          - 0.99822044
           - 0.5727965
           - 0.59771866
           - 0.9889437
-          - 0.95618933
+          - 0.9561894
           - 0.99998534
-          - 0.99957687
+          - 0.9995769
           - 0.5909726
           - 0.69934106
-          - 0.9948389
-          - 0.99516594
+          - 0.99483895
+          - 0.9951659
           - 0.800114
           - 0.9672435
           - 0.8808443
           - 0.9947744
           - 0.999853
-          - 0.9999062
+          - 0.99990624
           - 0.9226527
-          - 0.78047633
+          - 0.7804763
           - 0.50780004
-          - 0.96239483
+          - 0.9623949
           - 0.9861341
           - 0.9952998
           - 1.0
     ▿ prefillMetrics: EdgeToolsPrefillMetrics
-      ▿ duration: 0.045349334 seconds
-        - _low: 45349334000000000
+      ▿ duration: 0.023071458 seconds
+        - _low: 23071458000000000
         - _high: 0
       - tokens: 150
     - response: "<tool_call> [{\"name\":\"send_email\",\"arguments\":{\"address\":\"henderry@gmail.com\",\"subject\":\"Hello\",\"body\":\"Could you please go on an adventure?[\"}}]"
@@ -231,7 +231,7 @@
       ▿ AnyEdgeToolCall
         ▿ base: EdgeToolCall<SendEmailTool>
           ▿ id: EdgeToolCallID
-            - rawValue: "C6D76EAC-CA95-4E22-8C37-4E341ABA2C97"
+            - rawValue: "7774358F-B94B-45EF-9302-2C3F74494A69"
           ▿ input: Input
             - address: "henderry@gmail.com"
             - body: "Could you please go on an adventure?["

@@ -1,11 +1,11 @@
 ▿ EdgeToolsSessionGeneration
   ▿ engineGeneration: EdgeToolsEngineGeneration
     ▿ decodeMetrics: EdgeToolsDecodeMetrics
-      ▿ duration: 0.741626334 seconds
-        - _low: 741626334000000000
+      ▿ duration: 0.766818458 seconds
+        - _low: 766818458000000000
         - _high: 0
-      ▿ durationToFirstToken: 2.702689708 seconds
-        - _low: 2702689708000000000
+      ▿ durationToFirstToken: 2.784700417 seconds
+        - _low: 2784700417000000000
         - _high: 0
       - tokens: 84
     ▿ metadata: 2 key/value pairs
@@ -18,92 +18,92 @@
           - rawValue: "PerTokenConfidences"
         ▿ value: 84 elements
           - 1.0
-          - 0.9640324
-          - 0.9999988
+          - 0.96403235
+          - 0.99999887
+          - 0.99999994
+          - 0.9999997
           - 1.0
-          - 0.99999976
-          - 1.0
-          - 0.99999976
-          - 0.99993896
-          - 0.99998784
-          - 1.0
-          - 0.9084063
+          - 0.9999998
+          - 0.999939
+          - 0.9999879
+          - 0.99999994
+          - 0.90840626
           - 0.9999716
           - 0.5822816
           - 0.8203455
-          - 0.7050882
-          - 0.9593864
+          - 0.70508826
+          - 0.95938635
           - 1.0
-          - 0.9999976
+          - 0.9999977
           - 1.0
-          - 0.99997723
-          - 0.99999654
-          - 0.99999976
-          - 0.99822026
+          - 0.9999773
+          - 0.9999966
+          - 0.9999998
+          - 0.9982203
           - 0.57681996
           - 0.59528536
           - 0.98893917
           - 0.9562711
-          - 0.99998534
-          - 0.99957985
-          - 0.5928195
+          - 0.9999853
+          - 0.9995799
+          - 0.59281945
           - 0.7014539
-          - 0.99489945
+          - 0.9948994
           - 0.9951959
           - 0.7999171
-          - 0.96741486
-          - 0.88178766
-          - 0.99481416
-          - 0.9998534
-          - 0.99990606
+          - 0.9674149
+          - 0.8817876
+          - 0.9948141
+          - 0.99985343
+          - 0.9999061
           - 0.9212147
-          - 0.7914029
+          - 0.79140294
           - 0.5001372
           - 0.58430105
-          - 0.9978023
-          - 0.9999989
+          - 0.9978024
+          - 0.99999887
           - 0.99999535
           - 1.0
-          - 0.999997
-          - 0.996546
-          - 0.99992204
-          - 0.9999994
+          - 0.9999971
+          - 0.99654603
+          - 0.999922
+          - 0.99999934
           - 0.95281845
           - 0.99998295
           - 0.55694205
           - 0.99903166
-          - 0.99726534
-          - 0.92002124
+          - 0.9972654
+          - 0.9200212
           - 0.9999999
           - 0.99998987
           - 1.0
-          - 0.9999887
+          - 0.9999886
           - 0.9999788
           - 0.9999999
-          - 0.9960083
-          - 0.62660474
+          - 0.9960082
+          - 0.6266047
           - 0.8192547
           - 0.9828016
           - 0.9950335
           - 0.9999802
-          - 0.99776506
+          - 0.9977651
           - 0.5855574
-          - 0.56217265
-          - 0.7511532
+          - 0.5621727
+          - 0.7511531
           - 0.9900883
           - 0.9963812
           - 0.99707735
           - 0.8151119
           - 0.8261561
-          - 0.83478355
+          - 0.8347836
           - 0.9889417
-          - 0.99987614
-          - 0.9999069
+          - 0.9998761
+          - 0.99990696
           - 0.7160073
           - 1.0
     ▿ prefillMetrics: EdgeToolsPrefillMetrics
-      ▿ duration: 2.699494333 seconds
-        - _low: 2699494333000000000
+      ▿ duration: 2.781368125 seconds
+        - _low: 2781368125000000000
         - _high: 0
       - tokens: 150
     - response: "<tool_call> [{\"name\":\"send_email\",\"arguments\":{\"address\":\"henderry@gmail.com\",\"subject\":\"Hello\",\"body\":\"Could you please go on an adventure?[{\"}},{\"name\":\"send_email\",\"arguments\":{\"address\":\"adventure@gmail.com\",\"subject\":\"Hello\",\"body\":\"I am writing to go on an adventure.\"}}]"
@@ -399,7 +399,7 @@
       ▿ AnyEdgeToolCall
         ▿ base: EdgeToolCall<SendEmailTool>
           ▿ id: EdgeToolCallID
-            - rawValue: "2603FCD4-53D6-4BC6-854D-C46D556E6002"
+            - rawValue: "57036B7D-9147-4DF8-9C4D-7278537B7BA8"
           ▿ input: Input
             - address: "henderry@gmail.com"
             - body: "Could you please go on an adventure?[{"
@@ -432,7 +432,7 @@
       ▿ AnyEdgeToolCall
         ▿ base: EdgeToolCall<SendEmailTool>
           ▿ id: EdgeToolCallID
-            - rawValue: "ECF50ACE-7ADD-4DF2-9F67-9BA4645388B7"
+            - rawValue: "18C60DE4-AB8A-4027-8A34-42BF3128F542"
           ▿ input: Input
             - address: "adventure@gmail.com"
             - body: "I am writing to go on an adventure."

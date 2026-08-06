@@ -22,7 +22,7 @@ struct `NeedleSPTokenizer tests` {
   @Test
   func `Vocabulary Size`() throws {
     let tokenizer = try NeedleSPTokenizer(modelURL: self.modelURL)
-    expectNoDifference(tokenizer.vocabularySize, 8192)
+    expectNoDifference(tokenizer.vocabularySize, .needleVocabularySize)
   }
 
   @Test

@@ -203,15 +203,15 @@
     var constraintObservation: ConstraintObservation?
     var index = 0
 
-    var vocabularySize: Int { 8192 }
+    var vocabularySize: Int { .needleVocabularySize }
 
-    func makeGrammarContext(tokenizer: AnyEdgeToolsXGRTokenizer) throws -> XGRGrammarContext {
+    func grammarContext(tokenizer: AnyEdgeToolsXGRTokenizer) throws -> XGRGrammarContext {
       try XGRGrammarContext(
         tokenizerInfo: tokenizer.tokenizerInfo(modelVocabularySize: self.vocabularySize)
       )
     }
 
-    func makeGrammarCompiler(context: borrowing XGRGrammarContext) throws -> XGRCompiler {
+    func grammarCompiler(context: borrowing XGRGrammarContext) throws -> XGRCompiler {
       try XGRCompiler(tokenizerInfo: context.tokenizerInfo)
     }
 

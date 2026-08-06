@@ -43,7 +43,7 @@ func testTokenizer() throws -> NeedleSPTokenizer {
   func makeGenericXGRCompiler(
     tokenizer: some EdgeToolsXGRTokenizer
   ) throws -> XGRCompiler {
-    let vocabulary = tokenizer.convertIdsToTokens(Array(0..<8192))
+    let vocabulary = tokenizer.convertIdsToTokens(Array(0..<Int.needleVocabularySize))
     guard let eosToken = tokenizer.eosTokenId, vocabulary.allSatisfy({ $0 != nil }) else {
       throw XGRError(
         code: EdgeToolsXGRError.invalidNeedleTokenizer,
