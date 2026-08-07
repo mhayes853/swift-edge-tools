@@ -127,6 +127,28 @@ struct `ToolCallParserCommon tests` {
       expectNoDifference(value.unicodeScalars.map(\.value), expected.unicodeScalars.map(\.value))
     }
   }
+
+  @Test
+  func `Gemma 4 Distinguishes Strings From Boolean And Null Keywords`() throws {
+    let calls = parseToolCalls(
+      [
+        "<|tool_call>call:values{stringTrue:<|\"|>true<|\"|>,boolTrue:true,",
+        "stringNull:<|\"|>null<|\"|>,nullValue:null}<tool_call|>"
+      ],
+      using: { Gemma4ToolCallParser() }
+    )
+    let call = try #require(calls.first)
+
+    expectNoDifference(
+      call.arguments,
+      [
+        "stringTrue": "true",
+        "boolTrue": true,
+        "stringNull": "null",
+        "nullValue": .null
+      ]
+    )
+  }
 }
 
 struct ToolCallParserTestFixture: Sendable, CustomStringConvertible {
@@ -293,6 +315,38 @@ let toolCallParserTestFixtures = [
       "👩🏽",
       "\u{200D}",
       "💻 漢字 한글 العربية<escape>}<end_function_call>"
+    ]
+  ),
+  ToolCallParserTestFixture(
+    name: "Gemma 4",
+    makeParser: { Gemma4ToolCallParser() },
+    noCalls: ["There are no tools to call."],
+    emptyArguments: ["<|tool_call>call:empty{}<tool_call|>"],
+    complexCall: [
+      #"""
+      <|tool_call>call:complex{
+      destination:{"city":<|"|>東京<|"|>,"country":<|"|>日本<|"|>},
+      activities:[{"name":<|"|>寿司<|"|>,"duration":2},{"name":<|"|>متحف<|"|>,"duration":3}],
+      tags:[<|"|>é<|"|>,<|"|>👩🏽‍💻<|"|>,<|"|>🇺🇳<|"|>],
+      enabled:true,disabled:false,rating:4.5,missing:null,
+      note:<|"|>braces {[]} and "quotes" \ slash
+      line<|"|>}<tool_call|>
+      """#
+    ],
+    multipleCalls: [
+      "<|tool_call>call:first{value:1}<tool_call|>",
+      "<|tool_call>call:second{value:2}<tool_call|>"
+    ],
+    malformedThenValid: [
+      "<|tool_call>call:bad{value:}<tool_call|>",
+      "<|tool_call>call:valid{value:2}<tool_call|>"
+    ],
+    unicodeCall: [
+      "<|tool_call>call:unicode{value:<|\"|>e",
+      "\u{301}",
+      "👩🏽",
+      "\u{200D}",
+      "💻 漢字 한글 العربية<|\"|>}<tool_call|>"
     ]
   ),
   ToolCallParserTestFixture(

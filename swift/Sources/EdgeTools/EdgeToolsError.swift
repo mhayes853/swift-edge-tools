@@ -26,6 +26,8 @@ public struct EdgeToolsError: Error, Hashable, Sendable {
     public static let grammarRejectedToken = Self(rawValue: "grammar-rejected-token")
     public static let missingModelOutputs = Self(rawValue: "missing-model-outputs")
     public static let modelNotPrepared = Self(rawValue: "model-not-prepared")
+    public static let invalidMedia = Self(rawValue: "invalid-media")
+    public static let unsupportedMedia = Self(rawValue: "unsupported-media")
   }
 
   public let code: Code
@@ -128,4 +130,12 @@ extension EdgeToolsError {
     code: .modelNotPrepared,
     message: "The model has no active generation. Call prepare before decoding."
   )
+
+  static func invalidMedia(_ message: String) -> Self {
+    Self(code: .invalidMedia, message: message)
+  }
+
+  static func unsupportedMedia(_ message: String) -> Self {
+    Self(code: .unsupportedMedia, message: message)
+  }
 }

@@ -12,13 +12,21 @@ import OrderedCollections
 
   // MARK: - Qwen3P5 Model
 
-  extension Qwen35Model: MLXModel {
+  public struct Qwen3P5MLXModel: MLXModel {
     public typealias ModelConfiguration = Qwen35Configuration
     public typealias Prompt = EdgeToolsLLMPrompt
     public typealias ToolCallParser = Qwen3P5ToolCallParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarCompiler = XGRCompiler
     public typealias GrammarContext = XGRGrammarContext
+
+    public let languageModel: Qwen35Model
+
+    public init(configuration: Qwen35Configuration) {
+      self.languageModel = Qwen35Model(configuration)
+    }
+
+    public var vocabularySize: Int { self.languageModel.vocabularySize }
 
     public func toolCallGrammar(
       tools: [EdgeToolDefinition],
@@ -28,14 +36,9 @@ import OrderedCollections
     }
   }
 
-  public typealias Qwen35MLXModelEngine = MLXEngine<Qwen35Model>
-  public typealias Qwen3P5MLXModelEngine = MLXEngine<Qwen35Model>
-
-  extension Qwen3P5MLXModelEngine {
-    public init(from directoryURL: URL) async throws {
-      try await self.init(from: directoryURL, model: Qwen35Model.init)
-    }
-  }
+  public typealias Qwen35MLXModel = Qwen3P5MLXModel
+  public typealias Qwen35MLXModelEngine = MLXEngine<Qwen3P5MLXModel>
+  public typealias Qwen3P5MLXModelEngine = MLXEngine<Qwen3P5MLXModel>
 #endif
 
 // MARK: - Qwen3P5 Tool Call Parsing
@@ -149,7 +152,7 @@ public typealias Qwen3P6ToolCallParser = QwenXMLToolCallParser
     }
 
     private static func qwenXMLCall(_ tool: EdgeToolDefinition) throws -> XGRGrammar {
-      let arguments = Self.qwenXMLArguments(for: tool)
+      let arguments = Self.xmlToolArguments(for: tool)
       let prefix = try XGRGrammar.literal("<tool_call><function=\(tool.name)>")
       let withArguments = try prefix.concatenate(arguments)
       return try withArguments.concatenate(

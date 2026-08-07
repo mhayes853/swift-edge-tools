@@ -22,9 +22,9 @@
     }
   }
 
-  // MARK: - NeedleMLXModel
+  // MARK: - NeedleLanguageModel
 
-  public final class NeedleMLXModel: Module, LanguageModel, KVCacheDimensionProvider {
+  public final class NeedleLanguageModel: Module, LanguageModel, KVCacheDimensionProvider {
     public var vocabularySize: Int { self.configuration.vocabularySize }
 
     public var kvHeads: [Int] {
@@ -39,6 +39,9 @@
     private var crossAttentionKV: [ProjectedAttentionKV]?
     private var encoderOutput: MLXArray?
     private var compiledDecoderFunction: (@Sendable ([MLXArray]) -> [MLXArray])?
+    private static let encoderOutputKey = LMOutput.Key<MLXArray>(
+      "edge-tools.needle.encoder-output"
+    )
 
     private var defaultEncoderOutput: MLXArray {
       .zeros([1, 0, self.configuration.dimensions])
@@ -125,7 +128,7 @@
         preconditionFailure("Needle must be prepared before decoding.")
       }
       let encoderOutput =
-        state?.crossAttentionStates ?? self.encoderOutput ?? self.defaultEncoderOutput
+        state?[Self.encoderOutputKey] ?? self.encoderOutput ?? self.defaultEncoderOutput
       return self.decode(
         input.tokens,
         crossAttentionMask: crossAttentionMask,
@@ -194,7 +197,8 @@
             offset: offset + 1
           )
       }
-      let state = LMOutput.State(crossAttentionStates: encoderOutput)
+      var state = LMOutput.State()
+      state[Self.encoderOutputKey] = encoderOutput
       return LMOutput(logits: outputs[0], state: state)
     }
 
@@ -203,7 +207,9 @@
         caches.count == self.configuration.decoderLayers,
         let offset = caches.first?.offset
       else {
-        preconditionFailure("Needle requires one cache per decoder layer from NeedleMLXModel.")
+        preconditionFailure(
+          "Needle requires one cache per decoder layer from NeedleMLXLanguageModel."
+        )
       }
       precondition(caches.allSatisfy { $0.offset == offset }, "Needle KV cache offsets must match.")
       return caches
@@ -278,13 +284,21 @@
   // MARK: - MLXModel
 
   #if XGrammar
-    extension NeedleMLXModel: MLXModel {
+    public struct NeedleMLXModel: MLXModel {
       public typealias ModelConfiguration = NeedleModelConfiguration
       public typealias Prompt = NeedlePrompt
       public typealias GenerateParameters = NeedleMLXGenerateParameters
       public typealias ToolCallParser = NeedleToolCallParser
       public typealias GrammarCompiler = XGRCompiler
       public typealias GrammarContext = XGRGrammarContext
+
+      public let languageModel: NeedleLanguageModel
+
+      public init(configuration: NeedleModelConfiguration) {
+        self.languageModel = NeedleLanguageModel(configuration: configuration)
+      }
+
+      public var vocabularySize: Int { self.languageModel.vocabularySize }
 
       public func grammar(
         tools: [EdgeToolDefinition],
@@ -298,25 +312,21 @@
         tools: [EdgeToolDefinition],
         range: GrammarToolCallRange
       ) throws -> XGRGrammar {
-        try XGRGrammar.needle(tools: tools, range: range)
+        try .needle(tools: tools, range: range)
       }
 
-      public func input(
+      public nonisolated(nonsending) func input(
         prompt: NeedlePrompt,
         tools: [EdgeToolDefinition],
         tokenizer: any EdgeToolsTokenizer
-      ) throws -> LMInput {
-        try LMInput.needle(prompt: prompt, tools: tools, using: tokenizer)
+      ) async throws -> EdgeToolsModelInput<LMInput> {
+        let input = try LMInput.needle(prompt: prompt, tools: tools, using: tokenizer)
+        let tokenIds = input.text.tokens.asArray(EdgeToolsToken.ID.self)
+        return EdgeToolsModelInput(value: input, tokenIds: tokenIds)
       }
     }
 
     public typealias NeedleMLXModelEngine = MLXEngine<NeedleMLXModel>
-
-    extension NeedleMLXModelEngine {
-      public init(from directoryURL: URL) async throws {
-        try await self.init(from: directoryURL, model: NeedleMLXModel.init(configuration:))
-      }
-    }
   #endif
 
   // MARK: - SimpleAttentionNetwork

@@ -12,15 +12,21 @@ import OrderedCollections
 
   // MARK: - MiniCPM5 Model
 
-  public typealias MiniCPM5Configuration = MLXLLM.LlamaConfiguration
-
-  extension MLXLLM.LlamaModel: MLXModel {
+  public struct MiniCPM5MLXModel: MLXModel {
     public typealias ModelConfiguration = MiniCPM5Configuration
     public typealias Prompt = EdgeToolsLLMPrompt
     public typealias ToolCallParser = MiniCPM5ToolCallParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarCompiler = XGRCompiler
     public typealias GrammarContext = XGRGrammarContext
+
+    public let languageModel: LlamaModel
+
+    public init(configuration: MiniCPM5Configuration) {
+      self.languageModel = LlamaModel(configuration)
+    }
+
+    public var vocabularySize: Int { self.languageModel.vocabularySize }
 
     public func toolCallGrammar(
       tools: [EdgeToolDefinition],
@@ -30,14 +36,8 @@ import OrderedCollections
     }
   }
 
-  public typealias MiniCPM5MLXModel = MLXLLM.LlamaModel
-  public typealias MiniCPM5MLXModelEngine = MLXEngine<MLXLLM.LlamaModel>
-
-  extension MiniCPM5MLXModelEngine {
-    public init(from directoryURL: URL) async throws {
-      try await self.init(from: directoryURL, model: MLXLLM.LlamaModel.init)
-    }
-  }
+  public typealias MiniCPM5Configuration = LlamaConfiguration
+  public typealias MiniCPM5MLXModelEngine = MLXEngine<MiniCPM5MLXModel>
 #endif
 
 // MARK: - MiniCPM5 Tool Call Parsing

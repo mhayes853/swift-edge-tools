@@ -12,10 +12,17 @@
     import Tokenizers
   #endif
 
+  #if Transformers && canImport(CoreImage) && canImport(MLXVLM)
+    import CoreImage
+    import Foundation
+    import MLXVLM
+  #endif
+
   // MARK: - MLXModel
 
-  public protocol MLXModel: LanguageModel, SendableMetatype {
-    associatedtype ModelConfiguration: Decodable
+  public protocol MLXModel: SendableMetatype {
+    associatedtype UnderlyingModel: LanguageModel
+    associatedtype ModelConfiguration
     associatedtype Prompt: Sendable
     associatedtype GenerateParameters: MLXGenerateParameters
     associatedtype ToolCallParser: EdgeToolCallParser
@@ -23,7 +30,13 @@
     associatedtype GrammarCompiler: EdgeToolsGrammarCompiler, ~Copyable
     where GrammarCompiler.Context == GrammarContext
 
+    init(configuration: ModelConfiguration) throws
+
+    var languageModel: UnderlyingModel { get }
     var vocabularySize: Int { get }
+    var extraStopTokens: Set<String> { get }
+
+    func loadWeights(from directoryURL: URL) throws
 
     func grammarContext(tokenizer: any EdgeToolsTokenizer) throws -> GrammarContext
     func grammarCompiler(context: borrowing GrammarContext) throws -> GrammarCompiler
@@ -39,11 +52,11 @@
       range: GrammarToolCallRange
     ) throws -> GrammarCompiler.Grammar
 
-    func input(
+    nonisolated(nonsending) func input(
       prompt: Prompt,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer
-    ) throws -> LMInput
+    ) async throws -> EdgeToolsModelInput<LMInput>
   }
 
   extension MLXModel
@@ -61,37 +74,28 @@
       let toolCallGrammar = try constraint.toolCallRange.map {
         try self.toolCallGrammar(tools: tools, range: $0)
       }
-      return try constraint.grammar(
-        toolCallGrammar: toolCallGrammar,
-        context: context
-      )
+      return try constraint.grammar(toolCallGrammar: toolCallGrammar, context: context)
     }
   }
 
   extension MLXModel {
-    package static func loadEdgeToolsLanguageModel(
-      from directoryURL: URL,
-      model makeModel: @Sendable (ModelConfiguration) throws -> Self
-    ) throws -> Self {
-      let configuration = try decodeModelConfiguration(
-        ModelConfiguration.self,
-        in: directoryURL
-      )
+    public var extraStopTokens: Set<String> { [] }
+
+    public func loadWeights(from directoryURL: URL) throws {
       let baseConfiguration = try decodeModelConfiguration(
         BaseConfiguration.self,
-        in: directoryURL
+        in: directoryURL,
+        decoder: JSONDecoder.json5()
       )
-      guard let configuration, let baseConfiguration else {
+      guard let baseConfiguration else {
         throw EdgeToolsError.failedToLoadConfiguration
       }
 
-      let model = try makeModel(configuration)
-      try loadWeights(
+      try MLXLMCommon.loadWeights(
         modelDirectory: directoryURL,
-        model: model,
+        model: self.languageModel,
         perLayerQuantization: baseConfiguration.perLayerQuantization
       )
-      return model
     }
   }
 
@@ -193,21 +197,24 @@
 
   #if Transformers && canImport(Tokenizers)
     extension MLXModel
-    where Self: LLMModel, Prompt == EdgeToolsLLMPrompt {
-      public func input(
+    where UnderlyingModel: LLMModel, Prompt == EdgeToolsLLMPrompt {
+      public nonisolated(nonsending) func input(
         prompt: EdgeToolsLLMPrompt,
         tools: [EdgeToolDefinition],
         tokenizer: any EdgeToolsTokenizer
-      ) throws -> LMInput {
+      ) async throws -> EdgeToolsModelInput<LMInput> {
         guard let tokenizer = tokenizer as? TransformersTokenizer else {
           throw EdgeToolsError.unsupportedTokenizer
         }
-        let tokenIds = try tokenizer.tokenizer.applyChatTemplate(
+        let tokenIds = try tokenizer.base.applyChatTemplate(
           messages: try prompt.mlxMessages(),
           tools: tools.mlxToolSpecs,
           additionalContext: nil
         )
-        return LMInput(tokens: MLXArray(tokenIds))
+        return EdgeToolsModelInput(
+          value: LMInput(tokens: MLXArray(tokenIds)),
+          tokenIds: tokenIds
+        )
       }
     }
 
@@ -302,6 +309,63 @@
 
   #endif
 
+  // MARK: - VLM Prompt Conversion
+
+  #if Transformers && canImport(CoreImage) && canImport(MLXVLM)
+    package func decodeMLXVLMProcessorConfiguration<Configuration: Decodable>(
+      _ type: Configuration.Type,
+      in directoryURL: URL
+    ) throws -> Configuration? {
+      let preprocessorURL = directoryURL.appending(path: "preprocessor_config.json")
+      let filename =
+        FileManager.default.fileExists(atPath: preprocessorURL.path)
+        ? "preprocessor_config.json"
+        : "processor_config.json"
+      return try decodeModelConfiguration(type, named: filename, in: directoryURL)
+    }
+
+    extension EdgeToolsLLMPrompt.Asset {
+      package func mlxImage() throws -> UserInput.Image {
+        switch self.content {
+        case .path(let path):
+          return .url(URL(filePath: path))
+        case .bytes(let bytes):
+          guard let image = CIImage(data: Data(bytes)) else {
+            throw EdgeToolsError.invalidMedia("The image bytes could not be decoded.")
+          }
+          return .ciImage(image)
+        }
+      }
+    }
+
+    extension Sequence where Element == EdgeToolsLLMPrompt.Asset {
+      package func mlxImages() throws -> [UserInput.Image] {
+        try self.map { try $0.mlxImage() }
+      }
+    }
+
+    extension EdgeToolsLLMPrompt {
+      package func rejectAudio() throws {
+        guard !self.audio.isEmpty else { return }
+        throw EdgeToolsError.unsupportedMedia(
+          "This MLX model integration does not support audio input."
+        )
+      }
+
+      package func mlxVLMUserInput(
+        tools: [EdgeToolDefinition],
+        transformMessage: (Message) throws -> MLXLMCommon.Message
+      ) throws -> UserInput {
+        try self.rejectAudio()
+        return UserInput(
+          messages: try self.messages.map(transformMessage),
+          images: try self.images.mlxImages(),
+          tools: tools.mlxToolSpecs
+        )
+      }
+    }
+  #endif
+
   // MARK: - MLXModel Adapter
 
   public struct _EdgeToolsMLXModel<Model: MLXModel>: EdgeToolsModel {
@@ -339,7 +403,10 @@
       self.configuredExtraStopTokenIds = []
     }
 
-    package init(model: Model, extraStopTokenIds: Set<EdgeToolsToken.ID>) {
+    package init(
+      model: Model,
+      extraStopTokenIds: Set<EdgeToolsToken.ID>
+    ) {
       self.model = model
       self.configuredExtraStopTokenIds = extraStopTokenIds
     }
@@ -372,16 +439,12 @@
       try self.model.toolCallGrammar(tools: tools, range: range)
     }
 
-    public func input(
+    public nonisolated(nonsending) func input(
       prompt: Model.Prompt,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer
-    ) throws -> EdgeToolsModelInput<LMInput> {
-      let input = try self.model.input(prompt: prompt, tools: tools, tokenizer: tokenizer)
-      return EdgeToolsModelInput(
-        value: input,
-        tokenIds: input.text.tokens.asArray(EdgeToolsToken.ID.self)
-      )
+    ) async throws -> EdgeToolsModelInput<LMInput> {
+      try await self.model.input(prompt: prompt, tools: tools, tokenizer: tokenizer)
     }
 
     public nonisolated(nonsending) mutating func prepare(
@@ -432,7 +495,7 @@
           quantizedKVStart: parameters.quantizedKVStart
         )
         let token = MLXArray([pendingTokenId])
-        let output = self.model(
+        let output = self.model.languageModel(
           LMInput.Text(tokens: token)[text: .newAxis],
           cache: generation.cache,
           state: generation.outputState
@@ -475,16 +538,21 @@
     ) async throws -> EdgeToolsEnginePrefill {
       let clock = ContinuousClock()
       let tokenIds = input.text.tokens.asArray(EdgeToolsToken.ID.self)
-      let cache = self.model.newCache(parameters: nil)
+      let cache = self.model.languageModel.newCache(parameters: nil)
       let start = clock.now
       let output = try self.prepareModelOutput(input: input, cache: cache)
       eval(output.logits)
       eval(cache)
-      self.cachedPrefill = CachedPrefill(
-        tokenIds: tokenIds,
-        cache: cache.map { $0.copy() },
-        output: output
-      )
+      self.cachedPrefill =
+        if input.image == nil, input.video == nil {
+          CachedPrefill(
+            tokenIds: tokenIds,
+            cache: cache.map { $0.copy() },
+            output: output
+          )
+        } else {
+          nil
+        }
       let snapshot = Self.memorySnapshot(synchronize: true)
       var metadata = EdgeToolsMetadata()
       metadata.mlxEnginePostPrefillMemorySnapshot = snapshot
@@ -501,10 +569,11 @@
       input: LMInput,
       tokenIds: [EdgeToolsToken.ID]
     ) throws -> (output: LMOutput, cache: [any KVCache], tokenCount: Int) {
-      guard let cachedPrefill = self.cachedPrefill,
+      guard input.image == nil, input.video == nil,
+        let cachedPrefill = self.cachedPrefill,
         tokenIds.starts(with: cachedPrefill.tokenIds)
       else {
-        let cache = self.model.newCache(parameters: nil)
+        let cache = self.model.languageModel.newCache(parameters: nil)
         return (try self.prepareModelOutput(input: input, cache: cache), cache, tokenIds.count)
       }
       let suffixCount = tokenIds.count - cachedPrefill.tokenIds.count
@@ -513,7 +582,7 @@
         if suffixCount == 0 {
           cachedPrefill.output
         } else {
-          self.model(
+          self.model.languageModel(
             input.text[cachedPrefill.tokenIds.count...][text: .newAxis],
             cache: cache,
             state: cachedPrefill.output.state
@@ -523,14 +592,18 @@
     }
 
     private func prepareModelOutput(input: LMInput, cache: [any KVCache]) throws -> LMOutput {
-      switch try self.model.prepare(input, cache: cache, windowSize: nil) {
+      switch try self.model.languageModel.prepare(input, cache: cache, windowSize: nil) {
       case .logits(let output):
         return output
       case .tokens(let tokens):
         guard tokens.tokens.size > 0 else {
           throw MLXEngineError(code: .emptyInput, message: "Model received empty input.")
         }
-        return self.model(tokens[text: .newAxis], cache: cache.isEmpty ? nil : cache, state: nil)
+        return self.model.languageModel(
+          tokens[text: .newAxis],
+          cache: cache.isEmpty ? nil : cache,
+          state: nil
+        )
       }
     }
 
@@ -553,23 +626,44 @@
     }
 
     public init<Base: MLXModel>(
-      from directoryURL: URL,
-      model makeModel: @Sendable (Base.ModelConfiguration) throws -> Base
-    ) async throws where Model == _EdgeToolsMLXModel<Base> {
-      try await self.init(loading: Base.self, from: directoryURL, model: makeModel)
+      from directoryURL: URL
+    ) async throws
+    where
+      Model == _EdgeToolsMLXModel<Base>,
+      Base.ModelConfiguration: Decodable
+    {
+      guard
+        let configuration = try decodeModelConfiguration(
+          Base.ModelConfiguration.self,
+          in: directoryURL,
+          decoder: JSONDecoder.json5()
+        )
+      else {
+        throw EdgeToolsError.failedToLoadConfiguration
+      }
+      try await self.init(
+        from: directoryURL,
+        configuration: configuration
+      )
     }
 
-    private init<Base: MLXModel>(
-      loading modelType: Base.Type,
+    public init<Base: MLXModel>(
       from directoryURL: URL,
-      model makeModel: @Sendable (Base.ModelConfiguration) throws -> Base
+      configuration: Base.ModelConfiguration
     ) async throws where Model == _EdgeToolsMLXModel<Base> {
       let tokenizer = try await EdgeToolsAutoTokenizer.from(modelDirectory: directoryURL)
-      let model = try Base.loadEdgeToolsLanguageModel(from: directoryURL, model: makeModel)
+      let model = try Base(configuration: configuration)
+      try model.loadWeights(from: directoryURL)
       var extraStopTokenIds = try loadMLXExtraStopTokenIds(from: directoryURL)
+      extraStopTokenIds.formUnion(
+        model.extraStopTokens.compactMap { tokenizer.convertTokenToId($0) }
+      )
       if let eosTokenId = tokenizer.eosTokenId { extraStopTokenIds.remove(eosTokenId) }
       try self.init(
-        model: _EdgeToolsMLXModel(model: model, extraStopTokenIds: extraStopTokenIds),
+        model: _EdgeToolsMLXModel(
+          model: model,
+          extraStopTokenIds: extraStopTokenIds
+        ),
         tokenizer: tokenizer
       )
     }

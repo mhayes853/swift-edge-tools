@@ -77,11 +77,11 @@
       range: GrammarToolCallRange
     ) throws -> GrammarCompiler.Grammar
 
-    func input(
+    nonisolated(nonsending) func input(
       prompt: Prompt,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer
-    ) throws -> EdgeToolsModelInput<Input>
+    ) async throws -> EdgeToolsModelInput<Input>
 
     nonisolated(nonsending) mutating func prepare(
       input: Input,
@@ -164,7 +164,11 @@
       prompt: Model.Prompt,
       tools: [EdgeToolDefinition] = []
     ) async throws -> [EdgeToolsToken] {
-      let input = try self.model.input(prompt: prompt, tools: tools, tokenizer: self.tokenizer)
+      let input = try await self.model.input(
+        prompt: prompt,
+        tools: tools,
+        tokenizer: self.tokenizer
+      )
       let tokens = self.tokenizer.convertIdsToTokens(input.tokenIds)
       return zip(input.tokenIds, tokens)
         .compactMap { tokenId, token in
@@ -266,10 +270,13 @@
         context: self.grammarContext
       )
       var stopTokenIds = model.extraStopTokenIds
-      if let eosTokenId = self.tokenizer.eosTokenId { stopTokenIds.insert(eosTokenId) }
+      if let eosTokenId = self.tokenizer.eosTokenId {
+        stopTokenIds.insert(eosTokenId)
+      }
+
       var matcher = try self.matcher(grammar: grammar, stopTokenIds: stopTokenIds)
       let generateStart = self.clock.now
-      let input = try model.input(prompt: prompt, tools: tools, tokenizer: self.tokenizer)
+      let input = try await model.input(prompt: prompt, tools: tools, tokenizer: self.tokenizer)
       var preparation = try await model.prepare(input: input.value, parameters: parameters)
       var detokenizer = StreamingDetokenizer()
       var parser = Model.ToolCallParser()
@@ -383,7 +390,7 @@
       try await self.generationGate.acquire()
       var model = self.model
       do {
-        let input = try model.input(
+        let input = try await model.input(
           prompt: promptPrefix,
           tools: tools,
           tokenizer: self.tokenizer

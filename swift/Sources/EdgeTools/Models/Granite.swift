@@ -10,7 +10,7 @@
 
   // MARK: - Granite Model
 
-  extension GraniteModel: MLXModel {
+  public struct GraniteMLXModel: MLXModel {
     public typealias ModelConfiguration = GraniteConfiguration
     public typealias Prompt = EdgeToolsLLMPrompt
     public typealias ToolCallParser = GraniteToolCallParser
@@ -18,6 +18,14 @@
     public typealias GrammarCompiler = XGRCompiler
     public typealias GrammarContext = XGRGrammarContext
 
+    public let languageModel: GraniteModel
+
+    public init(configuration: GraniteConfiguration) {
+      self.languageModel = GraniteModel(configuration)
+    }
+
+    public var vocabularySize: Int { self.languageModel.vocabularySize }
+
     public func toolCallGrammar(
       tools: [EdgeToolDefinition],
       range: GrammarToolCallRange
@@ -26,17 +34,11 @@
     }
   }
 
-  public typealias GraniteMLXModelEngine = MLXEngine<GraniteModel>
-
-  extension GraniteMLXModelEngine {
-    public init(from directoryURL: URL) async throws {
-      try await self.init(from: directoryURL, model: GraniteModel.init)
-    }
-  }
+  public typealias GraniteMLXModelEngine = MLXEngine<GraniteMLXModel>
 
   // MARK: - GraniteMoeHybrid Model
 
-  extension GraniteMoeHybridModel: MLXModel {
+  public struct GraniteMoeHybridMLXModel: MLXModel {
     public typealias ModelConfiguration = GraniteMoeHybridConfiguration
     public typealias Prompt = EdgeToolsLLMPrompt
     public typealias ToolCallParser = GraniteToolCallParser
@@ -44,6 +46,14 @@
     public typealias GrammarCompiler = XGRCompiler
     public typealias GrammarContext = XGRGrammarContext
 
+    public let languageModel: GraniteMoeHybridModel
+
+    public init(configuration: GraniteMoeHybridConfiguration) {
+      self.languageModel = GraniteMoeHybridModel(configuration)
+    }
+
+    public var vocabularySize: Int { self.languageModel.vocabularySize }
+
     public func toolCallGrammar(
       tools: [EdgeToolDefinition],
       range: GrammarToolCallRange
@@ -52,13 +62,7 @@
     }
   }
 
-  public typealias GraniteMoeHybridMLXModelEngine = MLXEngine<GraniteMoeHybridModel>
-
-  extension GraniteMoeHybridMLXModelEngine {
-    public init(from directoryURL: URL) async throws {
-      try await self.init(from: directoryURL, model: GraniteMoeHybridModel.init)
-    }
-  }
+  public typealias GraniteMoeHybridMLXModelEngine = MLXEngine<GraniteMoeHybridMLXModel>
 #endif
 
 // MARK: - Granite Tool Call Parsing

@@ -10,13 +10,21 @@
 
   // MARK: - Qwen3 Model
 
-  extension Qwen3Model: MLXModel {
+  public struct Qwen3MLXModel: MLXModel {
     public typealias ModelConfiguration = Qwen3Configuration
     public typealias Prompt = EdgeToolsLLMPrompt
     public typealias ToolCallParser = Qwen3ToolCallParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarCompiler = XGRCompiler
     public typealias GrammarContext = XGRGrammarContext
+
+    public let languageModel: Qwen3Model
+
+    public init(configuration: Qwen3Configuration) {
+      self.languageModel = Qwen3Model(configuration)
+    }
+
+    public var vocabularySize: Int { self.languageModel.vocabularySize }
 
     public func toolCallGrammar(
       tools: [EdgeToolDefinition],
@@ -26,15 +34,7 @@
     }
   }
 
-  public typealias Qwen3MLXModelEngine = MLXEngine<Qwen3Model>
-
-  // MARK: - Model Engine Loading
-
-  extension Qwen3MLXModelEngine {
-    public init(from directoryURL: URL) async throws {
-      try await self.init(from: directoryURL, model: Qwen3Model.init)
-    }
-  }
+  public typealias Qwen3MLXModelEngine = MLXEngine<Qwen3MLXModel>
 #endif
 
 // MARK: - Qwen3 Tool Call Parsing

@@ -39,5 +39,5 @@
     ▿ Message
       ▿ assistant: (2 elements)
         ▿ .0: Optional<String>
-          - some: "<think>\nThe weather in Paris is currently sunny with a temperature of 21°C.\n</think>\n\nThe weather in Paris is currently sunny with a temperature of 21°C."
+          - some: "Based on the weather data retrieved, Paris is currently in the morning with a sunny day. The average temperature is 21 degrees Celsius, which is pleasant for a day in spring or early summer (depending on the specific day of the month)."
         - toolCalls: 0 elements

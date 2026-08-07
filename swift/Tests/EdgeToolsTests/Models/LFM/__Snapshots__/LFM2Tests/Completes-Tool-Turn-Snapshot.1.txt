@@ -39,5 +39,5 @@
     ▿ Message
       ▿ assistant: (2 elements)
         ▿ .0: Optional<String>
-          - some: "The current weather in Paris is **sunny** with a temperature of **21°C**. Let me know if you\'d like more details!"
+          - some: "The weather in Paris today is **sunny** with a temperature of **21°C**. Let me know if you\'d like more details!"
         - toolCalls: 0 elements

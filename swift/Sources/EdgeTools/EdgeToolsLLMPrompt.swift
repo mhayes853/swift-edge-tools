@@ -6,6 +6,20 @@ public struct EdgeToolsLLMPrompt: Hashable, Sendable {
   public init(messages: [Message]) {
     self.messages = messages
   }
+
+  public var images: [Asset] {
+    self.messages.flatMap { message -> [Asset] in
+      guard case .user(_, let images, audio: _) = message else { return [] }
+      return images
+    }
+  }
+
+  public var audio: [Asset] {
+    self.messages.flatMap { message -> [Asset] in
+      guard case .user(_, images: _, let audio) = message else { return [] }
+      return audio
+    }
+  }
 }
 
 // MARK: - Message

@@ -11,13 +11,16 @@
   @Suite(.serialized, .enabledIfXcode())
   struct `NeedleMLXModel tests` {
     @Test
+    @available(iOS 18.0, macOS 15.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
     func `TokenIterator Usage`() async throws {
       let url = try await downloadNeedle()
       var tokenizer = try self.tokenizer(url: url)
-      let model = try NeedleMLXModel.loadEdgeToolsLanguageModel(
-        from: url,
-        model: { NeedleMLXModel(configuration: $0) }
+      let configuration = try #require(
+        try decodeModelConfiguration(NeedleModelConfiguration.self, in: url)
       )
+      let wrappedModel = NeedleMLXModel(configuration: configuration)
+      try wrappedModel.loadWeights(from: url)
+      let model = wrappedModel.languageModel
       let tokenizerInfo = try XGRTokenizerInfo.needle(tokenizer: tokenizer)
       let grammarEngine = try XGRCompiler(tokenizerInfo: tokenizerInfo)
       let grammar = try XGRGrammar.needle(tools: [.sendEmail])
@@ -53,10 +56,12 @@
     func `KV Cache Grows Past Initial Capacity`() async throws {
       let url = try await downloadNeedle()
       let tokenizer = try self.tokenizer(url: url)
-      let model = try NeedleMLXModel.loadEdgeToolsLanguageModel(
-        from: url,
-        model: { NeedleMLXModel(configuration: $0) }
+      let configuration = try #require(
+        try decodeModelConfiguration(NeedleModelConfiguration.self, in: url)
       )
+      let wrappedModel = NeedleMLXModel(configuration: configuration)
+      try wrappedModel.loadWeights(from: url)
+      let model = wrappedModel.languageModel
       let input = try LMInput.needle(
         prompt: .sendAdventureEmail,
         tools: [.sendEmail],

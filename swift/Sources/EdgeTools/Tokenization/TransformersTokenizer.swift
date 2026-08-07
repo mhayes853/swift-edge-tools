@@ -14,32 +14,32 @@
 
 #if Transformers && canImport(Tokenizers)
   public struct TransformersTokenizer: EdgeToolsTokenizer {
-    public let tokenizer: PreTrainedTokenizer
+    public let base: PreTrainedTokenizer
     public let backendJSON: String
 
     public init(tokenizer: PreTrainedTokenizer, backendJSON: String) {
-      self.tokenizer = tokenizer
+      self.base = tokenizer
       self.backendJSON = backendJSON
     }
 
-    public var unknownTokenId: EdgeToolsToken.ID? { self.tokenizer.unknownTokenId }
-    public var bosTokenId: EdgeToolsToken.ID? { self.tokenizer.bosTokenId }
-    public var eosTokenId: EdgeToolsToken.ID? { self.tokenizer.eosTokenId }
+    public var unknownTokenId: EdgeToolsToken.ID? { self.base.unknownTokenId }
+    public var bosTokenId: EdgeToolsToken.ID? { self.base.bosTokenId }
+    public var eosTokenId: EdgeToolsToken.ID? { self.base.eosTokenId }
 
     public func encode(text: String) -> [EdgeToolsToken.ID] {
-      self.tokenizer.encode(text: text)
+      self.base.encode(text: text)
     }
 
     public func decode(tokens: [EdgeToolsToken.ID]) -> String {
-      self.tokenizer.decode(tokens: tokens)
+      self.base.decode(tokens: tokens)
     }
 
     public func convertTokensToIds(_ tokens: [String]) -> [EdgeToolsToken.ID?] {
-      self.tokenizer.convertTokensToIds(tokens)
+      self.base.convertTokensToIds(tokens)
     }
 
     public func convertIdsToTokens(_ ids: [EdgeToolsToken.ID]) -> [String?] {
-      self.tokenizer.convertIdsToTokens(ids)
+      self.base.convertIdsToTokens(ids)
     }
   }
 

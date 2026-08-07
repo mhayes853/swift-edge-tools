@@ -402,6 +402,12 @@
   }
 
   extension Substring {
+    func hasRuleReference(withPrefix prefix: String) -> Bool {
+      self.ebnfTokens.contains { token in
+        token.kind == .identifier && self[token.range].hasPrefix(prefix)
+      }
+    }
+
     var hasToolCallContinuationReference: Bool {
       self.ebnfTokens.contains { token in
         token.kind == .identifier && self[token.range].isToolCallContinuationName
@@ -428,7 +434,7 @@
       return grammar
     }
 
-    static func qwenXMLArguments(for tool: EdgeToolDefinition) -> XGRGrammar {
+    static func xmlToolArguments(for tool: EdgeToolDefinition) -> XGRGrammar {
       let schema = tool.arguments.orderedJSONString()
       let structuralTag =
         #"{"type":"structural_tag","format":{"type":"json_schema","json_schema":\#(schema),"style":"qwen_xml","any_order":false}}"#
