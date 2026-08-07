@@ -99,9 +99,14 @@
 
     fileprivate func matcher(
       for grammar: XGRGrammar,
-      compiler: borrowing XGRCompiler
+      compiler: borrowing XGRCompiler,
+      stopTokenIds: Set<EdgeToolsToken.ID>
     ) throws -> XGRMatcher {
-      let matcher = try self.matcherPool.matcher(grammar: grammar, compilingWith: compiler)
+      let matcher = try self.matcherPool.matcher(
+        grammar: grammar,
+        compilingWith: compiler,
+        stopTokenIds: stopTokenIds
+      )
       matcher.reset()
       return matcher
     }
@@ -116,9 +121,10 @@
 
     public func matcher(
       for grammar: XGRGrammar,
-      context: borrowing XGRGrammarContext
+      context: borrowing XGRGrammarContext,
+      stopTokenIds: Set<EdgeToolsToken.ID>
     ) throws -> XGRMatcher {
-      try context.matcher(for: grammar, compiler: self)
+      try context.matcher(for: grammar, compiler: self, stopTokenIds: stopTokenIds)
     }
   }
 
@@ -127,8 +133,15 @@
   extension XGRGrammar {
     public static func literal(_ literal: String) throws -> XGRGrammar {
       let escapedLiteral = literal.reduce(into: "") { result, character in
-        if character == "\\" || character == "\"" { result.append("\\") }
-        result.append(character)
+        switch character {
+        case "\\", "\"":
+          result.append("\\")
+          result.append(character)
+        case "\n": result.append(contentsOf: "\\n")
+        case "\r": result.append(contentsOf: "\\r")
+        case "\t": result.append(contentsOf: "\\t")
+        default: result.append(character)
+        }
       }
       return try Self.ebnf("root ::= \"\(escapedLiteral)\"")
     }
@@ -296,6 +309,23 @@
         self.rules[index].body = try Self.mapLiterals(in: rule.body) { value, suffix in
           transform(rule.name, value, suffix)
         }
+      }
+    }
+
+    mutating func mapRuleReferences(
+      _ transform: (_ ruleName: String, _ reference: String) -> String
+    ) {
+      for index in self.rules.indices {
+        let rule = self.rules[index]
+        var output = ""
+        var outputStart = rule.body.startIndex
+        for token in rule.body.ebnfTokens where token.kind == .identifier {
+          output.append(contentsOf: rule.body[outputStart..<token.range.lowerBound])
+          output.append(transform(rule.name, String(rule.body[token.range])))
+          outputStart = token.range.upperBound
+        }
+        output.append(contentsOf: rule.body[outputStart...])
+        self.rules[index].body = output
       }
     }
 
@@ -502,15 +532,20 @@
 
     func matcher(
       grammar: XGRGrammar,
-      compilingWith compiler: borrowing XGRCompiler
+      compilingWith compiler: borrowing XGRCompiler,
+      stopTokenIds: Set<EdgeToolsToken.ID>
     ) throws -> XGRMatcher {
-      let key = grammar.ebnf
+      let sortedStopTokenIds = stopTokenIds.sorted()
+      let key = "\(grammar.ebnf)\u{0}\(sortedStopTokenIds.map(String.init).joined(separator: ","))"
       if let cached = self.entries[key] {
         self.touch(key)
         return cached.fork()
       }
       let compiledGrammar = try compiler.compile(grammar)
-      let matcher = try XGRMatcher(compiledGrammar: compiledGrammar)
+      let matcher = try XGRMatcher(
+        compiledGrammar: compiledGrammar,
+        overrideStopTokenIDs: sortedStopTokenIds
+      )
       return self.insert(key, matcher: consume matcher)
     }
 

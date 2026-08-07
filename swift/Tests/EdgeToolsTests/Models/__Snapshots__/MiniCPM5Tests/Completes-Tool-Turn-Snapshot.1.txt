@@ -39,5 +39,5 @@
     ▿ Message
       ▿ assistant: (2 elements)
         ▿ .0: Optional<String>
-          - some: "The weather in Paris is:\n**Sunny with a temperature of 21°C**."
+          - some: "<think>\nThe weather in Paris is sunny, with a temperature of 21 degrees Celsius.\n</think>\n\nThe weather in Paris is sunny, with a temperature of 21°C."
         - toolCalls: 0 elements

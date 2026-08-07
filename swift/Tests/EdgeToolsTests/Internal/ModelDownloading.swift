@@ -23,6 +23,10 @@ import Foundation
     try await downloadModel(id: "LiquidAI/LFM2.5-230M-MLX-4bit")
   }
 
+  func downloadMiniCPM5() async throws -> URL {
+    try await downloadModel(id: "openbmb/MiniCPM5-1B-MLX")
+  }
+
   func downloadGraniteMoeHybrid() async throws -> URL {
     try await downloadModel(id: "mlx-community/granite-4.0-h-350m-5bit")
   }
@@ -44,9 +48,10 @@ import Foundation
   }
 
   private func hasCompatibleTokenizer(in directory: URL) -> Bool {
-    ["tokenizer.model", "tokenizer.json"].contains {
-      FileManager.default.fileExists(atPath: directory.appending(path: $0).path())
-    }
+    ["tokenizer.model", "tokenizer.json"]
+      .contains {
+        FileManager.default.fileExists(atPath: directory.appending(path: $0).path())
+      }
   }
 #endif
 

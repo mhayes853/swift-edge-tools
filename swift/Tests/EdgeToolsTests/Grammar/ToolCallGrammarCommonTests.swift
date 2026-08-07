@@ -298,6 +298,37 @@
         """,
       ruleNamedCall:
         #"<|tool_call_start|>[ruleNamedTool(root="a",xml_object="b")]<|tool_call_end|>"#
+    ),
+    ToolCallGrammarTestFixture(
+      name: "MiniCPM5",
+      makeGrammar: { try XGRGrammar.miniCPM5(tools: $0, range: $1) },
+      makeParser: { MiniCPM5ToolCallParser() },
+      expectedComplexName: "complexTool",
+      emptyCall: "",
+      simpleCall:
+        #"<function name="getWeather"><param name="location">"Seoul"</param></function>"#,
+      twoCalls:
+        """
+        <function name="getWeather"><param name="location">"Seoul"</param></function>
+        <function name="getWeather"><param name="location">"Paris"</param></function>
+        """,
+      unknownToolCall:
+        #"<function name="unknown"><param name="location">"Seoul"</param></function>"#,
+      wrongTypeCall:
+        #"<function name="integerTool"><param name="value">"oops"</param></function>"#,
+      complexCall:
+        """
+        <function name="complexTool"><param name="title">"alpha"</param>\
+        <param name="count">3.5</param><param name="enabled">true</param>\
+        <param name="mode">"execute"</param><param name="ticket_id">"ABC-12"</param>\
+        <param name="priority">4</param><param name="routing">{"region":"us-west"}</param>\
+        <param name="labels">{"ALPHA":1,"BETA_LABEL":2}</param><param name="window">3</param>\
+        <param name="tuple_args">["alpha",2,true]</param><param name="optional_note">null</param>\
+        <param name="tags">["a","b"]</param>\
+        <param name="config">{"threshold":0.75,"flags":[true,false]}</param></function>
+        """,
+      ruleNamedCall:
+        #"<function name="ruleNamedTool"><param name="root">"a"</param><param name="xml_object">"b"</param></function>"#
     )
   ]
 #endif

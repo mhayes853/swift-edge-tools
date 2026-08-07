@@ -57,6 +57,7 @@ struct `ToolCallParserCommon tests` {
       expectNoDifference(secondActivity["duration"], 3)
       expectNoDifference(arguments["tags"], ["e\u{301}", "👩🏽‍💻", "🇺🇳"])
       expectNoDifference(arguments["enabled"], true)
+      expectNoDifference(arguments["disabled"], false)
       expectNoDifference(arguments["rating"], 4.5)
       expectNoDifference(arguments["missing"], .null)
       expectNoDifference(arguments["note"], "braces {[]} and \"quotes\" \\ slash\nline")
@@ -138,7 +139,7 @@ let toolCallParserTestFixtures = [
     complexCall: [
       #"<tool_call> [{"name":"complex","arguments":{"destination":{"city":"東京","country":"日本"},"activities":["#,
       #"{"name":"寿司","duration":2},{"name":"متحف","duration":3}],"tags":["#,
-      #""e\u0301","👩🏽‍💻","🇺🇳"],"enabled":true,"rating":4.5,"missing":null,"#,
+      #""e\u0301","👩🏽‍💻","🇺🇳"],"enabled":true,"disabled":false,"rating":4.5,"missing":null,"#,
       #""note":"braces {[]} and \"quotes\" \\ slash\nline"}}]"#
     ],
     multipleCalls: [
@@ -165,7 +166,7 @@ let toolCallParserTestFixtures = [
     complexCall: [
       #"<tool_call>{"name":"complex","arguments":{"destination":{"city":"東京","country":"日本"},"activities":["#,
       #"{"name":"寿司","duration":2},{"name":"متحف","duration":3}],"tags":["#,
-      #""e\u0301","👩🏽‍💻","🇺🇳"],"enabled":true,"rating":4.5,"missing":null,"#,
+      #""e\u0301","👩🏽‍💻","🇺🇳"],"enabled":true,"disabled":false,"rating":4.5,"missing":null,"#,
       #""note":"braces {[]} and \"quotes\" \\ slash\nline"}}</tool_call>"#
     ],
     multipleCalls: [
@@ -195,7 +196,8 @@ let toolCallParserTestFixtures = [
       <parameter=destination>{"city":"東京","country":"日本"}</parameter>
       <parameter=activities>[{"name":"寿司","duration":2},{"name":"متحف","duration":3}]</parameter>
       <parameter=tags>["e\u0301","👩🏽‍💻","🇺🇳"]</parameter>
-      <parameter=enabled>True</parameter><parameter=rating>4.5</parameter>
+      <parameter=enabled>True</parameter><parameter=disabled>False</parameter>
+      <parameter=rating>4.5</parameter>
       <parameter=missing>None</parameter>
       <parameter=note>braces {[]} and "quotes" \ slash
       line</parameter></function></tool_call>
@@ -227,7 +229,7 @@ let toolCallParserTestFixtures = [
       <|tool_call_start|>[complex(
         destination={'city':'東京','country':'日本'},
         activities=[{'name':'寿司','duration':2},{'name':'متحف','duration':3}],
-        tags=['e\u0301','👩🏽‍💻','🇺🇳'], enabled=True, rating=4.5, missing=None,
+        tags=['e\u0301','👩🏽‍💻','🇺🇳'], enabled=True, disabled=False, rating=4.5, missing=None,
         note='braces {[]} and "quotes" \\ slash\nline'
       )]<|tool_call_end|>
       """#
@@ -259,7 +261,8 @@ let toolCallParserTestFixtures = [
       destination:<escape>{"city":"東京","country":"日本"}<escape>,
       activities:<escape>[{"name":"寿司","duration":2},{"name":"متحف","duration":3}]<escape>,
       tags:<escape>["é","👩🏽‍💻","🇺🇳"]<escape>,
-      enabled:<escape>true<escape>,rating:<escape>4.5<escape>,missing:<escape>null<escape>,
+      enabled:<escape>true<escape>,disabled:<escape>false<escape>,
+      rating:<escape>4.5<escape>,missing:<escape>null<escape>,
       note:<escape>braces {[]} and "quotes" \ slash
       line<escape>}<end_function_call>
       """#
@@ -278,6 +281,40 @@ let toolCallParserTestFixtures = [
       "👩🏽",
       "\u{200D}",
       "💻 漢字 한글 العربية<escape>}<end_function_call>"
+    ]
+  ),
+  ToolCallParserTestFixture(
+    name: "MiniCPM5",
+    makeParser: { MiniCPM5ToolCallParser() },
+    noCalls: ["There are no tools to call."],
+    emptyArguments: [#"<function name="empty"></function>"#],
+    complexCall: [
+      #"""
+      <function name="complex">
+      <param name="destination">{"city":"東京","country":"日本"}</param>
+      <param name="activities">[{"name":"寿司","duration":2},{"name":"متحف","duration":3}]</param>
+      <param name="tags">["e\u0301","👩🏽‍💻","🇺🇳"]</param>
+      <param name="enabled">true</param><param name="disabled">false</param>
+      <param name="rating">4.5</param>
+      <param name="missing">null</param>
+      <param name="note"><![CDATA[braces {[]} and "quotes" \ slash
+      line]]></param></function>
+      """#
+    ],
+    multipleCalls: [
+      #"<function name="first"><param name="value">1</param></function>"#,
+      #"<function name="second"><param name="value">2</param></function>"#
+    ],
+    malformedThenValid: [
+      #"<function name="bad"><param name="value">1</function>"#,
+      #"<function name="valid"><param name="value">2</param></function>"#
+    ],
+    unicodeCall: [
+      #"<function name="unicode"><param name="value"><![CDATA[e"#,
+      "\u{301}",
+      "👩🏽",
+      "\u{200D}",
+      #"💻 漢字 한글 العربية]]></param></function>"#
     ]
   )
 ]

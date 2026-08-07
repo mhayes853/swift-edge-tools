@@ -30,6 +30,31 @@
     }
 
     @Test
+    func `Stops At Any Extra Model Stop Token`() async throws {
+      let tokenizer = try testTokenizer()
+      let responseTokenIds = encodedGrammarText("hello", tokenizer: tokenizer)
+      let stopTokenId = try #require(tokenizer.unknownTokenId)
+      let alternateStopTokenId = try #require(tokenizer.bosTokenId)
+      let eosTokenId = try requiredTestEOSToken(tokenizer: tokenizer)
+      let engine = try EdgeToolsModelEngine(
+        model: TestModel(extraStopTokenIds: [alternateStopTokenId, stopTokenId]),
+        tokenizer: tokenizer
+      )
+      let task = try engine.generate(
+        prompt: NeedlePrompt(system: "", user: "Prompt"),
+        parameters: TestModel.Parameters(
+          tokenIds: responseTokenIds + [stopTokenId, eosTokenId]
+        ),
+        channel: EdgeToolsGenerationChannel()
+      )
+
+      let generation = try await task.value
+
+      expectNoDifference(generation.tokens.map(\.id), responseTokenIds + [stopTokenId])
+      expectNoDifference(generation.response, tokenizer.decode(tokens: responseTokenIds))
+    }
+
+    @Test
     func `Constrained Model Parameters Resolve Tool Constraints`() async throws {
       let tokenizer = try testTokenizer()
       let eosTokenId = try requiredTestEOSToken(tokenizer: tokenizer)
@@ -200,6 +225,7 @@
 
     var assets: TestAssets?
     var constraintObservation: ConstraintObservation?
+    var extraStopTokenIds = Set<EdgeToolsToken.ID>()
     var index = 0
 
     var vocabularySize: Int { .needleVocabularySize }

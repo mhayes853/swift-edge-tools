@@ -330,14 +330,22 @@
     }
 
     private var model: Model
+    private let configuredExtraStopTokenIds: Set<EdgeToolsToken.ID>
     private var cachedPrefill: CachedPrefill?
     private var generation: Generation?
 
     public init(model: Model) {
       self.model = model
+      self.configuredExtraStopTokenIds = []
+    }
+
+    package init(model: Model, extraStopTokenIds: Set<EdgeToolsToken.ID>) {
+      self.model = model
+      self.configuredExtraStopTokenIds = extraStopTokenIds
     }
 
     public var vocabularySize: Int { self.model.vocabularySize }
+    public var extraStopTokenIds: Set<EdgeToolsToken.ID> { self.configuredExtraStopTokenIds }
 
     public func grammarContext(tokenizer: any EdgeToolsTokenizer) throws -> Model.GrammarContext {
       try self.model.grammarContext(tokenizer: tokenizer)
@@ -558,7 +566,29 @@
     ) async throws where Model == _EdgeToolsMLXModel<Base> {
       let tokenizer = try await EdgeToolsAutoTokenizer.from(modelDirectory: directoryURL)
       let model = try Base.loadEdgeToolsLanguageModel(from: directoryURL, model: makeModel)
-      try self.init(model: _EdgeToolsMLXModel(model: model), tokenizer: tokenizer)
+      var extraStopTokenIds = try loadMLXExtraStopTokenIds(from: directoryURL)
+      if let eosTokenId = tokenizer.eosTokenId { extraStopTokenIds.remove(eosTokenId) }
+      try self.init(
+        model: _EdgeToolsMLXModel(model: model, extraStopTokenIds: extraStopTokenIds),
+        tokenizer: tokenizer
+      )
     }
+  }
+
+  private func loadMLXExtraStopTokenIds(from directoryURL: URL) throws -> Set<EdgeToolsToken.ID> {
+    let baseConfiguration = try decodeModelConfiguration(
+      BaseConfiguration.self,
+      in: directoryURL,
+      decoder: JSONDecoder.json5()
+    )
+    var extraStopTokenIds = Set(baseConfiguration?.eosTokenIds?.values ?? [])
+    let generationConfigurationURL = directoryURL.appending(path: "generation_config.json")
+    if let data = try? Data(contentsOf: generationConfigurationURL),
+      let configuration = try? JSONDecoder.json5().decode(GenerationConfigFile.self, from: data),
+      let values = configuration.eosTokenIds?.values
+    {
+      extraStopTokenIds = Set(values)
+    }
+    return extraStopTokenIds
   }
 #endif

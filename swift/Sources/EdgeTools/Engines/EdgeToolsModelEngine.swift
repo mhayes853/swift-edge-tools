@@ -60,6 +60,7 @@
     where GrammarCompiler.Context == GrammarContext
 
     var vocabularySize: Int { get }
+    var extraStopTokenIds: Set<EdgeToolsToken.ID> { get }
 
     func grammarContext(tokenizer: any EdgeToolsTokenizer) throws -> GrammarContext
     func grammarCompiler(context: borrowing GrammarContext) throws -> GrammarCompiler
@@ -101,6 +102,8 @@
   }
 
   extension EdgeToolsModel {
+    public var extraStopTokenIds: Set<EdgeToolsToken.ID> { [] }
+
     public func finish() -> EdgeToolsMetadata {
       EdgeToolsMetadata()
     }
@@ -243,7 +246,9 @@
         parameters: parameters,
         context: self.grammarContext
       )
-      var matcher = try self.matcher(grammar: grammar)
+      var stopTokenIds = model.extraStopTokenIds
+      if let eosTokenId = self.tokenizer.eosTokenId { stopTokenIds.insert(eosTokenId) }
+      var matcher = try self.matcher(grammar: grammar, stopTokenIds: stopTokenIds)
       let generateStart = self.clock.now
       let input = try model.input(prompt: prompt, tools: tools, tokenizer: self.tokenizer)
       var preparation = try await model.prepare(input: input.value, parameters: parameters)
@@ -259,7 +264,7 @@
       if !matcher.isTerminated,
         !isStopped.load(ordering: .relaxed),
         generatedTokens.count < maximumTokenCount,
-        generatedTokens.last?.id != self.tokenizer.eosTokenId
+        generatedTokens.last.map({ !stopTokenIds.contains($0.id) }) ?? true
       {
         try Task.checkCancellation()
         bitmask = matcher.bitmask()
@@ -292,7 +297,7 @@
         if !matcher.isTerminated,
           !isStopped.load(ordering: .relaxed),
           generatedTokens.count < maximumTokenCount,
-          generatedTokens.last?.id != self.tokenizer.eosTokenId
+          generatedTokens.last.map({ !stopTokenIds.contains($0.id) }) ?? true
         {
           try Task.checkCancellation()
           bitmask = matcher.bitmask()
@@ -304,10 +309,10 @@
       preparation.metadata.merge(finalMetadata) { _, finalValue in finalValue }
       preparation.metadata.generationConfidence = confidence.mean
       preparation.metadata.perTokenConfidences = confidence.perTokenConfidences
-      let responseTokenIds =
-        self.tokenizer.eosTokenId.map { eosTokenId in
-          detokenizer.tokenIds.filter { $0 != eosTokenId }
-        } ?? detokenizer.tokenIds
+      var responseTokenIds = detokenizer.tokenIds
+      if let lastTokenId = responseTokenIds.last, stopTokenIds.contains(lastTokenId) {
+        responseTokenIds.removeLast()
+      }
       let response = self.tokenizer.decode(tokens: responseTokenIds)
       let decodeDuration =
         generateStart.duration(to: self.clock.now) - finalDurationToFirstToken
@@ -327,9 +332,14 @@
     }
 
     private func matcher(
-      grammar: Model.GrammarCompiler.Grammar
+      grammar: Model.GrammarCompiler.Grammar,
+      stopTokenIds: Set<EdgeToolsToken.ID>
     ) throws -> Model.GrammarCompiler.Matcher {
-      try self.grammarCompiler.matcher(for: grammar, context: self.grammarContext)
+      try self.grammarCompiler.matcher(
+        for: grammar,
+        context: self.grammarContext,
+        stopTokenIds: stopTokenIds
+      )
     }
   }
 

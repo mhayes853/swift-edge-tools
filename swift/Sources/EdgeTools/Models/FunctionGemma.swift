@@ -124,21 +124,11 @@ private struct FunctionGemmaCallReader: ToolCallValueReader {
   }
 
   private static func parseBareValue(_ token: String) -> EdgeToolsValue? {
-    return switch token {
-    case "true", "True": true
-    case "false", "False": false
-    case "null", "None": .null
-    default:
-      if token.isEmpty {
-        nil
-      } else if let integer = Int(token) {
-        .integer(integer)
-      } else if let number = Double(token) {
-        .number(number)
-      } else {
-        .string(token)
-      }
-    }
+    if token.isEmpty { return nil }
+    if let value = parseToolCallBooleanOrNull(token) { return value }
+    if let integer = Int(token) { return .integer(integer) }
+    if let number = Double(token) { return .number(number) }
+    return .string(token)
   }
 }
 

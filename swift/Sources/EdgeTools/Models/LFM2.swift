@@ -192,12 +192,7 @@ private struct PythonCallReader: ToolCallValueReader {
       return self.parseNumber()
     }
     guard let identifier = self.parseIdentifier() else { return nil }
-    return switch identifier {
-    case "True", "true": true
-    case "False", "false": false
-    case "None", "null": .null
-    default: nil
-    }
+    return parseToolCallBooleanOrNull(identifier)
   }
 
   private mutating func parseObject() -> EdgeToolsValue? {
