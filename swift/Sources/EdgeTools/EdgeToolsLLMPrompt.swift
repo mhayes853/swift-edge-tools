@@ -120,9 +120,7 @@ public struct EdgeToolsMIMEType:
   public static let webP = Self(rawValue: "image/webp")
 }
 
-#if !$Embedded
-  extension EdgeToolsMIMEType: Codable {}
-#endif
+extension EdgeToolsMIMEType: EdgeToolsCodable {}
 
 private func inferredPathExtension(from path: String) -> String? {
   let path =

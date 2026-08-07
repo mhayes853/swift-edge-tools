@@ -101,8 +101,8 @@ public struct NeedleModelConfiguration: Hashable, Sendable {
 
 }
 
-#if !$Embedded
-  extension NeedleModelConfiguration: Codable {
+extension NeedleModelConfiguration: EdgeToolsCodable {
+  #if !$Embedded
     private enum CodingKeys: String, CodingKey {
       case vocabularySize = "vocab_size"
       case dimensions = "d_model"
@@ -123,8 +123,8 @@ public struct NeedleModelConfiguration: Hashable, Sendable {
       case dtypeValue = "dtype"
       case torchDTypeValue = "torch_dtype"
     }
-  }
-#endif
+  #endif
+}
 
 // MARK: - NeedleNumerics
 

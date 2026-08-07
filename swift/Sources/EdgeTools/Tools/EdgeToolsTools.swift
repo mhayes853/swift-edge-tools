@@ -102,11 +102,11 @@ public struct EdgeToolCallID: Hashable, Sendable, RawRepresentable, ExpressibleB
   }
 }
 
-#if !$Embedded
-  extension EdgeRawToolCall: Codable {}
-  extension EdgeToolDefinition: Codable {}
+extension EdgeRawToolCall: EdgeToolsCodable {}
+extension EdgeToolDefinition: EdgeToolsCodable {}
 
-  extension EdgeToolCallID: Codable {
+extension EdgeToolCallID: EdgeToolsCodable {
+  #if !$Embedded
     public init(from decoder: any Decoder) throws {
       let container = try decoder.singleValueContainer()
       self.rawValue = try container.decode(String.self)
@@ -116,8 +116,8 @@ public struct EdgeToolCallID: Hashable, Sendable, RawRepresentable, ExpressibleB
       var container = encoder.singleValueContainer()
       try container.encode(self.rawValue)
     }
-  }
-#endif
+  #endif
+}
 
 private func makeEdgeToolCallID(using generator: inout some RandomNumberGenerator) -> String {
   var bytes = (0..<16).map { _ in UInt8.random(in: .min ... .max, using: &generator) }
