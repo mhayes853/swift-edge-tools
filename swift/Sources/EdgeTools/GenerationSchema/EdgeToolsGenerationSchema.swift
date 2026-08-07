@@ -75,10 +75,10 @@ public enum EdgeToolsGenerationSchema: Hashable, Sendable {
 
 // MARK: - Codable
 
-#if !$Embedded
-  extension EdgeToolsGenerationSchema.Key: Codable {}
+extension EdgeToolsGenerationSchema.Key: EdgeToolsCodable {}
 
-  extension EdgeToolsGenerationSchema: Encodable {
+extension EdgeToolsGenerationSchema: EdgeToolsEncodable {
+  #if !$Embedded
     public func encode(to encoder: any Encoder) throws {
       switch self {
       case .boolean(let value):
@@ -91,9 +91,11 @@ public enum EdgeToolsGenerationSchema: Hashable, Sendable {
         }
       }
     }
-  }
+  #endif
+}
 
-  extension EdgeToolsGenerationSchema: Decodable {
+extension EdgeToolsGenerationSchema: EdgeToolsDecodable {
+  #if !$Embedded
     public init(from decoder: any Decoder) throws {
       let container = try decoder.singleValueContainer()
       if let bool = try? container.decode(Bool.self) {
@@ -111,8 +113,8 @@ public enum EdgeToolsGenerationSchema: Hashable, Sendable {
       }
       self = .object(object)
     }
-  }
-#endif
+  #endif
+}
 
 // MARK: - Literals
 
@@ -573,14 +575,16 @@ extension EdgeToolsGenerationSchema.ValueType: ExpressibleByArrayLiteral {
   }
 }
 
-#if !$Embedded
-  extension EdgeToolsGenerationSchema.ValueType: Encodable {
+extension EdgeToolsGenerationSchema.ValueType: EdgeToolsEncodable {
+  #if !$Embedded
     public func encode(to encoder: any Encoder) throws {
       try self.edgeToolsValue.encode(to: encoder)
     }
-  }
+  #endif
+}
 
-  extension EdgeToolsGenerationSchema.ValueType: Decodable {
+extension EdgeToolsGenerationSchema.ValueType: EdgeToolsDecodable {
+  #if !$Embedded
     public init(from decoder: any Decoder) throws {
       let value = try EdgeToolsValue(from: decoder)
       guard let type = EdgeToolsGenerationSchema.valueType(from: value) else {
@@ -592,8 +596,8 @@ extension EdgeToolsGenerationSchema.ValueType: ExpressibleByArrayLiteral {
       }
       self = type
     }
-  }
-#endif
+  #endif
+}
 
 extension EdgeToolsGenerationSchema.ValueType {
   var canonicalName: String {
