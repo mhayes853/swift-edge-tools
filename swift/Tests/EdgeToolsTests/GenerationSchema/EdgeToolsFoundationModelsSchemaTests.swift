@@ -6,9 +6,9 @@
   import Testing
 
   @Suite
-  struct EdgeToolsFoundationModelsSchemaConsolidatedTests {
-    @Suite("EdgeToolsValue FoundationModels tests")
-    struct EdgeToolsValueFMTests {
+  struct `EdgeToolsFoundationModelsSchema tests` {
+    @Suite
+    struct `EdgeToolsValueFoundationModels tests` {
       @Test
       @available(iOS 26.0, macOS 26.0, watchOS 27.0, tvOS 26.0, visionOS 26.0, *)
       func `Converts Generated Content In Both Directions`() throws {
@@ -32,15 +32,15 @@
       @Test
       @available(iOS 26.0, macOS 26.0, watchOS 27.0, tvOS 26.0, visionOS 26.0, *)
       func `Rejects Nonfinite Numbers`() {
-        let error = #expect(throws: EdgeToolsFMError.self) {
+        let error = #expect(throws: FMConversionError.self) {
           try GeneratedContent(edgeToolsValue: .number(.infinity))
         }
         expectNoDifference(error?.code, .nonFiniteNumber)
       }
     }
 
-    @Suite("EdgeToolsGenerationSchema FoundationModels tests")
-    struct EdgeToolsGenerationSchemaFMTests {
+    @Suite
+    struct `EdgeToolsGenerationSchemaFoundationModels tests` {
       @Test
       @available(iOS 26.0, macOS 26.0, watchOS 27.0, tvOS 26.0, visionOS 26.0, *)
       func `Converts Generation Schema In Both Directions`() throws {
@@ -194,7 +194,7 @@
             }
           )
         } else {
-          #expect(throws: EdgeToolsFMError.self) {
+          #expect(throws: FMConversionError.self) {
             try DynamicGenerationSchema(
               edgeToolsGenerationSchema: testCase.schema,
               name: testCase.name

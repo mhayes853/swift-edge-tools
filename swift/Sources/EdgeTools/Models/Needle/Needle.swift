@@ -17,8 +17,6 @@ public struct NeedleModelConfiguration: Hashable, Sendable {
   public var encoderLayers: Int = 12
   public var decoderLayers: Int = 8
   public var hiddenLayers: Int = 8
-  public var ropeTheta: Float = 10000.0
-  public var rmsNormEps: Float = 1e-6
   public var padTokenId: EdgeToolsToken.ID = 0
   public var decoderStartTokenId: EdgeToolsToken.ID = 1
   public var tieWordEmbeddings: Bool = true
@@ -27,6 +25,18 @@ public struct NeedleModelConfiguration: Hashable, Sendable {
   private var decoderMaxLengthValue: Int?
   private var dtypeValue: String?
   private var torchDTypeValue: String?
+  private var ropeThetaValue: Float?
+  private var rmsNormEpsValue: Float?
+
+  public var ropeTheta: Float {
+    get { self.ropeThetaValue ?? 10000.0 }
+    set { self.ropeThetaValue = newValue }
+  }
+
+  public var rmsNormEps: Float {
+    get { self.rmsNormEpsValue ?? 1e-6 }
+    set { self.rmsNormEpsValue = newValue }
+  }
 
   public var dtype: String {
     get { self.dtypeValue ?? self.torchDTypeValue ?? "bfloat16" }
@@ -91,8 +101,8 @@ public struct NeedleModelConfiguration: Hashable, Sendable {
 
 }
 
-#if !$Embedded
-  extension NeedleModelConfiguration: Codable {
+extension NeedleModelConfiguration: EdgeToolsCodable {
+  #if !$Embedded
     private enum CodingKeys: String, CodingKey {
       case vocabularySize = "vocab_size"
       case dimensions = "d_model"
@@ -102,8 +112,8 @@ public struct NeedleModelConfiguration: Hashable, Sendable {
       case decoderLayers = "num_decoder_layers"
       case hiddenLayers = "num_hidden_layers"
       case kvHeads = "num_kv_heads"
-      case ropeTheta = "rope_theta"
-      case rmsNormEps = "rms_norm_eps"
+      case ropeThetaValue = "rope_theta"
+      case rmsNormEpsValue = "rms_norm_eps"
       case padTokenId = "pad_token_id"
       case decoderStartTokenId = "decoder_start_token_id"
       case tieWordEmbeddings = "tie_word_embeddings"
@@ -113,8 +123,8 @@ public struct NeedleModelConfiguration: Hashable, Sendable {
       case dtypeValue = "dtype"
       case torchDTypeValue = "torch_dtype"
     }
-  }
-#endif
+  #endif
+}
 
 // MARK: - NeedleNumerics
 
@@ -223,8 +233,16 @@ public struct NeedleToolCallParser: EdgeToolCallParser, Sendable {
 
   public init() {}
 
-  public mutating func accept(token: EdgeToolsToken) -> EdgeRawToolCall? {
+  public mutating func accept(token: EdgeToolsToken) -> [EdgeRawToolCall] {
     self.list.append(token)
+    var calls = [EdgeRawToolCall]()
+    while let call = self.nextCall() {
+      calls.append(call)
+    }
+    return calls
+  }
+
+  private mutating func nextCall() -> EdgeRawToolCall? {
     while let objectData = self.list.nextItem(findRange: { $0.firstCompleteJSONObjectRange() }) {
       if let value = try? EdgeToolsValue(json: objectData),
         let call = EdgeRawToolCall(jsonValue: value)
@@ -245,49 +263,49 @@ public protocol NeedleGenerateParameters: EdgeToolsEngineGenerateParameters {
 #if XGrammar
   // MARK: - NeedleModel
 
-    public protocol NeedleModel: EdgeToolsModel
-    where
-        Prompt == NeedlePrompt,
-        GenerateParameters: NeedleGenerateParameters,
-        ToolCallParser == NeedleToolCallParser,
-        GrammarCompiler == XGRCompiler,
-        GrammarContext == XGRGrammarContext
-    {}
+  public protocol NeedleModel: EdgeToolsModel
+  where
+    Prompt == NeedlePrompt,
+    GenerateParameters: NeedleGenerateParameters,
+    ToolCallParser == NeedleToolCallParser,
+    GrammarCompiler == XGRCompiler,
+    GrammarContext == XGRGrammarContext
+  {}
 
-    extension NeedleModel {
-        public func grammarContext(tokenizer: any EdgeToolsTokenizer) throws -> XGRGrammarContext {
-        guard let tokenizer = tokenizer as? any EdgeToolsXGRTokenizer else {
-            throw EdgeToolsError.unsupportedTokenizer
-        }
-        let tokenizerInfo = try tokenizer.tokenizerInfo(modelVocabularySize: self.vocabularySize)
-        return XGRGrammarContext(tokenizerInfo: tokenizerInfo)
-        }
-
-        public func grammarCompiler(context: borrowing XGRGrammarContext) throws -> XGRCompiler {
-        try XGRCompiler(tokenizerInfo: context.tokenizerInfo)
-        }
-
-        public func grammar(
-        tools: [EdgeToolDefinition],
-        parameters: GenerateParameters,
-        context _: XGRGrammarContext
-        ) throws -> XGRGrammar {
-        try self.toolCallGrammar(tools: tools, range: parameters.toolCallRange)
-        }
-
-        public func toolCallGrammar(
-        tools: [EdgeToolDefinition],
-        range: GrammarToolCallRange
-        ) throws -> XGRGrammar {
-        try XGRGrammar.needle(tools: tools, range: range)
-        }
+  extension NeedleModel {
+    public func grammarContext(tokenizer: any EdgeToolsTokenizer) throws -> XGRGrammarContext {
+      guard let tokenizer = tokenizer as? any XGRTokenizer else {
+        throw EdgeToolsError.unsupportedTokenizer
+      }
+      let tokenizerInfo = try tokenizer.tokenizerInfo(modelVocabularySize: self.vocabularySize)
+      return XGRGrammarContext(tokenizerInfo: tokenizerInfo)
     }
+
+    public func grammarCompiler(context: borrowing XGRGrammarContext) throws -> XGRCompiler {
+      try XGRCompiler(tokenizerInfo: context.tokenizerInfo)
+    }
+
+    public func grammar(
+      tools: [EdgeToolDefinition],
+      parameters: GenerateParameters,
+      context _: XGRGrammarContext
+    ) throws -> XGRGrammar {
+      try self.toolCallGrammar(tools: tools, range: parameters.toolCallRange)
+    }
+
+    public func toolCallGrammar(
+      tools: [EdgeToolDefinition],
+      range: GrammarToolCallRange
+    ) throws -> XGRGrammar {
+      try XGRGrammar.needle(tools: tools, range: range)
+    }
+  }
 
   // MARK: - XGRTokenizerInfo
 
   extension XGRTokenizerInfo {
     public static func needle(
-      tokenizer: some EdgeToolsXGRTokenizer,
+      tokenizer: some XGRTokenizer,
       vocabularySize: Int = .needleVocabularySize
     ) throws -> XGRTokenizerInfo {
       try Self.needle(
@@ -304,7 +322,7 @@ public protocol NeedleGenerateParameters: EdgeToolsEngineGenerateParameters {
     ) throws -> XGRTokenizerInfo {
       guard let eosTokenID, vocabulary.allSatisfy({ $0 != nil }) else {
         throw XGRError(
-          code: EdgeToolsXGRError.invalidNeedleTokenizer,
+          code: XGRError.Code.invalidNeedleTokenizer,
           message: "Needle requires a tokenizer with an EOS token and full vocabulary."
         )
       }

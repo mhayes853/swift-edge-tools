@@ -1,5 +1,16 @@
 import OrderedCollections
 
+// MARK: - Tool Call Primitive Parsing
+
+func parseToolCallBooleanOrNull(_ source: String) -> EdgeToolsValue? {
+  switch source {
+  case "true", "True": true
+  case "false", "False": false
+  case "null", "None": .null
+  default: nil
+  }
+}
+
 private struct JSONStringState: Hashable, Sendable {
   private var isInsideString = false
   private var isEscaping = false

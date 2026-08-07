@@ -13,8 +13,6 @@ ONNX export workflows.
 - `onnxruntime`
 - `onnxscript`
 - `safetensors`
-- `sentencepiece`
-- `tokenizers`
 
 Install dependencies from this directory:
 
@@ -119,24 +117,10 @@ python3 cli.py --backend onnx --onnx-quantization int8 --output ./build/onnx-int
 ```
 
 The ONNX decoder returns only `key_cache_delta` and `value_cache_delta`, each
-containing the newly generated row for every layer. The runtime appends these
-small outputs to its local cache tensors instead of receiving complete updated
-caches from the model. The benchmark includes that append in measured per-token
-latency.
-
-The ONNX benchmark retains the configured 512-position maximum cache but starts
-with 128 active positions by default, growing to 256 and 512 only when needed:
-
-```bash
-python3 scripts/benchmark_needle.py ./build/onnx-export \
-  --backend onnx \
-  --encoder-length 128 \
-  --generate 32
-```
-
-Use `--initial-cache-length 512` for a fixed-size baseline. `--cache-length`
-sets the maximum capacity rather than the initial active size. Apple benchmark
-results report `cross_cache_init_ms` separately and include it in TTFT.
+containing the newly generated row for every layer. Native runtimes append these
+small outputs to local cache tensors instead of receiving complete updated
+caches from the model. The Swift ONNX runtime starts with 128 active positions
+and grows the cache toward its configured maximum only when needed.
 
 For custom compression, use the Python API:
 
@@ -237,13 +221,11 @@ The Python implementation resolves these choices into one immutable
 combining cache booleans. ONNX uses explicit adaptive caches with delta outputs,
 CoreML uses per-layer self/cross states with decomposed attention, and CoreAI
 uses per-layer self states with cross K/V inputs and native GQA. Cache names and
-shapes live in `needle/cache_layout.py`; backend benchmark adapters live under
-`needle/benchmark/`.
+shapes live in `needle/cache_layout.py`.
 
 `--experimental-coreml-dynamic-cache` retains the fixed 512-position CoreML
 state while allowing the self-attention mask to select a dynamic active prefix.
-Benchmark with `--initial-cache-length 128` to start at 128 positions and grow
-to 256/512. Dynamic CoreML state currently requires an uncompressed export.
+Dynamic CoreML state currently requires an uncompressed export.
 
 Supported compression convenience flags:
 

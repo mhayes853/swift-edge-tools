@@ -2,15 +2,21 @@
   import Atomics
 
   final class AtomicGenerationTask: EdgeToolsEngineGenerationTask {
+    enum State: UInt8 {
+      case queued
+      case running
+      case stopped
+    }
+
     private let task: Task<EdgeToolsEngineGeneration, any Error>
-    private let isStopped: ManagedAtomic<Bool>
+    private let state: ManagedAtomic<UInt8>
 
     init(
       task: sending Task<EdgeToolsEngineGeneration, any Error>,
-      isStopped: ManagedAtomic<Bool>
+      state: ManagedAtomic<UInt8>
     ) {
       self.task = task
-      self.isStopped = isStopped
+      self.state = state
     }
 
     var value: EdgeToolsEngineGeneration {
@@ -18,7 +24,13 @@
     }
 
     func stop() {
-      self.isStopped.store(true, ordering: .relaxed)
+      let previousState = self.state.exchange(
+        State.stopped.rawValue,
+        ordering: .relaxed
+      )
+      if previousState == State.queued.rawValue {
+        self.task.cancel()
+      }
     }
   }
 #endif

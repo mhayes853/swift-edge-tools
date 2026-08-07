@@ -13,8 +13,6 @@ dependencies = [
   "onnxscript>=0.5.0",
   "PyYAML>=6.0",
   "safetensors>=0.6.2",
-  "sentencepiece>=0.2.1",
-  "tokenizers>=0.22.1",
 ]
 
 [build-system]
@@ -22,7 +20,7 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["needle", "needle.benchmark", "needle.export"]
+packages = ["needle", "needle.export"]
 package-dir = { needle = "needle" }
 py-modules = ["cli"]
 

@@ -99,13 +99,14 @@
 
     @Test
     func `Generate With Untied Word Embeddings`() async throws {
+      let directoryURL = try await downloadNeedle()
+      var configuration = try #require(
+        try decodeModelConfiguration(NeedleModelConfiguration.self, in: directoryURL)
+      )
+      configuration.tieWordEmbeddings = false
       let engine = try await Engine(
-        from: downloadNeedle(),
-        model: { configuration in
-          var configuration = configuration
-          configuration.tieWordEmbeddings = false
-          return NeedleMLXModel(configuration: configuration)
-        }
+        from: directoryURL,
+        configuration: configuration
       )
 
       let tokenStorage = Lock([EdgeToolsToken]())

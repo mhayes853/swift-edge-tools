@@ -2,26 +2,25 @@
   import EdgeToolsXGrammar
   import OrderedCollections
 
-  /// EdgeTools-specific XGrammar error codes.
-  public struct EdgeToolsXGRError {
+  extension XGRError.Code {
     /// An invalid ``GrammarToolCallRange`` for generation.
-    public static let invalidToolInvocationRange = XGRError.Code(
+    public static let invalidToolInvocationRange = Self(
       rawValue: "invalid-tool-invocation-range"
     )
 
     /// An empty tool collection for generation.
-    public static let emptyToolCollection = XGRError.Code(rawValue: "empty-tool-collection")
+    public static let emptyToolCollection = Self(rawValue: "empty-tool-collection")
 
     /// An unsupported tool schema for generation.
-    public static let unsupportedToolSchema = XGRError.Code(rawValue: "unsupported-tool-schema")
+    public static let unsupportedToolSchema = Self(rawValue: "unsupported-tool-schema")
 
     /// An incompatible tokenizer vocabulary for generation.
-    public static let incompatibleTokenizerVocabulary = XGRError.Code(
+    public static let incompatibleTokenizerVocabulary = Self(
       rawValue: "incompatible-tokenizer-vocabulary"
     )
 
     /// An invalid Needle tokenizer for generation.
-    public static let invalidNeedleTokenizer = XGRError.Code(rawValue: "invalid-needle-tokenizer")
+    public static let invalidNeedleTokenizer = Self(rawValue: "invalid-needle-tokenizer")
   }
 
   extension XGRError {
@@ -30,11 +29,11 @@
       message: "Invalid Hugging Face tokenizer metadata."
     )
     static let invalidToolInvocationRange = Self(
-      code: EdgeToolsXGRError.invalidToolInvocationRange,
+      code: XGRError.Code.invalidToolInvocationRange,
       message: "Tool invocation ranges cannot have a negative lower bound."
     )
     static let unsupportedToolSchema = Self(
-      code: EdgeToolsXGRError.unsupportedToolSchema,
+      code: XGRError.Code.unsupportedToolSchema,
       message: "The tool definition has an unsupported schema."
     )
   }
@@ -100,9 +99,14 @@
 
     fileprivate func matcher(
       for grammar: XGRGrammar,
-      compiler: borrowing XGRCompiler
+      compiler: borrowing XGRCompiler,
+      stopTokenIds: Set<EdgeToolsToken.ID>
     ) throws -> XGRMatcher {
-      let matcher = try self.matcherPool.matcher(grammar: grammar, compilingWith: compiler)
+      let matcher = try self.matcherPool.matcher(
+        grammar: grammar,
+        compilingWith: compiler,
+        stopTokenIds: stopTokenIds
+      )
       matcher.reset()
       return matcher
     }
@@ -117,9 +121,10 @@
 
     public func matcher(
       for grammar: XGRGrammar,
-      context: borrowing XGRGrammarContext
+      context: borrowing XGRGrammarContext,
+      stopTokenIds: Set<EdgeToolsToken.ID>
     ) throws -> XGRMatcher {
-      try context.matcher(for: grammar, compiler: self)
+      try context.matcher(for: grammar, compiler: self, stopTokenIds: stopTokenIds)
     }
   }
 
@@ -128,8 +133,15 @@
   extension XGRGrammar {
     public static func literal(_ literal: String) throws -> XGRGrammar {
       let escapedLiteral = literal.reduce(into: "") { result, character in
-        if character == "\\" || character == "\"" { result.append("\\") }
-        result.append(character)
+        switch character {
+        case "\\", "\"":
+          result.append("\\")
+          result.append(character)
+        case "\n": result.append(contentsOf: "\\n")
+        case "\r": result.append(contentsOf: "\\r")
+        case "\t": result.append(contentsOf: "\\t")
+        default: result.append(character)
+        }
       }
       return try Self.ebnf("root ::= \"\(escapedLiteral)\"")
     }
@@ -157,9 +169,9 @@
     }
   }
 
-  // MARK: - EdgeToolsXGRGenerationConstraint
+  // MARK: - XGRGenerationConstraint
 
-  public struct EdgeToolsXGRGenerationConstraint: Sendable {
+  public struct XGRGenerationConstraint: Sendable {
     private enum Kind: Sendable {
       case unconstrained
       case grammar(XGRGrammar)
@@ -206,7 +218,7 @@
     }
   }
 
-  extension EdgeToolsXGRGenerationConstraint: EdgeToolsGenerationConstraint {
+  extension XGRGenerationConstraint: EdgeToolsGenerationConstraint {
     public typealias Context = XGRGrammarContext
 
     public var toolCallRange: GrammarToolCallRange? {
@@ -300,6 +312,23 @@
       }
     }
 
+    mutating func mapRuleReferences(
+      _ transform: (_ ruleName: String, _ reference: String) -> String
+    ) {
+      for index in self.rules.indices {
+        let rule = self.rules[index]
+        var output = ""
+        var outputStart = rule.body.startIndex
+        for token in rule.body.ebnfTokens where token.kind == .identifier {
+          output.append(contentsOf: rule.body[outputStart..<token.range.lowerBound])
+          output.append(transform(rule.name, String(rule.body[token.range])))
+          outputStart = token.range.upperBound
+        }
+        output.append(contentsOf: rule.body[outputStart...])
+        self.rules[index].body = output
+      }
+    }
+
     private static func mapLiterals(
       in source: String,
       _ transform: (_ value: String, _ suffix: Substring) -> String
@@ -321,7 +350,9 @@
       return output
     }
 
-    private static func replacingRuleReferences(in source: String, aliases: [String: String]) -> String {
+    private static func replacingRuleReferences(in source: String, aliases: [String: String])
+      -> String
+    {
       var output = ""
       var outputStart = source.startIndex
       for token in source.ebnfTokens where token.kind == .identifier {
@@ -371,6 +402,12 @@
   }
 
   extension Substring {
+    func hasRuleReference(withPrefix prefix: String) -> Bool {
+      self.ebnfTokens.contains { token in
+        token.kind == .identifier && self[token.range].hasPrefix(prefix)
+      }
+    }
+
     var hasToolCallContinuationReference: Bool {
       self.ebnfTokens.contains { token in
         token.kind == .identifier && self[token.range].isToolCallContinuationName
@@ -397,7 +434,7 @@
       return grammar
     }
 
-    static func qwenXMLArguments(for tool: EdgeToolDefinition) -> XGRGrammar {
+    static func xmlToolArguments(for tool: EdgeToolDefinition) -> XGRGrammar {
       let schema = tool.arguments.orderedJSONString()
       let structuralTag =
         #"{"type":"structural_tag","format":{"type":"json_schema","json_schema":\#(schema),"style":"qwen_xml","any_order":false}}"#
@@ -417,7 +454,7 @@
       guard let firstTool = tools.first else {
         guard range.lowerBound == 0 else {
           throw XGRError(
-            code: EdgeToolsXGRError.emptyToolCollection,
+            code: XGRError.Code.emptyToolCollection,
             message: "A nonzero tool invocation range requires at least one tool."
           )
         }
@@ -501,15 +538,20 @@
 
     func matcher(
       grammar: XGRGrammar,
-      compilingWith compiler: borrowing XGRCompiler
+      compilingWith compiler: borrowing XGRCompiler,
+      stopTokenIds: Set<EdgeToolsToken.ID>
     ) throws -> XGRMatcher {
-      let key = grammar.ebnf
+      let sortedStopTokenIds = stopTokenIds.sorted()
+      let key = "\(grammar.ebnf)\u{0}\(sortedStopTokenIds.map(String.init).joined(separator: ","))"
       if let cached = self.entries[key] {
         self.touch(key)
         return cached.fork()
       }
       let compiledGrammar = try compiler.compile(grammar)
-      let matcher = try XGRMatcher(compiledGrammar: compiledGrammar)
+      let matcher = try XGRMatcher(
+        compiledGrammar: compiledGrammar,
+        overrideStopTokenIDs: sortedStopTokenIds
+      )
       return self.insert(key, matcher: consume matcher)
     }
 

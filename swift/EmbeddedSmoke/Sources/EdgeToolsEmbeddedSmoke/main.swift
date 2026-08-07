@@ -48,7 +48,7 @@ final class MockEngine: EdgeToolsEngine {
     prompt: Prompt,
     tools: [EdgeToolDefinition],
     parameters: GenerateParameters,
-    channel: EdgeToolsGenerationChannel
+    channel: sending EdgeToolsGenerationChannel
   ) throws -> GenerationTask {
     let token = EdgeToolsToken(id: 0, stringValue: "calling")
     let arguments = EdgeToolsValue.object(["message": .string("hello embedded")])

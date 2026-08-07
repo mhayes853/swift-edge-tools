@@ -4,7 +4,7 @@ import Testing
 
 #if ONNX && canImport(COnnxRuntime) && !os(WASI)
   @Suite(.serialized, .basicNeedleInference())
-  struct `Needle ONNX basic inference tests` {
+  struct `NeedleONNXBasicInference tests` {
     @Test
     func `Generate Basics With CPU Execution Provider`() async throws {
       let engine = try await makeNeedleONNXModelEngine()
@@ -26,7 +26,7 @@ import Testing
   import CoreML
 
   @Suite(.serialized, .basicNeedleInference())
-  struct `Needle Core ML basic inference tests` {
+  struct `NeedleCoreMLBasicInference tests` {
     @Test
     @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
     func `Generate Basics`() async throws {
@@ -49,7 +49,7 @@ import Testing
   import CoreAI
 
   @Suite(.serialized, .basicNeedleInference())
-  struct `Needle Core AI basic inference tests` {
+  struct `NeedleCoreAIBasicInference tests` {
     @Test
     @available(anyAppleOS 27.0, *)
     func `Generate Basics`() async throws {

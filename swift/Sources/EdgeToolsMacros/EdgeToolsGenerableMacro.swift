@@ -21,7 +21,7 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro, MemberAttribut
 
     if !Self.hasExistingEdgeToolsGenerationSchema(in: structDecl) {
       members.append(
-        Self.edgeToolsGenerationSchemaProperty(
+        Self.generationSchemaProperty(
           from: properties,
           modifierPrefix: modifierPrefix,
           schemaFragments: schemaFragments
@@ -30,21 +30,11 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro, MemberAttribut
     }
 
     if !Self.hasExistingEdgeToolsValueInitializer(in: structDecl) {
-      members.append(
-        Self.edgeToolsValueInitializer(
-          from: properties,
-          modifierPrefix: modifierPrefix
-        )
-      )
+      members.append(Self.valueInitializer(from: properties, modifierPrefix: modifierPrefix))
     }
 
     if !Self.hasExistingEdgeToolsValueProperty(in: structDecl) {
-      members.append(
-        Self.edgeToolsValueProperty(
-          from: properties,
-          modifierPrefix: modifierPrefix
-        )
-      )
+      members.append(Self.valueProperty(from: properties, modifierPrefix: modifierPrefix))
     }
 
     return members
@@ -207,7 +197,7 @@ extension EdgeToolsGenerableMacro {
       }
       let propertyName = identifierPattern.identifier.text
       let typeName = type.trimmedDescription
-      let guideAttributes = Self.edgeToolsGuideAttributes(in: variableDecl)
+      let guideAttributes = Self.guideAttributes(in: variableDecl)
       if guideAttributes.count > 1 {
         context.diagnose(
           Diagnostic(
@@ -221,7 +211,7 @@ extension EdgeToolsGenerableMacro {
       let guideSelection = guideAttributes.first.flatMap { attribute in
         Self.parseEdgeToolsGuide(in: attribute, context: context)
       }
-      let ignoredAttribute = Self.edgeToolsIgnoredAttribute(in: variableDecl)
+      let ignoredAttribute = Self.ignoredAttribute(in: variableDecl)
       var isIgnored = ignoredAttribute != nil
       let hasDefaultValue = binding.initializer != nil
       let isOptional = Self.isOptionalTypeName(typeName)
@@ -327,7 +317,7 @@ extension EdgeToolsGenerableMacro {
     return EdgeToolsGuideSelection(key: key, schemaFragments: fragments)
   }
 
-  private static func edgeToolsGenerationSchemaProperty(
+  private static func generationSchemaProperty(
     from properties: [StoredProperty],
     modifierPrefix: String,
     schemaFragments: [String]
@@ -372,7 +362,7 @@ extension EdgeToolsGenerableMacro {
       """
   }
 
-  private static func edgeToolsValueInitializer(
+  private static func valueInitializer(
     from properties: [StoredProperty],
     modifierPrefix: String
   ) -> DeclSyntax {
@@ -405,7 +395,7 @@ extension EdgeToolsGenerableMacro {
       """
   }
 
-  private static func edgeToolsValueProperty(
+  private static func valueProperty(
     from properties: [StoredProperty],
     modifierPrefix: String
   ) -> DeclSyntax {
@@ -437,9 +427,7 @@ extension EdgeToolsGenerableMacro {
       """
   }
 
-  private static func edgeToolsGuideAttributes(in variableDecl: VariableDeclSyntax)
-    -> [AttributeSyntax]
-  {
+  private static func guideAttributes(in variableDecl: VariableDeclSyntax) -> [AttributeSyntax] {
     variableDecl.attributes.compactMap { element in
       guard let attribute = element.as(AttributeSyntax.self) else { return nil }
       guard let identifierType = attribute.attributeName.as(IdentifierTypeSyntax.self) else {
@@ -450,9 +438,7 @@ extension EdgeToolsGenerableMacro {
     }
   }
 
-  private static func edgeToolsIgnoredAttribute(in variableDecl: VariableDeclSyntax)
-    -> AttributeSyntax?
-  {
+  private static func ignoredAttribute(in variableDecl: VariableDeclSyntax) -> AttributeSyntax? {
     variableDecl.attributes
       .compactMap { element -> AttributeSyntax? in
         guard let attribute = element.as(AttributeSyntax.self) else { return nil }

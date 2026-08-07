@@ -4,7 +4,7 @@
   import Testing
 
   @Suite
-  struct `Tool call grammar common tests`: ~Copyable {
+  struct `ToolCallGrammarCommon tests`: ~Copyable {
     private let compiler: XGRCompiler
     private let tokenizer: NeedleSPTokenizer
     private let eosToken: EdgeToolsToken.ID
@@ -275,6 +275,37 @@
         """
     ),
     ToolCallGrammarTestFixture(
+      name: "Gemma 4",
+      makeGrammar: { try XGRGrammar.gemma4(tools: $0, range: $1) },
+      makeParser: { Gemma4ToolCallParser() },
+      expectedComplexName: "complexTool",
+      emptyCall: "",
+      simpleCall:
+        "<|tool_call>call:getWeather{location:<|\"|>Seoul<|\"|>}<tool_call|>",
+      twoCalls:
+        """
+        <|tool_call>call:getWeather{location:<|"|>Seoul<|"|>}<tool_call|>\
+        <|tool_call>call:getWeather{location:<|"|>Paris<|"|>}<tool_call|>
+        """,
+      unknownToolCall:
+        "<|tool_call>call:unknown{location:<|\"|>Seoul<|\"|>}<tool_call|>",
+      wrongTypeCall:
+        "<|tool_call>call:integerTool{value:<|\"|>oops<|\"|>}<tool_call|>",
+      complexCall:
+        """
+        <|tool_call>call:complexTool{title:<|"|>alpha<|"|>,count:3.5,enabled:true,mode:\
+        execute,ticket_id:ABC-12,priority:4,routing:{"region":"us-west"},\
+        labels:{"ALPHA":1,"BETA_LABEL":2},window:3,tuple_args:["alpha",2,true],\
+        optional_note:null,tags:["a","b"],config:{"threshold":0.75,"flags":[true,false]}}\
+        <tool_call|>
+        """,
+      ruleNamedCall:
+        """
+        <|tool_call>call:ruleNamedTool{root:<|"|>a<|"|>,xml_object:<|"|>b<|"|>}\
+        <tool_call|>
+        """
+    ),
+    ToolCallGrammarTestFixture(
       name: "LFM2 Python",
       makeGrammar: { try XGRGrammar.lfm2Python(tools: $0, range: $1) },
       makeParser: { LFM2PythonToolCallParser() },
@@ -298,6 +329,37 @@
         """,
       ruleNamedCall:
         #"<|tool_call_start|>[ruleNamedTool(root="a",xml_object="b")]<|tool_call_end|>"#
+    ),
+    ToolCallGrammarTestFixture(
+      name: "MiniCPM5",
+      makeGrammar: { try XGRGrammar.miniCPM5(tools: $0, range: $1) },
+      makeParser: { MiniCPM5ToolCallParser() },
+      expectedComplexName: "complexTool",
+      emptyCall: "",
+      simpleCall:
+        #"<function name="getWeather"><param name="location">"Seoul"</param></function>"#,
+      twoCalls:
+        """
+        <function name="getWeather"><param name="location">"Seoul"</param></function>
+        <function name="getWeather"><param name="location">"Paris"</param></function>
+        """,
+      unknownToolCall:
+        #"<function name="unknown"><param name="location">"Seoul"</param></function>"#,
+      wrongTypeCall:
+        #"<function name="integerTool"><param name="value">"oops"</param></function>"#,
+      complexCall:
+        """
+        <function name="complexTool"><param name="title">"alpha"</param>\
+        <param name="count">3.5</param><param name="enabled">true</param>\
+        <param name="mode">"execute"</param><param name="ticket_id">"ABC-12"</param>\
+        <param name="priority">4</param><param name="routing">{"region":"us-west"}</param>\
+        <param name="labels">{"ALPHA":1,"BETA_LABEL":2}</param><param name="window">3</param>\
+        <param name="tuple_args">["alpha",2,true]</param><param name="optional_note">null</param>\
+        <param name="tags">["a","b"]</param>\
+        <param name="config">{"threshold":0.75,"flags":[true,false]}</param></function>
+        """,
+      ruleNamedCall:
+        #"<function name="ruleNamedTool"><param name="root">"a"</param><param name="xml_object">"b"</param></function>"#
     )
   ]
 #endif

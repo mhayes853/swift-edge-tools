@@ -228,7 +228,7 @@ final class MockEngine: EdgeToolsPrefillableEngine, Sendable {
     prompt: NeedlePrompt,
     tools: [EdgeToolDefinition] = [],
     parameters: GenerateParameters,
-    channel: EdgeToolsGenerationChannel
+    channel: sending EdgeToolsGenerationChannel
   ) throws -> GenerationTask {
     self._generateCallCount.withLock { $0 += 1 }
     self._generationTools.withLock { $0.append(tools) }
@@ -252,9 +252,8 @@ final class MockEngine: EdgeToolsPrefillableEngine, Sendable {
           try Task.checkCancellation()
           switch event {
           case .token(let token):
-            let rawToolCall = parser.accept(token: token)
             channel.emit(token: token)
-            if let rawToolCall {
+            for rawToolCall in parser.accept(token: token) {
               toolCalls.append(rawToolCall)
               channel.emit(toolCall: rawToolCall)
             }

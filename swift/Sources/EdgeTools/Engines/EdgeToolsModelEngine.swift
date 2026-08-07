@@ -4,6 +4,7 @@
 
 #if Atomics
   import Atomics
+  import OrderedCollections
 
   // MARK: - EdgeToolsModelInput
 
@@ -60,6 +61,7 @@
     where GrammarCompiler.Context == GrammarContext
 
     var vocabularySize: Int { get }
+    var extraStopTokenIds: Set<EdgeToolsToken.ID> { get }
 
     func grammarContext(tokenizer: any EdgeToolsTokenizer) throws -> GrammarContext
     func grammarCompiler(context: borrowing GrammarContext) throws -> GrammarCompiler
@@ -75,11 +77,11 @@
       range: GrammarToolCallRange
     ) throws -> GrammarCompiler.Grammar
 
-    func input(
+    nonisolated(nonsending) func input(
       prompt: Prompt,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer
-    ) throws -> EdgeToolsModelInput<Input>
+    ) async throws -> EdgeToolsModelInput<Input>
 
     nonisolated(nonsending) mutating func prepare(
       input: Input,
@@ -101,6 +103,8 @@
   }
 
   extension EdgeToolsModel {
+    public var extraStopTokenIds: Set<EdgeToolsToken.ID> { [] }
+
     public func finish() -> EdgeToolsMetadata {
       EdgeToolsMetadata()
     }
@@ -141,17 +145,14 @@
     public typealias Prompt = Model.Prompt
     public typealias GenerateParameters = Model.GenerateParameters
 
-    private let generationGate = EdgeToolsModelGenerationGate()
+    private let generationGate = ModelGenerationGate()
     private var grammarCompiler: Model.GrammarCompiler
     private let grammarContext: Model.GrammarContext
     private var model: Model
     private let tokenizer: any EdgeToolsTokenizer
     private let clock = ContinuousClock()
 
-    public init(
-      model: sending Model,
-      tokenizer: sending any EdgeToolsTokenizer
-    ) throws {
+    public init(model: sending Model, tokenizer: sending any EdgeToolsTokenizer) throws {
       let grammarContext = try model.grammarContext(tokenizer: tokenizer)
       self.grammarCompiler = try model.grammarCompiler(context: grammarContext)
       self.grammarContext = grammarContext
@@ -163,7 +164,11 @@
       prompt: Model.Prompt,
       tools: [EdgeToolDefinition] = []
     ) async throws -> [EdgeToolsToken] {
-      let input = try self.model.input(prompt: prompt, tools: tools, tokenizer: self.tokenizer)
+      let input = try await self.model.input(
+        prompt: prompt,
+        tools: tools,
+        tokenizer: self.tokenizer
+      )
       let tokens = self.tokenizer.convertIdsToTokens(input.tokenIds)
       return zip(input.tokenIds, tokens)
         .compactMap { tokenId, token in
@@ -175,22 +180,40 @@
       prompt: Model.Prompt,
       tools: [EdgeToolDefinition] = [],
       parameters: sending Model.GenerateParameters,
-      channel: EdgeToolsGenerationChannel
+      channel: sending EdgeToolsGenerationChannel
     ) throws -> some EdgeToolsEngineGenerationTask {
-      let isStopped = ManagedAtomic(false)
+      let state = ManagedAtomic(AtomicGenerationTask.State.queued.rawValue)
 
-      // NB: Compiler region isolation checker limitation, this is safe because params are not
-      // accessed after being sent to generate.
+      // NB: Compiler region isolation checker limitation, these are safe because neither value
+      // is accessed after being sent to the generation task.
       nonisolated(unsafe) let parameters = parameters
+      nonisolated(unsafe) let channel = channel
       let task = Task {
-        await self.generationGate.acquire()
+        do {
+          try await self.generationGate.acquire()
+        } catch {
+          let currentState = state.load(ordering: .relaxed)
+          guard currentState == AtomicGenerationTask.State.stopped.rawValue else { throw error }
+          return EdgeToolsEngineGeneration.empty
+        }
+        let didStart =
+          state.compareExchange(
+            expected: AtomicGenerationTask.State.queued.rawValue,
+            desired: AtomicGenerationTask.State.running.rawValue,
+            ordering: .relaxed
+          )
+          .exchanged
+        guard didStart else {
+          await self.generationGate.release()
+          return EdgeToolsEngineGeneration.empty
+        }
         do {
           let generation = try await self.generate(
             prompt: prompt,
             tools: tools,
             parameters: parameters,
             channel: channel,
-            isStopped: isStopped
+            state: state
           )
           await self.generationGate.release()
           return generation
@@ -199,15 +222,15 @@
           throw error
         }
       }
-      return AtomicGenerationTask(task: task, isStopped: isStopped)
+      return AtomicGenerationTask(task: task, state: state)
     }
 
     private func generate(
       prompt: Model.Prompt,
       tools: [EdgeToolDefinition],
       parameters: sending Model.GenerateParameters,
-      channel: EdgeToolsGenerationChannel,
-      isStopped: ManagedAtomic<Bool>
+      channel: sending EdgeToolsGenerationChannel,
+      state: ManagedAtomic<UInt8>
     ) async throws -> EdgeToolsEngineGeneration {
       var model = self.model
       do {
@@ -216,7 +239,7 @@
           tools: tools,
           parameters: parameters,
           channel: channel,
-          isStopped: isStopped,
+          state: state,
           model: &model
         )
         model.resetGeneration()
@@ -233,36 +256,43 @@
       prompt: Model.Prompt,
       tools: [EdgeToolDefinition],
       parameters: sending Model.GenerateParameters,
-      channel: EdgeToolsGenerationChannel,
-      isStopped: ManagedAtomic<Bool>,
-      // swiftlint:disable:next identifier_name
+      channel: sending EdgeToolsGenerationChannel,
+      state: ManagedAtomic<UInt8>,
       model: inout Model
     ) async throws -> EdgeToolsEngineGeneration {
       try Task.checkCancellation()
-      guard !isStopped.load(ordering: .relaxed) else { return .empty }
+      let initialState = state.load(ordering: .relaxed)
+      guard initialState != AtomicGenerationTask.State.stopped.rawValue else { return .empty }
 
       let grammar = try model.grammar(
         tools: tools,
         parameters: parameters,
         context: self.grammarContext
       )
-      var matcher = try self.matcher(grammar: grammar)
+      var stopTokenIds = model.extraStopTokenIds
+      if let eosTokenId = self.tokenizer.eosTokenId {
+        stopTokenIds.insert(eosTokenId)
+      }
+
+      var matcher = try self.matcher(grammar: grammar, stopTokenIds: stopTokenIds)
       let generateStart = self.clock.now
-      let input = try model.input(prompt: prompt, tools: tools, tokenizer: self.tokenizer)
+      let input = try await model.input(prompt: prompt, tools: tools, tokenizer: self.tokenizer)
       var preparation = try await model.prepare(input: input.value, parameters: parameters)
       var detokenizer = StreamingDetokenizer()
       var parser = Model.ToolCallParser()
       var generatedTokens = [EdgeToolsToken]()
       var toolCalls = [EdgeRawToolCall]()
-      var confidence = EdgeToolsConfidenceState()
+      var confidence = ConfidenceState()
       var durationToFirstToken: Duration?
       let maximumTokenCount = parameters.maxTokens ?? .max
 
       var bitmask: GrammarBitmask?
+      let stateBeforeFirstToken = state.load(ordering: .relaxed)
       if !matcher.isTerminated,
-        !isStopped.load(ordering: .relaxed),
+        stateBeforeFirstToken != AtomicGenerationTask.State.stopped.rawValue,
         generatedTokens.count < maximumTokenCount,
-        generatedTokens.last?.id != self.tokenizer.eosTokenId {
+        generatedTokens.last.map({ !stopTokenIds.contains($0.id) }) ?? true
+      {
         try Task.checkCancellation()
         bitmask = matcher.bitmask()
       }
@@ -283,18 +313,19 @@
           throw EdgeToolsError.grammarRejectedToken(token: token)
         }
 
-        let rawToolCall = parser.accept(token: token)
         channel.emit(token: token)
-        if let rawToolCall {
+        for rawToolCall in parser.accept(token: token) {
           toolCalls.append(rawToolCall)
           channel.emit(toolCall: rawToolCall)
         }
 
         bitmask = nil
+        let currentState = state.load(ordering: .relaxed)
         if !matcher.isTerminated,
-          !isStopped.load(ordering: .relaxed),
+          currentState != AtomicGenerationTask.State.stopped.rawValue,
           generatedTokens.count < maximumTokenCount,
-          generatedTokens.last?.id != self.tokenizer.eosTokenId {
+          generatedTokens.last.map({ !stopTokenIds.contains($0.id) }) ?? true
+        {
           try Task.checkCancellation()
           bitmask = matcher.bitmask()
         }
@@ -305,13 +336,14 @@
       preparation.metadata.merge(finalMetadata) { _, finalValue in finalValue }
       preparation.metadata.generationConfidence = confidence.mean
       preparation.metadata.perTokenConfidences = confidence.perTokenConfidences
-      let responseTokenIds =
-        self.tokenizer.eosTokenId.map { eosTokenId in
-          detokenizer.tokenIds.filter { $0 != eosTokenId }
-        } ?? detokenizer.tokenIds
+      var responseTokenIds = detokenizer.tokenIds
+      if let lastTokenId = responseTokenIds.last, stopTokenIds.contains(lastTokenId) {
+        responseTokenIds.removeLast()
+      }
       let response = self.tokenizer.decode(tokens: responseTokenIds)
       let decodeDuration =
         generateStart.duration(to: self.clock.now) - finalDurationToFirstToken
+      let finalState = state.load(ordering: .relaxed)
       return EdgeToolsEngineGeneration(
         prefillMetrics: preparation.metrics,
         decodeMetrics: EdgeToolsDecodeMetrics(
@@ -319,7 +351,7 @@
           duration: decodeDuration,
           durationToFirstToken: finalDurationToFirstToken
         ),
-        wasStopped: isStopped.load(ordering: .relaxed),
+        wasStopped: finalState == AtomicGenerationTask.State.stopped.rawValue,
         tokens: generatedTokens,
         response: response,
         toolCalls: toolCalls,
@@ -328,9 +360,14 @@
     }
 
     private func matcher(
-      grammar: Model.GrammarCompiler.Grammar
+      grammar: Model.GrammarCompiler.Grammar,
+      stopTokenIds: Set<EdgeToolsToken.ID>
     ) throws -> Model.GrammarCompiler.Matcher {
-      try self.grammarCompiler.matcher(for: grammar, context: self.grammarContext)
+      try self.grammarCompiler.matcher(
+        for: grammar,
+        context: self.grammarContext,
+        stopTokenIds: stopTokenIds
+      )
     }
   }
 
@@ -350,10 +387,10 @@
       promptPrefix: Model.Prompt,
       tools: [EdgeToolDefinition]
     ) async throws -> EdgeToolsEnginePrefill {
-      await self.generationGate.acquire()
+      try await self.generationGate.acquire()
       var model = self.model
       do {
-        let input = try model.input(
+        let input = try await model.input(
           prompt: promptPrefix,
           tools: tools,
           tokenizer: self.tokenizer
@@ -371,26 +408,46 @@
     }
   }
 
-  // MARK: - EdgeToolsModelGenerationGate
+  // MARK: - ModelGenerationGate
 
-  private actor EdgeToolsModelGenerationGate {
+  private actor ModelGenerationGate {
     private var isAcquired = false
-    private var waiters = [UnsafeContinuation<Void, Never>]()
+    private var waiters = OrderedDictionary<Int, UnsafeContinuation<Bool, Never>>()
+    private var nextID = 0
 
-    func acquire() async {
+    func acquire() async throws {
+      try Task.checkCancellation()
       guard self.isAcquired else {
         self.isAcquired = true
         return
       }
-      await withUnsafeContinuation { self.waiters.append($0) }
+
+      let id = self.nextID
+      self.nextID += 1
+      let wasAcquired = await withTaskCancellationHandler {
+        await withUnsafeContinuation { continuation in
+          guard !Task.isCancelled else {
+            continuation.resume(returning: false)
+            return
+          }
+          self.waiters[id] = continuation
+        }
+      } onCancel: {
+        Task { await self.cancelWaiter(id: id) }
+      }
+      guard wasAcquired else { throw CancellationError() }
     }
 
     func release() {
-      guard !self.waiters.isEmpty else {
+      guard let id = self.waiters.keys.first else {
         self.isAcquired = false
         return
       }
-      self.waiters.removeFirst().resume()
+      self.waiters.removeValue(forKey: id)?.resume(returning: true)
+    }
+
+    private func cancelWaiter(id: Int) {
+      self.waiters.removeValue(forKey: id)?.resume(returning: false)
     }
   }
 #endif

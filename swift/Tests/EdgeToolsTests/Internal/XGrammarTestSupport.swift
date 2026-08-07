@@ -12,7 +12,7 @@ func testTokenizer() throws -> NeedleSPTokenizer {
     try NeedleSPTokenizer(modelURL: .testTokenizerModel)
   #elseif XGrammar
     throw XGRError(
-      code: EdgeToolsXGRError.invalidNeedleTokenizer,
+      code: XGRError.Code.invalidNeedleTokenizer,
       message: "Test tokenizer loading requires the Foundation trait."
     )
   #else
@@ -22,11 +22,11 @@ func testTokenizer() throws -> NeedleSPTokenizer {
 
 #if XGrammar
   func requiredTestEOSToken(
-    tokenizer: some EdgeToolsXGRTokenizer
+    tokenizer: some XGRTokenizer
   ) throws -> EdgeToolsToken.ID {
     guard let eosToken = tokenizer.eosTokenId else {
       throw XGRError(
-        code: EdgeToolsXGRError.invalidNeedleTokenizer,
+        code: XGRError.Code.invalidNeedleTokenizer,
         message: "The test tokenizer must provide an EOS token."
       )
     }
@@ -41,12 +41,12 @@ func testTokenizer() throws -> NeedleSPTokenizer {
   }
 
   func makeGenericXGRCompiler(
-    tokenizer: some EdgeToolsXGRTokenizer
+    tokenizer: some XGRTokenizer
   ) throws -> XGRCompiler {
     let vocabulary = tokenizer.convertIdsToTokens(Array(0..<Int.needleVocabularySize))
     guard let eosToken = tokenizer.eosTokenId, vocabulary.allSatisfy({ $0 != nil }) else {
       throw XGRError(
-        code: EdgeToolsXGRError.invalidNeedleTokenizer,
+        code: XGRError.Code.invalidNeedleTokenizer,
         message: "The test tokenizer must provide an EOS token and full vocabulary."
       )
     }
@@ -62,7 +62,7 @@ func testTokenizer() throws -> NeedleSPTokenizer {
 
   func encodedGrammarText(
     _ text: String,
-    tokenizer: some EdgeToolsXGRTokenizer
+    tokenizer: some XGRTokenizer
   ) -> [EdgeToolsToken.ID] {
     let tokenIds = tokenizer.encode(text: text)
     guard let firstTokenId = tokenIds.first else { return tokenIds }
@@ -76,7 +76,7 @@ func testTokenizer() throws -> NeedleSPTokenizer {
   func assertGrammarAccepts(
     _ text: String,
     matcher: borrowing XGRMatcher,
-    tokenizer: some EdgeToolsXGRTokenizer,
+    tokenizer: some XGRTokenizer,
     eosToken: EdgeToolsToken.ID
   ) {
     if let rejected = firstRejectedGrammarToken(in: text, matcher: matcher, tokenizer: tokenizer) {
@@ -94,7 +94,7 @@ func testTokenizer() throws -> NeedleSPTokenizer {
   func assertGrammarRejects(
     _ text: String,
     matcher: borrowing XGRMatcher,
-    tokenizer: some EdgeToolsXGRTokenizer,
+    tokenizer: some XGRTokenizer,
     eosToken: EdgeToolsToken.ID
   ) {
     guard firstRejectedGrammarToken(in: text, matcher: matcher, tokenizer: tokenizer) == nil else {
@@ -113,7 +113,7 @@ func testTokenizer() throws -> NeedleSPTokenizer {
   private func firstRejectedGrammarToken(
     in text: String,
     matcher: borrowing XGRMatcher,
-    tokenizer: some EdgeToolsXGRTokenizer
+    tokenizer: some XGRTokenizer
   ) -> RejectedGrammarToken? {
     let tokenIds = encodedGrammarText(text, tokenizer: tokenizer)
     for (index, tokenId) in tokenIds.enumerated() {

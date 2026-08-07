@@ -147,7 +147,7 @@
       shape: [Int]
     ) throws -> CONNXRuntimeTensor where Values.Element: ONNXElement {
       let values = ContiguousArray(values)
-      try edgeToolsONNXValidateValueCount(values.count, shape: shape)
+      try validateONNXTensorValueCount(values.count, shape: shape)
       let dimensions = shape.map(Int64.init)
       let dtype = Values.Element.onnxDType
       let handle: OpaquePointer = try dimensions.withUnsafeBufferPointer { dimensions in
@@ -283,7 +283,7 @@
       inputs: [String: CONNXRuntimeTensor],
       outputNames: [String]
     ) throws -> [String: CONNXRuntimeTensor] {
-      try edgeToolsONNXValidateOutputNames(outputNames)
+      try validateONNXOutputNames(outputNames)
       let inputs = Array(inputs)
       let inputNames = inputs.map(\.key)
       let inputValues = inputs.map { Optional($0.value.withUnsafePointer { $0 }) }
@@ -392,7 +392,10 @@
       try body(self.handle)
     }
 
-    nonisolated(nonsending) public func withUnsafeMutableBufferPointer<Element: ONNXElement, Result>(
+    nonisolated(nonsending) public func withUnsafeMutableBufferPointer<
+      Element: ONNXElement,
+      Result
+    >(
       as type: Element.Type,
       _ body: nonisolated(nonsending) (UnsafeMutableBufferPointer<Element>) async throws -> Result
     ) async throws -> Result {
@@ -403,7 +406,7 @@
             "Expected tensor element type \(Element.onnxDType.rawValue), got \(self.dtype.rawValue)."
         )
       }
-      let count = try edgeToolsONNXElementCount(for: self.shape)
+      let count = try onnxTensorElementCount(for: self.shape)
       var data: UnsafeMutableRawPointer?
       try self.runtime.withUnsafeAPIPointer { api in
         try check(api: api, status: api.pointee.GetTensorMutableData(self.handle, &data))

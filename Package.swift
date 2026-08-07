@@ -55,10 +55,10 @@ let package = Package(
       description: "Vendored ONNX Runtime support.",
       enabledTraits: ["ONNXCore", "Transformers"]
     ),
-    .default(enabledTraits: ["Foundation"])
+    .default(enabledTraits: ["Foundation", "MLX", "XGrammar"])
   ],
   dependencies: [
-    .package(url: "https://github.com/ml-explore/mlx-swift-lm", from: "3.31.3"),
+    .package(url: "https://github.com/ml-explore/mlx-swift-lm", from: "3.31.4"),
     .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.18.7"),
     .package(url: "https://github.com/pointfreeco/swift-custom-dump", from: "1.6.1"),
     .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.31.3"),
@@ -106,6 +106,8 @@ let package = Package(
         .product(name: "MLXNN", package: "mlx-swift", condition: .when(traits: ["MLX"])),
         .product(name: "MLXLLM", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),
         .product(name: "MLXLMCommon", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),
+        .product(name: "MLXHuggingFace", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),
+        .product(name: "MLXVLM", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),
         .target(name: "EdgeToolsXGrammar", condition: .when(traits: ["XGrammar"])),
         .target(
           name: "COnnxRuntime",
@@ -220,7 +222,10 @@ let package = Package(
         "Models/Needle/Engines/__Snapshots__",
         "Models/Needle/Engines/MLX/__Snapshots__",
         "Models/Needle/__Snapshots__",
-        "Models/__Snapshots__"
+        "Models/__Snapshots__",
+        "Models/Gemma/__Snapshots__",
+        "Models/LFM/__Snapshots__",
+        "Models/Qwen/__Snapshots__"
       ],
       resources: [.process("Resources")]
     )

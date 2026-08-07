@@ -1,0 +1,43 @@
+▿ EdgeToolsLLMPrompt
+  ▿ messages: 5 elements
+    ▿ Message
+      - system: "Use getWeather when needed. After receiving its result, summarize it for the user."
+    ▿ Message
+      ▿ user: (3 elements)
+        - .0: "What is the weather in Paris?"
+        - images: 0 elements
+        - audio: 0 elements
+    ▿ Message
+      ▿ assistant: (2 elements)
+        - .0: Optional<String>.none
+        ▿ toolCalls: 1 element
+          ▿ EdgeRawToolCall
+            ▿ arguments: EdgeToolsValue
+              ▿ object: 1 key/value pair
+                ▿ (2 elements)
+                  - key: "location"
+                  ▿ value: EdgeToolsValue
+                    - string: "Paris"
+            - name: "getWeather"
+    ▿ Message
+      ▿ tool: (2 elements)
+        - name: "getWeather"
+        ▿ response: EdgeToolsValue
+          ▿ object: 3 key/value pairs
+            ▿ (2 elements)
+              - key: "condition"
+              ▿ value: EdgeToolsValue
+                - string: "sunny"
+            ▿ (2 elements)
+              - key: "location"
+              ▿ value: EdgeToolsValue
+                - string: "Paris"
+            ▿ (2 elements)
+              - key: "temperatureCelsius"
+              ▿ value: EdgeToolsValue
+                - integer: 21
+    ▿ Message
+      ▿ assistant: (2 elements)
+        ▿ .0: Optional<String>
+          - some: "<think>\nThe weather in Paris is currently sunny with a temperature of 21°C.\n</think>\n\nThe weather in Paris is currently sunny with a temperature of 21°C."
+        - toolCalls: 0 elements

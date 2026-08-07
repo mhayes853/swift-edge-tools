@@ -50,8 +50,8 @@ public enum EdgeToolsValue: Hashable, Sendable {
 
 // MARK: - Codable
 
-#if !$Embedded
-  extension EdgeToolsValue: Encodable {
+extension EdgeToolsValue: EdgeToolsEncodable {
+  #if !$Embedded
     public func encode(to encoder: any Encoder) throws {
       switch self {
       case .array(let array):
@@ -81,9 +81,11 @@ public enum EdgeToolsValue: Hashable, Sendable {
         try container.encode(string)
       }
     }
-  }
+  #endif
+}
 
-  extension EdgeToolsValue: Decodable {
+extension EdgeToolsValue: EdgeToolsDecodable {
+  #if !$Embedded
     public init(from decoder: any Decoder) throws {
       if let keyedContainer = try? decoder.container(keyedBy: DynamicCodingKey.self) {
         var object = OrderedDictionary<String, Self>()
@@ -119,8 +121,8 @@ public enum EdgeToolsValue: Hashable, Sendable {
         throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid value.")
       }
     }
-  }
-#endif
+  #endif
+}
 
 // MARK: - ExpressibleByStringLiteral
 

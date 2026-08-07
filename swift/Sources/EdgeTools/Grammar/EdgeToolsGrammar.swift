@@ -18,7 +18,8 @@ public protocol EdgeToolsGrammarCompiler: ~Copyable {
 
   mutating func matcher(
     for grammar: Grammar,
-    context: borrowing Context
+    context: borrowing Context,
+    stopTokenIds: Set<EdgeToolsToken.ID>
   ) throws -> Matcher
 }
 

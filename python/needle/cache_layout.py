@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from .decoder_strategy import (  # pyright: ignore[reportMissingImports]
-    DecoderExportStrategy,
-)
+from .decoder_strategy import DecoderExportStrategy
 from .needle_configuration import NeedleModelConfiguation
 
 
@@ -17,19 +15,6 @@ def self_attention_state_names(
         for name in (
             f"self_attention_key_cache_{index}",
             f"self_attention_value_cache_{index}",
-        )
-    )
-
-
-def cross_attention_state_names(
-    configuration: NeedleModelConfiguation,
-) -> tuple[str, ...]:
-    return tuple(
-        name
-        for index in range(configuration.decoder_layers)
-        for name in (
-            f"cross_attention_key_cache_{index}",
-            f"cross_attention_value_cache_{index}",
         )
     )
 

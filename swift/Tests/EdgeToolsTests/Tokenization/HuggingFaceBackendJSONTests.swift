@@ -4,7 +4,7 @@ import Foundation
 import Testing
 
 @Suite
-struct `HuggingFace Backend JSON tests` {
+struct `HuggingFaceBackendJSON tests` {
   @Test
   func `Projects Only Metadata Fields`() throws {
     let source = #"""

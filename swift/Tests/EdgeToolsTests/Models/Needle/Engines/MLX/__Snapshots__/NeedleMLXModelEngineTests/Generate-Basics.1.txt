@@ -1,135 +1,135 @@
 ▿ EdgeToolsEngineGeneration
   ▿ decodeMetrics: EdgeToolsDecodeMetrics
-    ▿ duration: 1.334170542 seconds
-      - _low: 1334170542000000000
+    ▿ duration: 0.885495459 seconds
+      - _low: 885495459000000000
       - _high: 0
-    ▿ durationToFirstToken: 0.076083375 seconds
-      - _low: 76083375000000000
+    ▿ durationToFirstToken: 0.151062458 seconds
+      - _low: 151062458000000000
       - _high: 0
     - tokens: 84
   ▿ metadata: 5 key/value pairs
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "GenerationConfidence"
-      - value: 0.91247696
+      - value: 0.9126729
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "MLXEngineGenerationStartMemorySnapshot"
-      ▿ value: Peak:   51M          (53912908)
+      ▿ value: Peak:   75M          (79078744)
 Active: 50M          (52991768)
-Cache:  902K         (924024)
+Cache:  24M          (26090280)
         - activeMemory: 52991768
-        - cacheMemory: 924024
-        - peakMemory: 53912908
+        - cacheMemory: 26090280
+        - peakMemory: 79078744
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "MLXEnginePostDecodeMemorySnapshot"
-      ▿ value: Peak:   91M          (95568594)
-Active: 57M          (59889582)
-Cache:  70M          (74056112)
-        - activeMemory: 59889582
-        - cacheMemory: 74056112
-        - peakMemory: 95568594
+      ▿ value: Peak:   107M         (112201562)
+Active: 55M          (58456510)
+Cache:  90M          (94883218)
+        - activeMemory: 58456510
+        - cacheMemory: 94883218
+        - peakMemory: 112201562
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "MLXEnginePostPrefillMemorySnapshot"
-      ▿ value: Peak:   91M          (95568594)
-Active: 56M          (59533522)
-Cache:  48M          (51297656)
-        - activeMemory: 59533522
-        - cacheMemory: 51297656
-        - peakMemory: 95568594
+      ▿ value: Peak:   75M          (79078744)
+Active: 55M          (57947202)
+Cache:  51M          (54070266)
+        - activeMemory: 57947202
+        - cacheMemory: 54070266
+        - peakMemory: 79078744
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "PerTokenConfidences"
       ▿ value: 84 elements
         - 1.0
-        - 0.96295685
-        - 0.9999988
+        - 0.96331435
+        - 0.99999887
+        - 0.99999994
+        - 0.9999997
         - 1.0
-        - 0.99999976
+        - 0.9999998
+        - 0.9999414
+        - 0.9999879
+        - 0.99999994
+        - 0.90871257
+        - 0.99997103
+        - 0.5886338
+        - 0.8213568
+        - 0.7118929
+        - 0.9592489
         - 1.0
-        - 0.99999976
-        - 0.9999405
-        - 0.9999877
+        - 0.9999977
         - 1.0
-        - 0.9104233
-        - 0.99997115
-        - 0.586284
-        - 0.8205745
-        - 0.71104616
-        - 0.95888734
-        - 1.0
-        - 0.9999976
-        - 1.0
-        - 0.9999777
+        - 0.9999774
         - 0.99999666
-        - 0.99999976
-        - 0.99820554
-        - 0.56515086
-        - 0.58482045
-        - 0.9886263
-        - 0.95629203
-        - 0.9999857
-        - 0.9995741
-        - 0.5828194
-        - 0.6947474
-        - 0.9949928
-        - 0.9949726
-        - 0.8007766
-        - 0.9672019
-        - 0.8827115
-        - 0.9950176
-        - 0.99985886
-        - 0.99990606
-        - 0.92614824
-        - 0.76598763
-        - 0.5035246
-        - 0.58472097
-        - 0.99784327
+        - 0.9999998
+        - 0.99818623
+        - 0.56468654
+        - 0.588308
+        - 0.9887497
+        - 0.95599353
+        - 0.99998575
+        - 0.9995725
+        - 0.5823048
+        - 0.6954962
+        - 0.9949872
+        - 0.99493086
+        - 0.801936
+        - 0.96760356
+        - 0.8839521
+        - 0.99506843
+        - 0.99986297
+        - 0.9999056
+        - 0.925419
+        - 0.7582236
+        - 0.50209874
+        - 0.58454704
+        - 0.99789464
         - 0.9999989
-        - 0.99999535
+        - 0.9999953
         - 1.0
-        - 0.99999726
-        - 0.996496
-        - 0.99992275
+        - 0.9999972
+        - 0.996529
+        - 0.9999233
         - 0.9999994
-        - 0.9541691
-        - 0.99998283
-        - 0.55654174
-        - 0.9990495
-        - 0.9972703
-        - 0.92317444
+        - 0.9538043
+        - 0.99998254
+        - 0.55923706
+        - 0.99904656
+        - 0.9972425
+        - 0.924019
         - 0.9999999
-        - 0.9999895
+        - 0.9999892
         - 1.0
-        - 0.99998856
-        - 0.99997926
+        - 0.9999884
+        - 0.99997956
         - 0.9999999
-        - 0.99601114
-        - 0.6152229
-        - 0.8153359
-        - 0.9822871
-        - 0.9950956
-        - 0.9999809
-        - 0.99771994
-        - 0.5905982
-        - 0.5645524
-        - 0.7476894
-        - 0.9901945
-        - 0.9964579
-        - 0.99707603
-        - 0.81976813
-        - 0.82304114
-        - 0.8348148
-        - 0.9897544
-        - 0.9998826
-        - 0.9999064
-        - 0.7321682
+        - 0.99594826
+        - 0.61803305
+        - 0.8162737
+        - 0.98228335
+        - 0.99510366
+        - 0.9999811
+        - 0.9977065
+        - 0.5913638
+        - 0.5657138
+        - 0.7492088
+        - 0.9901672
+        - 0.9964904
+        - 0.9971076
+        - 0.8228305
+        - 0.82439125
+        - 0.83667284
+        - 0.9899225
+        - 0.9998856
+        - 0.9999065
+        - 0.7330683
         - 1.0
   ▿ prefillMetrics: EdgeToolsPrefillMetrics
-    ▿ duration: 0.061608375 seconds
-      - _low: 61608375000000000
+    ▿ duration: 0.080142209 seconds
+      - _low: 80142209000000000
       - _high: 0
     - tokens: 150
   - response: "<tool_call> [{\"name\":\"send_email\",\"arguments\":{\"address\":\"henderry@gmail.com\",\"subject\":\"Hello\",\"body\":\"Could you please go on an adventure?[{\"}},{\"name\":\"send_email\",\"arguments\":{\"address\":\"adventure@gmail.com\",\"subject\":\"Hello\",\"body\":\"I am writing to go on an adventure.\"}}]"

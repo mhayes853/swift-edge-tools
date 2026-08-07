@@ -16,4 +16,4 @@ import Testing
     ],
     record: .failed
   )
-) struct BaseTestSuite {}
+) struct `EdgeToolsMacros tests` {}

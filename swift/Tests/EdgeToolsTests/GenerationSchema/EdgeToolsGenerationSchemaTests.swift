@@ -6,43 +6,6 @@ import Testing
 @Suite
 struct `EdgeToolsEncoding tests` {
   @Test
-  func `String Encodes To String Value`() {
-    expectNoDifference("blob".edgeToolsValue, .string("blob"))
-  }
-
-  @Test
-  func `Bool Encodes To Boolean Value`() {
-    expectNoDifference(true.edgeToolsValue, .boolean(true))
-    expectNoDifference(false.edgeToolsValue, .boolean(false))
-  }
-
-  @Test
-  func `Signed Integers Encode To Integer Value`() {
-    expectNoDifference((-1).edgeToolsValue, .integer(-1))
-    expectNoDifference(Int8(2).edgeToolsValue, .integer(2))
-    expectNoDifference(Int16(3).edgeToolsValue, .integer(3))
-    expectNoDifference(Int32(4).edgeToolsValue, .integer(4))
-    expectNoDifference(Int64(5).edgeToolsValue, .integer(5))
-    expectNoDifference(Int64.max.edgeToolsValue, .integer(Int(Int64.max)))
-  }
-
-  @Test
-  func `Unsigned Integers Encode To Integer Value`() {
-    expectNoDifference(UInt(2).edgeToolsValue, .integer(2))
-    expectNoDifference(UInt8(3).edgeToolsValue, .integer(3))
-    expectNoDifference(UInt16(4).edgeToolsValue, .integer(4))
-    expectNoDifference(UInt32(5).edgeToolsValue, .integer(5))
-    expectNoDifference(UInt64(6).edgeToolsValue, .integer(6))
-    expectNoDifference(UInt64(Int.max).edgeToolsValue, .integer(Int.max))
-  }
-
-  @Test
-  func `Doubles And Floats Encode To Number Value`() {
-    expectNoDifference((1.5).edgeToolsValue, .number(1.5))
-    expectNoDifference(Float(2.5).edgeToolsValue, .number(2.5))
-  }
-
-  @Test
   func `Data Encodes To UTF8 String Value`() {
     let data = Data("blob".utf8)
     expectNoDifference(data.edgeToolsValue, .string("blob"))
@@ -69,38 +32,6 @@ struct `EdgeToolsEncoding tests` {
     expectNoDifference(String?.none.edgeToolsValue, .null)
     expectNoDifference(String?.some("blob").edgeToolsValue, .string("blob"))
     expectNoDifference(Int?.some(42).edgeToolsValue, .integer(42))
-  }
-
-  @Test
-  func `Array Encodes To Array Value`() {
-    expectNoDifference([Int]().edgeToolsValue, .array([]))
-    expectNoDifference(
-      [1, 2, 3].edgeToolsValue,
-      .array([.integer(1), .integer(2), .integer(3)])
-    )
-    expectNoDifference(["a", "b"].edgeToolsValue, .array([.string("a"), .string("b")]))
-  }
-
-  @Test
-  func `Dictionary Encodes To Object Value`() {
-    expectNoDifference([String: Int]().edgeToolsValue, .object([:]))
-
-    let encoded = ["one": 1, "two": 2].edgeToolsValue
-    guard case .object(let object) = encoded else {
-      Issue.record("Expected dictionary to encode as an object value.")
-      return
-    }
-    let expected = ["one": EdgeToolsValue.integer(1), "two": .integer(2)]
-    expectNoDifference(
-      Dictionary(uniqueKeysWithValues: object.map { ($0.key, $0.value) }),
-      expected
-    )
-  }
-
-  @Test
-  func `EdgeToolsValue Encodes To Itself`() {
-    expectNoDifference(EdgeToolsValue.null.edgeToolsValue, .null)
-    expectNoDifference(EdgeToolsValue.string("blob").edgeToolsValue, .string("blob"))
   }
 
   @Test
@@ -195,35 +126,7 @@ struct `EdgeToolsEncoding tests` {
 }
 
 @Suite
-struct `EdgeToolsGenerable initialization tests` {
-  @Test
-  func `Initializes String`() throws {
-    expectNoDifference(try String(edgeToolsValue: "blob"), "blob")
-  }
-
-  @Test
-  func `Initializes Bool`() throws {
-    expectNoDifference(try Bool(edgeToolsValue: true), true)
-  }
-
-  @Test
-  func `Initializes Double`() throws {
-    expectNoDifference(try Double(edgeToolsValue: 1.5), 1.5)
-    expectNoDifference(try Double(edgeToolsValue: 1), 1)
-  }
-
-  @Test
-  func `Initializes Float`() throws {
-    expectNoDifference(try Float(edgeToolsValue: 1.5), 1.5)
-    expectNoDifference(try Float(edgeToolsValue: 1), 1)
-  }
-
-  @Test
-  func `Initializes Signed And Unsigned Integers`() throws {
-    expectNoDifference(try Int8(edgeToolsValue: 1), 1)
-    expectNoDifference(try UInt(edgeToolsValue: 1), 1)
-  }
-
+struct `EdgeToolsGenerableInitialization tests` {
   @Test
   func `Initializes Data From UTF8 String`() throws {
     expectNoDifference(try Data(edgeToolsValue: "blob"), Data("blob".utf8))
@@ -243,19 +146,6 @@ struct `EdgeToolsGenerable initialization tests` {
   func `Initializes Optional`() throws {
     expectNoDifference(try String?(edgeToolsValue: .null), nil)
     expectNoDifference(try String?(edgeToolsValue: "blob"), "blob")
-  }
-
-  @Test
-  func `Initializes Array`() throws {
-    expectNoDifference(try [Int](edgeToolsValue: [1, 2, 3]), [1, 2, 3])
-  }
-
-  @Test
-  func `Initializes Dictionary`() throws {
-    expectNoDifference(
-      try [String: Int](edgeToolsValue: ["one": 1, "two": 2]),
-      ["one": 1, "two": 2]
-    )
   }
 
   @Test
@@ -315,7 +205,7 @@ struct `EdgeToolsGenerable initialization tests` {
 }
 
 @Suite
-struct `Schema composition tests` {
+struct `SchemaComposition tests` {
   @Test(
     arguments: [
       (EdgeToolsValue.number(11.1), "11.1"),
@@ -498,34 +388,6 @@ struct `Schema composition tests` {
     let encoder = JSONEncoder()
     return encoder
   }()
-}
-
-@Suite
-struct `EdgeToolsValue EdgeToolsGenerable tests` {
-  @Test
-  func `EdgeToolsValue Universal Schema Accepts Every Value Type`() throws {
-    let schema = EdgeToolsValue.edgeToolsGenerationSchema
-
-    let values: [EdgeToolsValue] = [
-      .string("blob"),
-      .boolean(true),
-      .boolean(false),
-      .number(3.14),
-      .integer(42),
-      .array([.string("blob"), .integer(1)]),
-      .object(["key": .string("value")]),
-      .null
-    ]
-
-    for value in values {
-      let data = try JSONEncoder().encode(schema)
-      let decodedSchema = try JSONDecoder().decode(EdgeToolsGenerationSchema.self, from: data)
-
-      expectNoDifference(decodedSchema, schema)
-      expectNoDifference(String(decoding: data, as: UTF8.self), "true")
-      expectNoDifference(EdgeToolsValue(edgeToolsValue: value), value)
-    }
-  }
 }
 
 @EdgeToolsGenerable

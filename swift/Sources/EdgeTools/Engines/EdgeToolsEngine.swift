@@ -11,7 +11,7 @@ public protocol EdgeToolsEngine: Sendable {
     prompt: Prompt,
     tools: [EdgeToolDefinition],
     parameters: sending GenerateParameters,
-    channel: EdgeToolsGenerationChannel
+    channel: sending EdgeToolsGenerationChannel
   ) throws -> GenerationTask
 }
 

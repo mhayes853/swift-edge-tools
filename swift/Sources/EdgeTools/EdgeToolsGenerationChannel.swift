@@ -1,10 +1,10 @@
-public struct EdgeToolsGenerationChannel: Sendable {
-  public var onToken: (@Sendable (EdgeToolsToken) -> Void)?
-  public var onToolCall: (@Sendable (EdgeRawToolCall) -> Void)?
+public struct EdgeToolsGenerationChannel {
+  public var onToken: ((EdgeToolsToken) -> Void)?
+  public var onToolCall: ((EdgeRawToolCall) -> Void)?
 
   public init(
-    onToken: (@Sendable (EdgeToolsToken) -> Void)? = nil,
-    onToolCall: (@Sendable (EdgeRawToolCall) -> Void)? = nil
+    onToken: ((EdgeToolsToken) -> Void)? = nil,
+    onToolCall: ((EdgeRawToolCall) -> Void)? = nil
   ) {
     self.onToken = onToken
     self.onToolCall = onToolCall
