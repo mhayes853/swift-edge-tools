@@ -51,8 +51,16 @@ public struct FunctionGemmaToolCallParser: EdgeToolCallParser, Sendable {
 
   public init() {}
 
-  public mutating func accept(token: EdgeToolsToken) -> EdgeRawToolCall? {
+  public mutating func accept(token: EdgeToolsToken) -> [EdgeRawToolCall] {
     self.block.append(token)
+    var calls = [EdgeRawToolCall]()
+    while let call = self.nextCall() {
+      calls.append(call)
+    }
+    return calls
+  }
+
+  private mutating func nextCall() -> EdgeRawToolCall? {
     while let payloadData = self.block.nextPayload(outside: Self.stringMarker) {
       let payload = String(decoding: payloadData, as: UTF8.self)
       var reader = FunctionGemmaCallReader(source: payload)

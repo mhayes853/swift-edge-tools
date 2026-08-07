@@ -45,8 +45,16 @@ public struct LFM2PythonToolCallParser: EdgeToolCallParser, Sendable {
 
   public init() {}
 
-  public mutating func accept(token: EdgeToolsToken) -> EdgeRawToolCall? {
+  public mutating func accept(token: EdgeToolsToken) -> [EdgeRawToolCall] {
     self.list.append(token)
+    var calls = [EdgeRawToolCall]()
+    while let call = self.nextCall() {
+      calls.append(call)
+    }
+    return calls
+  }
+
+  private mutating func nextCall() -> EdgeRawToolCall? {
     while let sourceData = self.list.nextItem(findRange: { $0.firstCompletePythonCallRange() }) {
       let source = String(decoding: sourceData, as: UTF8.self)
       var reader = PythonCallReader(source: source)

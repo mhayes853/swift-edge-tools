@@ -49,8 +49,16 @@ public struct QwenXMLToolCallParser: EdgeToolCallParser, Sendable {
 
   public init() {}
 
-  public mutating func accept(token: EdgeToolsToken) -> EdgeRawToolCall? {
+  public mutating func accept(token: EdgeToolsToken) -> [EdgeRawToolCall] {
     self.block.append(token)
+    var calls = [EdgeRawToolCall]()
+    while let call = self.nextCall() {
+      calls.append(call)
+    }
+    return calls
+  }
+
+  private mutating func nextCall() -> EdgeRawToolCall? {
     while let payloadData = self.nextBlockPayload() {
       let payload = String(decoding: payloadData, as: UTF8.self)
       if let call = Self.parse(payload) {

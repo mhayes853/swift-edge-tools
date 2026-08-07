@@ -6,6 +6,26 @@ import Testing
 @Suite
 struct `Needle tests` {
   @Suite
+  struct `NeedleModelConfiguration tests` {
+    @Test
+    func `Decodes Exported Configuration With Optional Defaults`() throws {
+      let json =
+        #"{"vocab_size":16,"d_model":8,"hidden_size":8,"num_attention_heads":2,"num_kv_heads":1,"num_encoder_layers":1,"num_decoder_layers":1,"num_hidden_layers":1,"max_seq_len":4,"pad_token_id":0,"decoder_start_token_id":1,"tie_word_embeddings":true,"torch_dtype":"float32","decoder_max_length":4}"#
+
+      let configuration =
+        try JSONDecoder().decode(
+          NeedleModelConfiguration.self,
+          from: Data(json.utf8)
+        )
+
+      expectNoDifference(configuration.ropeTheta, 10_000)
+      expectNoDifference(configuration.rmsNormEps, 1e-6)
+      expectNoDifference(configuration.decoderMaxLength, 4)
+      expectNoDifference(configuration.dtype, "float32")
+    }
+  }
+
+  @Suite
   struct `NeedlePrompt tests` {
     @Test
     func `Formats Properly`() throws {
@@ -146,9 +166,7 @@ struct `Needle tests` {
       var calls = [EdgeRawToolCall]()
       for (index, chunk) in chunks.enumerated() {
         let token = EdgeToolsToken(id: index, stringValue: chunk)
-        if let call = parser.accept(token: token) {
-          calls.append(call)
-        }
+        calls.append(contentsOf: parser.accept(token: token))
       }
       return calls
     }

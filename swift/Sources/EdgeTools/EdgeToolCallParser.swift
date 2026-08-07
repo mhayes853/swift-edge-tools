@@ -1,5 +1,5 @@
 public protocol EdgeToolCallParser {
   init()
 
-  mutating func accept(token: EdgeToolsToken) -> EdgeRawToolCall?
+  mutating func accept(token: EdgeToolsToken) -> [EdgeRawToolCall]
 }

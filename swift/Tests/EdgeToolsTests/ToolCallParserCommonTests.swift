@@ -75,6 +75,18 @@ struct `ToolCallParserCommon tests` {
   }
 
   @Test
+  func `Parses Multiple Calls From One Token`() {
+    for fixture in toolCallParserTestFixtures {
+      let calls = parseToolCalls(
+        [fixture.multipleCalls.joined()],
+        using: fixture.makeParser
+      )
+
+      expectNoDifference(calls.map(\.name), ["first", "second"])
+    }
+  }
+
+  @Test
   func `Recovers After A Malformed Call`() {
     for fixture in toolCallParserTestFixtures {
       let calls = parseToolCalls(fixture.malformedThenValid, using: fixture.makeParser)
@@ -325,7 +337,7 @@ func parseToolCalls(
 ) -> [EdgeRawToolCall] {
   var parser = makeParser()
   return chunks.enumerated()
-    .compactMap { index, chunk in
+    .flatMap { index, chunk in
       parser.accept(token: EdgeToolsToken(id: index, stringValue: chunk))
     }
 }

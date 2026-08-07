@@ -17,8 +17,6 @@ public struct NeedleModelConfiguration: Hashable, Sendable {
   public var encoderLayers: Int = 12
   public var decoderLayers: Int = 8
   public var hiddenLayers: Int = 8
-  public var ropeTheta: Float = 10000.0
-  public var rmsNormEps: Float = 1e-6
   public var padTokenId: EdgeToolsToken.ID = 0
   public var decoderStartTokenId: EdgeToolsToken.ID = 1
   public var tieWordEmbeddings: Bool = true
@@ -27,6 +25,18 @@ public struct NeedleModelConfiguration: Hashable, Sendable {
   private var decoderMaxLengthValue: Int?
   private var dtypeValue: String?
   private var torchDTypeValue: String?
+  private var ropeThetaValue: Float?
+  private var rmsNormEpsValue: Float?
+
+  public var ropeTheta: Float {
+    get { self.ropeThetaValue ?? 10000.0 }
+    set { self.ropeThetaValue = newValue }
+  }
+
+  public var rmsNormEps: Float {
+    get { self.rmsNormEpsValue ?? 1e-6 }
+    set { self.rmsNormEpsValue = newValue }
+  }
 
   public var dtype: String {
     get { self.dtypeValue ?? self.torchDTypeValue ?? "bfloat16" }
@@ -102,8 +112,8 @@ public struct NeedleModelConfiguration: Hashable, Sendable {
       case decoderLayers = "num_decoder_layers"
       case hiddenLayers = "num_hidden_layers"
       case kvHeads = "num_kv_heads"
-      case ropeTheta = "rope_theta"
-      case rmsNormEps = "rms_norm_eps"
+      case ropeThetaValue = "rope_theta"
+      case rmsNormEpsValue = "rms_norm_eps"
       case padTokenId = "pad_token_id"
       case decoderStartTokenId = "decoder_start_token_id"
       case tieWordEmbeddings = "tie_word_embeddings"
@@ -223,8 +233,16 @@ public struct NeedleToolCallParser: EdgeToolCallParser, Sendable {
 
   public init() {}
 
-  public mutating func accept(token: EdgeToolsToken) -> EdgeRawToolCall? {
+  public mutating func accept(token: EdgeToolsToken) -> [EdgeRawToolCall] {
     self.list.append(token)
+    var calls = [EdgeRawToolCall]()
+    while let call = self.nextCall() {
+      calls.append(call)
+    }
+    return calls
+  }
+
+  private mutating func nextCall() -> EdgeRawToolCall? {
     while let objectData = self.list.nextItem(findRange: { $0.firstCompleteJSONObjectRange() }) {
       if let value = try? EdgeToolsValue(json: objectData),
         let call = EdgeRawToolCall(jsonValue: value)

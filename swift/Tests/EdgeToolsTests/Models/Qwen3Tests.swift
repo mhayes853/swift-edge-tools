@@ -15,7 +15,7 @@ struct `Qwen3 tests` {
       var parser = Qwen3ToolCallParser()
       let source = #"<tool_call>{"name":"emoji","arguments":{"value":"\uD83D\uDE00"}}</tool_call>"#
       let parsed = parser.accept(token: EdgeToolsToken(id: 0, stringValue: source))
-      let call = try #require(parsed)
+      let call = try #require(parsed.first)
 
       expectNoDifference(call.arguments, ["value": "😀"])
     }

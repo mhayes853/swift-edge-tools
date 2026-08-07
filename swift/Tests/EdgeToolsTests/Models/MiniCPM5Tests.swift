@@ -28,7 +28,7 @@ struct `MiniCPM5 tests` {
       var parser = MiniCPM5ToolCallParser()
       let source = #"<function name="empty"></function>"#
       let parsed = parser.accept(token: EdgeToolsToken(id: 0, stringValue: source))
-      let call = try #require(parsed)
+      let call = try #require(parsed.first)
 
       expectNoDifference(call, EdgeRawToolCall(name: "empty", arguments: [:]))
     }
@@ -43,7 +43,7 @@ struct `MiniCPM5 tests` {
         <param name="null">null</param><param name="cdata"><![CDATA[true]]></param></function>
         """#
       let parsed = parser.accept(token: EdgeToolsToken(id: 0, stringValue: source))
-      let call = try #require(parsed)
+      let call = try #require(parsed.first)
 
       expectNoDifference(
         call.arguments,
@@ -78,7 +78,7 @@ struct `MiniCPM5 tests` {
         let second = String(source[splitIndex...])
         let firstCall = parser.accept(token: EdgeToolsToken(id: 0, stringValue: first))
         let secondCall = parser.accept(token: EdgeToolsToken(id: 1, stringValue: second))
-        let call = try #require(firstCall ?? secondCall)
+        let call = try #require((firstCall + secondCall).first)
 
         expectNoDifference(call.arguments, ["text": .string(expected)])
       }

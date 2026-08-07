@@ -252,9 +252,8 @@ final class MockEngine: EdgeToolsPrefillableEngine, Sendable {
           try Task.checkCancellation()
           switch event {
           case .token(let token):
-            let rawToolCall = parser.accept(token: token)
             channel.emit(token: token)
-            if let rawToolCall {
+            for rawToolCall in parser.accept(token: token) {
               toolCalls.append(rawToolCall)
               channel.emit(toolCall: rawToolCall)
             }

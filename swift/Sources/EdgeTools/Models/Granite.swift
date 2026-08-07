@@ -68,7 +68,7 @@ public struct GraniteToolCallParser: EdgeToolCallParser, Sendable {
 
   public init() {}
 
-  public mutating func accept(token: EdgeToolsToken) -> EdgeRawToolCall? {
+  public mutating func accept(token: EdgeToolsToken) -> [EdgeRawToolCall] {
     self.parser.accept(token: token)
   }
 }
@@ -81,7 +81,7 @@ public struct GraniteToolCallParser: EdgeToolCallParser, Sendable {
       tools: some Sequence<EdgeToolDefinition>,
       range: GrammarToolCallRange = .unbounded(minimum: 0)
     ) throws -> XGRGrammar {
-      try Self.qwenJSON(tools: tools, range: range)
+      try .qwenJSON(tools: tools, range: range)
     }
   }
 #endif

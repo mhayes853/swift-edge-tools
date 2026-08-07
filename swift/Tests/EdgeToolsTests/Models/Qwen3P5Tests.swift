@@ -16,7 +16,7 @@ struct `Qwen3P5 tests` {
 
     let call = parser.accept(token: EdgeToolsToken(id: 0, stringValue: source))
 
-    let parsedCall = try #require(call)
+    let parsedCall = try #require(call.first)
     expectNoDifference(parsedCall.name, "record_note")
     expectNoDifference(parsedCall.arguments, ["text": "literal </tool_call> text"])
   }
