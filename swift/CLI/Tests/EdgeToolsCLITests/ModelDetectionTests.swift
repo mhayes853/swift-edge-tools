@@ -38,6 +38,25 @@ struct `ModelDetection tests` {
     }
   }
 
+  @Test(arguments: [
+    ("coreml", EngineKind.coreml),
+    ("Core ML", .coreml),
+    ("core-ml", .coreml),
+    ("CORE_AI", .coreai),
+    ("Core AI", .coreai),
+    ("core-ai", .coreai),
+    ("MLX", .mlx),
+    ("OnNx", .onnx)
+  ])
+  func `Parses Case Insensitive Engine Names`(argument: String, expected: EngineKind) {
+    expectNoDifference(EngineKind(argument: argument), expected)
+  }
+
+  @Test
+  func `Rejects Unknown Engine Names`() {
+    expectNoDifference(EngineKind(argument: "metal"), nil)
+  }
+
   @Test
   func `Detects MiniCPM5 By Its Chat Template Markers`() throws {
     let directory = try temporaryModel(

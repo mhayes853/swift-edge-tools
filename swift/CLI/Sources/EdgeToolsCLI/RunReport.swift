@@ -70,7 +70,7 @@ extension RunReport {
       lines.append("\nTool calls")
       for (offset, call) in self.toolCalls.enumerated() {
         lines.append("  \(offset + 1). \(call.name)")
-        for line in prettyJSON(call.arguments).split(separator: "\n") {
+        for line in call.arguments.prettyJSONText.split(separator: "\n") {
           lines.append("     \(line)")
         }
       }
@@ -86,11 +86,11 @@ extension RunReport {
     )
     lines.append(
       "Prefill \(metrics.prefill.tokens) tok  \(metrics.prefill.duration.displayText)  "
-        + rateText(metrics.prefill.tokensPerSecond)
+        + metrics.prefill.tokensPerSecond.tokenRateText
     )
     lines.append(
       "Decode  \(metrics.decode.tokens) tok  \(metrics.decode.duration.displayText)  "
-        + rateText(metrics.decode.tokensPerSecond)
+        + metrics.decode.tokensPerSecond.tokenRateText
         + "  TTFT \(metrics.decode.durationToFirstToken.displayText)"
     )
     lines.append("E2E     \(metrics.endToEnd.displayText) (excludes load)")
@@ -98,21 +98,6 @@ extension RunReport {
   }
 
   public func jsonText() throws -> String {
-    try encodedJSON(self)
+    try self.encodedJSON()
   }
-}
-
-func rateText(_ tokensPerSecond: Double) -> String {
-  guard tokensPerSecond.isFinite else { return "-" }
-  return String(format: "%.1f tok/s", tokensPerSecond)
-}
-
-func encodedJSON(_ value: some Encodable) throws -> String {
-  let encoder = JSONEncoder()
-  encoder.outputFormatting = [.prettyPrinted, .withoutEscapingSlashes]
-  return String(decoding: try encoder.encode(value), as: UTF8.self)
-}
-
-private func prettyJSON(_ value: EdgeToolsValue) -> String {
-  (try? encodedJSON(value)) ?? "<unencodable>"
 }

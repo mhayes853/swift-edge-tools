@@ -80,21 +80,20 @@ extension BenchReport {
   }
 
   public func jsonText() throws -> String {
-    try encodedJSON(
-      Payload(
-        model: self.model,
-        engine: self.engine,
-        runs: self.runs,
-        warmup: self.warmup,
-        prefillTokensPerSecond: self.prefillRates,
-        decodeTokensPerSecond: self.decodeRates,
-        timeToFirstTokenMilliseconds: self.timesToFirstToken,
-        endToEndMilliseconds: self.endToEndTimes,
-        peakResidentBytes: self.peakResident,
-        peakGPUBytes: self.peakGPU,
-        runsWithToolCalls: self.runsWithToolCalls
-      )
+    try Payload(
+      model: self.model,
+      engine: self.engine,
+      runs: self.runs,
+      warmup: self.warmup,
+      prefillTokensPerSecond: self.prefillRates,
+      decodeTokensPerSecond: self.decodeRates,
+      timeToFirstTokenMilliseconds: self.timesToFirstToken,
+      endToEndMilliseconds: self.endToEndTimes,
+      peakResidentBytes: self.peakResident,
+      peakGPUBytes: self.peakGPU,
+      runsWithToolCalls: self.runsWithToolCalls
     )
+    .encodedJSON()
   }
 
   private struct Payload: Encodable {

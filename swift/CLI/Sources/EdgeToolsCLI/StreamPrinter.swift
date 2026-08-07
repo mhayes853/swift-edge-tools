@@ -16,7 +16,7 @@ final class StreamPrinter: Sendable {
     case .tokens:
       output(token.stringValue, terminator: "")
     case .events:
-      output("\(self.elapsed) token \(jsonString(token.stringValue))")
+      output("\(self.elapsed) token \(token.stringValue.compactJSONText)")
     case .none:
       break
     }
@@ -24,7 +24,7 @@ final class StreamPrinter: Sendable {
 
   func toolCall(_ call: EdgeRawToolCall) {
     guard self.mode == .events else { return }
-    output("\(self.elapsed) tool-call \(call.name) \(compactJSON(call.arguments))")
+    output("\(self.elapsed) tool-call \(call.name) \(call.arguments.compactJSONText)")
   }
 
   func finish() {
@@ -37,15 +37,4 @@ final class StreamPrinter: Sendable {
     self.start.duration(to: self.clock.now).displayText
       .padding(toLength: 8, withPad: " ", startingAt: 0)
   }
-}
-
-private func jsonString(_ value: String) -> String {
-  compactJSON(.string(value))
-}
-
-private func compactJSON(_ value: EdgeToolsValue) -> String {
-  let encoder = JSONEncoder()
-  encoder.outputFormatting = [.withoutEscapingSlashes]
-  guard let data = try? encoder.encode(value) else { return "<unencodable>" }
-  return String(decoding: data, as: UTF8.self)
 }

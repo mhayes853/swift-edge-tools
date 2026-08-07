@@ -47,6 +47,6 @@ extension InfoReport {
   }
 
   public func jsonText() throws -> String {
-    try encodedJSON(self)
+    try self.encodedJSON()
   }
 }

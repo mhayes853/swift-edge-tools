@@ -41,6 +41,16 @@ public enum EngineKind: String, CaseIterable, Sendable {
   case coreml
   case coreai
 
+  public init?(argument: String) {
+    switch argument.lowercased().filter({ $0.isLetter || $0.isNumber }) {
+    case "mlx": self = .mlx
+    case "onnx": self = .onnx
+    case "coreml": self = .coreml
+    case "coreai": self = .coreai
+    default: return nil
+    }
+  }
+
   public var isExperimental: Bool {
     self == .coreai
   }
