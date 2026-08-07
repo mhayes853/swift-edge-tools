@@ -37,6 +37,14 @@
     public let languageModel: MLXVLM.Gemma4
     private let processorConfiguration: MLXVLM.Gemma4ProcessorConfiguration
 
+    public static func configuration(from directory: MLXModelDirectory) throws -> Configuration {
+      let model = try directory.loadConfiguration(MLXVLM.Gemma4Configuration.self)
+      let processor = try directory.loadProcessorConfiguration(
+        MLXVLM.Gemma4ProcessorConfiguration.self
+      )
+      return Configuration(model: model, processor: processor)
+    }
+
     public init(configuration: Configuration) {
       self.languageModel = MLXVLM.Gemma4(configuration.model)
       self.processorConfiguration = configuration.processor
@@ -45,19 +53,13 @@
     public var vocabularySize: Int { self.languageModel.vocabularySize }
     public var extraStopTokens: Set<String> { ["<|tool_response>"] }
 
-    public func loadWeights(from directoryURL: URL) throws {
-      guard
-        let baseConfiguration = try decodeModelConfiguration(
-          BaseConfiguration.self,
-          in: directoryURL,
-          decoder: JSONDecoder.json5()
-        )
-      else {
-        throw EdgeToolsError.failedToLoadConfiguration
-      }
-
-      var (weights, metadata) = try loadGemma4Weights(from: directoryURL)
-      weights = self.languageModel.sanitize(weights: weights, metadata: metadata)
+    public func loadWeights(from directory: MLXModelDirectory) throws {
+      let baseConfiguration = try directory.loadConfiguration(BaseConfiguration.self)
+      let safetensors = try directory.loadSafetensors()
+      var weights = self.languageModel.sanitize(
+        weights: safetensors.weights,
+        metadata: safetensors.mergedMetadata
+      )
 
       // NB: mlx-swift-lm 3.31.4's VLM backbone declares local K/V projections for the shared-KV
       // tail even though E2B/E4B checkpoints correctly omit them.
@@ -123,35 +125,9 @@
   public typealias Gemma4Configuration = MLXVLM.Gemma4Configuration
   public typealias Gemma4MLXModelEngine = MLXEngine<Gemma4MLXModel>
 
-  extension Gemma4MLXModelEngine {
-    public init(from directoryURL: URL) async throws {
-      guard
-        let modelConfiguration = try decodeModelConfiguration(
-          MLXVLM.Gemma4Configuration.self,
-          in: directoryURL,
-          decoder: JSONDecoder.json5()
-        ),
-        let processorConfiguration = try decodeMLXVLMProcessorConfiguration(
-          MLXVLM.Gemma4ProcessorConfiguration.self,
-          in: directoryURL
-        )
-      else {
-        throw EdgeToolsError.failedToLoadConfiguration
-      }
-
-      try await self.init(
-        from: directoryURL,
-        configuration: Gemma4MLXModel.Configuration(
-          model: modelConfiguration,
-          processor: processorConfiguration
-        )
-      )
-    }
-  }
-
   extension EdgeToolsLLMPrompt {
     fileprivate func gemma4UserInput(tools: [EdgeToolDefinition]) throws -> UserInput {
-      try self.mlxVLMUserInput(tools: tools) { message in
+      try self.mlxUserInput(tools: tools) { message in
         switch message {
         case .system:
           return try message.mlxMessage()
@@ -170,20 +146,4 @@
     }
   }
 
-  private func loadGemma4Weights(
-    from directoryURL: URL
-  ) throws -> (weights: [String: MLXArray], metadata: [String: String]) {
-    var weights = [String: MLXArray]()
-    var metadata = [String: String]()
-    let enumerator = FileManager.default.enumerator(
-      at: directoryURL,
-      includingPropertiesForKeys: nil
-    )!
-    for case let url as URL in enumerator where url.pathExtension == "safetensors" {
-      let (arrays, fileMetadata) = try loadArraysAndMetadata(url: url)
-      weights.merge(arrays) { _, new in new }
-      if metadata.isEmpty { metadata = fileMetadata }
-    }
-    return (weights, metadata)
-  }
 #endif

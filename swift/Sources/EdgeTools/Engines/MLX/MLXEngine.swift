@@ -30,13 +30,15 @@
     associatedtype GrammarCompiler: EdgeToolsGrammarCompiler, ~Copyable
     where GrammarCompiler.Context == GrammarContext
 
+    static func configuration(from directory: MLXModelDirectory) throws -> ModelConfiguration
+
     init(configuration: ModelConfiguration) throws
 
     var languageModel: UnderlyingModel { get }
     var vocabularySize: Int { get }
     var extraStopTokens: Set<String> { get }
 
-    func loadWeights(from directoryURL: URL) throws
+    func loadWeights(from directory: MLXModelDirectory) throws
 
     func grammarContext(tokenizer: any EdgeToolsTokenizer) throws -> GrammarContext
     func grammarCompiler(context: borrowing GrammarContext) throws -> GrammarCompiler
@@ -81,21 +83,22 @@
   extension MLXModel {
     public var extraStopTokens: Set<String> { [] }
 
-    public func loadWeights(from directoryURL: URL) throws {
-      let baseConfiguration = try decodeModelConfiguration(
-        BaseConfiguration.self,
-        in: directoryURL,
-        decoder: JSONDecoder.json5()
-      )
-      guard let baseConfiguration else {
-        throw EdgeToolsError.failedToLoadConfiguration
-      }
+    public func loadWeights(from directory: MLXModelDirectory) throws {
+      let baseConfiguration = try directory.loadConfiguration(BaseConfiguration.self)
 
       try MLXLMCommon.loadWeights(
-        modelDirectory: directoryURL,
+        modelDirectory: directory.url,
         model: self.languageModel,
         perLayerQuantization: baseConfiguration.perLayerQuantization
       )
+    }
+  }
+
+  extension MLXModel where ModelConfiguration: Decodable {
+    public static func configuration(
+      from directory: MLXModelDirectory
+    ) throws -> ModelConfiguration {
+      try directory.loadConfiguration(ModelConfiguration.self)
     }
   }
 
@@ -225,7 +228,7 @@
     }
 
     extension EdgeToolsLLMPrompt.Message {
-      package func mlxMessage() throws -> MLXLMCommon.Message {
+      public func mlxMessage() throws -> MLXLMCommon.Message {
         switch self {
         case .system(let content):
           ["role": "system", "content": content]
@@ -275,19 +278,25 @@
       }
     }
 
+    extension EdgeToolDefinition {
+      public var mlxToolSpec: ToolSpec {
+        [
+          "type": "function",
+          "function": [
+            "name": self.name,
+            "description": self.description,
+            "parameters": self.arguments.edgeToolsValue.mlxValue
+          ] as MLXLMCommon.Message
+        ]
+      }
+    }
+
     extension Sequence where Element == EdgeToolDefinition {
       package var mlxToolSpecs: [ToolSpec]? {
-        let specifications = self.compactMap { definition -> ToolSpec? in
-          guard definition.includesSchemaInInstructions else { return nil }
-          return [
-            "type": "function",
-            "function": [
-              "name": definition.name,
-              "description": definition.description,
-              "parameters": definition.arguments.edgeToolsValue.mlxValue
-            ] as MLXLMCommon.Message
-          ]
-        }
+        let specifications =
+          self
+          .filter(\.includesSchemaInInstructions)
+          .map(\.mlxToolSpec)
         return specifications.isEmpty ? nil : specifications
       }
     }
@@ -312,20 +321,8 @@
   // MARK: - VLM Prompt Conversion
 
   #if Transformers && canImport(CoreImage) && canImport(MLXVLM)
-    package func decodeMLXVLMProcessorConfiguration<Configuration: Decodable>(
-      _ type: Configuration.Type,
-      in directoryURL: URL
-    ) throws -> Configuration? {
-      let preprocessorURL = directoryURL.appending(path: "preprocessor_config.json")
-      let filename =
-        FileManager.default.fileExists(atPath: preprocessorURL.path)
-        ? "preprocessor_config.json"
-        : "processor_config.json"
-      return try decodeModelConfiguration(type, named: filename, in: directoryURL)
-    }
-
     extension EdgeToolsLLMPrompt.Asset {
-      package func mlxImage() throws -> UserInput.Image {
+      public func mlxImage() throws -> UserInput.Image {
         switch self.content {
         case .path(let path):
           return .url(URL(filePath: path))
@@ -352,7 +349,7 @@
         )
       }
 
-      package func mlxVLMUserInput(
+      public func mlxUserInput(
         tools: [EdgeToolDefinition],
         transformMessage: (Message) throws -> MLXLMCommon.Message
       ) throws -> UserInput {
@@ -627,22 +624,16 @@
 
     public init<Base: MLXModel>(
       from directoryURL: URL
-    ) async throws
-    where
-      Model == _EdgeToolsMLXModel<Base>,
-      Base.ModelConfiguration: Decodable
-    {
-      guard
-        let configuration = try decodeModelConfiguration(
-          Base.ModelConfiguration.self,
-          in: directoryURL,
-          decoder: JSONDecoder.json5()
-        )
-      else {
-        throw EdgeToolsError.failedToLoadConfiguration
-      }
+    ) async throws where Model == _EdgeToolsMLXModel<Base> {
+      try await self.init(from: MLXModelDirectory(url: directoryURL))
+    }
+
+    public init<Base: MLXModel>(
+      from directory: MLXModelDirectory
+    ) async throws where Model == _EdgeToolsMLXModel<Base> {
+      let configuration = try Base.configuration(from: directory)
       try await self.init(
-        from: directoryURL,
+        from: directory,
         configuration: configuration
       )
     }
@@ -651,10 +642,20 @@
       from directoryURL: URL,
       configuration: Base.ModelConfiguration
     ) async throws where Model == _EdgeToolsMLXModel<Base> {
-      let tokenizer = try await EdgeToolsAutoTokenizer.from(modelDirectory: directoryURL)
+      try await self.init(
+        from: MLXModelDirectory(url: directoryURL),
+        configuration: configuration
+      )
+    }
+
+    public init<Base: MLXModel>(
+      from directory: MLXModelDirectory,
+      configuration: Base.ModelConfiguration
+    ) async throws where Model == _EdgeToolsMLXModel<Base> {
+      let tokenizer = try await directory.loadTokenizer()
       let model = try Base(configuration: configuration)
-      try model.loadWeights(from: directoryURL)
-      var extraStopTokenIds = try loadMLXExtraStopTokenIds(from: directoryURL)
+      try model.loadWeights(from: directory)
+      var extraStopTokenIds = try directory.loadStopTokenIds()
       extraStopTokenIds.formUnion(
         model.extraStopTokens.compactMap { tokenizer.convertTokenToId($0) }
       )
@@ -667,22 +668,5 @@
         tokenizer: tokenizer
       )
     }
-  }
-
-  private func loadMLXExtraStopTokenIds(from directoryURL: URL) throws -> Set<EdgeToolsToken.ID> {
-    let baseConfiguration = try decodeModelConfiguration(
-      BaseConfiguration.self,
-      in: directoryURL,
-      decoder: JSONDecoder.json5()
-    )
-    var extraStopTokenIds = Set(baseConfiguration?.eosTokenIds?.values ?? [])
-    let generationConfigurationURL = directoryURL.appending(path: "generation_config.json")
-    if let data = try? Data(contentsOf: generationConfigurationURL),
-      let configuration = try? JSONDecoder.json5().decode(GenerationConfigFile.self, from: data),
-      let values = configuration.eosTokenIds?.values
-    {
-      extraStopTokenIds = Set(values)
-    }
-    return extraStopTokenIds
   }
 #endif

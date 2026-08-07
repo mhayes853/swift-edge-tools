@@ -14,12 +14,11 @@
     @available(iOS 18.0, macOS 15.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
     func `TokenIterator Usage`() async throws {
       let url = try await downloadNeedle()
+      let directory = MLXModelDirectory(url: url)
       var tokenizer = try self.tokenizer(url: url)
-      let configuration = try #require(
-        try decodeModelConfiguration(NeedleModelConfiguration.self, in: url)
-      )
+      let configuration = try directory.loadConfiguration(NeedleModelConfiguration.self)
       let wrappedModel = NeedleMLXModel(configuration: configuration)
-      try wrappedModel.loadWeights(from: url)
+      try wrappedModel.loadWeights(from: directory)
       let model = wrappedModel.languageModel
       let tokenizerInfo = try XGRTokenizerInfo.needle(tokenizer: tokenizer)
       let grammarEngine = try XGRCompiler(tokenizerInfo: tokenizerInfo)
@@ -55,12 +54,11 @@
     @Test
     func `KV Cache Grows Past Initial Capacity`() async throws {
       let url = try await downloadNeedle()
+      let directory = MLXModelDirectory(url: url)
       let tokenizer = try self.tokenizer(url: url)
-      let configuration = try #require(
-        try decodeModelConfiguration(NeedleModelConfiguration.self, in: url)
-      )
+      let configuration = try directory.loadConfiguration(NeedleModelConfiguration.self)
       let wrappedModel = NeedleMLXModel(configuration: configuration)
-      try wrappedModel.loadWeights(from: url)
+      try wrappedModel.loadWeights(from: directory)
       let model = wrappedModel.languageModel
       let input = try LMInput.needle(
         prompt: .sendAdventureEmail,

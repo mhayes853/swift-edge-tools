@@ -37,6 +37,16 @@
     public let languageModel: MLXVLM.LFM2VL
     private let processorConfiguration: MLXVLM.LFM2VLProcessorConfiguration
 
+    public static func configuration(
+      from directory: MLXModelDirectory
+    ) throws -> Configuration {
+      let model = try directory.loadConfiguration(MLXVLM.LFM2VLConfiguration.self)
+      let processor = try directory.loadProcessorConfiguration(
+        MLXVLM.LFM2VLProcessorConfiguration.self
+      )
+      return Configuration(model: model, processor: processor)
+    }
+
     public init(configuration: Configuration) {
       self.languageModel = MLXVLM.LFM2VL(configuration.model)
       self.processorConfiguration = configuration.processor
@@ -44,19 +54,13 @@
 
     public var vocabularySize: Int { self.languageModel.vocabularySize }
 
-    public func loadWeights(from directoryURL: URL) throws {
-      guard
-        let baseConfiguration = try decodeModelConfiguration(
-          BaseConfiguration.self,
-          in: directoryURL,
-          decoder: JSONDecoder.json5()
-        )
-      else {
-        throw EdgeToolsError.failedToLoadConfiguration
-      }
-
-      var (weights, metadata) = try loadLFM2P5VLWeights(from: directoryURL)
-      weights = self.languageModel.sanitize(weights: weights, metadata: metadata)
+    public func loadWeights(from directory: MLXModelDirectory) throws {
+      let baseConfiguration = try directory.loadConfiguration(BaseConfiguration.self)
+      let safetensors = try directory.loadSafetensors()
+      var weights = self.languageModel.sanitize(
+        weights: safetensors.weights,
+        metadata: safetensors.mergedMetadata
+      )
 
       // NB: The 450M MLX checkpoint disables projector LayerNorm in config but retains weights from
       // an older conversion that always created it. The current module correctly has no matching
@@ -111,35 +115,9 @@
   public typealias LFM2P5VLConfiguration = MLXVLM.LFM2VLConfiguration
   public typealias LFM2P5VLMLXModelEngine = MLXEngine<LFM2P5VLMLXModel>
 
-  extension LFM2P5VLMLXModelEngine {
-    public init(from directoryURL: URL) async throws {
-      guard
-        let modelConfiguration = try decodeModelConfiguration(
-          MLXVLM.LFM2VLConfiguration.self,
-          in: directoryURL,
-          decoder: JSONDecoder.json5()
-        ),
-        let processorConfiguration = try decodeMLXVLMProcessorConfiguration(
-          MLXVLM.LFM2VLProcessorConfiguration.self,
-          in: directoryURL
-        )
-      else {
-        throw EdgeToolsError.failedToLoadConfiguration
-      }
-
-      try await self.init(
-        from: directoryURL,
-        configuration: LFM2P5VLMLXModel.Configuration(
-          model: modelConfiguration,
-          processor: processorConfiguration
-        )
-      )
-    }
-  }
-
   extension EdgeToolsLLMPrompt {
     fileprivate func lfm2VLUserInput(tools: [EdgeToolDefinition]) throws -> UserInput {
-      try self.mlxVLMUserInput(tools: tools) { message in
+      try self.mlxUserInput(tools: tools) { message in
         guard case .user(let text, let messageImages, audio: _) = message else {
           return try message.mlxMessage()
         }
@@ -152,22 +130,6 @@
     }
   }
 
-  private func loadLFM2P5VLWeights(
-    from directoryURL: URL
-  ) throws -> (weights: [String: MLXArray], metadata: [String: String]) {
-    var weights = [String: MLXArray]()
-    var metadata = [String: String]()
-    let enumerator = FileManager.default.enumerator(
-      at: directoryURL,
-      includingPropertiesForKeys: nil
-    )!
-    for case let url as URL in enumerator where url.pathExtension == "safetensors" {
-      let (arrays, fileMetadata) = try loadArraysAndMetadata(url: url)
-      weights.merge(arrays) { _, new in new }
-      if metadata.isEmpty { metadata = fileMetadata }
-    }
-    return (weights, metadata)
-  }
 #endif
 
 // MARK: - LFM2.5-VL Tool Calling

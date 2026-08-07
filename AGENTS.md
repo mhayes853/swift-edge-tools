@@ -69,6 +69,8 @@ Private helper functions should go at the bottom of the file, not the top.
 
 DO NOT ASSUME WASI IS A SINGLE THREADED ENVIRONMENT. It is not ok to conform types to `@unchecked Sendable` just because they have a member variable that uses a type from `JavaScriptKit`, and because "JS is single-threaded". `JavaScriptKit` does not conform most of its types to Sendable because Swift WASM supports sdks that enable multithreading through web workers or other means.
 
+If a lot of public APIs are using shared package or internal scoped APIs, it's likely that the API should also be public since it has inherent useful reusability. That is, users should get the same tools as us to make their own abstractions.
+
 ## Testing
 
 Generally, focus tests only on the public API (try to avoid anything not marked as public), and follow the conventions in the existing test suite. The following are generally mistakes that previous agents have made.
