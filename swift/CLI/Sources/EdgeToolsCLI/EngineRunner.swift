@@ -1,6 +1,7 @@
 import CoreML
 import EdgeTools
 import Foundation
+import MLX
 import MLXLMCommon
 
 // MARK: - EngineRunner
@@ -8,6 +9,7 @@ import MLXLMCommon
 public struct EngineRunner: Sendable {
   public let supportsCustomGrammar: Bool
   public let supportsSampling: Bool
+  public let usesMLX: Bool
 
   private let generation:
     @Sendable (GenerationRequest, sending EdgeToolsGenerationChannel) async throws ->
@@ -17,6 +19,7 @@ public struct EngineRunner: Sendable {
   public init(
     supportsCustomGrammar: Bool,
     supportsSampling: Bool,
+    usesMLX: Bool = false,
     generation:
       @escaping @Sendable (
         GenerationRequest, sending EdgeToolsGenerationChannel
@@ -25,6 +28,7 @@ public struct EngineRunner: Sendable {
   ) {
     self.supportsCustomGrammar = supportsCustomGrammar
     self.supportsSampling = supportsSampling
+    self.usesMLX = usesMLX
     self.generation = generation
     self.cacheClearing = cacheClearing
   }
@@ -48,6 +52,7 @@ extension EngineRunner {
     engine: Engine,
     supportsCustomGrammar: Bool,
     supportsSampling: Bool,
+    usesMLX: Bool = false,
     prompt: @escaping @Sendable (GenerationRequest) -> Engine.Prompt,
     parameters: @escaping @Sendable (GenerationRequest) throws -> sending Engine.GenerateParameters,
     cacheClearing: @escaping @Sendable () async -> Void
@@ -55,6 +60,7 @@ extension EngineRunner {
     self.init(
       supportsCustomGrammar: supportsCustomGrammar,
       supportsSampling: supportsSampling,
+      usesMLX: usesMLX,
       generation: { request, channel in
         let task = try engine.generate(
           prompt: prompt(request),
@@ -72,30 +78,55 @@ extension EngineRunner {
 // MARK: - Loading
 
 extension EngineRunner {
-  public init(detection: ModelDetection, engine: EngineKind) async throws {
+  public init(
+    detection: ModelDetection,
+    engine: EngineKind,
+    hardwareUnit: MLXHardwareUnit = .gpu
+  ) async throws {
     let directory = detection.directory
     switch (detection.model, engine) {
-    case (.needle, .mlx): self = try await Self.needleMLX(from: directory)
+    case (.needle, .mlx):
+      self = try await Self.needleMLX(from: directory, hardwareUnit: hardwareUnit)
     case (.needle, .onnx): self = try await Self.needleONNX(from: directory)
     case (.needle, .coreml): self = try await Self.needleCoreML(from: directory)
     case (.needle, .coreai): self = try await Self.needleCoreAI(from: directory)
-    case (.qwen3, _): self = try await Self.llm(Qwen3MLXModel.self, from: directory)
-    case (.qwen3P5, _): self = try await Self.llm(Qwen3P5MLXModel.self, from: directory)
-    case (.lfm2, _): self = try await Self.llm(LFM2MLXModel.self, from: directory)
-    case (.functionGemma, _): self = try await Self.llm(FunctionGemmaMLXModel.self, from: directory)
-    case (.granite, _): self = try await Self.llm(GraniteMLXModel.self, from: directory)
+    case (.qwen3, _):
+      self = try await Self.llm(Qwen3MLXModel.self, from: directory, hardwareUnit: hardwareUnit)
+    case (.qwen3P5, _):
+      self = try await Self.llm(Qwen3P5MLXModel.self, from: directory, hardwareUnit: hardwareUnit)
+    case (.lfm2, _):
+      self = try await Self.llm(LFM2MLXModel.self, from: directory, hardwareUnit: hardwareUnit)
+    case (.functionGemma, _):
+      self = try await Self.llm(
+        FunctionGemmaMLXModel.self,
+        from: directory,
+        hardwareUnit: hardwareUnit
+      )
+    case (.granite, _):
+      self = try await Self.llm(GraniteMLXModel.self, from: directory, hardwareUnit: hardwareUnit)
     case (.graniteMoeHybrid, _):
-      self = try await Self.llm(GraniteMoeHybridMLXModel.self, from: directory)
-    case (.miniCPM5, _): self = try await Self.llm(MiniCPM5MLXModel.self, from: directory)
+      self = try await Self.llm(
+        GraniteMoeHybridMLXModel.self,
+        from: directory,
+        hardwareUnit: hardwareUnit
+      )
+    case (.miniCPM5, _):
+      self = try await Self.llm(MiniCPM5MLXModel.self, from: directory, hardwareUnit: hardwareUnit)
     }
   }
 
-  private static func needleMLX(from directory: URL) async throws -> Self {
-    let engine = try await NeedleMLXModelEngine(from: directory)
+  private static func needleMLX(
+    from directory: URL,
+    hardwareUnit: MLXHardwareUnit
+  ) async throws -> Self {
+    let engine = try await Device.withDefaultDevice(hardwareUnit.device) {
+      try await NeedleMLXModelEngine(from: directory)
+    }
     return Self(
       engine: engine,
       supportsCustomGrammar: false,
       supportsSampling: true,
+      usesMLX: true,
       prompt: needlePrompt,
       parameters: { request in
         NeedleMLXGenerateParameters(
@@ -172,7 +203,8 @@ extension EngineRunner {
 
   private static func llm<Model: MLXModel>(
     _ model: Model.Type,
-    from directory: URL
+    from directory: URL,
+    hardwareUnit: MLXHardwareUnit
   ) async throws -> Self
   where
     Model.Prompt == EdgeToolsLLMPrompt,
@@ -181,11 +213,14 @@ extension EngineRunner {
     Model.GrammarContext == XGRGrammarContext,
     Model.ModelConfiguration: Decodable
   {
-    let engine = try await MLXEngine<Model>(from: directory)
+    let engine = try await Device.withDefaultDevice(hardwareUnit.device) {
+      try await MLXEngine<Model>(from: directory)
+    }
     return Self(
       engine: engine,
       supportsCustomGrammar: true,
       supportsSampling: true,
+      usesMLX: true,
       prompt: { request in
         var messages = [EdgeToolsLLMPrompt.Message]()
         if !request.system.isEmpty { messages.append(.system(request.system)) }

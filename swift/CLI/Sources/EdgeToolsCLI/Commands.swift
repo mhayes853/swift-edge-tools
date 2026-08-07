@@ -39,6 +39,7 @@ struct RunCommand: AsyncParsableCommand {
       context: .live,
       source: self.model.source,
       requestedEngine: self.model.engine,
+      hardwareUnit: self.model.hardwareUnit,
       settings: self.generation.settings,
       stream: stream,
       quiet: self.json
@@ -88,6 +89,7 @@ struct BenchCommand: AsyncParsableCommand {
       context: .live,
       source: self.model.source,
       requestedEngine: self.model.engine,
+      hardwareUnit: self.model.hardwareUnit,
       settings: self.generation.settings,
       runs: self.runs,
       warmup: self.warmup,

@@ -17,6 +17,7 @@ extension LoadedModel {
     context: EdgeContext,
     source: ModelSource,
     requestedEngine: EngineKind?,
+    hardwareUnit: MLXHardwareUnit,
     quiet: Bool
   ) async throws -> Self {
     let clock = ContinuousClock()
@@ -32,7 +33,7 @@ extension LoadedModel {
     return Self(
       detection: detection,
       engine: engine,
-      runner: try await context.makeRunner(detection, engine),
+      runner: try await context.makeRunner(detection, engine, hardwareUnit),
       loadDuration: start.duration(to: clock.now)
     )
   }

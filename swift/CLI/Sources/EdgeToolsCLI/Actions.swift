@@ -7,6 +7,7 @@ public struct RunAction: Sendable {
   public var context: EdgeContext
   public var source: ModelSource
   public var requestedEngine: EngineKind?
+  public var hardwareUnit: MLXHardwareUnit
   public var settings: GenerationSettings
   public var stream: StreamOption
   public var quiet: Bool
@@ -15,6 +16,7 @@ public struct RunAction: Sendable {
     context: EdgeContext,
     source: ModelSource,
     requestedEngine: EngineKind? = nil,
+    hardwareUnit: MLXHardwareUnit = .gpu,
     settings: GenerationSettings = GenerationSettings(),
     stream: StreamOption = .none,
     quiet: Bool = true
@@ -22,6 +24,7 @@ public struct RunAction: Sendable {
     self.context = context
     self.source = source
     self.requestedEngine = requestedEngine
+    self.hardwareUnit = hardwareUnit
     self.settings = settings
     self.stream = stream
     self.quiet = quiet
@@ -35,6 +38,7 @@ public struct RunAction: Sendable {
       context: self.context,
       source: self.source,
       requestedEngine: self.requestedEngine,
+      hardwareUnit: self.hardwareUnit,
       quiet: self.quiet
     )
     let request = try loaded.makeRequest(
@@ -46,13 +50,25 @@ public struct RunAction: Sendable {
     let clock = ContinuousClock()
     let start = clock.now
     let printer = StreamPrinter(mode: self.stream, start: start)
-    let generation = try await loaded.runner.generate(
-      request,
-      channel: EdgeToolsGenerationChannel(
-        onToken: { printer.token($0) },
-        onToolCall: { printer.toolCall($0) }
+    let generation = try await if loaded.runner.usesMLX {
+      try await self.hardwareUnit.withDefaultDevice {
+        try await loaded.runner.generate(
+          request,
+          channel: EdgeToolsGenerationChannel(
+            onToken: { printer.token($0) },
+            onToolCall: { printer.toolCall($0) }
+          )
+        )
+      }
+    } else {
+      try await loaded.runner.generate(
+        request,
+        channel: EdgeToolsGenerationChannel(
+          onToken: { printer.token($0) },
+          onToolCall: { printer.toolCall($0) }
+        )
       )
-    )
+    }
     printer.finish()
     let peakMemory = self.context.peakMemory()
 
@@ -82,6 +98,7 @@ public struct BenchAction: Sendable {
   public var context: EdgeContext
   public var source: ModelSource
   public var requestedEngine: EngineKind?
+  public var hardwareUnit: MLXHardwareUnit
   public var settings: GenerationSettings
   public var runs: Int
   public var warmup: Int
@@ -91,6 +108,7 @@ public struct BenchAction: Sendable {
     context: EdgeContext,
     source: ModelSource,
     requestedEngine: EngineKind? = nil,
+    hardwareUnit: MLXHardwareUnit = .gpu,
     settings: GenerationSettings = GenerationSettings(),
     runs: Int = 10,
     warmup: Int = 2,
@@ -99,6 +117,7 @@ public struct BenchAction: Sendable {
     self.context = context
     self.source = source
     self.requestedEngine = requestedEngine
+    self.hardwareUnit = hardwareUnit
     self.settings = settings
     self.runs = runs
     self.warmup = warmup
@@ -114,6 +133,7 @@ public struct BenchAction: Sendable {
       context: self.context,
       source: self.source,
       requestedEngine: self.requestedEngine,
+      hardwareUnit: self.hardwareUnit,
       quiet: self.quiet
     )
     let request = try loaded.makeRequest(
@@ -123,7 +143,7 @@ public struct BenchAction: Sendable {
     )
 
     for _ in 0..<self.warmup {
-      _ = try await loaded.runner.generate(request)
+      _ = try await self.generate(request, with: loaded.runner)
     }
 
     let clock = ContinuousClock()
@@ -132,7 +152,7 @@ public struct BenchAction: Sendable {
       onProgress(index + 1, self.runs)
       await loaded.runner.reset()
       let start = clock.now
-      let generation = try await loaded.runner.generate(request)
+      let generation = try await self.generate(request, with: loaded.runner)
       samples.append(
         BenchSample(
           endToEnd: start.duration(to: clock.now),
@@ -153,6 +173,18 @@ public struct BenchAction: Sendable {
       peakResident: peakMemory.resident,
       peakGPU: peakMemory.gpu
     )
+  }
+
+  private func generate(
+    _ request: GenerationRequest,
+    with runner: EngineRunner
+  ) async throws -> EdgeToolsEngineGeneration {
+    if runner.usesMLX {
+      return try await self.hardwareUnit.withDefaultDevice {
+        try await runner.generate(request)
+      }
+    }
+    return try await runner.generate(request)
   }
 }
 

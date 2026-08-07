@@ -20,6 +20,12 @@ struct ModelOptions: ParsableArguments {
   @Option(help: "The engine to run with. Defaults to the best available for the model.")
   var engine: EngineKind?
 
+  @Option(
+    name: .customLong("hardware-unit"),
+    help: "The hardware unit for MLX: cpu or gpu. Defaults to gpu."
+  )
+  var hardwareUnit: MLXHardwareUnit = .gpu
+
   init() {}
 
   func validate() throws {
@@ -49,6 +55,7 @@ struct ModelOptions: ParsableArguments {
 }
 
 extension EngineKind: ExpressibleByArgument {}
+extension MLXHardwareUnit: ExpressibleByArgument {}
 
 // MARK: - GenerationOptions
 

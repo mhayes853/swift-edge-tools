@@ -57,6 +57,26 @@ struct `ModelDetection tests` {
     expectNoDifference(EngineKind(argument: "metal"), nil)
   }
 
+  @Test(arguments: [
+    ("cpu", MLXHardwareUnit.cpu),
+    ("CPU", .cpu),
+    ("c-p-u", .cpu),
+    ("g p u", .gpu),
+    ("GPU", .gpu),
+    ("g_p_u", .gpu)
+  ])
+  func `Parses Case Insensitive Hardware Units`(
+    argument: String,
+    expected: MLXHardwareUnit
+  ) {
+    expectNoDifference(MLXHardwareUnit(argument: argument), expected)
+  }
+
+  @Test
+  func `Rejects Unknown Hardware Units`() {
+    expectNoDifference(MLXHardwareUnit(argument: "neural-engine"), nil)
+  }
+
   @Test
   func `Detects MiniCPM5 By Its Chat Template Markers`() throws {
     let directory = try temporaryModel(

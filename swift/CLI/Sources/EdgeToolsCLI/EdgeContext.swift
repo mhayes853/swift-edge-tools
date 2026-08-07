@@ -8,7 +8,8 @@ public struct EdgeContext: Sendable {
   public var resolveDirectory:
     @Sendable (ModelSource, @Sendable (String) -> Void) async throws -> URL
   public var detectModel: @Sendable (URL) throws -> ModelDetection
-  public var makeRunner: @Sendable (ModelDetection, EngineKind) async throws -> EngineRunner
+  public var makeRunner:
+    @Sendable (ModelDetection, EngineKind, MLXHardwareUnit) async throws -> EngineRunner
   public var peakMemory: @Sendable () -> PeakMemory
 
   public init(
@@ -16,7 +17,8 @@ public struct EdgeContext: Sendable {
       @escaping @Sendable (ModelSource, @Sendable (String) -> Void) async throws ->
       URL,
     detectModel: @escaping @Sendable (URL) throws -> ModelDetection,
-    makeRunner: @escaping @Sendable (ModelDetection, EngineKind) async throws -> EngineRunner,
+    makeRunner:
+      @escaping @Sendable (ModelDetection, EngineKind, MLXHardwareUnit) async throws -> EngineRunner,
     peakMemory: @escaping @Sendable () -> PeakMemory
   ) {
     self.resolveDirectory = resolveDirectory
@@ -34,7 +36,7 @@ extension EdgeContext {
       try await source.resolve(onDownloadStart: onDownloadStart)
     },
     detectModel: { try ModelDetection.detect(in: $0) },
-    makeRunner: { try await EngineRunner(detection: $0, engine: $1) },
+    makeRunner: { try await EngineRunner(detection: $0, engine: $1, hardwareUnit: $2) },
     peakMemory: { .current }
   )
 }

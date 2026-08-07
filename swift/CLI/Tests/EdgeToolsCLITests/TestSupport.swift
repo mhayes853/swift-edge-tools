@@ -19,7 +19,7 @@ extension EdgeContext {
       detectModel: {
         ModelDetection(directory: $0, model: model, engines: engines, files: files)
       },
-      makeRunner: { _, _ in runner },
+      makeRunner: { _, _, _ in runner },
       peakMemory: { .zero }
     )
   }

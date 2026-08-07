@@ -33,7 +33,9 @@ The model is detected from `config.json`, and the engine from the weights presen
 directory (`.safetensors` for MLX, `.onnx`, `.mlmodelc`/`.mlpackage` for CoreML, and
 `.aimodel`/`.aimodelc` for CoreAI). CoreAI is experimental, needs Swift 6.4 to build and
 OS 27 to run, and is never selected automatically — pass `--engine coreai` to use it.
-Needle is currently the only model with a CoreAI export, produced by the Python CLI.
+Needle is currently the only model with a CoreAI export, produced by the Python CLI. MLX runs use the
+GPU by default; pass `--hardware-unit cpu` to run them on the CPU. Hardware-unit names are
+case-insensitive and accept spaces, hyphens, or underscores.
 
 Textual models are detected from `model_type`: Needle, Qwen3, Qwen3.5, LFM2, FunctionGemma,
 Granite, Granite MoE Hybrid and MiniCPM5. MiniCPM5 ships as `model_type: llama`, so it is
