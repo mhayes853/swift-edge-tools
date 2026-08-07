@@ -55,7 +55,7 @@ let package = Package(
       description: "Vendored ONNX Runtime support.",
       enabledTraits: ["ONNXCore", "Transformers"]
     ),
-    .default(enabledTraits: ["Foundation", "MLX", "XGrammar"])
+    .default(enabledTraits: ["Foundation"])
   ],
   dependencies: [
     .package(url: "https://github.com/ml-explore/mlx-swift-lm", from: "3.31.4"),
