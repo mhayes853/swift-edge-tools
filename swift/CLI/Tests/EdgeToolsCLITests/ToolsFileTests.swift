@@ -1,9 +1,8 @@
 import CustomDump
 import EdgeTools
+import EdgeToolsCLI
 import Foundation
 import Testing
-
-@testable import EdgeToolsCLI
 
 @Suite
 struct `ToolsFile tests` {

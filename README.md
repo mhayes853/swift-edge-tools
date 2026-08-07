@@ -33,14 +33,18 @@ The model is detected from `config.json`, and the engine from the weights presen
 directory (`.safetensors` for MLX, `.onnx`, `.mlmodelc`/`.mlpackage` for CoreML, and
 `.aimodel`/`.aimodelc` for CoreAI). CoreAI is experimental, needs Swift 6.4 to build and
 OS 27 to run, and is never selected automatically — pass `--engine coreai` to use it.
-Needle is currently the only model with a CoreAI export, produced by the Python CLI. Unrecognized architectures fall back to a generic MLX path, which has no
-tool call grammar or parser, so tool calls from those models are not parsed.
+Needle is currently the only model with a CoreAI export, produced by the Python CLI.
+
+Textual models are detected from `model_type`: Needle, Qwen3, Qwen3.5, LFM2, FunctionGemma,
+Granite, Granite MoE Hybrid and MiniCPM5. MiniCPM5 ships as `model_type: llama`, so it is
+identified by the `<function` markers in its chat template. Vision models are not detected
+yet. Unrecognized architectures are rejected rather than guessed at.
 
 `--tools` accepts OpenAI function-calling JSON. Without it, a built-in five-tool demo set
 (`send_email`, `set_timer`, `search_web`, `create_calendar_event`, `get_weather`) is used,
 covering strings, integers, booleans, enums and arrays. `--grammar` selects the generation
-constraint: `auto` (the model's tool call grammar), `unconstrained`, `json`, a grammar
-file (`.ebnf`, `.lark`, `.json`), or an inline `<format>:<value>` such as
+constraint: `auto` (the model's tool call grammar), `unconstrained`, a grammar file
+(`.ebnf`, `.lark`, `.json`), or an inline `<format>:<value>` such as
 `regex:\d{4}-\d{2}-\d{2}`. A custom grammar replaces the tool call grammar rather than
 composing with it.
 

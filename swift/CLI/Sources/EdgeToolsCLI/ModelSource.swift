@@ -16,11 +16,7 @@ public struct ModelSource: Hashable, Sendable {
     self.location = location
     self.cacheDirectory = cacheDirectory
   }
-}
 
-// MARK: - Default Cache
-
-extension ModelSource {
   public static var defaultCacheDirectory: URL {
     let environment = ProcessInfo.processInfo.environment
     if let home = environment["HF_HOME"], !home.isEmpty {
@@ -53,7 +49,7 @@ extension ModelSource {
       let hub = HubApi(downloadBase: self.cacheDirectory)
       let repository = Hub.Repo(id: repo, type: .models)
       let destination = hub.localRepoLocation(repository)
-      if revision == "main", modelDirectoryIsPopulated(destination) {
+      if revision == "main", isPopulated(destination) {
         return destination
       }
       onDownloadStart(repo)
@@ -62,17 +58,7 @@ extension ModelSource {
   }
 }
 
-// MARK: - EdgeCLIError
-
-public struct EdgeCLIError: Error, CustomStringConvertible {
-  public let description: String
-
-  public init(_ description: String) {
-    self.description = description
-  }
-}
-
-private func modelDirectoryIsPopulated(_ directory: URL) -> Bool {
+private func isPopulated(_ directory: URL) -> Bool {
   let contents = try? FileManager.default.contentsOfDirectory(atPath: directory.path())
   return !(contents ?? []).isEmpty
 }

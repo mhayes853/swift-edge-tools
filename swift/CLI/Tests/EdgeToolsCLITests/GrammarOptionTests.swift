@@ -1,8 +1,7 @@
 import CustomDump
+import EdgeToolsCLI
 import Foundation
 import Testing
-
-@testable import EdgeToolsCLI
 
 @Suite
 struct `GrammarOption tests` {
@@ -10,7 +9,6 @@ struct `GrammarOption tests` {
   func `Parses Named Constraints`() {
     expectNoDifference(GrammarOption(argument: "auto"), .auto)
     expectNoDifference(GrammarOption(argument: "unconstrained"), .unconstrained)
-    expectNoDifference(GrammarOption(argument: "json"), .builtinJSON)
   }
 
   @Test

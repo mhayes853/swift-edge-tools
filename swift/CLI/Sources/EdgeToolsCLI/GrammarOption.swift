@@ -4,12 +4,10 @@ import Foundation
 
 // MARK: - GrammarOption
 
-/// The generation constraint applied while decoding.
 public enum GrammarOption: Hashable, Sendable {
-  /// The model's own tool call grammar.
+  // The model's own tool call grammar.
   case auto
   case unconstrained
-  case builtinJSON
   case custom(format: GrammarFormat, source: GrammarSourceLocation)
 }
 
@@ -22,6 +20,15 @@ public enum GrammarFormat: String, Hashable, Sendable, CaseIterable {
   case jsonSchema = "json-schema"
   case structuralTag = "structural-tag"
   case serialized
+
+  fileprivate init?(pathExtension: String) {
+    switch pathExtension.lowercased() {
+    case "ebnf", "gbnf": self = .ebnf
+    case "lark": self = .lark
+    case "json": self = .jsonSchema
+    default: return nil
+    }
+  }
 }
 
 // MARK: - GrammarSourceLocation
@@ -40,14 +47,14 @@ extension GrammarOption: ExpressibleByArgument {
       self = .auto
     case "unconstrained":
       self = .unconstrained
-    case "json":
-      self = .builtinJSON
     default:
       let separator = argument.firstIndex(of: ":")
       let prefix = separator.map { String(argument[argument.startIndex..<$0]) }
       if let prefix, let format = GrammarFormat(rawValue: prefix), let separator {
-        let value = String(argument[argument.index(after: separator)...])
-        self = .custom(format: format, source: .inline(value))
+        self = .custom(
+          format: format,
+          source: .inline(String(argument[argument.index(after: separator)...]))
+        )
       } else {
         let url = URL(fileURLWithPath: argument)
         guard let format = GrammarFormat(pathExtension: url.pathExtension) else { return nil }
@@ -57,44 +64,26 @@ extension GrammarOption: ExpressibleByArgument {
   }
 
   public static var allValueStrings: [String] {
-    ["auto", "unconstrained", "json"] + GrammarFormat.allCases.map { "\($0.rawValue):<inline>" }
+    ["auto", "unconstrained"] + GrammarFormat.allCases.map { "\($0.rawValue):<inline>" }
   }
 }
 
-extension GrammarFormat {
-  init?(pathExtension: String) {
-    switch pathExtension.lowercased() {
-    case "ebnf", "gbnf": self = .ebnf
-    case "lark": self = .lark
-    case "json": self = .jsonSchema
-    default: return nil
-    }
-  }
-}
-
-// MARK: - Constraint
+// MARK: - Constraints
 
 extension GrammarOption {
-  public func constraint(
-    toolCallRange: GrammarToolCallRange
-  ) throws -> EdgeToolsXGRGenerationConstraint {
+  public func constraint(toolCallRange: GrammarToolCallRange) throws -> XGRGenerationConstraint {
     switch self {
     case .auto:
       return .toolsWithGrammar(range: toolCallRange)
     case .unconstrained:
       return .unconstrained
-    case .builtinJSON:
-      return .grammar(.builtinJSONGrammar())
     case .custom(let format, let source):
-      return .grammar(try makeGrammar(format: format, source: source))
+      return .grammar(try grammar(format: format, source: source))
     }
   }
 }
 
-private func makeGrammar(
-  format: GrammarFormat,
-  source: GrammarSourceLocation
-) throws -> XGRGrammar {
+private func grammar(format: GrammarFormat, source: GrammarSourceLocation) throws -> XGRGrammar {
   let text: String
   switch source {
   case .inline(let value):

@@ -4,7 +4,7 @@ import Foundation
 
 // MARK: - ModelOptions
 
-public struct ModelOptions: ParsableArguments {
+struct ModelOptions: ParsableArguments {
   @Argument(help: "A Hugging Face repo, such as Cactus-Compute/needle.")
   var repo: String?
 
@@ -20,9 +20,9 @@ public struct ModelOptions: ParsableArguments {
   @Option(help: "The engine to run with. Defaults to the best available for the model.")
   var engine: EngineKind?
 
-  public init() {}
+  init() {}
 
-  public func validate() throws {
+  func validate() throws {
     switch (self.repo, self.path) {
     case (nil, nil):
       throw ValidationError("Specify a Hugging Face repo or --path.")
@@ -35,9 +35,7 @@ public struct ModelOptions: ParsableArguments {
       throw ValidationError("--revision and --cache-dir do not apply to --path.")
     }
   }
-}
 
-extension ModelOptions {
   var source: ModelSource {
     if let path {
       return ModelSource(location: .filesystem(URL(fileURLWithPath: path)))
@@ -54,7 +52,7 @@ extension EngineKind: ExpressibleByArgument {}
 
 // MARK: - GenerationOptions
 
-public struct GenerationOptions: ParsableArguments {
+struct GenerationOptions: ParsableArguments {
   @Option(name: .shortAndLong, help: "The user prompt. Read from stdin when omitted.")
   var prompt: String?
 
@@ -71,8 +69,8 @@ public struct GenerationOptions: ParsableArguments {
 
   @Option(
     help: """
-      The generation constraint: auto, unconstrained, json, a grammar file (.ebnf, .lark, .json), \
-      or an inline <format>:<value>.
+      The generation constraint: auto, unconstrained, a grammar file (.ebnf, .lark, .json), or an \
+      inline <format>:<value>.
       """
   )
   var grammar: GrammarOption = .auto
@@ -98,11 +96,20 @@ public struct GenerationOptions: ParsableArguments {
   )
   var maxToolCalls: Int?
 
-  public init() {}
-}
+  init() {}
 
-extension GenerationOptions {
-  var toolCallRange: GrammarToolCallRange {
+  var settings: GenerationSettings {
+    GenerationSettings(
+      system: self.system,
+      grammar: self.grammar,
+      toolCallRange: self.toolCallRange,
+      maxTokens: self.maxTokens,
+      temperature: self.temperature,
+      topP: self.topP
+    )
+  }
+
+  private var toolCallRange: GrammarToolCallRange {
     let minimum = self.toolCalls.minimumCalls
     guard let maximum = self.maxToolCalls else {
       return self.toolCalls == .none ? .exact(0) : .unbounded(minimum: minimum)
@@ -132,9 +139,7 @@ public enum ToolCallsOption: String, ExpressibleByArgument, CaseIterable, Sendab
   case auto
   case required
   case none
-}
 
-extension ToolCallsOption {
   var minimumCalls: Int {
     switch self {
     case .auto, .none: 0

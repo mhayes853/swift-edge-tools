@@ -2,38 +2,33 @@ import Foundation
 
 // MARK: - DetectedModel
 
-public enum DetectedModel: Hashable, Sendable {
+public enum DetectedModel: String, Hashable, Sendable, CaseIterable {
   case needle
   case qwen3
-  case qwen35
+  case qwen3P5
   case lfm2
   case functionGemma
-  case genericLLM(modelType: String)
-}
+  case granite
+  case graniteMoeHybrid
+  case miniCPM5
 
-extension DetectedModel {
   public var displayName: String {
     switch self {
     case .needle: "Needle"
     case .qwen3: "Qwen3"
-    case .qwen35: "Qwen3.5"
+    case .qwen3P5: "Qwen3.5"
     case .lfm2: "LFM2"
     case .functionGemma: "FunctionGemma"
-    case .genericLLM(let modelType): "unknown (\(modelType)) — generic LLM fallback"
+    case .granite: "Granite"
+    case .graniteMoeHybrid: "Granite MoE Hybrid"
+    case .miniCPM5: "MiniCPM5"
     }
-  }
-
-  /// Generic models have no model-specific tool call grammar or parser, so tool calls they emit
-  /// cannot be parsed back out of the response.
-  public var isGenericFallback: Bool {
-    if case .genericLLM = self { return true }
-    return false
   }
 
   public var supportedEngines: [EngineKind] {
     switch self {
     case .needle: [.mlx, .onnx, .coreml, .coreai]
-    case .qwen3, .qwen35, .lfm2, .functionGemma, .genericLLM: [.mlx]
+    default: [.mlx]
     }
   }
 }
@@ -45,25 +40,42 @@ public enum EngineKind: String, CaseIterable, Sendable {
   case onnx
   case coreml
   case coreai
-}
 
-extension EngineKind {
-  /// CoreAI support is experimental, so it is never selected without being asked for by name.
   public var isExperimental: Bool {
     self == .coreai
+  }
+
+  fileprivate func hasWeights(in files: [String]) -> Bool {
+    switch self {
+    case .mlx: files.contains { $0.hasSuffix(".safetensors") }
+    case .onnx: files.contains { $0.hasSuffix(".onnx") }
+    case .coreml: files.contains { $0.hasSuffix(".mlmodelc") || $0.hasSuffix(".mlpackage") }
+    case .coreai: files.contains { $0.hasSuffix(".aimodel") || $0.hasSuffix(".aimodelc") }
+    }
   }
 }
 
 // MARK: - ModelDetection
 
-public struct ModelDetection: Sendable {
+public struct ModelDetection: Hashable, Sendable {
   public var directory: URL
   public var model: DetectedModel
   public var engines: [EngineKind]
   public var files: [String]
 
+  public init(directory: URL, model: DetectedModel, engines: [EngineKind], files: [String]) {
+    self.directory = directory
+    self.model = model
+    self.engines = engines
+    self.files = files
+  }
+
   public var defaultEngine: EngineKind? {
     self.engines.first { !$0.isExperimental }
+  }
+
+  public var unavailableEngines: [EngineKind] {
+    self.model.supportedEngines.filter { !self.engines.contains($0) }
   }
 }
 
@@ -75,24 +87,17 @@ extension ModelDetection {
     guard let files, !files.isEmpty else {
       throw EdgeCLIError("Model directory \(directory.path()) is empty.")
     }
-    let model = try detectModel(in: directory, files: files)
-    let engines = model.supportedEngines.filter { $0.hasWeights(in: files) }
-    return Self(directory: directory, model: model, engines: engines, files: files)
+    let model = try detectedModel(in: directory, files: files)
+    return Self(
+      directory: directory,
+      model: model,
+      engines: model.supportedEngines.filter { $0.hasWeights(in: files) },
+      files: files
+    )
   }
 }
 
-extension EngineKind {
-  func hasWeights(in files: [String]) -> Bool {
-    switch self {
-    case .mlx: files.contains { $0.hasSuffix(".safetensors") }
-    case .onnx: files.contains { $0.hasSuffix(".onnx") }
-    case .coreml: files.contains { $0.hasSuffix(".mlmodelc") || $0.hasSuffix(".mlpackage") }
-    case .coreai: files.contains { $0.hasSuffix(".aimodel") || $0.hasSuffix(".aimodelc") }
-    }
-  }
-}
-
-// MARK: - Configuration Header
+// MARK: - ConfigurationHeader
 
 private struct ConfigurationHeader: Decodable {
   let modelType: String?
@@ -108,7 +113,7 @@ private struct ConfigurationHeader: Decodable {
   }
 }
 
-private func detectModel(in directory: URL, files: [String]) throws -> DetectedModel {
+private func detectedModel(in directory: URL, files: [String]) throws -> DetectedModel {
   let configurationFile = ["configuration.json", "config.json"].first { files.contains($0) }
   guard let configurationFile else {
     throw EdgeCLIError(
@@ -124,16 +129,38 @@ private func detectModel(in directory: URL, files: [String]) throws -> DetectedM
   switch header.modelType {
   case "needle": return .needle
   case "qwen3": return .qwen3
-  case "qwen3_5", "qwen3_5_text": return .qwen35
+  case "qwen3_5", "qwen3_5_text": return .qwen3P5
   case "lfm2": return .lfm2
   case "gemma3", "gemma3_text": return .functionGemma
-  case let modelType?: return .genericLLM(modelType: modelType)
-  case nil:
-    guard let architecture = header.architectures?.first else {
-      throw EdgeCLIError(
-        "\(configurationFile) has no model_type or architectures — cannot identify the model."
-      )
-    }
-    return .genericLLM(modelType: architecture)
+  case "granite": return .granite
+  case "granitemoehybrid": return .graniteMoeHybrid
+  case "llama" where chatTemplate(in: directory, files: files)?.contains("<function") == true:
+    return .miniCPM5
+  default:
+    let described = header.modelType ?? header.architectures?.first ?? "unspecified"
+    throw EdgeCLIError(
+      """
+      Unsupported model \(described) in \(directory.path()). Supported models: \
+      \(DetectedModel.allCases.map(\.displayName).joined(separator: ", ")).
+      """
+    )
   }
+}
+
+private func chatTemplate(in directory: URL, files: [String]) -> String? {
+  if files.contains("chat_template.jinja"),
+    let template = try? String(
+      contentsOf: directory.appending(path: "chat_template.jinja"),
+      encoding: .utf8
+    )
+  {
+    return template
+  }
+  guard files.contains("tokenizer_config.json"),
+    let data = try? Data(contentsOf: directory.appending(path: "tokenizer_config.json")),
+    let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+  else {
+    return nil
+  }
+  return json["chat_template"] as? String
 }

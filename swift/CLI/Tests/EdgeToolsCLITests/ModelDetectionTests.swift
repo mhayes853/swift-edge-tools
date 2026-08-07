@@ -1,8 +1,7 @@
 import CustomDump
+import EdgeToolsCLI
 import Foundation
 import Testing
-
-@testable import EdgeToolsCLI
 
 @Suite
 struct `ModelDetection tests` {
@@ -24,9 +23,11 @@ struct `ModelDetection tests` {
   func `Detects Known Model Types`() throws {
     let expected: [String: DetectedModel] = [
       "qwen3": .qwen3,
-      "qwen3_5": .qwen35,
+      "qwen3_5": .qwen3P5,
       "lfm2": .lfm2,
-      "gemma3_text": .functionGemma
+      "gemma3_text": .functionGemma,
+      "granite": .granite,
+      "granitemoehybrid": .graniteMoeHybrid
     ]
     for (modelType, model) in expected {
       let directory = try temporaryModel(
@@ -38,16 +39,39 @@ struct `ModelDetection tests` {
   }
 
   @Test
-  func `Falls Back To A Generic Model For Unknown Architectures`() throws {
+  func `Detects MiniCPM5 By Its Chat Template Markers`() throws {
+    let directory = try temporaryModel(
+      configuration: "{\"model_type\": \"llama\"}",
+      files: ["model.safetensors"],
+      chatTemplate: "{% for message in messages %}<function=get_weather>{% endfor %}"
+    )
+
+    expectNoDifference(try ModelDetection.detect(in: directory).model, .miniCPM5)
+  }
+
+  @Test
+  func `Rejects A Plain Llama Without MiniCPM5 Markers`() throws {
+    let directory = try temporaryModel(
+      configuration: "{\"model_type\": \"llama\"}",
+      files: ["model.safetensors"],
+      chatTemplate: "{% for message in messages %}{{ message.content }}{% endfor %}"
+    )
+
+    #expect(throws: EdgeCLIError.self) {
+      try ModelDetection.detect(in: directory)
+    }
+  }
+
+  @Test
+  func `Throws For Unsupported Architectures`() throws {
     let directory = try temporaryModel(
       configuration: "{\"model_type\": \"llama\"}",
       files: ["model.safetensors"]
     )
-    let detection = try ModelDetection.detect(in: directory)
 
-    expectNoDifference(detection.model, .genericLLM(modelType: "llama"))
-    expectNoDifference(detection.model.isGenericFallback, true)
-    expectNoDifference(detection.engines, [.mlx])
+    #expect(throws: EdgeCLIError.self) {
+      try ModelDetection.detect(in: directory)
+    }
   }
 
   @Test
@@ -102,11 +126,18 @@ struct `ModelDetection tests` {
   }
 }
 
-private func temporaryModel(configuration: String?, files: [String]) throws -> URL {
+private func temporaryModel(
+  configuration: String?,
+  files: [String],
+  chatTemplate: String? = nil
+) throws -> URL {
   let directory = URL.temporaryDirectory.appending(path: "edge-tests-\(UUID().uuidString)")
   try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
   if let configuration {
     try Data(configuration.utf8).write(to: directory.appending(path: "config.json"))
+  }
+  if let chatTemplate {
+    try Data(chatTemplate.utf8).write(to: directory.appending(path: "chat_template.jinja"))
   }
   for file in files {
     try Data().write(to: directory.appending(path: file))
