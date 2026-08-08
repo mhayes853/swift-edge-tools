@@ -306,9 +306,9 @@
         """
     ),
     ToolCallGrammarTestFixture(
-      name: "LFM2 Python",
-      makeGrammar: { try XGRGrammar.lfm2Python(tools: $0, range: $1) },
-      makeParser: { LFM2PythonToolCallParser() },
+      name: "LFM2P5 Python",
+      makeGrammar: { try XGRGrammar.lfm2P5Python(tools: $0, range: $1) },
+      makeParser: { LFM2P5PythonToolCallParser() },
       expectedComplexName: "complexTool",
       emptyCall: "<|tool_call_start|>[]<|tool_call_end|>",
       simpleCall: #"<|tool_call_start|>[getWeather(location="Seoul")]<|tool_call_end|>"#,

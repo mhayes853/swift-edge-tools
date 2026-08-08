@@ -281,11 +281,10 @@
     }
   }
 
-  // MARK: - MLXModel
+  // MARK: - MLXModelProfile
 
   #if XGrammar
-    public struct NeedleMLXModel: MLXModel {
-      public typealias ModelConfiguration = NeedleModelConfiguration
+    public struct NeedleMLXProfile: MLXModelProfile {
       public typealias Prompt = NeedlePrompt
       public typealias GenerateParameters = NeedleMLXGenerateParameters
       public typealias ToolCallParser = NeedleToolCallParser
@@ -298,34 +297,76 @@
         self.languageModel = NeedleLanguageModel(configuration: configuration)
       }
 
-      public var vocabularySize: Int { self.languageModel.vocabularySize }
+      public func loadWeights(from directory: MLXModelDirectory) throws {
+        let baseConfiguration = try directory.loadConfiguration(BaseConfiguration.self)
+        try MLXLMCommon.loadWeights(
+          modelDirectory: directory.url,
+          model: self.languageModel,
+          perLayerQuantization: baseConfiguration.perLayerQuantization
+        )
+      }
 
-      public func grammar(
+      public static func grammar(
         tools: [EdgeToolDefinition],
         parameters: NeedleMLXGenerateParameters,
         context _: XGRGrammarContext
       ) throws -> XGRGrammar {
-        try self.toolCallGrammar(tools: tools, range: parameters.toolCallRange)
+        try Self.toolCallGrammar(tools: tools, range: parameters.toolCallRange)
       }
 
-      public func toolCallGrammar(
+      public static func toolCallGrammar(
         tools: [EdgeToolDefinition],
         range: GrammarToolCallRange
       ) throws -> XGRGrammar {
         try .needle(tools: tools, range: range)
       }
 
-      public nonisolated(nonsending) func input(
+      public static nonisolated(nonsending) func input(
         prompt: NeedlePrompt,
         tools: [EdgeToolDefinition],
-        tokenizer: any EdgeToolsTokenizer
+        tokenizer: any EdgeToolsTokenizer,
+        processor _: (any UserInputProcessor)?
       ) async throws -> LMInput {
-        let input = try LMInput.needle(prompt: prompt, tools: tools, using: tokenizer)
-        return input
+        try .needle(prompt: prompt, tools: tools, using: tokenizer)
       }
     }
 
-    public typealias NeedleMLXModelEngine = MLXEngine<NeedleMLXModel>
+    public typealias NeedleMLXModelEngine = MLXEngine<NeedleMLXProfile>
+
+    extension EdgeToolsModelEngine where Model == EdgeToolsMLXModel<NeedleMLXProfile> {
+      public init(from directoryURL: URL) async throws {
+        try await self.init(from: MLXModelDirectory(url: directoryURL))
+      }
+
+      public init(from directory: MLXModelDirectory) async throws {
+        let configuration = try directory.loadConfiguration(NeedleModelConfiguration.self)
+        try await self.init(from: directory, configuration: configuration)
+      }
+
+      public init(
+        from directory: MLXModelDirectory,
+        configuration: NeedleModelConfiguration
+      ) async throws {
+        let tokenizer = try await directory.loadTokenizer()
+        let languageModel = NeedleLanguageModel(configuration: configuration)
+        let baseConfiguration = try directory.loadConfiguration(BaseConfiguration.self)
+        try MLXLMCommon.loadWeights(
+          modelDirectory: directory.url,
+          model: languageModel,
+          perLayerQuantization: baseConfiguration.perLayerQuantization
+        )
+        var extraStopTokenIds = try directory.loadStopTokenIds()
+        if let eosTokenId = tokenizer.eosTokenId {
+          extraStopTokenIds.remove(eosTokenId)
+        }
+        try self.init(
+          languageModel: languageModel,
+          tokenizer: tokenizer,
+          vocabularySize: configuration.vocabularySize,
+          extraStopTokenIds: extraStopTokenIds
+        )
+      }
+    }
   #endif
 
   // MARK: - SimpleAttentionNetwork

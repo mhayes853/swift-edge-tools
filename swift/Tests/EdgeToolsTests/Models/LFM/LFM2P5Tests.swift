@@ -7,12 +7,12 @@ import Testing
 #endif
 
 @Suite
-struct `LFM2 tests` {
+struct `LFM2P5 tests` {
   @Suite
-  struct `LFM2PythonToolCallParser tests` {
+  struct `LFM2P5PythonToolCallParser tests` {
     @Test
     func `Decodes Escaped Unicode Surrogate Pairs`() throws {
-      var parser = LFM2PythonToolCallParser()
+      var parser = LFM2P5PythonToolCallParser()
       let source = #"<|tool_call_start|>[emoji(value='\uD83D\uDE00')]<|tool_call_end|>"#
       let parsed = parser.accept(token: EdgeToolsToken(id: 0, stringValue: source))
       let call = try #require(parsed.first)
@@ -23,10 +23,10 @@ struct `LFM2 tests` {
 
   #if MLX && XGrammar && canImport(MLX) && !os(WASI)
     @Suite(.serialized, .enabledIfXcode())
-    struct `LFM2MLXModelEngine tests` {
+    struct `LFM2P5MLXModelEngine tests` {
       @Test
       func `Completes Tool Turn Snapshot`() async throws {
-        let engine = try await LFM2MLXModelEngine(from: downloadLFM2())
+        let engine = try await LFM2P5MLXModelEngine(from: downloadLFM2P5())
         let transcript = try await completeWeatherTurn(using: engine)
 
         withKnownIssue { assertSnapshot(of: transcript, as: .dump, record: .all) }
@@ -36,7 +36,7 @@ struct `LFM2 tests` {
 
   #if XGrammar
     @Suite(.serialized)
-    struct `LFM2XGRCompiler tests`: ~Copyable {
+    struct `LFM2P5XGRCompiler tests`: ~Copyable {
       private let compiler: XGRCompiler
       private let tokenizer: NeedleSPTokenizer
       private let eosToken: EdgeToolsToken.ID
@@ -51,8 +51,8 @@ struct `LFM2 tests` {
       }
 
       @Test
-      func `LFM2 Python Removes Duplicate EBNF Rules`() throws {
-        let grammar = try XGRGrammar.lfm2Python(
+      func `LFM2P5 Python Removes Duplicate EBNF Rules`() throws {
+        let grammar = try XGRGrammar.lfm2P5Python(
           tools: [.getWeather, Self.getForecast],
           range: .exact(1)
         )
@@ -62,9 +62,9 @@ struct `LFM2 tests` {
       }
 
       @Test
-      func `LFM2 Python Uses Keyword Arguments And Nested Dictionaries`() throws {
+      func `LFM2P5 Python Uses Keyword Arguments And Nested Dictionaries`() throws {
         let validMatcher = try self.compiler.makeMatcher(
-          try XGRGrammar.lfm2Python(tools: [Self.nestedTool], range: .exact(1))
+          try XGRGrammar.lfm2P5Python(tools: [Self.nestedTool], range: .exact(1))
         )
         let valid =
           """
@@ -79,7 +79,7 @@ struct `LFM2 tests` {
         )
 
         let optionalMatcher = try self.compiler.makeMatcher(
-          try XGRGrammar.lfm2Python(tools: [Self.nestedTool], range: .exact(1))
+          try XGRGrammar.lfm2P5Python(tools: [Self.nestedTool], range: .exact(1))
         )
         assertGrammarAccepts(
           """
@@ -92,7 +92,7 @@ struct `LFM2 tests` {
         )
 
         let topLevelJSONMatcher = try self.compiler.makeMatcher(
-          try XGRGrammar.lfm2Python(tools: [Self.nestedTool], range: .exact(1))
+          try XGRGrammar.lfm2P5Python(tools: [Self.nestedTool], range: .exact(1))
         )
         assertGrammarRejects(
           #"<|tool_call_start|>[nested("payload":{"enabled":True,"child":{"missing":None,"items":[]}})]<|tool_call_end|>"#,
@@ -102,7 +102,7 @@ struct `LFM2 tests` {
         )
 
         let nestedKeywordMatcher = try self.compiler.makeMatcher(
-          try XGRGrammar.lfm2Python(tools: [Self.nestedTool], range: .exact(1))
+          try XGRGrammar.lfm2P5Python(tools: [Self.nestedTool], range: .exact(1))
         )
         assertGrammarRejects(
           #"<|tool_call_start|>[nested(payload={"enabled"=True,"child":{"missing":None,"items":[]}})]<|tool_call_end|>"#,

@@ -4,9 +4,9 @@ import OrderedCollections
   import EdgeToolsXGrammar
 #endif
 
-// MARK: - LFM2PythonToolCallParser
+// MARK: - LFM2P5PythonToolCallParser
 
-public struct LFM2PythonToolCallParser: EdgeToolCallParser, Sendable {
+public struct LFM2P5PythonToolCallParser: EdgeToolCallParser, Sendable {
   private var list = IncrementalToolCallList(opener: "<|tool_call_start|>")
 
   public init() {}
@@ -32,10 +32,9 @@ public struct LFM2PythonToolCallParser: EdgeToolCallParser, Sendable {
   }
 }
 
-// MARK: - LFM2
+// MARK: - LFM2P5
 
-public typealias LFM2ToolCallParser = LFM2PythonToolCallParser
-public typealias LFM2P5ToolCallParser = LFM2PythonToolCallParser
+public typealias LFM2P5ToolCallParser = LFM2P5PythonToolCallParser
 
 // MARK: - Python Call Boundaries
 
@@ -253,25 +252,18 @@ private struct PythonCallReader: ToolCallValueReader {
   }
 }
 
-// MARK: - LFM2 Grammar
+// MARK: - LFM2P5 Grammar
 
 #if XGrammar
   extension XGRGrammar {
-    public static func lfm2(
-      tools: some Sequence<EdgeToolDefinition>,
-      range: GrammarToolCallRange = .unbounded(minimum: 0)
-    ) throws -> XGRGrammar {
-      try Self.lfm2Python(tools: tools, range: range)
-    }
-
     public static func lfm2P5(
       tools: some Sequence<EdgeToolDefinition>,
       range: GrammarToolCallRange = .unbounded(minimum: 0)
     ) throws -> XGRGrammar {
-      try Self.lfm2Python(tools: tools, range: range)
+      try Self.lfm2P5Python(tools: tools, range: range)
     }
 
-    public static func lfm2Python(
+    public static func lfm2P5Python(
       tools: some Sequence<EdgeToolDefinition>,
       range: GrammarToolCallRange = .unbounded(minimum: 0)
     ) throws -> XGRGrammar {

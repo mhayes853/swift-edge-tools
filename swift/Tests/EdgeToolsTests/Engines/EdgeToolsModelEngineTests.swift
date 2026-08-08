@@ -354,7 +354,10 @@
         )
       }
       return try XGRGrammarContext(
-        tokenizerInfo: tokenizer.tokenizerInfo(modelVocabularySize: self.vocabularySize)
+        tokenizerInfo: tokenizer.tokenizerInfo(
+          modelVocabularySize: self.vocabularySize,
+          extraStopTokenIds: self.extraStopTokenIds
+        )
       )
     }
 

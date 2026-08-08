@@ -39,5 +39,5 @@
     ▿ Message
       ▿ assistant: (2 elements)
         ▿ .0: Optional<String>
-          - some: "<think>\nOkay, the user asked for the weather in Paris. I called getWeather with Paris as the location and got a response. The condition is sunny, temperature is 21°C. I need to sum this up clearly.\n\nFirst, confirm the location is Paris. Then, mention the weather condition and temperature."
+          - some: "<think>\nOkay, the user asked for the weather in Paris. I used getWeather with Paris as the location. The response came back with a sunny condition and a temperature of 21°C. Now, I need to summarize this information clearly.\n\nFirst, I should mention the condition: sunny. That\'s straightforward."
         - toolCalls: 0 elements

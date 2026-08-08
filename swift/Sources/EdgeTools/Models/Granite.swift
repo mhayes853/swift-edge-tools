@@ -2,31 +2,17 @@
   import EdgeToolsXGrammar
 #endif
 
-#if MLX && XGrammar && Transformers && canImport(MLX)
-  import _EdgeToolsFoundation
-  import MLX
-  import MLXLLM
-  import MLXLMCommon
-
+#if MLX && XGrammar && canImport(MLX)
   // MARK: - Granite Model
 
-  public struct GraniteMLXModel: MLXModel {
-    public typealias ModelConfiguration = GraniteConfiguration
+  public struct GraniteMLXProfile: MLXLLMModelProfile {
     public typealias Prompt = EdgeToolsLLMPrompt
     public typealias ToolCallParser = GraniteToolCallParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarCompiler = XGRCompiler
     public typealias GrammarContext = XGRGrammarContext
 
-    public let languageModel: GraniteModel
-
-    public init(configuration: GraniteConfiguration) {
-      self.languageModel = GraniteModel(configuration)
-    }
-
-    public var vocabularySize: Int { self.languageModel.vocabularySize }
-
-    public func toolCallGrammar(
+    public static func toolCallGrammar(
       tools: [EdgeToolDefinition],
       range: GrammarToolCallRange
     ) throws -> XGRGrammar {
@@ -34,27 +20,18 @@
     }
   }
 
-  public typealias GraniteMLXModelEngine = MLXEngine<GraniteMLXModel>
+  public typealias GraniteMLXModelEngine = MLXEngine<GraniteMLXProfile>
 
   // MARK: - GraniteMoeHybrid Model
 
-  public struct GraniteMoeHybridMLXModel: MLXModel {
-    public typealias ModelConfiguration = GraniteMoeHybridConfiguration
+  public struct GraniteMoeHybridMLXProfile: MLXLLMModelProfile {
     public typealias Prompt = EdgeToolsLLMPrompt
     public typealias ToolCallParser = GraniteToolCallParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarCompiler = XGRCompiler
     public typealias GrammarContext = XGRGrammarContext
 
-    public let languageModel: GraniteMoeHybridModel
-
-    public init(configuration: GraniteMoeHybridConfiguration) {
-      self.languageModel = GraniteMoeHybridModel(configuration)
-    }
-
-    public var vocabularySize: Int { self.languageModel.vocabularySize }
-
-    public func toolCallGrammar(
+    public static func toolCallGrammar(
       tools: [EdgeToolDefinition],
       range: GrammarToolCallRange
     ) throws -> XGRGrammar {
@@ -62,7 +39,7 @@
     }
   }
 
-  public typealias GraniteMoeHybridMLXModelEngine = MLXEngine<GraniteMoeHybridMLXModel>
+  public typealias GraniteMoeHybridMLXModelEngine = MLXEngine<GraniteMoeHybridMLXProfile>
 #endif
 
 // MARK: - Granite Tool Call Parsing

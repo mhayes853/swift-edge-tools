@@ -12,42 +12,46 @@
       self.url = url
     }
 
+    public func loadConfigurationData() throws -> Data {
+      let configurationURLs = [
+        self.url.appending(path: "configuration.json"),
+        self.url.appending(path: "config.json")
+      ]
+      guard
+        let configurationURL = configurationURLs.first(where: {
+          FileManager.default.fileExists(atPath: $0.path())
+        })
+      else {
+        throw EdgeToolsError.failedToLoadConfiguration
+      }
+      return try Data(contentsOf: configurationURL)
+    }
+
     public func loadConfiguration<Configuration: Decodable>(
       _ type: Configuration.Type,
       decoder: JSONDecoder = .json5()
     ) throws -> Configuration {
-      guard
-        let configuration = try decodeModelConfiguration(
-          type,
-          in: self.url,
-          decoder: decoder
-        )
-      else {
-        throw EdgeToolsError.failedToLoadConfiguration
-      }
-      return configuration
+      try decoder.decode(type, from: self.loadConfigurationData())
     }
 
     public func loadProcessorConfiguration<Configuration: Decodable>(
       _ type: Configuration.Type,
       decoder: JSONDecoder = .json5()
     ) throws -> Configuration {
+      try decoder.decode(type, from: self.loadProcessorConfigurationData())
+    }
+
+    public func loadProcessorConfigurationData() throws -> Data {
       let preprocessorURL = self.url.appending(path: "preprocessor_config.json")
-      let filename =
+      let processorURL = self.url.appending(path: "processor_config.json")
+      let url =
         FileManager.default.fileExists(atPath: preprocessorURL.path())
-        ? "preprocessor_config.json"
-        : "processor_config.json"
-      guard
-        let configuration = try decodeModelConfiguration(
-          type,
-          named: filename,
-          in: self.url,
-          decoder: decoder
-        )
-      else {
+        ? preprocessorURL
+        : processorURL
+      guard FileManager.default.fileExists(atPath: url.path()) else {
         throw EdgeToolsError.failedToLoadConfiguration
       }
-      return configuration
+      return try Data(contentsOf: url)
     }
 
     public func loadGenerationConfiguration(

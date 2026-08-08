@@ -2,31 +2,17 @@
   import EdgeToolsXGrammar
 #endif
 
-#if MLX && XGrammar && Transformers && canImport(MLX)
-  import _EdgeToolsFoundation
-  import MLX
-  import MLXLLM
-  import MLXLMCommon
-
+#if MLX && XGrammar && canImport(MLX)
   // MARK: - Qwen3 Model
 
-  public struct Qwen3MLXModel: MLXModel {
-    public typealias ModelConfiguration = Qwen3Configuration
+  public struct Qwen3MLXProfile: MLXLLMModelProfile {
     public typealias Prompt = EdgeToolsLLMPrompt
     public typealias ToolCallParser = Qwen3ToolCallParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarCompiler = XGRCompiler
     public typealias GrammarContext = XGRGrammarContext
 
-    public let languageModel: Qwen3Model
-
-    public init(configuration: Qwen3Configuration) {
-      self.languageModel = Qwen3Model(configuration)
-    }
-
-    public var vocabularySize: Int { self.languageModel.vocabularySize }
-
-    public func toolCallGrammar(
+    public static func toolCallGrammar(
       tools: [EdgeToolDefinition],
       range: GrammarToolCallRange
     ) throws -> XGRGrammar {
@@ -34,7 +20,7 @@
     }
   }
 
-  public typealias Qwen3MLXModelEngine = MLXEngine<Qwen3MLXModel>
+  public typealias Qwen3MLXModelEngine = MLXEngine<Qwen3MLXProfile>
 #endif
 
 // MARK: - Qwen3 Tool Call Parsing

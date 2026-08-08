@@ -254,8 +254,8 @@ let toolCallParserTestFixtures = [
     ]
   ),
   ToolCallParserTestFixture(
-    name: "LFM2 Python",
-    makeParser: { LFM2PythonToolCallParser() },
+    name: "LFM2P5 Python",
+    makeParser: { LFM2P5PythonToolCallParser() },
     noCalls: ["There are no tools to call."],
     emptyArguments: ["<|tool_call_start|>[empty()]<|tool_call_end|>"],
     complexCall: [

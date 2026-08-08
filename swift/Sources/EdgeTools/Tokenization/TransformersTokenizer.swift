@@ -45,17 +45,24 @@
 
   #if XGrammar
     extension TransformersTokenizer: XGRTokenizer {
-      public func tokenizerInfo(modelVocabularySize: Int? = nil) throws -> XGRTokenizerInfo {
+      public func tokenizerInfo(
+        modelVocabularySize: Int?,
+        extraStopTokenIds: Set<EdgeToolsToken.ID>
+      ) throws -> XGRTokenizerInfo {
         var vocabulary = [String]()
         while let token = self.convertIdToToken(vocabulary.count) {
           vocabulary.append(token)
         }
         let vocabularySize = max(modelVocabularySize ?? 0, vocabulary.count)
+        var stopTokenIds = extraStopTokenIds
+        if let eosTokenId = self.eosTokenId {
+          stopTokenIds.insert(eosTokenId)
+        }
         return try XGRTokenizerInfo.huggingFace(
           encodedVocabulary: vocabulary,
           backendJSON: self.backendJSON,
           modelVocabularySize: vocabularySize,
-          stopTokenIDs: self.eosTokenId.map { [$0] } ?? []
+          stopTokenIDs: stopTokenIds.sorted()
         )
       }
     }

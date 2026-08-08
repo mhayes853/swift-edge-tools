@@ -9,7 +9,7 @@
   import Testing
 
   @Suite(.serialized, .enabledIfXcode())
-  struct `NeedleMLXModel tests` {
+  struct `NeedleMLXProfile tests` {
     @Test
     @available(iOS 18.0, macOS 15.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
     func `TokenIterator Usage`() async throws {
@@ -17,9 +17,9 @@
       let directory = MLXModelDirectory(url: url)
       var tokenizer = try self.tokenizer(url: url)
       let configuration = try directory.loadConfiguration(NeedleModelConfiguration.self)
-      let wrappedModel = NeedleMLXModel(configuration: configuration)
-      try wrappedModel.loadWeights(from: directory)
-      let model = wrappedModel.languageModel
+      let profile = NeedleMLXProfile(configuration: configuration)
+      try profile.loadWeights(from: directory)
+      let model = profile.languageModel
       let tokenizerInfo = try XGRTokenizerInfo.needle(tokenizer: tokenizer)
       let grammarEngine = try XGRCompiler(tokenizerInfo: tokenizerInfo)
       let grammar = try XGRGrammar.needle(tools: [.sendEmail])
@@ -57,9 +57,9 @@
       let directory = MLXModelDirectory(url: url)
       let tokenizer = try self.tokenizer(url: url)
       let configuration = try directory.loadConfiguration(NeedleModelConfiguration.self)
-      let wrappedModel = NeedleMLXModel(configuration: configuration)
-      try wrappedModel.loadWeights(from: directory)
-      let model = wrappedModel.languageModel
+      let profile = NeedleMLXProfile(configuration: configuration)
+      try profile.loadWeights(from: directory)
+      let model = profile.languageModel
       let input = try LMInput.needle(
         prompt: .sendAdventureEmail,
         tools: [.sendEmail],
@@ -82,7 +82,7 @@
     }
   }
 
-  extension `NeedleMLXModel tests` {
+  extension `NeedleMLXProfile tests` {
     fileprivate static let parameters = GenerateParameters(maxTokens: 512, temperature: 0)
   }
 #endif
