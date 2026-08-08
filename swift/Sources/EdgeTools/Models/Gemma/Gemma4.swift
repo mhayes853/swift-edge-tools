@@ -73,7 +73,7 @@
         switch message {
         case .system:
           return try message.mlxMessage()
-        case .user(let text, let messageImages, audio: _):
+        case .user(let text, let messageImages, videos: _, audio: _):
           var content: [MLXLMCommon.Message] = messageImages.map { _ in ["type": "image"] }
           content.append(["type": "text", "text": text])
           return ["role": "user", "content": content]

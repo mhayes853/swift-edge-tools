@@ -58,7 +58,7 @@
   extension EdgeToolsLLMPrompt {
     fileprivate func lfm2P5VLUserInput(tools: [EdgeToolDefinition]) throws -> UserInput {
       try self.mlxUserInput(tools: tools) { message in
-        guard case .user(let text, let messageImages, audio: _) = message else {
+        guard case .user(let text, let messageImages, videos: _, audio: _) = message else {
           return try message.mlxMessage()
         }
         guard !messageImages.isEmpty else { return ["role": "user", "content": text] }
