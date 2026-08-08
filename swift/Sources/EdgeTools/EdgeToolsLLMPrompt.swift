@@ -9,14 +9,21 @@ public struct EdgeToolsLLMPrompt: Hashable, Sendable {
 
   public var images: [Asset] {
     self.messages.flatMap { message -> [Asset] in
-      guard case .user(_, let images, audio: _) = message else { return [] }
+      guard case .user(_, let images, videos: _, audio: _) = message else { return [] }
       return images
+    }
+  }
+
+  public var videos: [Asset] {
+    self.messages.flatMap { message -> [Asset] in
+      guard case .user(_, images: _, let videos, audio: _) = message else { return [] }
+      return videos
     }
   }
 
   public var audio: [Asset] {
     self.messages.flatMap { message -> [Asset] in
-      guard case .user(_, images: _, let audio) = message else { return [] }
+      guard case .user(_, images: _, videos: _, let audio) = message else { return [] }
       return audio
     }
   }
@@ -28,7 +35,7 @@ extension EdgeToolsLLMPrompt {
   @nonexhaustive
   public enum Message: Hashable, Sendable {
     case system(String)
-    case user(String, images: [Asset] = [], audio: [Asset] = [])
+    case user(String, images: [Asset] = [], videos: [Asset] = [], audio: [Asset] = [])
     case assistant(String? = nil, toolCalls: [EdgeRawToolCall] = [])
     case tool(name: String, response: EdgeToolsValue)
   }
@@ -94,7 +101,10 @@ public struct EdgeToolsMIMEType:
     case "heif": self = .heif
     case "jpg", "jpeg": self = .jpeg
     case "m4a": self = .m4a
+    case "m4v": self = .m4v
     case "mp3": self = .mp3
+    case "mp4": self = .mp4
+    case "mov": self = .quickTime
     case "ogg": self = .ogg
     case "opus": self = .opus
     case "png": self = .png
@@ -112,10 +122,13 @@ public struct EdgeToolsMIMEType:
   public static let heif = Self(rawValue: "image/heif")
   public static let jpeg = Self(rawValue: "image/jpeg")
   public static let m4a = Self(rawValue: "audio/mp4")
+  public static let m4v = Self(rawValue: "video/x-m4v")
   public static let mp3 = Self(rawValue: "audio/mpeg")
+  public static let mp4 = Self(rawValue: "video/mp4")
   public static let ogg = Self(rawValue: "audio/ogg")
   public static let opus = Self(rawValue: "audio/opus")
   public static let png = Self(rawValue: "image/png")
+  public static let quickTime = Self(rawValue: "video/quicktime")
   public static let wav = Self(rawValue: "audio/wav")
   public static let webP = Self(rawValue: "image/webp")
 }

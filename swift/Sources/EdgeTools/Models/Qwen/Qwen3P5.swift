@@ -25,6 +25,54 @@ import OrderedCollections
   public typealias Qwen3P5MLXModelEngine = MLXEngine<Qwen3P5MLXProfile>
 #endif
 
+#if MLX && XGrammar && canImport(CoreImage) && canImport(MLX) && canImport(MLXVLM)
+  import Foundation
+  import MLXLMCommon
+  import MLXVLM
+
+  // MARK: - Qwen3P5 VLM Model
+
+  public struct Qwen3P5VLMLXProfile: MLXVLMModelProfile {
+    public typealias Prompt = EdgeToolsLLMPrompt
+    public typealias ToolCallParser = Qwen3P5ToolCallParser
+    public typealias GenerateParameters = DefaultMLXGenerateParameters
+    public typealias GrammarCompiler = XGRCompiler
+    public typealias GrammarContext = XGRGrammarContext
+
+    public static func toolCallGrammar(
+      tools: [EdgeToolDefinition],
+      range: GrammarToolCallRange
+    ) throws -> XGRGrammar {
+      try .qwen3P5(tools: tools, range: range)
+    }
+
+    public static nonisolated(nonsending) func input(
+      prompt: EdgeToolsLLMPrompt,
+      tools: [EdgeToolDefinition],
+      tokenizer _: any EdgeToolsTokenizer,
+      processor: (any UserInputProcessor)?
+    ) async throws -> LMInput {
+      guard let processor else { throw EdgeToolsError.failedToLoadConfiguration }
+      return try await prompt.mlxVLMInput(
+        tools: tools,
+        processor: processor
+      ) { message in
+        switch message {
+        case .user(let text, let images, let videos, audio: _):
+          var content: [MLXLMCommon.Message] = images.map { _ in ["type": "image"] }
+          content.append(contentsOf: videos.map { _ in ["type": "video"] })
+          content.append(["type": "text", "text": text])
+          return ["role": "user", "content": content]
+        case .system, .assistant, .tool:
+          return try message.mlxMessage()
+        }
+      }
+    }
+  }
+
+  public typealias Qwen3P5VLMLXModelEngine = MLXEngine<Qwen3P5VLMLXProfile>
+#endif
+
 // MARK: - Qwen3P5 Tool Call Parsing
 
 public struct QwenXMLToolCallParser: EdgeToolCallParser, Sendable {
