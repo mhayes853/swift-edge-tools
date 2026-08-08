@@ -15,6 +15,10 @@ import Foundation
     try await downloadModel(id: "mlx-community/Qwen3.5-0.8B-MLX-4bit")
   }
 
+  func downloadQwen3P5VL() async throws -> URL {
+    try await downloadModel(id: "mlx-community/Qwen3.5-2B-4bit")
+  }
+
   func downloadFunctionGemma() async throws -> URL {
     try await downloadModel(id: "mlx-community/functiongemma-270m-it-4bit")
   }
