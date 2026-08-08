@@ -238,37 +238,19 @@
   {
     let video = try await redVideoAsset()
     defer { video.remove() }
-    var prompt = EdgeToolsLLMPrompt(messages: [
-      .system(
-        "Inspect the video and call reportColor with its dominant color. After the tool result, summarize it."
-      ),
-      .user("Report the dominant video color.", videos: [video.asset])
-    ])
-    let toolTask = try engine.generate(
-      prompt: prompt,
-      tools: [.colorTest],
-      parameters: DefaultMLXGenerateParameters(
-        constraint: .toolsWithGrammar(range: .exact(1)),
-        maxTokens: 128
-      ),
-      channel: EdgeToolsGenerationChannel()
+    let turn = try await completeToolTurn(
+      using: engine,
+      prompt: EdgeToolsLLMPrompt(messages: [
+        .system(
+          "Inspect the video and call reportColor with its dominant color. After the tool result, summarize it."
+        ),
+        .user("Report the dominant video color.", videos: [video.asset])
+      ]),
+      tool: .colorTest,
+      toolResponse: ["color": "red"],
+      toolMaxTokens: 128
     )
-    let toolGeneration = try await toolTask.value
-    guard !toolGeneration.toolCalls.isEmpty else {
-      throw MLXGenerationTestError.missingToolCall
-    }
-
-    prompt.messages.append(.assistant(toolCalls: toolGeneration.toolCalls))
-    prompt.messages.append(.tool(name: "reportColor", response: ["color": "red"]))
-    let responseTask = try engine.generate(
-      prompt: prompt,
-      tools: [],
-      parameters: DefaultMLXGenerateParameters(maxTokens: 64),
-      channel: EdgeToolsGenerationChannel()
-    )
-    let response = try await responseTask.value.response
-    guard !response.isEmpty else { throw MLXGenerationTestError.missingFinalResponse }
-    return VLMToolTurnSnapshot(toolCalls: toolGeneration.toolCalls, response: response)
+    return VLMToolTurnSnapshot(toolCalls: turn.toolCalls, response: turn.response)
   }
 
   private func redImageAsset() throws -> EdgeToolsLLMPrompt.Asset {
