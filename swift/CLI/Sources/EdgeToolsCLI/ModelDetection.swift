@@ -50,8 +50,8 @@ public enum DetectedModel: String, Hashable, Sendable, CaseIterable {
 
   public var supportedEngines: [EngineKind] {
     switch self {
-    case .needle: [.mlx, .onnx, .coreml, .coreai]
-    default: [.mlx]
+    case .needle: EngineKind.allCases.filter(\.isAvailable)
+    default: [.mlx].filter(\.isAvailable)
     }
   }
 }
@@ -76,6 +76,31 @@ public enum EngineKind: String, CaseIterable, Sendable {
 
   public var isExperimental: Bool {
     self == .coreai
+  }
+
+  public var isAvailable: Bool {
+    switch self {
+    case .mlx:
+      #if canImport(MLX)
+        true
+      #else
+        false
+      #endif
+    case .onnx:
+      true
+    case .coreml:
+      #if canImport(CoreML)
+        true
+      #else
+        false
+      #endif
+    case .coreai:
+      #if swift(>=6.4) && canImport(CoreAI)
+        true
+      #else
+        false
+      #endif
+    }
   }
 
   fileprivate func hasWeights(in files: [String]) -> Bool {

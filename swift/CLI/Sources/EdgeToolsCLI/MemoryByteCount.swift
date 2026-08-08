@@ -1,6 +1,7 @@
-import Darwin
 import Foundation
-import MLX
+#if canImport(MLX)
+  import MLX
+#endif
 
 // MARK: - PeakMemory
 
@@ -29,7 +30,11 @@ extension MemoryByteCount {
   }
 
   public static var peakGPU: Self {
-    Self(bytes: Memory.snapshot().peakMemory)
+    #if canImport(MLX)
+      Self(bytes: Memory.snapshot().peakMemory)
+    #else
+      Self(bytes: 0)
+    #endif
   }
 
   public var isEmpty: Bool { self.bytes <= 0 }

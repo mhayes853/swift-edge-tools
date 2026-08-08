@@ -1,3 +1,4 @@
+#if canImport(MLX)
 import EdgeTools
 import Foundation
 import MLXLMCommon
@@ -60,3 +61,4 @@ extension EdgeToolsLLMPrompt {
     }
   }
 }
+#endif

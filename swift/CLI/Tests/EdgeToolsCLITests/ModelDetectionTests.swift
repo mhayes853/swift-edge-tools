@@ -16,7 +16,7 @@ struct `ModelDetection tests` {
     let detection = try ModelDetection.detect(in: directory)
 
     expectNoDifference(detection.model, .needle)
-    expectNoDifference(detection.engines, [.mlx])
+    expectNoDifference(detection.engines, EngineKind.mlx.isAvailable ? [.mlx] : [])
   }
 
   @Test
@@ -120,7 +120,7 @@ struct `ModelDetection tests` {
 
     expectNoDifference(detection.model, .genericLLM)
     expectNoDifference(detection.model.modality, .text)
-    expectNoDifference(detection.engines, [.mlx])
+    expectNoDifference(detection.engines, EngineKind.mlx.isAvailable ? [.mlx] : [])
   }
 
   @Test(arguments: ["preprocessor_config.json", "processor_config.json"])
@@ -161,7 +161,7 @@ struct `ModelDetection tests` {
     )
     let detection = try ModelDetection.detect(in: directory)
 
-    expectNoDifference(detection.engines, [.coreai])
+    expectNoDifference(detection.engines, EngineKind.coreai.isAvailable ? [.coreai] : [])
     expectNoDifference(detection.defaultEngine, nil)
   }
 
@@ -175,8 +175,9 @@ struct `ModelDetection tests` {
     )
     let detection = try ModelDetection.detect(in: directory)
 
-    expectNoDifference(detection.engines, [.mlx, .coreai])
-    expectNoDifference(detection.defaultEngine, .mlx)
+    let expectedEngines = [EngineKind.mlx, .coreai].filter(\.isAvailable)
+    expectNoDifference(detection.engines, expectedEngines)
+    expectNoDifference(detection.defaultEngine, EngineKind.mlx.isAvailable ? .mlx : nil)
   }
 
   @Test
