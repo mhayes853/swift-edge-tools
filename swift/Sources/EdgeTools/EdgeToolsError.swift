@@ -22,6 +22,7 @@ public struct EdgeToolsError: Error, Hashable, Sendable {
     public static let invalidJSONValue = Self(rawValue: "invalid-json-value")
     public static let contextLengthExceeded = Self(rawValue: "context-length-exceeded")
     public static let failedToLoadConfiguration = Self(rawValue: "failed-to-load-configuration")
+    public static let missingModelWeights = Self(rawValue: "missing-model-weights")
     public static let unsupportedTokenizer = Self(rawValue: "unsupported-tokenizer")
     public static let grammarRejectedToken = Self(rawValue: "grammar-rejected-token")
     public static let missingModelOutputs = Self(rawValue: "missing-model-outputs")
@@ -108,6 +109,10 @@ extension EdgeToolsError {
   static let failedToLoadConfiguration = Self(
     code: .failedToLoadConfiguration,
     message: "Could not load model configuration."
+  )
+  static let missingModelWeights = Self(
+    code: .missingModelWeights,
+    message: "No safetensor model weights were found."
   )
   static let unsupportedTokenizer = Self(
     code: .unsupportedTokenizer,

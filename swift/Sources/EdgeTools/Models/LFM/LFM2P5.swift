@@ -1,11 +1,9 @@
-#if XGrammar
-  import EdgeToolsXGrammar
-#endif
-
 #if MLX && XGrammar && canImport(MLX)
-  public struct FunctionGemmaMLXProfile: MLXLLMModelProfile {
+  import EdgeToolsXGrammar
+
+  public struct LFM2P5MLXProfile: MLXLLMModelProfile {
     public typealias Prompt = EdgeToolsLLMPrompt
-    public typealias ToolCallParser = FunctionGemmaToolCallParser
+    public typealias ToolCallParser = LFM2P5ToolCallParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarCompiler = XGRCompiler
     public typealias GrammarContext = XGRGrammarContext
@@ -14,9 +12,9 @@
       tools: [EdgeToolDefinition],
       range: GrammarToolCallRange
     ) throws -> XGRGrammar {
-      try .functionGemma(tools: tools, range: range)
+      try .lfm2P5(tools: tools, range: range)
     }
   }
 
-  public typealias FunctionGemmaMLXModelEngine = MLXEngine<FunctionGemmaMLXProfile>
+  public typealias LFM2P5MLXModelEngine = MLXEngine<LFM2P5MLXProfile>
 #endif

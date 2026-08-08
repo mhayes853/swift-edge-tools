@@ -19,7 +19,7 @@ import Foundation
     try await downloadModel(id: "mlx-community/functiongemma-270m-it-4bit")
   }
 
-  func downloadLFM2() async throws -> URL {
+  func downloadLFM2P5() async throws -> URL {
     try await downloadModel(id: "LiquidAI/LFM2.5-230M-MLX-4bit")
   }
 

@@ -100,12 +100,11 @@
     @Test
     func `Generate With Untied Word Embeddings`() async throws {
       let directoryURL = try await downloadNeedle()
-      var configuration = try #require(
-        try decodeModelConfiguration(NeedleModelConfiguration.self, in: directoryURL)
-      )
+      let directory = MLXModelDirectory(url: directoryURL)
+      var configuration = try directory.loadConfiguration(NeedleModelConfiguration.self)
       configuration.tieWordEmbeddings = false
       let engine = try await Engine(
-        from: directoryURL,
+        from: directory,
         configuration: configuration
       )
 

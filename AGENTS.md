@@ -65,9 +65,13 @@ Separate significant sections of functionallity or types with MARK comments. MAR
 
 Try not to be overly verbose, focus on making things condensed.
 
+Try to prioritize using Collections/Sequence algorithms over doing things with loops as long as it doesn't look too crazy.
+
 Private helper functions should go at the bottom of the file, not the top.
 
 DO NOT ASSUME WASI IS A SINGLE THREADED ENVIRONMENT. It is not ok to conform types to `@unchecked Sendable` just because they have a member variable that uses a type from `JavaScriptKit`, and because "JS is single-threaded". `JavaScriptKit` does not conform most of its types to Sendable because Swift WASM supports sdks that enable multithreading through web workers or other means.
+
+If a lot of public APIs are using shared package or internal scoped APIs, it's likely that the API should also be public since it has inherent useful reusability. That is, users should get the same tools as us to make their own abstractions.
 
 ## Testing
 

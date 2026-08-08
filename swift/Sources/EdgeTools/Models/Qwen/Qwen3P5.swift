@@ -4,31 +4,17 @@ import OrderedCollections
   import EdgeToolsXGrammar
 #endif
 
-#if MLX && XGrammar && Transformers && canImport(MLX)
-  import _EdgeToolsFoundation
-  import MLX
-  import MLXLLM
-  import MLXLMCommon
-
+#if MLX && XGrammar && canImport(MLX)
   // MARK: - Qwen3P5 Model
 
-  public struct Qwen3P5MLXModel: MLXModel {
-    public typealias ModelConfiguration = Qwen35Configuration
+  public struct Qwen3P5MLXProfile: MLXLLMModelProfile {
     public typealias Prompt = EdgeToolsLLMPrompt
     public typealias ToolCallParser = Qwen3P5ToolCallParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarCompiler = XGRCompiler
     public typealias GrammarContext = XGRGrammarContext
 
-    public let languageModel: Qwen35Model
-
-    public init(configuration: Qwen35Configuration) {
-      self.languageModel = Qwen35Model(configuration)
-    }
-
-    public var vocabularySize: Int { self.languageModel.vocabularySize }
-
-    public func toolCallGrammar(
+    public static func toolCallGrammar(
       tools: [EdgeToolDefinition],
       range: GrammarToolCallRange
     ) throws -> XGRGrammar {
@@ -36,9 +22,7 @@ import OrderedCollections
     }
   }
 
-  public typealias Qwen35MLXModel = Qwen3P5MLXModel
-  public typealias Qwen35MLXModelEngine = MLXEngine<Qwen3P5MLXModel>
-  public typealias Qwen3P5MLXModelEngine = MLXEngine<Qwen3P5MLXModel>
+  public typealias Qwen3P5MLXModelEngine = MLXEngine<Qwen3P5MLXProfile>
 #endif
 
 // MARK: - Qwen3P5 Tool Call Parsing

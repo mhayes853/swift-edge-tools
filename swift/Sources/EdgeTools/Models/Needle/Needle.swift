@@ -160,7 +160,7 @@ public struct NeedlePrompt: Hashable, Sendable {
 
 // MARK: - NeedleModelInput
 
-public struct NeedleModelInput: Hashable, Sendable {
+public struct NeedleModelInput: EdgeToolsModelInput, Hashable, Sendable {
   public var prompt: NeedlePrompt
   public var tools: [EdgeToolDefinition]
   public var tokenIds: [EdgeToolsToken.ID]
@@ -277,7 +277,10 @@ public protocol NeedleGenerateParameters: EdgeToolsEngineGenerateParameters {
       guard let tokenizer = tokenizer as? any XGRTokenizer else {
         throw EdgeToolsError.unsupportedTokenizer
       }
-      let tokenizerInfo = try tokenizer.tokenizerInfo(modelVocabularySize: self.vocabularySize)
+      let tokenizerInfo = try tokenizer.tokenizerInfo(
+        modelVocabularySize: self.vocabularySize,
+        extraStopTokenIds: self.extraStopTokenIds
+      )
       return XGRGrammarContext(tokenizerInfo: tokenizerInfo)
     }
 
@@ -306,19 +309,22 @@ public protocol NeedleGenerateParameters: EdgeToolsEngineGenerateParameters {
   extension XGRTokenizerInfo {
     public static func needle(
       tokenizer: some XGRTokenizer,
-      vocabularySize: Int = .needleVocabularySize
+      vocabularySize: Int = .needleVocabularySize,
+      stopTokenIds: Set<EdgeToolsToken.ID> = []
     ) throws -> XGRTokenizerInfo {
       try Self.needle(
         vocabulary: tokenizer.convertIdsToTokens(Array(0..<vocabularySize)),
         eosTokenID: tokenizer.eosTokenId,
-        vocabularySize: vocabularySize
+        vocabularySize: vocabularySize,
+        stopTokenIds: stopTokenIds
       )
     }
 
     private static func needle(
       vocabulary: [String?],
       eosTokenID: EdgeToolsToken.ID?,
-      vocabularySize: Int
+      vocabularySize: Int,
+      stopTokenIds: Set<EdgeToolsToken.ID>
     ) throws -> XGRTokenizerInfo {
       guard let eosTokenID, vocabulary.allSatisfy({ $0 != nil }) else {
         throw XGRError(
@@ -326,11 +332,13 @@ public protocol NeedleGenerateParameters: EdgeToolsEngineGenerateParameters {
           message: "Needle requires a tokenizer with an EOS token and full vocabulary."
         )
       }
+      var stopTokenIds = stopTokenIds
+      stopTokenIds.insert(eosTokenID)
       return try XGRTokenizerInfo(
         encodedVocabulary: vocabulary.compactMap { $0 },
         vocabularyType: .byteFallback,
         vocabularySize: vocabularySize,
-        stopTokenIDs: [eosTokenID],
+        stopTokenIDs: stopTokenIds.sorted(),
         addPrefixSpace: true
       )
     }

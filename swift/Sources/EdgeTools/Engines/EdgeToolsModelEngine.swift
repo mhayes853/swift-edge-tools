@@ -6,22 +6,6 @@
   import Atomics
   import OrderedCollections
 
-  // MARK: - EdgeToolsModelInput
-
-  public struct EdgeToolsModelInput<Value> {
-    public var value: Value
-    public var tokenIds: [EdgeToolsToken.ID]
-
-    public init(value: Value, tokenIds: [EdgeToolsToken.ID]) {
-      self.value = value
-      self.tokenIds = tokenIds
-    }
-  }
-
-  extension EdgeToolsModelInput: Equatable where Value: Equatable {}
-  extension EdgeToolsModelInput: Hashable where Value: Hashable {}
-  extension EdgeToolsModelInput: Sendable where Value: Sendable {}
-
   // MARK: - EdgeToolsModelPreparation
 
   public struct EdgeToolsModelPreparation: Sendable {
@@ -53,7 +37,7 @@
 
   public protocol EdgeToolsModel: SendableMetatype {
     associatedtype Prompt: Sendable
-    associatedtype Input
+    associatedtype Input: EdgeToolsModelInput
     associatedtype GenerateParameters: EdgeToolsEngineGenerateParameters
     associatedtype ToolCallParser: EdgeToolCallParser
     associatedtype GrammarContext = Void
@@ -81,7 +65,7 @@
       prompt: Prompt,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer
-    ) async throws -> EdgeToolsModelInput<Input>
+    ) async throws -> Input
 
     nonisolated(nonsending) mutating func prepare(
       input: Input,
@@ -276,7 +260,7 @@
       var matcher = try self.matcher(grammar: grammar, stopTokenIds: stopTokenIds)
       let generateStart = self.clock.now
       let input = try await model.input(prompt: prompt, tools: tools, tokenizer: self.tokenizer)
-      var preparation = try await model.prepare(input: input.value, parameters: parameters)
+      var preparation = try await model.prepare(input: input, parameters: parameters)
       var detokenizer = StreamingDetokenizer()
       var parser = Model.ToolCallParser()
       var generatedTokens = [EdgeToolsToken]()
@@ -394,7 +378,7 @@
           tools: tools,
           tokenizer: self.tokenizer
         )
-        let prefill = try await model.prefill(input: input.value)
+        let prefill = try await model.prefill(input: input)
         self.model = model
         await self.generationGate.release()
         return prefill
