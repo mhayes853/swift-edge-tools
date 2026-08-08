@@ -160,7 +160,7 @@ public struct NeedlePrompt: Hashable, Sendable {
 
 // MARK: - NeedleModelInput
 
-public struct NeedleModelInput: Hashable, Sendable {
+public struct NeedleModelInput: EdgeToolsModelInput, Hashable, Sendable {
   public var prompt: NeedlePrompt
   public var tools: [EdgeToolDefinition]
   public var tokenIds: [EdgeToolsToken.ID]

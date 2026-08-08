@@ -319,10 +319,9 @@
         prompt: NeedlePrompt,
         tools: [EdgeToolDefinition],
         tokenizer: any EdgeToolsTokenizer
-      ) async throws -> EdgeToolsModelInput<LMInput> {
+      ) async throws -> LMInput {
         let input = try LMInput.needle(prompt: prompt, tools: tools, using: tokenizer)
-        let tokenIds = input.text.tokens.asArray(EdgeToolsToken.ID.self)
-        return EdgeToolsModelInput(value: input, tokenIds: tokenIds)
+        return input
       }
     }
 

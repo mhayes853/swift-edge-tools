@@ -393,9 +393,9 @@
       prompt: NeedlePrompt,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer
-    ) throws -> EdgeToolsModelInput<[EdgeToolsToken.ID]> {
+    ) throws -> [EdgeToolsToken.ID] {
       let tokenIds = try tokenizer.encode(text: prompt.formatted(tools: tools))
-      return EdgeToolsModelInput(value: tokenIds, tokenIds: tokenIds)
+      return tokenIds
     }
 
     public nonisolated(nonsending) mutating func prepare(

@@ -58,7 +58,7 @@
       prompt: Prompt,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer
-    ) async throws -> EdgeToolsModelInput<LMInput>
+    ) async throws -> LMInput
   }
 
   extension MLXModel
@@ -91,6 +91,12 @@
         model: self.languageModel,
         perLayerQuantization: baseConfiguration.perLayerQuantization
       )
+    }
+  }
+
+  extension LMInput: EdgeToolsModelInput {
+    public var tokenIds: [EdgeToolsToken.ID] {
+      self.text.tokens.asArray(EdgeToolsToken.ID.self)
     }
   }
 
@@ -205,7 +211,7 @@
         prompt: EdgeToolsLLMPrompt,
         tools: [EdgeToolDefinition],
         tokenizer: any EdgeToolsTokenizer
-      ) async throws -> EdgeToolsModelInput<LMInput> {
+      ) async throws -> LMInput {
         guard let tokenizer = tokenizer as? TransformersTokenizer else {
           throw EdgeToolsError.unsupportedTokenizer
         }
@@ -214,10 +220,7 @@
           tools: tools.mlxToolSpecs,
           additionalContext: nil
         )
-        return EdgeToolsModelInput(
-          value: LMInput(tokens: MLXArray(tokenIds)),
-          tokenIds: tokenIds
-        )
+        return LMInput(tokens: MLXArray(tokenIds))
       }
     }
 
@@ -440,7 +443,7 @@
       prompt: Model.Prompt,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer
-    ) async throws -> EdgeToolsModelInput<LMInput> {
+    ) async throws -> LMInput {
       try await self.model.input(prompt: prompt, tools: tools, tokenizer: tokenizer)
     }
 

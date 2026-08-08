@@ -108,7 +108,7 @@
       prompt: EdgeToolsLLMPrompt,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer
-    ) async throws -> EdgeToolsModelInput<LMInput> {
+    ) async throws -> LMInput {
       guard let tokenizer = tokenizer as? TransformersTokenizer else {
         throw EdgeToolsError.unsupportedTokenizer
       }
@@ -117,8 +117,7 @@
         tokenizer: #adaptHuggingFaceTokenizer(tokenizer.base)
       )
       let input = try await processor.prepare(input: try prompt.gemma4UserInput(tools: tools))
-      let tokenIds = input.text.tokens.asArray(EdgeToolsToken.ID.self)
-      return EdgeToolsModelInput(value: input, tokenIds: tokenIds)
+      return input
     }
   }
 
