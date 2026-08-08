@@ -18,49 +18,18 @@
     Engine.Prompt == EdgeToolsLLMPrompt,
     Engine.GenerateParameters == DefaultMLXGenerateParameters
   {
-    var transcript = EdgeToolsLLMPrompt.weatherTest
-    let toolParameters = DefaultMLXGenerateParameters(
-      constraint: .toolsWithGrammar(range: .exact(1)),
-      maxTokens: 256
+    try await completeToolTurn(
+      using: engine,
+      prompt: .weatherTest,
+      tool: .weatherTest,
+      toolResponse: [
+        "location": "Paris",
+        "condition": "sunny",
+        "temperatureCelsius": 21
+      ],
+      toolMaxTokens: 256
     )
-    let responseParameters = DefaultMLXGenerateParameters(
-      constraint: .unconstrained,
-      maxTokens: 64
-    )
-
-    let toolGenerationTask = try engine.generate(
-      prompt: transcript,
-      tools: [.weatherTest],
-      parameters: toolParameters,
-      channel: EdgeToolsGenerationChannel()
-    )
-    let toolGeneration = try await toolGenerationTask.value
-    guard !toolGeneration.toolCalls.isEmpty else {
-      throw MLXGenerationTestError.missingToolCall
-    }
-    transcript.messages.append(.assistant(toolCalls: toolGeneration.toolCalls))
-    transcript.messages.append(
-      .tool(
-        name: "getWeather",
-        response: [
-          "location": "Paris",
-          "condition": "sunny",
-          "temperatureCelsius": 21
-        ]
-      )
-    )
-
-    let responseGenerationTask = try engine.generate(
-      prompt: transcript,
-      tools: [],
-      parameters: responseParameters,
-      channel: EdgeToolsGenerationChannel()
-    )
-    let responseGeneration = try await responseGenerationTask.value
-    let response = responseGeneration.response
-    guard !response.isEmpty else { throw MLXGenerationTestError.missingFinalResponse }
-    transcript.messages.append(.assistant(response))
-    return transcript
+    .transcript
   }
 
   extension EdgeToolsLLMPrompt {
@@ -140,37 +109,71 @@
     Engine.Prompt == EdgeToolsLLMPrompt,
     Engine.GenerateParameters == DefaultMLXGenerateParameters
   {
-    var prompt = EdgeToolsLLMPrompt(messages: [
-      .system(
-        "Inspect the image and call reportColor with its dominant color. After the tool result, summarize it."
-      ),
-      .user("Report the dominant image color.", images: [try redImageAsset()])
-    ])
-    let toolTask = try engine.generate(
-      prompt: prompt,
-      tools: [.colorTest],
+    let turn = try await completeToolTurn(
+      using: engine,
+      prompt: EdgeToolsLLMPrompt(messages: [
+        .system(
+          "Inspect the image and call reportColor with its dominant color. After the tool result, summarize it."
+        ),
+        .user("Report the dominant image color.", images: [try redImageAsset()])
+      ]),
+      tool: .colorTest,
+      toolResponse: ["color": "red"],
+      toolMaxTokens: 128
+    )
+    return VLMToolTurnSnapshot(toolCalls: turn.toolCalls, response: turn.response)
+  }
+
+  private func completeToolTurn<Engine: EdgeToolsEngine>(
+    using engine: Engine,
+    prompt: EdgeToolsLLMPrompt,
+    tool: EdgeToolDefinition,
+    toolResponse: EdgeToolsValue,
+    toolMaxTokens: Int
+  ) async throws -> (
+    transcript: EdgeToolsLLMPrompt,
+    toolCalls: [EdgeRawToolCall],
+    response: String
+  )
+  where
+    Engine.Prompt == EdgeToolsLLMPrompt,
+    Engine.GenerateParameters == DefaultMLXGenerateParameters
+  {
+    var transcript = prompt
+    let toolGenerationTask = try engine.generate(
+      prompt: transcript,
+      tools: [tool],
       parameters: DefaultMLXGenerateParameters(
         constraint: .toolsWithGrammar(range: .exact(1)),
-        maxTokens: 128
+        maxTokens: toolMaxTokens
       ),
       channel: EdgeToolsGenerationChannel()
     )
-    let toolGeneration = try await toolTask.value
+    let toolGeneration = try await toolGenerationTask.value
     guard !toolGeneration.toolCalls.isEmpty else {
       throw MLXGenerationTestError.missingToolCall
     }
 
-    prompt.messages.append(.assistant(toolCalls: toolGeneration.toolCalls))
-    prompt.messages.append(.tool(name: "reportColor", response: ["color": "red"]))
-    let responseTask = try engine.generate(
-      prompt: prompt,
+    transcript.messages.append(.assistant(toolCalls: toolGeneration.toolCalls))
+    transcript.messages.append(.tool(name: tool.name, response: toolResponse))
+
+    let responseGenerationTask = try engine.generate(
+      prompt: transcript,
       tools: [],
       parameters: DefaultMLXGenerateParameters(maxTokens: 64),
       channel: EdgeToolsGenerationChannel()
     )
-    let response = try await responseTask.value.response
-    guard !response.isEmpty else { throw MLXGenerationTestError.missingFinalResponse }
-    return VLMToolTurnSnapshot(toolCalls: toolGeneration.toolCalls, response: response)
+    let responseGeneration = try await responseGenerationTask.value
+    guard !responseGeneration.response.isEmpty else {
+      throw MLXGenerationTestError.missingFinalResponse
+    }
+
+    transcript.messages.append(.assistant(responseGeneration.response))
+    return (
+      transcript: transcript,
+      toolCalls: toolGeneration.toolCalls,
+      response: responseGeneration.response
+    )
   }
 
   private func redImageAsset() throws -> EdgeToolsLLMPrompt.Asset {
