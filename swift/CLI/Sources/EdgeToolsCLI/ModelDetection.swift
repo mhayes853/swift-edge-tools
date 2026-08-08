@@ -81,7 +81,7 @@ public struct ModelDetection: Hashable, Sendable {
   }
 
   public var defaultEngine: EngineKind? {
-    self.engines.first { !$0.isExperimental }
+    self.engines.first { self.model.supportedEngines.contains($0) && !$0.isExperimental }
   }
 
   public var unavailableEngines: [EngineKind] {

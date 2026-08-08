@@ -7,6 +7,7 @@ import MLXLMCommon
 // MARK: - EngineRunner
 
 public struct EngineRunner: Sendable {
+  public let engine: EngineKind
   public let supportsCustomGrammar: Bool
   public let supportsSampling: Bool
   public let usesMLX: Bool
@@ -17,6 +18,7 @@ public struct EngineRunner: Sendable {
   private let cacheClearing: @Sendable () async -> Void
 
   public init(
+    engine: EngineKind = .mlx,
     supportsCustomGrammar: Bool,
     supportsSampling: Bool,
     usesMLX: Bool = false,
@@ -26,6 +28,7 @@ public struct EngineRunner: Sendable {
       ) async throws -> EdgeToolsEngineGeneration,
     cacheClearing: @escaping @Sendable () async -> Void = {}
   ) {
+    self.engine = engine
     self.supportsCustomGrammar = supportsCustomGrammar
     self.supportsSampling = supportsSampling
     self.usesMLX = usesMLX
@@ -49,6 +52,7 @@ public struct EngineRunner: Sendable {
 
 extension EngineRunner {
   private init<Engine: EdgeToolsEngine>(
+    engineKind: EngineKind,
     engine: Engine,
     supportsCustomGrammar: Bool,
     supportsSampling: Bool,
@@ -58,6 +62,7 @@ extension EngineRunner {
     cacheClearing: @escaping @Sendable () async -> Void
   ) {
     self.init(
+      engine: engineKind,
       supportsCustomGrammar: supportsCustomGrammar,
       supportsSampling: supportsSampling,
       usesMLX: usesMLX,
@@ -80,38 +85,71 @@ extension EngineRunner {
 extension EngineRunner {
   public init(
     detection: ModelDetection,
-    engine: EngineKind,
+    requestedEngine: EngineKind? = nil,
     hardwareUnit: MLXHardwareUnit = .gpu
   ) async throws {
+    try await self.init(
+      detection: detection,
+      requestedEngine: requestedEngine,
+      hardwareUnit: hardwareUnit,
+      loader: Self.load
+    )
+  }
+
+  public init(
+    detection: ModelDetection,
+    requestedEngine: EngineKind?,
+    hardwareUnit: MLXHardwareUnit,
+    loader: @Sendable (ModelDetection, EngineKind, MLXHardwareUnit) async throws -> EngineRunner
+  ) async throws {
+    let engine = try resolvedEngine(requested: requestedEngine, detection: detection)
+    let implementation = try await loader(detection, engine, hardwareUnit)
+    self.init(
+      engine: engine,
+      supportsCustomGrammar: implementation.supportsCustomGrammar,
+      supportsSampling: implementation.supportsSampling,
+      usesMLX: implementation.usesMLX,
+      generation: implementation.generation,
+      cacheClearing: implementation.cacheClearing
+    )
+  }
+
+  private static func load(
+    detection: ModelDetection,
+    engine: EngineKind,
+    hardwareUnit: MLXHardwareUnit
+  ) async throws -> Self {
     let directory = detection.directory
     switch (detection.model, engine) {
     case (.needle, .mlx):
-      self = try await Self.needleMLX(from: directory, hardwareUnit: hardwareUnit)
-    case (.needle, .onnx): self = try await Self.needleONNX(from: directory)
-    case (.needle, .coreml): self = try await Self.needleCoreML(from: directory)
-    case (.needle, .coreai): self = try await Self.needleCoreAI(from: directory)
-    case (.qwen3, _):
-      self = try await Self.llm(Qwen3MLXModel.self, from: directory, hardwareUnit: hardwareUnit)
-    case (.qwen3P5, _):
-      self = try await Self.llm(Qwen3P5MLXModel.self, from: directory, hardwareUnit: hardwareUnit)
-    case (.lfm2, _):
-      self = try await Self.llm(LFM2MLXModel.self, from: directory, hardwareUnit: hardwareUnit)
-    case (.functionGemma, _):
-      self = try await Self.llm(
+      return try await Self.needleMLX(from: directory, hardwareUnit: hardwareUnit)
+    case (.needle, .onnx): return try await Self.needleONNX(from: directory)
+    case (.needle, .coreml): return try await Self.needleCoreML(from: directory)
+    case (.needle, .coreai): return try await Self.needleCoreAI(from: directory)
+    case (.qwen3, .mlx):
+      return try await Self.llm(Qwen3MLXModel.self, from: directory, hardwareUnit: hardwareUnit)
+    case (.qwen3P5, .mlx):
+      return try await Self.llm(Qwen3P5MLXModel.self, from: directory, hardwareUnit: hardwareUnit)
+    case (.lfm2, .mlx):
+      return try await Self.llm(LFM2MLXModel.self, from: directory, hardwareUnit: hardwareUnit)
+    case (.functionGemma, .mlx):
+      return try await Self.llm(
         FunctionGemmaMLXModel.self,
         from: directory,
         hardwareUnit: hardwareUnit
       )
-    case (.granite, _):
-      self = try await Self.llm(GraniteMLXModel.self, from: directory, hardwareUnit: hardwareUnit)
-    case (.graniteMoeHybrid, _):
-      self = try await Self.llm(
+    case (.granite, .mlx):
+      return try await Self.llm(GraniteMLXModel.self, from: directory, hardwareUnit: hardwareUnit)
+    case (.graniteMoeHybrid, .mlx):
+      return try await Self.llm(
         GraniteMoeHybridMLXModel.self,
         from: directory,
         hardwareUnit: hardwareUnit
       )
-    case (.miniCPM5, _):
-      self = try await Self.llm(MiniCPM5MLXModel.self, from: directory, hardwareUnit: hardwareUnit)
+    case (.miniCPM5, .mlx):
+      return try await Self.llm(MiniCPM5MLXModel.self, from: directory, hardwareUnit: hardwareUnit)
+    default:
+      throw EdgeCLIError("\(detection.model.displayName) does not support the \(engine.rawValue) engine.")
     }
   }
 
@@ -123,6 +161,7 @@ extension EngineRunner {
       try await NeedleMLXModelEngine(from: directory)
     }
     return Self(
+      engineKind: .mlx,
       engine: engine,
       supportsCustomGrammar: false,
       supportsSampling: true,
@@ -142,6 +181,7 @@ extension EngineRunner {
   private static func needleONNX(from directory: URL) async throws -> Self {
     let engine = try await NeedleCONNXModelEngine(from: directory)
     return Self(
+      engineKind: .onnx,
       engine: engine,
       supportsCustomGrammar: false,
       supportsSampling: false,
@@ -162,6 +202,7 @@ extension EngineRunner {
       modelConfiguration: MLModelConfiguration()
     )
     return Self(
+      engineKind: .coreml,
       engine: engine,
       supportsCustomGrammar: false,
       supportsSampling: false,
@@ -184,6 +225,7 @@ extension EngineRunner {
       }
       let engine = try await NeedleCoreAIModelEngine(modelDirectoryURL: directory)
       return Self(
+        engineKind: .coreai,
         engine: engine,
         supportsCustomGrammar: false,
         supportsSampling: false,
@@ -217,6 +259,7 @@ extension EngineRunner {
       try await MLXEngine<Model>(from: directory)
     }
     return Self(
+      engineKind: .mlx,
       engine: engine,
       supportsCustomGrammar: true,
       supportsSampling: true,
@@ -237,6 +280,37 @@ extension EngineRunner {
       cacheClearing: { await engine.clearCaches() }
     )
   }
+}
+
+private func resolvedEngine(
+  requested: EngineKind?,
+  detection: ModelDetection
+) throws -> EngineKind {
+  let available = detection.engines.filter(detection.model.supportedEngines.contains)
+  if let requested {
+    guard available.contains(requested) else {
+      throw EdgeCLIError(
+        """
+        The \(requested.rawValue) engine has no weights for \
+        \(detection.model.displayName) here. Available: \
+        \(available.map(\.rawValue).joined(separator: ", ")).
+        """
+      )
+    }
+    return requested
+  }
+  if let defaultEngine = available.first(where: { !$0.isExperimental }) {
+    return defaultEngine
+  }
+  let experimental = available.filter(\.isExperimental).map(\.rawValue)
+  throw EdgeCLIError(
+    """
+    No usable engine for \(detection.model.displayName) in \(detection.directory.path()). \
+    \(experimental.isEmpty
+      ? "Supported engines: \(detection.model.supportedEngines.map(\.rawValue).joined(separator: ", "))."
+      : "Select one explicitly with --engine: \(experimental.joined(separator: ", ")).")
+    """
+  )
 }
 
 private func needlePrompt(for request: GenerationRequest) -> NeedlePrompt {

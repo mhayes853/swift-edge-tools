@@ -10,8 +10,6 @@ public struct PeakMemory: Hashable, Sendable {
 
   public static let zero = Self(resident: MemoryByteCount(bytes: 0), gpu: MemoryByteCount(bytes: 0))
 
-  // Sampling the GPU allocator requires a working Metal device, so this is reached through
-  // `EdgeContext` rather than called directly.
   public static var current: Self {
     Self(resident: .peakResident, gpu: .peakGPU)
   }
@@ -31,7 +29,7 @@ extension MemoryByteCount {
   }
 
   public static var peakGPU: Self {
-    Self(bytes: GPU.snapshot().peakMemory)
+    Self(bytes: Memory.snapshot().peakMemory)
   }
 
   public var isEmpty: Bool { self.bytes <= 0 }

@@ -32,6 +32,19 @@ extension ModelSource {
   public func resolve(
     onDownloadStart: @Sendable (String) -> Void = { _ in }
   ) async throws -> URL {
+    try await self.resolve(onDownloadStart: onDownloadStart) { repo, revision, cacheDirectory in
+      let hub = HubApi(downloadBase: cacheDirectory)
+      return try await hub.snapshot(
+        from: Hub.Repo(id: repo, type: .models),
+        revision: revision
+      )
+    }
+  }
+
+  public func resolve(
+    onDownloadStart: @Sendable (String) -> Void = { _ in },
+    snapshot: @Sendable (String, String, URL) async throws -> URL
+  ) async throws -> URL {
     switch self.location {
     case .filesystem(let url):
       let standardized = url.standardizedFileURL
@@ -46,19 +59,8 @@ extension ModelSource {
       return standardized
 
     case .huggingFace(let repo, let revision):
-      let hub = HubApi(downloadBase: self.cacheDirectory)
-      let repository = Hub.Repo(id: repo, type: .models)
-      let destination = hub.localRepoLocation(repository)
-      if revision == "main", isPopulated(destination) {
-        return destination
-      }
       onDownloadStart(repo)
-      return try await hub.snapshot(from: repository, revision: revision)
+      return try await snapshot(repo, revision, self.cacheDirectory)
     }
   }
-}
-
-private func isPopulated(_ directory: URL) -> Bool {
-  let contents = try? FileManager.default.contentsOfDirectory(atPath: directory.path())
-  return !(contents ?? []).isEmpty
 }

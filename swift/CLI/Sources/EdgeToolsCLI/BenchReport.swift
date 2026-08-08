@@ -48,11 +48,14 @@ public struct Distribution: Encodable, Equatable, Sendable {
   }
 }
 
-func percentile(_ values: [Double], _ fraction: Double) -> Double {
+private func percentile(_ values: [Double], _ fraction: Double) -> Double {
   guard !values.isEmpty else { return 0 }
   let sorted = values.sorted()
-  let index = Int((Double(sorted.count - 1) * fraction).rounded())
-  return sorted[index]
+  let position = Double(sorted.count - 1) * fraction
+  let lower = Int(position.rounded(.down))
+  let upper = Int(position.rounded(.up))
+  guard lower != upper else { return sorted[lower] }
+  return sorted[lower] + (sorted[upper] - sorted[lower]) * (position - Double(lower))
 }
 
 // MARK: - Rendering

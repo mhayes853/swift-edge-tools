@@ -105,9 +105,22 @@ struct GenerationOptions: ParsableArguments {
 
   init() {}
 
-  var settings: GenerationSettings {
-    GenerationSettings(
+  func validate() throws {
+    if self.toolCalls == .none, self.maxToolCalls != nil {
+      throw ValidationError("--max-tool-calls cannot be used with --tool-calls none.")
+    }
+    if let maximum = self.maxToolCalls, maximum < self.toolCalls.minimumCalls {
+      throw ValidationError(
+        "--max-tool-calls must be at least \(self.toolCalls.minimumCalls) for --tool-calls \(self.toolCalls.rawValue)."
+      )
+    }
+  }
+
+  func request(prompt: String, tools: [EdgeToolDefinition]) -> GenerationRequest {
+    GenerationRequest(
       system: self.system,
+      user: prompt,
+      tools: tools,
       grammar: self.grammar,
       toolCallRange: self.toolCallRange,
       maxTokens: self.maxTokens,
@@ -121,13 +134,12 @@ struct GenerationOptions: ParsableArguments {
     guard let maximum = self.maxToolCalls else {
       return self.toolCalls == .none ? .exact(0) : .unbounded(minimum: minimum)
     }
-    return .bounded(minimum...Swift.max(minimum, maximum))
+    return .bounded(minimum...maximum)
   }
 
-  func resolvedPrompt() throws -> String {
+  func resolvedPrompt(input: () -> String) throws -> String {
     if let prompt { return prompt }
-    let input = AnyIterator { readLine(strippingNewline: false) }.joined()
-    let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+    let trimmed = input().trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else {
       throw ValidationError("No prompt. Pass --prompt or pipe one in on stdin.")
     }

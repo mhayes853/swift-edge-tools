@@ -1,212 +1,121 @@
 import EdgeTools
 import Foundation
 
-// MARK: - RunAction
+// MARK: - Run
 
-public struct RunAction: Sendable {
-  public var context: EdgeContext
-  public var source: ModelSource
-  public var requestedEngine: EngineKind?
-  public var hardwareUnit: MLXHardwareUnit
-  public var settings: GenerationSettings
-  public var stream: StreamOption
-  public var quiet: Bool
+public func runModel(
+  context: EdgeContext,
+  source: ModelSource,
+  requestedEngine: EngineKind? = nil,
+  hardwareUnit: MLXHardwareUnit = .gpu,
+  request: GenerationRequest,
+  stream: StreamOption = .none,
+  onOutput: @escaping @Sendable (String, String) -> Void = { _, _ in },
+  onWarning: @escaping @Sendable (String) -> Void = { _ in }
+) async throws -> RunReport {
+  let loaded = try await LoadedModel.load(
+    context: context,
+    source: source,
+    requestedEngine: requestedEngine,
+    hardwareUnit: hardwareUnit,
+    onWarning: onWarning
+  )
+  let request = try loaded.validate(request)
+  let start = context.now()
+  let printer = StreamPrinter(mode: stream, start: start, output: onOutput)
+  let generation = try await loaded.generate(
+    request,
+    hardwareUnit: hardwareUnit,
+    onToken: { printer.token($0) },
+    onToolCall: { printer.toolCall($0) }
+  )
+  printer.finish()
+  let peakMemory = context.peakMemory()
 
-  public init(
-    context: EdgeContext,
-    source: ModelSource,
-    requestedEngine: EngineKind? = nil,
-    hardwareUnit: MLXHardwareUnit = .gpu,
-    settings: GenerationSettings = GenerationSettings(),
-    stream: StreamOption = .none,
-    quiet: Bool = true
-  ) {
-    self.context = context
-    self.source = source
-    self.requestedEngine = requestedEngine
-    self.hardwareUnit = hardwareUnit
-    self.settings = settings
-    self.stream = stream
-    self.quiet = quiet
-  }
-
-  public func callAsFunction(
-    prompt: String,
-    tools: [EdgeToolDefinition] = []
-  ) async throws -> RunReport {
-    let loaded = try await LoadedModel.load(
-      context: self.context,
-      source: self.source,
-      requestedEngine: self.requestedEngine,
-      hardwareUnit: self.hardwareUnit,
-      quiet: self.quiet
-    )
-    let request = try loaded.makeRequest(
-      settings: self.settings,
-      prompt: prompt,
-      tools: tools
-    )
-
-    let clock = ContinuousClock()
-    let start = clock.now
-    let printer = StreamPrinter(mode: self.stream, start: start)
-    let generation = try await if loaded.runner.usesMLX {
-      try await self.hardwareUnit.withDefaultDevice {
-        try await loaded.runner.generate(
-          request,
-          channel: EdgeToolsGenerationChannel(
-            onToken: { printer.token($0) },
-            onToolCall: { printer.toolCall($0) }
-          )
-        )
-      }
-    } else {
-      try await loaded.runner.generate(
-        request,
-        channel: EdgeToolsGenerationChannel(
-          onToken: { printer.token($0) },
-          onToolCall: { printer.toolCall($0) }
-        )
-      )
-    }
-    printer.finish()
-    let peakMemory = self.context.peakMemory()
-
-    return RunReport(
-      model: loaded.detection.model.displayName,
-      engine: loaded.engine.rawValue,
-      response: generation.response,
-      wasStopped: generation.wasStopped,
-      toolCalls: generation.toolCalls.map {
-        RunReport.ToolCall(name: $0.name, arguments: $0.arguments)
-      },
-      metrics: RunReport.Metrics(
-        load: loaded.loadDuration,
-        endToEnd: start.duration(to: clock.now),
-        prefill: generation.prefillMetrics,
-        decode: generation.decodeMetrics,
-        peakResident: peakMemory.resident,
-        peakGPU: peakMemory.gpu
-      )
-    )
-  }
-}
-
-// MARK: - BenchAction
-
-public struct BenchAction: Sendable {
-  public var context: EdgeContext
-  public var source: ModelSource
-  public var requestedEngine: EngineKind?
-  public var hardwareUnit: MLXHardwareUnit
-  public var settings: GenerationSettings
-  public var runs: Int
-  public var warmup: Int
-  public var quiet: Bool
-
-  public init(
-    context: EdgeContext,
-    source: ModelSource,
-    requestedEngine: EngineKind? = nil,
-    hardwareUnit: MLXHardwareUnit = .gpu,
-    settings: GenerationSettings = GenerationSettings(),
-    runs: Int = 10,
-    warmup: Int = 2,
-    quiet: Bool = true
-  ) {
-    self.context = context
-    self.source = source
-    self.requestedEngine = requestedEngine
-    self.hardwareUnit = hardwareUnit
-    self.settings = settings
-    self.runs = runs
-    self.warmup = warmup
-    self.quiet = quiet
-  }
-
-  public func callAsFunction(
-    prompt: String,
-    tools: [EdgeToolDefinition] = [],
-    onProgress: @Sendable (Int, Int) -> Void = { _, _ in }
-  ) async throws -> BenchReport {
-    let loaded = try await LoadedModel.load(
-      context: self.context,
-      source: self.source,
-      requestedEngine: self.requestedEngine,
-      hardwareUnit: self.hardwareUnit,
-      quiet: self.quiet
-    )
-    let request = try loaded.makeRequest(
-      settings: self.settings,
-      prompt: prompt,
-      tools: tools
-    )
-
-    for _ in 0..<self.warmup {
-      _ = try await self.generate(request, with: loaded.runner)
-    }
-
-    let clock = ContinuousClock()
-    var samples = [BenchSample]()
-    for index in 0..<self.runs {
-      onProgress(index + 1, self.runs)
-      await loaded.runner.reset()
-      let start = clock.now
-      let generation = try await self.generate(request, with: loaded.runner)
-      samples.append(
-        BenchSample(
-          endToEnd: start.duration(to: clock.now),
-          prefill: generation.prefillMetrics,
-          decode: generation.decodeMetrics,
-          madeToolCalls: !generation.toolCalls.isEmpty
-        )
-      )
-    }
-
-    let peakMemory = self.context.peakMemory()
-    return BenchReport(
-      model: loaded.detection.model.displayName,
-      engine: loaded.engine.rawValue,
-      runs: samples.count,
-      warmup: self.warmup,
-      samples: samples,
+  return RunReport(
+    model: loaded.detection.model.displayName,
+    engine: loaded.runner.engine.rawValue,
+    response: generation.response,
+    wasStopped: generation.wasStopped,
+    toolCalls: generation.toolCalls.map {
+      RunReport.ToolCall(name: $0.name, arguments: $0.arguments)
+    },
+    metrics: RunReport.Metrics(
+      load: loaded.loadDuration,
+      endToEnd: start.duration(to: context.now()),
+      prefill: generation.prefillMetrics,
+      decode: generation.decodeMetrics,
       peakResident: peakMemory.resident,
       peakGPU: peakMemory.gpu
     )
-  }
-
-  private func generate(
-    _ request: GenerationRequest,
-    with runner: EngineRunner
-  ) async throws -> EdgeToolsEngineGeneration {
-    if runner.usesMLX {
-      return try await self.hardwareUnit.withDefaultDevice {
-        try await runner.generate(request)
-      }
-    }
-    return try await runner.generate(request)
-  }
+  )
 }
 
-// MARK: - InfoAction
+// MARK: - Benchmark
 
-public struct InfoAction: Sendable {
-  public var context: EdgeContext
-  public var source: ModelSource
-  public var quiet: Bool
+public func benchmarkModel(
+  context: EdgeContext,
+  source: ModelSource,
+  requestedEngine: EngineKind? = nil,
+  hardwareUnit: MLXHardwareUnit = .gpu,
+  request: GenerationRequest,
+  runs: Int,
+  warmup: Int,
+  onWarning: @escaping @Sendable (String) -> Void = { _ in },
+  onProgress: @Sendable (Int, Int) -> Void = { _, _ in }
+) async throws -> BenchReport {
+  let loaded = try await LoadedModel.load(
+    context: context,
+    source: source,
+    requestedEngine: requestedEngine,
+    hardwareUnit: hardwareUnit,
+    onWarning: onWarning
+  )
+  let request = try loaded.validate(request)
 
-  public init(context: EdgeContext, source: ModelSource, quiet: Bool = true) {
-    self.context = context
-    self.source = source
-    self.quiet = quiet
+  for _ in 0..<warmup {
+    _ = try await loaded.generate(request, hardwareUnit: hardwareUnit)
   }
 
-  public func callAsFunction() async throws -> InfoReport {
-    let directory = try await self.context.resolveDirectory(self.source) { repo in
-      if !self.quiet { warn("downloading \(repo)...") }
-    }
-    return InfoReport(detection: try self.context.detectModel(directory))
+  var samples = [BenchSample]()
+  for index in 0..<runs {
+    onProgress(index + 1, runs)
+    await loaded.runner.reset()
+    let start = context.now()
+    let generation = try await loaded.generate(request, hardwareUnit: hardwareUnit)
+    samples.append(
+      BenchSample(
+        endToEnd: start.duration(to: context.now()),
+        prefill: generation.prefillMetrics,
+        decode: generation.decodeMetrics,
+        madeToolCalls: !generation.toolCalls.isEmpty
+      )
+    )
   }
+
+  let peakMemory = context.peakMemory()
+  return BenchReport(
+    model: loaded.detection.model.displayName,
+    engine: loaded.runner.engine.rawValue,
+    runs: samples.count,
+    warmup: warmup,
+    samples: samples,
+    peakResident: peakMemory.resident,
+    peakGPU: peakMemory.gpu
+  )
+}
+
+// MARK: - Info
+
+public func inspectModel(
+  context: EdgeContext,
+  source: ModelSource,
+  onWarning: @escaping @Sendable (String) -> Void = { _ in }
+) async throws -> InfoReport {
+  let directory = try await context.resolveDirectory(source) { repo in
+    onWarning("downloading \(repo)...")
+  }
+  return InfoReport(detection: try context.detectModel(directory))
 }
 
 // MARK: - BenchSample

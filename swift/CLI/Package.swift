@@ -18,7 +18,8 @@ let package = Package(
     .package(url: "https://github.com/huggingface/swift-transformers", from: "1.3.0"),
     .package(url: "https://github.com/ml-explore/mlx-swift-lm", from: "3.31.3"),
     .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.31.3"),
-    .package(url: "https://github.com/pointfreeco/swift-custom-dump", from: "1.6.1")
+    .package(url: "https://github.com/pointfreeco/swift-custom-dump", from: "1.6.1"),
+    .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.18.0")
   ],
   targets: [
     .executableTarget(
@@ -45,9 +46,11 @@ let package = Package(
       name: "EdgeToolsCLITests",
       dependencies: [
         "EdgeToolsCLI",
-        .product(name: "CustomDump", package: "swift-custom-dump")
+        .product(name: "CustomDump", package: "swift-custom-dump"),
+        .product(name: "SnapshotTesting", package: "swift-snapshot-testing")
       ],
-      path: "Tests/EdgeToolsCLITests"
+      path: "Tests/EdgeToolsCLITests",
+      exclude: ["__Snapshots__"]
     )
   ],
   swiftLanguageModes: [.v6],

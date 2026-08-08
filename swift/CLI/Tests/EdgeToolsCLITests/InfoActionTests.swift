@@ -7,16 +7,14 @@ import Testing
 struct `InfoAction tests` {
   @Test
   func `Reports The Detected Model And Engines`() async throws {
-    let action = InfoAction(
+    let report = try await inspectModel(
       context: .stub(
         directory: URL(fileURLWithPath: "/models/needle"),
         engines: [.mlx, .onnx],
         files: ["config.json", "encoder.onnx", "model.safetensors"]
       ),
-      source: .test(),
-      quiet: true
+      source: .test()
     )
-    let report = try await action()
 
     expectNoDifference(report.model, "Needle")
     expectNoDifference(report.engines, ["mlx", "onnx"])
@@ -26,12 +24,10 @@ struct `InfoAction tests` {
 
   @Test
   func `Marks Experimental Engines And Leaves No Default`() async throws {
-    let action = InfoAction(
+    let report = try await inspectModel(
       context: .stub(engines: [.coreai], files: ["configuration.json", "encoder.aimodel"]),
-      source: .test(),
-      quiet: true
+      source: .test()
     )
-    let report = try await action()
 
     expectNoDifference(report.experimentalEngines, ["coreai"])
     expectNoDifference(report.defaultEngine, nil)
@@ -42,22 +38,18 @@ struct `InfoAction tests` {
   func `Propagates Detection Failures`() async {
     var context = EdgeContext.stub()
     context.detectModel = { _ in throw EdgeCLIError("no config") }
-    let action = InfoAction(context: context, source: .test(), quiet: true)
-
     await #expect(throws: EdgeCLIError("no config")) {
-      try await action()
+      try await inspectModel(context: context, source: .test())
     }
   }
 
   @Test
   func `Resolves The Source Described By The Model Options`() async throws {
     let sources = LockedBox<ModelSource?>(nil)
-    let action = InfoAction(
+    _ = try await inspectModel(
       context: .stub(onResolve: { sources.value = $0 }),
-      source: .test(repo: "org/model"),
-      quiet: true
+      source: .test(repo: "org/model")
     )
-    _ = try await action()
 
     expectNoDifference(
       try #require(sources.value).location,

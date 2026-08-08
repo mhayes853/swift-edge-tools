@@ -1,0 +1,6 @@
+/models/needle
+  model       Needle
+  engines     mlx · onnx
+              defaults to mlx
+              coreml · coreai — no weights here
+  files       config.json · decoder.onnx · model.safetensors

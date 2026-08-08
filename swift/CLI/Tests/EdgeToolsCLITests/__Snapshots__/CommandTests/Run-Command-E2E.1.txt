@@ -1,0 +1,15 @@
+Timer ready.
+
+Tool calls
+  1. set_timer
+     {
+       "duration" : "5 minutes"
+     }
+
+Model   Needle
+Engine  mlx
+Load    0ms
+Memory  0 MB peak RSS
+Prefill 10 tok  5ms  2000.0 tok/s
+Decode  2 tok  20ms  100.0 tok/s  TTFT 2ms
+E2E     0ms (excludes load)
