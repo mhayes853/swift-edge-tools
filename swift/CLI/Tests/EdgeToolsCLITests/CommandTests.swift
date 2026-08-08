@@ -70,14 +70,14 @@ struct `Command tests` {
   }
 
   @Test
-  func `Rejects Maximum Tool Calls When Calls Are Disabled`() async {
+  func `Rejects Maximum Tool Calls Below Minimum Tool Calls`() async {
     let (context, _) = EdgeContext.test()
 
     do {
       try await EdgeCommand.run(
         arguments: [
           "--path", "/models/needle", "--prompt", "hello",
-          "--tool-calls", "none", "--max-tool-calls", "2"
+          "--min-tool-calls", "3", "--max-tool-calls", "2"
         ],
         context: context
       )
@@ -85,7 +85,7 @@ struct `Command tests` {
     } catch {
       expectNoDifference(
         EdgeCommand.message(for: error),
-        "--max-tool-calls cannot be used with --tool-calls none."
+        "--max-tool-calls must be at least --min-tool-calls."
       )
     }
   }

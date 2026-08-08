@@ -95,10 +95,10 @@ struct GenerationOptions: ParsableArguments {
   var topP: Float = 1
 
   @Option(
-    name: .customLong("tool-calls"),
-    help: "Whether tool calls are required: auto, required, none."
+    name: .customLong("min-tool-calls"),
+    help: "The minimum number of tool calls to constrain to."
   )
-  var toolCalls: ToolCallsOption = .auto
+  var minToolCalls: Int?
 
   @Option(
     name: .customLong("max-tool-calls"),
@@ -112,13 +112,11 @@ struct GenerationOptions: ParsableArguments {
     if let image = self.image, !FileManager.default.fileExists(atPath: image) {
       throw ValidationError("No image at \(image).")
     }
-    if self.toolCalls == .none, self.maxToolCalls != nil {
-      throw ValidationError("--max-tool-calls cannot be used with --tool-calls none.")
+    if let minimum = self.minToolCalls, minimum < 0 {
+      throw ValidationError("--min-tool-calls must be at least 0.")
     }
-    if let maximum = self.maxToolCalls, maximum < self.toolCalls.minimumCalls {
-      throw ValidationError(
-        "--max-tool-calls must be at least \(self.toolCalls.minimumCalls) for --tool-calls \(self.toolCalls.rawValue)."
-      )
+    if let maximum = self.maxToolCalls, maximum < self.minToolCalls ?? 0 {
+      throw ValidationError("--max-tool-calls must be at least --min-tool-calls.")
     }
   }
 
@@ -137,9 +135,9 @@ struct GenerationOptions: ParsableArguments {
   }
 
   private var toolCallRange: GrammarToolCallRange {
-    let minimum = self.toolCalls.minimumCalls
+    let minimum = self.minToolCalls ?? 0
     guard let maximum = self.maxToolCalls else {
-      return self.toolCalls == .none ? .exact(0) : .unbounded(minimum: minimum)
+      return .unbounded(minimum: minimum)
     }
     return .bounded(minimum...maximum)
   }
@@ -156,21 +154,6 @@ struct GenerationOptions: ParsableArguments {
   func toolDefinitions() throws -> [EdgeToolDefinition] {
     guard let tools else { return defaultToolDefinitions }
     return try ToolsFile(contentsOf: URL(fileURLWithPath: tools)).definitions
-  }
-}
-
-// MARK: - ToolCallsOption
-
-public enum ToolCallsOption: String, ExpressibleByArgument, CaseIterable, Sendable {
-  case auto
-  case required
-  case none
-
-  var minimumCalls: Int {
-    switch self {
-    case .auto, .none: 0
-    case .required: 1
-    }
   }
 }
 
