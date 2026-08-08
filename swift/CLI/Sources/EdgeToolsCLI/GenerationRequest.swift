@@ -3,6 +3,7 @@ import EdgeTools
 public struct GenerationRequest: Sendable {
   public var system: String
   public var user: String
+  public var images: [EdgeToolsLLMPrompt.Asset]
   public var tools: [EdgeToolDefinition]
   public var grammar: GrammarOption
   public var toolCallRange: GrammarToolCallRange
@@ -13,6 +14,7 @@ public struct GenerationRequest: Sendable {
   public init(
     system: String = "",
     user: String,
+    images: [EdgeToolsLLMPrompt.Asset] = [],
     tools: [EdgeToolDefinition] = [],
     grammar: GrammarOption = .auto,
     toolCallRange: GrammarToolCallRange = .unbounded(minimum: 0),
@@ -22,6 +24,7 @@ public struct GenerationRequest: Sendable {
   ) {
     self.system = system
     self.user = user
+    self.images = images
     self.tools = tools
     self.grammar = grammar
     self.toolCallRange = toolCallRange

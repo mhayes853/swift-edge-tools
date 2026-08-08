@@ -94,4 +94,37 @@ struct `RunAction tests` {
 
     expectNoDifference(try #require(error).description.contains("greedily"), true)
   }
+
+  @Test
+  func `Throws When Images Are Unsupported By The Engine`() async throws {
+    let error = await #expect(throws: EdgeCLIError.self) {
+      try await runModel(
+        context: .stub(runner: .stub(supportsImages: false)),
+        source: .test(),
+        request: GenerationRequest(user: "hello", images: [Asset(path: "/tmp/cat.png")])
+      )
+    }
+
+    expectNoDifference(try #require(error).description.contains("--image"), true)
+  }
+
+  @Test
+  func `Forwards Images To A Vision Engine`() async throws {
+    let requests = LockedBox([GenerationRequest]())
+    _ = try await runModel(
+      context: .stub(
+        model: .genericVLM,
+        runner: .stub(
+          supportsImages: true,
+          onGenerate: { request in requests.withValue { $0.append(request) } }
+        )
+      ),
+      source: .test(),
+      request: GenerationRequest(user: "hello", images: [Asset(path: "/tmp/cat.png")])
+    )
+
+    expectNoDifference(requests.value.first?.images, [Asset(path: "/tmp/cat.png")])
+  }
 }
+
+private typealias Asset = EdgeToolsLLMPrompt.Asset

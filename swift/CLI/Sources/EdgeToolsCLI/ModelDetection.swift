@@ -8,9 +8,18 @@ public enum DetectedModel: String, Hashable, Sendable, CaseIterable {
   case qwen3P5
   case lfm2
   case functionGemma
+  case gemma4
   case granite
   case graniteMoeHybrid
   case miniCPM5
+  case lfm2P5VL
+  case genericLLM
+  case genericVLM
+
+  public enum Modality: String, Hashable, Sendable, CaseIterable {
+    case text
+    case vision
+  }
 
   public var displayName: String {
     switch self {
@@ -19,9 +28,23 @@ public enum DetectedModel: String, Hashable, Sendable, CaseIterable {
     case .qwen3P5: "Qwen3.5"
     case .lfm2: "LFM2"
     case .functionGemma: "FunctionGemma"
+    case .gemma4: "Gemma4"
     case .granite: "Granite"
     case .graniteMoeHybrid: "Granite MoE Hybrid"
     case .miniCPM5: "MiniCPM5"
+    case .lfm2P5VL: "LFM2.5 VL"
+    case .genericLLM: "Generic LLM"
+    case .genericVLM: "Generic VLM"
+    }
+  }
+
+  public var modality: Modality {
+    switch self {
+    case .needle, .qwen3, .qwen3P5, .lfm2, .functionGemma, .granite, .graniteMoeHybrid,
+      .miniCPM5, .genericLLM:
+      .text
+    case .gemma4, .lfm2P5VL, .genericVLM:
+      .vision
     }
   }
 
@@ -111,13 +134,11 @@ extension ModelDetection {
 
 private struct ConfigurationHeader: Decodable {
   let modelType: String?
-  let architectures: [String]?
   let encoderLayers: Int?
   let decoderStartTokenId: Int?
 
   enum CodingKeys: String, CodingKey {
     case modelType = "model_type"
-    case architectures
     case encoderLayers = "num_encoder_layers"
     case decoderStartTokenId = "decoder_start_token_id"
   }
@@ -141,19 +162,16 @@ private func detectedModel(in directory: URL, files: [String]) throws -> Detecte
   case "qwen3": return .qwen3
   case "qwen3_5", "qwen3_5_text": return .qwen3P5
   case "lfm2": return .lfm2
+  case "lfm2_vl", "lfm2-vl": return .lfm2P5VL
   case "gemma3", "gemma3_text": return .functionGemma
+  case "gemma4", "gemma4_unified": return .gemma4
   case "granite": return .granite
   case "granitemoehybrid": return .graniteMoeHybrid
   case "llama" where chatTemplate(in: directory, files: files)?.contains("<function") == true:
     return .miniCPM5
   default:
-    let described = header.modelType ?? header.architectures?.first ?? "unspecified"
-    throw EdgeCLIError(
-      """
-      Unsupported model \(described) in \(directory.path()). Supported models: \
-      \(DetectedModel.allCases.map(\.displayName).joined(separator: ", ")).
-      """
-    )
+    return files.contains { $0 == "preprocessor_config.json" || $0 == "processor_config.json" }
+      ? .genericVLM : .genericLLM
   }
 }
 

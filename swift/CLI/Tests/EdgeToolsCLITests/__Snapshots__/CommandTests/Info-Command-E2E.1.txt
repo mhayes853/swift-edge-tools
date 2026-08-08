@@ -1,5 +1,6 @@
 /models/needle
   model       Needle
+  modality    text
   engines     mlx · onnx
               defaults to mlx
               coreml · coreai — no weights here

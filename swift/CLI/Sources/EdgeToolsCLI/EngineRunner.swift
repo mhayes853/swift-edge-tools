@@ -10,6 +10,7 @@ public struct EngineRunner: Sendable {
   public let engine: EngineKind
   public let supportsCustomGrammar: Bool
   public let supportsSampling: Bool
+  public let supportsImages: Bool
   public let usesMLX: Bool
 
   private let generation:
@@ -21,6 +22,7 @@ public struct EngineRunner: Sendable {
     engine: EngineKind = .mlx,
     supportsCustomGrammar: Bool,
     supportsSampling: Bool,
+    supportsImages: Bool = false,
     usesMLX: Bool = false,
     generation:
       @escaping @Sendable (
@@ -31,6 +33,7 @@ public struct EngineRunner: Sendable {
     self.engine = engine
     self.supportsCustomGrammar = supportsCustomGrammar
     self.supportsSampling = supportsSampling
+    self.supportsImages = supportsImages
     self.usesMLX = usesMLX
     self.generation = generation
     self.cacheClearing = cacheClearing
@@ -56,6 +59,7 @@ extension EngineRunner {
     engine: Engine,
     supportsCustomGrammar: Bool,
     supportsSampling: Bool,
+    supportsImages: Bool = false,
     usesMLX: Bool = false,
     prompt: @escaping @Sendable (GenerationRequest) -> Engine.Prompt,
     parameters: @escaping @Sendable (GenerationRequest) throws -> sending Engine.GenerateParameters,
@@ -65,6 +69,7 @@ extension EngineRunner {
       engine: engineKind,
       supportsCustomGrammar: supportsCustomGrammar,
       supportsSampling: supportsSampling,
+      supportsImages: supportsImages,
       usesMLX: usesMLX,
       generation: { request, channel in
         let task = try engine.generate(
@@ -108,6 +113,7 @@ extension EngineRunner {
       engine: engine,
       supportsCustomGrammar: implementation.supportsCustomGrammar,
       supportsSampling: implementation.supportsSampling,
+      supportsImages: implementation.supportsImages,
       usesMLX: implementation.usesMLX,
       generation: implementation.generation,
       cacheClearing: implementation.cacheClearing
@@ -126,30 +132,50 @@ extension EngineRunner {
     case (.needle, .onnx): return try await Self.needleONNX(from: directory)
     case (.needle, .coreml): return try await Self.needleCoreML(from: directory)
     case (.needle, .coreai): return try await Self.needleCoreAI(from: directory)
-    case (.qwen3, .mlx):
-      return try await Self.llm(Qwen3MLXModel.self, from: directory, hardwareUnit: hardwareUnit)
+    case (.qwen3, .mlx), (.genericLLM, .mlx):
+      return try await Self.mlx(hardwareUnit: hardwareUnit) {
+        try await Qwen3MLXModelEngine(from: directory)
+      }
     case (.qwen3P5, .mlx):
-      return try await Self.llm(Qwen3P5MLXModel.self, from: directory, hardwareUnit: hardwareUnit)
+      return try await Self.mlx(hardwareUnit: hardwareUnit) {
+        try await Qwen3P5MLXModelEngine(from: directory)
+      }
     case (.lfm2, .mlx):
-      return try await Self.llm(LFM2MLXModel.self, from: directory, hardwareUnit: hardwareUnit)
+      return try await Self.mlx(hardwareUnit: hardwareUnit) {
+        try await LFM2P5MLXModelEngine(from: directory)
+      }
     case (.functionGemma, .mlx):
-      return try await Self.llm(
-        FunctionGemmaMLXModel.self,
-        from: directory,
-        hardwareUnit: hardwareUnit
-      )
+      return try await Self.mlx(hardwareUnit: hardwareUnit) {
+        try await FunctionGemmaMLXModelEngine(from: directory)
+      }
     case (.granite, .mlx):
-      return try await Self.llm(GraniteMLXModel.self, from: directory, hardwareUnit: hardwareUnit)
+      return try await Self.mlx(hardwareUnit: hardwareUnit) {
+        try await GraniteMLXModelEngine(from: directory)
+      }
     case (.graniteMoeHybrid, .mlx):
-      return try await Self.llm(
-        GraniteMoeHybridMLXModel.self,
-        from: directory,
-        hardwareUnit: hardwareUnit
-      )
+      return try await Self.mlx(hardwareUnit: hardwareUnit) {
+        try await GraniteMoeHybridMLXModelEngine(from: directory)
+      }
     case (.miniCPM5, .mlx):
-      return try await Self.llm(MiniCPM5MLXModel.self, from: directory, hardwareUnit: hardwareUnit)
+      return try await Self.mlx(hardwareUnit: hardwareUnit) {
+        try await MiniCPM5MLXModelEngine(from: directory)
+      }
+    case (.gemma4, .mlx):
+      return try await Self.mlx(hardwareUnit: hardwareUnit, supportsImages: true) {
+        try await Gemma4MLXModelEngine(from: directory)
+      }
+    case (.lfm2P5VL, .mlx):
+      return try await Self.mlx(hardwareUnit: hardwareUnit, supportsImages: true) {
+        try await LFM2P5VLMLXModelEngine(from: directory)
+      }
+    case (.genericVLM, .mlx):
+      return try await Self.mlx(hardwareUnit: hardwareUnit, supportsImages: true) {
+        try await GenericVLMMLXModelEngine(from: directory)
+      }
     default:
-      throw EdgeCLIError("\(detection.model.displayName) does not support the \(engine.rawValue) engine.")
+      throw EdgeCLIError(
+        "\(detection.model.displayName) does not support the \(engine.rawValue) engine."
+      )
     }
   }
 
@@ -243,33 +269,28 @@ extension EngineRunner {
     #endif
   }
 
-  private static func llm<Model: MLXModel>(
-    _ model: Model.Type,
-    from directory: URL,
-    hardwareUnit: MLXHardwareUnit
+  private static func mlx<Profile: MLXModelProfile>(
+    hardwareUnit: MLXHardwareUnit,
+    supportsImages: Bool = false,
+    make: () async throws -> MLXEngine<Profile>
   ) async throws -> Self
   where
-    Model.Prompt == EdgeToolsLLMPrompt,
-    Model.GenerateParameters == DefaultMLXGenerateParameters,
-    Model.GrammarCompiler == XGRCompiler,
-    Model.GrammarContext == XGRGrammarContext,
-    Model.ModelConfiguration: Decodable
+    Profile.Prompt == EdgeToolsLLMPrompt,
+    Profile.GenerateParameters == DefaultMLXGenerateParameters,
+    Profile.GrammarCompiler == XGRCompiler,
+    Profile.GrammarContext == XGRGrammarContext
   {
     let engine = try await Device.withDefaultDevice(hardwareUnit.device) {
-      try await MLXEngine<Model>(from: directory)
+      try await make()
     }
     return Self(
       engineKind: .mlx,
       engine: engine,
       supportsCustomGrammar: true,
       supportsSampling: true,
+      supportsImages: supportsImages,
       usesMLX: true,
-      prompt: { request in
-        var messages = [EdgeToolsLLMPrompt.Message]()
-        if !request.system.isEmpty { messages.append(.system(request.system)) }
-        messages.append(.user(request.user))
-        return EdgeToolsLLMPrompt(messages: messages)
-      },
+      prompt: llmPrompt,
       parameters: { request in
         DefaultMLXGenerateParameters(
           sampler: mlxSampler(for: request),
@@ -315,6 +336,13 @@ private func resolvedEngine(
 
 private func needlePrompt(for request: GenerationRequest) -> NeedlePrompt {
   NeedlePrompt(system: request.system, user: request.user)
+}
+
+private func llmPrompt(for request: GenerationRequest) -> EdgeToolsLLMPrompt {
+  var messages = [EdgeToolsLLMPrompt.Message]()
+  if !request.system.isEmpty { messages.append(.system(request.system)) }
+  messages.append(.user(request.user, images: request.images))
+  return EdgeToolsLLMPrompt(messages: messages)
 }
 
 private func mlxSampler(for request: GenerationRequest) -> any LogitSampler {

@@ -5,6 +5,7 @@ import Foundation
 public struct InfoReport: Encodable {
   public let directory: String
   public let model: String
+  public let modality: String
   public let engines: [String]
   public let unavailableEngines: [String]
   public let defaultEngine: String?
@@ -14,6 +15,7 @@ public struct InfoReport: Encodable {
   public init(detection: ModelDetection) {
     self.directory = detection.directory.path()
     self.model = detection.model.displayName
+    self.modality = detection.model.modality.rawValue
     self.engines = detection.engines.map(\.rawValue)
     self.unavailableEngines = detection.unavailableEngines.map(\.rawValue)
     self.defaultEngine = detection.defaultEngine?.rawValue
@@ -32,6 +34,7 @@ extension InfoReport {
     var lines = [
       self.directory,
       "  model       \(self.model)",
+      "  modality    \(self.modality)",
       "  engines     \(described.isEmpty ? "none" : described.joined(separator: " · "))"
     ]
     if let defaultEngine = self.defaultEngine {

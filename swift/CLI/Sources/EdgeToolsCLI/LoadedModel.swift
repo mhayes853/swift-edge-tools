@@ -48,6 +48,14 @@ extension LoadedModel {
         """
       )
     }
+    guard request.images.isEmpty || self.runner.supportsImages else {
+      throw EdgeCLIError(
+        """
+        \(self.detection.model.displayName) on \(self.runner.engine.rawValue) takes text only; \
+        --image does not apply.
+        """
+      )
+    }
     guard request.grammar == .auto || self.runner.supportsCustomGrammar else {
       throw EdgeCLIError(
         """

@@ -66,6 +66,9 @@ struct GenerationOptions: ParsableArguments {
   @Option(name: .shortAndLong, help: "The system prompt.")
   var system: String = ""
 
+  @Option(help: "A path to an image to include in the prompt. Vision models only.")
+  var image: String?
+
   @Option(
     help: """
       A JSON file of tool definitions, in OpenAI function-calling format. Defaults to a small \
@@ -106,6 +109,9 @@ struct GenerationOptions: ParsableArguments {
   init() {}
 
   func validate() throws {
+    if let image = self.image, !FileManager.default.fileExists(atPath: image) {
+      throw ValidationError("No image at \(image).")
+    }
     if self.toolCalls == .none, self.maxToolCalls != nil {
       throw ValidationError("--max-tool-calls cannot be used with --tool-calls none.")
     }
@@ -120,6 +126,7 @@ struct GenerationOptions: ParsableArguments {
     GenerationRequest(
       system: self.system,
       user: prompt,
+      images: self.image.map { [EdgeToolsLLMPrompt.Asset(path: $0)] } ?? [],
       tools: tools,
       grammar: self.grammar,
       toolCallRange: self.toolCallRange,

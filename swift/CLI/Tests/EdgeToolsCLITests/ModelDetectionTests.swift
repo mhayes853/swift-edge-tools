@@ -27,7 +27,11 @@ struct `ModelDetection tests` {
       "lfm2": .lfm2,
       "gemma3_text": .functionGemma,
       "granite": .granite,
-      "granitemoehybrid": .graniteMoeHybrid
+      "granitemoehybrid": .graniteMoeHybrid,
+      "gemma4": .gemma4,
+      "gemma4_unified": .gemma4,
+      "lfm2_vl": .lfm2P5VL,
+      "lfm2-vl": .lfm2P5VL
     ]
     for (modelType, model) in expected {
       let directory = try temporaryModel(
@@ -36,6 +40,13 @@ struct `ModelDetection tests` {
       )
       expectNoDifference(try ModelDetection.detect(in: directory).model, model)
     }
+  }
+
+  @Test
+  func `Reports Vision Modality For Vision Models`() {
+    let vision = DetectedModel.allCases.filter { $0.modality == .vision }
+
+    expectNoDifference(Set(vision), [.gemma4, .lfm2P5VL, .genericVLM])
   }
 
   @Test(arguments: [
@@ -89,28 +100,41 @@ struct `ModelDetection tests` {
   }
 
   @Test
-  func `Rejects A Plain Llama Without MiniCPM5 Markers`() throws {
+  func `Falls Back To A Generic LLM For A Plain Llama Without MiniCPM5 Markers`() throws {
     let directory = try temporaryModel(
       configuration: "{\"model_type\": \"llama\"}",
       files: ["model.safetensors"],
       chatTemplate: "{% for message in messages %}{{ message.content }}{% endfor %}"
     )
 
-    #expect(throws: EdgeCLIError.self) {
-      try ModelDetection.detect(in: directory)
-    }
+    expectNoDifference(try ModelDetection.detect(in: directory).model, .genericLLM)
   }
 
   @Test
-  func `Throws For Unsupported Architectures`() throws {
+  func `Falls Back To A Generic LLM For An Unrecognized Architecture`() throws {
     let directory = try temporaryModel(
-      configuration: "{\"model_type\": \"llama\"}",
+      configuration: "{\"model_type\": \"some_new_thing\"}",
       files: ["model.safetensors"]
     )
+    let detection = try ModelDetection.detect(in: directory)
 
-    #expect(throws: EdgeCLIError.self) {
-      try ModelDetection.detect(in: directory)
-    }
+    expectNoDifference(detection.model, .genericLLM)
+    expectNoDifference(detection.model.modality, .text)
+    expectNoDifference(detection.engines, [.mlx])
+  }
+
+  @Test(arguments: ["preprocessor_config.json", "processor_config.json"])
+  func `Falls Back To A Generic VLM When A Processor Configuration Is Present`(
+    processorFile: String
+  ) throws {
+    let directory = try temporaryModel(
+      configuration: "{\"model_type\": \"some_new_thing\"}",
+      files: ["model.safetensors", processorFile]
+    )
+    let detection = try ModelDetection.detect(in: directory)
+
+    expectNoDifference(detection.model, .genericVLM)
+    expectNoDifference(detection.model.modality, .vision)
   }
 
   @Test

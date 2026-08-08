@@ -103,6 +103,7 @@ extension EngineRunner {
     tokens: [String] = ["do", "ne"],
     supportsCustomGrammar: Bool = true,
     supportsSampling: Bool = true,
+    supportsImages: Bool = false,
     decodeDuration: Duration = .milliseconds(20),
     onGenerate: @escaping @Sendable (GenerationRequest) -> Void = { _ in },
     onReset: @escaping @Sendable () -> Void = {}
@@ -110,6 +111,7 @@ extension EngineRunner {
     Self(
       supportsCustomGrammar: supportsCustomGrammar,
       supportsSampling: supportsSampling,
+      supportsImages: supportsImages,
       generation: { request, channel in
         onGenerate(request)
         for (index, token) in tokens.enumerated() {
