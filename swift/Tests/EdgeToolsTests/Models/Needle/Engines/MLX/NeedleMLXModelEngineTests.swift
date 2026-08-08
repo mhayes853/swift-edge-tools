@@ -19,16 +19,7 @@
 
     @Test
     func `Generate Basics`() async throws {
-      let tokens = Lock([EdgeToolsToken]())
-      let generationTask = try self.engine.generate(
-        prompt: .sendAdventureEmail,
-        tools: NeedlePrompt.sendAdventureEmailDefinitions,
-        parameters: .default,
-        channel: EdgeToolsGenerationChannel(
-          onToken: { token in tokens.withLock { $0.append(token) } }
-        )
-      )
-      let generation = try await generationTask.value
+      let generation = try await generateNeedle(using: self.engine)
       expectNoDifference(generation.wasStopped, false)
       withKnownIssue {
         assertSnapshot(of: generation, as: .dump, record: .all)
@@ -38,63 +29,17 @@
 
     @Test
     func `Generate Streamed Response Matches Final Response`() async throws {
-      let tokens = Lock([EdgeToolsToken]())
-      let generationTask = try self.engine.generate(
-        prompt: .sendAdventureEmail,
-        tools: NeedlePrompt.sendAdventureEmailDefinitions,
-        parameters: .default,
-        channel: EdgeToolsGenerationChannel(
-          onToken: { token in tokens.withLock { $0.append(token) } }
-        )
-      )
-      let generation = try await generationTask.value
-
-      let streamedResponse = tokens.withLock { $0.map(\.stringValue).joined() }
-      let finalResponse = generation.response
-      expectNoDifference(streamedResponse, finalResponse)
+      try await expectNeedleStreamedResponseMatchesFinalResponse(using: self.engine)
     }
 
     @Test
     func `Generate Stops And Returns Stopped Generation`() async throws {
-      let tokens = Lock([EdgeToolsToken]())
-      let generationTaskBox = Lock<Engine.GenerationTask?>(nil)
-      let generationTask = try self.engine.generate(
-        prompt: .sendAdventureEmail,
-        tools: NeedlePrompt.sendAdventureEmailDefinitions,
-        parameters: .default,
-        channel: EdgeToolsGenerationChannel(
-          onToken: { token in
-            tokens.withLock { $0.append(token) }
-            generationTaskBox.withLock { $0?.stop() }
-          }
-        )
-      )
-      generationTaskBox.withLock { $0 = generationTask }
-      let generation = try await generationTask.value
-
-      expectNoDifference(generation.wasStopped, true)
-      let tokenCount = tokens.withLock { $0.count }
-      expectNoDifference(tokenCount > 0, true)
-      expectNoDifference(generation.decodeMetrics.tokens, tokenCount)
-      expectNoDifference(generation.tokens.isEmpty, false)
+      try await expectNeedleGenerationStops(using: self.engine)
     }
 
     @Test
     func `Generate Cancels And Throws Cancellation Error`() async throws {
-      let task = Task {
-        let generationTask = try self.engine.generate(
-          prompt: .sendAdventureEmail,
-          tools: NeedlePrompt.sendAdventureEmailDefinitions,
-          parameters: .default,
-          channel: EdgeToolsGenerationChannel()
-        )
-        _ = try await generationTask.value
-      }
-
-      task.cancel()
-      await #expect(throws: CancellationError.self) {
-        _ = try await task.value
-      }
+      await expectNeedleGenerationCancellation(using: self.engine)
     }
 
     @Test
@@ -108,16 +53,7 @@
         configuration: configuration
       )
 
-      let tokenStorage = Lock([EdgeToolsToken]())
-      let generationTask = try engine.generate(
-        prompt: .sendAdventureEmail,
-        tools: NeedlePrompt.sendAdventureEmailDefinitions,
-        parameters: .default,
-        channel: EdgeToolsGenerationChannel(
-          onToken: { token in tokenStorage.withLock { $0.append(token) } }
-        )
-      )
-      let generation = try await generationTask.value
+      let generation = try await generateNeedle(using: engine)
       expectNoDifference(generation.wasStopped, false)
       withKnownIssue {
         assertSnapshot(of: generation, as: .dump, record: .all)
@@ -128,11 +64,7 @@
 
     @Test
     func `Generate Through EdgeToolsSession`() async throws {
-      let session = EdgeToolsSession(
-        engine: self.engine,
-        tools: NeedlePrompt.sendAdventureEmailTools
-      )
-      let generation = try await session.generate(prompt: .sendAdventureEmail)
+      let generation = try await generateNeedleThroughSession(using: self.engine)
       expectNoDifference(generation.engineGeneration.wasStopped, false)
       withKnownIssue {
         assertSnapshot(of: generation, as: .dump, record: .all)
@@ -153,13 +85,10 @@
     func `Generate Invokes Custom Logit Processor With Batched Shapes`() async throws {
       let processor = CountingLogitProcessor()
 
-      let generationTask = try self.engine.generate(
-        prompt: .sendAdventureEmail,
-        tools: NeedlePrompt.sendAdventureEmailDefinitions,
-        parameters: Engine.GenerateParameters(processor: processor),
-        channel: EdgeToolsGenerationChannel()
+      _ = try await generateNeedle(
+        using: self.engine,
+        parameters: Engine.GenerateParameters(processor: processor)
       )
-      _ = try await generationTask.value
 
       expectNoDifference(processor.promptCalls, 1)
       expectNoDifference(processor.processCalls > 0, true)
@@ -170,13 +99,7 @@
 
     @Test
     func `Generate Records Mean Confidence In Range Zero To One`() async throws {
-      let generationTask = try self.engine.generate(
-        prompt: .sendAdventureEmail,
-        tools: NeedlePrompt.sendAdventureEmailDefinitions,
-        parameters: .default,
-        channel: EdgeToolsGenerationChannel()
-      )
-      let generation = try await generationTask.value
+      let generation = try await generateNeedle(using: self.engine)
 
       let confidence = try #require(generation.metadata.generationConfidence)
       expectNoDifference((0...1).contains(confidence), true)
@@ -190,20 +113,7 @@
 
     @Test
     func `Generate Throws When Prompt Exceeds Context Length`() async throws {
-      let prompt = NeedlePrompt(
-        system: "",
-        user: String(repeating: "token ", count: 2_000)
-      )
-
-      let error = await #expect(throws: EdgeToolsError.self) {
-        let generationTask = try self.engine.generate(
-          prompt: prompt,
-          parameters: .default,
-          channel: EdgeToolsGenerationChannel()
-        )
-        _ = try await generationTask.value
-      }
-      expectNoDifference(error?.code, .contextLengthExceeded)
+      await expectNeedleContextLengthExceeded(using: self.engine)
     }
 
     @Test
