@@ -232,7 +232,7 @@
         switch self {
         case .system(let content):
           ["role": "system", "content": content]
-        case .user(let content, images: _, audio: _):
+        case .user(let content, images: _, videos: _, audio: _):
           ["role": "user", "content": content]
         case .assistant(let content, let toolCalls):
           self.mlxAssistantMessage(content: content, toolCalls: toolCalls)
@@ -321,6 +321,52 @@
   // MARK: - VLM Prompt Conversion
 
   #if canImport(CoreImage) && canImport(MLXVLM)
+    private struct MLXTemporaryVideoInputs: ~Copyable {
+      let videos: [UserInput.Video]
+      private let temporaryURLs: [URL]
+
+      init<Assets: Sequence>(assets: Assets) throws where Assets.Element == EdgeToolsLLMPrompt.Asset {
+        var videos = [UserInput.Video]()
+        var temporaryURLs = [URL]()
+        videos.reserveCapacity(assets.underestimatedCount)
+
+        do {
+          for asset in assets {
+            switch asset.content {
+            case .path(let path):
+              videos.append(.url(URL(filePath: path)))
+            case .bytes(let bytes):
+              let url = Self.temporaryURL(for: asset.mimeType)
+              try Data(bytes).write(to: url, options: .atomic)
+              videos.append(.url(url))
+              temporaryURLs.append(url)
+            }
+          }
+        } catch {
+          temporaryURLs.forEach { try? FileManager.default.removeItem(at: $0) }
+          throw error
+        }
+
+        self.videos = videos
+        self.temporaryURLs = temporaryURLs
+      }
+
+      deinit {
+        self.temporaryURLs.forEach { try? FileManager.default.removeItem(at: $0) }
+      }
+
+      private static func temporaryURL(for mimeType: EdgeToolsMIMEType?) -> URL {
+        let fileExtension =
+          switch mimeType?.rawValue {
+          case EdgeToolsMIMEType.m4v.rawValue: "m4v"
+          case EdgeToolsMIMEType.quickTime.rawValue: "mov"
+          default: "mp4"
+          }
+        let directory = FileManager.default.temporaryDirectory
+        return directory.appending(path: "EdgeTools-\(UUID().uuidString).\(fileExtension)")
+      }
+    }
+
     extension EdgeToolsLLMPrompt.Asset {
       public func mlxImage() throws -> UserInput.Image {
         switch self.content {
@@ -349,15 +395,39 @@
         )
       }
 
+      package func rejectVideos() throws {
+        guard !self.videos.isEmpty else { return }
+        throw EdgeToolsError.unsupportedMedia(
+          "This MLX model integration does not support video input."
+        )
+      }
+
       public func mlxUserInput(
         tools: [EdgeToolDefinition],
+        videos: [UserInput.Video] = [],
         transformMessage: (Message) throws -> MLXLMCommon.Message
       ) throws -> UserInput {
         try self.rejectAudio()
+        if videos.isEmpty { try self.rejectVideos() }
         return UserInput(
           messages: try self.messages.map(transformMessage),
           images: try self.images.mlxImages(),
+          videos: videos,
           tools: tools.mlxToolSpecs
+        )
+      }
+
+      public func mlxVLMInput(
+        tools: [EdgeToolDefinition],
+        processor: any UserInputProcessor,
+        transformMessage: (Message) throws -> MLXLMCommon.Message
+      ) async throws -> LMInput {
+        let videoInputs = try MLXTemporaryVideoInputs(assets: self.videos)
+        return try await processor.prepare(
+          input: try self.mlxUserInput(
+            tools: tools,
+            videos: videoInputs.videos
+          ) { try transformMessage($0) }
         )
       }
     }
