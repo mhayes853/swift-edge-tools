@@ -128,7 +128,7 @@ public struct MiniCPM5ToolCallParser: EdgeToolCallParser, Sendable {
     private static func miniCPM5Call(_ tool: EdgeToolDefinition) throws -> XGRGrammar {
       var document = try XGREBNFDocument(Self.strictJSONArguments(for: tool).ebnf)
       try document.mapLiterals { ruleName, value, suffix in
-        guard Self.isMiniCPM5TopLevelArgumentRule(ruleName) else { return value }
+        guard isMiniCPM5TopLevelArgumentRule(ruleName) else { return value }
         switch value {
         case "{", "{}", ":":
           return ""
@@ -141,18 +141,23 @@ public struct MiniCPM5ToolCallParser: EdgeToolCallParser, Sendable {
           return "<param name=\"\(value.dropFirst().dropLast())\">"
         }
       }
+
+      // NB: Enum, pattern, union, and nullable strings are emitted as their own rules rather than
+      // inline in the argument rule, so the raw rewrite has to follow those references too.
+      let valueRules = miniCPM5ParameterValueRules(in: document)
+      try document.mapLiterals { ruleName, value, _ in
+        guard valueRules.contains(ruleName) else { return value }
+        if value == "\"" { return "" }
+        guard value.count >= 2, value.first == "\"", value.last == "\"" else { return value }
+        return String(value.dropFirst().dropLast())
+      }
       document.mapRuleReferences { ruleName, reference in
-        guard Self.isMiniCPM5TopLevelArgumentRule(ruleName), reference == "basic_string" else {
-          return reference
-        }
+        guard reference == "basic_string",
+          isMiniCPM5TopLevelArgumentRule(ruleName) || valueRules.contains(ruleName)
+        else { return reference }
         return "mini_cpm_string"
       }
-      document.rules.append(
-        XGREBNFDocument.Rule(
-          name: "mini_cpm_string",
-          body: #"basic_string | ("<![CDATA[" ([^\]] | "]" [^\]] | "]]" [^>])* "]]>")"#
-        )
-      )
+      document.rules.append(contentsOf: miniCPM5StringRules)
 
       let arguments = try XGRGrammar.ebnf(document.source)
       let prefix = try XGRGrammar.literal("<function name=\"\(tool.name)\">")
@@ -161,13 +166,92 @@ public struct MiniCPM5ToolCallParser: EdgeToolCallParser, Sendable {
         .concatenate(arguments)
         .concatenate(XGRGrammar.literal("</function>"))
     }
+  }
 
-    private static func isMiniCPM5TopLevelArgumentRule(_ name: String) -> Bool {
-      guard name != "root" else { return true }
-      guard name.starts(with: "root_") else { return false }
-      var digits = name.dropFirst("root_".count)
-      if digits.starts(with: "part_") { digits = digits.dropFirst("part_".count) }
-      return !digits.isEmpty && digits.allSatisfy { $0.isASCII && $0.isNumber }
+  // MARK: - MiniCPM5 Raw Parameter Values
+
+  // NB: MiniCPM5's own chat template documents parameter values as raw text, escaped through CDATA
+  // when they contain "<", "&", or a newline. Values are therefore unquoted, which makes a string
+  // ambiguous with the JSON primitive it happens to spell, so a raw value may not begin with a
+  // character that starts a JSON value, nor spell "true", "false", or "null" on its own.
+  private let miniCPM5RawTail = #"[^<&\r\n]"#
+  private let miniCPM5RawHead = #"[^<&\r\n \t\"\-0-9{\[tfn]"#
+  private let miniCPM5PrimitiveWords = ["true", "false", "null"]
+
+  private var miniCPM5StringRules: [XGREBNFDocument.Rule] {
+    let alternatives =
+      ["mini_cpm_raw_plain"] + miniCPM5PrimitiveWords.map { "mini_cpm_raw_\($0.first!)" }
+    return [
+      XGREBNFDocument.Rule(
+        name: "mini_cpm_string",
+        body: #"mini_cpm_raw | ("<![CDATA[" mini_cpm_cdata "]]>")"#
+      ),
+      XGREBNFDocument.Rule(name: "mini_cpm_raw", body: alternatives.joined(separator: " | ")),
+      XGREBNFDocument.Rule(name: "mini_cpm_raw_plain", body: "\(miniCPM5RawHead) mini_cpm_tail"),
+      XGREBNFDocument.Rule(
+        name: "mini_cpm_tail",
+        body: #"("") | (\#(miniCPM5RawTail) mini_cpm_tail)"#
+      ),
+      // NB: A trailing run of whitespace is trimmed off before parsing, so a value that spells a
+      // primitive followed only by spaces has to be rejected alongside the bare primitive.
+      XGREBNFDocument.Rule(
+        name: "mini_cpm_raw_suffix",
+        body: #"mini_cpm_space [^<&\r\n \t] mini_cpm_tail"#
+      ),
+      XGREBNFDocument.Rule(name: "mini_cpm_space", body: #"("") | ([ \t] mini_cpm_space)"#),
+      XGREBNFDocument.Rule(
+        name: "mini_cpm_cdata",
+        body: #"("") | (mini_cpm_cdata_char mini_cpm_cdata)"#
+      ),
+      XGREBNFDocument.Rule(name: "mini_cpm_cdata_char", body: #"[^\]] | ("]" [^\]]) | ("]]" [^>])"#)
+    ] + miniCPM5PrimitiveWords.flatMap(miniCPM5RawWordRules)
+  }
+
+  // Emits the rules matching every raw value that starts with `word`'s first character but never
+  // spells `word` itself, by branching away at each character that diverges from it.
+  private func miniCPM5RawWordRules(excluding word: String) -> [XGREBNFDocument.Rule] {
+    let characters = Array(word)
+    let name = "mini_cpm_raw_\(characters[0])"
+    let chain = characters.indices.dropFirst().map { index -> XGREBNFDocument.Rule in
+      let character = characters[index]
+      let next = index == characters.count - 1 ? "mini_cpm_raw_suffix" : "\(name)_\(index + 1)"
+      return XGREBNFDocument.Rule(
+        name: "\(name)_\(index)",
+        body: #"("") | ([^<&\r\n\#(character)] mini_cpm_tail) | ("\#(character)" \#(next))"#
+      )
     }
+    return [XGREBNFDocument.Rule(name: name, body: #""\#(characters[0])" \#(name)_1"#)] + chain
+  }
+
+  // Walks out from the argument rules to the rules holding each parameter's value, stopping at any
+  // value that opens a JSON container since its nested strings stay conventionally quoted.
+  private func miniCPM5ParameterValueRules(in document: XGREBNFDocument) -> Set<String> {
+    let references = document.ruleReferences
+    let literals = document.ruleLiterals
+    var names = Set<String>()
+    var pending = references.filter { isMiniCPM5TopLevelArgumentRule($0.key) }
+      .values
+      .flatMap { $0 }
+
+    while let name = pending.popLast() {
+      guard !name.hasPrefix("basic_"), !isMiniCPM5TopLevelArgumentRule(name),
+        !names.contains(name),
+        !(literals[name] ?? []).contains(where: { $0 == "{" || $0 == "[" }),
+        !(references[name] ?? []).contains(where: {
+          ["basic_object", "basic_array", "basic_any"].contains($0)
+        })
+      else { continue }
+      names.insert(name)
+      pending.append(contentsOf: references[name] ?? [])
+    }
+    return names
+  }
+
+  private func isMiniCPM5TopLevelArgumentRule(_ name: String) -> Bool {
+    guard name != "root" else { return true }
+    guard name.starts(with: "root_") else { return false }
+    var digits = name.dropFirst("root_".count)
+    if digits.starts(with: "part_") { digits = digits.dropFirst("part_".count) }
+    return !digits.isEmpty && digits.allSatisfy { $0.isASCII && $0.isNumber }
   }
 #endif
