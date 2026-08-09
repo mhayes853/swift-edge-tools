@@ -24,7 +24,9 @@ private struct ExtendingGraphemeTokenizer: EdgeToolsTokenizer {
   let bosTokenId: EdgeToolsToken.ID? = nil
   let eosTokenId: EdgeToolsToken.ID? = nil
 
-  func encode(text: String) -> [EdgeToolsToken.ID] { [] }
+  func encode(text: String) -> [EdgeToolsToken.ID] {
+    []
+  }
 
   func decode(tokens: [EdgeToolsToken.ID]) -> String {
     switch tokens {

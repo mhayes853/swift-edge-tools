@@ -10,6 +10,7 @@
     case missingToolCall
     case missingToolOutput
     case missingFinalResponse
+    case missingReasoning
     case failedToCreateImage
     case failedToCreateVideo
     case failedToAppendVideoFrame
@@ -67,7 +68,7 @@
       throw MLXGenerationTestError.missingToolOutput
     }
 
-    transcript.messages.append(.assistant(toolCalls: toolGeneration.engineGeneration.toolCalls))
+    transcript.messages.append(.init(generation: toolGeneration.engineGeneration))
     transcript.messages.append(.tool(name: "getWeather", response: .string(toolOutput)))
     let responseGeneration = try await session.generate(
       prompt: transcript,
@@ -101,6 +102,34 @@
     func invoke(input: WeatherToolArguments) async throws -> sending String {
       "It is sunny and 21 degrees celsius in \(input.location)."
     }
+  }
+
+  func generateReasoning<Engine: EdgeToolsEngine>(
+    using engine: Engine
+  ) async throws -> EdgeToolsEngineGeneration
+  where
+    Engine.Prompt == EdgeToolsLLMPrompt,
+    Engine.GenerateParameters == DefaultMLXGenerateParameters
+  {
+    let prompt = EdgeToolsLLMPrompt(
+      messages: [
+        .user(
+          "Think carefully before answering: what is the sum of 19 and 23? Keep the final answer brief."
+        )
+      ],
+      reasoningEffort: .high
+    )
+    let task = try engine.generate(
+      prompt: prompt,
+      tools: [],
+      parameters: DefaultMLXGenerateParameters(maxTokens: 512),
+      channel: EdgeToolsGenerationChannel()
+    )
+    let generation = try await task.value
+    guard !generation.reasoning.isEmpty else {
+      throw MLXGenerationTestError.missingReasoning
+    }
+    return generation
   }
 
   extension EdgeToolsLLMPrompt {
@@ -225,7 +254,7 @@
       throw MLXGenerationTestError.missingToolCall
     }
 
-    transcript.messages.append(.assistant(toolCalls: toolGeneration.toolCalls))
+    transcript.messages.append(.init(generation: toolGeneration))
     transcript.messages.append(.tool(name: tool.name, response: toolResponse))
 
     let responseGenerationTask = try engine.generate(
@@ -239,7 +268,7 @@
       throw MLXGenerationTestError.missingFinalResponse
     }
 
-    transcript.messages.append(.assistant(responseGeneration.response))
+    transcript.messages.append(.init(generation: responseGeneration))
     return (
       transcript: transcript,
       toolCalls: toolGeneration.toolCalls,
@@ -410,7 +439,8 @@
         width: width,
         height: height
       )
-      guard adaptor.append(pixelBuffer, withPresentationTime: CMTime(value: Int64(index), timescale: 2))
+      guard
+        adaptor.append(pixelBuffer, withPresentationTime: CMTime(value: Int64(index), timescale: 2))
       else { throw MLXGenerationTestError.failedToAppendVideoFrame }
     }
 
@@ -439,16 +469,18 @@
       let data = CVPixelBufferGetBaseAddress(pixelBuffer)
     else { throw MLXGenerationTestError.failedToCreateVideo }
     defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, []) }
-    guard let context = CGContext(
-      data: data,
-      width: width,
-      height: height,
-      bitsPerComponent: 8,
-      bytesPerRow: CVPixelBufferGetBytesPerRow(pixelBuffer),
-      space: CGColorSpaceCreateDeviceRGB(),
-      bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
-        | CGBitmapInfo.byteOrder32Little.rawValue
-    ) else { throw MLXGenerationTestError.failedToCreateVideo }
+    guard
+      let context = CGContext(
+        data: data,
+        width: width,
+        height: height,
+        bitsPerComponent: 8,
+        bytesPerRow: CVPixelBufferGetBytesPerRow(pixelBuffer),
+        space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
+          | CGBitmapInfo.byteOrder32Little.rawValue
+      )
+    else { throw MLXGenerationTestError.failedToCreateVideo }
     context.setFillColor(color)
     context.fill(CGRect(x: 0, y: 0, width: width, height: height))
   }

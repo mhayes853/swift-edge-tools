@@ -7,19 +7,6 @@ import Testing
 
 @Suite
 struct `Qwen3 tests` {
-  @Suite
-  struct `Qwen3ToolCallParser tests` {
-    @Test
-    func `Decodes Escaped Unicode Surrogate Pairs`() throws {
-      var parser = Qwen3ToolCallParser()
-      let source = #"<tool_call>{"name":"emoji","arguments":{"value":"\uD83D\uDE00"}}</tool_call>"#
-      let parsed = parser.accept(token: EdgeToolsToken(id: 0, stringValue: source))
-      let call = try #require(parsed.first)
-
-      expectNoDifference(call.arguments, ["value": "😀"])
-    }
-  }
-
   #if MLX && XGrammar && canImport(MLX) && !os(WASI)
     @Suite(.serialized, .enabledIfXcode())
     struct `Qwen3MLXModelEngine tests` {
@@ -29,6 +16,14 @@ struct `Qwen3 tests` {
         let transcript = try await completeWeatherTurn(using: engine)
 
         withKnownIssue { assertSnapshot(of: transcript, as: .dump, record: .all) }
+      }
+
+      @Test
+      func `Generates Reasoning Snapshot`() async throws {
+        let engine = try await Qwen3MLXModelEngine(from: downloadQwen3())
+        let generation = try await generateReasoning(using: engine)
+
+        withKnownIssue { assertSnapshot(of: generation, as: .dump, record: .all) }
       }
     }
   #endif

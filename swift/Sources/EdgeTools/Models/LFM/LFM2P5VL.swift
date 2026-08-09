@@ -8,16 +8,20 @@
 
   public struct LFM2P5VLMLXProfile: MLXVLMModelProfile {
     public typealias Prompt = EdgeToolsLLMPrompt
-    public typealias ToolCallParser = LFM2P5VLToolCallParser
+    public typealias GenerationParser = LFM2P5GenerationParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarCompiler = XGRCompiler
     public typealias GrammarContext = XGRGrammarContext
 
-    public static func toolCallGrammar(
+    public static func grammar(
+      prompt _: EdgeToolsLLMPrompt,
       tools: [EdgeToolDefinition],
-      range: GrammarToolCallRange
+      parameters: DefaultMLXGenerateParameters,
+      context: XGRGrammarContext
     ) throws -> XGRGrammar {
-      try .lfm2P5(tools: tools, range: range)
+      try Self.constrainedGrammar(tools: tools, parameters: parameters, context: context) {
+        try XGRGrammar.lfm2P5(tools: tools, range: $0)
+      }
     }
 
     public static nonisolated(nonsending) func input(
@@ -71,7 +75,3 @@
   }
 
 #endif
-
-// MARK: - LFM2P5VL Tool Calling
-
-public typealias LFM2P5VLToolCallParser = LFM2P5PythonToolCallParser

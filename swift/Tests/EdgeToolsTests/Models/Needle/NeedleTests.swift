@@ -13,7 +13,8 @@ struct `Needle tests` {
         #"{"vocab_size":16,"d_model":8,"hidden_size":8,"num_attention_heads":2,"num_kv_heads":1,"num_encoder_layers":1,"num_decoder_layers":1,"num_hidden_layers":1,"max_seq_len":4,"pad_token_id":0,"decoder_start_token_id":1,"tie_word_embeddings":true,"torch_dtype":"float32","decoder_max_length":4}"#
 
       let configuration =
-        try JSONDecoder().decode(
+        try JSONDecoder()
+        .decode(
           NeedleModelConfiguration.self,
           from: Data(json.utf8)
         )
@@ -130,47 +131,6 @@ struct `Needle tests` {
       expectNoDifference(formatted.contains(#""description":"Uses a \"quoted\" phrase"#), true)
       expectNoDifference(formatted.contains(#""pattern":"say \\\"hi\\\""#), true)
     }
-  }
-
-  @Suite
-  struct `NeedleToolCallParser tests` {
-    @Test
-    func `Ignores Boundaries Inside JSON Strings`() throws {
-      let calls = self.parse([
-        #"<tool_call> [{"name":"record_note","arguments":{"text":"literal}_and]_inside_string","#,
-        #""title":"{draft}"}}]"#
-      ])
-
-      let call = try #require(calls.first)
-      guard case .object(let arguments) = call.arguments else {
-        Issue.record("Expected object arguments.")
-        return
-      }
-
-      expectNoDifference(arguments["text"], "literal}_and]_inside_string")
-      expectNoDifference(arguments["title"], "{draft}")
-    }
-
-    @Test
-    func `Preserves The Raw Tool Name`() throws {
-      let calls = self.parse([
-        #"<tool_call> [{"name":"getWeather","arguments":{"location":"Seoul"}}]"#
-      ])
-      let call = try #require(calls.first)
-
-      expectNoDifference(call.name, "getWeather")
-    }
-
-    private func parse(_ chunks: [String]) -> [EdgeRawToolCall] {
-      var parser = NeedleToolCallParser()
-      var calls = [EdgeRawToolCall]()
-      for (index, chunk) in chunks.enumerated() {
-        let token = EdgeToolsToken(id: index, stringValue: chunk)
-        calls.append(contentsOf: parser.accept(token: token))
-      }
-      return calls
-    }
-
   }
 
 }

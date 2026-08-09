@@ -4,37 +4,39 @@ import OrderedCollections
   import EdgeToolsXGrammar
 #endif
 
-// MARK: - LFM2P5PythonToolCallParser
+// MARK: - LFM2P5 Generation Parsing
 
-public struct LFM2P5PythonToolCallParser: EdgeToolCallParser, Sendable {
-  private var list = IncrementalToolCallList(opener: "<|tool_call_start|>")
+public struct LFM2P5GenerationParser: EdgeToolsGenerationParser, Sendable {
+  private var base = DelimitedGenerationParser(
+    toolOpener: "<|tool_call_start|>",
+    toolCloser: "<|tool_call_end|>",
+    reasoningOpener: "<think>",
+    reasoningCloser: "</think>",
+    parseToolCalls: lfm2P5ToolCalls(in:)
+  )
 
   public init() {}
 
-  public mutating func accept(token: EdgeToolsToken) -> [EdgeRawToolCall] {
-    self.list.append(token)
-    var calls = [EdgeRawToolCall]()
-    while let call = self.nextCall() {
-      calls.append(call)
-    }
-    return calls
+  public mutating func accept(token: EdgeToolsToken) -> [EdgeToolsGenerationPart] {
+    self.base.accept(token: token)
   }
 
-  private mutating func nextCall() -> EdgeRawToolCall? {
-    while let sourceData = self.list.nextItem(findRange: { $0.firstCompletePythonCallRange() }) {
-      let source = String(decoding: sourceData, as: UTF8.self)
-      var reader = PythonCallReader(source: source)
-      if let call = reader.parse() {
-        return call
-      }
-    }
-    return nil
+  public mutating func finish() -> [EdgeToolsGenerationPart] {
+    self.base.finish()
   }
 }
 
-// MARK: - LFM2P5
-
-public typealias LFM2P5ToolCallParser = LFM2P5PythonToolCallParser
+private func lfm2P5ToolCalls(in source: String) -> [EdgeRawToolCall] {
+  var list = IncrementalToolCallList(opener: "<|tool_call_start|>")
+  list.append(EdgeToolsToken(id: -1, stringValue: source))
+  var calls = [EdgeRawToolCall]()
+  while let sourceData = list.nextItem(findRange: { $0.firstCompletePythonCallRange() }) {
+    let source = String(decoding: sourceData, as: UTF8.self)
+    var reader = PythonCallReader(source: source)
+    if let call = reader.parse() { calls.append(call) }
+  }
+  return calls
+}
 
 // MARK: - Python Call Boundaries
 
@@ -43,7 +45,9 @@ extension Array where Element == UInt8 {
     var state = PythonCallBoundaryState()
     for index in self.indices {
       guard let isComplete = state.consume(self[index]) else { return nil }
-      if isComplete { return 0..<(index + 1) }
+      if isComplete {
+        return 0..<(index + 1)
+      }
     }
     return nil
   }
@@ -159,8 +163,12 @@ private struct PythonCallReader: ToolCallValueReader {
     if character == "'" || character == "\"" {
       return self.parseString(quote: character).map(EdgeToolsValue.string)
     }
-    if character == "[" { return self.parseArray() }
-    if character == "{" { return self.parseObject() }
+    if character == "[" {
+      return self.parseArray()
+    }
+    if character == "{" {
+      return self.parseObject()
+    }
     if character == "-" || character == "+" || character.isNumber {
       return self.parseNumber()
     }
@@ -187,7 +195,9 @@ private struct PythonCallReader: ToolCallValueReader {
     var result = ""
     while let character = self.cursor.current {
       self.cursor.advance()
-      if character == quote { return result }
+      if character == quote {
+        return result
+      }
       if character == "\\" {
         guard self.appendEscape(to: &result) else { return nil }
       } else {
@@ -239,7 +249,9 @@ private struct PythonCallReader: ToolCallValueReader {
     let source = self.cursor.read {
       $0.isNumber || ["-", "+", ".", "e", "E"].contains($0)
     }
-    if let integer = Int(source) { return .integer(integer) }
+    if let integer = Int(source) {
+      return .integer(integer)
+    }
     return Double(source).map(EdgeToolsValue.number)
   }
 
@@ -292,8 +304,12 @@ private struct PythonCallReader: ToolCallValueReader {
         }
 
         guard Self.isLFMTopLevelArgumentRule(ruleName) else { return value }
-        if value == "{" || value == "}" { return "" }
-        if value == ":" { return "=" }
+        if value == "{" || value == "}" {
+          return ""
+        }
+        if value == ":" {
+          return "="
+        }
         if value.count >= 2, value.first == "\"", value.last == "\"",
           #"":""#.firstRange(in: suffix) != nil
         {
@@ -312,7 +328,9 @@ private struct PythonCallReader: ToolCallValueReader {
       guard name != "root" else { return true }
       guard name.starts(with: "root_") else { return false }
       var digits = name.dropFirst("root_".count)
-      if digits.starts(with: "part_") { digits = digits.dropFirst("part_".count) }
+        if digits.starts(with: "part_") {
+          digits = digits.dropFirst("part_".count)
+        }
       return !digits.isEmpty && digits.allSatisfy { $0.isASCII && $0.isNumber }
     }
   }

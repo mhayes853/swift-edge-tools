@@ -149,14 +149,16 @@
 
   private struct LLMPrefillTestProfile: MLXLLMModelProfile {
     typealias Prompt = PrefillTestPrompt
-    typealias ToolCallParser = NeedleToolCallParser
+    typealias GenerationParser = NeedleGenerationParser
     typealias GenerateParameters = DefaultMLXGenerateParameters
     typealias GrammarCompiler = XGRCompiler
     typealias GrammarContext = XGRGrammarContext
 
-    static func toolCallGrammar(
+    static func grammar(
+      prompt _: PrefillTestPrompt,
       tools _: [EdgeToolDefinition],
-      range _: GrammarToolCallRange
+      parameters _: DefaultMLXGenerateParameters,
+      context _: XGRGrammarContext
     ) throws -> XGRGrammar {
       .universal
     }
@@ -174,14 +176,16 @@
   #if canImport(CoreImage) && canImport(MLXVLM)
     private struct VLMPrefillTestProfile: MLXVLMModelProfile {
       typealias Prompt = PrefillTestPrompt
-      typealias ToolCallParser = NeedleToolCallParser
+      typealias GenerationParser = NeedleGenerationParser
       typealias GenerateParameters = DefaultMLXGenerateParameters
       typealias GrammarCompiler = XGRCompiler
       typealias GrammarContext = XGRGrammarContext
 
-      static func toolCallGrammar(
+      static func grammar(
+        prompt _: PrefillTestPrompt,
         tools _: [EdgeToolDefinition],
-        range _: GrammarToolCallRange
+        parameters _: DefaultMLXGenerateParameters,
+        context _: XGRGrammarContext
       ) throws -> XGRGrammar {
         .universal
       }

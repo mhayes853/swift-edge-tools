@@ -54,7 +54,7 @@ final class MockEngine: EdgeToolsEngine {
     let arguments = EdgeToolsValue.object(["message": .string("hello embedded")])
     let toolCall = EdgeRawToolCall(name: "echo", arguments: arguments)
     channel.emit(token: token)
-    channel.emit(toolCall: toolCall)
+    channel.emit(part: .toolCall(toolCall))
     return GenerationTask(
       generation: EdgeToolsEngineGeneration(
         prefillMetrics: EdgeToolsPrefillMetrics(tokens: 0, duration: .zero),
@@ -66,7 +66,7 @@ final class MockEngine: EdgeToolsEngine {
         wasStopped: false,
         tokens: [token],
         response: token.stringValue,
-        toolCalls: [toolCall]
+        parts: [.toolCall(toolCall)]
       )
     )
   }
@@ -89,7 +89,8 @@ func runSmoke() async throws {
   }
 
   let schema = EchoTool.Input.edgeToolsGenerationSchema
-  let expectedSchema = #"{"type":"object","properties":{"message":{"type":"string"}},"required":["message"]}"#
+  let expectedSchema =
+    #"{"type":"object","properties":{"message":{"type":"string"}},"required":["message"]}"#
   guard schema.orderedJSONString() == expectedSchema else { throw SmokeError.unexpectedSchema }
 
   let parsed = try EdgeToolsValue(json: Array(#"{"message":"round trip"}"#.utf8))

@@ -40,7 +40,9 @@ extension GrammarBitmask: MutableCollection {
   public typealias Index = Int
   public typealias Element = Bool
 
-  public func index(after index: Int) -> Int { index + 1 }
+  public func index(after index: Int) -> Int {
+    index + 1
+  }
   public var startIndex: Int { self.storage.startIndex }
   public var endIndex: Int { self.storage.endIndex * 8 }
 

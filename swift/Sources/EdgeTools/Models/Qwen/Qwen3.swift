@@ -7,16 +7,29 @@
 
   public struct Qwen3MLXProfile: MLXLLMModelProfile {
     public typealias Prompt = EdgeToolsLLMPrompt
-    public typealias ToolCallParser = Qwen3ToolCallParser
+    public typealias GenerationParser = Qwen3GenerationParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarCompiler = XGRCompiler
     public typealias GrammarContext = XGRGrammarContext
 
-    public static func toolCallGrammar(
+    public static func grammar(
+      prompt: EdgeToolsLLMPrompt,
       tools: [EdgeToolDefinition],
-      range: GrammarToolCallRange
+      parameters: DefaultMLXGenerateParameters,
+      context: XGRGrammarContext
     ) throws -> XGRGrammar {
-      try .qwen3(tools: tools, range: range)
+      try Self.constrainedGrammar(tools: tools, parameters: parameters, context: context) { range in
+        let toolCalls = try XGRGrammar.qwen3(tools: tools, range: range)
+        guard prompt.reasoningEffort.isEnabled else { return toolCalls }
+        return try XGRGrammar.qwenReasoning().concatenate(toolCalls)
+      }
+    }
+
+    public static func templateContext(
+      prompt: EdgeToolsLLMPrompt
+    ) -> [String: any Sendable]? {
+      guard prompt.reasoningEffort != .default else { return nil }
+      return ["enable_thinking": prompt.reasoningEffort.isEnabled]
     }
   }
 
@@ -25,41 +38,49 @@
 
 // MARK: - Qwen3 Tool Call Parsing
 
-public struct QwenJSONToolCallParser: EdgeToolCallParser, Sendable {
-  private var block = IncrementalToolCallBlock(
-    opener: "<tool_call>",
-    closer: "</tool_call>"
+public struct Qwen3GenerationParser: EdgeToolsGenerationParser, Sendable {
+  private var base = DelimitedGenerationParser(
+    toolOpener: "<tool_call>",
+    toolCloser: "</tool_call>",
+    reasoningOpener: "<think>",
+    reasoningCloser: "</think>",
+    parseToolCalls: qwenJSONToolCalls(in:)
   )
 
   public init() {}
 
-  public mutating func accept(token: EdgeToolsToken) -> [EdgeRawToolCall] {
-    self.block.append(token)
-    var calls = [EdgeRawToolCall]()
-    while let call = self.nextCall() {
-      calls.append(call)
-    }
-    return calls
+  public mutating func accept(token: EdgeToolsToken) -> [EdgeToolsGenerationPart] {
+    self.base.accept(token: token)
   }
 
-  private mutating func nextCall() -> EdgeRawToolCall? {
-    while let payload = self.block.nextPayload(respectingJSONStringBoundaries: true) {
-      if let value = try? EdgeToolsValue(json: payload),
-        let call = EdgeRawToolCall(jsonValue: value)
-      {
-        return call
-      }
-    }
-    return nil
+  public mutating func finish() -> [EdgeToolsGenerationPart] {
+    self.base.finish()
   }
 }
 
-public typealias Qwen3ToolCallParser = QwenJSONToolCallParser
+private func qwenJSONToolCalls(in source: String) -> [EdgeRawToolCall] {
+  var block = IncrementalToolCallBlock(opener: "<tool_call>", closer: "</tool_call>")
+  block.append(EdgeToolsToken(id: -1, stringValue: source))
+  var calls = [EdgeRawToolCall]()
+  while let payload = block.nextPayload(respectingJSONStringBoundaries: true) {
+    if let value = try? EdgeToolsValue(json: payload), let call = EdgeRawToolCall(jsonValue: value)
+    {
+      calls.append(call)
+    }
+  }
+  return calls
+}
 
 // MARK: - Qwen3 Grammar
 
 #if XGrammar
   extension XGRGrammar {
+    static func qwenReasoning() throws -> XGRGrammar {
+      let opener = try Self.literal("<think>")
+      let thought = try opener.concatenate(.universal)
+      return try thought.concatenate(Self.literal("</think>"))
+    }
+
     public static func qwenJSON(
       tools: some Sequence<EdgeToolDefinition>,
       range: GrammarToolCallRange = .unbounded(minimum: 0)

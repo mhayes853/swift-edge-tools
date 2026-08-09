@@ -19,6 +19,14 @@ struct `Gemma4 tests` {
       }
 
       @Test
+      func `Generates Reasoning Snapshot`() async throws {
+        let engine = try await Gemma4MLXModelEngine(from: downloadGemma4E2B())
+        let generation = try await generateReasoning(using: engine)
+
+        withKnownIssue { assertSnapshot(of: generation, as: .dump, record: .all) }
+      }
+
+      @Test
       func `Describes Image Snapshot`() async throws {
         let engine = try await Gemma4MLXModelEngine(from: downloadGemma4E2B())
         let response = try await describeRedImage(using: engine)
