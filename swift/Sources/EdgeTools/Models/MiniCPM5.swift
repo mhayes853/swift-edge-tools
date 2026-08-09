@@ -137,8 +137,12 @@ private enum MiniCPM5ToolCalls {
       return nil
     }
     let source = rawValue.trimmingWhitespace
-    if let value = parseToolCallBooleanOrNull(source) { return value }
-    if let value = try? EdgeToolsValue(json: source) { return value }
+    if let value = parseToolCallBooleanOrNull(source) {
+      return value
+    }
+    if let value = try? EdgeToolsValue(json: source) {
+      return value
+    }
     return .string(source)
   }
 }
@@ -197,7 +201,9 @@ private enum MiniCPM5ToolCalls {
       guard name != "root" else { return true }
       guard name.starts(with: "root_") else { return false }
       var digits = name.dropFirst("root_".count)
-      if digits.starts(with: "part_") { digits = digits.dropFirst("part_".count) }
+      if digits.starts(with: "part_") {
+        digits = digits.dropFirst("part_".count)
+      }
       return !digits.isEmpty && digits.allSatisfy { $0.isASCII && $0.isNumber }
     }
   }

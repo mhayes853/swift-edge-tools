@@ -45,7 +45,9 @@ extension Array where Element == UInt8 {
     var state = PythonCallBoundaryState()
     for index in self.indices {
       guard let isComplete = state.consume(self[index]) else { return nil }
-      if isComplete { return 0..<(index + 1) }
+      if isComplete {
+        return 0..<(index + 1)
+      }
     }
     return nil
   }
@@ -161,8 +163,12 @@ private struct PythonCallReader: ToolCallValueReader {
     if character == "'" || character == "\"" {
       return self.parseString(quote: character).map(EdgeToolsValue.string)
     }
-    if character == "[" { return self.parseArray() }
-    if character == "{" { return self.parseObject() }
+    if character == "[" {
+      return self.parseArray()
+    }
+    if character == "{" {
+      return self.parseObject()
+    }
     if character == "-" || character == "+" || character.isNumber {
       return self.parseNumber()
     }
@@ -189,7 +195,9 @@ private struct PythonCallReader: ToolCallValueReader {
     var result = ""
     while let character = self.cursor.current {
       self.cursor.advance()
-      if character == quote { return result }
+      if character == quote {
+        return result
+      }
       if character == "\\" {
         guard self.appendEscape(to: &result) else { return nil }
       } else {
@@ -241,7 +249,9 @@ private struct PythonCallReader: ToolCallValueReader {
     let source = self.cursor.read {
       $0.isNumber || ["-", "+", ".", "e", "E"].contains($0)
     }
-    if let integer = Int(source) { return .integer(integer) }
+    if let integer = Int(source) {
+      return .integer(integer)
+    }
     return Double(source).map(EdgeToolsValue.number)
   }
 
@@ -294,8 +304,12 @@ private struct PythonCallReader: ToolCallValueReader {
         }
 
         guard Self.isLFMTopLevelArgumentRule(ruleName) else { return value }
-        if value == "{" || value == "}" { return "" }
-        if value == ":" { return "=" }
+        if value == "{" || value == "}" {
+          return ""
+        }
+        if value == ":" {
+          return "="
+        }
         if value.count >= 2, value.first == "\"", value.last == "\"",
           #"":""#.firstRange(in: suffix) != nil
         {
@@ -314,7 +328,9 @@ private struct PythonCallReader: ToolCallValueReader {
       guard name != "root" else { return true }
       guard name.starts(with: "root_") else { return false }
       var digits = name.dropFirst("root_".count)
-      if digits.starts(with: "part_") { digits = digits.dropFirst("part_".count) }
+        if digits.starts(with: "part_") {
+          digits = digits.dropFirst("part_".count)
+        }
       return !digits.isEmpty && digits.allSatisfy { $0.isASCII && $0.isNumber }
     }
   }

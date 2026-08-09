@@ -59,7 +59,9 @@ extension Array where Element == UInt8 {
         depth += 1
       } else if byte == UInt8(ascii: "}") {
         depth -= 1
-        if depth == 0 { return 0..<(index + 1) }
+      if depth == 0 {
+        return 0..<(index + 1)
+      }
       }
       guard depth >= 0 else { return nil }
     }

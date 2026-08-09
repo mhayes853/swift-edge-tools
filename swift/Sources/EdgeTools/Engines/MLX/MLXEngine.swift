@@ -463,6 +463,31 @@
       let tokenIds: [EdgeToolsToken.ID]
       let cache: [any KVCache]
       let output: LMOutput
+      let context: EdgeToolsLLMPrefillContext?
+    }
+
+    private final class PrefillCacheState {
+      var cachedPrefill: CachedPrefill?
+      var inputContext: EdgeToolsLLMPrefillContext?
+
+      func input(for context: EdgeToolsLLMPrefillContext) -> LMInput? {
+        self.inputContext = context
+        guard let cachedPrefill, cachedPrefill.context == context else { return nil }
+        return cachedPrefill.input
+      }
+
+      func clearInputContext() {
+        self.inputContext = nil
+      }
+
+      func matches(input: LMInput) -> Bool {
+        mlxPrefillContextMatches(
+          cachedInput: self.cachedPrefill?.input,
+          input: input,
+          cachedContext: self.cachedPrefill?.context,
+          inputContext: self.inputContext
+        )
+      }
     }
 
     private struct Generation {
@@ -480,7 +505,7 @@
     private var languageModel: any LanguageModel
     private let processor: (any UserInputProcessor)?
     private let configuredExtraStopTokenIds: Set<EdgeToolsToken.ID>
-    private var cachedPrefill: CachedPrefill?
+    private let prefillCacheState = PrefillCacheState()
     private var generation: Generation?
 
     package init(
@@ -531,11 +556,10 @@
       parser: inout Profile.GenerationParser
     ) async throws -> EdgeToolsModelPreparation {
       Profile.prepare(prompt: &prompt, tools: tools, parser: &parser)
-      let input = try await Profile.input(
+      let input = try await self.input(
         prompt: prompt,
         tools: tools,
-        tokenizer: tokenizer,
-        processor: self.processor
+        tokenizer: tokenizer
       )
       return try await self.prepare(input: input, parameters: parameters)
     }
@@ -545,11 +569,10 @@
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer
     ) async throws -> [EdgeToolsToken.ID] {
-      let input = try await Profile.input(
+      let input = try await self.input(
         prompt: prompt,
         tools: tools,
-        tokenizer: tokenizer,
-        processor: self.processor
+        tokenizer: tokenizer
       )
       return input.text.tokens.asArray(EdgeToolsToken.ID.self)
     }
@@ -645,11 +668,10 @@
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer
     ) async throws -> EdgeToolsEnginePrefill {
-      let input = try await Profile.input(
+      let input = try await self.input(
         prompt: prompt,
         tools: tools,
-        tokenizer: tokenizer,
-        processor: self.processor
+        tokenizer: tokenizer
       )
       return try await self.prefill(input: input)
     }
@@ -663,11 +685,12 @@
       let prepared = try self.preparedOutput(input: input, tokenIds: tokenIds)
       eval(prepared.output.logits)
       eval(prepared.cache)
-      self.cachedPrefill = CachedPrefill(
+      self.prefillCacheState.cachedPrefill = CachedPrefill(
         input: input,
         tokenIds: tokenIds,
         cache: prepared.cache.map { $0.copy() },
-        output: prepared.output
+        output: prepared.output,
+        context: self.prefillCacheState.inputContext
       )
       let snapshot = Self.memorySnapshot(synchronize: true)
       var metadata = EdgeToolsMetadata()
@@ -681,13 +704,34 @@
       )
     }
 
+    private nonisolated(nonsending) func input(
+      prompt: Profile.Prompt,
+      tools: [EdgeToolDefinition],
+      tokenizer: any EdgeToolsTokenizer
+    ) async throws -> LMInput {
+      if let prompt = prompt as? EdgeToolsLLMPrompt {
+        let context = EdgeToolsLLMPrefillContext(prompt: prompt, tools: tools)
+        if let input = self.prefillCacheState.input(for: context) {
+          return input
+        }
+      } else {
+        self.prefillCacheState.clearInputContext()
+      }
+      return try await Profile.input(
+        prompt: prompt,
+        tools: tools,
+        tokenizer: tokenizer,
+        processor: self.processor
+      )
+    }
+
     private func preparedOutput(
       input: LMInput,
       tokenIds: [EdgeToolsToken.ID]
     ) throws -> (output: LMOutput, cache: [any KVCache], tokenCount: Int) {
-      guard let cachedPrefill = self.cachedPrefill,
+      guard let cachedPrefill = self.prefillCacheState.cachedPrefill,
         tokenIds.starts(with: cachedPrefill.tokenIds),
-        mlxPrefillContextsEqual(cachedPrefill.input, input)
+        self.prefillCacheState.matches(input: input)
       else {
         let cache = self.languageModel.newCache(parameters: nil)
         return (try self.prepareModelOutput(input: input, cache: cache), cache, tokenIds.count)
@@ -985,11 +1029,23 @@
     return model
   }
 
-  private func mlxPrefillContextsEqual(_ lhs: LMInput, _ rhs: LMInput) -> Bool {
-    mlxTextMasksHaveSamePrefix(lhs.text.mask, rhs.text.mask)
-      && mlxProcessedImagesEqual(lhs.image, rhs.image)
-      && mlxProcessedVideosEqual(lhs.video, rhs.video)
-      && mlxProcessedAudioEqual(lhs.audio, rhs.audio)
+  private func mlxPrefillContextMatches(
+    cachedInput: LMInput?,
+    input: LMInput,
+    cachedContext: EdgeToolsLLMPrefillContext?,
+    inputContext: EdgeToolsLLMPrefillContext?
+  ) -> Bool {
+    guard let cachedInput,
+      mlxTextMasksHaveSamePrefix(cachedInput.text.mask, input.text.mask)
+    else {
+      return false
+    }
+    if let cachedContext, let inputContext {
+      return cachedContext.hasMediaPrefix(in: inputContext)
+    }
+    return mlxProcessedImagesEqual(cachedInput.image, input.image)
+      && mlxProcessedVideosEqual(cachedInput.video, input.video)
+      && mlxProcessedAudioEqual(cachedInput.audio, input.audio)
   }
 
   private func mlxTextSuffix(_ text: LMInput.Text, from index: Int) -> LMInput.Text {

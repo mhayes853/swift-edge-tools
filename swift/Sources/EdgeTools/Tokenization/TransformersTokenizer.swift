@@ -136,7 +136,9 @@ private struct HuggingFaceBackendJSONScanner {
     while self.index < self.buffer.count {
       let byte = self.buffer[self.index]
       self.index += 1
-      if byte == .jsonQuote, !escaped { return start..<self.index }
+      if byte == .jsonQuote, !escaped {
+        return start..<self.index
+      }
       escaped = byte == .jsonEscape && !escaped
     }
     throw EdgeToolsError.invalidHuggingFaceBackendJSON
@@ -178,7 +180,9 @@ private struct HuggingFaceBackendJSONScanner {
       case .jsonOpenArray: endings.append(.jsonCloseArray)
       case .jsonCloseObject, .jsonCloseArray:
         guard endings.popLast() == byte else { throw EdgeToolsError.invalidHuggingFaceBackendJSON }
-        if endings.isEmpty { return }
+        if endings.isEmpty {
+          return
+        }
       default: break
       }
     }
