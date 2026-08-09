@@ -290,10 +290,9 @@ extension EdgeToolsSessionStream {
     let deliveredCounts = RawToolCallDeliveryState()
     return self.onPart { part in
       guard case .toolCall(let rawCall) = part else { return }
-      let calls = self.toolCalls.filter { $0.rawValue == rawCall }
-      let call = deliveredCounts.element(for: rawCall, in: calls)
-      if let call {
-        body(call)
+      let calls = Array(self.toolCalls.filter { $0.rawValue == rawCall })
+      if let index = deliveredCounts.nextIndex(for: rawCall, elementCount: calls.count) {
+        body(calls[index])
       }
     }
   }
@@ -690,12 +689,12 @@ extension EdgeToolsSession {
 private final class RawToolCallDeliveryState: Sendable {
   private let counts = Lock([EdgeRawToolCall: Int]())
 
-  func element<Element>(for rawCall: EdgeRawToolCall, in elements: [Element]) -> Element? {
+  func nextIndex(for rawCall: EdgeRawToolCall, elementCount: Int) -> Int? {
     self.counts.withLock { counts in
       let index = counts[rawCall, default: 0]
-      guard index < elements.count else { return nil }
+      guard index < elementCount else { return nil }
       counts[rawCall] = index + 1
-      return elements[index]
+      return index
     }
   }
 }
