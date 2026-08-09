@@ -39,5 +39,5 @@
     ▿ Message
       ▿ assistant: (2 elements)
         ▿ .0: Optional<String>
-          - some: "<think>\nThe weather in Paris is currently sunny with a temperature of 21°C.\n</think>\n\nThe weather in Paris is currently sunny with a temperature of 21°C."
+          - some: "<think>\nThe user asked for the weather in Paris, and I provided the current weather information. I should summarize the response clearly, including the condition, temperature, and location.\n</think>\n\nThe weather in Paris is currently **sunny** with a temperature of **21°C**."
         - toolCalls: 0 elements

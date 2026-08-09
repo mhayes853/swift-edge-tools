@@ -31,6 +31,25 @@ struct `Qwen3P5 tests` {
 
         withKnownIssue { assertSnapshot(of: transcript, as: .dump, record: .all) }
       }
+
+      @Test
+      func `Completes A Session Tool Turn With The Fused Sampler Snapshot`() async throws {
+        let engine = try await Qwen3P5MLXModelEngine(from: downloadQwen3P5())
+        let session = EdgeToolsSession(engine: engine) { WeatherTestTool() }
+        let turn = try await completeWeatherTurn(
+          using: session,
+          sampling: EdgeToolsFusedSamplingParameters(
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.9,
+            minP: 0.05,
+            repetitionPenalty: 1.1,
+            seed: 1234
+          )
+        )
+
+        withKnownIssue { assertSnapshot(of: turn, as: .dump, record: .all) }
+      }
     }
   #endif
 }

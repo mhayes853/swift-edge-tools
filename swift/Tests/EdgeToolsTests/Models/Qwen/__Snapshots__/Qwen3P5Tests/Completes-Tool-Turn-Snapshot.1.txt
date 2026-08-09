@@ -39,5 +39,5 @@
     ▿ Message
       ▿ assistant: (2 elements)
         ▿ .0: Optional<String>
-          - some: "Paris is currently sunny with a temperature of 21 degrees Celsius."
+          - some: "The weather in Paris is sunny with a temperature of 21 degrees Celsius."
         - toolCalls: 0 elements

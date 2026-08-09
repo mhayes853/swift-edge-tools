@@ -7,6 +7,7 @@
 
   private enum MLXGenerationTestError: Error {
     case missingToolCall
+    case missingToolOutput
     case missingFinalResponse
     case failedToCreateImage
   }
@@ -61,6 +62,72 @@
     guard !response.isEmpty else { throw MLXGenerationTestError.missingFinalResponse }
     transcript.messages.append(.assistant(response))
     return transcript
+  }
+
+  struct SessionWeatherTurnSnapshot: Hashable, Sendable {
+    var toolCalls: [EdgeRawToolCall]
+    var toolOutput: String
+    var response: String
+  }
+
+  func completeWeatherTurn<Engine: EdgeToolsEngine>(
+    using session: EdgeToolsSession<Engine>,
+    sampling parameters: EdgeToolsFusedSamplingParameters
+  ) async throws -> SessionWeatherTurnSnapshot
+  where
+    Engine.Prompt == EdgeToolsLLMPrompt,
+    Engine.GenerateParameters == DefaultMLXGenerateParameters
+  {
+    var transcript = EdgeToolsLLMPrompt.weatherTest
+    let toolGeneration = try await session.generate(
+      prompt: transcript,
+      parameters: DefaultMLXGenerateParameters(
+        sampler: MLXFusedSampler(parameters: parameters),
+        constraint: .toolsWithGrammar(range: .exact(1)),
+        maxTokens: 256
+      )
+    )
+    guard let toolCall = toolGeneration.toolCalls.first else {
+      throw MLXGenerationTestError.missingToolCall
+    }
+    guard let toolOutput = try await toolCall.output as? String else {
+      throw MLXGenerationTestError.missingToolOutput
+    }
+
+    transcript.messages.append(.assistant(toolCalls: toolGeneration.engineGeneration.toolCalls))
+    transcript.messages.append(.tool(name: "getWeather", response: .string(toolOutput)))
+    let responseGeneration = try await session.generate(
+      prompt: transcript,
+      parameters: DefaultMLXGenerateParameters(
+        sampler: MLXFusedSampler(parameters: parameters),
+        constraint: .unconstrained,
+        maxTokens: 64
+      )
+    )
+    let response = responseGeneration.response
+    guard !response.isEmpty else { throw MLXGenerationTestError.missingFinalResponse }
+    return SessionWeatherTurnSnapshot(
+      toolCalls: toolGeneration.engineGeneration.toolCalls,
+      toolOutput: toolOutput,
+      response: response
+    )
+  }
+
+  @EdgeToolsGenerable
+  struct WeatherToolArguments: Equatable {
+    var location: String
+  }
+
+  struct WeatherTestTool: EdgeTool {
+    typealias Input = WeatherToolArguments
+    typealias Output = String
+
+    let name = "getWeather"
+    let description = "Gets the weather for a city."
+
+    func invoke(input: WeatherToolArguments) async throws -> sending String {
+      "It is sunny and 21 degrees celsius in \(input.location)."
+    }
   }
 
   extension EdgeToolsLLMPrompt {
