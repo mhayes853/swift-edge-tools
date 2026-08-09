@@ -253,7 +253,7 @@ public struct NeedleGenerationParser: EdgeToolsGenerationParser, Sendable {
   }
 
   private mutating func nextTextPart(opener: String) -> EdgeToolsGenerationPart? {
-    guard let range = self.buffer.range(of: opener) else {
+    guard let range = opener.firstRange(in: self.buffer[...]) else {
       let retained = self.buffer.suffixPrefixLength(of: opener)
       guard self.buffer.count > retained else { return nil }
       let end = self.buffer.index(self.buffer.endIndex, offsetBy: -retained)

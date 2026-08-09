@@ -109,7 +109,7 @@ struct DelimitedGenerationParser: Sendable {
       defer { self.buffer = "" }
       return .reasoning(self.buffer)
     }
-    guard let range = self.buffer.range(of: reasoningCloser) else {
+    guard let range = reasoningCloser.firstRange(in: self.buffer[...]) else {
       return self.removeReasoningPrefix(retainingCloserPrefix: reasoningCloser)
     }
     if range.lowerBound > self.buffer.startIndex {
@@ -141,7 +141,7 @@ struct DelimitedGenerationParser: Sendable {
     markers: [String]
   ) -> (marker: String, range: Range<String.Index>)? {
     markers.compactMap { marker in
-      source.range(of: marker).map { (marker, $0) }
+      marker.firstRange(in: source[...]).map { (marker, $0) }
     }
     .min { $0.range.lowerBound < $1.range.lowerBound }
   }
@@ -173,20 +173,17 @@ struct DelimitedGenerationParser: Sendable {
     while cursor < source.endIndex {
       let nextIgnoredRegion = self.ignoredToolRegions
         .compactMap { region in
-          source.range(of: region.opener, range: cursor..<source.endIndex).map { (region, $0) }
+          region.opener.firstRange(in: source[cursor...]).map { (region, $0) }
         }
         .min { $0.1.lowerBound < $1.1.lowerBound }
-      let toolCloser = source.range(of: self.toolCloser, range: cursor..<source.endIndex)
+      let toolCloser = self.toolCloser.firstRange(in: source[cursor...])
       guard let toolCloser else { return nil }
       guard let nextIgnoredRegion, nextIgnoredRegion.1.lowerBound < toolCloser.lowerBound else {
         return toolCloser
       }
       let afterOpener = nextIgnoredRegion.1.upperBound
       guard
-        let ignoredCloser = source.range(
-          of: nextIgnoredRegion.0.closer,
-          range: afterOpener..<source.endIndex
-        )
+        let ignoredCloser = nextIgnoredRegion.0.closer.firstRange(in: source[afterOpener...])
       else { return nil }
       cursor = ignoredCloser.upperBound
     }
