@@ -209,9 +209,9 @@
   // MARK: - Prompt Conversion
 
   #if canImport(Tokenizers)
-    extension MLXLLMModelProfile where Prompt == EdgeToolsLLMPrompt {
+    extension MLXLLMModelProfile where Prompt == EdgeToolsConversationalPrompt {
       public static nonisolated(nonsending) func input(
-        prompt: EdgeToolsLLMPrompt,
+        prompt: EdgeToolsConversationalPrompt,
         tools: [EdgeToolDefinition],
         tokenizer: any EdgeToolsTokenizer,
         processor _: (any UserInputProcessor)?
@@ -228,26 +228,26 @@
       }
     }
 
-    extension EdgeToolsLLMPrompt {
+    extension EdgeToolsConversationalPrompt {
       fileprivate func mlxMessages() throws -> [MLXLMCommon.Message] {
         try self.messages.map { try $0.mlxMessage() }
       }
     }
 
-    extension EdgeToolsLLMPrompt.Message {
+    extension EdgeToolsConversationalPrompt.Message {
       public func mlxMessage() throws -> MLXLMCommon.Message {
         switch self {
-        case .system(let content):
-          ["role": "system", "content": content]
-        case .user(let content, images: _, videos: _, audio: _):
-          ["role": "user", "content": content]
-        case .assistant(let parts):
-          self.mlxAssistantMessage(parts: parts)
-        case .tool(let name, let response):
+        case .system(let message):
+          ["role": "system", "content": message.content]
+        case .user(let message):
+          ["role": "user", "content": message.content]
+        case .assistant(let message):
+          self.mlxAssistantMessage(parts: message.parts)
+        case .tool(let message):
           [
             "role": "tool",
-            "content": String(decoding: try Self.encode(response), as: UTF8.self),
-            "name": name
+            "content": String(decoding: try Self.encode(message.response), as: UTF8.self),
+            "name": message.name
           ]
         }
       }
@@ -337,7 +337,7 @@
       private let temporaryURLs: [URL]
 
       init<Assets: Sequence>(assets: Assets) throws
-      where Assets.Element == EdgeToolsLLMPrompt.Asset {
+      where Assets.Element == EdgeToolsConversationalPrompt.Asset {
         var videos = [UserInput.Video]()
         var temporaryURLs = [URL]()
         videos.reserveCapacity(assets.underestimatedCount)
@@ -379,7 +379,7 @@
       }
     }
 
-    extension EdgeToolsLLMPrompt.Asset {
+    extension EdgeToolsConversationalPrompt.Asset {
       public func mlxImage() throws -> UserInput.Image {
         switch self.content {
         case .path(let path):
@@ -393,13 +393,13 @@
       }
     }
 
-    extension Sequence where Element == EdgeToolsLLMPrompt.Asset {
+    extension Sequence where Element == EdgeToolsConversationalPrompt.Asset {
       package func mlxImages() throws -> [UserInput.Image] {
         try self.map { try $0.mlxImage() }
       }
     }
 
-    extension EdgeToolsLLMPrompt {
+    extension EdgeToolsConversationalPrompt {
       package func rejectAudio() throws {
         guard !self.audio.isEmpty else { return }
         throw EdgeToolsError.unsupportedMedia(
@@ -709,7 +709,7 @@
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer
     ) async throws -> LMInput {
-      if let prompt = prompt as? EdgeToolsLLMPrompt {
+      if let prompt = prompt as? EdgeToolsConversationalPrompt {
         let context = EdgeToolsLLMPrefillContext(prompt: prompt, tools: tools)
         if let input = self.prefillCacheState.input(for: context) {
           return input

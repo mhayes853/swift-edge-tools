@@ -8,14 +8,14 @@ import OrderedCollections
   // MARK: - Qwen3P5 Model
 
   public struct Qwen3P5MLXProfile: MLXLLMModelProfile {
-    public typealias Prompt = EdgeToolsLLMPrompt
+    public typealias Prompt = EdgeToolsConversationalPrompt
     public typealias GenerationParser = Qwen3P5GenerationParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarCompiler = XGRCompiler
     public typealias GrammarContext = XGRGrammarContext
 
     public static func grammar(
-      prompt: EdgeToolsLLMPrompt,
+      prompt: EdgeToolsConversationalPrompt,
       tools: [EdgeToolDefinition],
       parameters: DefaultMLXGenerateParameters,
       context: XGRGrammarContext
@@ -28,14 +28,14 @@ import OrderedCollections
     }
 
     public static func templateContext(
-      prompt: EdgeToolsLLMPrompt
+      prompt: EdgeToolsConversationalPrompt
     ) -> [String: any Sendable]? {
       guard prompt.reasoningEffort != .default else { return nil }
       return ["enable_thinking": prompt.reasoningEffort.isEnabled]
     }
 
     public static func prepare(
-      prompt: inout EdgeToolsLLMPrompt,
+      prompt: inout EdgeToolsConversationalPrompt,
       tools _: [EdgeToolDefinition],
       parser: inout Qwen3P5GenerationParser
     ) {
@@ -55,14 +55,14 @@ import OrderedCollections
   // MARK: - Qwen3P5 VLM Model
 
   public struct Qwen3P5VLMLXProfile: MLXVLMModelProfile {
-    public typealias Prompt = EdgeToolsLLMPrompt
+    public typealias Prompt = EdgeToolsConversationalPrompt
     public typealias GenerationParser = Qwen3P5GenerationParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarCompiler = XGRCompiler
     public typealias GrammarContext = XGRGrammarContext
 
     public static func grammar(
-      prompt: EdgeToolsLLMPrompt,
+      prompt: EdgeToolsConversationalPrompt,
       tools: [EdgeToolDefinition],
       parameters: DefaultMLXGenerateParameters,
       context: XGRGrammarContext
@@ -75,14 +75,14 @@ import OrderedCollections
     }
 
     public static func templateContext(
-      prompt: EdgeToolsLLMPrompt
+      prompt: EdgeToolsConversationalPrompt
     ) -> [String: any Sendable]? {
       guard prompt.reasoningEffort != .default else { return nil }
       return ["enable_thinking": prompt.reasoningEffort.isEnabled]
     }
 
     public static func prepare(
-      prompt: inout EdgeToolsLLMPrompt,
+      prompt: inout EdgeToolsConversationalPrompt,
       tools _: [EdgeToolDefinition],
       parser: inout Qwen3P5GenerationParser
     ) {
@@ -91,7 +91,7 @@ import OrderedCollections
     }
 
     public static nonisolated(nonsending) func input(
-      prompt: EdgeToolsLLMPrompt,
+      prompt: EdgeToolsConversationalPrompt,
       tools: [EdgeToolDefinition],
       tokenizer _: any EdgeToolsTokenizer,
       processor: (any UserInputProcessor)?
@@ -103,10 +103,10 @@ import OrderedCollections
         additionalContext: Self.templateContext(prompt: prompt)
       ) { message in
         switch message {
-        case .user(let text, let images, let videos, audio: _):
-          var content: [MLXLMCommon.Message] = images.map { _ in ["type": "image"] }
-          content.append(contentsOf: videos.map { _ in ["type": "video"] })
-          content.append(["type": "text", "text": text])
+        case .user(let message):
+          var content: [MLXLMCommon.Message] = message.images.map { _ in ["type": "image"] }
+          content.append(contentsOf: message.videos.map { _ in ["type": "video"] })
+          content.append(["type": "text", "text": message.content])
           return ["role": "user", "content": content]
         case .system, .assistant, .tool:
           return try message.mlxMessage()

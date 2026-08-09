@@ -2,14 +2,14 @@
   import EdgeToolsXGrammar
 
   public struct LFM2P5MLXProfile: MLXLLMModelProfile {
-    public typealias Prompt = EdgeToolsLLMPrompt
+    public typealias Prompt = EdgeToolsConversationalPrompt
     public typealias GenerationParser = LFM2P5GenerationParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarCompiler = XGRCompiler
     public typealias GrammarContext = XGRGrammarContext
 
     public static func grammar(
-      prompt _: EdgeToolsLLMPrompt,
+      prompt _: EdgeToolsConversationalPrompt,
       tools: [EdgeToolDefinition],
       parameters: DefaultMLXGenerateParameters,
       context: XGRGrammarContext

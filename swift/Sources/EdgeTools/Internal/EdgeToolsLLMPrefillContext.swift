@@ -21,7 +21,7 @@
       case bytes([UInt8], mimeType: EdgeToolsMIMEType?)
       case file(path: String, modificationDate: Date)
 
-      init(_ asset: EdgeToolsLLMPrompt.Asset) {
+      init(_ asset: EdgeToolsConversationalPrompt.Asset) {
         switch asset.content {
         case .bytes(let bytes):
           self = .bytes(bytes, mimeType: asset.mimeType)
@@ -43,22 +43,22 @@
     private let media: [Media]
     private let tools: [EdgeToolDefinition]
 
-    package init(prompt: EdgeToolsLLMPrompt, tools: [EdgeToolDefinition]) {
+    package init(prompt: EdgeToolsConversationalPrompt, tools: [EdgeToolDefinition]) {
       let messages: [Message] = prompt.messages.map { message in
         switch message {
-        case .system(let content):
-          .system(content)
-        case .user(let content, let images, let videos, let audio):
+        case .system(let message):
+          .system(message.content)
+        case .user(let message):
           .user(
-            content,
-            images: images.map(Asset.init),
-            videos: videos.map(Asset.init),
-            audio: audio.map(Asset.init)
+            message.content,
+            images: message.images.map(Asset.init),
+            videos: message.videos.map(Asset.init),
+            audio: message.audio.map(Asset.init)
           )
-        case .assistant(let parts):
-          .assistant(parts)
-        case .tool(let name, let response):
-          .tool(name: name, response: response)
+        case .assistant(let message):
+          .assistant(message.parts)
+        case .tool(let message):
+          .tool(name: message.name, response: message.response)
         }
       }
       self.messages = messages

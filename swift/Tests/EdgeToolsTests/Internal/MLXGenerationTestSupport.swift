@@ -18,9 +18,9 @@
 
   func completeWeatherTurn<Engine: EdgeToolsEngine>(
     using engine: Engine
-  ) async throws -> EdgeToolsLLMPrompt
+  ) async throws -> EdgeToolsConversationalPrompt
   where
-    Engine.Prompt == EdgeToolsLLMPrompt,
+    Engine.Prompt == EdgeToolsConversationalPrompt,
     Engine.GenerateParameters == DefaultMLXGenerateParameters
   {
     try await completeToolTurn(
@@ -41,10 +41,10 @@
     using engine: Engine
   ) async throws -> EdgeToolsEngineGeneration
   where
-    Engine.Prompt == EdgeToolsLLMPrompt,
+    Engine.Prompt == EdgeToolsConversationalPrompt,
     Engine.GenerateParameters == DefaultMLXGenerateParameters
   {
-    let prompt = EdgeToolsLLMPrompt(
+    let prompt = EdgeToolsConversationalPrompt(
       messages: [
         .user(
           "Think carefully before answering: what is the sum of 19 and 23? Keep the final answer brief."
@@ -65,7 +65,7 @@
     return generation
   }
 
-  extension EdgeToolsLLMPrompt {
+  extension EdgeToolsConversationalPrompt {
     static let weatherTest = Self(messages: [
       .system(
         "Use getWeather when needed. After receiving its result, summarize it for the user."
@@ -117,10 +117,10 @@
     using engine: Engine
   ) async throws -> String
   where
-    Engine.Prompt == EdgeToolsLLMPrompt,
+    Engine.Prompt == EdgeToolsConversationalPrompt,
     Engine.GenerateParameters == DefaultMLXGenerateParameters
   {
-    let prompt = EdgeToolsLLMPrompt(messages: [
+    let prompt = EdgeToolsConversationalPrompt(messages: [
       .user(
         "What is the dominant color in this image? Answer briefly.",
         images: [try redImageAsset()]
@@ -139,12 +139,12 @@
     using engine: Engine
   ) async throws -> VLMToolTurnSnapshot
   where
-    Engine.Prompt == EdgeToolsLLMPrompt,
+    Engine.Prompt == EdgeToolsConversationalPrompt,
     Engine.GenerateParameters == DefaultMLXGenerateParameters
   {
     let turn = try await completeToolTurn(
       using: engine,
-      prompt: EdgeToolsLLMPrompt(messages: [
+      prompt: EdgeToolsConversationalPrompt(messages: [
         .system(
           "Inspect the image and call reportColor with its dominant color. After the tool result, summarize it."
         ),
@@ -159,17 +159,17 @@
 
   private func completeToolTurn<Engine: EdgeToolsEngine>(
     using engine: Engine,
-    prompt: EdgeToolsLLMPrompt,
+    prompt: EdgeToolsConversationalPrompt,
     tool: EdgeToolDefinition,
     toolResponse: EdgeToolsValue,
     toolMaxTokens: Int
   ) async throws -> (
-    transcript: EdgeToolsLLMPrompt,
+    transcript: EdgeToolsConversationalPrompt,
     toolCalls: [EdgeRawToolCall],
     response: String
   )
   where
-    Engine.Prompt == EdgeToolsLLMPrompt,
+    Engine.Prompt == EdgeToolsConversationalPrompt,
     Engine.GenerateParameters == DefaultMLXGenerateParameters
   {
     var transcript = prompt
@@ -213,12 +213,12 @@
     using engine: Engine
   ) async throws -> String
   where
-    Engine.Prompt == EdgeToolsLLMPrompt,
+    Engine.Prompt == EdgeToolsConversationalPrompt,
     Engine.GenerateParameters == DefaultMLXGenerateParameters
   {
     let video = try await redVideoAsset()
     defer { video.remove() }
-    let prompt = EdgeToolsLLMPrompt(messages: [
+    let prompt = EdgeToolsConversationalPrompt(messages: [
       .user(
         "What is the dominant color in this video? Answer briefly.",
         videos: [video.asset]
@@ -237,12 +237,12 @@
     using engine: Engine
   ) async throws -> String
   where
-    Engine.Prompt == EdgeToolsLLMPrompt,
+    Engine.Prompt == EdgeToolsConversationalPrompt,
     Engine.GenerateParameters == DefaultMLXGenerateParameters
   {
     let video = try await redVideoAsset()
     defer { video.remove() }
-    let prompt = EdgeToolsLLMPrompt(messages: [
+    let prompt = EdgeToolsConversationalPrompt(messages: [
       .user(
         "What is the dominant color across the image and video? Answer briefly.",
         images: [try redImageAsset()],
@@ -262,14 +262,14 @@
     using engine: Engine
   ) async throws -> VLMToolTurnSnapshot
   where
-    Engine.Prompt == EdgeToolsLLMPrompt,
+    Engine.Prompt == EdgeToolsConversationalPrompt,
     Engine.GenerateParameters == DefaultMLXGenerateParameters
   {
     let video = try await redVideoAsset()
     defer { video.remove() }
     let turn = try await completeToolTurn(
       using: engine,
-      prompt: EdgeToolsLLMPrompt(messages: [
+      prompt: EdgeToolsConversationalPrompt(messages: [
         .system(
           "Inspect the video and call reportColor with its dominant color. After the tool result, summarize it."
         ),
@@ -282,7 +282,7 @@
     return VLMToolTurnSnapshot(toolCalls: turn.toolCalls, response: turn.response)
   }
 
-  private func redImageAsset() throws -> EdgeToolsLLMPrompt.Asset {
+  private func redImageAsset() throws -> EdgeToolsConversationalPrompt.Asset {
     let width = 128
     let height = 128
     guard
@@ -319,11 +319,11 @@
     guard CGImageDestinationFinalize(destination) else {
       throw MLXGenerationTestError.failedToCreateImage
     }
-    return EdgeToolsLLMPrompt.Asset(bytes: Array(data as Data), mimeTypeOverride: .png)
+    return EdgeToolsConversationalPrompt.Asset(bytes: Array(data as Data), mimeTypeOverride: .png)
   }
 
   private struct VideoTestAsset {
-    let asset: EdgeToolsLLMPrompt.Asset
+    let asset: EdgeToolsConversationalPrompt.Asset
     let url: URL
 
     func remove() {
@@ -387,7 +387,7 @@
       throw MLXGenerationTestError.failedToFinishVideo
     }
     return VideoTestAsset(
-      asset: EdgeToolsLLMPrompt.Asset(path: url.path(), mimeTypeOverride: .mp4),
+      asset: EdgeToolsConversationalPrompt.Asset(path: url.path(), mimeTypeOverride: .mp4),
       url: url
     )
   }

@@ -6,14 +6,14 @@
   // MARK: - Qwen3 Model
 
   public struct Qwen3MLXProfile: MLXLLMModelProfile {
-    public typealias Prompt = EdgeToolsLLMPrompt
+    public typealias Prompt = EdgeToolsConversationalPrompt
     public typealias GenerationParser = Qwen3GenerationParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarCompiler = XGRCompiler
     public typealias GrammarContext = XGRGrammarContext
 
     public static func grammar(
-      prompt: EdgeToolsLLMPrompt,
+      prompt: EdgeToolsConversationalPrompt,
       tools: [EdgeToolDefinition],
       parameters: DefaultMLXGenerateParameters,
       context: XGRGrammarContext
@@ -26,7 +26,7 @@
     }
 
     public static func templateContext(
-      prompt: EdgeToolsLLMPrompt
+      prompt: EdgeToolsConversationalPrompt
     ) -> [String: any Sendable]? {
       guard prompt.reasoningEffort != .default else { return nil }
       return ["enable_thinking": prompt.reasoningEffort.isEnabled]
