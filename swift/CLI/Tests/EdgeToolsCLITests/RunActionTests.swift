@@ -88,11 +88,42 @@ struct `RunAction tests` {
       try await runModel(
         context: .stub(runner: .stub(supportsSampling: false)),
         source: .test(),
-        request: GenerationRequest(user: "hello", temperature: 0.7)
+        request: GenerationRequest(user: "hello", topK: 40)
       )
     }
 
-    expectNoDifference(try #require(error).description.contains("greedily"), true)
+    expectNoDifference(try #require(error).description.contains("Sampler options"), true)
+  }
+
+  @Test
+  func `Uses Model Sampling Defaults Without An Override`() {
+    let request = GenerationRequest(user: "hello")
+
+    expectNoDifference(request.hasSamplingOverride, false)
+    expectNoDifference(request.fusedSamplingParameters, nil)
+  }
+
+  @Test
+  func `Builds Fused Sampling Parameters From An Override`() throws {
+    let request = GenerationRequest(
+      user: "hello",
+      topK: 40,
+      minP: 0.05,
+      repetitionPenalty: 1.1,
+      presencePenalty: 0.2,
+      repetitionContextSize: 32,
+      seed: 1234
+    )
+    let parameters = try #require(request.fusedSamplingParameters)
+
+    expectNoDifference(parameters.temperature, 0.6)
+    expectNoDifference(parameters.topK, 40)
+    expectNoDifference(parameters.topP, nil)
+    expectNoDifference(parameters.minP, 0.05)
+    expectNoDifference(parameters.repetitionPenalty, 1.1)
+    expectNoDifference(parameters.presencePenalty, 0.2)
+    expectNoDifference(parameters.repetitionContextSize, 32)
+    expectNoDifference(parameters.seed, 1234)
   }
 
   @Test
@@ -127,4 +158,4 @@ struct `RunAction tests` {
   }
 }
 
-private typealias Asset = EdgeToolsLLMPrompt.Asset
+private typealias Asset = EdgeToolsConversationalPrompt.Asset

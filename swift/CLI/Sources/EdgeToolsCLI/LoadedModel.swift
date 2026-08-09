@@ -40,11 +40,11 @@ extension LoadedModel {
 
 extension LoadedModel {
   func validate(_ request: GenerationRequest) throws -> GenerationRequest {
-    guard request.temperature == 0 || self.runner.supportsSampling else {
+    guard !request.hasSamplingOverride || self.runner.supportsSampling else {
       throw EdgeCLIError(
         """
         \(self.detection.model.displayName) on \(self.runner.engine.rawValue) always samples greedily; \
-        --temperature and --top-p do not apply.
+        Sampler options do not apply.
         """
       )
     }

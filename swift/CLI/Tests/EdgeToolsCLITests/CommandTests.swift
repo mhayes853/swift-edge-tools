@@ -92,4 +92,32 @@ struct `Command tests` {
       )
     }
   }
+
+  @Test
+  func `Passes Fused Sampler Options To The Request`() async throws {
+    let requests = LockedBox<GenerationRequest?>(nil)
+    let (context, _) = EdgeContext.test(
+      context: .stub(runner: .stub(onGenerate: { requests.value = $0 }))
+    )
+
+    try await EdgeCommand.run(
+      arguments: [
+        "--path", "/models/needle", "--prompt", "hello", "--stream", "none",
+        "--temperature", "0.7", "--top-k", "40", "--top-p", "0.9", "--min-p", "0.05",
+        "--repetition-penalty", "1.1", "--presence-penalty", "0.2",
+        "--repetition-context-size", "32", "--seed", "1234"
+      ],
+      context: context
+    )
+
+    let parameters = try #require(requests.value?.fusedSamplingParameters)
+    expectNoDifference(parameters.temperature, 0.7)
+    expectNoDifference(parameters.topK, 40)
+    expectNoDifference(parameters.topP, 0.9)
+    expectNoDifference(parameters.minP, 0.05)
+    expectNoDifference(parameters.repetitionPenalty, 1.1)
+    expectNoDifference(parameters.presencePenalty, 0.2)
+    expectNoDifference(parameters.repetitionContextSize, 32)
+    expectNoDifference(parameters.seed, 1234)
+  }
 }

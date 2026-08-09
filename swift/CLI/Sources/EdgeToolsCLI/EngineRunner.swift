@@ -204,7 +204,7 @@ extension EngineRunner {
         prompt: needlePrompt,
         parameters: { request in
           NeedleMLXGenerateParameters(
-            sampler: mlxSampler(for: request),
+            sampler: needleMLXSampler(for: request),
             maxTokens: request.maxTokens,
             toolCallRange: request.toolCallRange
           )
@@ -288,7 +288,7 @@ extension EngineRunner {
       make: () async throws -> MLXEngine<Profile>
     ) async throws -> Self
     where
-      Profile.Prompt == EdgeToolsLLMPrompt,
+      Profile.Prompt == EdgeToolsConversationalPrompt,
       Profile.GenerateParameters == DefaultMLXGenerateParameters,
       Profile.GrammarCompiler == XGRCompiler,
       Profile.GrammarContext == XGRGrammarContext
@@ -306,7 +306,7 @@ extension EngineRunner {
         prompt: llmPrompt,
         parameters: { request in
           DefaultMLXGenerateParameters(
-            sampler: mlxSampler(for: request),
+            sampler: request.fusedSamplingParameters.map { MLXFusedSampler(parameters: $0) },
             constraint: try request.grammar.constraint(toolCallRange: request.toolCallRange),
             maxTokens: request.maxTokens
           )
@@ -353,18 +353,19 @@ private func needlePrompt(for request: GenerationRequest) -> NeedlePrompt {
 }
 
 #if canImport(MLX)
-  private func llmPrompt(for request: GenerationRequest) -> EdgeToolsLLMPrompt {
-    var messages = [EdgeToolsLLMPrompt.Message]()
+  private func llmPrompt(for request: GenerationRequest) -> EdgeToolsConversationalPrompt {
+    var messages = [EdgeToolsConversationalPrompt.Message]()
     if !request.system.isEmpty { messages.append(.system(request.system)) }
     messages.append(.user(request.user, images: request.images))
-    return EdgeToolsLLMPrompt(
+    return EdgeToolsConversationalPrompt(
       messages: messages,
       reasoningEffort: request.reasoning
     )
   }
 
-  private func mlxSampler(for request: GenerationRequest) -> any LogitSampler {
-    guard request.temperature > 0 else { return ArgMaxSampler() }
-    return TopPSampler(temperature: request.temperature, topP: request.topP)
+  private func needleMLXSampler(for request: GenerationRequest) -> any LogitSampler {
+    let temperature = request.temperature ?? 0
+    guard temperature > 0 else { return ArgMaxSampler() }
+    return TopPSampler(temperature: temperature, topP: request.topP ?? 1)
   }
 #endif
