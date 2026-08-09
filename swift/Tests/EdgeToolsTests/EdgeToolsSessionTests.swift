@@ -805,7 +805,9 @@ extension String {
     return strings.enumerated()
       .compactMap { index, tokenString in
         guard let id = tokenizer.convertTokenToId(tokenString) else { return nil }
-        if index == 0, tokenString.hasPrefix("▁") { return nil }
+        if index == 0, tokenString.hasPrefix("▁") {
+          return nil
+        }
         return EdgeToolsToken(id: id, stringValue: tokenString)
       }
   }
@@ -820,7 +822,9 @@ private struct GetWeatherTool: EdgeTool {
   let name = "GetWeather"
   let description = ""
 
-  func invoke(input: String) async throws -> sending String { "" }
+  func invoke(input: String) async throws -> sending String {
+    ""
+  }
 }
 
 // MARK: - Reentrant Mock Engine
@@ -926,5 +930,7 @@ private struct GETWEATHERTOOL: EdgeTool {
   let name = "GETWEATHER"
   let description = ""
 
-  func invoke(input: String) async throws -> sending String { "" }
+  func invoke(input: String) async throws -> sending String {
+    ""
+  }
 }

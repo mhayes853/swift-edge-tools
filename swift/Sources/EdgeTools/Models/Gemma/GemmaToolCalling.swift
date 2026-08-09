@@ -80,7 +80,9 @@ private struct GemmaToolCallParser: EdgeToolCallParser, Sendable {
         stringMarker: self.format.stringMarker,
         markedValuesAreJSON: self.format.marksAllValues
       )
-      if let call = reader.parse() { return call }
+      if let call = reader.parse() {
+        return call
+      }
     }
     return nil
   }
@@ -158,10 +160,18 @@ private struct GemmaCallReader: ToolCallValueReader {
   }
 
   private static func parseBareValue(_ token: String) -> EdgeToolsValue? {
-    if token.isEmpty { return nil }
-    if let value = parseToolCallBooleanOrNull(token) { return value }
-    if let integer = Int(token) { return .integer(integer) }
-    if let number = Double(token) { return .number(number) }
+    if token.isEmpty {
+      return nil
+    }
+    if let value = parseToolCallBooleanOrNull(token) {
+      return value
+    }
+    if let integer = Int(token) {
+      return .integer(integer)
+    }
+    if let number = Double(token) {
+      return .number(number)
+    }
     return .string(token)
   }
 }
@@ -202,7 +212,9 @@ private struct GemmaCallReader: ToolCallValueReader {
       var document = try XGREBNFDocument(xmlArguments.ebnf)
       try document.mapLiterals { ruleName, value, suffix in
         if value == "</parameter>" {
-          if ruleName.hasPrefix("xml_string") { return format.stringMarker }
+          if ruleName.hasPrefix("xml_string") {
+            return format.stringMarker
+          }
           let marker = format.marksAllValues ? format.stringMarker : ""
           return suffix.hasToolCallContinuationReference ? "\(marker)," : marker
         }
@@ -216,7 +228,9 @@ private struct GemmaCallReader: ToolCallValueReader {
             }
           return "\(name):\(marker)"
         }
-        if value == "<parameter=" { return "" }
+        if value == "<parameter=" {
+          return ""
+        }
         if value == ">", ruleName.hasPrefix("xml_object") {
           return format.marksAllValues ? ":\(format.stringMarker)" : ":"
         }

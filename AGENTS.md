@@ -59,6 +59,8 @@ Grammar constraints and tool argument parsing are generally represented through 
 
 Generally speaking, follow the patterns you see already for the most part. The following are generally mistakes that previous agents have made.
 
+One-line `if` statements with a `return` on the same line are not allowed. Non-empty function signatures and bodies must be on separate lines. Deinits and empty functions may remain on one line.
+
 Avoid using things like `.init` or making excessive amounts of static functions. If a function doesn't reasonably belong on a type, feel free to make it a global function.
 
 Separate significant sections of functionallity or types with MARK comments. MARK comments should never appear inside type, extension, or function bodies. Always keep them at the file scope.

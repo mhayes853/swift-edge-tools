@@ -145,7 +145,9 @@ public struct QwenXMLToolCallParser: EdgeToolCallParser, Sendable {
   }
 
   private static func parseParameterValue(_ source: String) -> EdgeToolsValue {
-    if let value = parseToolCallBooleanOrNull(source) { return value }
+    if let value = parseToolCallBooleanOrNull(source) {
+      return value
+    }
     return (try? EdgeToolsValue(json: source)) ?? .string(source)
   }
 }

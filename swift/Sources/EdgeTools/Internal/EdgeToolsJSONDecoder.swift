@@ -270,18 +270,42 @@
       return YYJSONValueDecoder.string(from: self.decoder.value)
     }
 
-    func decode(_ type: Double.Type) throws -> Double { try self.floatingPoint(type) }
-    func decode(_ type: Float.Type) throws -> Float { try self.floatingPoint(type) }
-    func decode(_ type: Int.Type) throws -> Int { try self.integer(type) }
-    func decode(_ type: Int8.Type) throws -> Int8 { try self.integer(type) }
-    func decode(_ type: Int16.Type) throws -> Int16 { try self.integer(type) }
-    func decode(_ type: Int32.Type) throws -> Int32 { try self.integer(type) }
-    func decode(_ type: Int64.Type) throws -> Int64 { try self.integer(type) }
-    func decode(_ type: UInt.Type) throws -> UInt { try self.integer(type) }
-    func decode(_ type: UInt8.Type) throws -> UInt8 { try self.integer(type) }
-    func decode(_ type: UInt16.Type) throws -> UInt16 { try self.integer(type) }
-    func decode(_ type: UInt32.Type) throws -> UInt32 { try self.integer(type) }
-    func decode(_ type: UInt64.Type) throws -> UInt64 { try self.integer(type) }
+    func decode(_ type: Double.Type) throws -> Double {
+      try self.floatingPoint(type)
+    }
+    func decode(_ type: Float.Type) throws -> Float {
+      try self.floatingPoint(type)
+    }
+    func decode(_ type: Int.Type) throws -> Int {
+      try self.integer(type)
+    }
+    func decode(_ type: Int8.Type) throws -> Int8 {
+      try self.integer(type)
+    }
+    func decode(_ type: Int16.Type) throws -> Int16 {
+      try self.integer(type)
+    }
+    func decode(_ type: Int32.Type) throws -> Int32 {
+      try self.integer(type)
+    }
+    func decode(_ type: Int64.Type) throws -> Int64 {
+      try self.integer(type)
+    }
+    func decode(_ type: UInt.Type) throws -> UInt {
+      try self.integer(type)
+    }
+    func decode(_ type: UInt8.Type) throws -> UInt8 {
+      try self.integer(type)
+    }
+    func decode(_ type: UInt16.Type) throws -> UInt16 {
+      try self.integer(type)
+    }
+    func decode(_ type: UInt32.Type) throws -> UInt32 {
+      try self.integer(type)
+    }
+    func decode(_ type: UInt64.Type) throws -> UInt64 {
+      try self.integer(type)
+    }
 
     func decode<T: Decodable>(_ type: T.Type) throws -> T {
       try T(from: self.decoder)
@@ -317,7 +341,11 @@
       self.stringValue = "Index \(index)"
     }
 
-    init?(stringValue: String) { return nil }
-    init?(intValue: Int) { self.init(index: intValue) }
+    init?(stringValue: String) {
+      return nil
+    }
+    init?(intValue: Int) {
+      self.init(index: intValue)
+    }
   }
 #endif

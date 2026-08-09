@@ -546,7 +546,9 @@
     ) async throws -> LMInput {
       if let prompt = prompt as? EdgeToolsLLMPrompt {
         let context = EdgeToolsLLMPrefillContext(prompt: prompt, tools: tools)
-        if let input = self.prefillCacheState.input(for: context) { return input }
+        if let input = self.prefillCacheState.input(for: context) {
+          return input
+        }
       } else {
         self.prefillCacheState.clearInputContext()
       }

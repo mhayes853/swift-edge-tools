@@ -29,7 +29,9 @@ struct DefinitionTool: EdgeTool {
   var arguments: EdgeToolsGenerationSchema { self.definition.arguments }
   var includesSchemaInInstructions: Bool { self.definition.includesSchemaInInstructions }
 
-  func invoke(input: String) async throws -> sending String { "" }
+  func invoke(input: String) async throws -> sending String {
+    ""
+  }
 }
 
 // MARK: - SendEmailTool
