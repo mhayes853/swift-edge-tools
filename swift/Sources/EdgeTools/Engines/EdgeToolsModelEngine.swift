@@ -37,9 +37,8 @@
 
   public protocol EdgeToolsModel: SendableMetatype {
     associatedtype Prompt: Sendable
-    associatedtype Input: EdgeToolsModelInput
     associatedtype GenerateParameters: EdgeToolsEngineGenerateParameters
-    associatedtype ToolCallParser: EdgeToolCallParser
+    associatedtype GenerationParser: EdgeToolsGenerationParser
     associatedtype GrammarContext = Void
     associatedtype GrammarCompiler: EdgeToolsGrammarCompiler, ~Copyable
     where GrammarCompiler.Context == GrammarContext
@@ -51,25 +50,24 @@
     func grammarCompiler(context: borrowing GrammarContext) throws -> GrammarCompiler
 
     func grammar(
+      prompt: Prompt,
       tools: [EdgeToolDefinition],
       parameters: GenerateParameters,
       context: GrammarContext
     ) throws -> GrammarCompiler.Grammar
 
-    func toolCallGrammar(
-      tools: [EdgeToolDefinition],
-      range: GrammarToolCallRange
-    ) throws -> GrammarCompiler.Grammar
-
-    nonisolated(nonsending) func input(
+    nonisolated(nonsending) func tokenIds(
       prompt: Prompt,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer
-    ) async throws -> Input
+    ) async throws -> [EdgeToolsToken.ID]
 
     nonisolated(nonsending) mutating func prepare(
-      input: Input,
-      parameters: GenerateParameters
+      prompt: inout Prompt,
+      tools: [EdgeToolDefinition],
+      tokenizer: any EdgeToolsTokenizer,
+      parameters: GenerateParameters,
+      parser: inout GenerationParser
     ) async throws -> EdgeToolsModelPreparation
 
     nonisolated(nonsending) mutating func decode(
@@ -96,30 +94,13 @@
     public mutating func resetGeneration() {}
   }
 
-  extension EdgeToolsModel
-  where
-    GenerateParameters: EdgeToolsConstrainedGenerateParameters,
-    GenerateParameters.Constraint.Grammar == GrammarCompiler.Grammar,
-    GenerateParameters.Constraint.Context == GrammarContext
-  {
-    public func grammar(
-      tools: [EdgeToolDefinition],
-      parameters: GenerateParameters,
-      context: GrammarContext
-    ) throws -> GrammarCompiler.Grammar {
-      let constraint = parameters.constraint
-      let toolCallGrammar = try constraint.toolCallRange.map {
-        try self.toolCallGrammar(tools: tools, range: $0)
-      }
-      return try constraint.grammar(toolCallGrammar: toolCallGrammar, context: context)
-    }
-  }
-
   // MARK: - EdgeToolsPrefillableModel
 
   public protocol EdgeToolsPrefillableModel: EdgeToolsModel {
     nonisolated(nonsending) mutating func prefill(
-      input: Input
+      prompt: Prompt,
+      tools: [EdgeToolDefinition],
+      tokenizer: any EdgeToolsTokenizer
     ) async throws -> EdgeToolsEnginePrefill
   }
 
@@ -148,13 +129,13 @@
       prompt: Model.Prompt,
       tools: [EdgeToolDefinition] = []
     ) async throws -> [EdgeToolsToken] {
-      let input = try await self.model.input(
+      let tokenIds = try await self.model.tokenIds(
         prompt: prompt,
         tools: tools,
         tokenizer: self.tokenizer
       )
-      let tokens = self.tokenizer.convertIdsToTokens(input.tokenIds)
-      return zip(input.tokenIds, tokens)
+      let tokens = self.tokenizer.convertIdsToTokens(tokenIds)
+      return zip(tokenIds, tokens)
         .compactMap { tokenId, token in
           token.map { EdgeToolsToken(id: tokenId, stringValue: $0) }
         }
@@ -247,7 +228,19 @@
       let initialState = state.load(ordering: .relaxed)
       guard initialState != AtomicGenerationTask.State.stopped.rawValue else { return .empty }
 
+      var prompt = prompt
+      var parser = Model.GenerationParser()
+      let generateStart = self.clock.now
+      var preparation = try await model.prepare(
+        prompt: &prompt,
+        tools: tools,
+        tokenizer: self.tokenizer,
+        parameters: parameters,
+        parser: &parser
+      )
+
       let grammar = try model.grammar(
+        prompt: prompt,
         tools: tools,
         parameters: parameters,
         context: self.grammarContext
@@ -258,13 +251,9 @@
       }
 
       var matcher = try self.matcher(grammar: grammar, stopTokenIds: stopTokenIds)
-      let generateStart = self.clock.now
-      let input = try await model.input(prompt: prompt, tools: tools, tokenizer: self.tokenizer)
-      var preparation = try await model.prepare(input: input, parameters: parameters)
       var detokenizer = StreamingDetokenizer()
-      var parser = Model.ToolCallParser()
       var generatedTokens = [EdgeToolsToken]()
-      var toolCalls = [EdgeRawToolCall]()
+      var parts = [EdgeToolsGenerationPart]()
       var confidence = ConfidenceState()
       var durationToFirstToken: Duration?
       let maximumTokenCount = parameters.maxTokens ?? .max
@@ -297,9 +286,10 @@
         }
 
         channel.emit(token: token)
-        for rawToolCall in parser.accept(token: token) {
-          toolCalls.append(rawToolCall)
-          channel.emit(toolCall: rawToolCall)
+        let parsedParts = stopTokenIds.contains(token.id) ? [] : parser.accept(token: token)
+        for part in parsedParts {
+          parts.append(part)
+          channel.emit(part: part)
         }
 
         bitmask = nil
@@ -312,6 +302,11 @@
           try Task.checkCancellation()
           bitmask = matcher.bitmask()
         }
+      }
+
+      for part in parser.finish() {
+        parts.append(part)
+        channel.emit(part: part)
       }
 
       let finalDurationToFirstToken = durationToFirstToken ?? .zero
@@ -337,7 +332,7 @@
         wasStopped: finalState == AtomicGenerationTask.State.stopped.rawValue,
         tokens: generatedTokens,
         response: response,
-        toolCalls: toolCalls,
+        parts: parts,
         metadata: preparation.metadata
       )
     }
@@ -373,12 +368,11 @@
       try await self.generationGate.acquire()
       var model = self.model
       do {
-        let input = try await model.input(
+        let prefill = try await model.prefill(
           prompt: promptPrefix,
           tools: tools,
           tokenizer: self.tokenizer
         )
-        let prefill = try await model.prefill(input: input)
         self.model = model
         await self.generationGate.release()
         return prefill

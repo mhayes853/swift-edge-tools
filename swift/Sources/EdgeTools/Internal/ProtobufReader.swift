@@ -30,7 +30,9 @@ struct ProtobufReader {
         throw NeedleSPTokenizerError.invalidProtobuf(message: "contains an overflowing varint.")
       }
       value |= UInt64(byte & 0x7F) << UInt64(index * 7)
-      if byte & 0x80 == 0 { return value }
+      if byte & 0x80 == 0 {
+        return value
+      }
     }
     throw NeedleSPTokenizerError.invalidProtobuf(message: "contains an overflowing varint.")
   }

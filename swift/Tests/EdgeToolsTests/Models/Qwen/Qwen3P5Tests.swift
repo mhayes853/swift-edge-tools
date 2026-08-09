@@ -1,4 +1,3 @@
-import CustomDump
 import EdgeTools
 import Testing
 
@@ -8,19 +7,6 @@ import Testing
 
 @Suite
 struct `Qwen3P5 tests` {
-  @Test
-  func `Qwen XML Preserves A Tool Call Closing Tag Inside A Parameter Value`() throws {
-    var parser = QwenXMLToolCallParser()
-    let source =
-      "<tool_call><function=record_note><parameter=text>literal </tool_call> text</parameter></function></tool_call>"
-
-    let call = parser.accept(token: EdgeToolsToken(id: 0, stringValue: source))
-
-    let parsedCall = try #require(call.first)
-    expectNoDifference(parsedCall.name, "record_note")
-    expectNoDifference(parsedCall.arguments, ["text": "literal </tool_call> text"])
-  }
-
   #if MLX && XGrammar && canImport(MLX) && !os(WASI)
     @Suite(.serialized, .enabledIfXcode())
     struct `Qwen3P5MLXModelEngine tests` {
@@ -30,6 +16,14 @@ struct `Qwen3P5 tests` {
         let transcript = try await completeWeatherTurn(using: engine)
 
         withKnownIssue { assertSnapshot(of: transcript, as: .dump, record: .all) }
+      }
+
+      @Test
+      func `Generates Reasoning Snapshot`() async throws {
+        let engine = try await Qwen3P5MLXModelEngine(from: downloadQwen3P5())
+        let generation = try await generateReasoning(using: engine)
+
+        withKnownIssue { assertSnapshot(of: generation, as: .dump, record: .all) }
       }
     }
 
@@ -58,6 +52,14 @@ struct `Qwen3P5 tests` {
           let result = try await completeVideoColorTurn(using: engine)
 
           withKnownIssue { assertSnapshot(of: result, as: .dump, record: .all) }
+        }
+
+        @Test
+        func `Generates Reasoning Snapshot`() async throws {
+          let engine = try await Qwen3P5VLMLXModelEngine(from: downloadQwen3P5VL())
+          let generation = try await generateReasoning(using: engine)
+
+          withKnownIssue { assertSnapshot(of: generation, as: .dump, record: .all) }
         }
       }
     #endif

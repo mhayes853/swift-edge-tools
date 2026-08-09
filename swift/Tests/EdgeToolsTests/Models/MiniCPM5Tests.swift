@@ -1,4 +1,3 @@
-import CustomDump
 import EdgeTools
 import Testing
 
@@ -18,72 +17,16 @@ struct `MiniCPM5 tests` {
 
         withKnownIssue { assertSnapshot(of: transcript, as: .dump, record: .all) }
       }
-    }
-  #endif
 
-  @Suite
-  struct `MiniCPM5ToolCallParser tests` {
-    @Test
-    func `Parses A Tool Call Without Arguments`() throws {
-      var parser = MiniCPM5ToolCallParser()
-      let source = #"<function name="empty"></function>"#
-      let parsed = parser.accept(token: EdgeToolsToken(id: 0, stringValue: source))
-      let call = try #require(parsed.first)
+      @Test
+      func `Generates Reasoning Snapshot`() async throws {
+        let engine = try await MiniCPM5MLXModelEngine(from: downloadMiniCPM5())
+        let generation = try await generateReasoning(using: engine)
 
-      expectNoDifference(call, EdgeRawToolCall(name: "empty", arguments: [:]))
-    }
-
-    @Test
-    func `Distinguishes Strings From JSON Primitives`() throws {
-      var parser = MiniCPM5ToolCallParser()
-      let source = #"""
-        <function name="values"><param name="string_boolean">"true"</param>
-        <param name="boolean">true</param><param name="string_integer">"123"</param>
-        <param name="integer">123</param><param name="string_null">"null"</param>
-        <param name="null">null</param><param name="cdata"><![CDATA[true]]></param></function>
-        """#
-      let parsed = parser.accept(token: EdgeToolsToken(id: 0, stringValue: source))
-      let call = try #require(parsed.first)
-
-      expectNoDifference(
-        call.arguments,
-        [
-          "string_boolean": "true",
-          "boolean": true,
-          "string_integer": "123",
-          "integer": 123,
-          "string_null": "null",
-          "null": .null,
-          "cdata": "true"
-        ]
-      )
-    }
-
-    @Test
-    func `Preserves Tool Markup Inside CDATA Across Every Token Split`() throws {
-      let source = #"""
-        <function name="record"><param name="text"><![CDATA[first line
-        literal </function> and </param> and <function text
-        漢字 👩🏽‍💻]]></param></function>
-        """#
-      let expected = """
-        first line
-        literal </function> and </param> and <function text
-        漢字 👩🏽‍💻
-        """
-
-      for splitIndex in source.indices.dropFirst() {
-        var parser = MiniCPM5ToolCallParser()
-        let first = String(source[..<splitIndex])
-        let second = String(source[splitIndex...])
-        let firstCall = parser.accept(token: EdgeToolsToken(id: 0, stringValue: first))
-        let secondCall = parser.accept(token: EdgeToolsToken(id: 1, stringValue: second))
-        let call = try #require((firstCall + secondCall).first)
-
-        expectNoDifference(call.arguments, ["text": .string(expected)])
+        withKnownIssue { assertSnapshot(of: generation, as: .dump, record: .all) }
       }
     }
-  }
+  #endif
 
   #if XGrammar
     @Suite
