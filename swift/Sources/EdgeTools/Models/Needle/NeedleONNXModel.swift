@@ -21,8 +21,7 @@
     public static var `default`: Self { Self() }
 
     public var sampler: EdgeToolsSampler<ONNXTensorView<Float>>
-    public var processor:
-      EdgeToolsLogitsProcessor<[EdgeToolsToken.ID], ONNXTensorView<Float>>?
+    public var processor: EdgeToolsLogitsProcessor<[EdgeToolsToken.ID], ONNXTensorView<Float>>?
     public var maxTokens: Int?
     public var toolCallRange: GrammarToolCallRange
 
@@ -274,8 +273,7 @@
       let kvHeads = self.configuration.kvHeads
       let headDimensions = self.configuration.attentionHeadDimensions
       #if JS && canImport(JavaScriptKit)
-        if
-          let source = source as? JSONNXTensor,
+        if let source = source as? JSONNXTensor,
           let destination = destination as? JSONNXTensor
         {
           try await Self.copyJSONCacheLayers(
@@ -327,11 +325,13 @@
             (layer * region.sourceLength + region.sourcePosition) * rowCount
           let destinationOffset =
             (layer * region.destinationLength + region.destinationPosition) * rowCount
-          let sourceSlice = try subarray.throws(
-            this: sourceData,
-            sourceOffset,
-            sourceOffset + region.positionCount * rowCount
-          ).object!
+          let sourceSlice = try subarray
+            .throws(
+              this: sourceData,
+              sourceOffset,
+              sourceOffset + region.positionCount * rowCount
+            )
+            .object!
           _ = try set.throws(this: destinationData, sourceSlice, destinationOffset)
         }
       }
@@ -386,29 +386,31 @@
   // MARK: - NeedleModel
 
   extension NeedleONNXModel: NeedleModel {
-    public typealias Input = [EdgeToolsToken.ID]
     public typealias GenerateParameters = NeedleONNXGenerateParameters
 
-    public func input(
+    public func tokenIds(
       prompt: NeedlePrompt,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer
     ) throws -> [EdgeToolsToken.ID] {
-      let tokenIds = try tokenizer.encode(text: prompt.formatted(tools: tools))
-      return tokenIds
+      try tokenizer.encode(text: prompt.formatted(tools: tools))
     }
 
     public nonisolated(nonsending) mutating func prepare(
-      input: [EdgeToolsToken.ID],
-      parameters: NeedleONNXGenerateParameters
+      prompt: inout NeedlePrompt,
+      tools: [EdgeToolDefinition],
+      tokenizer: any EdgeToolsTokenizer,
+      parameters: NeedleONNXGenerateParameters,
+      parser _: inout NeedleGenerationParser
     ) async throws -> EdgeToolsModelPreparation {
+      let tokenIds = try self.tokenIds(prompt: prompt, tools: tools, tokenizer: tokenizer)
       let clock = ContinuousClock()
       let start = clock.now
-      parameters.processor?.prompt(input)
-      try await self.startGeneration(tokenIds: input)
+      parameters.processor?.prompt(tokenIds)
+      try await self.startGeneration(tokenIds: tokenIds)
       return EdgeToolsModelPreparation(
         metrics: EdgeToolsPrefillMetrics(
-          tokens: input.count,
+          tokens: tokenIds.count,
           duration: start.duration(to: clock.now)
         )
       )

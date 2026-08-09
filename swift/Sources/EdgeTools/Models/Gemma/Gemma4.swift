@@ -10,18 +10,34 @@
 
   public struct Gemma4MLXProfile: MLXVLMModelProfile {
     public typealias Prompt = EdgeToolsLLMPrompt
-    public typealias ToolCallParser = Gemma4ToolCallParser
+    public typealias GenerationParser = Gemma4GenerationParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarCompiler = XGRCompiler
     public typealias GrammarContext = XGRGrammarContext
 
     public static var extraStopTokens: Set<String> { ["<|tool_response>"] }
 
-    public static func toolCallGrammar(
+    public static func grammar(
+      prompt: EdgeToolsLLMPrompt,
       tools: [EdgeToolDefinition],
-      range: GrammarToolCallRange
+      parameters: DefaultMLXGenerateParameters,
+      context: XGRGrammarContext
     ) throws -> XGRGrammar {
-      try .gemma4(tools: tools, range: range)
+      try Self.constrainedGrammar(tools: tools, parameters: parameters, context: context) { range in
+        let toolCalls = try XGRGrammar.gemma4(tools: tools, range: range)
+        guard prompt.reasoningEffort != .default, prompt.reasoningEffort.isEnabled else {
+          return toolCalls
+        }
+        return try XGRGrammar.gemma4Reasoning().concatenate(toolCalls)
+      }
+    }
+
+    public static func prepare(
+      prompt: inout EdgeToolsLLMPrompt,
+      tools _: [EdgeToolDefinition],
+      parser _: inout Gemma4GenerationParser
+    ) {
+      prompt = prompt.gemma4PreparedForReasoning
     }
 
     public static nonisolated(nonsending) func input(
@@ -47,7 +63,7 @@
         guard let model = model as? MLXVLM.Gemma4 else { return }
         let firstSharedLayer =
           model.config.textConfiguration.hiddenLayers
-            - model.config.textConfiguration.numKVSharedLayers
+          - model.config.textConfiguration.numKVSharedLayers
         guard firstSharedLayer > 0 else { return }
         for (key, value) in model.parameters().flattened() where weights[key] == nil {
           let components = key.split(separator: ".")
@@ -68,8 +84,20 @@
   }
 
   extension EdgeToolsLLMPrompt {
+    fileprivate var gemma4PreparedForReasoning: Self {
+      guard self.reasoningEffort != .default, self.reasoningEffort.isEnabled else { return self }
+      var prompt = self
+      if case .system(let instruction) = prompt.messages.first {
+        guard !instruction.hasPrefix("<|think|>\n") else { return prompt }
+        prompt.messages[0] = .system("<|think|>\n\(instruction)")
+      } else {
+        prompt.messages.insert(.system("<|think|>"), at: 0)
+      }
+      return prompt
+    }
+
     fileprivate func gemma4UserInput(tools: [EdgeToolDefinition]) throws -> UserInput {
-      try self.mlxUserInput(tools: tools) { message in
+      try self.gemma4PreparedForReasoning.mlxUserInput(tools: tools) { message in
         switch message {
         case .system:
           return try message.mlxMessage()
@@ -85,6 +113,14 @@
           return result
         }
       }
+    }
+  }
+
+  extension XGRGrammar {
+    static func gemma4Reasoning() throws -> XGRGrammar {
+      let opener = try Self.literal("<|channel>thought\n")
+      let thought = try opener.concatenate(.universal)
+      return try thought.concatenate(Self.literal("<channel|>"))
     }
   }
 #endif

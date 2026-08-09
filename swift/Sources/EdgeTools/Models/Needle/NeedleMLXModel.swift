@@ -287,7 +287,7 @@
     public struct NeedleMLXProfile: MLXModelProfile {
       public typealias Prompt = NeedlePrompt
       public typealias GenerateParameters = NeedleMLXGenerateParameters
-      public typealias ToolCallParser = NeedleToolCallParser
+      public typealias GenerationParser = NeedleGenerationParser
       public typealias GrammarCompiler = XGRCompiler
       public typealias GrammarContext = XGRGrammarContext
 
@@ -307,18 +307,12 @@
       }
 
       public static func grammar(
+        prompt _: NeedlePrompt,
         tools: [EdgeToolDefinition],
         parameters: NeedleMLXGenerateParameters,
         context _: XGRGrammarContext
       ) throws -> XGRGrammar {
-        try Self.toolCallGrammar(tools: tools, range: parameters.toolCallRange)
-      }
-
-      public static func toolCallGrammar(
-        tools: [EdgeToolDefinition],
-        range: GrammarToolCallRange
-      ) throws -> XGRGrammar {
-        try .needle(tools: tools, range: range)
+        try .needle(tools: tools, range: parameters.toolCallRange)
       }
 
       public static nonisolated(nonsending) func input(

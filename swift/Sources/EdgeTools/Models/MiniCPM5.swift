@@ -9,16 +9,36 @@ import OrderedCollections
 
   public struct MiniCPM5MLXProfile: MLXLLMModelProfile {
     public typealias Prompt = EdgeToolsLLMPrompt
-    public typealias ToolCallParser = MiniCPM5ToolCallParser
+    public typealias GenerationParser = MiniCPM5GenerationParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarCompiler = XGRCompiler
     public typealias GrammarContext = XGRGrammarContext
 
-    public static func toolCallGrammar(
+    public static func grammar(
+      prompt: EdgeToolsLLMPrompt,
       tools: [EdgeToolDefinition],
-      range: GrammarToolCallRange
+      parameters: DefaultMLXGenerateParameters,
+      context: XGRGrammarContext
     ) throws -> XGRGrammar {
-      try .miniCPM5(tools: tools, range: range)
+      try Self.constrainedGrammar(tools: tools, parameters: parameters, context: context) { range in
+        let toolCalls = try XGRGrammar.miniCPM5(tools: tools, range: range)
+        guard prompt.reasoningEffort.isEnabled else { return toolCalls }
+        return try XGRGrammar.qwenReasoning().concatenate(toolCalls)
+      }
+    }
+
+    public static func templateContext(prompt: EdgeToolsLLMPrompt) -> [String: any Sendable]? {
+      guard prompt.reasoningEffort != .default else { return nil }
+      return ["enable_thinking": prompt.reasoningEffort.isEnabled]
+    }
+
+    public static func prepare(
+      prompt: inout EdgeToolsLLMPrompt,
+      tools _: [EdgeToolDefinition],
+      parser: inout MiniCPM5GenerationParser
+    ) {
+      let prefix = prompt.reasoningEffort.isEnabled ? "<think>\n" : "<think>\n\n</think>\n\n"
+      _ = parser.accept(token: EdgeToolsToken(id: -1, stringValue: prefix))
     }
   }
 
@@ -27,37 +47,48 @@ import OrderedCollections
 
 // MARK: - MiniCPM5 Tool Call Parsing
 
-public struct MiniCPM5ToolCallParser: EdgeToolCallParser, Sendable {
+public struct MiniCPM5GenerationParser: EdgeToolsGenerationParser, Sendable {
+  private var base = DelimitedGenerationParser(
+    toolOpener: "<function",
+    toolCloser: "</function>",
+    reasoningOpener: "<think>",
+    reasoningCloser: "</think>",
+    ignoredToolRegions: [.init(opener: "<![CDATA[", closer: "]]>")],
+    parseToolCalls: MiniCPM5ToolCalls.parse
+  )
+
+  public init() {}
+
+  public mutating func accept(token: EdgeToolsToken) -> [EdgeToolsGenerationPart] {
+    self.base.accept(token: token)
+  }
+
+  public mutating func finish() -> [EdgeToolsGenerationPart] {
+    self.base.finish()
+  }
+}
+
+private enum MiniCPM5ToolCalls {
   private static let cdataOpener = Array("<![CDATA[".utf8)
   private static let cdataCloser = Array("]]>".utf8)
   private static let parameterCloser = Array("</param>".utf8)
 
-  private var block = IncrementalToolCallBlock(opener: "<function", closer: "</function>")
-
-  public init() {}
-
-  public mutating func accept(token: EdgeToolsToken) -> [EdgeRawToolCall] {
-    self.block.append(token)
+  static func parse(_ source: String) -> [EdgeRawToolCall] {
+    var block = IncrementalToolCallBlock(opener: "<function", closer: "</function>")
+    block.append(EdgeToolsToken(id: -1, stringValue: source))
     var calls = [EdgeRawToolCall]()
-    while let call = self.nextCall() {
-      calls.append(call)
-    }
-    return calls
-  }
-
-  private mutating func nextCall() -> EdgeRawToolCall? {
-    while let payload = self.block.nextPayload(
+    while let payload = block.nextPayload(
       outsideRegionOpenedBy: Self.cdataOpener,
       closedBy: Self.cdataCloser,
       orAbortedBy: Self.parameterCloser
     ) {
       let source = String(decoding: payload, as: UTF8.self)
-      if let call = Self.parse(source) { return call }
+      if let call = Self.parseCall(source) { calls.append(call) }
     }
-    return nil
+    return calls
   }
 
-  private static func parse(_ source: String) -> EdgeRawToolCall? {
+  private static func parseCall(_ source: String) -> EdgeRawToolCall? {
     var cursor = ToolCallStringCursor(source)
     cursor.skipWhitespace()
     guard cursor.consume("name="), let quote = cursor.current,

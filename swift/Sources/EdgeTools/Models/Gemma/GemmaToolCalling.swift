@@ -31,58 +31,42 @@ package struct GemmaToolCallFormat: Hashable, Sendable {
 
 // MARK: - Gemma Tool Call Parsers
 
-public struct FunctionGemmaToolCallParser: EdgeToolCallParser, Sendable {
-  private var parser = GemmaToolCallParser(format: .functionGemma)
+public struct Gemma4GenerationParser: EdgeToolsGenerationParser, Sendable {
+  private var base = DelimitedGenerationParser(
+    toolOpener: "<|tool_call>",
+    toolCloser: "<tool_call|>",
+    reasoningOpener: "<|channel>thought\n",
+    reasoningCloser: "<channel|>",
+    parseToolCalls: { GemmaToolCalls.parse($0, format: .gemma4) }
+  )
 
   public init() {}
 
-  public mutating func accept(token: EdgeToolsToken) -> [EdgeRawToolCall] {
-    self.parser.accept(token: token)
+  public mutating func accept(token: EdgeToolsToken) -> [EdgeToolsGenerationPart] {
+    self.base.accept(token: token)
+  }
+
+  public mutating func finish() -> [EdgeToolsGenerationPart] {
+    self.base.finish()
   }
 }
 
-public struct Gemma4ToolCallParser: EdgeToolCallParser, Sendable {
-  private var parser = GemmaToolCallParser(format: .gemma4)
-
-  public init() {}
-
-  public mutating func accept(token: EdgeToolsToken) -> [EdgeRawToolCall] {
-    self.parser.accept(token: token)
-  }
-}
-
-private struct GemmaToolCallParser: EdgeToolCallParser, Sendable {
-  private let format: GemmaToolCallFormat
-  private var block: IncrementalToolCallBlock
-
-  init(format: GemmaToolCallFormat) {
-    self.format = format
-    self.block = IncrementalToolCallBlock(opener: format.opener, closer: format.closer)
-  }
-
-  init() {
-    self.init(format: .functionGemma)
-  }
-
-  mutating func accept(token: EdgeToolsToken) -> [EdgeRawToolCall] {
-    self.block.append(token)
+enum GemmaToolCalls {
+  static func parse(_ source: String, format: GemmaToolCallFormat) -> [EdgeRawToolCall] {
+    var block = IncrementalToolCallBlock(opener: format.opener, closer: format.closer)
+    block.append(EdgeToolsToken(id: -1, stringValue: source))
     var calls = [EdgeRawToolCall]()
-    while let call = self.nextCall() { calls.append(call) }
-    return calls
-  }
-
-  private mutating func nextCall() -> EdgeRawToolCall? {
-    let marker = Array(self.format.stringMarker.utf8)
-    while let payloadData = self.block.nextPayload(outside: marker) {
+    let marker = Array(format.stringMarker.utf8)
+    while let payloadData = block.nextPayload(outside: marker) {
       let payload = String(decoding: payloadData, as: UTF8.self)
       var reader = GemmaCallReader(
         source: payload,
-        stringMarker: self.format.stringMarker,
-        markedValuesAreJSON: self.format.marksAllValues
+        stringMarker: format.stringMarker,
+        markedValuesAreJSON: format.marksAllValues
       )
-      if let call = reader.parse() { return call }
+      if let call = reader.parse() { calls.append(call) }
     }
-    return nil
+    return calls
   }
 }
 

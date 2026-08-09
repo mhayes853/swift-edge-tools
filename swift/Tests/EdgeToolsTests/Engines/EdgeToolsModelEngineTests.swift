@@ -26,6 +26,7 @@
       expectNoDifference(generation.wasStopped, false)
       expectNoDifference(generation.tokens.map(\.id), responseTokenIds + [eosTokenId])
       expectNoDifference(generation.response, tokenizer.decode(tokens: responseTokenIds))
+      expectNoDifference(generation.text, tokenizer.decode(tokens: responseTokenIds))
       expectNoDifference(generation.prefillMetrics.tokens > 0, true)
     }
 
@@ -334,9 +335,8 @@
     }
 
     typealias Prompt = NeedlePrompt
-    typealias Input = [EdgeToolsToken.ID]
     typealias GenerateParameters = Parameters
-    typealias ToolCallParser = NeedleToolCallParser
+    typealias GenerationParser = NeedleGenerationParser
     typealias GrammarContext = XGRGrammarContext
 
     var assets: TestAssets?
@@ -365,27 +365,36 @@
       try XGRCompiler(tokenizerInfo: context.tokenizerInfo)
     }
 
-    func toolCallGrammar(
-      tools: [EdgeToolDefinition],
-      range: GrammarToolCallRange
+    func grammar(
+      prompt _: NeedlePrompt,
+      tools _: [EdgeToolDefinition],
+      parameters: Parameters,
+      context: XGRGrammarContext
     ) throws -> XGRGrammar {
-      self.constraintObservation?.record(range: range)
-      return .universal
+      let constraint = parameters.constraint
+      let grammar = try constraint.toolCallRange.map {
+        self.constraintObservation?.record(range: $0)
+        return XGRGrammar.universal
+      }
+      return try constraint.grammar(toolCallGrammar: grammar, context: context)
     }
 
-    func input(
+    func tokenIds(
       prompt: NeedlePrompt,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer
     ) throws -> [EdgeToolsToken.ID] {
-      let tokenIds = tokenizer.encode(text: prompt.user)
-      return tokenIds
+      tokenizer.encode(text: prompt.user)
     }
 
     nonisolated(nonsending) mutating func prepare(
-      input: [EdgeToolsToken.ID],
-      parameters: Parameters
+      prompt: inout NeedlePrompt,
+      tools: [EdgeToolDefinition],
+      tokenizer: any EdgeToolsTokenizer,
+      parameters: Parameters,
+      parser _: inout NeedleGenerationParser
     ) async throws -> EdgeToolsModelPreparation {
+      let tokenIds = try self.tokenIds(prompt: prompt, tools: tools, tokenizer: tokenizer)
       self.assets?.begin()
       defer { self.assets?.end() }
       if let preparationGate = parameters.preparationGate {
@@ -395,7 +404,7 @@
       }
       self.index = 0
       return EdgeToolsModelPreparation(
-        metrics: EdgeToolsPrefillMetrics(tokens: input.count, duration: .zero)
+        metrics: EdgeToolsPrefillMetrics(tokens: tokenIds.count, duration: .zero)
       )
     }
 

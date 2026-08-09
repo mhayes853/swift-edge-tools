@@ -7,19 +7,6 @@ import Testing
 
 @Suite
 struct `LFM2P5 tests` {
-  @Suite
-  struct `LFM2P5PythonToolCallParser tests` {
-    @Test
-    func `Decodes Escaped Unicode Surrogate Pairs`() throws {
-      var parser = LFM2P5PythonToolCallParser()
-      let source = #"<|tool_call_start|>[emoji(value='\uD83D\uDE00')]<|tool_call_end|>"#
-      let parsed = parser.accept(token: EdgeToolsToken(id: 0, stringValue: source))
-      let call = try #require(parsed.first)
-
-      expectNoDifference(call.arguments, ["value": "😀"])
-    }
-  }
-
   #if MLX && XGrammar && canImport(MLX) && !os(WASI)
     @Suite(.serialized, .enabledIfXcode())
     struct `LFM2P5MLXModelEngine tests` {
@@ -29,6 +16,14 @@ struct `LFM2P5 tests` {
         let transcript = try await completeWeatherTurn(using: engine)
 
         withKnownIssue { assertSnapshot(of: transcript, as: .dump, record: .all) }
+      }
+
+      @Test
+      func `Generates Reasoning Snapshot`() async throws {
+        let engine = try await LFM2P5MLXModelEngine(from: downloadLFM2P5())
+        let generation = try await generateReasoning(using: engine)
+
+        withKnownIssue { assertSnapshot(of: generation, as: .dump, record: .all) }
       }
     }
   #endif

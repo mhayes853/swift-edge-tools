@@ -63,7 +63,7 @@ public struct EdgeToolsEngineGeneration: Sendable {
   public var wasStopped: Bool
   public var tokens: [EdgeToolsToken]
   public var response: String
-  public var toolCalls: [EdgeRawToolCall]
+  public var parts: [EdgeToolsGenerationPart]
   public var metadata: EdgeToolsMetadata
 
   public init(
@@ -72,7 +72,7 @@ public struct EdgeToolsEngineGeneration: Sendable {
     wasStopped: Bool,
     tokens: [EdgeToolsToken],
     response: String,
-    toolCalls: [EdgeRawToolCall] = [],
+    parts: [EdgeToolsGenerationPart] = [],
     metadata: EdgeToolsMetadata = [:]
   ) {
     self.prefillMetrics = prefillMetrics
@@ -80,7 +80,7 @@ public struct EdgeToolsEngineGeneration: Sendable {
     self.wasStopped = wasStopped
     self.tokens = tokens
     self.response = response
-    self.toolCalls = toolCalls
+    self.parts = parts
     self.metadata = metadata
   }
 }
@@ -100,7 +100,20 @@ extension EdgeToolsEngineGeneration {
       && self.wasStopped
       && self.tokens.isEmpty
       && self.response.isEmpty
-      && self.toolCalls.isEmpty
+      && self.parts.isEmpty
       && self.metadata.isEmpty
+  }
+
+  public var text: String {
+    guard !self.parts.isEmpty else { return self.response }
+    return self.parts.compactMap(\.text).joined()
+  }
+
+  public var reasoning: [String] {
+    self.parts.compactMap(\.reasoning)
+  }
+
+  public var toolCalls: [EdgeRawToolCall] {
+    self.parts.compactMap(\.toolCall)
   }
 }
