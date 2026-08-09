@@ -13,7 +13,7 @@
     public typealias GrammarContext = XGRGrammarContext
 
     public static func grammar(
-      prompt _: EdgeToolsConversationalPrompt,
+      prompt: EdgeToolsConversationalPrompt,
       tools: [EdgeToolDefinition],
       parameters: DefaultMLXGenerateParameters,
       context: XGRGrammarContext
@@ -36,7 +36,7 @@
     public typealias GrammarContext = XGRGrammarContext
 
     public static func grammar(
-      prompt _: EdgeToolsConversationalPrompt,
+      prompt: EdgeToolsConversationalPrompt,
       tools: [EdgeToolDefinition],
       parameters: DefaultMLXGenerateParameters,
       context: XGRGrammarContext

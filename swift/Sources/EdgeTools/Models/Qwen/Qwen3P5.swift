@@ -36,7 +36,7 @@ import OrderedCollections
 
     public static func prepare(
       prompt: inout EdgeToolsConversationalPrompt,
-      tools _: [EdgeToolDefinition],
+      tools: [EdgeToolDefinition],
       parser: inout Qwen3P5GenerationParser
     ) {
       let prefix = prompt.reasoningEffort.isEnabled ? "<think>\n" : "<think>\n\n</think>\n\n"
@@ -83,7 +83,7 @@ import OrderedCollections
 
     public static func prepare(
       prompt: inout EdgeToolsConversationalPrompt,
-      tools _: [EdgeToolDefinition],
+      tools: [EdgeToolDefinition],
       parser: inout Qwen3P5GenerationParser
     ) {
       let prefix = prompt.reasoningEffort.isEnabled ? "<think>\n" : "<think>\n\n</think>\n\n"
@@ -93,7 +93,7 @@ import OrderedCollections
     public static nonisolated(nonsending) func input(
       prompt: EdgeToolsConversationalPrompt,
       tools: [EdgeToolDefinition],
-      tokenizer _: any EdgeToolsTokenizer,
+      tokenizer: any EdgeToolsTokenizer,
       processor: (any UserInputProcessor)?
     ) async throws -> LMInput {
       guard let processor else { throw EdgeToolsError.failedToLoadConfiguration }

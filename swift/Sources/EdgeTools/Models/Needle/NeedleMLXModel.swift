@@ -59,7 +59,7 @@
       }
     }
 
-    public func newCache(parameters _: MLXLMCommon.GenerateParameters?) -> [any KVCache] {
+    public func newCache(parameters: MLXLMCommon.GenerateParameters?) -> [any KVCache] {
       (0..<self.configuration.decoderLayers)
         .map { _ in
           let dtype = self.model.embedding.weight.dtype
@@ -307,10 +307,10 @@
       }
 
       public static func grammar(
-        prompt _: NeedlePrompt,
+        prompt: NeedlePrompt,
         tools: [EdgeToolDefinition],
         parameters: NeedleMLXGenerateParameters,
-        context _: XGRGrammarContext
+        context: XGRGrammarContext
       ) throws -> XGRGrammar {
         try .needle(tools: tools, range: parameters.toolCallRange)
       }
@@ -319,7 +319,7 @@
         prompt: NeedlePrompt,
         tools: [EdgeToolDefinition],
         tokenizer: any EdgeToolsTokenizer,
-        processor _: (any UserInputProcessor)?
+        processor: (any UserInputProcessor)?
       ) async throws -> LMInput {
         try .needle(prompt: prompt, tools: tools, using: tokenizer)
       }
@@ -912,7 +912,7 @@
     func makeMask(
       n tokenCount: Int,
       windowSize: Int?,
-      returnArray _: Bool
+      returnArray: Bool
     ) -> MLXFast.ScaledDotProductAttentionMaskMode {
       tokenCount == 1
         ? .none

@@ -34,8 +34,8 @@
 
     public static func prepare(
       prompt: inout EdgeToolsConversationalPrompt,
-      tools _: [EdgeToolDefinition],
-      parser _: inout Gemma4GenerationParser
+      tools: [EdgeToolDefinition],
+      parser: inout Gemma4GenerationParser
     ) {
       prompt = prompt.gemma4PreparedForReasoning
     }
@@ -43,7 +43,7 @@
     public static nonisolated(nonsending) func input(
       prompt: EdgeToolsConversationalPrompt,
       tools: [EdgeToolDefinition],
-      tokenizer _: any EdgeToolsTokenizer,
+      tokenizer: any EdgeToolsTokenizer,
       processor: (any UserInputProcessor)?
     ) async throws -> LMInput {
       guard let processor else { throw EdgeToolsError.failedToLoadConfiguration }

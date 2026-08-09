@@ -81,7 +81,7 @@
   }
 
   extension EdgeToolsModel where GrammarContext == Void {
-    public func grammarContext(tokenizer _: any EdgeToolsTokenizer) throws {}
+    public func grammarContext(tokenizer: any EdgeToolsTokenizer) throws {}
   }
 
   extension EdgeToolsModel {

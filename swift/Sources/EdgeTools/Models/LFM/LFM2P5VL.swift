@@ -14,7 +14,7 @@
     public typealias GrammarContext = XGRGrammarContext
 
     public static func grammar(
-      prompt _: EdgeToolsConversationalPrompt,
+      prompt: EdgeToolsConversationalPrompt,
       tools: [EdgeToolDefinition],
       parameters: DefaultMLXGenerateParameters,
       context: XGRGrammarContext
@@ -27,7 +27,7 @@
     public static nonisolated(nonsending) func input(
       prompt: EdgeToolsConversationalPrompt,
       tools: [EdgeToolDefinition],
-      tokenizer _: any EdgeToolsTokenizer,
+      tokenizer: any EdgeToolsTokenizer,
       processor: (any UserInputProcessor)?
     ) async throws -> LMInput {
       guard let processor else { throw EdgeToolsError.failedToLoadConfiguration }

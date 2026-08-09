@@ -34,7 +34,7 @@ import OrderedCollections
 
     public static func prepare(
       prompt: inout EdgeToolsConversationalPrompt,
-      tools _: [EdgeToolDefinition],
+      tools: [EdgeToolDefinition],
       parser: inout MiniCPM5GenerationParser
     ) {
       let prefix = prompt.reasoningEffort.isEnabled ? "<think>\n" : "<think>\n\n</think>\n\n"

@@ -156,7 +156,7 @@
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer,
       parameters: GenerateParameters,
-      parser _: inout NeedleGenerationParser
+      parser: inout NeedleGenerationParser
     ) async throws -> EdgeToolsModelPreparation {
       let tokenIds = try self.tokenIds(prompt: prompt, tools: tools, tokenizer: tokenizer)
       guard tokenIds.count <= self.configuration.encoderMaxLength else {

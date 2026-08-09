@@ -61,7 +61,7 @@
       prompt: Prompt,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer,
-      processor: (any UserInputProcessor)?
+        processor: (any UserInputProcessor)?
     ) async throws -> LMInput
   }
 
@@ -93,9 +93,9 @@
     public static var extraStopTokens: Set<String> { [] }
 
     public static func prepare(
-      prompt _: inout Prompt,
-      tools _: [EdgeToolDefinition],
-      parser _: inout GenerationParser
+      prompt: inout Prompt,
+      tools: [EdgeToolDefinition],
+      parser: inout GenerationParser
     ) {}
 
     public static func templateContext(prompt: Prompt) -> [String: any Sendable]? {
@@ -214,7 +214,7 @@
         prompt: EdgeToolsConversationalPrompt,
         tools: [EdgeToolDefinition],
         tokenizer: any EdgeToolsTokenizer,
-        processor _: (any UserInputProcessor)?
+      processor: (any UserInputProcessor)?
       ) async throws -> LMInput {
         guard let tokenizer = tokenizer as? TransformersTokenizer else {
           throw EdgeToolsError.unsupportedTokenizer
@@ -958,7 +958,7 @@
   }
 
   private func mlxExtraStopTokenIds<Profile: MLXModelProfile>(
-    profile _: Profile.Type,
+    profile: Profile.Type,
     directory: MLXModelDirectory,
     tokenizer: any EdgeToolsTokenizer
   ) throws -> Set<EdgeToolsToken.ID> {
