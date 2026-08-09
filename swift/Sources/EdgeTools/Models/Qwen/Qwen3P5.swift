@@ -53,10 +53,7 @@ import OrderedCollections
       processor: (any UserInputProcessor)?
     ) async throws -> LMInput {
       guard let processor else { throw EdgeToolsError.failedToLoadConfiguration }
-      return try await prompt.mlxVLMInput(
-        tools: tools,
-        processor: processor
-      ) { message in
+      return try await prompt.mlxVLMInput(tools: tools, processor: processor) { message in
         switch message {
         case .user(let text, let images, let videos, audio: _):
           var content: [MLXLMCommon.Message] = images.map { _ in ["type": "image"] }
