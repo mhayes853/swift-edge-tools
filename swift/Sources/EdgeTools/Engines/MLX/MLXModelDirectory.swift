@@ -65,6 +65,17 @@
       )
     }
 
+    public func loadDefaultSampling() throws -> EdgeToolsFusedSamplingParameters? {
+      let configurationURL = self.url.appending(path: "generation_config.json")
+      guard FileManager.default.fileExists(atPath: configurationURL.path()) else { return nil }
+      let configuration = try JSONDecoder.json5()
+        .decode(
+          MLXSamplingConfiguration.self,
+          from: Data(contentsOf: configurationURL)
+        )
+      return configuration.samplingParameters
+    }
+
     public func loadStopTokenIds() throws -> Set<EdgeToolsToken.ID> {
       let baseConfiguration = try self.loadConfiguration(BaseConfiguration.self)
       var tokenIds = Set(baseConfiguration.eosTokenIds?.values ?? [])
@@ -131,6 +142,41 @@
         result.merge(self.metadataByFile[url] ?? [:]) { _, new in new }
       }
       return result
+    }
+  }
+
+  // MARK: - MLXSamplingConfiguration
+
+  private struct MLXSamplingConfiguration: Decodable {
+    var doSample: Bool?
+    var temperature: Float?
+    var topK: Int?
+    var topP: Float?
+    var minP: Float?
+    var repetitionPenalty: Float?
+    var presencePenalty: Float?
+
+    enum CodingKeys: String, CodingKey {
+      case doSample = "do_sample"
+      case temperature
+      case topK = "top_k"
+      case topP = "top_p"
+      case minP = "min_p"
+      case repetitionPenalty = "repetition_penalty"
+      case presencePenalty = "presence_penalty"
+    }
+
+    var samplingParameters: EdgeToolsFusedSamplingParameters? {
+      guard self.doSample != false else { return EdgeToolsFusedSamplingParameters(temperature: 0) }
+      guard let temperature = self.temperature else { return nil }
+      return EdgeToolsFusedSamplingParameters(
+        temperature: temperature,
+        topK: self.topK,
+        topP: self.topP,
+        minP: self.minP,
+        repetitionPenalty: self.repetitionPenalty ?? 1,
+        presencePenalty: self.presencePenalty ?? 0
+      )
     }
   }
 #endif

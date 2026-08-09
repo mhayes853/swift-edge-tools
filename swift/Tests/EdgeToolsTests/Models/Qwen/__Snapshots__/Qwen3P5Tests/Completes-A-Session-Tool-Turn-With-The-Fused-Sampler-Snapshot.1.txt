@@ -1,0 +1,12 @@
+▿ SessionWeatherTurnSnapshot
+  - response: "Paris is currently sunny, with a temperature of 21 degrees Celsius."
+  ▿ toolCalls: 1 element
+    ▿ EdgeRawToolCall
+      ▿ arguments: EdgeToolsValue
+        ▿ object: 1 key/value pair
+          ▿ (2 elements)
+            - key: "location"
+            ▿ value: EdgeToolsValue
+              - string: "Paris"
+      - name: "getWeather"
+  - toolOutput: "It is sunny and 21 degrees celsius in Paris."
