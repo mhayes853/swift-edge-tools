@@ -236,14 +236,14 @@ final class MockEngine: EdgeToolsPrefillableEngine, Sendable {
     let onStart = self._onGenerateStart.withLock { $0 }
     let onEnd = self._onGenerateEnd.withLock { $0 }
     let task = Task {
-      var parser = NeedleToolCallParser()
+      var parser = NeedleGenerationParser()
       onStart?()
       defer {
         onEnd?()
         self.storage.finishGeneration(id: id)
       }
       var emittedTokens = [EdgeToolsToken]()
-      var toolCalls = [EdgeRawToolCall]()
+      var parts = [EdgeToolsGenerationPart]()
       var wasStopped = false
       var thrownError: (any Error)?
 
@@ -253,9 +253,9 @@ final class MockEngine: EdgeToolsPrefillableEngine, Sendable {
           switch event {
           case .token(let token):
             channel.emit(token: token)
-            for rawToolCall in parser.accept(token: token) {
-              toolCalls.append(rawToolCall)
-              channel.emit(toolCall: rawToolCall)
+            for part in parser.accept(token: token) {
+              parts.append(part)
+              channel.emit(part: part)
             }
             emittedTokens.append(token)
           case .stop:
@@ -272,6 +272,10 @@ final class MockEngine: EdgeToolsPrefillableEngine, Sendable {
       }
 
       if let error = thrownError { throw error }
+      for part in parser.finish() {
+        parts.append(part)
+        channel.emit(part: part)
+      }
       let response = emittedTokens.map(\.stringValue).joined()
       return EdgeToolsEngineGeneration(
         prefillMetrics: EdgeToolsPrefillMetrics(tokens: 0, duration: .zero),
@@ -283,7 +287,7 @@ final class MockEngine: EdgeToolsPrefillableEngine, Sendable {
         wasStopped: wasStopped,
         tokens: emittedTokens,
         response: response,
-        toolCalls: toolCalls
+        parts: parts
       )
     }
     return GenerationTask(task: task) {

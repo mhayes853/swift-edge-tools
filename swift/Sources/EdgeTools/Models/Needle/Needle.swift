@@ -158,24 +158,6 @@ public struct NeedlePrompt: Hashable, Sendable {
   }
 }
 
-// MARK: - NeedleModelInput
-
-public struct NeedleModelInput: EdgeToolsModelInput, Hashable, Sendable {
-  public var prompt: NeedlePrompt
-  public var tools: [EdgeToolDefinition]
-  public var tokenIds: [EdgeToolsToken.ID]
-
-  public init(
-    prompt: NeedlePrompt,
-    tools: [EdgeToolDefinition],
-    tokenIds: [EdgeToolsToken.ID]
-  ) {
-    self.prompt = prompt
-    self.tools = tools
-    self.tokenIds = tokenIds
-  }
-}
-
 // MARK: - Formatting
 
 extension NeedlePrompt {
@@ -226,31 +208,100 @@ extension Sequence where Element == EdgeToolDefinition {
   }
 }
 
-// MARK: - NeedleToolCallParser
+// MARK: - NeedleGenerationParser
 
-public struct NeedleToolCallParser: EdgeToolCallParser, Sendable {
-  private var list = IncrementalToolCallList(opener: "<tool_call>")
+public struct NeedleGenerationParser: EdgeToolsGenerationParser, Sendable {
+  private enum Region {
+    case text
+    case tool
+  }
+
+  private var region = Region.text
+  private var buffer = ""
+  private var hasSeenListStart = false
 
   public init() {}
 
-  public mutating func accept(token: EdgeToolsToken) -> [EdgeRawToolCall] {
-    self.list.append(token)
-    var calls = [EdgeRawToolCall]()
-    while let call = self.nextCall() {
-      calls.append(call)
-    }
-    return calls
+  public mutating func accept(token: EdgeToolsToken) -> [EdgeToolsGenerationPart] {
+    self.buffer.append(token.stringValue)
+    var parts = [EdgeToolsGenerationPart]()
+    while let part = self.nextPart() { parts.append(part) }
+    return parts
   }
 
-  private mutating func nextCall() -> EdgeRawToolCall? {
-    while let objectData = self.list.nextItem(findRange: { $0.firstCompleteJSONObjectRange() }) {
-      if let value = try? EdgeToolsValue(json: objectData),
-        let call = EdgeRawToolCall(jsonValue: value)
-      {
-        return call
-      }
+  public mutating func finish() -> [EdgeToolsGenerationPart] {
+    defer {
+      self.region = .text
+      self.buffer = ""
+      self.hasSeenListStart = false
     }
-    return nil
+    guard !self.buffer.isEmpty else { return [] }
+    return switch self.region {
+    case .text: [.text(self.buffer)]
+    case .tool: [.text("<tool_call>" + self.buffer)]
+    }
+  }
+
+  private mutating func nextPart() -> EdgeToolsGenerationPart? {
+    let opener = "<tool_call>"
+    switch self.region {
+    case .text:
+      return self.nextTextPart(opener: opener)
+    case .tool:
+      return self.nextToolPart()
+    }
+  }
+
+  private mutating func nextTextPart(opener: String) -> EdgeToolsGenerationPart? {
+    guard let range = opener.firstRange(in: self.buffer[...]) else {
+      let retained = self.buffer.suffixPrefixLength(of: opener)
+      guard self.buffer.count > retained else { return nil }
+      let end = self.buffer.index(self.buffer.endIndex, offsetBy: -retained)
+      defer { self.buffer.removeSubrange(..<end) }
+      return .text(String(self.buffer[..<end]))
+    }
+    if range.lowerBound > self.buffer.startIndex {
+      let text = String(self.buffer[..<range.lowerBound])
+      self.buffer.removeSubrange(..<range.lowerBound)
+      return .text(text)
+    }
+    self.buffer.removeSubrange(..<range.upperBound)
+    self.region = .tool
+    return self.nextPart()
+  }
+
+  private mutating func nextToolPart() -> EdgeToolsGenerationPart? {
+    if !self.hasSeenListStart {
+      guard let listStart = self.buffer.firstIndex(of: "[") else { return nil }
+      self.buffer.removeSubrange(...listStart)
+      self.hasSeenListStart = true
+    }
+    self.buffer.removeLeadingWhitespaceAndCommas()
+    if self.buffer.first == "]" {
+      self.buffer.removeFirst()
+      self.region = .text
+      self.hasSeenListStart = false
+      return self.nextPart()
+    }
+
+    let bytes = Array(self.buffer.utf8)
+    guard let objectRange = bytes.firstCompleteJSONObjectRange() else { return nil }
+    let object = String(decoding: bytes[objectRange], as: UTF8.self)
+    self.buffer.removeSubrange(..<self.buffer.index(self.buffer.startIndex, offsetBy: object.count))
+    guard let value = try? EdgeToolsValue(json: object),
+      let call = EdgeRawToolCall(jsonValue: value)
+    else {
+      return .text(object)
+    }
+    return .toolCall(call)
+  }
+}
+
+extension String {
+  fileprivate mutating func removeLeadingWhitespaceAndCommas() {
+    while let first, first.isWhitespace || first == "," {
+      self.removeFirst()
+    }
   }
 }
 
@@ -267,7 +318,7 @@ public protocol NeedleGenerateParameters: EdgeToolsEngineGenerateParameters {
   where
     Prompt == NeedlePrompt,
     GenerateParameters: NeedleGenerateParameters,
-    ToolCallParser == NeedleToolCallParser,
+    GenerationParser == NeedleGenerationParser,
     GrammarCompiler == XGRCompiler,
     GrammarContext == XGRGrammarContext
   {}
@@ -289,18 +340,12 @@ public protocol NeedleGenerateParameters: EdgeToolsEngineGenerateParameters {
     }
 
     public func grammar(
+      prompt: NeedlePrompt,
       tools: [EdgeToolDefinition],
       parameters: GenerateParameters,
-      context _: XGRGrammarContext
+      context: XGRGrammarContext
     ) throws -> XGRGrammar {
-      try self.toolCallGrammar(tools: tools, range: parameters.toolCallRange)
-    }
-
-    public func toolCallGrammar(
-      tools: [EdgeToolDefinition],
-      range: GrammarToolCallRange
-    ) throws -> XGRGrammar {
-      try XGRGrammar.needle(tools: tools, range: range)
+      try XGRGrammar.needle(tools: tools, range: parameters.toolCallRange)
     }
   }
 

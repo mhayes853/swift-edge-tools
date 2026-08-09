@@ -7,7 +7,7 @@
     private enum Message: Hashable {
       case system(String)
       case user(String, images: [Asset], videos: [Asset], audio: [Asset])
-      case assistant(String?, toolCalls: [EdgeRawToolCall])
+      case assistant([EdgeToolsGenerationPart])
       case tool(name: String, response: EdgeToolsValue)
     }
 
@@ -28,11 +28,12 @@
         case .path(let path):
           let url = URL(filePath: path).standardizedFileURL
           let attributes = try? FileManager.default.attributesOfItem(atPath: url.path())
-          let modificationDate = if (attributes?[.type] as? FileAttributeType) == .typeRegular {
-            attributes?[.modificationDate] as? Date ?? Date(timeIntervalSince1970: 0)
-          } else {
-            Date(timeIntervalSince1970: 0)
-          }
+          let modificationDate =
+            if (attributes?[.type] as? FileAttributeType) == .typeRegular {
+              attributes?[.modificationDate] as? Date ?? Date(timeIntervalSince1970: 0)
+            } else {
+              Date(timeIntervalSince1970: 0)
+            }
           self = .file(path: url.path(), modificationDate: modificationDate)
         }
       }
@@ -54,8 +55,8 @@
             videos: videos.map(Asset.init),
             audio: audio.map(Asset.init)
           )
-        case .assistant(let content, let toolCalls):
-          .assistant(content, toolCalls: toolCalls)
+        case .assistant(let parts):
+          .assistant(parts)
         case .tool(let name, let response):
           .tool(name: name, response: response)
         }

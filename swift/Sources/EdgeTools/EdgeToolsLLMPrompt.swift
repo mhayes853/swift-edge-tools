@@ -2,9 +2,14 @@
 
 public struct EdgeToolsLLMPrompt: Hashable, Sendable {
   public var messages: [Message]
+  public var reasoningEffort: EdgeToolsReasoningEffort
 
-  public init(messages: [Message]) {
+  public init(
+    messages: [Message],
+    reasoningEffort: EdgeToolsReasoningEffort = .default
+  ) {
     self.messages = messages
+    self.reasoningEffort = reasoningEffort
   }
 
   public var images: [Asset] {
@@ -27,6 +32,7 @@ public struct EdgeToolsLLMPrompt: Hashable, Sendable {
       return audio
     }
   }
+
 }
 
 // MARK: - Message
@@ -36,8 +42,16 @@ extension EdgeToolsLLMPrompt {
   public enum Message: Hashable, Sendable {
     case system(String)
     case user(String, images: [Asset] = [], videos: [Asset] = [], audio: [Asset] = [])
-    case assistant(String? = nil, toolCalls: [EdgeRawToolCall] = [])
+    case assistant([EdgeToolsGenerationPart])
     case tool(name: String, response: EdgeToolsValue)
+  }
+}
+
+extension EdgeToolsLLMPrompt.Message {
+  public init(generation: EdgeToolsEngineGeneration) {
+    let isEmpty = generation.parts.isEmpty && !generation.response.isEmpty
+    let parts = isEmpty ? [.text(generation.response)]  : generation.parts
+    self = .assistant(parts)
   }
 }
 

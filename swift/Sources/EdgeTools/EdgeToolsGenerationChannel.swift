@@ -1,20 +1,20 @@
 public struct EdgeToolsGenerationChannel {
   public var onToken: ((EdgeToolsToken) -> Void)?
-  public var onToolCall: ((EdgeRawToolCall) -> Void)?
+  public var onPart: ((EdgeToolsGenerationPart) -> Void)?
 
   public init(
     onToken: ((EdgeToolsToken) -> Void)? = nil,
-    onToolCall: ((EdgeRawToolCall) -> Void)? = nil
+    onPart: ((EdgeToolsGenerationPart) -> Void)? = nil
   ) {
     self.onToken = onToken
-    self.onToolCall = onToolCall
+    self.onPart = onPart
   }
 
   public func emit(token: EdgeToolsToken) {
     self.onToken?(token)
   }
 
-  public func emit(toolCall: EdgeRawToolCall) {
-    self.onToolCall?(toolCall)
+  public func emit(part: EdgeToolsGenerationPart) {
+    self.onPart?(part)
   }
 }

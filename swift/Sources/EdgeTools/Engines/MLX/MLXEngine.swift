@@ -28,7 +28,7 @@
   public protocol MLXModelProfile: SendableMetatype {
     associatedtype Prompt: Sendable
     associatedtype GenerateParameters: MLXGenerateParameters
-    associatedtype ToolCallParser: EdgeToolCallParser
+    associatedtype GenerationParser: EdgeToolsGenerationParser
     associatedtype GrammarContext = Void
     associatedtype GrammarCompiler: EdgeToolsGrammarCompiler, ~Copyable
     where GrammarCompiler.Context == GrammarContext
@@ -43,15 +43,19 @@
     static func grammarCompiler(context: borrowing GrammarContext) throws -> GrammarCompiler
 
     static func grammar(
+      prompt: Prompt,
       tools: [EdgeToolDefinition],
       parameters: GenerateParameters,
       context: GrammarContext
     ) throws -> GrammarCompiler.Grammar
 
-    static func toolCallGrammar(
+    static func prepare(
+      prompt: inout Prompt,
       tools: [EdgeToolDefinition],
-      range: GrammarToolCallRange
-    ) throws -> GrammarCompiler.Grammar
+      parser: inout GenerationParser
+    )
+
+    static func templateContext(prompt: Prompt) -> [String: any Sendable]?
 
     static nonisolated(nonsending) func input(
       prompt: Prompt,
@@ -73,26 +77,29 @@
     GenerateParameters.Constraint.Grammar == GrammarCompiler.Grammar,
     GenerateParameters.Constraint.Context == GrammarContext
   {
-    public static func grammar(
+    public static func constrainedGrammar(
       tools: [EdgeToolDefinition],
       parameters: GenerateParameters,
-      context: GrammarContext
+      context: GrammarContext,
+      toolCallGrammar: (GrammarToolCallRange) throws -> GrammarCompiler.Grammar
     ) throws -> GrammarCompiler.Grammar {
       let constraint = parameters.constraint
-      let toolCallGrammar = try constraint.toolCallRange.map {
-        try Self.toolCallGrammar(tools: tools, range: $0)
-      }
-      return try constraint.grammar(toolCallGrammar: toolCallGrammar, context: context)
+      let grammar = try constraint.toolCallRange.map(toolCallGrammar)
+      return try constraint.grammar(toolCallGrammar: grammar, context: context)
     }
   }
 
   extension MLXModelProfile {
     public static var extraStopTokens: Set<String> { [] }
-  }
 
-  extension LMInput: EdgeToolsModelInput {
-    public var tokenIds: [EdgeToolsToken.ID] {
-      self.text.tokens.asArray(EdgeToolsToken.ID.self)
+    public static func prepare(
+      prompt _: inout Prompt,
+      tools _: [EdgeToolDefinition],
+      parser _: inout GenerationParser
+    ) {}
+
+    public static func templateContext(prompt: Prompt) -> [String: any Sendable]? {
+      nil
     }
   }
 
@@ -215,7 +222,7 @@
         let tokenIds = try tokenizer.base.applyChatTemplate(
           messages: try prompt.mlxMessages(),
           tools: tools.mlxToolSpecs,
-          additionalContext: nil
+          additionalContext: Self.templateContext(prompt: prompt)
         )
         return LMInput(tokens: MLXArray(tokenIds))
       }
@@ -234,8 +241,8 @@
           ["role": "system", "content": content]
         case .user(let content, images: _, videos: _, audio: _):
           ["role": "user", "content": content]
-        case .assistant(let content, let toolCalls):
-          self.mlxAssistantMessage(content: content, toolCalls: toolCalls)
+        case .assistant(let parts):
+          self.mlxAssistantMessage(parts: parts)
         case .tool(let name, let response):
           [
             "role": "tool",
@@ -245,13 +252,17 @@
         }
       }
 
-      private func mlxAssistantMessage(
-        content: String?,
-        toolCalls: [EdgeRawToolCall]
-      ) -> MLXLMCommon.Message {
+      private func mlxAssistantMessage(parts: [EdgeToolsGenerationPart]) -> MLXLMCommon.Message {
         var message: MLXLMCommon.Message = ["role": "assistant"]
-        if let content {
+        let content = parts.compactMap(\.text).joined()
+        let reasoning = parts.compactMap(\.reasoning).joined()
+        let toolCalls = parts.compactMap(\.toolCall)
+        if !content.isEmpty {
           message["content"] = content
+        }
+        if !reasoning.isEmpty {
+          message["reasoning_content"] = reasoning
+          message["thinking"] = reasoning
         }
         if !toolCalls.isEmpty {
           message["tool_calls"] = toolCalls.map(\.mlxToolCall)
@@ -325,7 +336,8 @@
       let videos: [UserInput.Video]
       private let temporaryURLs: [URL]
 
-      init<Assets: Sequence>(assets: Assets) throws where Assets.Element == EdgeToolsLLMPrompt.Asset {
+      init<Assets: Sequence>(assets: Assets) throws
+      where Assets.Element == EdgeToolsLLMPrompt.Asset {
         var videos = [UserInput.Video]()
         var temporaryURLs = [URL]()
         videos.reserveCapacity(assets.underestimatedCount)
@@ -405,6 +417,7 @@
       public func mlxUserInput(
         tools: [EdgeToolDefinition],
         videos: [UserInput.Video] = [],
+        additionalContext: [String: any Sendable]? = nil,
         transformMessage: (Message) throws -> MLXLMCommon.Message
       ) throws -> UserInput {
         try self.rejectAudio()
@@ -413,20 +426,23 @@
           messages: try self.messages.map(transformMessage),
           images: try self.images.mlxImages(),
           videos: videos,
-          tools: tools.mlxToolSpecs
+          tools: tools.mlxToolSpecs,
+          additionalContext: additionalContext
         )
       }
 
       public func mlxVLMInput(
         tools: [EdgeToolDefinition],
         processor: any UserInputProcessor,
+        additionalContext: [String: any Sendable]? = nil,
         transformMessage: (Message) throws -> MLXLMCommon.Message
       ) async throws -> LMInput {
         let videoInputs = try MLXTemporaryVideoInputs(assets: self.videos)
         return try await processor.prepare(
           input: try self.mlxUserInput(
             tools: tools,
-            videos: videoInputs.videos
+            videos: videoInputs.videos,
+            additionalContext: additionalContext
           ) { try transformMessage($0) }
         )
       }
@@ -437,9 +453,8 @@
 
   public struct EdgeToolsMLXModel<Profile: MLXModelProfile>: EdgeToolsModel {
     public typealias Prompt = Profile.Prompt
-    public typealias Input = LMInput
     public typealias GenerateParameters = Profile.GenerateParameters
-    public typealias ToolCallParser = Profile.ToolCallParser
+    public typealias GenerationParser = Profile.GenerationParser
     public typealias GrammarCompiler = Profile.GrammarCompiler
     public typealias GrammarContext = Profile.GrammarContext
 
@@ -525,42 +540,44 @@
     }
 
     public func grammar(
+      prompt: Profile.Prompt,
       tools: [EdgeToolDefinition],
       parameters: Profile.GenerateParameters,
       context: Profile.GrammarContext
     ) throws -> Profile.GrammarCompiler.Grammar {
-      try Profile.grammar(tools: tools, parameters: parameters, context: context)
-    }
-
-    public func toolCallGrammar(
-      tools: [EdgeToolDefinition],
-      range: GrammarToolCallRange
-    ) throws -> Profile.GrammarCompiler.Grammar {
-      try Profile.toolCallGrammar(tools: tools, range: range)
-    }
-
-    public nonisolated(nonsending) func input(
-      prompt: Profile.Prompt,
-      tools: [EdgeToolDefinition],
-      tokenizer: any EdgeToolsTokenizer
-    ) async throws -> LMInput {
-      if let prompt = prompt as? EdgeToolsLLMPrompt {
-        let context = EdgeToolsLLMPrefillContext(prompt: prompt, tools: tools)
-        if let input = self.prefillCacheState.input(for: context) {
-          return input
-        }
-      } else {
-        self.prefillCacheState.clearInputContext()
-      }
-      return try await Profile.input(
-        prompt: prompt,
-        tools: tools,
-        tokenizer: tokenizer,
-        processor: self.processor
-      )
+      try Profile.grammar(prompt: prompt, tools: tools, parameters: parameters, context: context)
     }
 
     public nonisolated(nonsending) mutating func prepare(
+      prompt: inout Profile.Prompt,
+      tools: [EdgeToolDefinition],
+      tokenizer: any EdgeToolsTokenizer,
+      parameters: Profile.GenerateParameters,
+      parser: inout Profile.GenerationParser
+    ) async throws -> EdgeToolsModelPreparation {
+      Profile.prepare(prompt: &prompt, tools: tools, parser: &parser)
+      let input = try await self.input(
+        prompt: prompt,
+        tools: tools,
+        tokenizer: tokenizer
+      )
+      return try await self.prepare(input: input, parameters: parameters)
+    }
+
+    public nonisolated(nonsending) func tokenIds(
+      prompt: Profile.Prompt,
+      tools: [EdgeToolDefinition],
+      tokenizer: any EdgeToolsTokenizer
+    ) async throws -> [EdgeToolsToken.ID] {
+      let input = try await self.input(
+        prompt: prompt,
+        tools: tools,
+        tokenizer: tokenizer
+      )
+      return input.text.tokens.asArray(EdgeToolsToken.ID.self)
+    }
+
+    private nonisolated(nonsending) mutating func prepare(
       input: LMInput,
       parameters: Profile.GenerateParameters
     ) async throws -> EdgeToolsModelPreparation {
@@ -647,6 +664,19 @@
     }
 
     public nonisolated(nonsending) mutating func prefill(
+      prompt: Profile.Prompt,
+      tools: [EdgeToolDefinition],
+      tokenizer: any EdgeToolsTokenizer
+    ) async throws -> EdgeToolsEnginePrefill {
+      let input = try await self.input(
+        prompt: prompt,
+        tools: tools,
+        tokenizer: tokenizer
+      )
+      return try await self.prefill(input: input)
+    }
+
+    private nonisolated(nonsending) mutating func prefill(
       input: LMInput
     ) async throws -> EdgeToolsEnginePrefill {
       let clock = ContinuousClock()
@@ -671,6 +701,27 @@
           duration: start.duration(to: clock.now)
         ),
         metadata: metadata
+      )
+    }
+
+    private nonisolated(nonsending) func input(
+      prompt: Profile.Prompt,
+      tools: [EdgeToolDefinition],
+      tokenizer: any EdgeToolsTokenizer
+    ) async throws -> LMInput {
+      if let prompt = prompt as? EdgeToolsLLMPrompt {
+        let context = EdgeToolsLLMPrefillContext(prompt: prompt, tools: tools)
+        if let input = self.prefillCacheState.input(for: context) {
+          return input
+        }
+      } else {
+        self.prefillCacheState.clearInputContext()
+      }
+      return try await Profile.input(
+        prompt: prompt,
+        tools: tools,
+        tokenizer: tokenizer,
+        processor: self.processor
       )
     }
 

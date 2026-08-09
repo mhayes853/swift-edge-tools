@@ -251,7 +251,7 @@ struct `EdgeToolsSession tests` {
         } else if token == secondToken {
           tokenWasDeliveredDuringReplay.withLock { $0 = !replayFinished.withLock { $0 } }
         }
-      case .toolCall: break
+      case .part: break
       case .finish: events.withLock { $0.append("finish") }
       @unknown default: break
       }

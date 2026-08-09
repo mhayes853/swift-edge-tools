@@ -91,7 +91,7 @@
     @Test
     func `All Grammar Fixtures Are Accepted By Their Parsers`() {
       for fixture in toolCallGrammarTestFixtures {
-        let calls = parseToolCalls([fixture.complexCall], using: fixture.makeParser)
+        let calls = parseToolCalls([fixture.complexCall], using: fixture.makeGenerationParser)
 
         expectNoDifference(calls.first?.name, fixture.expectedComplexName)
       }
@@ -141,7 +141,7 @@
   struct ToolCallGrammarTestFixture: Sendable, CustomStringConvertible {
     let name: String
     let makeGrammar: @Sendable ([EdgeToolDefinition], GrammarToolCallRange) throws -> XGRGrammar
-    let makeParser: @Sendable () -> any EdgeToolCallParser
+    let makeGenerationParser: @Sendable () -> any EdgeToolsGenerationParser
     let expectedComplexName: String
     let emptyCall: String
     let simpleCall: String
@@ -158,7 +158,7 @@
     ToolCallGrammarTestFixture(
       name: "Needle",
       makeGrammar: { try XGRGrammar.needle(tools: $0, range: $1) },
-      makeParser: { NeedleToolCallParser() },
+      makeGenerationParser: { NeedleGenerationParser() },
       expectedComplexName: "complex_tool",
       emptyCall: "<tool_call> []",
       simpleCall: #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
@@ -182,7 +182,7 @@
     ToolCallGrammarTestFixture(
       name: "Qwen JSON",
       makeGrammar: { try XGRGrammar.qwenJSON(tools: $0, range: $1) },
-      makeParser: { QwenJSONToolCallParser() },
+      makeGenerationParser: { Qwen3GenerationParser() },
       expectedComplexName: "complexTool",
       emptyCall: "",
       simpleCall: #"<tool_call>{"name":"getWeather","arguments":{"location":"Seoul"}}</tool_call>"#,
@@ -210,7 +210,7 @@
     ToolCallGrammarTestFixture(
       name: "Qwen XML",
       makeGrammar: { try XGRGrammar.qwenXML(tools: $0, range: $1) },
-      makeParser: { QwenXMLToolCallParser() },
+      makeGenerationParser: { Qwen3P5GenerationParser() },
       expectedComplexName: "complexTool",
       emptyCall: "",
       simpleCall:
@@ -244,7 +244,7 @@
     ToolCallGrammarTestFixture(
       name: "FunctionGemma",
       makeGrammar: { try XGRGrammar.functionGemma(tools: $0, range: $1) },
-      makeParser: { FunctionGemmaToolCallParser() },
+      makeGenerationParser: { FunctionGemmaGenerationParser() },
       expectedComplexName: "complexTool",
       emptyCall: "",
       simpleCall:
@@ -277,7 +277,7 @@
     ToolCallGrammarTestFixture(
       name: "Gemma 4",
       makeGrammar: { try XGRGrammar.gemma4(tools: $0, range: $1) },
-      makeParser: { Gemma4ToolCallParser() },
+      makeGenerationParser: { Gemma4GenerationParser() },
       expectedComplexName: "complexTool",
       emptyCall: "",
       simpleCall:
@@ -308,7 +308,7 @@
     ToolCallGrammarTestFixture(
       name: "LFM2P5 Python",
       makeGrammar: { try XGRGrammar.lfm2P5Python(tools: $0, range: $1) },
-      makeParser: { LFM2P5PythonToolCallParser() },
+      makeGenerationParser: { LFM2P5GenerationParser() },
       expectedComplexName: "complexTool",
       emptyCall: "<|tool_call_start|>[]<|tool_call_end|>",
       simpleCall: #"<|tool_call_start|>[getWeather(location="Seoul")]<|tool_call_end|>"#,
@@ -333,7 +333,7 @@
     ToolCallGrammarTestFixture(
       name: "MiniCPM5",
       makeGrammar: { try XGRGrammar.miniCPM5(tools: $0, range: $1) },
-      makeParser: { MiniCPM5ToolCallParser() },
+      makeGenerationParser: { MiniCPM5GenerationParser() },
       expectedComplexName: "complexTool",
       emptyCall: "",
       simpleCall:
@@ -362,4 +362,17 @@
         #"<function name="ruleNamedTool"><param name="root">"a"</param><param name="xml_object">"b"</param></function>"#
     )
   ]
+#endif
+
+#if XGrammar
+  private func parseToolCalls(
+    _ chunks: [String],
+    using makeParser: () -> any EdgeToolsGenerationParser
+  ) -> [EdgeRawToolCall] {
+    var parser = makeParser()
+    return chunks.enumerated()
+      .flatMap { index, chunk in
+        parser.accept(token: EdgeToolsToken(id: index, stringValue: chunk)).compactMap(\.toolCall)
+      } + parser.finish().compactMap(\.toolCall)
+  }
 #endif

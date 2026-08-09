@@ -141,35 +141,33 @@
 
   @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
   extension NeedleCoreMLModel: NeedleModel {
-    public typealias Input = NeedleModelInput
-
     public var vocabularySize: Int { self.configuration.vocabularySize }
 
-    public func input(
+    public func tokenIds(
       prompt: NeedlePrompt,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer
-    ) throws -> NeedleModelInput {
-      NeedleModelInput(
-        prompt: prompt,
-        tools: tools,
-        tokenIds: try tokenizer.encode(text: prompt.formatted(tools: tools))
-      )
+    ) throws -> [EdgeToolsToken.ID] {
+      try tokenizer.encode(text: prompt.formatted(tools: tools))
     }
 
     public nonisolated(nonsending) func prepare(
-      input: NeedleModelInput,
-      parameters: GenerateParameters
+      prompt: inout NeedlePrompt,
+      tools: [EdgeToolDefinition],
+      tokenizer: any EdgeToolsTokenizer,
+      parameters: GenerateParameters,
+      parser _: inout NeedleGenerationParser
     ) async throws -> EdgeToolsModelPreparation {
-      guard input.tokenIds.count <= self.configuration.encoderMaxLength else {
+      let tokenIds = try self.tokenIds(prompt: prompt, tools: tools, tokenizer: tokenizer)
+      guard tokenIds.count <= self.configuration.encoderMaxLength else {
         throw EdgeToolsError.contextLengthExceeded(
-          tokens: input.tokenIds.count,
+          tokens: tokenIds.count,
           maximum: self.configuration.encoderMaxLength
         )
       }
-      let promptTensor = MLTensor(tokenIds: input.tokenIds)
+      let promptTensor = MLTensor(tokenIds: tokenIds)
       let paddedPromptTensor = MLTensor(
-        tokenIds: input.tokenIds,
+        tokenIds: tokenIds,
         paddingTo: self.configuration.encoderMaxLength,
         padTokenId: self.configuration.padTokenId
       )
@@ -196,7 +194,7 @@
       )
       return EdgeToolsModelPreparation(
         metrics: EdgeToolsPrefillMetrics(
-          tokens: input.tokenIds.count,
+          tokens: tokenIds.count,
           duration: start.duration(to: self.clock.now)
         )
       )
