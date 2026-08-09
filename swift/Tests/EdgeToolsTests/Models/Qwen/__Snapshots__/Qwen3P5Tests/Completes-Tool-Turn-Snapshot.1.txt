@@ -3,9 +3,10 @@
     ▿ Message
       - system: "Use getWeather when needed. After receiving its result, summarize it for the user."
     ▿ Message
-      ▿ user: (3 elements)
+      ▿ user: (4 elements)
         - .0: "What is the weather in Paris?"
         - images: 0 elements
+        - videos: 0 elements
         - audio: 0 elements
     ▿ Message
       ▿ assistant: (2 elements)
@@ -39,5 +40,5 @@
     ▿ Message
       ▿ assistant: (2 elements)
         ▿ .0: Optional<String>
-          - some: "The weather in Paris is sunny with a temperature of 21 degrees Celsius."
+          - some: "Based on the weather data, Paris is currently experiencing sunny weather with a temperature of 21 degrees Celsius."
         - toolCalls: 0 elements
