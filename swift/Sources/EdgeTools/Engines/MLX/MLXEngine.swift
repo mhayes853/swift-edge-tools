@@ -61,8 +61,13 @@
       prompt: Prompt,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer,
-      processor: (any UserInputProcessor)?
+        processor: (any UserInputProcessor)?
     ) async throws -> LMInput
+
+    static func defaultSampling(
+      prompt: Prompt,
+      parameters: GenerateParameters
+    ) -> EdgeToolsFusedSamplingParameters?
   }
 
   public protocol MLXLLMModelProfile: MLXModelProfile {}
@@ -92,10 +97,17 @@
   extension MLXModelProfile {
     public static var extraStopTokens: Set<String> { [] }
 
+    public static func defaultSampling(
+      prompt: Prompt,
+      parameters: GenerateParameters
+    ) -> EdgeToolsFusedSamplingParameters? {
+      nil
+    }
+
     public static func prepare(
-      prompt _: inout Prompt,
-      tools _: [EdgeToolDefinition],
-      parser _: inout GenerationParser
+      prompt: inout Prompt,
+      tools: [EdgeToolDefinition],
+      parser: inout GenerationParser
     ) {}
 
     public static func templateContext(prompt: Prompt) -> [String: any Sendable]? {
@@ -126,7 +138,7 @@
   // MARK: - MLXGenerateParameters
 
   public protocol MLXGenerateParameters: EdgeToolsEngineGenerateParameters {
-    var sampler: any LogitSampler { get }
+    var sampler: (any LogitSampler)? { get }
     var processor: (any LogitProcessor)? { get }
     var kvCacheQuantizationBits: Int? { get }
     var kvCacheQuantizationGroupSize: Int { get }
@@ -143,7 +155,7 @@
     {
       public static var `default`: Self { Self() }
 
-      public var sampler: any LogitSampler
+      public var sampler: (any LogitSampler)?
       public var processor: (any LogitProcessor)?
       public var constraint: XGRGenerationConstraint
       public var maxTokens: Int?
@@ -153,7 +165,7 @@
       public var synchronizeStreamForMemorySnapshots: Bool
 
       public init(
-        sampler: any LogitSampler = CategoricalSampler(temperature: 0.6),
+        sampler: (any LogitSampler)? = nil,
         processor: (any LogitProcessor)? = nil,
         constraint: XGRGenerationConstraint = .unconstrained,
         maxTokens: Int? = 1024,
@@ -209,12 +221,12 @@
   // MARK: - Prompt Conversion
 
   #if canImport(Tokenizers)
-    extension MLXLLMModelProfile where Prompt == EdgeToolsLLMPrompt {
+    extension MLXLLMModelProfile where Prompt == EdgeToolsConversationalPrompt {
       public static nonisolated(nonsending) func input(
-        prompt: EdgeToolsLLMPrompt,
+        prompt: EdgeToolsConversationalPrompt,
         tools: [EdgeToolDefinition],
         tokenizer: any EdgeToolsTokenizer,
-        processor _: (any UserInputProcessor)?
+      processor: (any UserInputProcessor)?
       ) async throws -> LMInput {
         guard let tokenizer = tokenizer as? TransformersTokenizer else {
           throw EdgeToolsError.unsupportedTokenizer
@@ -228,26 +240,26 @@
       }
     }
 
-    extension EdgeToolsLLMPrompt {
+    extension EdgeToolsConversationalPrompt {
       fileprivate func mlxMessages() throws -> [MLXLMCommon.Message] {
         try self.messages.map { try $0.mlxMessage() }
       }
     }
 
-    extension EdgeToolsLLMPrompt.Message {
+    extension EdgeToolsConversationalPrompt.Message {
       public func mlxMessage() throws -> MLXLMCommon.Message {
         switch self {
-        case .system(let content):
-          ["role": "system", "content": content]
-        case .user(let content, images: _, videos: _, audio: _):
-          ["role": "user", "content": content]
-        case .assistant(let parts):
-          self.mlxAssistantMessage(parts: parts)
-        case .tool(let name, let response):
+        case .system(let message):
+          ["role": "system", "content": message.content]
+        case .user(let message):
+          ["role": "user", "content": message.content]
+        case .assistant(let message):
+          self.mlxAssistantMessage(parts: message.parts)
+        case .tool(let message):
           [
             "role": "tool",
-            "content": String(decoding: try Self.encode(response), as: UTF8.self),
-            "name": name
+            "content": String(decoding: try Self.encode(message.response), as: UTF8.self),
+            "name": message.name
           ]
         }
       }
@@ -337,7 +349,7 @@
       private let temporaryURLs: [URL]
 
       init<Assets: Sequence>(assets: Assets) throws
-      where Assets.Element == EdgeToolsLLMPrompt.Asset {
+      where Assets.Element == EdgeToolsConversationalPrompt.Asset {
         var videos = [UserInput.Video]()
         var temporaryURLs = [URL]()
         videos.reserveCapacity(assets.underestimatedCount)
@@ -379,7 +391,7 @@
       }
     }
 
-    extension EdgeToolsLLMPrompt.Asset {
+    extension EdgeToolsConversationalPrompt.Asset {
       public func mlxImage() throws -> UserInput.Image {
         switch self.content {
         case .path(let path):
@@ -393,13 +405,13 @@
       }
     }
 
-    extension Sequence where Element == EdgeToolsLLMPrompt.Asset {
+    extension Sequence where Element == EdgeToolsConversationalPrompt.Asset {
       package func mlxImages() throws -> [UserInput.Image] {
         try self.map { try $0.mlxImage() }
       }
     }
 
-    extension EdgeToolsLLMPrompt {
+    extension EdgeToolsConversationalPrompt {
       package func rejectAudio() throws {
         guard !self.audio.isEmpty else { return }
         throw EdgeToolsError.unsupportedMedia(
@@ -496,6 +508,7 @@
       var logits: MLXArray
       var pendingTokenId: EdgeToolsToken.ID?
       var processor: (any LogitProcessor)?
+      let sampler: any LogitSampler
       let synchronizeStreamForMemorySnapshots: Bool
       let generationStartSnapshot: Memory.Snapshot
       let postPrefillSnapshot: Memory.Snapshot
@@ -505,6 +518,7 @@
     private var languageModel: any LanguageModel
     private let processor: (any UserInputProcessor)?
     private let configuredExtraStopTokenIds: Set<EdgeToolsToken.ID>
+    private let configuredSampling: EdgeToolsFusedSamplingParameters?
     private let prefillCacheState = PrefillCacheState()
     private var generation: Generation?
 
@@ -512,12 +526,14 @@
       languageModel: any LanguageModel,
       processor: (any UserInputProcessor)? = nil,
       vocabularySize: Int,
-      extraStopTokenIds: Set<EdgeToolsToken.ID>
+      extraStopTokenIds: Set<EdgeToolsToken.ID>,
+      defaultSampling: EdgeToolsFusedSamplingParameters? = nil
     ) {
       self.languageModel = languageModel
       self.processor = processor
       self.vocabularySizeValue = vocabularySize
       self.configuredExtraStopTokenIds = extraStopTokenIds
+      self.configuredSampling = defaultSampling
     }
 
     public var vocabularySize: Int { self.vocabularySizeValue }
@@ -561,7 +577,14 @@
         tools: tools,
         tokenizer: tokenizer
       )
-      return try await self.prepare(input: input, parameters: parameters)
+      let sampler =
+        parameters.sampler
+        ?? MLXFusedSampler(
+          parameters: Profile.defaultSampling(prompt: prompt, parameters: parameters)
+            ?? self.configuredSampling
+            ?? EdgeToolsFusedSamplingParameters()
+        )
+      return try await self.prepare(input: input, sampler: sampler, parameters: parameters)
     }
 
     public nonisolated(nonsending) func tokenIds(
@@ -579,6 +602,7 @@
 
     private nonisolated(nonsending) mutating func prepare(
       input: LMInput,
+      sampler: any LogitSampler,
       parameters: Profile.GenerateParameters
     ) async throws -> EdgeToolsModelPreparation {
       let clock = ContinuousClock()
@@ -603,6 +627,7 @@
         logits: prepared.output.logits,
         pendingTokenId: nil,
         processor: processor,
+        sampler: sampler,
         synchronizeStreamForMemorySnapshots: parameters.synchronizeStreamForMemorySnapshots,
         generationStartSnapshot: generationStartSnapshot,
         postPrefillSnapshot: postPrefillSnapshot
@@ -637,7 +662,7 @@
       stepLogits = generation.processor?.process(logits: stepLogits) ?? stepLogits
       let maskedLogits = applyBitmaskMLX(logits: stepLogits, mask: bitmask)
       let confidenceValues = top(maskedLogits.flattened(), k: 2)
-      let token = parameters.sampler.sample(logits: maskedLogits)
+      let token = generation.sampler.sample(logits: maskedLogits)
       eval(confidenceValues, token)
 
       let confidence = tokenConfidence(unorderedPair: confidenceValues.asArray(Float.self))
@@ -709,7 +734,7 @@
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer
     ) async throws -> LMInput {
-      if let prompt = prompt as? EdgeToolsLLMPrompt {
+      if let prompt = prompt as? EdgeToolsConversationalPrompt {
         let context = EdgeToolsLLMPrefillContext(prompt: prompt, tools: tools)
         if let input = self.prefillCacheState.input(for: context) {
           return input
@@ -783,14 +808,16 @@
       tokenizer: sending any EdgeToolsTokenizer,
       processor: sending (any UserInputProcessor)? = nil,
       vocabularySize: Int,
-      extraStopTokenIds: Set<EdgeToolsToken.ID> = []
+      extraStopTokenIds: Set<EdgeToolsToken.ID> = [],
+      defaultSampling: EdgeToolsFusedSamplingParameters? = nil
     ) throws where Model == EdgeToolsMLXModel<Profile> {
       try self.init(
         model: EdgeToolsMLXModel(
           languageModel: languageModel,
           processor: processor,
           vocabularySize: vocabularySize,
-          extraStopTokenIds: extraStopTokenIds
+          extraStopTokenIds: extraStopTokenIds,
+          defaultSampling: defaultSampling
         ),
         tokenizer: tokenizer
       )
@@ -919,7 +946,8 @@
         tokenizer: tokenizer,
         processor: processor,
         vocabularySize: vocabularySize,
-        extraStopTokenIds: extraStopTokenIds
+        extraStopTokenIds: extraStopTokenIds,
+        defaultSampling: try? directory.loadDefaultSampling()
       )
     }
   }
@@ -958,7 +986,7 @@
   }
 
   private func mlxExtraStopTokenIds<Profile: MLXModelProfile>(
-    profile _: Profile.Type,
+    profile: Profile.Type,
     directory: MLXModelDirectory,
     tokenizer: any EdgeToolsTokenizer
   ) throws -> Set<EdgeToolsToken.ID> {

@@ -3,7 +3,7 @@ import EdgeTools
 import Testing
 
 @Suite
-struct `EdgeToolsLLMPrompt tests` {
+struct `EdgeToolsConversationalPrompt tests` {
   struct MIMETypeCase: Sendable {
     let path: String
     let mimeType: EdgeToolsMIMEType?
@@ -30,10 +30,37 @@ struct `EdgeToolsLLMPrompt tests` {
 
   @Test
   func `Path Media Infers And Overrides MIME Type`() {
-    let inferredImage = EdgeToolsLLMPrompt.Asset(path: "image.png")
-    let overriddenImage = EdgeToolsLLMPrompt.Asset(path: "image.png", mimeTypeOverride: .jpeg)
+    let inferredImage = EdgeToolsConversationalPrompt.Asset(path: "image.png")
+    let overriddenImage = EdgeToolsConversationalPrompt.Asset(
+      path: "image.png",
+      mimeTypeOverride: .jpeg
+    )
 
     expectNoDifference(inferredImage.mimeType, .png)
     expectNoDifference(overriddenImage.mimeType, .jpeg)
+  }
+
+  @Test
+  func `Message Cases Store Dedicated Content Structs`() {
+    let system = EdgeToolsConversationalPrompt.SystemMessage(content: "Instructions")
+    let user = EdgeToolsConversationalPrompt.UserMessage(content: "Hello")
+    let assistant = EdgeToolsConversationalPrompt.AssistantMessage(parts: [.text("Hi")])
+    let tool = EdgeToolsConversationalPrompt.ToolMessage(
+      name: "weather",
+      response: ["temperature": .integer(72)]
+    )
+
+    let messages: [EdgeToolsConversationalPrompt.Message] = [
+      .system(system),
+      .user(user),
+      .assistant(assistant),
+      .tool(tool)
+    ]
+
+    expectNoDifference(messages.count, 4)
+    expectNoDifference(messages.compactMap { message in
+      guard case .user(let message) = message else { return nil }
+      return message.content
+    }, ["Hello"])
   }
 }

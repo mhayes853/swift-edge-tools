@@ -6,14 +6,14 @@
   // MARK: - Granite Model
 
   public struct GraniteMLXProfile: MLXLLMModelProfile {
-    public typealias Prompt = EdgeToolsLLMPrompt
+    public typealias Prompt = EdgeToolsConversationalPrompt
     public typealias GenerationParser = GraniteGenerationParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarCompiler = XGRCompiler
     public typealias GrammarContext = XGRGrammarContext
 
     public static func grammar(
-      prompt _: EdgeToolsLLMPrompt,
+      prompt: EdgeToolsConversationalPrompt,
       tools: [EdgeToolDefinition],
       parameters: DefaultMLXGenerateParameters,
       context: XGRGrammarContext
@@ -29,14 +29,14 @@
   // MARK: - GraniteMoeHybrid Model
 
   public struct GraniteMoeHybridMLXProfile: MLXLLMModelProfile {
-    public typealias Prompt = EdgeToolsLLMPrompt
+    public typealias Prompt = EdgeToolsConversationalPrompt
     public typealias GenerationParser = GraniteGenerationParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarCompiler = XGRCompiler
     public typealias GrammarContext = XGRGrammarContext
 
     public static func grammar(
-      prompt _: EdgeToolsLLMPrompt,
+      prompt: EdgeToolsConversationalPrompt,
       tools: [EdgeToolDefinition],
       parameters: DefaultMLXGenerateParameters,
       context: XGRGrammarContext

@@ -9,7 +9,7 @@
   import MLXVLM
 
   public struct Gemma4MLXProfile: MLXVLMModelProfile {
-    public typealias Prompt = EdgeToolsLLMPrompt
+    public typealias Prompt = EdgeToolsConversationalPrompt
     public typealias GenerationParser = Gemma4GenerationParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarCompiler = XGRCompiler
@@ -18,7 +18,7 @@
     public static var extraStopTokens: Set<String> { ["<|tool_response>"] }
 
     public static func grammar(
-      prompt: EdgeToolsLLMPrompt,
+      prompt: EdgeToolsConversationalPrompt,
       tools: [EdgeToolDefinition],
       parameters: DefaultMLXGenerateParameters,
       context: XGRGrammarContext
@@ -33,17 +33,17 @@
     }
 
     public static func prepare(
-      prompt: inout EdgeToolsLLMPrompt,
-      tools _: [EdgeToolDefinition],
-      parser _: inout Gemma4GenerationParser
+      prompt: inout EdgeToolsConversationalPrompt,
+      tools: [EdgeToolDefinition],
+      parser: inout Gemma4GenerationParser
     ) {
       prompt = prompt.gemma4PreparedForReasoning
     }
 
     public static nonisolated(nonsending) func input(
-      prompt: EdgeToolsLLMPrompt,
+      prompt: EdgeToolsConversationalPrompt,
       tools: [EdgeToolDefinition],
-      tokenizer _: any EdgeToolsTokenizer,
+      tokenizer: any EdgeToolsTokenizer,
       processor: (any UserInputProcessor)?
     ) async throws -> LMInput {
       guard let processor else { throw EdgeToolsError.failedToLoadConfiguration }
@@ -83,15 +83,20 @@
     }
   }
 
-  extension EdgeToolsLLMPrompt {
+  extension EdgeToolsConversationalPrompt {
     fileprivate var gemma4PreparedForReasoning: Self {
       guard self.reasoningEffort != .default, self.reasoningEffort.isEnabled else { return self }
       var prompt = self
-      if case .system(let instruction) = prompt.messages.first {
-        guard !instruction.hasPrefix("<|think|>\n") else { return prompt }
-        prompt.messages[0] = .system("<|think|>\n\(instruction)")
+      if case .system(let message) = prompt.messages.first {
+        guard !message.content.hasPrefix("<|think|>\n") else { return prompt }
+        prompt.messages[0] = .system(
+          EdgeToolsConversationalPrompt.SystemMessage(content: "<|think|>\n\(message.content)")
+        )
       } else {
-        prompt.messages.insert(.system("<|think|>"), at: 0)
+        prompt.messages.insert(
+          .system(EdgeToolsConversationalPrompt.SystemMessage(content: "<|think|>")),
+          at: 0
+        )
       }
       return prompt
     }
@@ -101,9 +106,9 @@
         switch message {
         case .system:
           return try message.mlxMessage()
-        case .user(let text, let messageImages, videos: _, audio: _):
-          var content: [MLXLMCommon.Message] = messageImages.map { _ in ["type": "image"] }
-          content.append(["type": "text", "text": text])
+        case .user(let message):
+          var content: [MLXLMCommon.Message] = message.images.map { _ in ["type": "image"] }
+          content.append(["type": "text", "text": message.content])
           return ["role": "user", "content": content]
         case .assistant, .tool:
           var result = try message.mlxMessage()

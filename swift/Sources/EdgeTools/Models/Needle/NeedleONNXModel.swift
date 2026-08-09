@@ -401,7 +401,7 @@
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer,
       parameters: NeedleONNXGenerateParameters,
-      parser _: inout NeedleGenerationParser
+      parser: inout NeedleGenerationParser
     ) async throws -> EdgeToolsModelPreparation {
       let tokenIds = try self.tokenIds(prompt: prompt, tools: tools, tokenizer: tokenizer)
       let clock = ContinuousClock()

@@ -4,14 +4,14 @@
 
 #if MLX && XGrammar && canImport(MLX)
   public struct FunctionGemmaMLXProfile: MLXLLMModelProfile {
-    public typealias Prompt = EdgeToolsLLMPrompt
+    public typealias Prompt = EdgeToolsConversationalPrompt
     public typealias GenerationParser = FunctionGemmaGenerationParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarCompiler = XGRCompiler
     public typealias GrammarContext = XGRGrammarContext
 
     public static func grammar(
-      prompt _: EdgeToolsLLMPrompt,
+      prompt: EdgeToolsConversationalPrompt,
       tools: [EdgeToolDefinition],
       parameters: DefaultMLXGenerateParameters,
       context: XGRGrammarContext

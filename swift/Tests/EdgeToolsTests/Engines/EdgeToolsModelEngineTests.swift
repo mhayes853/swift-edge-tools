@@ -366,8 +366,8 @@
     }
 
     func grammar(
-      prompt _: NeedlePrompt,
-      tools _: [EdgeToolDefinition],
+      prompt: NeedlePrompt,
+      tools: [EdgeToolDefinition],
       parameters: Parameters,
       context: XGRGrammarContext
     ) throws -> XGRGrammar {
@@ -392,7 +392,7 @@
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer,
       parameters: Parameters,
-      parser _: inout NeedleGenerationParser
+      parser: inout NeedleGenerationParser
     ) async throws -> EdgeToolsModelPreparation {
       let tokenIds = try self.tokenIds(prompt: prompt, tools: tools, tokenizer: tokenizer)
       self.assets?.begin()

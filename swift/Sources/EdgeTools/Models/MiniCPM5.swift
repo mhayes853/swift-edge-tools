@@ -8,14 +8,14 @@ import OrderedCollections
   // MARK: - MiniCPM5 Model
 
   public struct MiniCPM5MLXProfile: MLXLLMModelProfile {
-    public typealias Prompt = EdgeToolsLLMPrompt
+    public typealias Prompt = EdgeToolsConversationalPrompt
     public typealias GenerationParser = MiniCPM5GenerationParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarCompiler = XGRCompiler
     public typealias GrammarContext = XGRGrammarContext
 
     public static func grammar(
-      prompt: EdgeToolsLLMPrompt,
+      prompt: EdgeToolsConversationalPrompt,
       tools: [EdgeToolDefinition],
       parameters: DefaultMLXGenerateParameters,
       context: XGRGrammarContext
@@ -27,14 +27,14 @@ import OrderedCollections
       }
     }
 
-    public static func templateContext(prompt: EdgeToolsLLMPrompt) -> [String: any Sendable]? {
+    public static func templateContext(prompt: EdgeToolsConversationalPrompt) -> [String: any Sendable]? {
       guard prompt.reasoningEffort != .default else { return nil }
       return ["enable_thinking": prompt.reasoningEffort.isEnabled]
     }
 
     public static func prepare(
-      prompt: inout EdgeToolsLLMPrompt,
-      tools _: [EdgeToolDefinition],
+      prompt: inout EdgeToolsConversationalPrompt,
+      tools: [EdgeToolDefinition],
       parser: inout MiniCPM5GenerationParser
     ) {
       let prefix = prompt.reasoningEffort.isEnabled ? "<think>\n" : "<think>\n\n</think>\n\n"

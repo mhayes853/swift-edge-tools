@@ -7,14 +7,14 @@
   // MARK: - LFM2P5VL Model
 
   public struct LFM2P5VLMLXProfile: MLXVLMModelProfile {
-    public typealias Prompt = EdgeToolsLLMPrompt
+    public typealias Prompt = EdgeToolsConversationalPrompt
     public typealias GenerationParser = LFM2P5GenerationParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarCompiler = XGRCompiler
     public typealias GrammarContext = XGRGrammarContext
 
     public static func grammar(
-      prompt _: EdgeToolsLLMPrompt,
+      prompt: EdgeToolsConversationalPrompt,
       tools: [EdgeToolDefinition],
       parameters: DefaultMLXGenerateParameters,
       context: XGRGrammarContext
@@ -25,9 +25,9 @@
     }
 
     public static nonisolated(nonsending) func input(
-      prompt: EdgeToolsLLMPrompt,
+      prompt: EdgeToolsConversationalPrompt,
       tools: [EdgeToolDefinition],
-      tokenizer _: any EdgeToolsTokenizer,
+      tokenizer: any EdgeToolsTokenizer,
       processor: (any UserInputProcessor)?
     ) async throws -> LMInput {
       guard let processor else { throw EdgeToolsError.failedToLoadConfiguration }
@@ -59,16 +59,16 @@
     }
   #endif
 
-  extension EdgeToolsLLMPrompt {
+  extension EdgeToolsConversationalPrompt {
     fileprivate func lfm2P5VLUserInput(tools: [EdgeToolDefinition]) throws -> UserInput {
       try self.mlxUserInput(tools: tools) { message in
-        guard case .user(let text, let messageImages, videos: _, audio: _) = message else {
+        guard case .user(let message) = message else {
           return try message.mlxMessage()
         }
-        guard !messageImages.isEmpty else { return ["role": "user", "content": text] }
+        guard !message.images.isEmpty else { return ["role": "user", "content": message.content] }
 
-        var content: [MLXLMCommon.Message] = [["type": "text", "text": text]]
-        content.append(contentsOf: messageImages.map { _ in ["type": "image"] })
+        var content: [MLXLMCommon.Message] = [["type": "text", "text": message.content]]
+        content.append(contentsOf: message.images.map { _ in ["type": "image"] })
         return ["role": "user", "content": content]
       }
     }

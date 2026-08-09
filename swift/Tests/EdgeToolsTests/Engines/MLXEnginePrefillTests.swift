@@ -155,19 +155,19 @@
     typealias GrammarContext = XGRGrammarContext
 
     static func grammar(
-      prompt _: PrefillTestPrompt,
-      tools _: [EdgeToolDefinition],
-      parameters _: DefaultMLXGenerateParameters,
-      context _: XGRGrammarContext
+      prompt: PrefillTestPrompt,
+      tools: [EdgeToolDefinition],
+      parameters: DefaultMLXGenerateParameters,
+      context: XGRGrammarContext
     ) throws -> XGRGrammar {
       .universal
     }
 
     static func input(
       prompt: PrefillTestPrompt,
-      tools _: [EdgeToolDefinition],
-      tokenizer _: any EdgeToolsTokenizer,
-      processor _: (any UserInputProcessor)?
+      tools: [EdgeToolDefinition],
+      tokenizer: any EdgeToolsTokenizer,
+      processor: (any UserInputProcessor)?
     ) async throws -> LMInput {
       LMInput(tokens: MLXArray(prompt.tokenIds))
     }
@@ -182,19 +182,19 @@
       typealias GrammarContext = XGRGrammarContext
 
       static func grammar(
-        prompt _: PrefillTestPrompt,
-        tools _: [EdgeToolDefinition],
-        parameters _: DefaultMLXGenerateParameters,
-        context _: XGRGrammarContext
+        prompt: PrefillTestPrompt,
+        tools: [EdgeToolDefinition],
+        parameters: DefaultMLXGenerateParameters,
+        context: XGRGrammarContext
       ) throws -> XGRGrammar {
         .universal
       }
 
       static func input(
         prompt: PrefillTestPrompt,
-        tools _: [EdgeToolDefinition],
-        tokenizer _: any EdgeToolsTokenizer,
-        processor _: (any UserInputProcessor)?
+        tools: [EdgeToolDefinition],
+        tokenizer: any EdgeToolsTokenizer,
+        processor: (any UserInputProcessor)?
       ) async throws -> LMInput {
         LMInput(
           text: LMInput.Text(
@@ -238,7 +238,7 @@
     func prepare(
       _ input: LMInput,
       cache: [any KVCache],
-      windowSize _: Int?
+      windowSize: Int?
     ) throws -> PrepareResult {
       if input.image != nil {
         return .logits(LMOutput(logits: self(input.text.tokens, cache: cache)))

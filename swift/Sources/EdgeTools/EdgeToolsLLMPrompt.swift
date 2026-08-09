@@ -1,6 +1,6 @@
-// MARK: - EdgeToolsLLMPrompt
+// MARK: - EdgeToolsConversationalPrompt
 
-public struct EdgeToolsLLMPrompt: Hashable, Sendable {
+public struct EdgeToolsConversationalPrompt: Hashable, Sendable {
   public var messages: [Message]
   public var reasoningEffort: EdgeToolsReasoningEffort
 
@@ -14,22 +14,22 @@ public struct EdgeToolsLLMPrompt: Hashable, Sendable {
 
   public var images: [Asset] {
     self.messages.flatMap { message -> [Asset] in
-      guard case .user(_, let images, videos: _, audio: _) = message else { return [] }
-      return images
+      guard case .user(let message) = message else { return [] }
+      return message.images
     }
   }
 
   public var videos: [Asset] {
     self.messages.flatMap { message -> [Asset] in
-      guard case .user(_, images: _, let videos, audio: _) = message else { return [] }
-      return videos
+      guard case .user(let message) = message else { return [] }
+      return message.videos
     }
   }
 
   public var audio: [Asset] {
     self.messages.flatMap { message -> [Asset] in
-      guard case .user(_, images: _, videos: _, let audio) = message else { return [] }
-      return audio
+      guard case .user(let message) = message else { return [] }
+      return message.audio
     }
   }
 
@@ -37,27 +37,121 @@ public struct EdgeToolsLLMPrompt: Hashable, Sendable {
 
 // MARK: - Message
 
-extension EdgeToolsLLMPrompt {
+extension EdgeToolsConversationalPrompt {
   @nonexhaustive
   public enum Message: Hashable, Sendable {
-    case system(String)
-    case user(String, images: [Asset] = [], videos: [Asset] = [], audio: [Asset] = [])
-    case assistant([EdgeToolsGenerationPart])
-    case tool(name: String, response: EdgeToolsValue)
+    case system(SystemMessage)
+    case user(UserMessage)
+    case assistant(AssistantMessage)
+    case tool(ToolMessage)
   }
 }
 
-extension EdgeToolsLLMPrompt.Message {
+// MARK: - Message Content
+
+extension EdgeToolsConversationalPrompt {
+  public struct SystemMessage: Hashable, Sendable {
+    public var content: String
+
+    public init(content: String) {
+      self.content = content
+    }
+
+    public init(_ content: String) {
+      self.init(content: content)
+    }
+  }
+
+  public struct UserMessage: Hashable, Sendable {
+    public var content: String
+    public var images: [Asset]
+    public var videos: [Asset]
+    public var audio: [Asset]
+
+    public init(
+      content: String,
+      images: [Asset] = [],
+      videos: [Asset] = [],
+      audio: [Asset] = []
+    ) {
+      self.content = content
+      self.images = images
+      self.videos = videos
+      self.audio = audio
+    }
+
+    public init(
+      _ content: String,
+      images: [Asset] = [],
+      videos: [Asset] = [],
+      audio: [Asset] = []
+    ) {
+      self.init(content: content, images: images, videos: videos, audio: audio)
+    }
+  }
+
+  public struct AssistantMessage: Hashable, Sendable {
+    public var parts: [EdgeToolsGenerationPart]
+
+    public init(parts: [EdgeToolsGenerationPart]) {
+      self.parts = parts
+    }
+
+    public init(_ parts: [EdgeToolsGenerationPart]) {
+      self.init(parts: parts)
+    }
+  }
+
+  public struct ToolMessage: Hashable, Sendable {
+    public var name: String
+    public var response: EdgeToolsValue
+
+    public init(name: String, response: EdgeToolsValue) {
+      self.name = name
+      self.response = response
+    }
+  }
+}
+
+extension EdgeToolsConversationalPrompt.Message {
+  public static func system(_ content: String) -> Self {
+    .system(EdgeToolsConversationalPrompt.SystemMessage(content: content))
+  }
+
+  public static func user(
+    _ content: String,
+    images: [EdgeToolsConversationalPrompt.Asset] = [],
+    videos: [EdgeToolsConversationalPrompt.Asset] = [],
+    audio: [EdgeToolsConversationalPrompt.Asset] = []
+  ) -> Self {
+    .user(
+      EdgeToolsConversationalPrompt.UserMessage(
+        content: content,
+        images: images,
+        videos: videos,
+        audio: audio
+      )
+    )
+  }
+
+  public static func assistant(_ parts: [EdgeToolsGenerationPart]) -> Self {
+    .assistant(EdgeToolsConversationalPrompt.AssistantMessage(parts: parts))
+  }
+
+  public static func tool(name: String, response: EdgeToolsValue) -> Self {
+    .tool(EdgeToolsConversationalPrompt.ToolMessage(name: name, response: response))
+  }
+
   public init(generation: EdgeToolsEngineGeneration) {
     let isEmpty = generation.parts.isEmpty && !generation.response.isEmpty
     let parts = isEmpty ? [.text(generation.response)]  : generation.parts
-    self = .assistant(parts)
+    self = .assistant(EdgeToolsConversationalPrompt.AssistantMessage(parts: parts))
   }
 }
 
 // MARK: - Asset
 
-extension EdgeToolsLLMPrompt {
+extension EdgeToolsConversationalPrompt {
   public struct Asset: Hashable, Sendable {
     @nonexhaustive
     public enum Content: Hashable, Sendable {
