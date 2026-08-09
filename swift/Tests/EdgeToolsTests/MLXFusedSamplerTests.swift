@@ -36,6 +36,16 @@
     }
 
     @Test
+    func `Presence Penalty Demotes An Already Sampled Token`() {
+      let sampler = MLXFusedSampler(
+        parameters: EdgeToolsFusedSamplingParameters(temperature: 0, presencePenalty: 3)
+      )
+
+      expectNoDifference(sampler.pick(from: .test), 1)
+      expectNoDifference(sampler.pick(from: .test), 2)
+    }
+
+    @Test
     func `Resetting The History Restores The Unpenalized Token`() {
       let sampler = MLXFusedSampler(
         parameters: EdgeToolsFusedSamplingParameters(temperature: 0, repetitionPenalty: 2)

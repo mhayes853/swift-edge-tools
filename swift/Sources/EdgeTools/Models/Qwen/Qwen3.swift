@@ -31,6 +31,15 @@
       guard prompt.reasoningEffort != .default else { return nil }
       return ["enable_thinking": prompt.reasoningEffort.isEnabled]
     }
+
+    public static func defaultSampling(
+      prompt: EdgeToolsLLMPrompt,
+      parameters: DefaultMLXGenerateParameters
+    ) -> EdgeToolsFusedSamplingParameters? {
+      prompt.reasoningEffort.isEnabled
+        ? EdgeToolsFusedSamplingParameters(temperature: 0.6, topK: 20, topP: 0.95)
+        : EdgeToolsFusedSamplingParameters(temperature: 0.7, topK: 20, topP: 0.8)
+    }
   }
 
   public typealias Qwen3MLXModelEngine = MLXEngine<Qwen3MLXProfile>

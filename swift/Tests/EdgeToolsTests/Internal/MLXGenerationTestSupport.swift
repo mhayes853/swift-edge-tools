@@ -2,6 +2,7 @@
   import CoreGraphics
   import AVFoundation
   import EdgeTools
+  import MLXLMCommon
   import Foundation
   import ImageIO
   import UniformTypeIdentifiers
@@ -53,6 +54,7 @@
     Engine.GenerateParameters == DefaultMLXGenerateParameters
   {
     var transcript = EdgeToolsLLMPrompt.weatherTest
+    transcript.reasoningEffort = .none
     let toolGeneration = try await session.generate(
       prompt: transcript,
       parameters: DefaultMLXGenerateParameters(
@@ -244,6 +246,7 @@
       prompt: transcript,
       tools: [tool],
       parameters: DefaultMLXGenerateParameters(
+        sampler: ArgMaxSampler(),
         constraint: .toolsWithGrammar(range: .exact(1)),
         maxTokens: toolMaxTokens
       ),

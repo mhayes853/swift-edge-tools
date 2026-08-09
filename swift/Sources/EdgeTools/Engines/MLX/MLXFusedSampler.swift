@@ -33,7 +33,7 @@
     }
 
     public func sample(logits: MLXArray) -> MLXArray {
-      let isPenalized = self.parameters.repetitionPenalty != 1
+      let isPenalized = self.parameters.penalizesHistory
       let prngKey = self.nextPRNGKey()
       let token =
         (isPenalized ? self.history.tokens : nil)
@@ -108,18 +108,22 @@
     if let history {
       let indices = history.asType(.uint32)[.newAxis, 0...]
       let selected = takeAlong(logits, indices, axis: -1)
-      let penalized = MLX.where(
+      let scaled = MLX.where(
         selected .< 0,
         selected * parameters.repetitionPenalty,
         selected / parameters.repetitionPenalty
       )
+      let penalized =
+        parameters.presencePenalty == 0
+        ? scaled
+        : scaled - parameters.presencePenalty
       logits = putAlong(logits, indices, values: penalized, axis: -1)
     }
     guard !parameters.isGreedy else { return argMax(logits, axis: -1) }
 
     let logProbabilities = logSoftmax(logits, axis: -1)
     let temperature = 1 / parameters.temperature
-    guard let topK = parameters.topK, topK < logits.dim(-1) else {
+    guard let topK = parameters.topK, topK > 0, topK < logits.dim(-1) else {
       return categorical(
         filteredLogProbabilities(logProbabilities, parameters: parameters) * temperature,
         key: prngKey
@@ -133,12 +137,12 @@
     let ids = takeAlong(partitioned, descending, axis: -1)
 
     var keep: MLXArray?
-    if let topP = parameters.topP {
+    if let topP = parameters.topP, topP < 1 {
       let probabilities = exp(sorted)
       let exclusive = cumsum(probabilities, axis: -1) - probabilities
       keep = (exclusive .< topP)
     }
-    if let minP = parameters.minP {
+    if let minP = parameters.minP, minP > 0 {
       let survives = sorted .>= sorted[0..., ..<1] + log(MLXArray(minP))
       keep = keep.map { $0 .&& survives } ?? survives
     }
@@ -153,7 +157,7 @@
     parameters: EdgeToolsFusedSamplingParameters
   ) -> MLXArray {
     var logProbabilities = logProbabilities
-    if let minP = parameters.minP {
+    if let minP = parameters.minP, minP > 0 {
       let threshold = logProbabilities.max(axis: -1, keepDims: true) + log(MLXArray(minP))
       logProbabilities = MLX.where(
         logProbabilities .>= threshold,
@@ -161,7 +165,7 @@
         -Float.infinity
       )
     }
-    guard let topP = parameters.topP else { return logProbabilities }
+    guard let topP = parameters.topP, topP < 1 else { return logProbabilities }
 
     let ascending = argSort(logProbabilities, axis: -1)
     let sorted = takeAlong(logProbabilities, ascending, axis: -1)

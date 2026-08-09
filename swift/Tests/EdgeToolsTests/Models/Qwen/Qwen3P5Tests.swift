@@ -8,6 +8,26 @@ import Testing
 @Suite
 struct `Qwen3P5 tests` {
   #if MLX && XGrammar && canImport(MLX) && !os(WASI)
+    @Test
+    func `Default Sampling Follows The Reasoning Effort`() {
+      let thinking = Qwen3P5MLXProfile.defaultSampling(
+        prompt: EdgeToolsLLMPrompt(messages: [.user("hi")], reasoningEffort: .high),
+        parameters: DefaultMLXGenerateParameters()
+      )
+      let nonThinking = Qwen3P5MLXProfile.defaultSampling(
+        prompt: EdgeToolsLLMPrompt(messages: [.user("hi")], reasoningEffort: .none),
+        parameters: DefaultMLXGenerateParameters()
+      )
+
+      expectNoDifference(thinking?.topP, 0.95)
+      expectNoDifference(thinking?.presencePenalty, 1.5)
+      expectNoDifference(nonThinking?.topP, nil)
+      expectNoDifference(nonThinking?.presencePenalty, 2)
+    }
+
+  #endif
+
+  #if MLX && XGrammar && canImport(MLX) && !os(WASI)
     @Suite(.serialized, .enabledIfXcode())
     struct `Qwen3P5MLXModelEngine tests` {
       @Test

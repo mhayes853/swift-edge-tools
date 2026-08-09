@@ -40,6 +40,7 @@ public struct EdgeToolsFusedSamplingParameters: Hashable, Sendable {
   public var topP: Float?
   public var minP: Float?
   public var repetitionPenalty: Float
+  public var presencePenalty: Float
   public var repetitionContextSize: Int
   public var seed: UInt64?
 
@@ -49,6 +50,7 @@ public struct EdgeToolsFusedSamplingParameters: Hashable, Sendable {
     topP: Float? = nil,
     minP: Float? = nil,
     repetitionPenalty: Float = 1,
+    presencePenalty: Float = 0,
     repetitionContextSize: Int = 20,
     seed: UInt64? = nil
   ) {
@@ -58,12 +60,17 @@ public struct EdgeToolsFusedSamplingParameters: Hashable, Sendable {
     self.topP = topP
     self.minP = minP
     self.repetitionPenalty = repetitionPenalty
+    self.presencePenalty = presencePenalty
     self.repetitionContextSize = repetitionContextSize
     self.seed = seed
   }
 
   public var isGreedy: Bool {
     self.temperature == 0
+  }
+
+  public var penalizesHistory: Bool {
+    self.repetitionPenalty != 1 || self.presencePenalty != 0
   }
 }
 

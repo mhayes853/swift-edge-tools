@@ -257,7 +257,7 @@
   {
     public static var `default`: Self { Self() }
 
-    public var sampler: any LogitSampler
+    public var sampler: (any LogitSampler)?
     public var processor: (any LogitProcessor)?
     public var maxTokens: Int?
     public var toolCallRange: GrammarToolCallRange
@@ -267,7 +267,7 @@
     public var quantizedKVStart: Int { 0 }
 
     public init(
-      sampler: any LogitSampler = ArgMaxSampler(),
+      sampler: (any LogitSampler)? = ArgMaxSampler(),
       processor: (any LogitProcessor)? = nil,
       maxTokens: Int? = 1024,
       toolCallRange: GrammarToolCallRange = .unbounded(minimum: 0),
