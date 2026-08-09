@@ -10,6 +10,7 @@ public struct GenerationRequest: Sendable {
   public var maxTokens: Int?
   public var temperature: Float
   public var topP: Float
+  public var reasoning: EdgeToolsReasoningEffort
 
   public init(
     system: String = "",
@@ -20,7 +21,8 @@ public struct GenerationRequest: Sendable {
     toolCallRange: GrammarToolCallRange = .unbounded(minimum: 0),
     maxTokens: Int? = 1024,
     temperature: Float = 0,
-    topP: Float = 1
+    topP: Float = 1,
+    reasoning: EdgeToolsReasoningEffort = .default
   ) {
     self.system = system
     self.user = user
@@ -31,5 +33,6 @@ public struct GenerationRequest: Sendable {
     self.maxTokens = maxTokens
     self.temperature = temperature
     self.topP = topP
+    self.reasoning = reasoning
   }
 }

@@ -26,8 +26,7 @@ public func runModel(
   let generation = try await loaded.generate(
     request,
     hardwareUnit: hardwareUnit,
-    onToken: { printer.token($0) },
-    onToolCall: { printer.toolCall($0) }
+    onPart: { printer.part($0) }
   )
   printer.finish()
   let peakMemory = context.peakMemory()

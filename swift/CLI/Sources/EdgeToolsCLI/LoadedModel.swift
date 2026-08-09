@@ -73,20 +73,19 @@ extension LoadedModel {
   func generate(
     _ request: GenerationRequest,
     hardwareUnit: MLXHardwareUnit,
-    onToken: (@Sendable (EdgeToolsToken) -> Void)? = nil,
-    onToolCall: (@Sendable (EdgeRawToolCall) -> Void)? = nil
+    onPart: (@Sendable (EdgeToolsGenerationPart) -> Void)? = nil
   ) async throws -> EdgeToolsEngineGeneration {
     if self.runner.usesMLX {
       return try await hardwareUnit.withDefaultDevice {
         try await self.runner.generate(
           request,
-          channel: EdgeToolsGenerationChannel(onToken: onToken, onToolCall: onToolCall)
+          channel: EdgeToolsGenerationChannel(onPart: onPart)
         )
       }
     }
     return try await self.runner.generate(
       request,
-      channel: EdgeToolsGenerationChannel(onToken: onToken, onToolCall: onToolCall)
+      channel: EdgeToolsGenerationChannel(onPart: onPart)
     )
   }
 }

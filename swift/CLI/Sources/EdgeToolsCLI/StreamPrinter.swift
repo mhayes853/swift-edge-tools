@@ -17,20 +17,26 @@ final class StreamPrinter: Sendable {
     self.output = output
   }
 
-  func token(_ token: EdgeToolsToken) {
+  func part(_ part: EdgeToolsGenerationPart) {
     switch self.mode {
     case .tokens:
-      self.output(token.stringValue, "")
+      if case .text(let text) = part {
+        self.output(text, "")
+      }
     case .events:
-      self.output("\(self.elapsed) token \(token.stringValue.compactJSONText)", "\n")
+      switch part {
+      case .text(let text):
+        self.output("\(self.elapsed) text \(text.compactJSONText)", "\n")
+      case .reasoning(let reasoning):
+        self.output("\(self.elapsed) reasoning \(reasoning.compactJSONText)", "\n")
+      case .toolCall(let call):
+        self.output("\(self.elapsed) tool-call \(call.name) \(call.arguments.compactJSONText)", "\n")
+      @unknown default:
+        break
+      }
     case .none:
       break
     }
-  }
-
-  func toolCall(_ call: EdgeRawToolCall) {
-    guard self.mode == .events else { return }
-    self.output("\(self.elapsed) tool-call \(call.name) \(call.arguments.compactJSONText)", "\n")
   }
 
   func finish() {

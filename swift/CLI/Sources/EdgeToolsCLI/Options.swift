@@ -95,6 +95,12 @@ struct GenerationOptions: ParsableArguments {
   var topP: Float = 1
 
   @Option(
+    name: .customLong("reasoning"),
+    help: "The reasoning level. Accepts any model-defined string; defaults to default."
+  )
+  var reasoning: String = EdgeToolsReasoningEffort.default.rawValue
+
+  @Option(
     name: .customLong("min-tool-calls"),
     help: "The minimum number of tool calls to constrain to."
   )
@@ -130,7 +136,8 @@ struct GenerationOptions: ParsableArguments {
       toolCallRange: self.toolCallRange,
       maxTokens: self.maxTokens,
       temperature: self.temperature,
-      topP: self.topP
+      topP: self.topP,
+      reasoning: EdgeToolsReasoningEffort(rawValue: self.reasoning)
     )
   }
 

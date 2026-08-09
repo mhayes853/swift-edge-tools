@@ -357,7 +357,10 @@ private func needlePrompt(for request: GenerationRequest) -> NeedlePrompt {
     var messages = [EdgeToolsLLMPrompt.Message]()
     if !request.system.isEmpty { messages.append(.system(request.system)) }
     messages.append(.user(request.user, images: request.images))
-    return EdgeToolsLLMPrompt(messages: messages)
+    return EdgeToolsLLMPrompt(
+      messages: messages,
+      reasoningEffort: request.reasoning
+    )
   }
 
   private func mlxSampler(for request: GenerationRequest) -> any LogitSampler {

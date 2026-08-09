@@ -114,11 +114,11 @@ extension EngineRunner {
       supportsImages: supportsImages,
       generation: { request, channel in
         onGenerate(request)
-        for (index, token) in tokens.enumerated() {
-          channel.emit(token: EdgeToolsToken(id: index, stringValue: token))
+        for token in tokens {
+          channel.emit(part: .text(token))
         }
         for call in toolCalls {
-          channel.emit(toolCall: call)
+          channel.emit(part: .toolCall(call))
         }
         return EdgeToolsEngineGeneration(
           prefillMetrics: EdgeToolsPrefillMetrics(tokens: 10, duration: .milliseconds(5)),
@@ -131,7 +131,7 @@ extension EngineRunner {
           tokens: tokens.enumerated()
             .map { EdgeToolsToken(id: $0.offset, stringValue: $0.element) },
           response: response,
-          toolCalls: toolCalls
+          parts: toolCalls.map(EdgeToolsGenerationPart.toolCall)
         )
       },
       cacheClearing: { onReset() }

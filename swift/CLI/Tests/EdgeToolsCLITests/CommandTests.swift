@@ -22,13 +22,16 @@ struct `Command tests` {
     )
 
     try await EdgeCommand.run(
-      arguments: ["--path", "/models/needle", "--stream", "none"],
+      arguments: [
+        "--path", "/models/needle", "--stream", "none", "--reasoning", "custom-level"
+      ],
       context: context
     )
 
     assertSnapshot(of: capture.standardOutput.value, as: .lines)
     expectNoDifference(capture.standardError.value, "")
     expectNoDifference(try #require(requests.value).user, "Set a timer for five minutes.")
+    expectNoDifference(try #require(requests.value).reasoning.rawValue, "custom-level")
     expectNoDifference(
       try #require(requests.value).tools.map(\.name),
       defaultToolDefinitions.map(\.name)
