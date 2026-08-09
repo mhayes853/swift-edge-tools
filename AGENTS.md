@@ -87,7 +87,9 @@ The highest levels of the framework (eg. `EdgeToolsSession`, etc.) should be tes
 
 The most important tests besides the general framework tests are the engine generation tests and the snapshots they produce. Everything else is trivial by comparison. Most engine generation tests record snapshots with `withKnownIssue`, this makes them robust to non-deterministic model outputs, but requires manual validation of the snapshot. As an agent, you should be able to perform such validation yourself.
 
-MLX tests an only be ran through via Xcode and not through `swift test`.
+Run MLX tests through `scripts/test-mlx.sh`. The script enables the required
+traits and configures MLX's Metal library for the SwiftPM test runner. Use
+`scripts/test-mlx.sh --filter '<test filter>'` to run a focused subset.
 
 Make sure to prefer using `expectNoDifference` over `#expect` for assertions. The only times where `#expect` are preferred are for `#expect(throws:)` and for `WASITests` (`expectNoDifference` doesn't work properly on WASI). For assertions on boolean expressions, you can do `expectNoDifference(myConditionExpression, true)` or `expectNoDifference(myConditionExpression, false)`.
 

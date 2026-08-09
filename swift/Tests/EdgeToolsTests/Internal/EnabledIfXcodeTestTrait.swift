@@ -1,12 +1,13 @@
 import Foundation
 import Testing
 
-func isRunningTestsFromXcode() -> Bool {
+func isMLXTestsEnabled() -> Bool {
   ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    || ProcessInfo.processInfo.environment["EDGE_TOOLS_ENABLE_MLX_TESTS"] == "1"
 }
 
 extension Trait where Self == ConditionTrait {
-  static func enabledIfXcode(sourceLocation: SourceLocation = #_sourceLocation) -> Self {
-    .enabled(if: isRunningTestsFromXcode(), sourceLocation: sourceLocation)
+  static func enabledIfMLXTests(sourceLocation: SourceLocation = #_sourceLocation) -> Self {
+    .enabled(if: isMLXTestsEnabled(), sourceLocation: sourceLocation)
   }
 }

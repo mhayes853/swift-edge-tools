@@ -8,7 +8,7 @@ import Testing
 @Suite
 struct `Granite tests` {
   #if MLX && XGrammar && canImport(MLX) && !os(WASI)
-    @Suite(.serialized, .enabledIfXcode())
+    @Suite(.serialized, .enabledIfMLXTests())
     struct `GraniteMoeHybridMLXModelEngine tests` {
       @Test
       func `Completes Tool Turn Snapshot`() async throws {

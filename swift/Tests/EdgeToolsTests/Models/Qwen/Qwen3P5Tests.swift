@@ -8,7 +8,7 @@ import Testing
 @Suite
 struct `Qwen3P5 tests` {
   #if MLX && XGrammar && canImport(MLX) && !os(WASI)
-    @Suite(.serialized, .enabledIfXcode())
+    @Suite(.serialized, .enabledIfMLXTests())
     struct `Qwen3P5MLXModelEngine tests` {
       @Test
       func `Completes Tool Turn Snapshot`() async throws {
@@ -28,7 +28,7 @@ struct `Qwen3P5 tests` {
     }
 
     #if canImport(CoreImage) && canImport(MLXVLM)
-      @Suite(.serialized, .enabledIfXcode())
+      @Suite(.serialized, .enabledIfMLXTests())
       struct `Qwen3P5VLMLXModelEngine tests` {
         @Test
         func `Describes Video Snapshot`() async throws {
