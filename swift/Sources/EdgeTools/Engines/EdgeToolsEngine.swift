@@ -106,14 +106,14 @@ extension EdgeToolsEngineGeneration {
 
   public var text: String {
     guard !self.parts.isEmpty else { return self.response }
-    return self.parts.compactMap(\.text).joined()
+    return self.parts.compactMap { $0.text }.joined()
   }
 
   public var reasoning: [String] {
-    self.parts.compactMap(\.reasoning)
+    self.parts.compactMap { $0.reasoning }
   }
 
   public var toolCalls: [EdgeRawToolCall] {
-    self.parts.compactMap(\.toolCall)
+    self.parts.compactMap { $0.toolCall }
   }
 }
