@@ -26,7 +26,11 @@ extension MemoryByteCount {
   public static var peakResident: Self {
     var info = rusage()
     guard getrusage(RUSAGE_SELF, &info) == 0 else { return Self(bytes: 0) }
-    return Self(bytes: Int(info.ru_maxrss))
+    #if os(Linux) || os(Android)
+      return Self(bytes: Int(info.ru_maxrss) * 1024)
+    #else
+      return Self(bytes: Int(info.ru_maxrss))
+    #endif
   }
 
   public static var peakGPU: Self {

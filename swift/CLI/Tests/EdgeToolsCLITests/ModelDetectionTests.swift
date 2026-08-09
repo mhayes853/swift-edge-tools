@@ -46,7 +46,20 @@ struct `ModelDetection tests` {
   func `Reports Vision Modality For Vision Models`() {
     let vision = DetectedModel.allCases.filter { $0.modality == .vision }
 
-    expectNoDifference(Set(vision), [.gemma4, .lfm2P5VL, .genericVLM])
+    expectNoDifference(Set(vision), [.qwen3P5VL, .gemma4, .lfm2P5VL, .genericVLM])
+  }
+
+  @Test(arguments: ["qwen3_5", "qwen3_5_text"])
+  func `Detects Qwen3 Point 5 Vision Models`(modelType: String) throws {
+    let directory = try temporaryModel(
+      configuration: "{\"model_type\": \"\(modelType)\"}",
+      files: ["model.safetensors", "processor_config.json"]
+    )
+
+    let detection = try ModelDetection.detect(in: directory)
+
+    expectNoDifference(detection.model, .qwen3P5VL)
+    expectNoDifference(detection.model.modality, .vision)
   }
 
   @Test(arguments: [
@@ -149,6 +162,22 @@ struct `ModelDetection tests` {
 
     expectNoDifference(detection.engines, [.onnx])
     expectNoDifference(detection.defaultEngine, .onnx)
+  }
+
+  @Test
+  func `Reports Every Engine With Matching Weights`() throws {
+    let directory = try temporaryModel(
+      configuration: """
+        {"num_encoder_layers": 4, "num_decoder_layers": 4, "decoder_start_token_id": 1}
+        """,
+      files: ["model.safetensors", "encoder.onnx", "decoder.onnx"]
+    )
+    let detection = try ModelDetection.detect(in: directory)
+
+    expectNoDifference(
+      detection.engines,
+      [EngineKind.mlx, .onnx].filter(\.isAvailable)
+    )
   }
 
   @Test

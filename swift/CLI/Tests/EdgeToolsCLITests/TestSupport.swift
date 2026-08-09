@@ -50,7 +50,8 @@ extension EdgeContext {
     engines: [EngineKind] = [.mlx],
     files: [String] = ["config.json", "model.safetensors"],
     runner: EngineRunner = .stub(),
-    onResolve: @escaping @Sendable (ModelSource) -> Void = { _ in }
+    onResolve: @escaping @Sendable (ModelSource) -> Void = { _ in },
+    onMakeRunner: @escaping @Sendable () -> Void = {}
   ) -> Self {
     let now = ContinuousClock().now
     return Self(
@@ -61,10 +62,11 @@ extension EdgeContext {
       detectModel: {
         ModelDetection(directory: $0, model: model, engines: engines, files: files)
       },
-      makeRunner: { detection, requestedEngine, hardwareUnit in
-        try await EngineRunner(
+      makeRunner: { detection, engine, hardwareUnit in
+        onMakeRunner()
+        return try await EngineRunner(
           detection: detection,
-          requestedEngine: requestedEngine,
+          requestedEngine: engine,
           hardwareUnit: hardwareUnit,
           loader: { _, _, _ in runner }
         )
@@ -114,7 +116,8 @@ extension EngineRunner {
       supportsImages: supportsImages,
       generation: { request, channel in
         onGenerate(request)
-        for token in tokens {
+        for (index, token) in tokens.enumerated() {
+          channel.emit(token: EdgeToolsToken(id: index, stringValue: token))
           channel.emit(part: .text(token))
         }
         for call in toolCalls {
@@ -134,7 +137,7 @@ extension EngineRunner {
           parts: toolCalls.map(EdgeToolsGenerationPart.toolCall)
         )
       },
-      cacheClearing: { onReset() }
+      modelResetting: { onReset() }
     )
   }
 

@@ -9,13 +9,15 @@ struct `BenchAction tests` {
   @Test
   func `Measures Only The Requested Runs And Resets Between Them`() async throws {
     let generations = LockedBox(0)
+    let loads = LockedBox(0)
     let resets = LockedBox(0)
     let report = try await benchmarkModel(
       context: .stub(
         runner: .stub(
           onGenerate: { _ in generations.value += 1 },
           onReset: { resets.value += 1 }
-        )
+        ),
+        onMakeRunner: { loads.value += 1 }
       ),
       source: .test(),
       request: GenerationRequest(user: "hello"),
@@ -25,6 +27,7 @@ struct `BenchAction tests` {
 
     expectNoDifference(report.runs, 5)
     expectNoDifference(report.samples.count, 5)
+    expectNoDifference(loads.value, 1)
     expectNoDifference(generations.value, 7)
     expectNoDifference(resets.value, 5)
   }

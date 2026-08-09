@@ -348,6 +348,10 @@
         stopTokenIds: stopTokenIds
       )
     }
+
+    public func resetGeneration() {
+      self.model.resetGeneration()
+    }
   }
 
   #if XGrammar

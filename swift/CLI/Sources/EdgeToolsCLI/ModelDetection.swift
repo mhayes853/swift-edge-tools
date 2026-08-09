@@ -6,6 +6,7 @@ public enum DetectedModel: String, Hashable, Sendable, CaseIterable {
   case needle
   case qwen3
   case qwen3P5
+  case qwen3P5VL
   case lfm2
   case functionGemma
   case gemma4
@@ -26,6 +27,7 @@ public enum DetectedModel: String, Hashable, Sendable, CaseIterable {
     case .needle: "Needle"
     case .qwen3: "Qwen3"
     case .qwen3P5: "Qwen3.5"
+    case .qwen3P5VL: "Qwen3.5 VL"
     case .lfm2: "LFM2"
     case .functionGemma: "FunctionGemma"
     case .gemma4: "Gemma4"
@@ -43,7 +45,7 @@ public enum DetectedModel: String, Hashable, Sendable, CaseIterable {
     case .needle, .qwen3, .qwen3P5, .lfm2, .functionGemma, .granite, .graniteMoeHybrid,
       .miniCPM5, .genericLLM:
       .text
-    case .gemma4, .lfm2P5VL, .genericVLM:
+    case .qwen3P5VL, .gemma4, .lfm2P5VL, .genericVLM:
       .vision
     }
   }
@@ -185,7 +187,8 @@ private func detectedModel(in directory: URL, files: [String]) throws -> Detecte
   switch header.modelType {
   case "needle": return .needle
   case "qwen3": return .qwen3
-  case "qwen3_5", "qwen3_5_text": return .qwen3P5
+  case "qwen3_5", "qwen3_5_text":
+    return hasProcessorConfiguration(files) ? .qwen3P5VL : .qwen3P5
   case "lfm2": return .lfm2
   case "lfm2_vl", "lfm2-vl": return .lfm2P5VL
   case "gemma3", "gemma3_text": return .functionGemma
@@ -195,9 +198,12 @@ private func detectedModel(in directory: URL, files: [String]) throws -> Detecte
   case "llama" where chatTemplate(in: directory, files: files)?.contains("<function") == true:
     return .miniCPM5
   default:
-    return files.contains { $0 == "preprocessor_config.json" || $0 == "processor_config.json" }
-      ? .genericVLM : .genericLLM
+    return hasProcessorConfiguration(files) ? .genericVLM : .genericLLM
   }
+}
+
+private func hasProcessorConfiguration(_ files: [String]) -> Bool {
+  files.contains { $0 == "preprocessor_config.json" || $0 == "processor_config.json" }
 }
 
 private func chatTemplate(in directory: URL, files: [String]) -> String? {

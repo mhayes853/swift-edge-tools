@@ -6,6 +6,7 @@ import Foundation
 struct LoadedModel {
   var detection: ModelDetection
   var runner: EngineRunner
+  var hardwareUnit: MLXHardwareUnit
   var loadDuration: Duration
 }
 
@@ -16,76 +17,56 @@ extension LoadedModel {
     context: EdgeContext,
     source: ModelSource,
     requestedEngine: EngineKind?,
-    hardwareUnit: MLXHardwareUnit,
+    hardwareUnit: MLXHardwareUnit?,
+    request: GenerationRequest,
     onWarning: @escaping @Sendable (String) -> Void
   ) async throws -> Self {
+    try request.grammar.validate()
     let start = context.now()
     let directory = try await context.resolveDirectory(source) { repo in
       onWarning("downloading \(repo)...")
     }
     let detection = try context.detectModel(directory)
-    let runner = try await context.makeRunner(detection, requestedEngine, hardwareUnit)
+    let configuration = try EngineRunner.parse(
+      request,
+      detection: detection,
+      requestedEngine: requestedEngine,
+      requestedHardwareUnit: hardwareUnit
+    )
+    let runner = try await context.makeRunner(
+      detection,
+      configuration.engine,
+      configuration.hardwareUnit
+    )
     if runner.engine.isExperimental {
       onWarning("the \(runner.engine.rawValue) engine is experimental.")
     }
     return Self(
       detection: detection,
       runner: runner,
+      hardwareUnit: configuration.hardwareUnit,
       loadDuration: start.duration(to: context.now())
     )
-  }
-}
-
-// MARK: - Requests
-
-extension LoadedModel {
-  func validate(_ request: GenerationRequest) throws -> GenerationRequest {
-    guard !request.hasSamplingOverride || self.runner.supportsSampling else {
-      throw EdgeCLIError(
-        """
-        \(self.detection.model.displayName) on \(self.runner.engine.rawValue) always samples greedily; \
-        Sampler options do not apply.
-        """
-      )
-    }
-    guard request.images.isEmpty || self.runner.supportsImages else {
-      throw EdgeCLIError(
-        """
-        \(self.detection.model.displayName) on \(self.runner.engine.rawValue) takes text only; \
-        --image does not apply.
-        """
-      )
-    }
-    guard request.grammar == .auto || self.runner.supportsCustomGrammar else {
-      throw EdgeCLIError(
-        """
-        \(self.detection.model.displayName) on \(self.runner.engine.rawValue) only supports \
-        `--grammar auto`; its generate parameters expose a tool call range rather than a full \
-        generation constraint.
-        """
-      )
-    }
-    return request
   }
 }
 
 extension LoadedModel {
   func generate(
     _ request: GenerationRequest,
-    hardwareUnit: MLXHardwareUnit,
+    onToken: (@Sendable (EdgeToolsToken) -> Void)? = nil,
     onPart: (@Sendable (EdgeToolsGenerationPart) -> Void)? = nil
   ) async throws -> EdgeToolsEngineGeneration {
     if self.runner.usesMLX {
-      return try await hardwareUnit.withDefaultDevice {
+      return try await self.hardwareUnit.withDefaultDevice {
         try await self.runner.generate(
           request,
-          channel: EdgeToolsGenerationChannel(onPart: onPart)
+          channel: EdgeToolsGenerationChannel(onToken: onToken, onPart: onPart)
         )
       }
     }
     return try await self.runner.generate(
       request,
-      channel: EdgeToolsGenerationChannel(onPart: onPart)
+      channel: EdgeToolsGenerationChannel(onToken: onToken, onPart: onPart)
     )
   }
 }

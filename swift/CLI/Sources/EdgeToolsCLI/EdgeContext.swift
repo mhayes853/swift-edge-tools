@@ -9,7 +9,7 @@ public struct EdgeContext: Sendable {
     @Sendable (ModelSource, @Sendable (String) -> Void) async throws -> URL
   public var detectModel: @Sendable (URL) throws -> ModelDetection
   public var makeRunner:
-    @Sendable (ModelDetection, EngineKind?, MLXHardwareUnit) async throws -> EngineRunner
+    @Sendable (ModelDetection, EngineKind, MLXHardwareUnit) async throws -> EngineRunner
   public var peakMemory: @Sendable () -> PeakMemory
   public var now: @Sendable () -> ContinuousClock.Instant
   public var readStandardInput: @Sendable () -> String
@@ -23,7 +23,7 @@ public struct EdgeContext: Sendable {
       URL,
     detectModel: @escaping @Sendable (URL) throws -> ModelDetection,
     makeRunner:
-      @escaping @Sendable (ModelDetection, EngineKind?, MLXHardwareUnit) async throws ->
+      @escaping @Sendable (ModelDetection, EngineKind, MLXHardwareUnit) async throws ->
       EngineRunner,
     peakMemory: @escaping @Sendable () -> PeakMemory,
     now: @escaping @Sendable () -> ContinuousClock.Instant = { ContinuousClock().now },
@@ -53,7 +53,7 @@ extension EdgeContext {
     },
     detectModel: { try ModelDetection.detect(in: $0) },
     makeRunner: {
-      try await EngineRunner(detection: $0, requestedEngine: $1, hardwareUnit: $2)
+      try await EngineRunner(detection: $0, engine: $1, hardwareUnit: $2)
     },
     peakMemory: { .current },
     readStandardInput: { AnyIterator { readLine(strippingNewline: false) }.joined() },

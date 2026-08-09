@@ -47,13 +47,30 @@ struct `RunAction tests` {
   @Test
   func `Throws When The Requested Engine Has No Weights`() async {
     await #expect(throws: EdgeCLIError.self) {
-      try await runModel(
+      _ = try await runModel(
         context: .stub(engines: [.mlx]),
         source: .test(),
         requestedEngine: .onnx,
         request: GenerationRequest(user: "hello")
       )
     }
+  }
+
+  @Test
+  func `Rejects An MLX Hardware Unit For Another Engine Before Loading`() async throws {
+    let loads = LockedBox(0)
+    let error = await #expect(throws: EdgeCLIError.self) {
+      try await runModel(
+        context: .stub(engines: [.onnx], onMakeRunner: { loads.value += 1 }),
+        source: .test(),
+        requestedEngine: .onnx,
+        hardwareUnit: .cpu,
+        request: GenerationRequest(user: "hello")
+      )
+    }
+
+    expectNoDifference(loads.value, 0)
+    expectNoDifference(try #require(error).description, "--hardware-unit only applies to the mlx engine.")
   }
 
   @Test
@@ -73,7 +90,7 @@ struct `RunAction tests` {
   func `Throws When A Custom Grammar Is Unsupported By The Engine`() async throws {
     let error = await #expect(throws: EdgeCLIError.self) {
       try await runModel(
-        context: .stub(runner: .stub(supportsCustomGrammar: false)),
+        context: .stub(),
         source: .test(),
         request: GenerationRequest(user: "hello", grammar: .unconstrained)
       )
@@ -84,53 +101,78 @@ struct `RunAction tests` {
 
   @Test
   func `Throws When Sampling Is Unsupported By The Engine`() async throws {
-    let error = await #expect(throws: EdgeCLIError.self) {
-      try await runModel(
-        context: .stub(runner: .stub(supportsSampling: false)),
+    do {
+      _ = try await runModel(
+        context: .stub(),
         source: .test(),
-        request: GenerationRequest(user: "hello", topK: 40)
+        request: GenerationRequest(
+          user: "hello",
+          sampling: EdgeToolsFusedSamplingOverrides(topK: 40)
+        )
+      )
+      Issue.record("Expected sampler validation to fail.")
+    } catch {
+      expectNoDifference(
+        String(describing: error),
+        "Needle on mlx always samples greedily; sampler options do not apply."
       )
     }
-
-    expectNoDifference(try #require(error).description.contains("Sampler options"), true)
   }
 
   @Test
   func `Uses Model Sampling Defaults Without An Override`() {
     let request = GenerationRequest(user: "hello")
 
-    expectNoDifference(request.hasSamplingOverride, false)
-    expectNoDifference(request.fusedSamplingParameters, nil)
+    expectNoDifference(request.sampling.isEmpty, true)
   }
 
   @Test
-  func `Builds Fused Sampling Parameters From An Override`() throws {
+  func `Merges Sampling Overrides Into Model Defaults`() {
     let request = GenerationRequest(
       user: "hello",
-      topK: 40,
-      minP: 0.05,
-      repetitionPenalty: 1.1,
-      presencePenalty: 0.2,
-      repetitionContextSize: 32,
-      seed: 1234
+      sampling: EdgeToolsFusedSamplingOverrides(minP: 0.05, seed: 1234)
     )
-    let parameters = try #require(request.fusedSamplingParameters)
+    let parameters = request.sampling.applying(
+      to: EdgeToolsFusedSamplingParameters(
+        temperature: 1,
+        topK: 20,
+        topP: 0.8,
+        repetitionPenalty: 1.1,
+        presencePenalty: 2,
+        repetitionContextSize: 32
+      )
+    )
 
-    expectNoDifference(parameters.temperature, 0.6)
-    expectNoDifference(parameters.topK, 40)
-    expectNoDifference(parameters.topP, nil)
+    expectNoDifference(parameters.temperature, 1)
+    expectNoDifference(parameters.topK, 20)
+    expectNoDifference(parameters.topP, 0.8)
     expectNoDifference(parameters.minP, 0.05)
     expectNoDifference(parameters.repetitionPenalty, 1.1)
-    expectNoDifference(parameters.presencePenalty, 0.2)
+    expectNoDifference(parameters.presencePenalty, 2)
     expectNoDifference(parameters.repetitionContextSize, 32)
     expectNoDifference(parameters.seed, 1234)
+  }
+
+  @Test
+  func `Streams Raw Tokens`() async throws {
+    let output = LockedBox("")
+
+    _ = try await runModel(
+      context: .stub(runner: .stub(tokens: ["<think>", "answer"])),
+      source: .test(),
+      request: GenerationRequest(user: "hello"),
+      stream: .tokens,
+      onOutput: { string, terminator in output.value += string + terminator }
+    )
+
+    expectNoDifference(output.value, "<think>answer\n")
   }
 
   @Test
   func `Throws When Images Are Unsupported By The Engine`() async throws {
     let error = await #expect(throws: EdgeCLIError.self) {
       try await runModel(
-        context: .stub(runner: .stub(supportsImages: false)),
+        context: .stub(),
         source: .test(),
         request: GenerationRequest(user: "hello", images: [Asset(path: "/tmp/cat.png")])
       )
@@ -155,6 +197,30 @@ struct `RunAction tests` {
     )
 
     expectNoDifference(requests.value.first?.images, [Asset(path: "/tmp/cat.png")])
+  }
+
+  @Test
+  func `Validates A Custom Grammar Before Resolving The Model`() async throws {
+    let resolutions = LockedBox(0)
+    let error = await #expect(throws: EdgeCLIError.self) {
+      try await runModel(
+        context: .stub(onResolve: { _ in resolutions.value += 1 }),
+        source: .test(),
+        request: GenerationRequest(
+          user: "hello",
+          grammar: .custom(
+            format: .regex,
+            source: .file(URL(fileURLWithPath: "/missing/grammar.ebnf"))
+          )
+        )
+      )
+    }
+
+    expectNoDifference(resolutions.value, 0)
+    expectNoDifference(
+      try #require(error).description,
+      "Could not read grammar file /missing/grammar.ebnf."
+    )
   }
 }
 

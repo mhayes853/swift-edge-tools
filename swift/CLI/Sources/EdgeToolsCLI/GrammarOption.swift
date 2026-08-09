@@ -71,6 +71,11 @@ extension GrammarOption: ExpressibleByArgument {
 // MARK: - Constraints
 
 extension GrammarOption {
+  func validate() throws {
+    guard case .custom(let format, let source) = self else { return }
+    _ = try grammar(format: format, source: source)
+  }
+
   public func constraint(toolCallRange: GrammarToolCallRange) throws -> XGRGenerationConstraint {
     switch self {
     case .auto:

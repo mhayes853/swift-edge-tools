@@ -139,11 +139,16 @@
 
   public protocol MLXGenerateParameters: EdgeToolsEngineGenerateParameters {
     var sampler: (any LogitSampler)? { get }
+    var samplingOverrides: EdgeToolsFusedSamplingOverrides { get }
     var processor: (any LogitProcessor)? { get }
     var kvCacheQuantizationBits: Int? { get }
     var kvCacheQuantizationGroupSize: Int { get }
     var quantizedKVStart: Int { get }
     var synchronizeStreamForMemorySnapshots: Bool { get }
+  }
+
+  extension MLXGenerateParameters {
+    public var samplingOverrides: EdgeToolsFusedSamplingOverrides { EdgeToolsFusedSamplingOverrides() }
   }
 
   // MARK: - DefaultMLXGenerateParameters
@@ -156,6 +161,7 @@
       public static var `default`: Self { Self() }
 
       public var sampler: (any LogitSampler)?
+      public var samplingOverrides: EdgeToolsFusedSamplingOverrides
       public var processor: (any LogitProcessor)?
       public var constraint: XGRGenerationConstraint
       public var maxTokens: Int?
@@ -166,6 +172,7 @@
 
       public init(
         sampler: (any LogitSampler)? = nil,
+        samplingOverrides: EdgeToolsFusedSamplingOverrides = EdgeToolsFusedSamplingOverrides(),
         processor: (any LogitProcessor)? = nil,
         constraint: XGRGenerationConstraint = .unconstrained,
         maxTokens: Int? = 1024,
@@ -175,6 +182,7 @@
         synchronizeStreamForMemorySnapshots: Bool = true
       ) {
         self.sampler = sampler
+        self.samplingOverrides = samplingOverrides
         self.processor = processor
         self.constraint = constraint
         self.maxTokens = maxTokens
@@ -577,13 +585,13 @@
         tools: tools,
         tokenizer: tokenizer
       )
-      let sampler =
-        parameters.sampler
-        ?? MLXFusedSampler(
-          parameters: Profile.defaultSampling(prompt: prompt, parameters: parameters)
-            ?? self.configuredSampling
-            ?? EdgeToolsFusedSamplingParameters()
-        )
+      let defaultSampling =
+        Profile.defaultSampling(prompt: prompt, parameters: parameters)
+        ?? self.configuredSampling
+        ?? EdgeToolsFusedSamplingParameters()
+      let sampler = parameters.sampler ?? MLXFusedSampler(
+        parameters: parameters.samplingOverrides.applying(to: defaultSampling)
+      )
       return try await self.prepare(input: input, sampler: sampler, parameters: parameters)
     }
 

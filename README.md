@@ -39,8 +39,9 @@ case-insensitive and accept spaces, hyphens, or underscores.
 
 Textual models are detected from `model_type`: Needle, Qwen3, Qwen3.5, LFM2, FunctionGemma,
 Granite, Granite MoE Hybrid and MiniCPM5. MiniCPM5 ships as `model_type: llama`, so it is
-identified by the `<function` markers in its chat template. Vision models are not detected
-yet. Unrecognized architectures are rejected rather than guessed at.
+identified by the `<function` markers in its chat template. Qwen3.5 VL, Gemma4, and LFM2.5 VL
+are detected as vision models, and other architectures fall back to generic text or vision MLX
+profiles based on whether a processor configuration is present.
 
 `--tools` accepts OpenAI function-calling JSON. Without it, a built-in five-tool demo set
 (`send_email`, `set_timer`, `search_web`, `create_calendar_event`, `get_weather`) is used,
@@ -52,7 +53,9 @@ composing with it.
 
 Only models whose generate parameters expose a full generation constraint support
 `--grammar` beyond `auto`. Needle exposes only a tool call range, on every engine, so it
-is limited to `--grammar auto`.
+is limited to `--grammar auto` and greedy sampling. Sampling flags override only the values
+specified on the command line; all other values continue to use the model or generation
+configuration defaults.
 
 ## Package Traits
 

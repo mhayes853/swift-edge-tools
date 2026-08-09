@@ -113,6 +113,11 @@ struct BenchCommand: EdgeSubcommand {
     let showsProgress = !self.json && context.isStandardErrorTTY()
     let warning = warningHandler(json: self.json, context: context)
     let writeError = context.writeStandardError
+    defer {
+      if showsProgress {
+        writeError("\u{1B}[2K", "")
+      }
+    }
     let report = try await benchmarkModel(
       context: context,
       source: self.model.source,
@@ -127,9 +132,6 @@ struct BenchCommand: EdgeSubcommand {
         writeError("run \(index)/\(total)", "\r")
       }
     )
-    if showsProgress {
-      context.writeStandardError("\u{1B}[2K", "")
-    }
     context.writeStandardOutput(self.json ? try report.jsonText() : report.displayText(), "\n")
   }
 }
@@ -142,7 +144,7 @@ struct InfoCommand: EdgeSubcommand {
     abstract: "Report what model and engines were detected, without running anything."
   )
 
-  @OptionGroup var model: ModelOptions
+  @OptionGroup var model: ModelSourceOptions
 
   @Flag(help: "Emit a single JSON object instead of human-readable output.")
   var json = false

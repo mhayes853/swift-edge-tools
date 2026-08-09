@@ -7,7 +7,7 @@ public func runModel(
   context: EdgeContext,
   source: ModelSource,
   requestedEngine: EngineKind? = nil,
-  hardwareUnit: MLXHardwareUnit = .gpu,
+  hardwareUnit: MLXHardwareUnit? = nil,
   request: GenerationRequest,
   stream: StreamOption = .none,
   onOutput: @escaping @Sendable (String, String) -> Void = { _, _ in },
@@ -18,14 +18,14 @@ public func runModel(
     source: source,
     requestedEngine: requestedEngine,
     hardwareUnit: hardwareUnit,
+    request: request,
     onWarning: onWarning
   )
-  let request = try loaded.validate(request)
   let start = context.now()
   let printer = StreamPrinter(mode: stream, start: start, output: onOutput)
   let generation = try await loaded.generate(
     request,
-    hardwareUnit: hardwareUnit,
+    onToken: { printer.token($0) },
     onPart: { printer.part($0) }
   )
   printer.finish()
@@ -56,7 +56,7 @@ public func benchmarkModel(
   context: EdgeContext,
   source: ModelSource,
   requestedEngine: EngineKind? = nil,
-  hardwareUnit: MLXHardwareUnit = .gpu,
+  hardwareUnit: MLXHardwareUnit? = nil,
   request: GenerationRequest,
   runs: Int,
   warmup: Int,
@@ -68,12 +68,12 @@ public func benchmarkModel(
     source: source,
     requestedEngine: requestedEngine,
     hardwareUnit: hardwareUnit,
+    request: request,
     onWarning: onWarning
   )
-  let request = try loaded.validate(request)
 
   for _ in 0..<warmup {
-    _ = try await loaded.generate(request, hardwareUnit: hardwareUnit)
+    _ = try await loaded.generate(request)
   }
 
   var samples = [BenchSample]()
@@ -81,7 +81,7 @@ public func benchmarkModel(
     onProgress(index + 1, runs)
     await loaded.runner.reset()
     let start = context.now()
-    let generation = try await loaded.generate(request, hardwareUnit: hardwareUnit)
+    let generation = try await loaded.generate(request)
     samples.append(
       BenchSample(
         endToEnd: start.duration(to: context.now()),
