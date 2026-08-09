@@ -62,14 +62,9 @@ extension EdgeContext {
       detectModel: {
         ModelDetection(directory: $0, model: model, engines: engines, files: files)
       },
-      makeRunner: { detection, engine, hardwareUnit in
+      makeRunner: { _, _, _ in
         onMakeRunner()
-        return try await EngineRunner(
-          detection: detection,
-          requestedEngine: engine,
-          hardwareUnit: hardwareUnit,
-          loader: { _, _, _ in runner }
-        )
+        return runner
       },
       peakMemory: { .zero },
       now: { now },
@@ -111,6 +106,7 @@ extension EngineRunner {
     onReset: @escaping @Sendable () -> Void = {}
   ) -> Self {
     Self(
+      engine: .onnx,
       supportsCustomGrammar: supportsCustomGrammar,
       supportsSampling: supportsSampling,
       supportsImages: supportsImages,
@@ -143,6 +139,7 @@ extension EngineRunner {
 
   static func failing(_ error: any Error) -> Self {
     Self(
+      engine: .onnx,
       supportsCustomGrammar: true,
       supportsSampling: true,
       generation: { _, _ in throw error }

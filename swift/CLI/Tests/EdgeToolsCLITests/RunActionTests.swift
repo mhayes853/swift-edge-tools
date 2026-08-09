@@ -17,7 +17,7 @@ struct `RunAction tests` {
 
     expectNoDifference(report.response, "on it")
     expectNoDifference(report.model, "Needle")
-    expectNoDifference(report.engine, "mlx")
+    expectNoDifference(report.engine, "onnx")
     expectNoDifference(report.toolCalls.map(\.name), ["set_timer"])
     expectNoDifference(report.metrics.decode.tokens, 2)
   }

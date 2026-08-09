@@ -56,7 +56,7 @@ extension LoadedModel {
     onToken: (@Sendable (EdgeToolsToken) -> Void)? = nil,
     onPart: (@Sendable (EdgeToolsGenerationPart) -> Void)? = nil
   ) async throws -> EdgeToolsEngineGeneration {
-    if self.runner.usesMLX {
+    if self.runner.engine == .mlx {
       return try await self.hardwareUnit.withDefaultDevice {
         try await self.runner.generate(
           request,

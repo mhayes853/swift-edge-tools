@@ -1,5 +1,6 @@
 import EdgeTools
 import Foundation
+
 #if canImport(CoreML)
   import CoreML
 #endif
@@ -9,12 +10,22 @@ import Foundation
 
 // MARK: - EngineRunner
 
+private struct EngineFactoryContext: Sendable {
+  let detection: ModelDetection
+  let hardwareUnit: MLXHardwareUnit
+}
+
+private typealias ModelEngineFactory = @Sendable (EngineFactoryContext) async throws -> EngineRunner
+
+private struct ModelRegistration: Sendable {
+  let engines: [EngineKind: ModelEngineFactory]
+}
+
 public struct EngineRunner: Sendable {
   public let engine: EngineKind
   public let supportsCustomGrammar: Bool
   public let supportsSampling: Bool
   public let supportsImages: Bool
-  public let usesMLX: Bool
 
   private let generation:
     @Sendable (GenerationRequest, sending EdgeToolsGenerationChannel) async throws ->
@@ -26,7 +37,6 @@ public struct EngineRunner: Sendable {
     supportsCustomGrammar: Bool,
     supportsSampling: Bool,
     supportsImages: Bool = false,
-    usesMLX: Bool = false,
     generation:
       @escaping @Sendable (
         GenerationRequest, sending EdgeToolsGenerationChannel
@@ -37,7 +47,6 @@ public struct EngineRunner: Sendable {
     self.supportsCustomGrammar = supportsCustomGrammar
     self.supportsSampling = supportsSampling
     self.supportsImages = supportsImages
-    self.usesMLX = usesMLX
     self.generation = generation
     self.modelResetting = modelResetting
   }
@@ -63,7 +72,6 @@ extension EngineRunner {
     supportsCustomGrammar: Bool,
     supportsSampling: Bool,
     supportsImages: Bool = false,
-    usesMLX: Bool = false,
     prompt: @escaping @Sendable (GenerationRequest) -> Engine.Prompt,
     parameters: @escaping @Sendable (GenerationRequest) throws -> sending Engine.GenerateParameters,
     modelResetting: @escaping @Sendable () async -> Void
@@ -73,7 +81,6 @@ extension EngineRunner {
       supportsCustomGrammar: supportsCustomGrammar,
       supportsSampling: supportsSampling,
       supportsImages: supportsImages,
-      usesMLX: usesMLX,
       generation: { request, channel in
         let task = try engine.generate(
           prompt: prompt(request),
@@ -104,7 +111,6 @@ extension EngineRunner {
       supportsCustomGrammar: supportsCustomGrammar,
       supportsSampling: supportsSampling,
       supportsImages: supportsImages,
-      usesMLX: engineKind == .mlx,
       prompt: prompt,
       parameters: parameters,
       modelResetting: { await engine.resetGeneration() }
@@ -115,6 +121,12 @@ extension EngineRunner {
 // MARK: - Loading
 
 extension EngineRunner {
+  static func registeredEngines(for model: DetectedModel) -> [EngineKind] {
+    EngineKind.allCases.filter {
+      $0.isAvailable && Self.modelRegistrations[model]?.engines[$0] != nil
+    }
+  }
+
   struct ParsedConfiguration: Sendable {
     let engine: EngineKind
     let hardwareUnit: MLXHardwareUnit
@@ -162,8 +174,7 @@ extension EngineRunner {
     try await self.init(
       detection: detection,
       engine: try resolvedEngine(requested: requestedEngine, detection: detection),
-      hardwareUnit: hardwareUnit,
-      loader: Self.load
+      hardwareUnit: hardwareUnit
     )
   }
 
@@ -172,12 +183,14 @@ extension EngineRunner {
     engine: EngineKind,
     hardwareUnit: MLXHardwareUnit = .gpu
   ) async throws {
-    try await self.init(
-      detection: detection,
-      engine: try resolvedEngine(requested: engine, detection: detection),
-      hardwareUnit: hardwareUnit,
-      loader: Self.load
-    )
+    let engine = try resolvedEngine(requested: engine, detection: detection)
+    let context = EngineFactoryContext(detection: detection, hardwareUnit: hardwareUnit)
+    guard let factory = Self.modelRegistrations[detection.model]?.engines[engine] else {
+      throw EdgeCLIError(
+        "\(detection.model.displayName) does not support the \(engine.rawValue) engine."
+      )
+    }
+    self = try await factory(context)
   }
 
   public init(
@@ -206,77 +219,87 @@ extension EngineRunner {
       supportsCustomGrammar: implementation.supportsCustomGrammar,
       supportsSampling: implementation.supportsSampling,
       supportsImages: implementation.supportsImages,
-      usesMLX: implementation.usesMLX,
       generation: implementation.generation,
       modelResetting: implementation.modelResetting
     )
   }
 
-  private static func load(
-    detection: ModelDetection,
-    engine: EngineKind,
-    hardwareUnit: MLXHardwareUnit
-  ) async throws -> Self {
-    let directory = detection.directory
-    switch (detection.model, engine) {
+  private static let modelRegistrations: [DetectedModel: ModelRegistration] = {
+    var registrations: [DetectedModel: ModelRegistration] = [
+      .needle: ModelRegistration(engines: Self.needleFactories)
+    ]
     #if canImport(MLX)
-      case (.needle, .mlx):
-        return try await Self.needleMLX(from: directory, hardwareUnit: hardwareUnit)
-      case (.qwen3, .mlx), (.genericLLM, .mlx):
-        return try await Self.mlx(hardwareUnit: hardwareUnit) {
-          try await Qwen3MLXModelEngine(from: directory)
-        }
-      case (.qwen3P5, .mlx):
-        return try await Self.mlx(hardwareUnit: hardwareUnit) {
-          try await Qwen3P5MLXModelEngine(from: directory)
-        }
-      case (.qwen3P5VL, .mlx):
-        return try await Self.mlx(hardwareUnit: hardwareUnit, supportsImages: true) {
-          try await Qwen3P5VLMLXModelEngine(from: directory)
-        }
-      case (.lfm2, .mlx):
-        return try await Self.mlx(hardwareUnit: hardwareUnit) {
-          try await LFM2P5MLXModelEngine(from: directory)
-        }
-      case (.functionGemma, .mlx):
-        return try await Self.mlx(hardwareUnit: hardwareUnit) {
-          try await FunctionGemmaMLXModelEngine(from: directory)
-        }
-      case (.granite, .mlx):
-        return try await Self.mlx(hardwareUnit: hardwareUnit) {
-          try await GraniteMLXModelEngine(from: directory)
-        }
-      case (.graniteMoeHybrid, .mlx):
-        return try await Self.mlx(hardwareUnit: hardwareUnit) {
-          try await GraniteMoeHybridMLXModelEngine(from: directory)
-        }
-      case (.miniCPM5, .mlx):
-        return try await Self.mlx(hardwareUnit: hardwareUnit) {
-          try await MiniCPM5MLXModelEngine(from: directory)
-        }
-      case (.gemma4, .mlx):
-        return try await Self.mlx(hardwareUnit: hardwareUnit, supportsImages: true) {
-          try await Gemma4MLXModelEngine(from: directory)
-        }
-      case (.lfm2P5VL, .mlx):
-        return try await Self.mlx(hardwareUnit: hardwareUnit, supportsImages: true) {
-          try await LFM2P5VLMLXModelEngine(from: directory)
-        }
-      case (.genericVLM, .mlx):
-        return try await Self.mlx(hardwareUnit: hardwareUnit, supportsImages: true) {
-          try await GenericVLMMLXModelEngine(from: directory)
-        }
+      registrations[.qwen3] = ModelRegistration(engines: [
+        .mlx: Self.mlxFactory { try await Qwen3MLXModelEngine(from: $0) }
+      ])
+      registrations[.qwen3P5] = ModelRegistration(engines: [
+        .mlx: Self.mlxFactory { try await Qwen3P5MLXModelEngine(from: $0) }
+      ])
+      registrations[.qwen3P5VL] = ModelRegistration(engines: [
+        .mlx: Self.mlxFactory(
+          { try await Qwen3P5VLMLXModelEngine(from: $0) },
+          supportsImages: true
+        )
+      ])
+      registrations[.lfm2] = ModelRegistration(engines: [
+        .mlx: Self.mlxFactory { try await LFM2P5MLXModelEngine(from: $0) }
+      ])
+      registrations[.functionGemma] = ModelRegistration(engines: [
+        .mlx: Self.mlxFactory { try await FunctionGemmaMLXModelEngine(from: $0) }
+      ])
+      registrations[.gemma4] = ModelRegistration(engines: [
+        .mlx: Self.mlxFactory(
+          { try await Gemma4MLXModelEngine(from: $0) },
+          supportsImages: true
+        )
+      ])
+      registrations[.granite] = ModelRegistration(engines: [
+        .mlx: Self.mlxFactory { try await GraniteMLXModelEngine(from: $0) }
+      ])
+      registrations[.graniteMoeHybrid] = ModelRegistration(engines: [
+        .mlx: Self.mlxFactory { try await GraniteMoeHybridMLXModelEngine(from: $0) }
+      ])
+      registrations[.miniCPM5] = ModelRegistration(engines: [
+        .mlx: Self.mlxFactory { try await MiniCPM5MLXModelEngine(from: $0) }
+      ])
+      registrations[.lfm2P5VL] = ModelRegistration(engines: [
+        .mlx: Self.mlxFactory(
+          { try await LFM2P5VLMLXModelEngine(from: $0) },
+          supportsImages: true
+        )
+      ])
+      registrations[.genericLLM] = ModelRegistration(engines: [
+        .mlx: Self.mlxFactory { try await Qwen3MLXModelEngine(from: $0) }
+      ])
+      registrations[.genericVLM] = ModelRegistration(engines: [
+        .mlx: Self.mlxFactory(
+          { try await GenericVLMMLXModelEngine(from: $0) },
+          supportsImages: true
+        )
+      ])
     #endif
-    case (.needle, .onnx): return try await Self.needleONNX(from: directory)
+    return registrations
+  }()
+
+  private static var needleFactories: [EngineKind: ModelEngineFactory] {
+    var factories: [EngineKind: ModelEngineFactory] = [
+      .onnx: { context in try await Self.needleONNX(from: context.detection.directory) },
+      .coreai: { context in try await Self.needleCoreAI(from: context.detection.directory) }
+    ]
+    #if canImport(MLX)
+      factories[.mlx] = { context in
+        try await Self.needleMLX(
+          from: context.detection.directory,
+          hardwareUnit: context.hardwareUnit
+        )
+      }
+    #endif
     #if canImport(CoreML)
-      case (.needle, .coreml): return try await Self.needleCoreML(from: directory)
+      factories[.coreml] = { context in
+        try await Self.needleCoreML(from: context.detection.directory)
+      }
     #endif
-    case (.needle, .coreai): return try await Self.needleCoreAI(from: directory)
-    default:
-      throw EdgeCLIError(
-        "\(detection.model.displayName) does not support the \(engine.rawValue) engine."
-      )
-    }
+    return factories
   }
 
   #if canImport(MLX)
@@ -360,6 +383,26 @@ extension EngineRunner {
   }
 
   #if canImport(MLX)
+    private static func mlxFactory<Profile: MLXModelProfile>(
+      _ make: @escaping @Sendable (URL) async throws -> MLXEngine<Profile>,
+      supportsImages: Bool = false
+    ) -> ModelEngineFactory
+    where
+      Profile.Prompt == EdgeToolsConversationalPrompt,
+      Profile.GenerateParameters == DefaultMLXGenerateParameters,
+      Profile.GrammarCompiler == XGRCompiler,
+      Profile.GrammarContext == XGRGrammarContext
+    {
+      { context in
+        try await Self.mlx(
+          hardwareUnit: context.hardwareUnit,
+          supportsImages: supportsImages
+        ) {
+          try await make(context.detection.directory)
+        }
+      }
+    }
+
     private static func mlx<Profile: MLXModelProfile>(
       hardwareUnit: MLXHardwareUnit,
       supportsImages: Bool = false,
@@ -380,7 +423,6 @@ extension EngineRunner {
         supportsCustomGrammar: true,
         supportsSampling: true,
         supportsImages: supportsImages,
-        usesMLX: true,
         prompt: llmPrompt,
         parameters: { request in
           DefaultMLXGenerateParameters(

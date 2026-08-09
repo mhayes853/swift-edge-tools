@@ -51,10 +51,7 @@ public enum DetectedModel: String, Hashable, Sendable, CaseIterable {
   }
 
   public var supportedEngines: [EngineKind] {
-    switch self {
-    case .needle: EngineKind.allCases.filter(\.isAvailable)
-    default: [.mlx].filter(\.isAvailable)
-    }
+    EngineRunner.registeredEngines(for: self)
   }
 }
 
