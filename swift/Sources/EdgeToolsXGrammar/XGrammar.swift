@@ -752,9 +752,9 @@ public struct XGRCompiledGrammar: ~Copyable, @unchecked Sendable {
 ///
 /// Create one compiler per vocabulary. Reusing a compiler avoids repeating preprocessing when the
 /// same grammar or schema is compiled more than once.
-public struct XGRCompiler: ~Copyable {
+public final class XGRCompiler {
   /// The underlying compiler pointer.
-  public let handle: xgrammar_compiler_t
+  private let handle: xgrammar_compiler_t
 
   /// The tokenizer metadata used for every compilation by this compiler.
   public let tokenizerInfo: XGRTokenizerInfo
@@ -798,17 +798,17 @@ public struct XGRCompiler: ~Copyable {
 
   /// The current approximate cache size, in bytes.
   public var cacheSizeBytes: Int64 {
-    xgrammar_compiler_cache_size_bytes(self.handle)
+    self.withUnsafePointer { xgrammar_compiler_cache_size_bytes($0) }
   }
 
   /// The configured maximum cache size, in bytes.
   public var cacheLimitBytes: Int64 {
-    xgrammar_compiler_cache_limit_bytes(self.handle)
+    self.withUnsafePointer { xgrammar_compiler_cache_limit_bytes($0) }
   }
 
   /// Removes all compiled grammars from the compiler cache.
   public func clearCache() {
-    xgrammar_compiler_clear_cache(self.handle)
+    self.withUnsafePointer { xgrammar_compiler_clear_cache($0) }
   }
 
   /// Compiles a grammar for this compiler’s tokenizer vocabulary.
@@ -818,9 +818,24 @@ public struct XGRCompiler: ~Copyable {
   /// - Parameters:
   ///   - grammar: The grammar to preprocess.
   /// - Returns: A compiled grammar ready to create an ``XGRMatcher``.
-  public borrowing func compile(_ grammar: XGRGrammar) throws -> XGRCompiledGrammar {
-    let handle = try require(xgrammar_compiler_compile_grammar(self.handle, grammar.handle))
+  public func compile(_ grammar: XGRGrammar) throws -> XGRCompiledGrammar {
+    let handle = try self.withUnsafePointer {
+      try require(xgrammar_compiler_compile_grammar($0, grammar.handle))
+    }
     return XGRCompiledGrammar(handle: handle)
+  }
+
+  /// Calls `body` with the underlying compiler pointer.
+  ///
+  /// The pointer is only valid for the duration of `body`.
+  ///
+  /// - Parameters:
+  ///   - body: A closure that uses the pointer.
+  /// - Returns: The result of `body`.
+  public func withUnsafePointer<R>(
+    _ body: (xgrammar_compiler_t) throws -> R
+  ) rethrows -> R {
+    try body(self.handle)
   }
 }
 
@@ -831,9 +846,9 @@ public struct XGRCompiler: ~Copyable {
 /// Query ``bitmask()`` to determine which tokens are valid next, then call ``accept(tokenId:)``
 /// after selecting a token. A matcher can be reset, rolled back, or forked to manage generation
 /// branches.
-public struct XGRMatcher: ~Copyable {
+public final class XGRMatcher {
   /// The underlying matcher pointer.
-  public let handle: xgrammar_matcher_t
+  private let handle: xgrammar_matcher_t
 
   /// Creates a matcher for a compiled grammar.
   ///
@@ -881,12 +896,12 @@ public struct XGRMatcher: ~Copyable {
 
   /// Indicates whether the matcher has accepted a complete valid sequence.
   public var isCompleted: Bool {
-    xgrammar_matcher_is_completed(self.handle) != 0
+    self.withUnsafePointer { xgrammar_matcher_is_completed($0) != 0 }
   }
 
   /// Indicates whether generation has been terminated by the matcher.
   public var isTerminated: Bool {
-    xgrammar_matcher_is_terminated(self.handle) != 0
+    self.withUnsafePointer { xgrammar_matcher_is_terminated($0) != 0 }
   }
 
   /// Returns the vocabulary acceptance mask for the current matcher state.
@@ -896,10 +911,10 @@ public struct XGRMatcher: ~Copyable {
   ///
   /// - Returns: A bitmask of token IDs accepted at the current state.
   public func bitmask() -> [Int32] {
-    let bitCount = Int(xgrammar_matcher_bit_count(self.handle))
+    let bitCount = self.withUnsafePointer { Int(xgrammar_matcher_bit_count($0)) }
     var bitmask = [Int32](repeating: 0, count: (bitCount + 31) / 32)
-    _ = bitmask.withUnsafeMutableBufferPointer {
-      xgrammar_matcher_bitmask(self.handle, $0.baseAddress)
+    _ = bitmask.withUnsafeMutableBufferPointer { bitmask in
+      self.withUnsafePointer { xgrammar_matcher_bitmask($0, bitmask.baseAddress) }
     }
     return bitmask
   }
@@ -911,7 +926,7 @@ public struct XGRMatcher: ~Copyable {
   /// - Returns: Whether the token is accepted by the grammar at the current state.
   @discardableResult
   public func accept(tokenId: Int) -> Bool {
-    xgrammar_matcher_accept_token(self.handle, Int32(tokenId)) != 0
+    self.withUnsafePointer { xgrammar_matcher_accept_token($0, Int32(tokenId)) != 0 }
   }
 
   /// Advances the matcher with a string.
@@ -923,7 +938,9 @@ public struct XGRMatcher: ~Copyable {
   /// - Returns: Whether the string is accepted by the grammar at the current state.
   @discardableResult
   public func accept(string: String) -> Bool {
-    string.withCString { xgrammar_matcher_accept_string(self.handle, $0) != 0 }
+    self.withUnsafePointer { handle in
+      string.withCString { xgrammar_matcher_accept_string(handle, $0) != 0 }
+    }
   }
 
   /// Rewinds the matcher by the specified number of accepted tokens.
@@ -933,12 +950,12 @@ public struct XGRMatcher: ~Copyable {
   /// - Parameters:
   ///   - tokenCount: The number of most recently accepted tokens to remove.
   public func rollback(_ tokenCount: Int = 1) {
-    xgrammar_matcher_rollback(self.handle, Int32(tokenCount))
+    self.withUnsafePointer { xgrammar_matcher_rollback($0, Int32(tokenCount)) }
   }
 
   /// Restores the matcher to its initial state.
   public func reset() {
-    xgrammar_matcher_reset(self.handle)
+    self.withUnsafePointer { xgrammar_matcher_reset($0) }
   }
 
   /// Creates an independent matcher with the current state.
@@ -946,8 +963,21 @@ public struct XGRMatcher: ~Copyable {
   /// Subsequent changes to either matcher do not affect the other.
   ///
   /// - Returns: A matcher initialized with this matcher’s current state.
-  public borrowing func fork() -> XGRMatcher {
-    XGRMatcher(handle: xgrammar_matcher_fork(self.handle)!)
+  public func fork() -> XGRMatcher {
+    self.withUnsafePointer { XGRMatcher(handle: xgrammar_matcher_fork($0)!) }
+  }
+
+  /// Calls `body` with the underlying matcher pointer.
+  ///
+  /// The pointer is only valid for the duration of `body`.
+  ///
+  /// - Parameters:
+  ///   - body: A closure that uses the pointer.
+  /// - Returns: The result of `body`.
+  public func withUnsafePointer<R>(
+    _ body: (xgrammar_matcher_t) throws -> R
+  ) rethrows -> R {
+    try body(self.handle)
   }
 }
 
