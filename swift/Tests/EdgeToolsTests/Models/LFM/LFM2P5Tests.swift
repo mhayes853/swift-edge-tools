@@ -19,8 +19,8 @@ struct `LFM2P5 tests` {
       }
 
       @Test
-      func `Generates Reasoning Snapshot`() async throws {
-        let engine = try await LFM2P5MLXModelEngine(from: downloadLFM2P5())
+      func `Thinking Model Generates Reasoning Snapshot`() async throws {
+        let engine = try await LFM2P5MLXModelEngine(from: downloadLFM2P5Thinking())
         let generation = try await generateReasoning(using: engine)
 
         withKnownIssue { assertSnapshot(of: generation, as: .dump, record: .all) }

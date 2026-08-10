@@ -31,6 +31,10 @@ import Foundation
     try await downloadModel(id: "LiquidAI/LFM2.5-VL-450M-MLX-4bit")
   }
 
+  func downloadLFM2P5Thinking() async throws -> URL {
+    try await downloadModel(id: "LiquidAI/LFM2.5-1.2B-Thinking-MLX-4bit")
+  }
+
   func downloadGemma4E2B() async throws -> URL {
     try await downloadModel(id: "mlx-community/gemma-4-e2b-it-4bit")
   }

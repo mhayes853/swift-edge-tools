@@ -33,7 +33,7 @@
     }
 
     public static func defaultSampling(
-      prompt: EdgeToolsLLMPrompt,
+      prompt: EdgeToolsConversationalPrompt,
       parameters: DefaultMLXGenerateParameters
     ) -> EdgeToolsFusedSamplingParameters? {
       prompt.reasoningEffort.isEnabled

@@ -1,26 +1,28 @@
-▿ EdgeToolsLLMPrompt
+▿ EdgeToolsConversationalPrompt
   ▿ messages: 5 elements
     ▿ Message
-      - system: "Use getWeather when needed. After receiving its result, summarize it for the user."
+      ▿ system: SystemMessage
+        - content: "Use getWeather when needed. After receiving its result, summarize it for the user."
     ▿ Message
-      ▿ user: (4 elements)
-        - .0: "What is the weather in Paris?"
+      ▿ user: UserMessage
+        - audio: 0 elements
+        - content: "What is the weather in Paris?"
         - images: 0 elements
         - videos: 0 elements
-        - audio: 0 elements
     ▿ Message
-      ▿ assistant: 1 element
-        ▿ EdgeToolsGenerationPart
-          ▿ toolCall: EdgeRawToolCall
-            ▿ arguments: EdgeToolsValue
-              ▿ object: 1 key/value pair
-                ▿ (2 elements)
-                  - key: "location"
-                  ▿ value: EdgeToolsValue
-                    - string: "Paris"
-            - name: "getWeather"
+      ▿ assistant: AssistantMessage
+        ▿ parts: 1 element
+          ▿ EdgeToolsGenerationPart
+            ▿ toolCall: EdgeRawToolCall
+              ▿ arguments: EdgeToolsValue
+                ▿ object: 1 key/value pair
+                  ▿ (2 elements)
+                    - key: "location"
+                    ▿ value: EdgeToolsValue
+                      - string: "Paris"
+              - name: "getWeather"
     ▿ Message
-      ▿ tool: (2 elements)
+      ▿ tool: ToolMessage
         - name: "getWeather"
         ▿ response: EdgeToolsValue
           ▿ object: 3 key/value pairs
@@ -37,42 +39,45 @@
               ▿ value: EdgeToolsValue
                 - integer: 21
     ▿ Message
-      ▿ assistant: 18 elements
-        ▿ EdgeToolsGenerationPart
-          - text: "The"
-        ▿ EdgeToolsGenerationPart
-          - text: " weather"
-        ▿ EdgeToolsGenerationPart
-          - text: " in"
-        ▿ EdgeToolsGenerationPart
-          - text: " Paris"
-        ▿ EdgeToolsGenerationPart
-          - text: " is"
-        ▿ EdgeToolsGenerationPart
-          - text: " "
-        ▿ EdgeToolsGenerationPart
-          - text: "2"
-        ▿ EdgeToolsGenerationPart
-          - text: "1"
-        ▿ EdgeToolsGenerationPart
-          - text: "°"
-        ▿ EdgeToolsGenerationPart
-          - text: "C"
-        ▿ EdgeToolsGenerationPart
-          - text: " with"
-        ▿ EdgeToolsGenerationPart
-          - text: " a"
-        ▿ EdgeToolsGenerationPart
-          - text: " value"
-        ▿ EdgeToolsGenerationPart
-          - text: " of"
-        ▿ EdgeToolsGenerationPart
-          - text: " "
-        ▿ EdgeToolsGenerationPart
-          - text: "2"
-        ▿ EdgeToolsGenerationPart
-          - text: "1"
-        ▿ EdgeToolsGenerationPart
-          - text: "."
+      ▿ assistant: AssistantMessage
+        ▿ parts: 19 elements
+          ▿ EdgeToolsGenerationPart
+            - text: "The"
+          ▿ EdgeToolsGenerationPart
+            - text: " weather"
+          ▿ EdgeToolsGenerationPart
+            - text: " in"
+          ▿ EdgeToolsGenerationPart
+            - text: " Paris"
+          ▿ EdgeToolsGenerationPart
+            - text: " is"
+          ▿ EdgeToolsGenerationPart
+            - text: ":"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n"
+          ▿ EdgeToolsGenerationPart
+            - text: "**"
+          ▿ EdgeToolsGenerationPart
+            - text: "Sunny"
+          ▿ EdgeToolsGenerationPart
+            - text: " with"
+          ▿ EdgeToolsGenerationPart
+            - text: " a"
+          ▿ EdgeToolsGenerationPart
+            - text: " temperature"
+          ▿ EdgeToolsGenerationPart
+            - text: " of"
+          ▿ EdgeToolsGenerationPart
+            - text: " "
+          ▿ EdgeToolsGenerationPart
+            - text: "2"
+          ▿ EdgeToolsGenerationPart
+            - text: "1"
+          ▿ EdgeToolsGenerationPart
+            - text: "°"
+          ▿ EdgeToolsGenerationPart
+            - text: "C"
+          ▿ EdgeToolsGenerationPart
+            - text: "**."
   ▿ reasoningEffort: EdgeToolsReasoningEffort
     - rawValue: "default"

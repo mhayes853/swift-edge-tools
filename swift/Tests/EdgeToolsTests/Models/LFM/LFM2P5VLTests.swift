@@ -19,14 +19,6 @@ struct `LFM2P5VL tests` {
       }
 
       @Test
-      func `Generates Reasoning Snapshot`() async throws {
-        let engine = try await LFM2P5VLMLXModelEngine(from: downloadLFM2P5VL())
-        let generation = try await generateReasoning(using: engine)
-
-        withKnownIssue { assertSnapshot(of: generation, as: .dump, record: .all) }
-      }
-
-      @Test
       func `Describes Image Snapshot`() async throws {
         let engine = try await LFM2P5VLMLXModelEngine(from: downloadLFM2P5VL())
         let response = try await describeRedImage(using: engine)

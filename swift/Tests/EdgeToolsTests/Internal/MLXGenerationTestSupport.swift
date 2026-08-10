@@ -50,10 +50,10 @@
     sampling parameters: EdgeToolsFusedSamplingParameters
   ) async throws -> SessionWeatherTurnSnapshot
   where
-    Engine.Prompt == EdgeToolsLLMPrompt,
+    Engine.Prompt == EdgeToolsConversationalPrompt,
     Engine.GenerateParameters == DefaultMLXGenerateParameters
   {
-    var transcript = EdgeToolsLLMPrompt.weatherTest
+    var transcript = EdgeToolsConversationalPrompt.weatherTest
     transcript.reasoningEffort = .none
     let toolGeneration = try await session.generate(
       prompt: transcript,

@@ -11,11 +11,11 @@ struct `Qwen3P5 tests` {
     @Test
     func `Default Sampling Follows The Reasoning Effort`() {
       let thinking = Qwen3P5MLXProfile.defaultSampling(
-        prompt: EdgeToolsLLMPrompt(messages: [.user("hi")], reasoningEffort: .high),
+        prompt: EdgeToolsConversationalPrompt(messages: [.user("hi")], reasoningEffort: .high),
         parameters: DefaultMLXGenerateParameters()
       )
       let nonThinking = Qwen3P5MLXProfile.defaultSampling(
-        prompt: EdgeToolsLLMPrompt(messages: [.user("hi")], reasoningEffort: .none),
+        prompt: EdgeToolsConversationalPrompt(messages: [.user("hi")], reasoningEffort: .none),
         parameters: DefaultMLXGenerateParameters()
       )
 

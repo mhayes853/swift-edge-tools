@@ -1,5 +1,5 @@
 ▿ VLMToolTurnSnapshot
-  - response: "The dominant color visible in the image is red."
+  - response: "**Summary:**\nThe dominant color visible in the image is red."
   ▿ toolCalls: 1 element
     ▿ EdgeRawToolCall
       ▿ arguments: EdgeToolsValue
