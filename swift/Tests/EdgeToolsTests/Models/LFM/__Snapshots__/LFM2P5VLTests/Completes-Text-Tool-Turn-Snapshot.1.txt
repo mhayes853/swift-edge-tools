@@ -3,15 +3,15 @@
     ▿ Message
       - system: "Use getWeather when needed. After receiving its result, summarize it for the user."
     ▿ Message
-      ▿ user: (3 elements)
+      ▿ user: (4 elements)
         - .0: "What is the weather in Paris?"
         - images: 0 elements
+        - videos: 0 elements
         - audio: 0 elements
     ▿ Message
-      ▿ assistant: (2 elements)
-        - .0: Optional<String>.none
-        ▿ toolCalls: 1 element
-          ▿ EdgeRawToolCall
+      ▿ assistant: 1 element
+        ▿ EdgeToolsGenerationPart
+          ▿ toolCall: EdgeRawToolCall
             ▿ arguments: EdgeToolsValue
               ▿ object: 1 key/value pair
                 ▿ (2 elements)
@@ -37,7 +37,38 @@
               ▿ value: EdgeToolsValue
                 - integer: 21
     ▿ Message
-      ▿ assistant: (2 elements)
-        ▿ .0: Optional<String>
-          - some: "The current weather in Paris is sunny with a temperature of 21 degrees Celsius."
-        - toolCalls: 0 elements
+      ▿ assistant: 16 elements
+        ▿ EdgeToolsGenerationPart
+          - text: "The"
+        ▿ EdgeToolsGenerationPart
+          - text: " weather"
+        ▿ EdgeToolsGenerationPart
+          - text: " in"
+        ▿ EdgeToolsGenerationPart
+          - text: " Paris"
+        ▿ EdgeToolsGenerationPart
+          - text: " is"
+        ▿ EdgeToolsGenerationPart
+          - text: " currently"
+        ▿ EdgeToolsGenerationPart
+          - text: " sunny"
+        ▿ EdgeToolsGenerationPart
+          - text: " with"
+        ▿ EdgeToolsGenerationPart
+          - text: " a"
+        ▿ EdgeToolsGenerationPart
+          - text: " temperature"
+        ▿ EdgeToolsGenerationPart
+          - text: " of"
+        ▿ EdgeToolsGenerationPart
+          - text: " "
+        ▿ EdgeToolsGenerationPart
+          - text: "21"
+        ▿ EdgeToolsGenerationPart
+          - text: " degrees"
+        ▿ EdgeToolsGenerationPart
+          - text: " Celsius"
+        ▿ EdgeToolsGenerationPart
+          - text: "."
+  ▿ reasoningEffort: EdgeToolsReasoningEffort
+    - rawValue: "default"

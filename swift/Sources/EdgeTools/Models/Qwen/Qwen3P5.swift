@@ -42,6 +42,20 @@ import OrderedCollections
       let prefix = prompt.reasoningEffort.isEnabled ? "<think>\n" : "<think>\n\n</think>\n\n"
       _ = parser.accept(token: EdgeToolsToken(id: -1, stringValue: prefix))
     }
+
+    public static func defaultSampling(
+      prompt: EdgeToolsLLMPrompt,
+      parameters: DefaultMLXGenerateParameters
+    ) -> EdgeToolsFusedSamplingParameters? {
+      prompt.reasoningEffort.isEnabled
+        ? EdgeToolsFusedSamplingParameters(
+          temperature: 1,
+          topK: 20,
+          topP: 0.95,
+          presencePenalty: 1.5
+        )
+        : EdgeToolsFusedSamplingParameters(temperature: 1, topK: 20, presencePenalty: 2)
+    }
   }
 
   public typealias Qwen3P5MLXModelEngine = MLXEngine<Qwen3P5MLXProfile>
@@ -88,6 +102,20 @@ import OrderedCollections
     ) {
       let prefix = prompt.reasoningEffort.isEnabled ? "<think>\n" : "<think>\n\n</think>\n\n"
       _ = parser.accept(token: EdgeToolsToken(id: -1, stringValue: prefix))
+    }
+
+    public static func defaultSampling(
+      prompt: EdgeToolsLLMPrompt,
+      parameters: DefaultMLXGenerateParameters
+    ) -> EdgeToolsFusedSamplingParameters? {
+      prompt.reasoningEffort.isEnabled
+        ? EdgeToolsFusedSamplingParameters(temperature: 0.6, topK: 20, topP: 0.95)
+        : EdgeToolsFusedSamplingParameters(
+          temperature: 0.7,
+          topK: 20,
+          topP: 0.8,
+          presencePenalty: 1.5
+        )
     }
 
     public static nonisolated(nonsending) func input(
