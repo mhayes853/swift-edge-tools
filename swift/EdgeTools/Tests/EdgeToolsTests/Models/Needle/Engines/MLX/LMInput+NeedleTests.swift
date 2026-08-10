@@ -7,7 +7,7 @@
   import Testing
   import SnapshotTesting
 
-  @Suite(.serialized, .enabledIfXcode())
+  @Suite(.serialized, .enabledIfMLXTests())
   struct `LMInput+Needle tests` {
     @Test
     func `Needle Snapshot`() throws {

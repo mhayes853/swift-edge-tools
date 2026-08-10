@@ -102,12 +102,36 @@ let package = Package(
           package: "JavaScriptKit",
           condition: .when(traits: ["JS"])
         ),
-        .product(name: "MLX", package: "mlx-swift", condition: .when(traits: ["MLX"])),
-        .product(name: "MLXNN", package: "mlx-swift", condition: .when(traits: ["MLX"])),
-        .product(name: "MLXLLM", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),
-        .product(name: "MLXLMCommon", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),
-        .product(name: "MLXHuggingFace", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),
-        .product(name: "MLXVLM", package: "mlx-swift-lm", condition: .when(traits: ["MLX"])),
+        .product(
+          name: "MLX",
+          package: "mlx-swift",
+          condition: .when(platforms: [.macOS], traits: ["MLX"])
+        ),
+        .product(
+          name: "MLXNN",
+          package: "mlx-swift",
+          condition: .when(platforms: [.macOS], traits: ["MLX"])
+        ),
+        .product(
+          name: "MLXLLM",
+          package: "mlx-swift-lm",
+          condition: .when(platforms: [.macOS], traits: ["MLX"])
+        ),
+        .product(
+          name: "MLXLMCommon",
+          package: "mlx-swift-lm",
+          condition: .when(platforms: [.macOS], traits: ["MLX"])
+        ),
+        .product(
+          name: "MLXHuggingFace",
+          package: "mlx-swift-lm",
+          condition: .when(platforms: [.macOS], traits: ["MLX"])
+        ),
+        .product(
+          name: "MLXVLM",
+          package: "mlx-swift-lm",
+          condition: .when(platforms: [.macOS], traits: ["MLX"])
+        ),
         .target(name: "EdgeToolsXGrammar", condition: .when(traits: ["XGrammar"])),
         .target(
           name: "COnnxRuntime",

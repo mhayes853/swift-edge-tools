@@ -8,7 +8,7 @@ import Testing
 @Suite
 struct `Qwen3 tests` {
   #if MLX && XGrammar && canImport(MLX) && !os(WASI)
-    @Suite(.serialized, .enabledIfXcode())
+    @Suite(.serialized, .enabledIfMLXTests())
     struct `Qwen3MLXModelEngine tests` {
       @Test
       func `Completes Tool Turn Snapshot`() async throws {

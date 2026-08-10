@@ -8,7 +8,7 @@ import Testing
 @Suite
 struct `LFM2P5VL tests` {
   #if MLX && XGrammar && canImport(MLX) && !os(WASI)
-    @Suite(.serialized, .enabledIfXcode())
+    @Suite(.serialized, .enabledIfMLXTests())
     struct `LFM2P5VLMLXModelEngine tests` {
       @Test
       func `Completes Text Tool Turn Snapshot`() async throws {

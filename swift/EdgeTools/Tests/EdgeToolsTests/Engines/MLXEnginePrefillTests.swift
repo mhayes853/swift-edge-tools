@@ -6,7 +6,7 @@
   import MLXNN
   import Testing
 
-  @Suite(.serialized, .enabledIfXcode())
+  @Suite(.serialized, .enabledIfMLXTests())
   struct `MLXEngineLLMPrefill tests` {
     @Test
     func `Extending Prefill Only Processes Suffix`() async throws {
@@ -71,7 +71,7 @@
   }
 
   #if canImport(CoreImage) && canImport(MLXVLM)
-    @Suite(.serialized, .enabledIfXcode())
+    @Suite(.serialized, .enabledIfMLXTests())
     struct `MLXEngineVLMPrefill tests` {
       @Test
       func `Extending Prefill With Same Image Only Processes Suffix`() async throws {
