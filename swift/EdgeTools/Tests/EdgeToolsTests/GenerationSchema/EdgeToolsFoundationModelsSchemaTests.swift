@@ -79,6 +79,20 @@
 
         expectNoDifference(convertedJSON, expectedJSON)
       }
+
+      @Test
+      @available(iOS 26.0, macOS 26.0, watchOS 27.0, tvOS 26.0, visionOS 26.0, *)
+      func `Converts Associated Value Enum Schema`() throws {
+        let generationSchema = try GenerationSchema(
+          edgeToolsGenerationSchema: associatedValueEnumSchema
+        )
+        let data = try JSONEncoder().encode(generationSchema)
+        let json = try #require(String(data: data, encoding: .utf8))
+
+        expectNoDifference(json.contains(#""anyOf""#), true)
+        expectNoDifference(json.contains(#""move""#), true)
+        expectNoDifference(json.contains(#""query""#), true)
+      }
     }
 
     @Suite
@@ -167,6 +181,12 @@
           isSupported: true
         ),
         TestCase(
+          name: "AssociatedValueEnum",
+          schema: associatedValueEnumSchema,
+          expectedFragments: [#""anyOf""#, #""move""#, #""query""#],
+          isSupported: true
+        ),
+        TestCase(
           name: "Unsupported",
           schema: true,
           expectedFragments: [],
@@ -204,4 +224,35 @@
       }
     }
   }
+
+  private let associatedValueEnumSchema = EdgeToolsGenerationSchema(
+    .anyOf([
+      EdgeToolsGenerationSchema(
+        .type(.object),
+        .properties([
+          "move": EdgeToolsGenerationSchema(
+            .type(.object),
+            .properties(["_0": .number, "_1": .number]),
+            .required(["_0", "_1"]),
+            .additionalProperties(false)
+          )
+        ]),
+        .required(["move"]),
+        .additionalProperties(false)
+      ),
+      EdgeToolsGenerationSchema(
+        .type(.object),
+        .properties([
+          "search": EdgeToolsGenerationSchema(
+            .type(.object),
+            .properties(["query": .string, "limit": .integer.nullable()]),
+            .required(["query", "limit"]),
+            .additionalProperties(false)
+          )
+        ]),
+        .required(["search"]),
+        .additionalProperties(false)
+      )
+    ])
+  )
 #endif

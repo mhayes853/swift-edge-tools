@@ -12,29 +12,59 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro, MemberAttribut
     conformingTo protocols: [TypeSyntax],
     in context: some MacroExpansionContext
   ) throws -> [DeclSyntax] {
-    let structDecl = try Self.requireStructDecl(declaration: declaration)
-    let properties = Self.storedProperties(in: structDecl, context: context)
     let schemaFragments = Self.schemaFragments(from: node, context: context)
-    let accessModifier = Self.accessModifier(for: structDecl)
+    let accessModifier = Self.accessModifier(for: declaration)
     let modifierPrefix = Self.modifierPrefix(for: accessModifier)
     var members = [DeclSyntax]()
 
-    if !Self.hasExistingEdgeToolsGenerationSchema(in: structDecl) {
-      members.append(
-        Self.generationSchemaProperty(
-          from: properties,
-          modifierPrefix: modifierPrefix,
-          schemaFragments: schemaFragments
+    if let structDecl = declaration.as(StructDeclSyntax.self) {
+      let properties = Self.storedProperties(in: structDecl, context: context)
+      if !Self.hasExistingEdgeToolsGenerationSchema(in: declaration) {
+        members.append(
+          Self.generationSchemaProperty(
+            from: properties,
+            modifierPrefix: modifierPrefix,
+            schemaFragments: schemaFragments
+          )
         )
+      }
+
+      if !Self.hasExistingEdgeToolsValueInitializer(in: declaration) {
+        members.append(Self.valueInitializer(from: properties, modifierPrefix: modifierPrefix))
+      }
+
+      if !Self.hasExistingEdgeToolsValueProperty(in: declaration) {
+        members.append(Self.valueProperty(from: properties, modifierPrefix: modifierPrefix))
+      }
+    } else if let enumDecl = declaration.as(EnumDeclSyntax.self) {
+      let cases = try Self.enumCases(in: enumDecl)
+      if !Self.hasExistingEdgeToolsGenerationSchema(in: declaration) {
+        members.append(
+          Self.enumGenerationSchemaProperty(
+            from: cases,
+            modifierPrefix: modifierPrefix,
+            schemaFragments: schemaFragments
+          )
+        )
+      }
+
+      if !Self.hasExistingEdgeToolsValueInitializer(in: declaration) {
+        members.append(
+          Self.enumValueInitializer(
+            typeName: enumDecl.name.text,
+            cases: cases,
+            modifierPrefix: modifierPrefix
+          )
+        )
+      }
+
+      if !Self.hasExistingEdgeToolsValueProperty(in: declaration) {
+        members.append(Self.enumValueProperty(from: cases, modifierPrefix: modifierPrefix))
+      }
+    } else {
+      throw MacroExpansionErrorMessage(
+        "@EdgeToolsGenerable can only be applied to struct or enum declarations."
       )
-    }
-
-    if !Self.hasExistingEdgeToolsValueInitializer(in: structDecl) {
-      members.append(Self.valueInitializer(from: properties, modifierPrefix: modifierPrefix))
-    }
-
-    if !Self.hasExistingEdgeToolsValueProperty(in: structDecl) {
-      members.append(Self.valueProperty(from: properties, modifierPrefix: modifierPrefix))
     }
 
     return members
@@ -47,7 +77,11 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro, MemberAttribut
     conformingTo protocols: [TypeSyntax],
     in context: some MacroExpansionContext
   ) throws -> [ExtensionDeclSyntax] {
-    _ = try Self.requireStructDecl(declaration: declaration)
+    guard declaration.is(StructDeclSyntax.self) || declaration.is(EnumDeclSyntax.self) else {
+      throw MacroExpansionErrorMessage(
+        "@EdgeToolsGenerable can only be applied to struct or enum declarations."
+      )
+    }
     let typeName = type.trimmedDescription
     return [
       try ExtensionDeclSyntax(
@@ -85,18 +119,22 @@ extension EdgeToolsGenerableMacro {
     let schemaFragments: [String]
   }
 
-  private static func requireStructDecl(
-    declaration: some DeclGroupSyntax
-  ) throws -> StructDeclSyntax {
-    guard let structDecl = declaration.as(StructDeclSyntax.self) else {
-      throw MacroExpansionErrorMessage(
-        "@EdgeToolsGenerable can only be applied to struct declarations."
-      )
-    }
-    return structDecl
+  private struct AssociatedValue {
+    let sourceLabel: String?
+    let schemaKey: String
+    let typeName: String
+    let bindingName: String
   }
 
-  private static func hasExistingEdgeToolsGenerationSchema(in declaration: StructDeclSyntax) -> Bool
+  private struct EnumCase {
+    let name: String
+    let sourceName: String
+    let associatedValues: [AssociatedValue]
+  }
+
+  private static func hasExistingEdgeToolsGenerationSchema(
+    in declaration: some DeclGroupSyntax
+  ) -> Bool
   {
     declaration.memberBlock.members.contains { member in
       guard let variableDecl = member.decl.as(VariableDeclSyntax.self) else { return false }
@@ -110,7 +148,9 @@ extension EdgeToolsGenerableMacro {
     }
   }
 
-  private static func hasExistingEdgeToolsValueInitializer(in declaration: StructDeclSyntax) -> Bool
+  private static func hasExistingEdgeToolsValueInitializer(
+    in declaration: some DeclGroupSyntax
+  ) -> Bool
   {
     declaration.memberBlock.members.contains { member in
       guard let initializer = member.decl.as(InitializerDeclSyntax.self) else { return false }
@@ -120,7 +160,9 @@ extension EdgeToolsGenerableMacro {
     }
   }
 
-  private static func hasExistingEdgeToolsValueProperty(in declaration: StructDeclSyntax) -> Bool {
+  private static func hasExistingEdgeToolsValueProperty(
+    in declaration: some DeclGroupSyntax
+  ) -> Bool {
     declaration.memberBlock.members.contains { member in
       guard let variableDecl = member.decl.as(VariableDeclSyntax.self) else { return false }
       guard !Self.isStatic(variableDecl) else { return false }
@@ -137,7 +179,7 @@ extension EdgeToolsGenerableMacro {
     variableDecl.modifiers.contains { $0.name.tokenKind == .keyword(.static) }
   }
 
-  private static func accessModifier(for declaration: StructDeclSyntax) -> String? {
+  private static func accessModifier(for declaration: some DeclGroupSyntax) -> String? {
     declaration.modifiers
       .first { modifier in
         switch modifier.name.tokenKind {
@@ -270,6 +312,58 @@ extension EdgeToolsGenerableMacro {
     return "EdgeToolsGenerationSchema(\(fragments))"
   }
 
+  private static func enumCases(
+    in declaration: EnumDeclSyntax
+  ) throws -> [EnumCase] {
+    let elements = declaration.memberBlock.members.flatMap { member -> [EnumCaseElementSyntax] in
+      member.decl.as(EnumCaseDeclSyntax.self).map { Array($0.elements) } ?? []
+    }
+    guard !elements.isEmpty else {
+      throw MacroExpansionErrorMessage(
+        "@EdgeToolsGenerable enums must declare at least one case."
+      )
+    }
+
+    var caseNames = Set<String>()
+    return try elements.map { element in
+      let name = element.name.text
+      guard caseNames.insert(name).inserted else {
+        throw MacroExpansionErrorMessage(
+          "@EdgeToolsGenerable does not support overloaded enum case names ('\(name)')."
+        )
+      }
+      guard let parameters = element.parameterClause?.parameters, !parameters.isEmpty else {
+        throw MacroExpansionErrorMessage(
+          "@EdgeToolsGenerable enum case '\(name)' must have at least one associated value."
+        )
+      }
+
+      var schemaKeys = Set<String>()
+      let associatedValues = try parameters.enumerated().map { index, parameter in
+        let rawLabel = parameter.firstName?.text
+        let label = rawLabel == "_" ? nil : rawLabel
+        let schemaKey = label ?? "_\(index)"
+        guard schemaKeys.insert(schemaKey).inserted else {
+          throw MacroExpansionErrorMessage(
+            "Enum case '\(name)' has multiple associated values represented by the key '\(schemaKey)'."
+          )
+        }
+        return AssociatedValue(
+          sourceLabel: label == nil ? nil : parameter.firstName?.trimmedDescription,
+          schemaKey: schemaKey,
+          typeName: parameter.type.trimmedDescription,
+          bindingName: "value\(index)"
+        )
+      }
+
+      return EnumCase(
+        name: name,
+        sourceName: element.name.trimmedDescription,
+        associatedValues: associatedValues
+      )
+    }
+  }
+
   private static func schemaFragments(
     from attribute: AttributeSyntax,
     context: some MacroExpansionContext
@@ -362,6 +456,47 @@ extension EdgeToolsGenerableMacro {
       """
   }
 
+  private static func enumGenerationSchemaProperty(
+    from cases: [EnumCase],
+    modifierPrefix: String,
+    schemaFragments: [String]
+  ) -> DeclSyntax {
+    let choices = cases.map { enumCase in
+      let propertyPairs = enumCase.associatedValues.map { value in
+        "\(Self.quotedStringLiteral(value.schemaKey)): \(value.typeName).edgeToolsGenerationSchema"
+      }
+      .joined(separator: ",\n                      ")
+      let required = enumCase.associatedValues.map { Self.quotedStringLiteral($0.schemaKey) }
+        .joined(separator: ", ")
+      return """
+        EdgeToolsGenerationSchema(
+          .type(.object),
+          .properties([
+            \(Self.quotedStringLiteral(enumCase.name)): EdgeToolsGenerationSchema(
+              .type(.object),
+              .properties([
+                \(propertyPairs)
+              ]),
+              .required([\(required)]),
+              .additionalProperties(false)
+            )
+          ]),
+          .required([\(Self.quotedStringLiteral(enumCase.name))]),
+          .additionalProperties(false)
+        )
+        """
+    }
+    var fragments = [".anyOf([\n            \(choices.joined(separator: ",\n            "))\n          ])"]
+    fragments.append(contentsOf: schemaFragments)
+    return """
+      \(raw: modifierPrefix)static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
+        EdgeToolsGenerationSchema(
+          \(raw: fragments.joined(separator: ",\n          "))
+        )
+      }
+      """
+  }
+
   private static func valueInitializer(
     from properties: [StoredProperty],
     modifierPrefix: String
@@ -395,6 +530,43 @@ extension EdgeToolsGenerableMacro {
       """
   }
 
+  private static func enumValueInitializer(
+    typeName: String,
+    cases: [EnumCase],
+    modifierPrefix: String
+  ) -> DeclSyntax {
+    let caseInitializers = cases.map { enumCase in
+      let keys = enumCase.associatedValues.map { Self.quotedStringLiteral($0.schemaKey) }
+        .joined(separator: ", ")
+      let arguments = enumCase.associatedValues.map { value in
+        let expression =
+          "try \(Self.initializerTypeName(for: value.typeName))(edgeToolsValue: _edgeToolsValue(payload, forKey: \(Self.quotedStringLiteral(value.schemaKey))))"
+        return value.sourceLabel.map { "\($0): \(expression)" } ?? expression
+      }
+      .joined(separator: ",\n          ")
+      return """
+        if let value = object[\(Self.quotedStringLiteral(enumCase.name))] {
+          let payload = try _edgeToolsRequireObjectValue(value, keys: [\(keys)])
+          self = .\(enumCase.sourceName)(
+            \(arguments)
+          )
+          return
+        }
+        """
+    }
+    .joined(separator: "\n")
+    return """
+      \(raw: modifierPrefix)init(edgeToolsValue: EdgeToolsValue) throws {
+        let object = try _edgeToolsRequireObjectValue(edgeToolsValue)
+        \(raw: caseInitializers)
+        throw EdgeToolsUnknownEnumCaseError(
+          typeName: \(raw: Self.quotedStringLiteral(typeName)),
+          caseName: object.keys.first ?? ""
+        )
+      }
+      """
+  }
+
   private static func valueProperty(
     from properties: [StoredProperty],
     modifierPrefix: String
@@ -423,6 +595,35 @@ extension EdgeToolsGenerableMacro {
         _edgeToolsBuildObjectValue(
           \(raw: entries.joined(separator: ",\n          "))
         )
+      }
+      """
+  }
+
+  private static func enumValueProperty(
+    from cases: [EnumCase],
+    modifierPrefix: String
+  ) -> DeclSyntax {
+    let switchCases = cases.map { enumCase in
+      let bindings = enumCase.associatedValues.map { "let \($0.bindingName)" }
+        .joined(separator: ", ")
+      let entries = enumCase.associatedValues.map { value in
+        "(key: \(Self.quotedStringLiteral(value.schemaKey)), value: \(value.bindingName).edgeToolsValue)"
+      }
+      .joined(separator: ",\n            ")
+      return """
+        case .\(enumCase.sourceName)(\(bindings)):
+          _edgeToolsBuildObjectValue(
+            (key: \(Self.quotedStringLiteral(enumCase.name)), value: _edgeToolsBuildObjectValue(
+              \(entries)
+            )))
+        """
+    }
+    .joined(separator: "\n")
+    return """
+      \(raw: modifierPrefix)var edgeToolsValue: EdgeToolsValue {
+        switch self {
+        \(raw: switchCases)
+        }
       }
       """
   }
