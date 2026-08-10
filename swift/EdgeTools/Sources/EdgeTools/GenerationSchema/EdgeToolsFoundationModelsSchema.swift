@@ -155,6 +155,16 @@
   extension GenerationSchema {
     public init(edgeToolsGenerationSchema: EdgeToolsGenerationSchema) throws {
       do {
+        if #available(iOS 26.4, macOS 26.4, tvOS 26.4, visionOS 26.4, *),
+          edgeToolsGenerationSchema.requiresDynamicFoundationModelsConversion
+        {
+          let root = try DynamicGenerationSchema(
+            edgeToolsGenerationSchema: edgeToolsGenerationSchema,
+            name: edgeToolsGenerationSchema.foundationModelsName
+          )
+          self = try GenerationSchema(root: root, dependencies: [])
+          return
+        }
         let schema = try edgeToolsGenerationSchema.foundationModelsNormalized()
         let data = try JSONEncoder().encode(schema)
         self = try JSONDecoder().decode(Self.self, from: data)
@@ -184,6 +194,9 @@
       let propertyKeys = try Self.normalizeProperties(in: &object, path: path)
       try Self.normalizeSchemaValues(in: &object, path: path)
       try Self.normalizeSchemaArrays(in: &object, path: path)
+      if object[.anyOf] != nil {
+        object[.title] = object[.title] ?? .string(Self.inferredName(from: path))
+      }
 
       var schema = Self.object(object)
       if let propertyKeys {
@@ -252,7 +265,16 @@
         object[key] = .array(
           try values.enumerated()
             .map { index, value in
-              try Self.normalizedSchemaValue(value, path: "\(path).\(key.rawValue)[\(index)]")
+              let valuePath = "\(path).\(key.rawValue)[\(index)]"
+              var schema = try Self.schema(from: value, path: valuePath)
+                .foundationModelsNormalized(path: valuePath)
+              if key == .anyOf, case .object(var choice) = schema,
+                choice[.type] == .string("object")
+              {
+                choice[.title] = choice[.title] ?? .string(Self.inferredName(from: valuePath))
+                schema = .object(choice)
+              }
+              return schema.edgeToolsValue
             }
         )
       }
@@ -287,6 +309,31 @@
     private static func inferredName(from path: String) -> String {
       let name = path.schemaPascalCased
       return name.isEmpty ? "GeneratedContent" : name
+    }
+
+    fileprivate var foundationModelsName: String {
+      guard case .object(let object) = self, case .string(let title)? = object[.title] else {
+        return "GeneratedContent"
+      }
+      return title
+    }
+
+    fileprivate var requiresDynamicFoundationModelsConversion: Bool {
+      self.edgeToolsValue.containsAnyOf
+    }
+  }
+
+  extension EdgeToolsValue {
+    fileprivate var containsAnyOf: Bool {
+      switch self {
+      case .array(let values):
+        values.contains { $0.containsAnyOf }
+      case .object(let object):
+        object[EdgeToolsGenerationSchema.Key.anyOf.rawValue] != nil
+          || object.values.contains { $0.containsAnyOf }
+      default:
+        false
+      }
     }
   }
 

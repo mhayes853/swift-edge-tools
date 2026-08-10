@@ -2,7 +2,11 @@ import OrderedCollections
 
 // MARK: - Macros
 
-/// Generates ``EdgeToolsGenerable`` support for a struct.
+/// Generates ``EdgeToolsGenerable`` support for a struct or associated-value enum.
+///
+/// Enum values use an externally tagged object representation. Every case payload is an object;
+/// labeled associated values use their labels as keys and unlabeled values use positional keys
+/// such as `_0` and `_1`.
 @attached(extension, conformances: EdgeToolsGenerable)
 @attached(member, names: named(edgeToolsGenerationSchema), named(init), named(edgeToolsValue))
 @attached(memberAttribute)
@@ -35,6 +39,22 @@ public func _edgeToolsRequireObjectValue(
 
 @inlinable
 @inline(always)
+public func _edgeToolsRequireObjectValue(
+  _ value: EdgeToolsValue,
+  keys: [String]
+) throws -> OrderedDictionary<String, EdgeToolsValue> {
+  let object = try _edgeToolsRequireObjectValue(value)
+  guard keys.allSatisfy({ object[$0] != nil }) else {
+    throw EdgeToolsObjectKeysError(
+      expected: keys,
+      received: Array(object.keys)
+    )
+  }
+  return object
+}
+
+@inlinable
+@inline(always)
 public func _edgeToolsValue(
   _ object: OrderedDictionary<String, EdgeToolsValue>,
   forKey key: String
@@ -54,4 +74,32 @@ public func _edgeToolsBuildObjectValue(
     }
   }
   return .object(object)
+}
+
+// MARK: - Macro Conversion Errors
+
+/// An error thrown when an object does not contain its required keys.
+public struct EdgeToolsObjectKeysError: Error, Hashable, Sendable {
+  /// The required object keys.
+  public let expected: [String]
+  /// The received object keys.
+  public let received: [String]
+
+  public init(expected: [String], received: [String]) {
+    self.expected = expected
+    self.received = received
+  }
+}
+
+/// An error thrown when an enum representation contains an unknown case name.
+public struct EdgeToolsUnknownEnumCaseError: Error, Hashable, Sendable {
+  /// The enum type name.
+  public let typeName: String
+  /// The unrecognized case name.
+  public let caseName: String
+
+  public init(typeName: String, caseName: String) {
+    self.typeName = typeName
+    self.caseName = caseName
+  }
 }

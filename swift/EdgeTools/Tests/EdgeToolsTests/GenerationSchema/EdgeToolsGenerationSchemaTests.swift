@@ -53,6 +53,71 @@ struct `EdgeToolsEncoding tests` {
   }
 
   @Test
+  func `Macro Generated Enum Round Trips Through EdgeToolsValue`() throws {
+    let actions: [MacroEncodingAction] = [
+      .store(try MacroEncodingAddress(edgeToolsValue: ["city": "Brooklyn"])),
+      .move(12.5, 8),
+      .search(query: "swift", limit: nil),
+      .replace("old", with: "new")
+    ]
+    let expectedValues: [EdgeToolsValue] = [
+      ["store": ["_0": ["city": "Brooklyn"]]],
+      ["move": ["_0": 12.5, "_1": 8.0]],
+      ["search": ["query": "swift", "limit": .null]],
+      ["replace": ["_0": "old", "with": "new"]]
+    ]
+
+    let encoded = actions.map { $0.edgeToolsValue }
+    expectNoDifference(encoded, expectedValues)
+    expectNoDifference(
+      try expectedValues.map(MacroEncodingAction.init(edgeToolsValue:)),
+      actions
+    )
+  }
+
+  @Test
+  func `Macro Generated Enum Requires Known Cases And Payload Keys`() throws {
+    #expect(throws: EdgeToolsUnknownEnumCaseError.self) {
+      try MacroEncodingAction(edgeToolsValue: [:])
+    }
+    #expect(throws: EdgeToolsUnknownEnumCaseError.self) {
+      try MacroEncodingAction(edgeToolsValue: ["unknown": ["_0": 1]])
+    }
+    #expect(throws: EdgeToolsObjectKeysError.self) {
+      try MacroEncodingAction(edgeToolsValue: ["move": ["_0": 1]])
+    }
+    expectNoDifference(
+      try MacroEncodingAction(
+        edgeToolsValue: ["move": ["_0": 1, "_1": 2, "ignored": 3]]
+      ),
+      .move(1, 2)
+    )
+    expectNoDifference(
+      try MacroEncodingAction(
+        edgeToolsValue: ["move": ["_0": 1, "_1": 2], "ignored": .null]
+      ),
+      .move(1, 2)
+    )
+  }
+
+  @Test
+  func `Macro Generated Enum Uses AnyOf Object Cases`() {
+    let expected = EdgeToolsGenerationSchema(
+      .anyOf([
+        enumCaseSchema("store", properties: ["_0": MacroEncodingAddress.edgeToolsGenerationSchema]),
+        enumCaseSchema("move", properties: ["_0": .number, "_1": .number]),
+        enumCaseSchema(
+          "search",
+          properties: ["query": .string, "limit": .integer.nullable()]
+        ),
+        enumCaseSchema("replace", properties: ["_0": .string, "with": .string])
+      ])
+    )
+
+    expectNoDifference(MacroEncodingAction.edgeToolsGenerationSchema, expected)
+  }
+
+  @Test
   func `Macro Generated Encoding Decodes Escaped Key Overrides`() throws {
     let value = try EscapedGuideKey(edgeToolsValue: ["line\nbreak": "blob"])
 
@@ -411,6 +476,14 @@ private struct MacroEncodingAddress: Equatable {
 }
 
 @EdgeToolsGenerable
+private enum MacroEncodingAction: Equatable {
+  case store(MacroEncodingAddress)
+  case move(Double, Double)
+  case search(query: String, limit: Int?)
+  case replace(String, with: String)
+}
+
+@EdgeToolsGenerable
 private struct EscapedGuideKey: Equatable {
   @EdgeToolsGuide(key: "line\nbreak")
   var value: String
@@ -434,4 +507,23 @@ private struct MacroUser: Equatable {
 @EdgeToolsGenerable
 private struct Address: Equatable {
   var city: String
+}
+
+private func enumCaseSchema(
+  _ name: String,
+  properties: KeyValuePairs<String, EdgeToolsGenerationSchema>
+) -> EdgeToolsGenerationSchema {
+  EdgeToolsGenerationSchema(
+    .type(.object),
+    .properties([
+      name: EdgeToolsGenerationSchema(
+        .type(.object),
+        .properties(properties),
+        .required(properties.map(\.0)),
+        .additionalProperties(false)
+      )
+    ]),
+    .required([name]),
+    .additionalProperties(false)
+  )
 }

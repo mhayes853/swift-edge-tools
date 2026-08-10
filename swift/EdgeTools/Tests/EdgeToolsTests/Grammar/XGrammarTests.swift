@@ -138,6 +138,23 @@
         let bitmask = matcher.grammarBitmask()
         expectNoDifference(bitmask.count, 8192)
       }
+
+      @Test(arguments: [
+        (#"{"move":{"_0":12.5,"_1":8}}"#, true),
+        (#"{"search":{"query":"swift","limit":null}}"#, true),
+        (#"{"unknown":{"_0":1}}"#, false),
+        (#"{"move":{"_0":12.5}}"#, false),
+        (#"{"move":{"_0":12.5,"_1":8,"_2":4}}"#, false)
+      ])
+      func `Associated Value Enum Schema Enforces Exact Object Cases`(
+        json: String,
+        isAccepted: Bool
+      ) throws {
+        let grammar = XGRGrammar.schema(XGrammarAssociatedValueEnum.self)
+        let matcher = try self.engine.makeMatcher(grammar)
+        expectNoDifference(matcher.accept(string: json), isAccepted)
+        expectNoDifference(matcher.isCompleted, isAccepted)
+      }
     }
 
     @Suite(.serialized)
@@ -372,5 +389,11 @@
 
   private func genericGrammar() throws -> XGRGrammar {
     try XGRGrammar.literal(genericGrammarText)
+  }
+
+  @EdgeToolsGenerable
+  private enum XGrammarAssociatedValueEnum {
+    case move(Double, Double)
+    case search(query: String, limit: Int?)
   }
 #endif
