@@ -1,0 +1,10 @@
+Needle · onnx · 2 runs (1 warmup)
+
+                   median       p95       min       max
+Prefill tok/s        2000.0    2000.0    2000.0    2000.0
+Decode tok/s          100.0     100.0     100.0     100.0
+TTFT ms                   2         2         2         2
+E2E ms                    0         0         0         0
+
+Peak RSS          0 MB
+Tool calls        0/2 runs produced calls

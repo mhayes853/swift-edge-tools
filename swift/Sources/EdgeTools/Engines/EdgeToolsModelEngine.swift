@@ -149,8 +149,8 @@
     ) throws -> some EdgeToolsEngineGenerationTask {
       let state = ManagedAtomic(AtomicGenerationTask.State.queued.rawValue)
 
-      // NB: Compiler region isolation checker limitation, these are safe because neither value
-      // is accessed after being sent to the generation task.
+      // NB: Compiler region isolation checker limitation, this is safe because these values are not
+      // accessed after being sent to the generation task.
       nonisolated(unsafe) let parameters = parameters
       nonisolated(unsafe) let channel = channel
       let task = Task {
@@ -347,6 +347,10 @@
         context: self.grammarContext,
         stopTokenIds: stopTokenIds
       )
+    }
+
+    public func resetGeneration() {
+      self.model.resetGeneration()
     }
   }
 

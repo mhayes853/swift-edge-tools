@@ -8,7 +8,7 @@ import Testing
 @Suite
 struct `MiniCPM5 tests` {
   #if MLX && XGrammar && canImport(MLX) && !os(WASI)
-    @Suite(.serialized, .enabledIfXcode())
+    @Suite(.serialized, .enabledIfMLXTests())
     struct `MiniCPM5MLXModelEngine tests` {
       @Test
       func `Completes Tool Turn Snapshot`() async throws {
@@ -62,55 +62,128 @@ struct `MiniCPM5 tests` {
       }
 
       @Test
-      func `Distinguishes Quoted Strings From Typed Primitives`() throws {
+      func `Requires CDATA For String Arguments That Spell A JSON Primitive`() throws {
         let tokenizer = try testTokenizer()
         let compiler = try makeGenericXGRCompiler(tokenizer: tokenizer)
         let eosToken = try requiredTestEOSToken(tokenizer: tokenizer)
-        let stringGrammar = try XGRGrammar.miniCPM5(
-          tools: [.getWeather],
-          range: .exact(1)
-        )
-        let quotedString =
-          #"<function name="getWeather"><param name="location">"true"</param></function>"#
-        let boolean =
-          #"<function name="getWeather"><param name="location">true</param></function>"#
+        let grammar = try XGRGrammar.miniCPM5(tools: [.getWeather], range: .exact(1))
+        let call = { (value: String) in
+          #"<function name="getWeather"><param name="location">\#(value)</param></function>"#
+        }
 
-        assertGrammarAccepts(
-          quotedString,
-          matcher: try compiler.makeMatcher(stringGrammar),
-          tokenizer: tokenizer,
-          eosToken: eosToken
-        )
-        assertGrammarRejects(
-          boolean,
-          matcher: try compiler.makeMatcher(stringGrammar),
-          tokenizer: tokenizer,
-          eosToken: eosToken
-        )
+        // NB: A raw value that parses back as a primitive would decode to the wrong type, and a
+        // trailing run of spaces is trimmed away before parsing, so both have to be unreachable.
+        for value in [
+          "true", "false", "null", "123", "-4", "1.5", #""Seoul""#, "{}", "[]", "true "
+        ] {
+          assertGrammarRejects(
+            call(value),
+            matcher: try compiler.makeMatcher(grammar),
+            tokenizer: tokenizer,
+            eosToken: eosToken
+          )
+        }
+        for value in ["Seoul", "tuesday", "farewell", "nullify", "true story", "<![CDATA[true]]>"] {
+          assertGrammarAccepts(
+            call(value),
+            matcher: try compiler.makeMatcher(grammar),
+            tokenizer: tokenizer,
+            eosToken: eosToken
+          )
+        }
+      }
 
-        let booleanTool = EdgeToolDefinition(
-          name: "booleanTool",
-          description: "Accepts a Boolean.",
+      @Test
+      func `Emits Raw Values For String Arguments Held In Their Own Rules`() throws {
+        let tokenizer = try testTokenizer()
+        let compiler = try makeGenericXGRCompiler(tokenizer: tokenizer)
+        let eosToken = try requiredTestEOSToken(tokenizer: tokenizer)
+        let tool = EdgeToolDefinition(
+          name: "shapedTool",
+          description: "Accepts strings whose schemas compile to their own rules.",
           arguments: EdgeToolsGenerationSchema(
             .type(.object),
-            .properties(["value": .boolean]),
-            .required(["value"]),
+            .properties([
+              "mode": EdgeToolsGenerationSchema(.string, .enum([.string("execute")])),
+              "ticket": EdgeToolsGenerationSchema(.string, .pattern("[A-Z]{3}-[0-9]{2}")),
+              "priority": EdgeToolsGenerationSchema(.type([.string, .integer])),
+              "note": EdgeToolsGenerationSchema(.type([.string, .null]))
+            ]),
+            .required(["mode", "ticket", "priority", "note"]),
             .additionalProperties(false)
           )
         )
-        let booleanGrammar = try XGRGrammar.miniCPM5(
-          tools: [booleanTool],
-          range: .exact(1)
+        let grammar = try XGRGrammar.miniCPM5(tools: [tool], range: .exact(1))
+        let call = { (mode: String, ticket: String, priority: String, note: String) in
+          """
+          <function name="shapedTool"><param name="mode">\(mode)</param>\
+          <param name="ticket">\(ticket)</param><param name="priority">\(priority)</param>\
+          <param name="note">\(note)</param></function>
+          """
+        }
+
+        for arguments in [
+          ("execute", "ABC-12", "4", "null"),
+          ("execute", "ABC-12", "urgent", "look into it")
+        ] {
+          assertGrammarAccepts(
+            call(arguments.0, arguments.1, arguments.2, arguments.3),
+            matcher: try compiler.makeMatcher(grammar),
+            tokenizer: tokenizer,
+            eosToken: eosToken
+          )
+        }
+        for arguments in [
+          (#""execute""#, "ABC-12", "4", "null"),
+          ("execute", #""ABC-12""#, "4", "null"),
+          ("execute", "ABC-12", #""urgent""#, "null"),
+          ("execute", "ABC-12", "4", #""look into it""#)
+        ] {
+          assertGrammarRejects(
+            call(arguments.0, arguments.1, arguments.2, arguments.3),
+            matcher: try compiler.makeMatcher(grammar),
+            tokenizer: tokenizer,
+            eosToken: eosToken
+          )
+        }
+      }
+
+      @Test
+      func `Keeps Strings Nested Inside Container Arguments Quoted`() throws {
+        let tokenizer = try testTokenizer()
+        let compiler = try makeGenericXGRCompiler(tokenizer: tokenizer)
+        let eosToken = try requiredTestEOSToken(tokenizer: tokenizer)
+        let tool = EdgeToolDefinition(
+          name: "routingTool",
+          description: "Accepts an object argument.",
+          arguments: EdgeToolsGenerationSchema(
+            .type(.object),
+            .properties([
+              "routing": EdgeToolsGenerationSchema(
+                .type(.object),
+                .properties(["region": .string]),
+                .required(["region"]),
+                .additionalProperties(false)
+              )
+            ]),
+            .required(["routing"]),
+            .additionalProperties(false)
+          )
         )
+        let grammar = try XGRGrammar.miniCPM5(tools: [tool], range: .exact(1))
+        let call = { (value: String) in
+          #"<function name="routingTool"><param name="routing">\#(value)</param></function>"#
+        }
+
         assertGrammarAccepts(
-          #"<function name="booleanTool"><param name="value">true</param></function>"#,
-          matcher: try compiler.makeMatcher(booleanGrammar),
+          call(#"{"region":"us-west"}"#),
+          matcher: try compiler.makeMatcher(grammar),
           tokenizer: tokenizer,
           eosToken: eosToken
         )
         assertGrammarRejects(
-          #"<function name="booleanTool"><param name="value">"true"</param></function>"#,
-          matcher: try compiler.makeMatcher(booleanGrammar),
+          call("{region:us-west}"),
+          matcher: try compiler.makeMatcher(grammar),
           tokenizer: tokenizer,
           eosToken: eosToken
         )

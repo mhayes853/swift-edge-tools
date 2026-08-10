@@ -65,7 +65,7 @@ struct `GrammarBitmaskAllPlatforms tests` {
     @Suite
     struct `ApplyBitmask tests` {
       #if MLX && canImport(MLX)
-        @Test(.enabledIfXcode())
+        @Test(.enabledIfMLXTests())
         func `MLX Filters Masked Tokens`() {
           let mask = Self.mask()
           let initialLogits = MLXArray((0..<64).map(Float.init))

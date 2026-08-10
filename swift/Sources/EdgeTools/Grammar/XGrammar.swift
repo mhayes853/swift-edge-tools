@@ -271,6 +271,19 @@
       self.rules.map { "\($0.name) ::= \($0.body)" }.joined(separator: "\n")
     }
 
+    var ruleReferences: [String: [String]] {
+      self.ruleContents { body, token in
+        token.kind == .identifier ? String(body[token.range]) : nil
+      }
+    }
+
+    var ruleLiterals: [String: [String]] {
+      self.ruleContents { body, token in
+        guard token.kind == .literal else { return nil }
+        return Self.decodeLiteral(body[token.range].dropFirst().dropLast())
+      }
+    }
+
     mutating func removeDuplicateRules() {
       while true {
         let orderedRules = self.rules.sorted { lhs, _ in lhs.name == "root" }
@@ -359,6 +372,17 @@
       }
       output.append(contentsOf: source[outputStart...])
       return output
+    }
+
+    private func ruleContents(
+      _ transform: (_ body: String, _ token: EBNFToken) -> String?
+    ) -> [String: [String]] {
+      Dictionary(
+        self.rules.map { rule in
+          (rule.name, rule.body.ebnfTokens.compactMap { transform(rule.body, $0) })
+        },
+        uniquingKeysWith: +
+      )
     }
 
     private static func decodeLiteral(_ literal: Substring) -> String {

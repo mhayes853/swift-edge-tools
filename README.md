@@ -3,6 +3,60 @@
 A Swift runtime for local model tool calling, with built-in support for
 [Cactus Needle](https://github.com/cactus-compute/needle).
 
+## The `edge` CLI
+
+`edge` runs a prompt against a model and reports what it generated, which tool calls it
+made, and how fast it did so. It never invokes tools — it reports the calls the model
+produced.
+
+```sh
+source ./setup.sh
+```
+
+This builds `swift/CLI` and puts `edge` on your `PATH` for the current shell.
+
+```sh
+# a Hugging Face repo, cached under ${HF_HOME:-~/.cache/huggingface}
+edge Cactus-Compute/needle -p "Set a timer for 20 minutes" --tools my_tools.json
+
+# a local directory, such as a fresh export
+edge --path ./exports/needle-onnx-int4 -p "..." --tools my_tools.json
+
+# what model and engines were detected, without running anything
+edge info Cactus-Compute/needle
+
+# distribution of metrics across repeated runs
+edge bench Cactus-Compute/needle -p "..." --repeat-count 20 --warmup 3 --json
+```
+
+The model is detected from `config.json`, and the engine from the weights present in the
+directory (`.safetensors` for MLX, `.onnx`, `.mlmodelc`/`.mlpackage` for CoreML, and
+`.aimodel`/`.aimodelc` for CoreAI). CoreAI is experimental, needs Swift 6.4 to build and
+OS 27 to run, and is never selected automatically — pass `--engine coreai` to use it.
+Needle is currently the only model with a CoreAI export, produced by the Python CLI. MLX runs use the
+GPU by default; pass `--hardware-unit cpu` to run them on the CPU. Hardware-unit names are
+case-insensitive and accept spaces, hyphens, or underscores.
+
+Textual models are detected from `model_type`: Needle, Qwen3, Qwen3.5, LFM2, FunctionGemma,
+Granite, Granite MoE Hybrid and MiniCPM5. MiniCPM5 ships as `model_type: llama`, so it is
+identified by the `<function` markers in its chat template. Qwen3.5 VL, Gemma4, and LFM2.5 VL
+are detected as vision models, and other architectures fall back to generic text or vision MLX
+profiles based on whether a processor configuration is present.
+
+`--tools` accepts OpenAI function-calling JSON. Without it, a built-in five-tool demo set
+(`send_email`, `set_timer`, `search_web`, `create_calendar_event`, `get_weather`) is used,
+covering strings, integers, booleans, enums and arrays. `--grammar` selects the generation
+constraint: `auto` (the model's tool call grammar), `unconstrained`, a grammar file
+(`.ebnf`, `.lark`, `.json`), or an inline `<format>:<value>` such as
+`regex:\d{4}-\d{2}-\d{2}`. A custom grammar replaces the tool call grammar rather than
+composing with it.
+
+Only models whose generate parameters expose a full generation constraint support
+`--grammar` beyond `auto`. Needle exposes only a tool call range, on every engine, so it
+is limited to `--grammar auto` and greedy sampling. Sampling flags override only the values
+specified on the command line; all other values continue to use the model or generation
+configuration defaults.
+
 ## Package Traits
 
 `Foundation` is enabled by default and provides conveniences such as `URL`-based model
