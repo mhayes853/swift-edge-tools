@@ -1,8 +1,8 @@
-swift/Sources/CXGrammar/include/dlpack/** linguist-vendored
-swift/Sources/CXGrammar/include/picojson/** linguist-vendored
-swift/Sources/COnnxRuntime/include/coreml_provider_factory.h linguist-vendored
-swift/Sources/COnnxRuntime/include/onnxruntime_c_api.h linguist-vendored
-swift/Sources/COnnxRuntime/include/onnxruntime_ep_c_api.h linguist-vendored
+swift/EdgeTools/Sources/CXGrammar/include/dlpack/** linguist-vendored
+swift/EdgeTools/Sources/CXGrammar/include/picojson/** linguist-vendored
+swift/EdgeTools/Sources/COnnxRuntime/include/coreml_provider_factory.h linguist-vendored
+swift/EdgeTools/Sources/COnnxRuntime/include/onnxruntime_c_api.h linguist-vendored
+swift/EdgeTools/Sources/COnnxRuntime/include/onnxruntime_ep_c_api.h linguist-vendored
 bin/*.artifactbundle.zip filter=lfs diff=lfs merge=lfs -text
 bin/onnxruntime-webgpu-1.27.0.artifactbundle.zip filter=lfs diff=lfs merge=lfs -text
 patches/**/*.patch text eol=lf

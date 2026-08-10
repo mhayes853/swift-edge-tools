@@ -1,3 +1,3 @@
 [submodule "swift/Sources/CXGrammar/xgrammar"]
-	path = swift/Sources/CXGrammar/xgrammar
+	path = swift/EdgeTools/Sources/CXGrammar/xgrammar
 	url = https://github.com/mlc-ai/xgrammar.git

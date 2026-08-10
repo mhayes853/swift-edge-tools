@@ -123,7 +123,7 @@ let package = Package(
           )
         )
       ],
-      path: "swift/Sources/EdgeTools",
+      path: "swift/EdgeTools/Sources/EdgeTools",
       swiftSettings: [
         .enableExperimentalFeature("Lifetimes"),
         .enableExperimentalFeature("AddressableTypes")
@@ -132,12 +132,12 @@ let package = Package(
     ),
     .target(
       name: "_EdgeToolsFoundation",
-      path: "swift/Sources/_EdgeToolsFoundation"
+      path: "swift/EdgeTools/Sources/_EdgeToolsFoundation"
     ),
     .target(
       name: "EdgeToolsXGrammar",
       dependencies: ["CXGrammar"],
-      path: "swift/Sources/EdgeToolsXGrammar"
+      path: "swift/EdgeTools/Sources/EdgeToolsXGrammar"
     ),
     .target(
       name: "COnnxRuntime",
@@ -151,7 +151,7 @@ let package = Package(
           condition: .when(platforms: [.linux, .android], traits: ["ONNX"])
         )
       ],
-      path: "swift/Sources/COnnxRuntime",
+      path: "swift/EdgeTools/Sources/COnnxRuntime",
       exclude: ["LICENSE"],
       publicHeadersPath: "include"
     ),
@@ -166,7 +166,7 @@ let package = Package(
     ),
     .target(
       name: "CXGrammar",
-      path: "swift/Sources/CXGrammar",
+      path: "swift/EdgeTools/Sources/CXGrammar",
       sources: ["bridging.cc"],
       publicHeadersPath: "include",
       cxxSettings: [
@@ -184,7 +184,7 @@ let package = Package(
       ],
       plugins: [.plugin(name: "PatchPlugin")]
     ),
-    .plugin(name: "PatchPlugin", capability: .buildTool(), path: "swift/Plugins/PatchPlugin"),
+    .plugin(name: "PatchPlugin", capability: .buildTool(), path: "swift/EdgeTools/Plugins/PatchPlugin"),
     .macro(
       name: "EdgeToolsMacros",
       dependencies: [
@@ -195,14 +195,14 @@ let package = Package(
         .product(name: "SwiftParser", package: "swift-syntax"),
         .product(name: "SwiftDiagnostics", package: "swift-syntax")
       ],
-      path: "swift/Sources/EdgeToolsMacros"
+      path: "swift/EdgeTools/Sources/EdgeToolsMacros"
     ),
     .testTarget(
       name: "EdgeToolsMacrosTests",
       dependencies: [
         "EdgeToolsMacros", .product(name: "MacroTesting", package: "swift-macro-testing")
       ],
-      path: "swift/Tests/EdgeToolsMacrosTests"
+      path: "swift/EdgeTools/Tests/EdgeToolsMacrosTests"
     ),
     .testTarget(
       name: "EdgeToolsTests",
@@ -216,7 +216,7 @@ let package = Package(
         .product(name: "CustomDump", package: "swift-custom-dump"),
         .product(name: "Hub", package: "swift-transformers", condition: .when(traits: ["MLX"]))
       ],
-      path: "swift/Tests/EdgeToolsTests",
+      path: "swift/EdgeTools/Tests/EdgeToolsTests",
       exclude: [
         "GenerationSchema/__Snapshots__",
         "Models/Needle/Engines/__Snapshots__",
