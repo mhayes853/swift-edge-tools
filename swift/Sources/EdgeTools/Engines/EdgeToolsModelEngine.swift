@@ -40,7 +40,7 @@
     associatedtype GenerateParameters: EdgeToolsEngineGenerateParameters
     associatedtype GenerationParser: EdgeToolsGenerationParser
     associatedtype GrammarContext = Void
-    associatedtype GrammarCompiler: EdgeToolsGrammarCompiler, ~Copyable
+    associatedtype GrammarCompiler: EdgeToolsGrammarCompiler
     where GrammarCompiler.Context == GrammarContext
 
     var vocabularySize: Int { get }
@@ -267,7 +267,7 @@
         generatedTokens.last.map({ !stopTokenIds.contains($0.id) }) ?? true
       {
         try Task.checkCancellation()
-        bitmask = matcher.bitmask()
+        bitmask = matcher.grammarBitmask()
       }
 
       while let currentBitmask = bitmask {
@@ -301,7 +301,7 @@
           generatedTokens.last.map({ !stopTokenIds.contains($0.id) }) ?? true
         {
           try Task.checkCancellation()
-          bitmask = matcher.bitmask()
+          bitmask = matcher.grammarBitmask()
         }
       }
 

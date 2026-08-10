@@ -30,7 +30,7 @@
     associatedtype GenerateParameters: MLXGenerateParameters
     associatedtype GenerationParser: EdgeToolsGenerationParser
     associatedtype GrammarContext = Void
-    associatedtype GrammarCompiler: EdgeToolsGrammarCompiler, ~Copyable
+    associatedtype GrammarCompiler: EdgeToolsGrammarCompiler
     where GrammarCompiler.Context == GrammarContext
 
     static var extraStopTokens: Set<String> { get }

@@ -1,9 +1,9 @@
 // MARK: - EdgeToolsGrammarMatcher
 
-public protocol EdgeToolsGrammarMatcher: ~Copyable {
+public protocol EdgeToolsGrammarMatcher {
   var isTerminated: Bool { get }
 
-  mutating func bitmask() -> GrammarBitmask
+  mutating func grammarBitmask() -> GrammarBitmask
 
   @discardableResult
   mutating func accept(tokenId: EdgeToolsToken.ID) -> Bool
@@ -11,10 +11,10 @@ public protocol EdgeToolsGrammarMatcher: ~Copyable {
 
 // MARK: - EdgeToolsGrammarCompiler
 
-public protocol EdgeToolsGrammarCompiler: ~Copyable {
+public protocol EdgeToolsGrammarCompiler {
   associatedtype Grammar: Sendable
   associatedtype Context = Void
-  associatedtype Matcher: EdgeToolsGrammarMatcher, ~Copyable
+  associatedtype Matcher: EdgeToolsGrammarMatcher
 
   mutating func matcher(
     for grammar: Grammar,

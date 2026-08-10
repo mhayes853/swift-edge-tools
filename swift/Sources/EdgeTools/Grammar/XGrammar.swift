@@ -80,11 +80,7 @@
     }
   }
 
-  extension XGRMatcher: EdgeToolsGrammarMatcher {
-    public mutating func bitmask() -> GrammarBitmask {
-      self.grammarBitmask()
-    }
-  }
+  extension XGRMatcher: EdgeToolsGrammarMatcher {}
 
   // MARK: - Grammar Context
 
@@ -99,7 +95,7 @@
 
     fileprivate func matcher(
       for grammar: XGRGrammar,
-      compiler: borrowing XGRCompiler,
+      compiler: XGRCompiler,
       stopTokenIds: Set<EdgeToolsToken.ID>
     ) throws -> XGRMatcher {
       let matcher = try self.matcherPool.matcher(
@@ -540,20 +536,8 @@
   // MARK: - Matcher Pool
 
   final class XGRToolCallMatcherPool {
-    private final class CachedMatcher {
-      private let matcher: XGRMatcher
-
-      init(_ matcher: consuming XGRMatcher) {
-        self.matcher = consume matcher
-      }
-
-      func fork() -> XGRMatcher {
-        self.matcher.fork()
-      }
-    }
-
     private let maxCount: Int
-    private var entries = [String: CachedMatcher]()
+    private var entries = [String: XGRMatcher]()
     private var order = [String]()
 
     init(maxCount: Int = 8) {
@@ -562,7 +546,7 @@
 
     func matcher(
       grammar: XGRGrammar,
-      compilingWith compiler: borrowing XGRCompiler,
+      compilingWith compiler: XGRCompiler,
       stopTokenIds: Set<EdgeToolsToken.ID>
     ) throws -> XGRMatcher {
       let sortedStopTokenIds = stopTokenIds.sorted()
@@ -591,16 +575,15 @@
 
     private func insert(
       _ key: String,
-      matcher: consuming XGRMatcher
+      matcher: XGRMatcher
     ) -> XGRMatcher {
-      let cached = CachedMatcher(consume matcher)
       if self.entries.count >= self.maxCount, let leastRecentlyUsed = self.order.first {
         self.entries.removeValue(forKey: leastRecentlyUsed)
         self.order.removeFirst()
       }
-      self.entries[key] = cached
+      self.entries[key] = matcher
       self.order.append(key)
-      return cached.fork()
+      return matcher.fork()
     }
   }
 

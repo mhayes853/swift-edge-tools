@@ -63,12 +63,11 @@ extension GrammarBitmask: RandomAccessCollection {}
 // MARK: - MLX
 
 #if MLX && canImport(MLX)
-  public final class MLXBitmaskProcessor<Matcher: ~Copyable>: LogitProcessor
-  where Matcher: EdgeToolsGrammarMatcher {
+  public final class MLXBitmaskProcessor<Matcher: EdgeToolsGrammarMatcher>: LogitProcessor {
     public private(set) var matcher: Matcher
 
-    public init(matcher: consuming Matcher) {
-      self.matcher = consume matcher
+    public init(matcher: Matcher) {
+      self.matcher = matcher
     }
 
     public func prompt(_ prompt: MLXArray) {}
@@ -80,7 +79,7 @@ extension GrammarBitmask: RandomAccessCollection {}
 
     public func process(logits: MLXArray) -> MLXArray {
       guard !self.matcher.isTerminated else { return logits }
-      return applyBitmaskMLX(logits: logits, mask: self.matcher.bitmask())
+      return applyBitmaskMLX(logits: logits, mask: self.matcher.grammarBitmask())
     }
   }
 #endif
