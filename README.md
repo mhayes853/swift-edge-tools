@@ -30,12 +30,10 @@ edge bench Cactus-Compute/needle -p "..." --repeat-count 20 --warmup 3 --json
 ```
 
 The model is detected from `config.json`, and the engine from the weights present in the
-directory (`.safetensors` for MLX, `.onnx`, `.mlmodelc`/`.mlpackage` for CoreML, and
-`.aimodel`/`.aimodelc` for CoreAI). CoreAI is experimental, needs Swift 6.4 to build and
-OS 27 to run, and is never selected automatically — pass `--engine coreai` to use it.
-Needle is currently the only model with a CoreAI export, produced by the Python CLI. MLX runs use the
-GPU by default; pass `--hardware-unit cpu` to run them on the CPU. Hardware-unit names are
-case-insensitive and accept spaces, hyphens, or underscores.
+directory (`.safetensors` for MLX and `.onnx` for ONNX). If both are present, Apple
+platforms prefer MLX and other platforms prefer ONNX. An explicit `--engine` always wins.
+MLX runs use the GPU by default; pass `--hardware-unit cpu` to run them on the CPU.
+Hardware-unit names are case-insensitive and accept spaces, hyphens, or underscores.
 
 Textual models are detected from `model_type`: Needle, Qwen3, Qwen3.5, LFM2, FunctionGemma,
 Granite, Granite MoE Hybrid and MiniCPM5. MiniCPM5 ships as `model_type: llama`, so it is
@@ -63,7 +61,7 @@ configuration defaults.
 loading and Foundation `Codable` integrations. When `Foundation` is enabled, model and
 tokenizer loading use Foundation's file I/O facilities.
 
-The `MLX`, `CoreML`, `CoreAI`, `Transformers`, and `FoundationModels` traits enable
+The `MLX`, `Transformers`, and `FoundationModels` traits enable
 `Foundation` automatically. Foundation can also be enabled independently:
 
 ```sh
@@ -86,8 +84,6 @@ let modelURL = try await NeedleMLX.download(from: .cactusNeedleMLXHuggingFace) {
 let model = try NeedleMLX(from: modelURL)
 let model = try NeedleONNX(from: modelURL)
 let model = try NeedleCactus(from: modelURL)
-let model = try NeedleCoreML(from: modelURL)
-let model = try NeedleCoreAI(from: modelURL) // WWDC Rumors
 
 let toolDefinition = EdgeToolDefinition(
   name: "get_weather",

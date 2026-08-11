@@ -2,25 +2,19 @@
   import Accelerate
 #endif
 
-#if swift(>=6.4) && CoreAI && canImport(CoreAI)
-  import CoreAI
-#endif
-
-#if CoreML && canImport(CoreML)
-  import CoreML
-#endif
-
 // MARK: - EdgeToolsSampler
 
 public struct EdgeToolsSampler<Logits: ~Copyable & ~Escapable> {
-  private let body: nonisolated(nonsending) (
-    borrowing Logits
-  ) async throws -> EdgeToolsToken.ID
-
-  public init(
-    _ body: nonisolated(nonsending) @escaping (
+  private let body:
+    nonisolated(nonsending) (
       borrowing Logits
     ) async throws -> EdgeToolsToken.ID
+
+  public init(
+    _ body:
+      nonisolated(nonsending) @escaping (
+        borrowing Logits
+      ) async throws -> EdgeToolsToken.ID
   ) {
     self.body = body
   }
@@ -245,43 +239,6 @@ func argmaxScalar(
     public static var argmax: Self {
       EdgeToolsSampler { logits in
         logits.span.withUnsafeBufferPointer { argmaxContiguous($0) }
-      }
-    }
-  }
-#endif
-
-// MARK: - Core AI
-
-#if swift(>=6.4) && CoreAI && canImport(CoreAI)
-  @available(anyAppleOS 27.0, *)
-  extension EdgeToolsSampler where Logits == NDArray {
-    public static var argmax: Self {
-      EdgeToolsSampler { logits in
-        let view = logits.view(as: Float.self)
-        let vocabularySize = view.shape[1]
-        guard vocabularySize > 0 else { return 0 }
-
-        if view.isContiguous {
-          return view.withUnsafePointer { pointer, _, _ in
-            argmaxContiguous(UnsafeBufferPointer(start: pointer, count: vocabularySize))
-          }
-        } else {
-          return argmaxScalar(count: vocabularySize) { view[scalarAt: [0, $0]] }
-        }
-      }
-    }
-  }
-#endif
-
-// MARK: - Core ML
-
-#if CoreML && canImport(CoreML)
-  @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-  extension EdgeToolsSampler where Logits == MLTensor {
-    public static var argmax: Self {
-      EdgeToolsSampler { logits in
-        let indices = await logits.argmax(alongAxis: 1).shapedArray(of: Int32.self).scalars
-        return EdgeToolsToken.ID(indices.first ?? 0)
       }
     }
   }

@@ -38,9 +38,6 @@ extension LoadedModel {
       configuration.engine,
       configuration.hardwareUnit
     )
-    if runner.engine.isExperimental {
-      onWarning("the \(runner.engine.rawValue) engine is experimental.")
-    }
     return Self(
       detection: detection,
       runner: runner,

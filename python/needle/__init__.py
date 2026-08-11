@@ -5,20 +5,8 @@ that importing the core model never pulls in an optional runtime dependency.
 """
 
 from .cache_layout import (
-    cross_attention_state_shape,
-    decoder_state_names,
-    decoder_state_shape,
     empty_decoder_caches,
     explicit_cache_shape,
-    self_attention_state_shape,
-)
-from .decoder_strategy import (
-    ActiveCacheStrategy,
-    AttentionImplementation,
-    CacheLayout,
-    CacheOutput,
-    CrossAttentionStorage,
-    DecoderExportStrategy,
 )
 from .json import JSONObject, JSONScalar, JSONValue
 from .needle_configuration import NeedleModelConfiguation
@@ -32,12 +20,6 @@ from .torch_utils import (
 )
 
 __all__ = [
-    "ActiveCacheStrategy",
-    "AttentionImplementation",
-    "CacheLayout",
-    "CacheOutput",
-    "CrossAttentionStorage",
-    "DecoderExportStrategy",
     "JSONObject",
     "JSONScalar",
     "JSONValue",
@@ -46,14 +28,10 @@ __all__ = [
     "NeedleEncoder",
     "NeedleModelConfiguation",
     "StateDictPayload",
-    "cross_attention_state_shape",
-    "decoder_state_names",
-    "decoder_state_shape",
     "empty_decoder_caches",
     "explicit_cache_shape",
     "extract_state_dict",
     "load_state_dict",
     "normalize_state_dict",
-    "self_attention_state_shape",
     "torch_dtype",
 ]

@@ -37,17 +37,4 @@ struct `EngineRunner tests` {
     expectNoDifference(runner.engine, .onnx)
   }
 
-  @Test
-  func `Initializer Does Not Default To An Experimental Engine`() async {
-    let detection = ModelDetection(
-      directory: URL(fileURLWithPath: "/models/needle"),
-      model: .needle,
-      engines: [.coreai],
-      files: ["model.aimodel"]
-    )
-
-    await #expect(throws: EdgeCLIError.self) {
-      try await EngineRunner(detection: detection)
-    }
-  }
 }

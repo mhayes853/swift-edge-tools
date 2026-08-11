@@ -13,7 +13,7 @@ from onnxruntime.quantization.onnx_model import ONNXModel
 from onnxruntime.quantization.quant_utils import QuantFormat
 
 ONNXModelComponent = Literal["encoder", "decoder"]
-ONNXQuantizationBits = Literal[4, 8]
+ONNXQuantizationBits = Literal[4]
 
 
 class ONNXCompressor(Protocol):
@@ -32,16 +32,12 @@ class MatMulNBitsONNXCompressor:
     bits: ONNXQuantizationBits
 
     def __post_init__(self) -> None:
-        if self.bits not in (4, 8):
-            raise ValueError("MatMulNBits quantization supports only 4 or 8 bits")
+        if self.bits != 4:
+            raise ValueError("MatMulNBits quantization supports only 4 bits")
 
     @classmethod
     def int4(cls) -> MatMulNBitsONNXCompressor:
         return cls(bits=4)
-
-    @classmethod
-    def int8(cls) -> MatMulNBitsONNXCompressor:
-        return cls(bits=8)
 
     def compress(
         self,

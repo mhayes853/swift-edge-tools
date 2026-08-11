@@ -5,13 +5,10 @@ description = ""
 requires-python = ">=3.9"
 dependencies = [
   "torch==2.11.0",
-  "coreai-opt>=0.2.1; sys_platform == 'darwin'",
-  "coreai-torch==0.4.1; sys_platform == 'darwin'",
   "huggingface_hub>=1.21.0",
   "onnx>=1.16.0",
   "onnxruntime>=1.23.2",
   "onnxscript>=0.5.0",
-  "PyYAML>=6.0",
   "safetensors>=0.6.2",
 ]
 
@@ -25,7 +22,7 @@ package-dir = { needle = "needle" }
 py-modules = ["cli"]
 
 [project.scripts]
-needle-coreai-export = "cli:main"
+needle-export = "cli:main"
 
 [tool.mypy]
 python_version = "3.12"

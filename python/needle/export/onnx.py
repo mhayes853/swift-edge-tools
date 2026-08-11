@@ -10,7 +10,6 @@ from onnxruntime.transformers.fusion_options import FusionOptions
 from onnxruntime.transformers.optimizer import optimize_model
 
 from ..cache_layout import empty_decoder_caches
-from ..decoder_strategy import DecoderExportStrategy
 from ..needle_configuration import NeedleModelConfiguation
 from ..needle_torch import Needle
 from . import helpers
@@ -23,7 +22,6 @@ def export_needle_onnx(
     *,
     compressor: ONNXCompressor | None = None,
     dtype: str = "float32",
-    decoder_strategy: DecoderExportStrategy | None = None,
     opset_version: int = 21,
     external_data: bool = True,
 ) -> Path:
@@ -35,7 +33,6 @@ def export_needle_onnx(
     needle = helpers.load_needle_model(
         export_configuration,
         source_files.weights_path,
-        decoder_strategy=decoder_strategy or DecoderExportStrategy.onnx(),
     )
     convert_needle_onnx_models(
         needle,
@@ -93,11 +90,7 @@ def convert_needle_onnx_models(
             configuration.encoder_max_length,
         ),
     )
-    decoder_spec = helpers.decoder_export_spec(
-        configuration,
-        needle.decoder.strategy,
-        dynamic_buffers=True,
-    )
+    decoder_spec = helpers.decoder_export_spec(configuration)
     decoder_sample = (
         *helpers.sample_decoder_inputs(needle, configuration),
         *empty_decoder_caches(configuration, dtype=next(needle.parameters()).dtype),

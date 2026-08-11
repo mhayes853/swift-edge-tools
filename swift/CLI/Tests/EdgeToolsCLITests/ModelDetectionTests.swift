@@ -63,14 +63,8 @@ struct `ModelDetection tests` {
   }
 
   @Test(arguments: [
-    ("coreml", EngineKind.coreml),
-    ("Core ML", .coreml),
-    ("core-ml", .coreml),
-    ("CORE_AI", .coreai),
-    ("Core AI", .coreai),
-    ("core-ai", .coreai),
-    ("MLX", .mlx),
-    ("OnNx", .onnx)
+    ("MLX", EngineKind.mlx),
+    ("OnNx", EngineKind.onnx)
   ])
   func `Parses Case Insensitive Engine Names`(argument: String, expected: EngineKind) {
     expectNoDifference(EngineKind(argument: argument), expected)
@@ -181,32 +175,16 @@ struct `ModelDetection tests` {
   }
 
   @Test
-  func `Detects CoreAI Weights But Never Defaults To Them`() throws {
-    let directory = try temporaryModel(
-      configuration: """
-        {"num_encoder_layers": 4, "num_decoder_layers": 4, "decoder_start_token_id": 1}
-        """,
-      files: ["encoder.aimodel", "decoder.aimodel"]
+  func `Prioritizes MLX On Apple And ONNX Elsewhere`() {
+    let detection = ModelDetection(
+      directory: URL(fileURLWithPath: "/models/needle"),
+      model: .needle,
+      engines: [.mlx, .onnx],
+      files: ["model.safetensors", "encoder.onnx", "decoder.onnx"]
     )
-    let detection = try ModelDetection.detect(in: directory)
 
-    expectNoDifference(detection.engines, EngineKind.coreai.isAvailable ? [.coreai] : [])
-    expectNoDifference(detection.defaultEngine, nil)
-  }
-
-  @Test
-  func `Prefers A Stable Engine Over An Experimental One`() throws {
-    let directory = try temporaryModel(
-      configuration: """
-        {"num_encoder_layers": 4, "num_decoder_layers": 4, "decoder_start_token_id": 1}
-        """,
-      files: ["model.safetensors", "encoder.aimodelc", "decoder.aimodelc"]
-    )
-    let detection = try ModelDetection.detect(in: directory)
-
-    let expectedEngines = [EngineKind.mlx, .coreai].filter(\.isAvailable)
-    expectNoDifference(detection.engines, expectedEngines)
-    expectNoDifference(detection.defaultEngine, EngineKind.mlx.isAvailable ? .mlx : nil)
+    expectNoDifference(detection.defaultEngine(for: .apple), .mlx)
+    expectNoDifference(detection.defaultEngine(for: .nonApple), .onnx)
   }
 
   @Test

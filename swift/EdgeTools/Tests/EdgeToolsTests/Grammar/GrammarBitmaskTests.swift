@@ -5,12 +5,6 @@ import Testing
 #if MLX && canImport(MLX)
   import MLX
 #endif
-#if CoreML && canImport(CoreML)
-  import CoreML
-#endif
-#if swift(>=6.4) && CoreAI && canImport(CoreAI)
-  import CoreAI
-#endif
 
 @Suite
 struct `GrammarBitmaskAllPlatforms tests` {
@@ -79,21 +73,6 @@ struct `GrammarBitmaskAllPlatforms tests` {
         }
       #endif
 
-      #if CoreML && canImport(CoreML)
-        @Test
-        @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-        func `Core ML Filters Masked Tokens`() async {
-          let mask = Self.mask()
-          let initialLogits = MLTensor(shape: [1, 64], scalars: (0..<64).map(Float.init))
-          let logits = await applyBitmaskCoreML(logits: initialLogits, mask: mask)
-            .shapedArray(of: Float.self)
-          let filtered = (0..<64)
-            .filter { logits[scalarAt: [0, $0]] == -.infinity }
-
-          expectNoDifference(filtered, Self.expectedIndices)
-        }
-      #endif
-
       #if ONNXCore
         @Test
         func `ONNX Filters Masked Tokens`() {
@@ -105,23 +84,6 @@ struct `GrammarBitmaskAllPlatforms tests` {
           }
           let filtered = (0..<logits.count)
             .filter { logits[$0] == -.infinity }
-
-          expectNoDifference(filtered, Self.expectedIndices)
-        }
-      #endif
-
-      #if swift(>=6.4) && CoreAI && canImport(CoreAI)
-        @Test
-        @available(anyAppleOS 27.0, *)
-        func `Core AI Filters Masked Tokens`() {
-          let mask = Self.mask()
-          var initialLogits = NDArray(scalars: (0..<64).map(Float.init), shape: [1, 64])
-          let logits = applyBitmask(logits: &initialLogits, mask: mask)
-          let view = logits.view(as: Float.self)
-          let filtered = (0..<64)
-            .compactMap { index in
-              view[scalarAt: [0, index]] == -.infinity ? index : nil
-            }
 
           expectNoDifference(filtered, Self.expectedIndices)
         }

@@ -32,16 +32,6 @@ let package = Package(
       enabledTraits: ["Transformers", "Foundation", "Atomics"]
     ),
     .trait(
-      name: "CoreAI",
-      description: "CoreAI model support (experimental).",
-      enabledTraits: ["XGrammar", "Foundation", "Atomics"]
-    ),
-    .trait(
-      name: "CoreML",
-      description: "CoreML model support.",
-      enabledTraits: ["XGrammar", "Foundation", "Atomics"]
-    ),
-    .trait(
       name: "ONNXCore",
       description: """
         Needle ONNX model and runtime-provider protocols.

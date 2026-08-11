@@ -70,20 +70,10 @@ struct `RunAction tests` {
     }
 
     expectNoDifference(loads.value, 0)
-    expectNoDifference(try #require(error).description, "--hardware-unit only applies to the mlx engine.")
-  }
-
-  @Test
-  func `Throws Rather Than Selecting An Experimental Engine`() async throws {
-    let error = await #expect(throws: EdgeCLIError.self) {
-      try await runModel(
-        context: .stub(engines: [.coreai]),
-        source: .test(),
-        request: GenerationRequest(user: "hello")
-      )
-    }
-
-    expectNoDifference(try #require(error).description.contains("--engine: coreai"), true)
+    expectNoDifference(
+      try #require(error).description,
+      "--hardware-unit only applies to the mlx engine."
+    )
   }
 
   @Test

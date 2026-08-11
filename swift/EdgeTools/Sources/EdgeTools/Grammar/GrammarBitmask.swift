@@ -7,14 +7,6 @@
   import MLXLMCommon
 #endif
 
-#if CoreML && canImport(CoreML)
-  import CoreML
-#endif
-
-#if swift(>=6.4) && CoreAI && canImport(CoreAI)
-  import CoreAI
-#endif
-
 // MARK: - GrammarBitmask
 
 public struct GrammarBitmask: Hashable, Sendable {
@@ -98,58 +90,6 @@ extension GrammarBitmask: RandomAccessCollection {}
     return logits[0..., 0..<vocabularySize]
       + table[mask].flattened(start: -2)[0..., 0..<vocabularySize]
   }
-#endif
-
-// MARK: - Core ML
-
-#if CoreML && canImport(CoreML)
-  @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-  public func applyBitmaskCoreML(logits: MLTensor, mask: GrammarBitmask) -> MLTensor {
-    let vocabularySize = logits.shape[1]
-    validateBitmaskCoverage(mask: mask, vocabularySize: vocabularySize)
-    let maskTensor = mask.storage.withUnsafeBytes { bytes in
-      let scalars = bytes.bindMemory(to: UInt8.self)
-        .flatMap { bitmaskTable[(Int($0) * 8)..<(Int($0) * 8 + 8)] }
-      return MLTensor(shape: [1, vocabularySize], scalars: Array(scalars.prefix(vocabularySize)))
-    }
-    return logits + maskTensor
-  }
-#endif
-
-// MARK: - Core AI
-
-#if swift(>=6.4) && CoreAI && canImport(CoreAI)
-  @discardableResult
-  @available(anyAppleOS 27.0, *)
-  public func applyBitmask(logits: inout NDArray, mask: GrammarBitmask) -> NDArray {
-    var logitsView = logits.mutableView(as: Float.self)
-    let rowCount = logitsView.shape[0]
-    let vocabularySize = logitsView.shape[1]
-    validateBitmaskCoverage(mask: mask, vocabularySize: vocabularySize)
-    if logitsView.isContiguous {
-      logitsView.withUnsafeMutablePointer { logitsPointer, _, _ in
-        for rowIndex in 0..<rowCount {
-          var logits = MutableSpan(
-            _unsafeStart: logitsPointer.advanced(by: rowIndex * vocabularySize),
-            count: vocabularySize
-          )
-          applyBitmask(logits: &logits, mask: mask)
-        }
-      }
-    } else {
-      mask.storage.withUnsafeBytes { bytes in
-        let maskBytes = bytes.bindMemory(to: UInt8.self)
-        for rowIndex in 0..<rowCount {
-          for columnIndex in 0..<vocabularySize {
-            let value = bitmaskValue(maskBytes: maskBytes, index: columnIndex)
-            logitsView[scalarAt: [rowIndex, columnIndex]] += value
-          }
-        }
-      }
-    }
-    return logits
-  }
-
 #endif
 
 // MARK: - Contiguous Storage
