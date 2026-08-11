@@ -38,6 +38,27 @@
 
       expectNoDifference(prefill.metrics.tokens, 4)
     }
+
+    @Test
+    func `Successful Generation Commits Its Prefill`() async throws {
+      let generatedTokenId: EdgeToolsToken.ID = 42
+      let engine = try makePrefillTestEngine(
+        LLMPrefillTestProfile.self,
+        sampleTokenId: generatedTokenId
+      )
+      let context = engine.context()
+      context.transcript = .tokens([10, 11, 12])
+      _ = try await engine.prefill(context: context)
+
+      context.transcript = .tokens([10, 11, 12, 13, 14])
+      let firstGeneration = try await generate(using: engine, context: context)
+      expectNoDifference(firstGeneration.prefillMetrics.tokens, 2)
+
+      context.transcript = .tokens([10, 11, 12, 13, 14, generatedTokenId, 15])
+      let secondGeneration = try await generate(using: engine, context: context)
+
+      expectNoDifference(secondGeneration.prefillMetrics.tokens, 1)
+    }
   }
 
   #if canImport(CoreImage) && canImport(MLXVLM)
@@ -82,6 +103,20 @@
       processor: (any UserInputProcessor)?
     ) async throws -> LMInput {
       LMInput(tokens: MLXArray(prompt.prefillTestTokenIds))
+    }
+
+    static func prefillInput(
+      prompt: EdgeToolsTranscript,
+      tools: [EdgeToolDefinition],
+      tokenizer: any EdgeToolsTokenizer,
+      processor: (any UserInputProcessor)?
+    ) async throws -> LMInput {
+      try await self.input(
+        prompt: prompt,
+        tools: tools,
+        tokenizer: tokenizer,
+        processor: processor
+      )
     }
   }
 
@@ -154,12 +189,12 @@
   }
 
   private final class PrefillTestLanguageModel: Module, LanguageModel, KVCacheDimensionProvider {
-    let eosTokenId: EdgeToolsToken.ID
+    let sampleTokenId: EdgeToolsToken.ID
     let vocabularySize: Int
     var kvHeads: [Int] { [1] }
 
-    init(eosTokenId: EdgeToolsToken.ID, vocabularySize: Int) {
-      self.eosTokenId = eosTokenId
+    init(sampleTokenId: EdgeToolsToken.ID, vocabularySize: Int) {
+      self.sampleTokenId = sampleTokenId
       self.vocabularySize = vocabularySize
       super.init()
     }
@@ -186,7 +221,7 @@
         count: tokenCount * self.vocabularySize
       )
       for index in 0..<tokenCount {
-        logits[index * self.vocabularySize + self.eosTokenId] = 100
+        logits[index * self.vocabularySize + self.sampleTokenId] = 100
       }
       return MLXArray(logits, [1, tokenCount, self.vocabularySize])
     }
@@ -195,13 +230,14 @@
   // MARK: - Test Helpers
 
   private func makePrefillTestEngine<Profile: MLXModelProfile>(
-    _: Profile.Type
+    _: Profile.Type,
+    sampleTokenId: EdgeToolsToken.ID? = nil
   ) throws -> MLXEngine<Profile> where Profile.Prompt == EdgeToolsTranscript {
     let tokenizer = try testTokenizer()
     let eosTokenId = try requiredTestEOSToken(tokenizer: tokenizer)
     return try MLXEngine<Profile>(
       languageModel: PrefillTestLanguageModel(
-        eosTokenId: eosTokenId,
+        sampleTokenId: sampleTokenId ?? eosTokenId,
         vocabularySize: .needleVocabularySize
       ),
       tokenizer: tokenizer,

@@ -62,6 +62,13 @@
       processor: (any UserInputProcessor)?
     ) async throws -> LMInput
 
+    static nonisolated(nonsending) func prefillInput(
+      prompt: Prompt,
+      tools: [EdgeToolDefinition],
+      tokenizer: any EdgeToolsTokenizer,
+      processor: (any UserInputProcessor)?
+    ) async throws -> LMInput
+
     static func defaultSampling(
       prompt: Prompt,
       parameters: GenerateParameters
@@ -110,6 +117,20 @@
 
     public static func templateContext(prompt: Prompt) -> [String: any Sendable]? {
       nil
+    }
+
+    public static nonisolated(nonsending) func prefillInput(
+      prompt: Prompt,
+      tools: [EdgeToolDefinition],
+      tokenizer: any EdgeToolsTokenizer,
+      processor: (any UserInputProcessor)?
+    ) async throws -> LMInput {
+      try await self.input(
+        prompt: prompt,
+        tools: tools,
+        tokenizer: tokenizer,
+        processor: processor
+      )
     }
   }
 
@@ -231,6 +252,8 @@
 
   // MARK: - MLXContext
 
+  fileprivate final class MLXEngineIdentity: Sendable {}
+
   public final class MLXContext<Profile: MLXModelProfile>: Identifiable, Sendable
   where Profile.Prompt == EdgeToolsTranscript {
     private struct State {
@@ -238,15 +261,16 @@
       var reasoningEffort: EdgeToolsReasoningEffort
       var isResponding = false
       var revision = 0
-      var model: MLXModelState<Profile>?
+      var model: MLXModelState<Profile>
 
       mutating func finish(
         generation: EdgeToolsEngineGeneration?,
         revision: Int,
-        model: sending MLXModelState<Profile>,
-        makeModelState: @Sendable () -> sending MLXModelState<Profile>
+        model: sending MLXModelState<Profile>
       ) {
-        self.model = self.revision == revision ? model : makeModelState()
+        if self.revision == revision {
+          self.model = model
+        }
         if let generation {
           self.transcript.messages.append(.init(generation: generation))
           self.revision += 1
@@ -261,8 +285,13 @@
       let model: MLXModelState<Profile>
     }
 
+    private struct ForkSnapshot {
+      let parameters: MLXContextParameters
+      let model: MLXModelState<Profile>
+    }
+
     private let state: Lock<State>
-    private let makeModelState: @Sendable () -> sending MLXModelState<Profile>
+    fileprivate let engineIdentity: MLXEngineIdentity
     private let observationRegistrar = _ObservationRegistrar()
 
     public var transcript: EdgeToolsTranscript {
@@ -300,10 +329,10 @@
       return self.state.withBorrowedLock { $0.isResponding }
     }
 
-    init(
+    fileprivate init(
       parameters: MLXContextParameters,
       model: sending MLXModelState<Profile>,
-      makeModelState: @escaping @Sendable () -> sending MLXModelState<Profile>
+      engineIdentity: MLXEngineIdentity
     ) {
       self.state = Lock(
         State(
@@ -312,7 +341,24 @@
           model: model
         )
       )
-      self.makeModelState = makeModelState
+      self.engineIdentity = engineIdentity
+    }
+
+    public func fork() -> MLXContext<Profile> {
+      let snapshot = self.state.withBorrowedLock { state in
+        ForkSnapshot(
+          parameters: MLXContextParameters(
+            transcript: state.transcript,
+            reasoningEffort: state.reasoningEffort
+          ),
+          model: state.model.forkedContextState(copyingCache: state.isResponding)
+        )
+      }
+      return MLXContext(
+        parameters: snapshot.parameters,
+        model: snapshot.model,
+        engineIdentity: self.engineIdentity
+      )
     }
 
     func transcript(
@@ -328,9 +374,10 @@
 
     func begin(appending message: EdgeToolsTranscript.UserMessage) throws -> GenerationSnapshot {
       try self.state.withLock { state in
-        guard !state.isResponding, let model = state.model.take() else {
+        guard !state.isResponding else {
           throw EdgeToolsError.contextInUse
         }
+        let model = state.model.forkedContextState(copyingCache: false)
         var transcript = state.transcript
         transcript.messages.append(.user(message))
         var snapshot: GenerationSnapshot!
@@ -353,9 +400,10 @@
 
     func begin() throws -> GenerationSnapshot {
       try self.state.withLock { state in
-        guard !state.isResponding, let model = state.model.take() else {
+        guard !state.isResponding else {
           throw EdgeToolsError.contextInUse
         }
+        let model = state.model.forkedContextState(copyingCache: false)
         var snapshot: GenerationSnapshot!
         self.observationRegistrar.withMutation(of: self, keyPath: \.isResponding) {
           state.isResponding = true
@@ -376,15 +424,14 @@
       revision: Int,
       model: sending MLXModelState<Profile>
     ) {
-      // The compiler cannot track a `sending` parameter through the lock closure. The context
-      // removed its only reference at `begin`, and this method stores the returned value once.
+      // The compiler cannot track a `sending` parameter through the lock closure. This method
+      // stores the generation branch once when its context revision still matches.
       nonisolated(unsafe) let model = model
       self.state.withLock { state in
         state.finish(
           generation: generation,
           revision: revision,
-          model: model,
-          makeModelState: self.makeModelState
+          model: model
         )
       }
       self.observationRegistrar.withMutation(of: self, keyPath: \.transcript) {
@@ -406,11 +453,43 @@
         tokenizer: any EdgeToolsTokenizer,
         processor: (any UserInputProcessor)?
       ) async throws -> LMInput {
+        try self.input(
+          prompt: prompt,
+          tools: tools,
+          tokenizer: tokenizer,
+          addGenerationPrompt: true
+        )
+      }
+
+      public static nonisolated(nonsending) func prefillInput(
+        prompt: EdgeToolsTranscript,
+        tools: [EdgeToolDefinition],
+        tokenizer: any EdgeToolsTokenizer,
+        processor: (any UserInputProcessor)?
+      ) async throws -> LMInput {
+        try self.input(
+          prompt: prompt,
+          tools: tools,
+          tokenizer: tokenizer,
+          addGenerationPrompt: false
+        )
+      }
+
+      private static func input(
+        prompt: EdgeToolsTranscript,
+        tools: [EdgeToolDefinition],
+        tokenizer: any EdgeToolsTokenizer,
+        addGenerationPrompt: Bool
+      ) throws -> LMInput {
         guard let tokenizer = tokenizer as? TransformersTokenizer else {
           throw EdgeToolsError.unsupportedTokenizer
         }
         let tokenIds = try tokenizer.base.applyChatTemplate(
           messages: try prompt.mlxMessages(),
+          chatTemplate: nil,
+          addGenerationPrompt: addGenerationPrompt,
+          truncation: false,
+          maxLength: nil,
           tools: tools.mlxToolSpecs,
           additionalContext: Self.templateContext(prompt: prompt)
         )
@@ -518,6 +597,11 @@
     }
 
   #endif
+
+  private enum MLXInputKind: Equatable {
+    case generation
+    case prefill
+  }
 
   // MARK: - VLM Prompt Conversion
 
@@ -646,43 +730,126 @@
   // MARK: - MLXModelState
 
   public struct MLXModelState<Profile: MLXModelProfile> {
-    private struct CachedPrefill {
+    private final class CachedPrefill {
+      struct Snapshot {
+        let input: LMInput
+        let tokenIds: [EdgeToolsToken.ID]
+        let cache: [any KVCache]
+        let output: LMOutput
+        let context: EdgeToolsLLMPrefillContext?
+      }
+
       let input: LMInput
       let tokenIds: [EdgeToolsToken.ID]
       let cache: [any KVCache]
       let output: LMOutput
       let context: EdgeToolsLLMPrefillContext?
+      let inputKind: MLXInputKind
+      private let copying = Lock(())
+
+      init(
+        input: LMInput,
+        tokenIds: [EdgeToolsToken.ID],
+        cache: [any KVCache],
+        output: LMOutput,
+        context: EdgeToolsLLMPrefillContext?,
+        inputKind: MLXInputKind
+      ) {
+        self.input = input
+        self.tokenIds = tokenIds
+        self.cache = cache
+        self.output = output
+        self.context = context
+        self.inputKind = inputKind
+      }
+
+      func input(
+        for context: EdgeToolsLLMPrefillContext,
+        kind: MLXInputKind
+      ) -> LMInput? {
+        self.context == context && self.inputKind == kind ? self.input : nil
+      }
+
+      func mutableSnapshot(
+        tokenIds: [EdgeToolsToken.ID],
+        input: LMInput,
+        inputContext: EdgeToolsLLMPrefillContext?
+      ) -> Snapshot? {
+        guard tokenIds.starts(with: self.tokenIds),
+          mlxPrefillContextMatches(
+            cachedInput: self.input,
+            input: input,
+            cachedContext: self.context,
+            inputContext: inputContext
+          )
+        else {
+          return nil
+        }
+        return Snapshot(
+          input: self.input,
+          tokenIds: self.tokenIds,
+          cache: self.copiedCache(),
+          output: self.output,
+          context: self.context
+        )
+      }
+
+      func forked(copyingCache: Bool) -> CachedPrefill {
+        guard copyingCache else {
+          return self
+        }
+        let cache = self.copiedCache()
+        eval(cache)
+        return CachedPrefill(
+          input: self.input,
+          tokenIds: self.tokenIds,
+          cache: cache,
+          output: self.output,
+          context: self.context,
+          inputKind: self.inputKind
+        )
+      }
+
+      private func copiedCache() -> [any KVCache] {
+        // The lock closure runs synchronously and exclusively. The local only escapes after the
+        // copy completes, but Swift's isolation checker cannot express that transfer today.
+        nonisolated(unsafe) var copiedCache: [any KVCache]?
+        self.copying.withLock { _ in
+          copiedCache = self.cache.map { $0.copy() }
+        }
+        return copiedCache!
+      }
     }
 
     private struct PrefillCacheState {
       var cachedPrefill: CachedPrefill?
       var inputContext: EdgeToolsLLMPrefillContext?
 
-      mutating func input(for context: EdgeToolsLLMPrefillContext) -> LMInput? {
+      mutating func input(
+        for context: EdgeToolsLLMPrefillContext,
+        kind: MLXInputKind
+      ) -> LMInput? {
         self.inputContext = context
-        guard let cachedPrefill, cachedPrefill.context == context else { return nil }
-        return cachedPrefill.input
+        return self.cachedPrefill?.input(for: context, kind: kind)
       }
 
       mutating func clearInputContext() {
         self.inputContext = nil
       }
 
-      func matches(input: LMInput) -> Bool {
-        mlxPrefillContextMatches(
-          cachedInput: self.cachedPrefill?.input,
-          input: input,
-          cachedContext: self.cachedPrefill?.context,
-          inputContext: self.inputContext
-        )
+      mutating func fork(copyingCache: Bool) {
+        self.cachedPrefill = self.cachedPrefill?.forked(copyingCache: copyingCache)
       }
     }
 
     private struct Generation {
+      let input: LMInput
+      var cachedTokenIds: [EdgeToolsToken.ID]
       var cache: [any KVCache]
       var outputState: LMOutput.State?
       var logits: MLXArray
       var pendingTokenId: EdgeToolsToken.ID?
+      let inputContext: EdgeToolsLLMPrefillContext?
       var processor: (any LogitProcessor)?
       let sampler: any LogitSampler
       let synchronizeStreamForMemorySnapshots: Bool
@@ -751,7 +918,12 @@
       parser: inout Profile.GenerationParser
     ) async throws -> EdgeToolsModelPreparation {
       Profile.prepare(prompt: &prompt, tools: tools, parser: &parser)
-      let input = try await self.input(prompt: prompt, tools: tools, tokenizer: tokenizer)
+      let input = try await self.input(
+        prompt: prompt,
+        tools: tools,
+        tokenizer: tokenizer,
+        kind: .generation
+      )
       let defaultSampling =
         Profile.defaultSampling(prompt: prompt, parameters: parameters)
         ?? self.configuredSampling
@@ -767,7 +939,12 @@
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer
     ) async throws -> [EdgeToolsToken.ID] {
-      let input = try await self.input(prompt: prompt, tools: tools, tokenizer: tokenizer)
+      let input = try await self.input(
+        prompt: prompt,
+        tools: tools,
+        tokenizer: tokenizer,
+        kind: .generation
+      )
       return input.text.tokens.asArray(EdgeToolsToken.ID.self)
     }
 
@@ -793,10 +970,13 @@
         synchronize: parameters.synchronizeStreamForMemorySnapshots
       )
       self.generation = Generation(
+        input: input,
+        cachedTokenIds: tokenIds,
         cache: prepared.cache,
         outputState: prepared.output.state,
         logits: prepared.output.logits,
         pendingTokenId: nil,
+        inputContext: self.prefillCacheState.inputContext,
         processor: processor,
         sampler: sampler,
         synchronizeStreamForMemorySnapshots: parameters.synchronizeStreamForMemorySnapshots,
@@ -828,6 +1008,7 @@
         )
         generation.outputState = output.state
         generation.logits = output.logits
+        generation.cachedTokenIds.append(pendingTokenId)
       }
       var stepLogits = generation.logits[0..., -1, 0...]
       stepLogits = generation.processor?.process(logits: stepLogits) ?? stepLogits
@@ -855,6 +1036,35 @@
       return metadata
     }
 
+    public mutating func commitGeneration(
+      stopTokenIds: Set<EdgeToolsToken.ID>
+    ) {
+      guard var generation = self.generation else { return }
+      if let pendingTokenId = generation.pendingTokenId,
+        !stopTokenIds.contains(pendingTokenId)
+      {
+        let output = self.languageModel(
+          LMInput.Text(tokens: MLXArray([pendingTokenId]))[text: .newAxis],
+          cache: generation.cache,
+          state: generation.outputState
+        )
+        generation.outputState = output.state
+        generation.logits = output.logits
+        generation.cachedTokenIds.append(pendingTokenId)
+      }
+      eval(generation.logits)
+      eval(generation.cache)
+      self.prefillCacheState.cachedPrefill = CachedPrefill(
+        input: generation.input,
+        tokenIds: generation.cachedTokenIds,
+        cache: generation.cache,
+        output: LMOutput(logits: generation.logits, state: generation.outputState),
+        context: generation.inputContext,
+        inputKind: .generation
+      )
+      self.generation = nil
+    }
+
     public mutating func resetGeneration() async {
       self.generation = nil
     }
@@ -872,12 +1082,37 @@
       )
     }
 
+    fileprivate func forkedContextState(copyingCache: Bool) -> sending Self {
+      // Model weights are immutable after engine initialization and intentionally shared across
+      // contexts. The cached prefill is immutable, or is copied here for an active-context fork.
+      nonisolated(unsafe) let languageModel = self.languageModel
+      var state = Self(
+        languageModel: languageModel,
+        processor: self.processor,
+        vocabularySize: self.vocabularySizeValue,
+        extraStopTokenIds: self.configuredExtraStopTokenIds,
+        defaultSampling: self.configuredSampling
+      )
+      state.prefillCacheState = self.prefillCacheState
+      state.prefillCacheState.fork(copyingCache: copyingCache)
+      // The returned state shares only immutable model weights and, for an idle context, an
+      // immutable cached-prefill checkpoint whose cache copies are serialized internally. Swift's
+      // isolation checker cannot express that ownership boundary.
+      nonisolated(unsafe) let transferredState = state
+      return transferredState
+    }
+
     public nonisolated(nonsending) mutating func prefill(
       prompt: Profile.Prompt,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer
     ) async throws -> EdgeToolsEnginePrefill {
-      let input = try await self.input(prompt: prompt, tools: tools, tokenizer: tokenizer)
+      let input = try await self.input(
+        prompt: prompt,
+        tools: tools,
+        tokenizer: tokenizer,
+        kind: .prefill
+      )
       return try await self.prefill(input: input)
     }
 
@@ -893,9 +1128,10 @@
       self.prefillCacheState.cachedPrefill = CachedPrefill(
         input: input,
         tokenIds: tokenIds,
-        cache: prepared.cache.map { $0.copy() },
+        cache: prepared.cache,
         output: prepared.output,
-        context: self.prefillCacheState.inputContext
+        context: self.prefillCacheState.inputContext,
+        inputKind: .prefill
       )
       let snapshot = Self.memorySnapshot(synchronize: true)
       var metadata = EdgeToolsMetadata()
@@ -912,37 +1148,51 @@
     private nonisolated(nonsending) mutating func input(
       prompt: Profile.Prompt,
       tools: [EdgeToolDefinition],
-      tokenizer: any EdgeToolsTokenizer
+      tokenizer: any EdgeToolsTokenizer,
+      kind: MLXInputKind
     ) async throws -> LMInput {
       if let prompt = prompt as? EdgeToolsTranscript {
         let context = EdgeToolsLLMPrefillContext(prompt: prompt, tools: tools)
-        if let input = self.prefillCacheState.input(for: context) {
+        if let input = self.prefillCacheState.input(for: context, kind: kind) {
           return input
         }
       } else {
         self.prefillCacheState.clearInputContext()
       }
-      return try await Profile.input(
-        prompt: prompt,
-        tools: tools,
-        tokenizer: tokenizer,
-        processor: self.processor
-      )
+      switch kind {
+      case .generation:
+        return try await Profile.input(
+          prompt: prompt,
+          tools: tools,
+          tokenizer: tokenizer,
+          processor: self.processor
+        )
+      case .prefill:
+        return try await Profile.prefillInput(
+          prompt: prompt,
+          tools: tools,
+          tokenizer: tokenizer,
+          processor: self.processor
+        )
+      }
     }
 
     private func preparedOutput(
       input: LMInput,
       tokenIds: [EdgeToolsToken.ID]
     ) throws -> (output: LMOutput, cache: [any KVCache], tokenCount: Int) {
-      guard let cachedPrefill = self.prefillCacheState.cachedPrefill,
-        tokenIds.starts(with: cachedPrefill.tokenIds),
-        self.prefillCacheState.matches(input: input)
+      guard
+        let cachedPrefill = self.prefillCacheState.cachedPrefill?.mutableSnapshot(
+          tokenIds: tokenIds,
+          input: input,
+          inputContext: self.prefillCacheState.inputContext
+        )
       else {
         let cache = self.languageModel.newCache(parameters: nil)
         return (try self.prepareModelOutput(input: input, cache: cache), cache, tokenIds.count)
       }
       let suffixCount = tokenIds.count - cachedPrefill.tokenIds.count
-      let cache = cachedPrefill.cache.map { $0.copy() }
+      let cache = cachedPrefill.cache
       let output =
         if suffixCount == 0 {
           cachedPrefill.output
@@ -1138,6 +1388,7 @@
 
     private let prototype: Lock<MLXModelState<Profile>>
     private let extraStopTokenIds: Set<EdgeToolsToken.ID>
+    private let identity = MLXEngineIdentity()
     public let tokenizer: any EdgeToolsTokenizer
     public let grammarEngine: Profile.GrammarEngine
 
@@ -1170,7 +1421,7 @@
       MLXContext(
         parameters: parameters,
         model: self.makeModelState(),
-        makeModelState: { self.makeModelState() }
+        engineIdentity: self.identity
       )
     }
 
@@ -1179,6 +1430,7 @@
       tools: [EdgeToolDefinition],
       context: MLXContext<Profile>
     ) async throws -> [EdgeToolsToken] {
+      try self.validate(context)
       let transcript = context.transcript(appending: prompt)
       var model = self.makeModelState()
       let tokenIds = try await model.tokenIds(
@@ -1197,7 +1449,8 @@
       prompt: EdgeToolsTranscript.UserMessage,
       context: MLXContext<Profile>
     ) async throws -> ModelGenerationState {
-      self.generationState(from: try context.begin(appending: prompt))
+      try self.validate(context)
+      return self.generationState(from: try context.begin(appending: prompt))
     }
 
     public func prepare(
@@ -1253,16 +1506,18 @@
     ) async -> Result<EdgeToolsEngineGeneration, any Error> {
       var state = state
       let metadata = state.model.finish()
-      await state.model.resetGeneration()
 
       let generation: EdgeToolsEngineGeneration?
       let finalResult: Result<EdgeToolsEngineGeneration, any Error>
       switch result {
       case .success(var value):
+        let stopTokenIds = self.stopTokenIds(state: state)
+        state.model.commitGeneration(stopTokenIds: stopTokenIds)
         value.metadata.merge(metadata) { _, finalValue in finalValue }
         generation = value
         finalResult = .success(value)
       case .failure(let error):
+        await state.model.resetGeneration()
         generation = nil
         finalResult = .failure(error)
       }
@@ -1282,7 +1537,8 @@
       tools: [EdgeToolDefinition],
       context: MLXContext<Profile>
     ) async throws -> EdgeToolsEnginePrefill {
-      try await self.prefill(
+      try self.validate(context)
+      return try await self.prefill(
         snapshot: context.begin(appending: promptPrefix),
         tools: tools,
         context: context
@@ -1293,7 +1549,8 @@
       tools: [EdgeToolDefinition] = [],
       context: MLXContext<Profile>
     ) async throws -> EdgeToolsEnginePrefill {
-      try await self.prefill(
+      try self.validate(context)
+      return try await self.prefill(
         snapshot: context.begin(),
         tools: tools,
         context: context
@@ -1306,7 +1563,8 @@
       context: MLXContext<Profile>,
       channel: sending EdgeToolsGenerationChannel
     ) throws -> some EdgeToolsEngineGenerationTask {
-      self.generationTask(
+      try self.validate(context)
+      return self.generationTask(
         prompt: .user(""),
         tools: tools,
         parameters: parameters,
@@ -1345,6 +1603,12 @@
 
     private func makeModelState() -> sending MLXModelState<Profile> {
       self.prototype.withBorrowedLock { $0.contextState() }
+    }
+
+    private func validate(_ context: MLXContext<Profile>) throws {
+      guard context.engineIdentity === self.identity else {
+        throw EdgeToolsError.incompatibleContext
+      }
     }
 
     private func generationState(

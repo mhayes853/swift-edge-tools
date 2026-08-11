@@ -1,5 +1,4 @@
 import _Concurrency
-import OrderedCollections
 
 #if !$Embedded
   import Observation
@@ -10,7 +9,6 @@ import OrderedCollections
 public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable {
   public let engine: Engine
   private let _tools: Lock<[EdgeToolsSessionTool]>
-  private let _contexts = Lock(OrderedDictionary<Engine.Context.ID, Engine.Context>())
   private let _activeStreams = Lock([EdgeToolsSessionStream]())
   private let observationRegistrar = _ObservationRegistrar()
 
@@ -30,11 +28,6 @@ public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable {
 
   public var isResponding: Bool {
     !self.activeStreams.isEmpty
-  }
-
-  public var contexts: [Engine.Context] {
-    self.access(.contexts)
-    return self._contexts.withLock { Array($0.values) }
   }
 
   public var activeStreams: [EdgeToolsSessionStream] {
@@ -77,19 +70,8 @@ public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable {
     }
   }
 
-  fileprivate func registerContext(_ context: Engine.Context) {
-    self._contexts.withLock { contexts in
-      self.withMutation(of: .contexts) {
-        contexts.removeValue(forKey: context.id)
-        contexts[context.id] = context
-      }
-    }
-  }
-
   fileprivate func resolveContext(_ context: Engine.Context?) -> Engine.Context {
-    guard let context else { return self.context() }
-    self.registerContext(context)
-    return context
+    context ?? self.context()
   }
 }
 
@@ -97,27 +79,11 @@ public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable {
 
 extension EdgeToolsSession {
   public func context() -> Engine.Context {
-    let context = self.engine.context()
-    self.registerContext(context)
-    return context
+    self.engine.context()
   }
 
   public func context(_ parameters: Engine.ContextParameters) -> Engine.Context {
-    let context = self.engine.context(parameters)
-    self.registerContext(context)
-    return context
-  }
-
-  public func removeContext(id: Engine.Context.ID) {
-    _ = self._contexts.withLock { contexts in
-      self.withMutation(of: .contexts) {
-        contexts.removeValue(forKey: id)
-      }
-    }
-  }
-
-  public func removeContext(_ context: Engine.Context) {
-    self.removeContext(id: context.id)
+    self.engine.context(parameters)
   }
 
   public func tokenize(
@@ -140,7 +106,6 @@ extension EdgeToolsSession where Engine: EdgeToolsPrefillableEngine {
     context: Engine.Context
   ) async throws -> EdgeToolsEnginePrefill {
     let toolDefinitions = self.tools.map { $0.definition }
-    self.registerContext(context)
     return try await self.engine.prefill(
       promptPrefix: promptPrefix,
       tools: toolDefinitions,
@@ -777,7 +742,6 @@ private final class RawToolCallDeliveryState: Sendable {
 extension EdgeToolsSession {
   fileprivate enum ObservedProperty {
     case tools
-    case contexts
     case activeStreams
   }
 
@@ -785,7 +749,6 @@ extension EdgeToolsSession {
     #if !$Embedded
       switch property {
       case .tools: self.observationRegistrar.access(self, keyPath: \.tools)
-      case .contexts: self.observationRegistrar.access(self, keyPath: \.contexts)
       case .activeStreams: self.observationRegistrar.access(self, keyPath: \.activeStreams)
       }
     #endif
@@ -799,8 +762,6 @@ extension EdgeToolsSession {
       switch property {
       case .tools:
         self.observationRegistrar.withMutation(of: self, keyPath: \.tools, body)
-      case .contexts:
-        self.observationRegistrar.withMutation(of: self, keyPath: \.contexts, body)
       case .activeStreams:
         self.observationRegistrar.withMutation(of: self, keyPath: \.activeStreams, body)
       }

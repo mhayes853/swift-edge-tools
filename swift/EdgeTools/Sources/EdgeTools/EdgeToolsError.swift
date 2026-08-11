@@ -30,6 +30,7 @@ public struct EdgeToolsError: Error, Hashable, Sendable {
     public static let invalidMedia = Self(rawValue: "invalid-media")
     public static let unsupportedMedia = Self(rawValue: "unsupported-media")
     public static let contextInUse = Self(rawValue: "context-in-use")
+    public static let incompatibleContext = Self(rawValue: "incompatible-context")
   }
 
   public let code: Code
@@ -148,5 +149,10 @@ extension EdgeToolsError {
   static let contextInUse = Self(
     code: .contextInUse,
     message: "The context already has an active generation."
+  )
+
+  static let incompatibleContext = Self(
+    code: .incompatibleContext,
+    message: "The context was created by a different engine."
   )
 }

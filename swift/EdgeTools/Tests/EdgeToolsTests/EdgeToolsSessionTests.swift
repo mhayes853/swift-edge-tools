@@ -7,17 +7,6 @@ import Testing
 @Suite(.serialized)
 struct `EdgeToolsSession tests` {
   @Test
-  func `Creates And Removes A Context`() {
-    let session = EdgeToolsSession(engine: MockEngine())
-
-    let context = session.context()
-
-    expectNoDifference(session.contexts.map(\.id), [context.id])
-    session.removeContext(context)
-    expectNoDifference(session.contexts.isEmpty, true)
-  }
-
-  @Test
   func `Tokenize Forwards Prompt To The Engine`() async throws {
     let expectedTokens = (0..<6).map { EdgeToolsToken(id: $0, stringValue: "t\($0)") }
     let tool = WeatherTool()

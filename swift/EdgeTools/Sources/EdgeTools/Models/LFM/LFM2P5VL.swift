@@ -30,7 +30,21 @@
       processor: (any UserInputProcessor)?
     ) async throws -> LMInput {
       guard let processor else { throw EdgeToolsError.failedToLoadConfiguration }
-      return try await processor.prepare(input: try prompt.lfm2P5VLUserInput(tools: tools))
+      return try await processor.prepare(
+        input: try prompt.lfm2P5VLUserInput(tools: tools, addGenerationPrompt: true)
+      )
+    }
+
+    public static nonisolated(nonsending) func prefillInput(
+      prompt: EdgeToolsTranscript,
+      tools: [EdgeToolDefinition],
+      tokenizer: any EdgeToolsTokenizer,
+      processor: (any UserInputProcessor)?
+    ) async throws -> LMInput {
+      guard let processor else { throw EdgeToolsError.failedToLoadConfiguration }
+      return try await processor.prepare(
+        input: try prompt.lfm2P5VLUserInput(tools: tools, addGenerationPrompt: false)
+      )
     }
   }
 
@@ -58,8 +72,14 @@
   #endif
 
   extension EdgeToolsTranscript {
-    fileprivate func lfm2P5VLUserInput(tools: [EdgeToolDefinition]) throws -> UserInput {
-      try self.mlxUserInput(tools: tools) { message in
+    fileprivate func lfm2P5VLUserInput(
+      tools: [EdgeToolDefinition],
+      addGenerationPrompt: Bool
+    ) throws -> UserInput {
+      try self.mlxUserInput(
+        tools: tools,
+        additionalContext: ["add_generation_prompt": addGenerationPrompt]
+      ) { message in
         guard case .user(let message) = message else {
           return try message.mlxMessage()
         }

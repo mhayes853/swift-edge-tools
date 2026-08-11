@@ -126,11 +126,41 @@ import OrderedCollections
       tokenizer: any EdgeToolsTokenizer,
       processor: (any UserInputProcessor)?
     ) async throws -> LMInput {
+      try await self.input(
+        prompt: prompt,
+        tools: tools,
+        processor: processor,
+        addGenerationPrompt: true
+      )
+    }
+
+    public static nonisolated(nonsending) func prefillInput(
+      prompt: EdgeToolsTranscript,
+      tools: [EdgeToolDefinition],
+      tokenizer: any EdgeToolsTokenizer,
+      processor: (any UserInputProcessor)?
+    ) async throws -> LMInput {
+      try await self.input(
+        prompt: prompt,
+        tools: tools,
+        processor: processor,
+        addGenerationPrompt: false
+      )
+    }
+
+    private static nonisolated(nonsending) func input(
+      prompt: EdgeToolsTranscript,
+      tools: [EdgeToolDefinition],
+      processor: (any UserInputProcessor)?,
+      addGenerationPrompt: Bool
+    ) async throws -> LMInput {
       guard let processor else { throw EdgeToolsError.failedToLoadConfiguration }
+      var templateContext = Self.templateContext(prompt: prompt) ?? [:]
+      templateContext["add_generation_prompt"] = addGenerationPrompt
       return try await prompt.mlxVLMInput(
         tools: tools,
         processor: processor,
-        additionalContext: Self.templateContext(prompt: prompt)
+        additionalContext: templateContext
       ) { message in
         switch message {
         case .user(let message):

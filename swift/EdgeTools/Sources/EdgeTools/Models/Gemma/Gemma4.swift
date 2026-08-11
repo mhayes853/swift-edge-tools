@@ -50,7 +50,21 @@
       processor: (any UserInputProcessor)?
     ) async throws -> LMInput {
       guard let processor else { throw EdgeToolsError.failedToLoadConfiguration }
-      return try await processor.prepare(input: try prompt.gemma4UserInput(tools: tools))
+      return try await processor.prepare(
+        input: try prompt.gemma4UserInput(tools: tools, addGenerationPrompt: true)
+      )
+    }
+
+    public static nonisolated(nonsending) func prefillInput(
+      prompt: EdgeToolsTranscript,
+      tools: [EdgeToolDefinition],
+      tokenizer: any EdgeToolsTokenizer,
+      processor: (any UserInputProcessor)?
+    ) async throws -> LMInput {
+      guard let processor else { throw EdgeToolsError.failedToLoadConfiguration }
+      return try await processor.prepare(
+        input: try prompt.gemma4UserInput(tools: tools, addGenerationPrompt: false)
+      )
     }
   }
 
@@ -104,8 +118,14 @@
       return prompt
     }
 
-    fileprivate func gemma4UserInput(tools: [EdgeToolDefinition]) throws -> UserInput {
-      try self.gemma4PreparedForReasoning.mlxUserInput(tools: tools) { message in
+    fileprivate func gemma4UserInput(
+      tools: [EdgeToolDefinition],
+      addGenerationPrompt: Bool
+    ) throws -> UserInput {
+      try self.gemma4PreparedForReasoning.mlxUserInput(
+        tools: tools,
+        additionalContext: ["add_generation_prompt": addGenerationPrompt]
+      ) { message in
         switch message {
         case .system:
           return try message.mlxMessage()

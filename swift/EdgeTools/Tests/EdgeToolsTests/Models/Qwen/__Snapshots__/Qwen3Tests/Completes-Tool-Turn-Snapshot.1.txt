@@ -484,13 +484,15 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " with"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " Paris"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " as"
-          ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
             - reasoning: " location"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " set"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " to"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " Paris"
           ▿ EdgeToolsGenerationPart
             - reasoning: "."
           ▿ EdgeToolsGenerationPart
@@ -504,19 +506,17 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " with"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " the"
+            - reasoning: " sunny"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " condition"
+            - reasoning: " weather"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " \""
+            - reasoning: " and"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "s"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "unny"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "\","
+            - reasoning: " a"
           ▿ EdgeToolsGenerationPart
             - reasoning: " temperature"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " of"
           ▿ EdgeToolsGenerationPart
             - reasoning: " "
           ▿ EdgeToolsGenerationPart
@@ -525,16 +525,6 @@
             - reasoning: "1"
           ▿ EdgeToolsGenerationPart
             - reasoning: "°C"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: ","
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " and"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " a"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " light"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " breeze"
           ▿ EdgeToolsGenerationPart
             - reasoning: "."
           ▿ EdgeToolsGenerationPart
@@ -571,5 +561,15 @@
             - reasoning: " mention"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " condition"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: ":"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " sunny"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "."
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " That"
   ▿ reasoningEffort: EdgeToolsReasoningEffort
     - rawValue: "default"
