@@ -22,6 +22,7 @@ struct `NeedleJSONNXModelEngine tests` {
         system: "",
         user: "Send an email to Henry asking him to go on an adventure."
       ),
+      context: nil,
       parameters: parameters,
       shouldInvokeTools: { _ in false }
     )

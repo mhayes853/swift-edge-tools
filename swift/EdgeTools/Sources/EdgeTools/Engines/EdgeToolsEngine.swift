@@ -74,19 +74,6 @@ public protocol EdgeToolsPrefillableEngine: EdgeToolsEngine {
   ) async throws -> EdgeToolsEnginePrefill
 }
 
-extension EdgeToolsPrefillableEngine {
-  public func prefill(
-    promptPrefix: Prompt,
-    tools: [EdgeToolDefinition]
-  ) async throws -> EdgeToolsEnginePrefill {
-    try await self.prefill(
-      promptPrefix: promptPrefix,
-      tools: tools,
-      context: self.context()
-    )
-  }
-}
-
 // MARK: - EdgeToolsEnginePrefill
 
 public struct EdgeToolsEnginePrefill: Sendable {

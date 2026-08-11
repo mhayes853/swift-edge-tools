@@ -137,10 +137,10 @@ extension EdgeToolsSession {
 extension EdgeToolsSession where Engine: EdgeToolsPrefillableEngine {
   public func prefill(
     promptPrefix: Engine.Prompt,
-    context: Engine.Context? = nil
+    context: Engine.Context
   ) async throws -> EdgeToolsEnginePrefill {
     let toolDefinitions = self.tools.map { $0.definition }
-    let context = self.resolveContext(context)
+    self.registerContext(context)
     return try await self.engine.prefill(
       promptPrefix: promptPrefix,
       tools: toolDefinitions,
@@ -717,7 +717,7 @@ extension EdgeToolsSessionStream {
 extension EdgeToolsSession {
   public func stream(
     prompt: Engine.Prompt,
-    context: Engine.Context? = nil,
+    context: Engine.Context?,
     parameters: sending Engine.GenerateParameters = .default,
     shouldInvokeTools: @escaping @Sendable (AnyEdgeToolCall) -> Bool = { _ in true }
   ) -> EdgeToolsSessionStream {
@@ -743,7 +743,7 @@ extension EdgeToolsSession {
   @concurrent
   public func generate(
     prompt: Engine.Prompt,
-    context: Engine.Context? = nil,
+    context: Engine.Context?,
     parameters: sending Engine.GenerateParameters = .default,
     shouldInvokeTools: @escaping @Sendable (AnyEdgeToolCall) -> Bool = { _ in true }
   ) async throws -> EdgeToolsSessionGeneration {

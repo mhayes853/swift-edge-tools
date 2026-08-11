@@ -113,7 +113,7 @@
     using engine: Engine
   ) async throws -> EdgeToolsSessionGeneration where Engine.Prompt == NeedlePrompt {
     let session = EdgeToolsSession(engine: engine, tools: NeedlePrompt.sendAdventureEmailTools)
-    return try await session.generate(prompt: .sendAdventureEmail)
+    return try await session.generate(prompt: .sendAdventureEmail, context: nil)
   }
 
   func expectNeedleContextLengthExceeded<Engine: EdgeToolsEngine>(

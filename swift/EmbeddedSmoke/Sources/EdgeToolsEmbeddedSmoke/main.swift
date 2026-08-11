@@ -84,7 +84,7 @@ func runSmoke() async throws {
   let session = EdgeToolsSession(engine: MockEngine()) {
     EchoTool()
   }
-  let generation = try await session.generate(prompt: MockEngine.Prompt())
+  let generation = try await session.generate(prompt: MockEngine.Prompt(), context: nil)
 
   guard generation.toolCalls.count == 1 else { throw SmokeError.unexpectedToolCallCount }
   let call = generation.toolCalls[0]
