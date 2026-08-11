@@ -9,7 +9,6 @@ public struct InfoReport: Encodable {
   public let engines: [String]
   public let unavailableEngines: [String]
   public let defaultEngine: String?
-  public let experimentalEngines: [String]
   public let files: [String]
 
   public init(detection: ModelDetection) {
@@ -19,7 +18,6 @@ public struct InfoReport: Encodable {
     self.engines = detection.engines.map(\.rawValue)
     self.unavailableEngines = detection.unavailableEngines.map(\.rawValue)
     self.defaultEngine = detection.defaultEngine?.rawValue
-    self.experimentalEngines = detection.engines.filter(\.isExperimental).map(\.rawValue)
     self.files = detection.files
   }
 }
@@ -28,14 +26,11 @@ public struct InfoReport: Encodable {
 
 extension InfoReport {
   public func displayText() -> String {
-    let described = self.engines.map {
-      self.experimentalEngines.contains($0) ? "\($0) (experimental)" : $0
-    }
     var lines = [
       self.directory,
       "  model       \(self.model)",
       "  modality    \(self.modality)",
-      "  engines     \(described.isEmpty ? "none" : described.joined(separator: " · "))"
+      "  engines     \(self.engines.isEmpty ? "none" : self.engines.joined(separator: " · "))"
     ]
     if let defaultEngine = self.defaultEngine {
       lines.append("              defaults to \(defaultEngine)")

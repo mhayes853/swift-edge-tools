@@ -19,19 +19,7 @@ struct `InfoAction tests` {
     expectNoDifference(report.model, "Needle")
     expectNoDifference(report.engines, ["mlx", "onnx"])
     expectNoDifference(report.defaultEngine, "mlx")
-    expectNoDifference(report.unavailableEngines, ["coreml", "coreai"])
-  }
-
-  @Test
-  func `Marks Experimental Engines And Leaves No Default`() async throws {
-    let report = try await inspectModel(
-      context: .stub(engines: [.coreai], files: ["configuration.json", "encoder.aimodel"]),
-      source: .test()
-    )
-
-    expectNoDifference(report.experimentalEngines, ["coreai"])
-    expectNoDifference(report.defaultEngine, nil)
-    expectNoDifference(report.displayText().contains("coreai (experimental)"), true)
+    expectNoDifference(report.unavailableEngines, [])
   }
 
   @Test

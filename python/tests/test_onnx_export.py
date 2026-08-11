@@ -11,7 +11,6 @@ import torch
 
 import cli
 from needle import (
-    DecoderExportStrategy,
     JSONObject,
     Needle,
     NeedleModelConfiguation,
@@ -45,7 +44,7 @@ class RecordingCompressor:
 
 
 class ONNXExportTests(unittest.TestCase):
-    def test_cli_exports_int8_quantized_bundle_end_to_end(self) -> None:
+    def test_cli_exports_int4_quantized_bundle_end_to_end(self) -> None:
         with (
             tempfile.TemporaryDirectory() as source_name,
             tempfile.TemporaryDirectory() as output_name,
@@ -73,18 +72,13 @@ class ONNXExportTests(unittest.TestCase):
             (source_directory / "tokenizer.json").write_text(tokenizer_contents)
 
             configuration = NeedleModelConfiguation.from_json_object(configuration_data)
-            needle = Needle(
-                configuration,
-                decoder_strategy=DecoderExportStrategy.reference(),
-            )
+            needle = Needle(configuration)
             torch.save(needle.state_dict(), source_directory / "weights.pkl")
 
             result = cli.main(
                 [
-                    "--backend",
-                    "onnx",
-                    "--onnx-quantization",
-                    "int8",
+                    "--quantization",
+                    "int4",
                     "--source",
                     str(source_directory),
                     "--output",
@@ -124,7 +118,7 @@ class ONNXExportTests(unittest.TestCase):
                             for attribute in node.attribute
                             if attribute.name == "bits"
                         )
-                        == 8
+                        == 4
                         for node in quantized_nodes
                     )
                 )
@@ -201,10 +195,7 @@ class ONNXExportTests(unittest.TestCase):
             (source_directory / "tokenizer.json").write_text("{}")
             configuration = NeedleModelConfiguation.from_json_object(configuration_data)
             torch.save(
-                Needle(
-                    configuration,
-                    decoder_strategy=DecoderExportStrategy.reference(),
-                ).state_dict(),
+                Needle(configuration).state_dict(),
                 source_directory / "weights.pkl",
             )
             compressor = RecordingCompressor()

@@ -18,9 +18,9 @@ fi
 SOURCE="${1:-Cactus-Compute/needle}"
 OUTPUT="${2:-$PYTHON_DIR/build/onnx-export}"
 QUANTIZATION="${3:-}"
-ARGS=(--backend onnx --source "$SOURCE" --output "$OUTPUT")
+ARGS=(--source "$SOURCE" --output "$OUTPUT")
 if [[ -n "$QUANTIZATION" ]]; then
-	ARGS+=(--onnx-quantization "$QUANTIZATION")
+	ARGS+=(--quantization "$QUANTIZATION")
 fi
 
 "$PYTHON" "$PYTHON_DIR/cli.py" "${ARGS[@]}"

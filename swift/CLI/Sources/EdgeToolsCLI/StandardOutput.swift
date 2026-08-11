@@ -4,10 +4,9 @@ import Foundation
 
 /// CLI output goes here rather than through `print`.
 ///
-/// Engine runtimes (CoreAI in particular) write diagnostics straight to file descriptor 1, which
-/// would corrupt `--json`. `claimStandardOutput` takes a private duplicate of the real standard
-/// output and points descriptor 1 at standard error, so those diagnostics stay visible without
-/// mixing into CLI output.
+/// Some engine runtimes write diagnostics straight to file descriptor 1, which would corrupt
+/// `--json`. `claimStandardOutput` takes a private duplicate of the real standard output and points
+/// descriptor 1 at standard error, so those diagnostics stay visible without mixing into CLI output.
 public func claimStandardOutput() {
   _ = standardOutput
 }

@@ -1,9 +1,6 @@
 import EdgeTools
 import Foundation
 
-#if canImport(CoreML)
-  import CoreML
-#endif
 #if canImport(MLX)
   import MLX
 #endif
@@ -283,8 +280,7 @@ extension EngineRunner {
 
   private static var needleFactories: [EngineKind: ModelEngineFactory] {
     var factories: [EngineKind: ModelEngineFactory] = [
-      .onnx: { context in try await Self.needleONNX(from: context.detection.directory) },
-      .coreai: { context in try await Self.needleCoreAI(from: context.detection.directory) }
+      .onnx: { context in try await Self.needleONNX(from: context.detection.directory) }
     ]
     #if canImport(MLX)
       factories[.mlx] = { context in
@@ -292,11 +288,6 @@ extension EngineRunner {
           from: context.detection.directory,
           hardwareUnit: context.hardwareUnit
         )
-      }
-    #endif
-    #if canImport(CoreML)
-      factories[.coreml] = { context in
-        try await Self.needleCoreML(from: context.detection.directory)
       }
     #endif
     return factories
@@ -337,49 +328,6 @@ extension EngineRunner {
         )
       }
     )
-  }
-
-  #if canImport(CoreML)
-    private static func needleCoreML(from directory: URL) async throws -> Self {
-      let engine = try await NeedleCoreMLModelEngine(
-        modelDirectoryURL: directory,
-        modelConfiguration: MLModelConfiguration()
-      )
-      return Self(
-        engineKind: .coreml,
-        engine: engine,
-        prompt: needlePrompt,
-        parameters: { request in
-          NeedleCoreMLModel.GenerateParameters(
-            maxTokens: request.maxTokens,
-            toolCallRange: request.toolCallRange
-          )
-        }
-      )
-    }
-  #endif
-
-  // CoreAI is experimental, needs Swift 6.4 to build, and needs OS 27 to run.
-  private static func needleCoreAI(from directory: URL) async throws -> Self {
-    #if swift(>=6.4) && canImport(CoreAI)
-      guard #available(macOS 27.0, *) else {
-        throw EdgeCLIError("The coreai engine needs macOS 27 or newer.")
-      }
-      let engine = try await NeedleCoreAIModelEngine(modelDirectoryURL: directory)
-      return Self(
-        engineKind: .coreai,
-        engine: engine,
-        prompt: needlePrompt,
-        parameters: { request in
-          NeedleCoreAIModel.GenerateParameters(
-            maxTokens: request.maxTokens,
-            toolCallRange: request.toolCallRange
-          )
-        }
-      )
-    #else
-      throw EdgeCLIError("This build of edge has no coreai engine; it requires Swift 6.4 or newer.")
-    #endif
   }
 
   #if canImport(MLX)
@@ -454,16 +402,13 @@ private func resolvedEngine(
     }
     return requested
   }
-  if let defaultEngine = available.first(where: { !$0.isExperimental }) {
+  if let defaultEngine = detection.defaultEngine {
     return defaultEngine
   }
-  let experimental = available.filter(\.isExperimental).map(\.rawValue)
   throw EdgeCLIError(
     """
     No usable engine for \(detection.model.displayName) in \(detection.directory.path()). \
-    \(experimental.isEmpty
-      ? "Supported engines: \(detection.model.supportedEngines.map(\.rawValue).joined(separator: ", "))."
-      : "Select one explicitly with --engine: \(experimental.joined(separator: ", ")).")
+    Supported engines: \(detection.model.supportedEngines.map(\.rawValue).joined(separator: ", ")).
     """
   )
 }

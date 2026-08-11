@@ -60,21 +60,13 @@ public enum DetectedModel: String, Hashable, Sendable, CaseIterable {
 public enum EngineKind: String, CaseIterable, Sendable {
   case mlx
   case onnx
-  case coreml
-  case coreai
 
   public init?(argument: String) {
     switch argument.lowercased().filter({ $0.isLetter || $0.isNumber }) {
     case "mlx": self = .mlx
     case "onnx": self = .onnx
-    case "coreml": self = .coreml
-    case "coreai": self = .coreai
     default: return nil
     }
-  }
-
-  public var isExperimental: Bool {
-    self == .coreai
   }
 
   public var isAvailable: Bool {
@@ -87,18 +79,6 @@ public enum EngineKind: String, CaseIterable, Sendable {
       #endif
     case .onnx:
       true
-    case .coreml:
-      #if canImport(CoreML)
-        true
-      #else
-        false
-      #endif
-    case .coreai:
-      #if swift(>=6.4) && canImport(CoreAI)
-        true
-      #else
-        false
-      #endif
     }
   }
 
@@ -106,9 +86,22 @@ public enum EngineKind: String, CaseIterable, Sendable {
     switch self {
     case .mlx: files.contains { $0.hasSuffix(".safetensors") }
     case .onnx: files.contains { $0.hasSuffix(".onnx") }
-    case .coreml: files.contains { $0.hasSuffix(".mlmodelc") || $0.hasSuffix(".mlpackage") }
-    case .coreai: files.contains { $0.hasSuffix(".aimodel") || $0.hasSuffix(".aimodelc") }
     }
+  }
+}
+
+// MARK: - EngineSelectionPlatform
+
+public enum EngineSelectionPlatform: Hashable, Sendable {
+  case apple
+  case nonApple
+
+  public static var current: Self {
+    #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
+      .apple
+    #else
+      .nonApple
+    #endif
   }
 }
 
@@ -128,7 +121,17 @@ public struct ModelDetection: Hashable, Sendable {
   }
 
   public var defaultEngine: EngineKind? {
-    self.engines.first { self.model.supportedEngines.contains($0) && !$0.isExperimental }
+    self.defaultEngine(for: .current)
+  }
+
+  public func defaultEngine(for platform: EngineSelectionPlatform) -> EngineKind? {
+    let available = self.engines.filter(self.model.supportedEngines.contains)
+    let priority: [EngineKind] =
+      switch platform {
+      case .apple: [.mlx, .onnx]
+      case .nonApple: [.onnx, .mlx]
+      }
+    return priority.first(where: available.contains)
   }
 
   public var unavailableEngines: [EngineKind] {

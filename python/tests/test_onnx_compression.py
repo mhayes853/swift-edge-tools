@@ -57,7 +57,7 @@ class ONNXCompressionTests(unittest.TestCase):
             self.assertEqual(bits, 4)
 
     def test_rejects_unsupported_bit_width(self) -> None:
-        with self.assertRaisesRegex(ValueError, "only 4 or 8 bits"):
+        with self.assertRaisesRegex(ValueError, "only 4 bits"):
             MatMulNBitsONNXCompressor(bits=cast(ONNXQuantizationBits, 3))
 
 

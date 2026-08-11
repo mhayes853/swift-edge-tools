@@ -12,7 +12,7 @@ let package = Package(
     .package(
       name: "swift-edge-tools",
       path: "../..",
-      traits: ["MLX", "CoreML", "CoreAI", "ONNX"]
+      traits: ["MLX", "ONNX"]
     ),
     .package(url: "https://github.com/apple/swift-argument-parser", from: "1.5.0"),
     .package(url: "https://github.com/huggingface/swift-transformers", from: "1.3.0"),

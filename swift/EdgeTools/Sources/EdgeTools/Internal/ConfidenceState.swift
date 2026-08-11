@@ -16,14 +16,6 @@
   import simd
 #endif
 
-#if CoreML && canImport(CoreML)
-  import CoreML
-#endif
-
-#if swift(>=6.4) && CoreAI && canImport(CoreAI)
-  import CoreAI
-#endif
-
 // MARK: - ConfidenceState
 
 struct ConfidenceState {
@@ -130,41 +122,6 @@ func tokenConfidence(unorderedPair values: some Collection<Float>) -> Float {
 #if ONNXCore
   func tokenConfidenceONNX(logits: Span<Float>) -> Float {
     let top = logits.withUnsafeBufferPointer { top2SIMD($0) }
-    return tokenConfidence(top1: top.top1, top2: top.top2)
-  }
-#endif
-
-// MARK: - Core ML
-
-#if CoreML && canImport(CoreML)
-  @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-  func tokenConfidenceCoreML(logits: MLTensor) async -> Float {
-    let values = await logits.topK(2)
-      .values
-      .cast(to: Float.self)
-      .shapedArray(of: Float.self)
-      .scalars
-    return tokenConfidence(unorderedPair: values)
-  }
-#endif
-
-// MARK: - Core AI
-
-#if swift(>=6.4) && CoreAI && canImport(CoreAI)
-  @available(anyAppleOS 27.0, *)
-  func tokenConfidenceCoreAI(logits: NDArray) throws -> Float {
-    let view = logits.view(as: Float.self)
-    let vocabularySize = view.shape[1]
-    guard vocabularySize > 0 else { return 0 }
-
-    let top =
-      if view.isContiguous {
-        view.withUnsafePointer { pointer, _, _ in
-          top2SIMD(UnsafeBufferPointer(start: pointer, count: vocabularySize))
-        }
-      } else {
-        top2Scalar(count: vocabularySize) { view[scalarAt: [0, $0]] }
-      }
     return tokenConfidence(top1: top.top1, top2: top.top2)
   }
 #endif

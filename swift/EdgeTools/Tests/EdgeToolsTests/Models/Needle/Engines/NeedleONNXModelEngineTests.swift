@@ -124,23 +124,6 @@
     }
 
     @Test
-    func `Generate Basics With INT8 Export`() async throws {
-      let engine = try await makeNeedleONNXModelEngine(quantization: "int8")
-      let generation = try await generateNeedle(using: engine)
-
-      expectNoDifference(generation.wasStopped, false)
-      withKnownIssue {
-        assertSnapshot(of: generation, as: .dump, record: .all)
-        assertSnapshot(of: generation.metadata, as: .dump, record: .all)
-        assertSnapshot(
-          of: generation.tokens.map(\.stringValue).joined(),
-          as: .lines,
-          record: .all
-        )
-      }
-    }
-
-    @Test
     func `Initialization Throws For Missing Encoder Model`() async throws {
       let source = try await exportNeedleONNX()
       let directory = try temporaryONNXBundleCopy(from: source, excluding: ["encoder.onnx"])
