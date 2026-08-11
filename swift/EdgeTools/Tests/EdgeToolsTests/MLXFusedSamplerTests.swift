@@ -4,7 +4,7 @@
   import MLX
   import Testing
 
-  @Suite(.serialized, .enabledIfXcode())
+  @Suite(.serialized, .enabledIfMLXTests())
   struct `MLXFusedSampler tests` {
     @Test
     func `Greedy Sampling Picks The Highest Logit`() {

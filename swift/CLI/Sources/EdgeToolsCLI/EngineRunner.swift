@@ -93,14 +93,14 @@ extension EngineRunner {
 }
 
 extension EngineRunner {
-  private init<Model: EdgeToolsModel>(
+  private init<Engine: EdgeToolsModelEngine>(
     engineKind: EngineKind,
-    engine: EdgeToolsModelEngine<Model>,
+    engine: Engine,
     supportsCustomGrammar: Bool = false,
     supportsSampling: Bool = false,
     supportsImages: Bool = false,
-    prompt: @escaping @Sendable (GenerationRequest) -> Model.Prompt,
-    parameters: @escaping @Sendable (GenerationRequest) throws -> sending Model.GenerateParameters
+    prompt: @escaping @Sendable (GenerationRequest) -> Engine.Prompt,
+    parameters: @escaping @Sendable (GenerationRequest) throws -> sending Engine.GenerateParameters
   ) {
     self.init(
       engineKind: engineKind,
@@ -110,7 +110,7 @@ extension EngineRunner {
       supportsImages: supportsImages,
       prompt: prompt,
       parameters: parameters,
-      modelResetting: { await engine.resetGeneration() }
+      modelResetting: {}
     )
   }
 }
@@ -336,10 +336,9 @@ extension EngineRunner {
       supportsImages: Bool = false
     ) -> ModelEngineFactory
     where
-      Profile.Prompt == EdgeToolsConversationalPrompt,
+      Profile.Prompt == EdgeToolsTranscript,
       Profile.GenerateParameters == DefaultMLXGenerateParameters,
-      Profile.GrammarCompiler == XGRCompiler,
-      Profile.GrammarContext == XGRGrammarContext
+      Profile.GrammarEngine == XGrammarEngine
     {
       { context in
         try await Self.mlx(
@@ -357,29 +356,46 @@ extension EngineRunner {
       make: () async throws -> MLXEngine<Profile>
     ) async throws -> Self
     where
-      Profile.Prompt == EdgeToolsConversationalPrompt,
+      Profile.Prompt == EdgeToolsTranscript,
       Profile.GenerateParameters == DefaultMLXGenerateParameters,
-      Profile.GrammarCompiler == XGRCompiler,
-      Profile.GrammarContext == XGRGrammarContext
+      Profile.GrammarEngine == XGrammarEngine
     {
       let engine = try await Device.withDefaultDevice(hardwareUnit.device) {
         try await make()
       }
       return Self(
-        engineKind: .mlx,
-        engine: engine,
+        engine: .mlx,
         supportsCustomGrammar: true,
         supportsSampling: true,
         supportsImages: supportsImages,
-        prompt: llmPrompt,
-        parameters: { request in
-          DefaultMLXGenerateParameters(
-            samplingOverrides: request.sampling,
-            constraint: try request.grammar.constraint(toolCallRange: request.toolCallRange),
-            maxTokens: request.maxTokens
+        generation: { request, channel in
+          let context = engine.context(
+            MLXContextParameters(
+              transcript: EdgeToolsTranscript(
+                messages: request.system.isEmpty ? [] : [.system(request.system)]
+              ),
+              reasoningEffort: request.reasoning
+            )
           )
+          let task = try engine.generate(
+            prompt: .user(
+              request.user,
+              images: request.images
+            ),
+            tools: request.tools,
+            parameters: DefaultMLXGenerateParameters(
+              samplingOverrides: request.sampling,
+              constraint: try request.grammar.constraint(
+                toolCallRange: request.toolCallRange
+              ),
+              maxTokens: request.maxTokens
+            ),
+            context: context,
+            channel: channel
+          )
+          return try await task.value
         },
-        modelResetting: { await engine.resetGeneration() }
+        modelResetting: {}
       )
     }
   #endif
@@ -416,16 +432,3 @@ private func resolvedEngine(
 private func needlePrompt(for request: GenerationRequest) -> NeedlePrompt {
   NeedlePrompt(system: request.system, user: request.user)
 }
-
-#if canImport(MLX)
-  private func llmPrompt(for request: GenerationRequest) -> EdgeToolsConversationalPrompt {
-    var messages = [EdgeToolsConversationalPrompt.Message]()
-    if !request.system.isEmpty { messages.append(.system(request.system)) }
-    messages.append(.user(request.user, images: request.images))
-    return EdgeToolsConversationalPrompt(
-      messages: messages,
-      reasoningEffort: request.reasoning
-    )
-  }
-
-#endif

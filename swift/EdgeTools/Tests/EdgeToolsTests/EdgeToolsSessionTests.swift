@@ -7,6 +7,17 @@ import Testing
 @Suite(.serialized)
 struct `EdgeToolsSession tests` {
   @Test
+  func `Creates And Removes A Context`() {
+    let session = EdgeToolsSession(engine: MockEngine())
+
+    let context = session.context()
+
+    expectNoDifference(session.contexts.map(\.id), [context.id])
+    session.removeContext(context)
+    expectNoDifference(session.contexts.isEmpty, true)
+  }
+
+  @Test
   func `Tokenize Forwards Prompt To The Engine`() async throws {
     let expectedTokens = (0..<6).map { EdgeToolsToken(id: $0, stringValue: "t\($0)") }
     let tool = WeatherTool()
@@ -830,6 +841,8 @@ private struct GetWeatherTool: EdgeTool {
 // MARK: - Reentrant Mock Engine
 
 private final class ReentrantMockEngine: EdgeToolsEngine {
+  final class Context: Identifiable, Sendable {}
+
   struct Prompt: Sendable {}
 
   struct GenerateParameters: EdgeToolsEngineGenerateParameters {
@@ -869,7 +882,15 @@ private final class ReentrantMockEngine: EdgeToolsEngine {
   private let task = GenerationTask()
   private let ready = AsyncStream<Void>.makeStream()
 
-  func tokenize(prompt: Prompt, tools: [EdgeToolDefinition]) async throws -> [EdgeToolsToken] {
+  func context(_ parameters: Void) -> Context {
+    Context()
+  }
+
+  func tokenize(
+    prompt: Prompt,
+    tools: [EdgeToolDefinition],
+    context: Context
+  ) async throws -> [EdgeToolsToken] {
     []
   }
 
@@ -877,6 +898,7 @@ private final class ReentrantMockEngine: EdgeToolsEngine {
     prompt: Prompt,
     tools: [EdgeToolDefinition],
     parameters: GenerateParameters,
+    context: Context,
     channel: sending EdgeToolsGenerationChannel
   ) throws -> GenerationTask {
     let channelStorage = ReentrantChannelStorage(channel: channel)

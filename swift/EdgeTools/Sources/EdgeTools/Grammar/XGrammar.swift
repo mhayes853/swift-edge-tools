@@ -82,45 +82,45 @@
 
   extension XGRMatcher: EdgeToolsGrammarMatcher {}
 
-  // MARK: - Grammar Context
+  // MARK: - XGrammarEngine
 
-  public struct XGRGrammarContext {
+  public final class XGrammarEngine: EdgeToolsGrammarEngine {
+    private struct State {
+      let compiler: XGRCompiler
+      let matcherPool: XGRToolCallMatcherPool
+    }
+
     public let tokenizerInfo: XGRTokenizerInfo
+    private let state: Lock<State>
 
-    private let matcherPool = XGRToolCallMatcherPool()
-
-    public init(tokenizerInfo: XGRTokenizerInfo) {
+    public init(tokenizerInfo: XGRTokenizerInfo) throws {
       self.tokenizerInfo = tokenizerInfo
+      self.state = try Lock {
+        State(
+          compiler: try XGRCompiler(tokenizerInfo: tokenizerInfo),
+          matcherPool: XGRToolCallMatcherPool()
+        )
+      }
     }
-
-    fileprivate func matcher(
-      for grammar: XGRGrammar,
-      compiler: XGRCompiler,
-      stopTokenIds: Set<EdgeToolsToken.ID>
-    ) throws -> XGRMatcher {
-      let matcher = try self.matcherPool.matcher(
-        grammar: grammar,
-        compilingWith: compiler,
-        stopTokenIds: stopTokenIds
-      )
-      matcher.reset()
-      return matcher
-    }
-
-    func clearMatcherCache() {
-      self.matcherPool.clear()
-    }
-  }
-
-  extension XGRCompiler: EdgeToolsGrammarCompiler {
-    public typealias Context = XGRGrammarContext
 
     public func matcher(
       for grammar: XGRGrammar,
-      context: borrowing XGRGrammarContext,
       stopTokenIds: Set<EdgeToolsToken.ID>
     ) throws -> XGRMatcher {
-      try context.matcher(for: grammar, compiler: self, stopTokenIds: stopTokenIds)
+      try self.state.withLock { state in
+        try state.matcherPool.matcher(
+          grammar: grammar,
+          compilingWith: state.compiler,
+          stopTokenIds: stopTokenIds
+        )
+      }
+    }
+
+    public func clearCaches() {
+      self.state.withLock { state in
+        state.matcherPool.clear()
+        state.compiler.clearCache()
+      }
     }
   }
 
@@ -215,7 +215,7 @@
   }
 
   extension XGRGenerationConstraint: EdgeToolsGenerationConstraint {
-    public typealias Context = XGRGrammarContext
+    public typealias Context = XGrammarEngine
 
     public var toolCallRange: GrammarToolCallRange? {
       guard case .toolsWithGrammar(let range, _) = self.kind else { return nil }
@@ -224,7 +224,7 @@
 
     public func grammar(
       toolCallGrammar: XGRGrammar?,
-      context: XGRGrammarContext
+      context: XGrammarEngine
     ) throws -> XGRGrammar {
       switch self.kind {
       case .unconstrained:

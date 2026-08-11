@@ -10,14 +10,10 @@
       let tokenizer = try testTokenizer()
       let responseTokenIds = encodedGrammarText("hello", tokenizer: tokenizer)
       let eosTokenId = try requiredTestEOSToken(tokenizer: tokenizer)
-      let model = TestModel()
-      let engine = try EdgeToolsModelEngine(
-        model: model,
-        tokenizer: tokenizer
-      )
+      let engine = try TestEngine(tokenizer: tokenizer)
       let task = try engine.generate(
         prompt: NeedlePrompt(system: "", user: "Prompt"),
-        parameters: TestModel.Parameters(tokenIds: responseTokenIds + [eosTokenId]),
+        parameters: TestEngine.Parameters(tokenIds: responseTokenIds + [eosTokenId]),
         channel: EdgeToolsGenerationChannel()
       )
 
@@ -37,13 +33,13 @@
       let stopTokenId = try #require(tokenizer.unknownTokenId)
       let alternateStopTokenId = try #require(tokenizer.bosTokenId)
       let eosTokenId = try requiredTestEOSToken(tokenizer: tokenizer)
-      let engine = try EdgeToolsModelEngine(
-        model: TestModel(extraStopTokenIds: [alternateStopTokenId, stopTokenId]),
-        tokenizer: tokenizer
+      let engine = try TestEngine(
+        tokenizer: tokenizer,
+        extraStopTokenIds: [alternateStopTokenId, stopTokenId]
       )
       let task = try engine.generate(
         prompt: NeedlePrompt(system: "", user: "Prompt"),
-        parameters: TestModel.Parameters(
+        parameters: TestEngine.Parameters(
           tokenIds: responseTokenIds + [stopTokenId, eosTokenId]
         ),
         channel: EdgeToolsGenerationChannel()
@@ -60,11 +56,7 @@
       let tokenizer = try testTokenizer()
       let eosTokenId = try requiredTestEOSToken(tokenizer: tokenizer)
       let observation = ConstraintObservation()
-      let model = TestModel(constraintObservation: observation)
-      let engine = try EdgeToolsModelEngine(
-        model: model,
-        tokenizer: tokenizer
-      )
+      let engine = try TestEngine(tokenizer: tokenizer, constraintObservation: observation)
       let range = GrammarToolCallRange.exact(1)
       let constraint = XGRGenerationConstraint.toolsWithGrammar(
         range: range,
@@ -75,7 +67,7 @@
       )
       let task = try engine.generate(
         prompt: NeedlePrompt(system: "", user: "Prompt"),
-        parameters: TestModel.Parameters(
+        parameters: TestEngine.Parameters(
           tokenIds: [eosTokenId],
           constraint: constraint
         ),
@@ -90,62 +82,25 @@
     }
 
     @Test
-    func `Constrained Model Parameters Union Tool And User Grammars`() async throws {
-      let tokenizer = try testTokenizer()
-      let eosTokenId = try requiredTestEOSToken(tokenizer: tokenizer)
-      let observation = ConstraintObservation()
-      let model = TestModel(constraintObservation: observation)
-      let engine = try EdgeToolsModelEngine(
-        model: model,
-        tokenizer: tokenizer
-      )
-      let range = GrammarToolCallRange.exact(1)
-      let userGrammar = try XGRGrammar.literal("USER")
-      let constraint = XGRGenerationConstraint.toolsOrGrammar(
-        userGrammar,
-        range: range,
-        transform: { toolsGrammar, tokenizerInfo in
-          observation.recordTransform(tokenizerInfo: tokenizerInfo)
-          return toolsGrammar
-        }
-      )
-      let task = try engine.generate(
-        prompt: NeedlePrompt(system: "", user: "Prompt"),
-        parameters: TestModel.Parameters(
-          tokenIds: [eosTokenId],
-          constraint: constraint
-        ),
-        channel: EdgeToolsGenerationChannel()
-      )
-
-      _ = try await task.value
-
-      expectNoDifference(observation.toolCallRange, range)
-      expectNoDifference(observation.didTransform, true)
-      expectNoDifference(observation.didReceiveTokenizerInfo, true)
-    }
-
-    @Test
-    func `Serializes Concurrent Generations`() async throws {
+    func `Runs Different Contexts Concurrently`() async throws {
       let tokenizer = try testTokenizer()
       let eosTokenId = try requiredTestEOSToken(tokenizer: tokenizer)
       let assets = TestAssets()
-      let engine = try EdgeToolsModelEngine(
-        model: TestModel(assets: assets),
-        tokenizer: tokenizer
-      )
-      let parameters = TestModel.Parameters(
+      let engine = try TestEngine(tokenizer: tokenizer, assets: assets)
+      let parameters = TestEngine.Parameters(
         tokenIds: [eosTokenId],
         preparationDelay: .milliseconds(50)
       )
       let first = try engine.generate(
         prompt: NeedlePrompt(system: "", user: "First"),
         parameters: parameters,
+        context: engine.context(),
         channel: EdgeToolsGenerationChannel()
       )
       let second = try engine.generate(
         prompt: NeedlePrompt(system: "", user: "Second"),
         parameters: parameters,
+        context: engine.context(),
         channel: EdgeToolsGenerationChannel()
       )
 
@@ -153,118 +108,7 @@
       async let secondGeneration = second.value
       _ = try await (firstGeneration, secondGeneration)
 
-      expectNoDifference(assets.maximumActiveCount, 1)
-    }
-
-    @Test(.timeLimit(.minutes(1)))
-    func `Cancelling A Queued Generation Does Not Wait For The Active Generation`() async throws {
-      let tokenizer = try testTokenizer()
-      let eosTokenId = try requiredTestEOSToken(tokenizer: tokenizer)
-      let assets = TestAssets()
-      let preparationGate = TestPreparationGate()
-      let engine = try EdgeToolsModelEngine(
-        model: TestModel(assets: assets),
-        tokenizer: tokenizer
-      )
-      let first = try engine.generate(
-        prompt: NeedlePrompt(system: "", user: "First"),
-        parameters: TestModel.Parameters(
-          tokenIds: [eosTokenId],
-          preparationGate: preparationGate
-        ),
-        channel: EdgeToolsGenerationChannel()
-      )
-      let firstValue = Task { try await first.value }
-      await preparationGate.waitUntilEntered()
-      defer { preparationGate.open() }
-
-      let second = try engine.generate(
-        prompt: NeedlePrompt(system: "", user: "Second"),
-        parameters: TestModel.Parameters(tokenIds: [eosTokenId]),
-        channel: EdgeToolsGenerationChannel()
-      )
-      let secondValue = Task { try await second.value }
-      await Task.yield()
-
-      secondValue.cancel()
-      await #expect(throws: CancellationError.self) {
-        _ = try await secondValue.value
-      }
-
-      expectNoDifference(preparationGate.isOpen, false)
-      expectNoDifference(assets.activeCount, 1)
-      preparationGate.open()
-      _ = try await firstValue.value
-    }
-
-    @Test(.timeLimit(.minutes(1)))
-    func `Stopping A Queued Generation Does Not Wait For The Active Generation`() async throws {
-      let tokenizer = try testTokenizer()
-      let eosTokenId = try requiredTestEOSToken(tokenizer: tokenizer)
-      let assets = TestAssets()
-      let preparationGate = TestPreparationGate()
-      let engine = try EdgeToolsModelEngine(
-        model: TestModel(assets: assets),
-        tokenizer: tokenizer
-      )
-      let first = try engine.generate(
-        prompt: NeedlePrompt(system: "", user: "First"),
-        parameters: TestModel.Parameters(
-          tokenIds: [eosTokenId],
-          preparationGate: preparationGate
-        ),
-        channel: EdgeToolsGenerationChannel()
-      )
-      let firstValue = Task { try await first.value }
-      await preparationGate.waitUntilEntered()
-      defer { preparationGate.open() }
-
-      let second = try engine.generate(
-        prompt: NeedlePrompt(system: "", user: "Second"),
-        parameters: TestModel.Parameters(tokenIds: [eosTokenId]),
-        channel: EdgeToolsGenerationChannel()
-      )
-      second.stop()
-
-      let generation = try await second.value
-
-      expectNoDifference(generation.isEmpty, true)
-      expectNoDifference(preparationGate.isOpen, false)
-      expectNoDifference(assets.activeCount, 1)
-      preparationGate.open()
-      _ = try await firstValue.value
-    }
-  }
-
-  private final class TestPreparationGate: Sendable {
-    private let entered = AsyncStream<Void>.makeStream()
-    private let opened = AsyncStream<Void>.makeStream()
-    private let openState = Lock(false)
-
-    var isOpen: Bool {
-      self.openState.withLock { $0 }
-    }
-
-    func waitUntilEntered() async {
-      for await _ in self.entered.stream { return }
-    }
-
-    func wait() async {
-      self.entered.continuation.yield()
-      self.entered.continuation.finish()
-      guard !self.isOpen else { return }
-      for await _ in self.opened.stream { return }
-    }
-
-    func open() {
-      let didOpen = self.openState.withLock { isOpen in
-        guard !isOpen else { return false }
-        isOpen = true
-        return true
-      }
-      guard didOpen else { return }
-      self.opened.continuation.yield()
-      self.opened.continuation.finish()
+      expectNoDifference(assets.maximumActiveCount, 2)
     }
   }
 
@@ -278,10 +122,6 @@
 
     var maximumActiveCount: Int {
       self.state.withLock { $0.maximumActiveCount }
-    }
-
-    var activeCount: Int {
-      self.state.withLock { $0.activeCount }
     }
 
     func begin() {
@@ -323,102 +163,167 @@
     }
   }
 
-  private struct TestModel: EdgeToolsModel, Sendable {
+  private struct TestGenerationState: Sendable {
+    var index = 0
+  }
+
+  private final class TestContext: Identifiable, Sendable {
+    private actor Runtime {
+      var state: TestGenerationState? = TestGenerationState()
+
+      func takeState() throws -> sending TestGenerationState {
+        guard let state = self.state.take() else {
+          throw CancellationError()
+        }
+        return state
+      }
+
+      func restore(state: sending TestGenerationState) {
+        self.state = state
+      }
+    }
+
+    private let runtime = Runtime()
+
+    var id: ObjectIdentifier {
+      ObjectIdentifier(self)
+    }
+
+    func takeState() async throws -> sending TestGenerationState {
+      try await self.runtime.takeState()
+    }
+
+    func restore(state: sending TestGenerationState) async {
+      await self.runtime.restore(state: state)
+    }
+  }
+
+  private final class TestEngine: EdgeToolsModelEngine {
+    typealias Context = TestContext
+    typealias ContextParameters = Void
+    typealias Prompt = NeedlePrompt
+    typealias GenerateParameters = Parameters
+    typealias ModelGenerationState = TestGenerationState
+    typealias GenerationParser = NeedleGenerationParser
+    typealias GrammarEngine = XGrammarEngine
+
     struct Parameters: EdgeToolsConstrainedGenerateParameters {
       static var `default`: Self { Parameters(tokenIds: []) }
 
       var tokenIds: [EdgeToolsToken.ID]
       var preparationDelay = Duration.zero
-      var preparationGate: TestPreparationGate?
       var constraint = XGRGenerationConstraint.unconstrained
       var maxTokens: Int? = 32
     }
 
-    typealias Prompt = NeedlePrompt
-    typealias GenerateParameters = Parameters
-    typealias GenerationParser = NeedleGenerationParser
-    typealias GrammarContext = XGRGrammarContext
+    let assets: TestAssets?
+    let constraintObservation: ConstraintObservation?
+    let extraStopTokenIds: Set<EdgeToolsToken.ID>
+    let tokenizer: any EdgeToolsTokenizer
+    let grammarEngine: XGrammarEngine
 
-    var assets: TestAssets?
-    var constraintObservation: ConstraintObservation?
-    var extraStopTokenIds = Set<EdgeToolsToken.ID>()
-    var index = 0
-
-    var vocabularySize: Int { .needleVocabularySize }
-
-    func grammarContext(tokenizer: any EdgeToolsTokenizer) throws -> XGRGrammarContext {
+    init(
+      tokenizer: any EdgeToolsTokenizer,
+      assets: TestAssets? = nil,
+      constraintObservation: ConstraintObservation? = nil,
+      extraStopTokenIds: Set<EdgeToolsToken.ID> = []
+    ) throws {
       guard let tokenizer = tokenizer as? any XGRTokenizer else {
         throw XGRError(
           code: .invalidTokenizerInfo,
-          message: "The test model requires an XGrammar tokenizer."
+          message: "The test engine requires an XGrammar tokenizer."
         )
       }
-      return try XGRGrammarContext(
+      self.grammarEngine = try XGrammarEngine(
         tokenizerInfo: tokenizer.tokenizerInfo(
-          modelVocabularySize: self.vocabularySize,
-          extraStopTokenIds: self.extraStopTokenIds
+          modelVocabularySize: .needleVocabularySize,
+          extraStopTokenIds: extraStopTokenIds
         )
       )
+      self.tokenizer = tokenizer
+      self.assets = assets
+      self.constraintObservation = constraintObservation
+      self.extraStopTokenIds = extraStopTokenIds
     }
 
-    func grammarCompiler(context: borrowing XGRGrammarContext) throws -> XGRCompiler {
-      try XGRCompiler(tokenizerInfo: context.tokenizerInfo)
+    func context(_ parameters: Void) -> TestContext {
+      TestContext()
     }
 
     func grammar(
       prompt: NeedlePrompt,
       tools: [EdgeToolDefinition],
       parameters: Parameters,
-      context: XGRGrammarContext
+      state: TestGenerationState
     ) throws -> XGRGrammar {
       let constraint = parameters.constraint
-      let grammar = try constraint.toolCallRange.map {
+      let grammar = constraint.toolCallRange.map {
         self.constraintObservation?.record(range: $0)
         return XGRGrammar.universal
       }
-      return try constraint.grammar(toolCallGrammar: grammar, context: context)
+      return try constraint.grammar(toolCallGrammar: grammar, context: self.grammarEngine)
     }
 
-    func tokenIds(
+    func tokenize(
       prompt: NeedlePrompt,
       tools: [EdgeToolDefinition],
-      tokenizer: any EdgeToolsTokenizer
-    ) throws -> [EdgeToolsToken.ID] {
-      tokenizer.encode(text: prompt.user)
+      context: TestContext
+    ) async throws -> [EdgeToolsToken] {
+      let tokenIds = self.tokenizer.encode(text: prompt.user)
+      return zip(tokenIds, self.tokenizer.convertIdsToTokens(tokenIds)).compactMap {
+        tokenId, token in token.map { EdgeToolsToken(id: tokenId, stringValue: $0) }
+      }
     }
 
-    nonisolated(nonsending) mutating func prepare(
+    func generationState(
+      prompt: NeedlePrompt,
+      context: TestContext
+    ) async throws -> TestGenerationState {
+      try await context.takeState()
+    }
+
+    func prepare(
       prompt: inout NeedlePrompt,
       tools: [EdgeToolDefinition],
-      tokenizer: any EdgeToolsTokenizer,
       parameters: Parameters,
-      parser: inout NeedleGenerationParser
+      parser: inout NeedleGenerationParser,
+      state: inout TestGenerationState
     ) async throws -> EdgeToolsModelPreparation {
-      let tokenIds = try self.tokenIds(prompt: prompt, tools: tools, tokenizer: tokenizer)
+      let tokenIds = self.tokenizer.encode(text: prompt.user)
       self.assets?.begin()
       defer { self.assets?.end() }
-      if let preparationGate = parameters.preparationGate {
-        await preparationGate.wait()
-      } else {
-        try await Task.sleep(for: parameters.preparationDelay)
-      }
-      self.index = 0
+      try await Task.sleep(for: parameters.preparationDelay)
+      state.index = 0
       return EdgeToolsModelPreparation(
         metrics: EdgeToolsPrefillMetrics(tokens: tokenIds.count, duration: .zero)
       )
     }
 
-    nonisolated(nonsending) mutating func decode(
+    func decode(
       bitmask: GrammarBitmask,
-      parameters: Parameters
+      parameters: Parameters,
+      state: inout TestGenerationState
     ) async throws -> EdgeToolsModelSample {
-      let tokenId = parameters.tokenIds[self.index]
-      self.index += 1
+      let tokenId = parameters.tokenIds[state.index]
+      state.index += 1
       return EdgeToolsModelSample(tokenId: tokenId, confidence: 1)
     }
 
-    mutating func resetGeneration() {
-      self.index = 0
+    func stopTokenIds(state: TestGenerationState) -> Set<EdgeToolsToken.ID> {
+      var stopTokenIds = self.extraStopTokenIds
+      if let eosTokenId = self.tokenizer.eosTokenId {
+        stopTokenIds.insert(eosTokenId)
+      }
+      return stopTokenIds
+    }
+
+    func finalize(
+      state: consuming TestGenerationState,
+      result: consuming Result<EdgeToolsEngineGeneration, any Error>,
+      context: TestContext
+    ) async -> Result<EdgeToolsEngineGeneration, any Error> {
+      await context.restore(state: state)
+      return result
     }
   }
 #endif

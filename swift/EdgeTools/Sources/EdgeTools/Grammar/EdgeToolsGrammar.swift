@@ -9,16 +9,14 @@ public protocol EdgeToolsGrammarMatcher {
   mutating func accept(tokenId: EdgeToolsToken.ID) -> Bool
 }
 
-// MARK: - EdgeToolsGrammarCompiler
+// MARK: - EdgeToolsGrammarEngine
 
-public protocol EdgeToolsGrammarCompiler {
+public protocol EdgeToolsGrammarEngine: Sendable {
   associatedtype Grammar: Sendable
-  associatedtype Context = Void
   associatedtype Matcher: EdgeToolsGrammarMatcher
 
-  mutating func matcher(
+  func matcher(
     for grammar: Grammar,
-    context: borrowing Context,
     stopTokenIds: Set<EdgeToolsToken.ID>
   ) throws -> Matcher
 }

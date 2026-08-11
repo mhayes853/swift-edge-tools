@@ -1,11 +1,11 @@
-// MARK: - EdgeToolsConversationalPrompt
+// MARK: - EdgeToolsTranscript
 
-public struct EdgeToolsConversationalPrompt: Hashable, Sendable {
+public struct EdgeToolsTranscript: Hashable, Sendable {
   public var messages: [Message]
   public var reasoningEffort: EdgeToolsReasoningEffort
 
   public init(
-    messages: [Message],
+    messages: [Message] = [],
     reasoningEffort: EdgeToolsReasoningEffort = .default
   ) {
     self.messages = messages
@@ -32,12 +32,11 @@ public struct EdgeToolsConversationalPrompt: Hashable, Sendable {
       return message.audio
     }
   }
-
 }
 
 // MARK: - Message
 
-extension EdgeToolsConversationalPrompt {
+extension EdgeToolsTranscript {
   @nonexhaustive
   public enum Message: Hashable, Sendable {
     case system(SystemMessage)
@@ -49,7 +48,7 @@ extension EdgeToolsConversationalPrompt {
 
 // MARK: - Message Content
 
-extension EdgeToolsConversationalPrompt {
+extension EdgeToolsTranscript {
   public struct SystemMessage: Hashable, Sendable {
     public var content: String
 
@@ -113,19 +112,19 @@ extension EdgeToolsConversationalPrompt {
   }
 }
 
-extension EdgeToolsConversationalPrompt.Message {
+extension EdgeToolsTranscript.Message {
   public static func system(_ content: String) -> Self {
-    .system(EdgeToolsConversationalPrompt.SystemMessage(content: content))
+    .system(EdgeToolsTranscript.SystemMessage(content: content))
   }
 
   public static func user(
     _ content: String,
-    images: [EdgeToolsConversationalPrompt.Asset] = [],
-    videos: [EdgeToolsConversationalPrompt.Asset] = [],
-    audio: [EdgeToolsConversationalPrompt.Asset] = []
+    images: [EdgeToolsTranscript.Asset] = [],
+    videos: [EdgeToolsTranscript.Asset] = [],
+    audio: [EdgeToolsTranscript.Asset] = []
   ) -> Self {
     .user(
-      EdgeToolsConversationalPrompt.UserMessage(
+      EdgeToolsTranscript.UserMessage(
         content: content,
         images: images,
         videos: videos,
@@ -135,23 +134,52 @@ extension EdgeToolsConversationalPrompt.Message {
   }
 
   public static func assistant(_ parts: [EdgeToolsGenerationPart]) -> Self {
-    .assistant(EdgeToolsConversationalPrompt.AssistantMessage(parts: parts))
+    .assistant(EdgeToolsTranscript.AssistantMessage(parts: parts))
   }
 
   public static func tool(name: String, response: EdgeToolsValue) -> Self {
-    .tool(EdgeToolsConversationalPrompt.ToolMessage(name: name, response: response))
+    .tool(EdgeToolsTranscript.ToolMessage(name: name, response: response))
   }
 
   public init(generation: EdgeToolsEngineGeneration) {
-    let isEmpty = generation.parts.isEmpty && !generation.response.isEmpty
-    let parts = isEmpty ? [.text(generation.response)]  : generation.parts
-    self = .assistant(EdgeToolsConversationalPrompt.AssistantMessage(parts: parts))
+    let usesResponse = generation.parts.isEmpty && !generation.response.isEmpty
+    let parts = usesResponse ? [.text(generation.response)] : generation.parts
+    self = .assistant(EdgeToolsTranscript.AssistantMessage(parts: parts))
+  }
+}
+
+extension EdgeToolsTranscript.SystemMessage {
+  public static func system(_ content: String) -> Self {
+    Self(content: content)
+  }
+}
+
+extension EdgeToolsTranscript.UserMessage {
+  public static func user(
+    _ content: String,
+    images: [EdgeToolsTranscript.Asset] = [],
+    videos: [EdgeToolsTranscript.Asset] = [],
+    audio: [EdgeToolsTranscript.Asset] = []
+  ) -> Self {
+    Self(content: content, images: images, videos: videos, audio: audio)
+  }
+}
+
+extension EdgeToolsTranscript.AssistantMessage {
+  public static func assistant(_ parts: [EdgeToolsGenerationPart]) -> Self {
+    Self(parts: parts)
+  }
+}
+
+extension EdgeToolsTranscript.ToolMessage {
+  public static func tool(name: String, response: EdgeToolsValue) -> Self {
+    Self(name: name, response: response)
   }
 }
 
 // MARK: - Asset
 
-extension EdgeToolsConversationalPrompt {
+extension EdgeToolsTranscript {
   public struct Asset: Hashable, Sendable {
     @nonexhaustive
     public enum Content: Hashable, Sendable {
@@ -178,82 +206,4 @@ extension EdgeToolsConversationalPrompt {
       self.init(content: .bytes(bytes), mimeType: mimeTypeOverride)
     }
   }
-}
-
-// MARK: - MIME Type
-
-public struct EdgeToolsMIMEType:
-  RawRepresentable,
-  Hashable,
-  Sendable,
-  ExpressibleByStringLiteral
-{
-  public var rawValue: String
-
-  public init(rawValue: String) {
-    self.rawValue = rawValue
-  }
-
-  public init(stringLiteral value: String) {
-    self.init(rawValue: value)
-  }
-
-  public init?(path: String) {
-    guard let pathExtension = inferredPathExtension(from: path) else { return nil }
-    switch pathExtension {
-    case "aac": self = .aac
-    case "bmp": self = .bmp
-    case "flac": self = .flac
-    case "gif": self = .gif
-    case "heic": self = .heic
-    case "heif": self = .heif
-    case "jpg", "jpeg": self = .jpeg
-    case "m4a": self = .m4a
-    case "m4v": self = .m4v
-    case "mp3": self = .mp3
-    case "mp4": self = .mp4
-    case "mov": self = .quickTime
-    case "ogg": self = .ogg
-    case "opus": self = .opus
-    case "png": self = .png
-    case "wav": self = .wav
-    case "webp": self = .webP
-    default: return nil
-    }
-  }
-
-  public static let aac = Self(rawValue: "audio/aac")
-  public static let bmp = Self(rawValue: "image/bmp")
-  public static let flac = Self(rawValue: "audio/flac")
-  public static let gif = Self(rawValue: "image/gif")
-  public static let heic = Self(rawValue: "image/heic")
-  public static let heif = Self(rawValue: "image/heif")
-  public static let jpeg = Self(rawValue: "image/jpeg")
-  public static let m4a = Self(rawValue: "audio/mp4")
-  public static let m4v = Self(rawValue: "video/x-m4v")
-  public static let mp3 = Self(rawValue: "audio/mpeg")
-  public static let mp4 = Self(rawValue: "video/mp4")
-  public static let ogg = Self(rawValue: "audio/ogg")
-  public static let opus = Self(rawValue: "audio/opus")
-  public static let png = Self(rawValue: "image/png")
-  public static let quickTime = Self(rawValue: "video/quicktime")
-  public static let wav = Self(rawValue: "audio/wav")
-  public static let webP = Self(rawValue: "image/webp")
-}
-
-extension EdgeToolsMIMEType: EdgeToolsCodable {}
-
-private func inferredPathExtension(from path: String) -> String? {
-  let path =
-    path
-    .split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false)[0]
-    .split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)[0]
-  guard
-    let component = path.split(separator: "/").last,
-    let separator = component.lastIndex(of: ".")
-  else { return nil }
-
-  let pathExtension = component[component.index(after: separator)...]
-  guard !pathExtension.isEmpty else { return nil }
-  return pathExtension.lowercased()
 }

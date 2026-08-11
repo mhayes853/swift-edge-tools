@@ -29,6 +29,7 @@ public struct EdgeToolsError: Error, Hashable, Sendable {
     public static let modelNotPrepared = Self(rawValue: "model-not-prepared")
     public static let invalidMedia = Self(rawValue: "invalid-media")
     public static let unsupportedMedia = Self(rawValue: "unsupported-media")
+    public static let contextInUse = Self(rawValue: "context-in-use")
   }
 
   public let code: Code
@@ -143,4 +144,9 @@ extension EdgeToolsError {
   static func unsupportedMedia(_ message: String) -> Self {
     Self(code: .unsupportedMedia, message: message)
   }
+
+  static let contextInUse = Self(
+    code: .contextInUse,
+    message: "The context already has an active generation."
+  )
 }

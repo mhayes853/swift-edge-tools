@@ -16,6 +16,8 @@ struct EchoTool: EdgeTool {
 }
 
 final class MockEngine: EdgeToolsEngine {
+  final class Context: Identifiable, Sendable {}
+
   struct GenerateParameters: EdgeToolsEngineGenerateParameters {
     static let `default` = GenerateParameters()
     var maxTokens: Int? { nil }
@@ -37,9 +39,14 @@ final class MockEngine: EdgeToolsEngine {
 
   struct Prompt: Sendable {}
 
+  func context(_ parameters: Void) -> Context {
+    Context()
+  }
+
   func tokenize(
     prompt: Prompt,
-    tools: [EdgeToolDefinition]
+    tools: [EdgeToolDefinition],
+    context: Context
   ) async throws -> [EdgeToolsToken] {
     []
   }
@@ -48,6 +55,7 @@ final class MockEngine: EdgeToolsEngine {
     prompt: Prompt,
     tools: [EdgeToolDefinition],
     parameters: GenerateParameters,
+    context: Context,
     channel: sending EdgeToolsGenerationChannel
   ) throws -> GenerationTask {
     let token = EdgeToolsToken(id: 0, stringValue: "calling")

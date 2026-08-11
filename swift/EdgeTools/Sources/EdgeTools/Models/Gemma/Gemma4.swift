@@ -9,21 +9,24 @@
   import MLXVLM
 
   public struct Gemma4MLXProfile: MLXVLMModelProfile {
-    public typealias Prompt = EdgeToolsConversationalPrompt
+    public typealias Prompt = EdgeToolsTranscript
     public typealias GenerationParser = Gemma4GenerationParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
-    public typealias GrammarCompiler = XGRCompiler
-    public typealias GrammarContext = XGRGrammarContext
+    public typealias GrammarEngine = XGrammarEngine
 
     public static var extraStopTokens: Set<String> { ["<|tool_response>"] }
 
     public static func grammar(
-      prompt: EdgeToolsConversationalPrompt,
+      prompt: EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
       parameters: DefaultMLXGenerateParameters,
-      context: XGRGrammarContext
+      grammarEngine: borrowing XGrammarEngine
     ) throws -> XGRGrammar {
-      try Self.constrainedGrammar(tools: tools, parameters: parameters, context: context) { range in
+      try Self.constrainedGrammar(
+        tools: tools,
+        parameters: parameters,
+        grammarEngine: grammarEngine
+      ) { range in
         let toolCalls = try XGRGrammar.gemma4(tools: tools, range: range)
         guard prompt.reasoningEffort != .default, prompt.reasoningEffort.isEnabled else {
           return toolCalls
@@ -33,7 +36,7 @@
     }
 
     public static func prepare(
-      prompt: inout EdgeToolsConversationalPrompt,
+      prompt: inout EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
       parser: inout Gemma4GenerationParser
     ) {
@@ -41,7 +44,7 @@
     }
 
     public static nonisolated(nonsending) func input(
-      prompt: EdgeToolsConversationalPrompt,
+      prompt: EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer,
       processor: (any UserInputProcessor)?
@@ -53,12 +56,12 @@
 
   public typealias Gemma4MLXModelEngine = MLXEngine<Gemma4MLXProfile>
 
-  extension EdgeToolsModelEngine where Model == EdgeToolsMLXModel<Gemma4MLXProfile> {
-    public init(from directoryURL: URL) async throws {
+  extension MLXEngine where Profile == Gemma4MLXProfile {
+    public convenience init(from directoryURL: URL) async throws {
       try await self.init(from: MLXModelDirectory(url: directoryURL))
     }
 
-    public init(from directory: MLXModelDirectory) async throws {
+    public convenience init(from directory: MLXModelDirectory) async throws {
       try await self.init(from: directory) { weights, model in
         guard let model = model as? MLXVLM.Gemma4 else { return }
         let firstSharedLayer =
@@ -83,18 +86,18 @@
     }
   }
 
-  extension EdgeToolsConversationalPrompt {
+  extension EdgeToolsTranscript {
     fileprivate var gemma4PreparedForReasoning: Self {
       guard self.reasoningEffort != .default, self.reasoningEffort.isEnabled else { return self }
       var prompt = self
       if case .system(let message) = prompt.messages.first {
         guard !message.content.hasPrefix("<|think|>\n") else { return prompt }
         prompt.messages[0] = .system(
-          EdgeToolsConversationalPrompt.SystemMessage(content: "<|think|>\n\(message.content)")
+          EdgeToolsTranscript.SystemMessage(content: "<|think|>\n\(message.content)")
         )
       } else {
         prompt.messages.insert(
-          .system(EdgeToolsConversationalPrompt.SystemMessage(content: "<|think|>")),
+          .system(EdgeToolsTranscript.SystemMessage(content: "<|think|>")),
           at: 0
         )
       }

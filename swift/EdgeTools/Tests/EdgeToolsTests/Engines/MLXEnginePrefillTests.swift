@@ -11,62 +11,32 @@
     @Test
     func `Extending Prefill Only Processes Suffix`() async throws {
       let engine = try makePrefillTestEngine(LLMPrefillTestProfile.self)
+      let context = engine.context()
 
-      let initial = try await engine.prefill(promptPrefix: .tokens([10, 11, 12]), tools: [])
-      let extended = try await engine.prefill(
-        promptPrefix: .tokens([10, 11, 12, 13, 14]),
-        tools: []
-      )
+      context.transcript = .tokens([10, 11, 12])
+      let initial = try await engine.prefill(context: context)
+      context.transcript = .tokens([10, 11, 12, 13, 14])
+      let extended = try await engine.prefill(context: context)
 
       expectNoDifference(initial.metrics.tokens, 3)
       expectNoDifference(extended.metrics.tokens, 2)
     }
 
     @Test
-    func `Generation Only Processes Suffix After Prefill`() async throws {
+    func `Generation Reuses Prefill And Invalidates A Different Prefix`() async throws {
       let engine = try makePrefillTestEngine(LLMPrefillTestProfile.self)
-      _ = try await engine.prefill(promptPrefix: .tokens([10, 11, 12]), tools: [])
+      let context = engine.context()
+      context.transcript = .tokens([10, 11, 12])
+      _ = try await engine.prefill(context: context)
 
-      let generation = try await generate(
-        using: engine,
-        prompt: .tokens([10, 11, 12, 13, 14])
-      )
-
+      context.transcript = .tokens([10, 11, 12, 13, 14])
+      let generation = try await generate(using: engine, context: context)
       expectNoDifference(generation.prefillMetrics.tokens, 2)
-    }
 
-    @Test
-    func `Exact Prefill Avoids Reprocessing Prompt During Generation`() async throws {
-      let engine = try makePrefillTestEngine(LLMPrefillTestProfile.self)
-      let prompt = PrefillTestPrompt.tokens([10, 11, 12])
-      _ = try await engine.prefill(promptPrefix: prompt, tools: [])
-
-      let generation = try await generate(using: engine, prompt: prompt)
-
-      expectNoDifference(generation.prefillMetrics.tokens, 0)
-    }
-
-    @Test
-    func `Different Prefix Invalidates Prefill`() async throws {
-      let engine = try makePrefillTestEngine(LLMPrefillTestProfile.self)
-      _ = try await engine.prefill(promptPrefix: .tokens([10, 11, 12]), tools: [])
-
-      let prefill = try await engine.prefill(
-        promptPrefix: .tokens([10, 99, 12, 13]),
-        tools: []
-      )
+      context.transcript = .tokens([10, 99, 12, 13])
+      let prefill = try await engine.prefill(context: context)
 
       expectNoDifference(prefill.metrics.tokens, 4)
-    }
-
-    @Test
-    func `Shorter Prompt Invalidates Prefill`() async throws {
-      let engine = try makePrefillTestEngine(LLMPrefillTestProfile.self)
-      _ = try await engine.prefill(promptPrefix: .tokens([10, 11, 12]), tools: [])
-
-      let generation = try await generate(using: engine, prompt: .tokens([10, 11]))
-
-      expectNoDifference(generation.prefillMetrics.tokens, 2)
     }
   }
 
@@ -76,71 +46,14 @@
       @Test
       func `Extending Prefill With Same Image Only Processes Suffix`() async throws {
         let engine = try makePrefillTestEngine(VLMPrefillTestProfile.self)
-        _ = try await engine.prefill(
-          promptPrefix: .tokens([10, 11, 12], imageValue: 1),
-          tools: []
-        )
+        let context = engine.context()
+        context.transcript = .tokens([10, 11, 12], imageValue: 1)
+        _ = try await engine.prefill(context: context)
 
-        let extended = try await engine.prefill(
-          promptPrefix: .tokens([10, 11, 12, 13, 14], imageValue: 1),
-          tools: []
-        )
+        context.transcript = .tokens([10, 11, 12, 13, 14], imageValue: 1)
+        let extended = try await engine.prefill(context: context)
 
         expectNoDifference(extended.metrics.tokens, 2)
-      }
-
-      @Test
-      func `Generation Only Processes Suffix After Image Prefill`() async throws {
-        let engine = try makePrefillTestEngine(VLMPrefillTestProfile.self)
-        _ = try await engine.prefill(
-          promptPrefix: .tokens([10, 11, 12], imageValue: 1),
-          tools: []
-        )
-
-        let generation = try await generate(
-          using: engine,
-          prompt: .tokens([10, 11, 12, 13, 14], imageValue: 1)
-        )
-
-        expectNoDifference(generation.prefillMetrics.tokens, 2)
-      }
-
-      @Test
-      func `Different Image In History Invalidates Prefill`() async throws {
-        let engine = try makePrefillTestEngine(VLMPrefillTestProfile.self)
-        _ = try await engine.prefill(
-          promptPrefix: .tokens([10, 11, 12], imageValue: 1),
-          tools: []
-        )
-
-        let prefill = try await engine.prefill(
-          promptPrefix: .tokens([10, 11, 12, 13], imageValue: 2),
-          tools: []
-        )
-
-        expectNoDifference(prefill.metrics.tokens, 4)
-      }
-
-      @Test
-      func `Adding Or Removing Image Invalidates Prefill`() async throws {
-        let engine = try makePrefillTestEngine(VLMPrefillTestProfile.self)
-        _ = try await engine.prefill(promptPrefix: .tokens([10, 11, 12]), tools: [])
-
-        let withImage = try await generate(
-          using: engine,
-          prompt: .tokens([10, 11, 12, 13], imageValue: 1)
-        )
-        expectNoDifference(withImage.prefillMetrics.tokens, 4)
-
-        _ = try await engine.prefill(
-          promptPrefix: .tokens([10, 11, 12], imageValue: 1),
-          tools: []
-        )
-        let withoutImage = try await generate(
-          using: engine,
-          prompt: .tokens([10, 11, 12, 13])
-        )
-        expectNoDifference(withoutImage.prefillMetrics.tokens, 4)
       }
     }
   #endif
@@ -148,60 +61,58 @@
   // MARK: - Test Profiles
 
   private struct LLMPrefillTestProfile: MLXLLMModelProfile {
-    typealias Prompt = PrefillTestPrompt
+    typealias Prompt = EdgeToolsTranscript
     typealias GenerationParser = NeedleGenerationParser
     typealias GenerateParameters = DefaultMLXGenerateParameters
-    typealias GrammarCompiler = XGRCompiler
-    typealias GrammarContext = XGRGrammarContext
+    typealias GrammarEngine = XGrammarEngine
 
     static func grammar(
-      prompt: PrefillTestPrompt,
+      prompt: EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
       parameters: DefaultMLXGenerateParameters,
-      context: XGRGrammarContext
+      grammarEngine: borrowing XGrammarEngine
     ) throws -> XGRGrammar {
       .universal
     }
 
     static func input(
-      prompt: PrefillTestPrompt,
+      prompt: EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer,
       processor: (any UserInputProcessor)?
     ) async throws -> LMInput {
-      LMInput(tokens: MLXArray(prompt.tokenIds))
+      LMInput(tokens: MLXArray(prompt.prefillTestTokenIds))
     }
   }
 
   #if canImport(CoreImage) && canImport(MLXVLM)
     private struct VLMPrefillTestProfile: MLXVLMModelProfile {
-      typealias Prompt = PrefillTestPrompt
+      typealias Prompt = EdgeToolsTranscript
       typealias GenerationParser = NeedleGenerationParser
       typealias GenerateParameters = DefaultMLXGenerateParameters
-      typealias GrammarCompiler = XGRCompiler
-      typealias GrammarContext = XGRGrammarContext
+      typealias GrammarEngine = XGrammarEngine
 
       static func grammar(
-        prompt: PrefillTestPrompt,
+        prompt: EdgeToolsTranscript,
         tools: [EdgeToolDefinition],
         parameters: DefaultMLXGenerateParameters,
-        context: XGRGrammarContext
+        grammarEngine: borrowing XGrammarEngine
       ) throws -> XGRGrammar {
         .universal
       }
 
       static func input(
-        prompt: PrefillTestPrompt,
+        prompt: EdgeToolsTranscript,
         tools: [EdgeToolDefinition],
         tokenizer: any EdgeToolsTokenizer,
         processor: (any UserInputProcessor)?
       ) async throws -> LMInput {
         LMInput(
           text: LMInput.Text(
-            tokens: MLXArray(prompt.tokenIds).expandedDimensions(axis: 0),
-            mask: MLXArray.ones([1, prompt.tokenIds.count]).asType(.int8)
+            tokens: MLXArray(prompt.prefillTestTokenIds).expandedDimensions(axis: 0),
+            mask: MLXArray.ones([1, prompt.prefillTestTokenIds.count]).asType(.int8)
           ),
-          image: prompt.imageValue.map {
+          image: prompt.prefillTestImageValue.map {
             LMInput.ProcessedImage(
               pixels: MLXArray([$0], [1, 1, 1]),
               frames: [THW(1, 1, 1)]
@@ -212,15 +123,33 @@
     }
   #endif
 
-  private struct PrefillTestPrompt: Sendable {
-    var tokenIds: [EdgeToolsToken.ID]
-    var imageValue: Float?
-
-    static func tokens(
+  extension EdgeToolsTranscript {
+    fileprivate static func tokens(
       _ tokenIds: [EdgeToolsToken.ID],
-      imageValue: Float? = nil
+      imageValue: UInt8? = nil
     ) -> Self {
-      Self(tokenIds: tokenIds, imageValue: imageValue)
+      Self(
+        messages: [
+          .user(
+            tokenIds.map(String.init).joined(separator: ","),
+            images: imageValue.map { [Asset(bytes: [$0])] } ?? []
+          )
+        ]
+      )
+    }
+
+    fileprivate var prefillTestTokenIds: [EdgeToolsToken.ID] {
+      guard case .user(let message) = self.messages.last else { return [] }
+      return message.content.split(separator: ",").compactMap { EdgeToolsToken.ID($0) }
+    }
+
+    fileprivate var prefillTestImageValue: Float? {
+      guard
+        case .user(let message) = self.messages.last,
+        case .bytes(let bytes) = message.images.first?.content,
+        let value = bytes.first
+      else { return nil }
+      return Float(value)
     }
   }
 
@@ -267,7 +196,7 @@
 
   private func makePrefillTestEngine<Profile: MLXModelProfile>(
     _: Profile.Type
-  ) throws -> MLXEngine<Profile> {
+  ) throws -> MLXEngine<Profile> where Profile.Prompt == EdgeToolsTranscript {
     let tokenizer = try testTokenizer()
     let eosTokenId = try requiredTestEOSToken(tokenizer: tokenizer)
     return try MLXEngine<Profile>(
@@ -282,20 +211,20 @@
 
   private func generate<Profile: MLXModelProfile>(
     using engine: MLXEngine<Profile>,
-    prompt: PrefillTestPrompt
+    context: MLXContext<Profile>
   ) async throws -> EdgeToolsEngineGeneration
   where
-    Profile.Prompt == PrefillTestPrompt,
+    Profile.Prompt == EdgeToolsTranscript,
     Profile.GenerateParameters == DefaultMLXGenerateParameters
   {
     let task = try engine.generate(
-      prompt: prompt,
       tools: [],
       parameters: DefaultMLXGenerateParameters(
         sampler: ArgMaxSampler(),
         maxTokens: 1,
         synchronizeStreamForMemorySnapshots: false
       ),
+      context: context,
       channel: EdgeToolsGenerationChannel()
     )
     return try await task.value

@@ -145,7 +145,7 @@ struct GenerationOptions: ParsableArguments {
     GenerationRequest(
       system: self.system,
       user: prompt,
-      images: self.image.map { [EdgeToolsConversationalPrompt.Asset(path: $0)] } ?? [],
+      images: self.image.map { [EdgeToolsTranscript.Asset(path: $0)] } ?? [],
       tools: tools,
       grammar: self.grammar,
       toolCallRange: self.toolCallRange,

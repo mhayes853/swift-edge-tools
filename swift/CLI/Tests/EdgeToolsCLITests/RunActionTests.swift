@@ -214,4 +214,4 @@ struct `RunAction tests` {
   }
 }
 
-private typealias Asset = EdgeToolsConversationalPrompt.Asset
+private typealias Asset = EdgeToolsTranscript.Asset

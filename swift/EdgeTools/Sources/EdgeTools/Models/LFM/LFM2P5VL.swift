@@ -7,25 +7,24 @@
   // MARK: - LFM2P5VL Model
 
   public struct LFM2P5VLMLXProfile: MLXVLMModelProfile {
-    public typealias Prompt = EdgeToolsConversationalPrompt
+    public typealias Prompt = EdgeToolsTranscript
     public typealias GenerationParser = LFM2P5GenerationParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
-    public typealias GrammarCompiler = XGRCompiler
-    public typealias GrammarContext = XGRGrammarContext
+    public typealias GrammarEngine = XGrammarEngine
 
     public static func grammar(
-      prompt: EdgeToolsConversationalPrompt,
+      prompt: EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
       parameters: DefaultMLXGenerateParameters,
-      context: XGRGrammarContext
+      grammarEngine: borrowing XGrammarEngine
     ) throws -> XGRGrammar {
-      try Self.constrainedGrammar(tools: tools, parameters: parameters, context: context) {
-        try XGRGrammar.lfm2P5(tools: tools, range: $0)
+      try Self.constrainedGrammar(tools: tools, parameters: parameters, grammarEngine: grammarEngine) {
+        try .lfm2P5(tools: tools, range: $0)
       }
     }
 
     public static nonisolated(nonsending) func input(
-      prompt: EdgeToolsConversationalPrompt,
+      prompt: EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer,
       processor: (any UserInputProcessor)?
@@ -38,15 +37,14 @@
   public typealias LFM2P5VLMLXModelEngine = MLXEngine<LFM2P5VLMLXProfile>
 
   #if canImport(Tokenizers)
-    extension EdgeToolsModelEngine where Model == EdgeToolsMLXModel<LFM2P5VLMLXProfile> {
-      public init(from directoryURL: URL) async throws {
+    extension MLXEngine where Profile == LFM2P5VLMLXProfile {
+      public convenience init(from directoryURL: URL) async throws {
         try await self.init(from: MLXModelDirectory(url: directoryURL))
       }
 
-      public init(from directory: MLXModelDirectory) async throws {
+      public convenience init(from directory: MLXModelDirectory) async throws {
         try await self.init(from: directory) { weights, model in
-          guard let model = model as? MLXVLM.LFM2VL,
-            !model.config.projectorUseLayernorm
+          guard let model = model as? MLXVLM.LFM2VL, !model.config.projectorUseLayernorm
           else { return }
           let staleKeys = weights.keys.filter {
             $0.hasPrefix("multi_modal_projector.layer_norm.")
@@ -59,7 +57,7 @@
     }
   #endif
 
-  extension EdgeToolsConversationalPrompt {
+  extension EdgeToolsTranscript {
     fileprivate func lfm2P5VLUserInput(tools: [EdgeToolDefinition]) throws -> UserInput {
       try self.mlxUserInput(tools: tools) { message in
         guard case .user(let message) = message else {
@@ -73,5 +71,4 @@
       }
     }
   }
-
 #endif

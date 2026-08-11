@@ -312,43 +312,6 @@ public protocol NeedleGenerateParameters: EdgeToolsEngineGenerateParameters {
 }
 
 #if XGrammar
-  // MARK: - NeedleModel
-
-  public protocol NeedleModel: EdgeToolsModel
-  where
-    Prompt == NeedlePrompt,
-    GenerateParameters: NeedleGenerateParameters,
-    GenerationParser == NeedleGenerationParser,
-    GrammarCompiler == XGRCompiler,
-    GrammarContext == XGRGrammarContext
-  {}
-
-  extension NeedleModel {
-    public func grammarContext(tokenizer: any EdgeToolsTokenizer) throws -> XGRGrammarContext {
-      guard let tokenizer = tokenizer as? any XGRTokenizer else {
-        throw EdgeToolsError.unsupportedTokenizer
-      }
-      let tokenizerInfo = try tokenizer.tokenizerInfo(
-        modelVocabularySize: self.vocabularySize,
-        extraStopTokenIds: self.extraStopTokenIds
-      )
-      return XGRGrammarContext(tokenizerInfo: tokenizerInfo)
-    }
-
-    public func grammarCompiler(context: borrowing XGRGrammarContext) throws -> XGRCompiler {
-      try XGRCompiler(tokenizerInfo: context.tokenizerInfo)
-    }
-
-    public func grammar(
-      prompt: NeedlePrompt,
-      tools: [EdgeToolDefinition],
-      parameters: GenerateParameters,
-      context: XGRGrammarContext
-    ) throws -> XGRGrammar {
-      try XGRGrammar.needle(tools: tools, range: parameters.toolCallRange)
-    }
-  }
-
   // MARK: - XGRTokenizerInfo
 
   extension XGRTokenizerInfo {

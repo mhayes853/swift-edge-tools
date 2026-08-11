@@ -1,4 +1,4 @@
-▿ EdgeToolsConversationalPrompt
+▿ EdgeToolsTranscript
   ▿ messages: 5 elements
     ▿ Message
       ▿ system: SystemMessage

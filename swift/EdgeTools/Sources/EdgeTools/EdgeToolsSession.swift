@@ -1,4 +1,5 @@
 import _Concurrency
+import OrderedCollections
 
 #if !$Embedded
   import Observation
@@ -9,6 +10,7 @@ import _Concurrency
 public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable {
   public let engine: Engine
   private let _tools: Lock<[EdgeToolsSessionTool]>
+  private let _contexts = Lock(OrderedDictionary<Engine.Context.ID, Engine.Context>())
   private let _activeStreams = Lock([EdgeToolsSessionStream]())
   private let observationRegistrar = _ObservationRegistrar()
 
@@ -28,6 +30,11 @@ public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable {
 
   public var isResponding: Bool {
     !self.activeStreams.isEmpty
+  }
+
+  public var contexts: [Engine.Context] {
+    self.access(.contexts)
+    return self._contexts.withLock { Array($0.values) }
   }
 
   public var activeStreams: [EdgeToolsSessionStream] {
@@ -69,19 +76,76 @@ public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable {
       }
     }
   }
+
+  fileprivate func registerContext(_ context: Engine.Context) {
+    self._contexts.withLock { contexts in
+      self.withMutation(of: .contexts) {
+        contexts.removeValue(forKey: context.id)
+        contexts[context.id] = context
+      }
+    }
+  }
+
+  fileprivate func resolveContext(_ context: Engine.Context?) -> Engine.Context {
+    guard let context else { return self.context() }
+    self.registerContext(context)
+    return context
+  }
 }
 
+// MARK: - Contexts
+
 extension EdgeToolsSession {
-  public func tokenize(prompt: Engine.Prompt) async throws -> [EdgeToolsToken] {
+  public func context() -> Engine.Context {
+    let context = self.engine.context()
+    self.registerContext(context)
+    return context
+  }
+
+  public func context(_ parameters: Engine.ContextParameters) -> Engine.Context {
+    let context = self.engine.context(parameters)
+    self.registerContext(context)
+    return context
+  }
+
+  public func removeContext(id: Engine.Context.ID) {
+    _ = self._contexts.withLock { contexts in
+      self.withMutation(of: .contexts) {
+        contexts.removeValue(forKey: id)
+      }
+    }
+  }
+
+  public func removeContext(_ context: Engine.Context) {
+    self.removeContext(id: context.id)
+  }
+
+  public func tokenize(
+    prompt: Engine.Prompt,
+    context: Engine.Context? = nil
+  ) async throws -> [EdgeToolsToken] {
     let toolDefinitions = self.tools.map { $0.definition }
-    return try await self.engine.tokenize(prompt: prompt, tools: toolDefinitions)
+    let context = self.resolveContext(context)
+    return try await self.engine.tokenize(
+      prompt: prompt,
+      tools: toolDefinitions,
+      context: context
+    )
   }
 }
 
 extension EdgeToolsSession where Engine: EdgeToolsPrefillableEngine {
-  public func prefill(promptPrefix: Engine.Prompt) async throws -> EdgeToolsEnginePrefill {
+  public func prefill(
+    promptPrefix: Engine.Prompt,
+    context: Engine.Context? = nil
+  ) async throws -> EdgeToolsEnginePrefill {
     let toolDefinitions = self.tools.map { $0.definition }
-    return try await self.engine.prefill(promptPrefix: promptPrefix, tools: toolDefinitions)
+    let context = self.resolveContext(context)
+    return try await self.engine.prefill(
+      promptPrefix: promptPrefix,
+      tools: toolDefinitions,
+      context: context
+    )
   }
 }
 
@@ -409,6 +473,7 @@ extension EdgeToolsSessionStream {
   fileprivate func start<Engine: EdgeToolsEngine>(
     session: EdgeToolsSession<Engine>,
     prompt: Engine.Prompt,
+    context: Engine.Context?,
     toolDefinitions: [EdgeToolDefinition],
     parameters: sending Engine.GenerateParameters
   ) {
@@ -426,6 +491,7 @@ extension EdgeToolsSessionStream {
       try await self.runGeneration(
         session: session,
         prompt: prompt,
+        context: context,
         toolDefinitions: toolDefinitions,
         parameters: parameters
       )
@@ -461,6 +527,7 @@ extension EdgeToolsSessionStream {
   private func runGeneration<Engine: EdgeToolsEngine>(
     session: EdgeToolsSession<Engine>,
     prompt: Engine.Prompt,
+    context: Engine.Context?,
     toolDefinitions: [EdgeToolDefinition],
     parameters: sending Engine.GenerateParameters
   ) async throws -> EdgeToolsSessionGeneration {
@@ -479,10 +546,12 @@ extension EdgeToolsSessionStream {
       onPart: { part in self.emit(part: part) }
     )
     do {
+      let context = session.resolveContext(context)
       let generationTask = try session.engine.generate(
         prompt: prompt,
         tools: toolDefinitions,
         parameters: parameters,
+        context: context,
         channel: channel
       )
       let shouldStop = self.state.withLock { state in
@@ -648,6 +717,7 @@ extension EdgeToolsSessionStream {
 extension EdgeToolsSession {
   public func stream(
     prompt: Engine.Prompt,
+    context: Engine.Context? = nil,
     parameters: sending Engine.GenerateParameters = .default,
     shouldInvokeTools: @escaping @Sendable (AnyEdgeToolCall) -> Bool = { _ in true }
   ) -> EdgeToolsSessionStream {
@@ -663,6 +733,7 @@ extension EdgeToolsSession {
     stream.start(
       session: self,
       prompt: prompt,
+      context: context,
       toolDefinitions: tools.map { $0.definition },
       parameters: parameters
     )
@@ -672,11 +743,13 @@ extension EdgeToolsSession {
   @concurrent
   public func generate(
     prompt: Engine.Prompt,
+    context: Engine.Context? = nil,
     parameters: sending Engine.GenerateParameters = .default,
     shouldInvokeTools: @escaping @Sendable (AnyEdgeToolCall) -> Bool = { _ in true }
   ) async throws -> EdgeToolsSessionGeneration {
     try await self.stream(
       prompt: prompt,
+      context: context,
       parameters: parameters,
       shouldInvokeTools: shouldInvokeTools
     )
@@ -704,6 +777,7 @@ private final class RawToolCallDeliveryState: Sendable {
 extension EdgeToolsSession {
   fileprivate enum ObservedProperty {
     case tools
+    case contexts
     case activeStreams
   }
 
@@ -711,6 +785,7 @@ extension EdgeToolsSession {
     #if !$Embedded
       switch property {
       case .tools: self.observationRegistrar.access(self, keyPath: \.tools)
+      case .contexts: self.observationRegistrar.access(self, keyPath: \.contexts)
       case .activeStreams: self.observationRegistrar.access(self, keyPath: \.activeStreams)
       }
     #endif
@@ -724,6 +799,8 @@ extension EdgeToolsSession {
       switch property {
       case .tools:
         self.observationRegistrar.withMutation(of: self, keyPath: \.tools, body)
+      case .contexts:
+        self.observationRegistrar.withMutation(of: self, keyPath: \.contexts, body)
       case .activeStreams:
         self.observationRegistrar.withMutation(of: self, keyPath: \.activeStreams, body)
       }

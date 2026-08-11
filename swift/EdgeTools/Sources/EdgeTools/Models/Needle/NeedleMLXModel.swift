@@ -8,6 +8,7 @@
   import MLXLLM
   import MLXLMCommon
   import MLXNN
+  import Observation
 
   // MARK: - LMInput + Needle
 
@@ -35,12 +36,19 @@
 
     private let model: NeedleSimpleAttentionNetwork
     @ModuleInfo(key: "lm_head") private var lmHead: Embedding?
-    private var crossAttentionMask: MLXArray?
-    private var crossAttentionKV: [ProjectedAttentionKV]?
-    private var encoderOutput: MLXArray?
-    private var compiledDecoderFunction: (@Sendable ([MLXArray]) -> [MLXArray])?
+
+    private let compiledDecoderFunction = Lock<(@Sendable ([MLXArray]) -> [MLXArray])?>(nil)
     private static let encoderOutputKey = LMOutput.Key<MLXArray>(
       "edge-tools.needle.encoder-output"
+    )
+    private static let crossAttentionMaskKey = LMOutput.Key<MLXArray>(
+      "edge-tools.needle.cross-attention-mask"
+    )
+    private static let crossAttentionKeysKey = LMOutput.Key<[MLXArray]>(
+      "edge-tools.needle.cross-attention-keys"
+    )
+    private static let crossAttentionValuesKey = LMOutput.Key<[MLXArray]>(
+      "edge-tools.needle.cross-attention-values"
     )
 
     private var defaultEncoderOutput: MLXArray {
@@ -94,16 +102,12 @@
         inputIds: encoderInput,
         padTokenId: self.configuration.padTokenId
       )
-      self.crossAttentionMask = encoderMask
-
       let encoderOutput = self.model.encode(
         encoderInput,
         previous: self.defaultEncoderOutput,
         mask: encoderMask
       )
       let crossAttentionKV = self.model.precomputeCrossAttention(encoderOutput: encoderOutput)
-      self.crossAttentionKV = crossAttentionKV
-      self.encoderOutput = encoderOutput
 
       let output = self.decode(
         MLXArray([self.configuration.decoderStartTokenId])[.newAxis, 0...],
@@ -124,11 +128,16 @@
       state: LMOutput.State?
     ) -> LMOutput {
       precondition(input.tokens.dim(1) == 1, "Needle decoding requires exactly one token.")
-      guard let crossAttentionMask, let crossAttentionKV else {
+      guard
+        let crossAttentionMask = state?[Self.crossAttentionMaskKey],
+        let crossAttentionKeys = state?[Self.crossAttentionKeysKey],
+        let crossAttentionValues = state?[Self.crossAttentionValuesKey]
+      else {
         preconditionFailure("Needle must be prepared before decoding.")
       }
-      let encoderOutput =
-        state?[Self.encoderOutputKey] ?? self.encoderOutput ?? self.defaultEncoderOutput
+      let crossAttentionKV = zip(crossAttentionKeys, crossAttentionValues)
+        .map { ProjectedAttentionKV(keys: $0, values: $1) }
+      let encoderOutput = state?[Self.encoderOutputKey] ?? self.defaultEncoderOutput
       return self.decode(
         input.tokens,
         crossAttentionMask: crossAttentionMask,
@@ -147,7 +156,7 @@
     }
 
     public func loadWeights(weights: [String: MLXArray]) throws {
-      self.compiledDecoderFunction = nil
+      self.compiledDecoderFunction.withLock { $0 = nil }
       try self.update(
         parameters: ModuleParameters.unflattened(self.sanitize(weights: weights)),
         verify: .all
@@ -161,12 +170,6 @@
         weights.removeValue(forKey: "lm_head.weight")
       }
       return weights
-    }
-
-    public func reset() {
-      self.encoderOutput = nil
-      self.crossAttentionKV = nil
-      self.crossAttentionMask = nil
     }
 
     private func decode(
@@ -199,6 +202,9 @@
       }
       var state = LMOutput.State()
       state[Self.encoderOutputKey] = encoderOutput
+      state[Self.crossAttentionMaskKey] = crossAttentionMask
+      state[Self.crossAttentionKeysKey] = precomputedCrossAttention.map(\.keys)
+      state[Self.crossAttentionValuesKey] = precomputedCrossAttention.map(\.values)
       return LMOutput(logits: outputs[0], state: state)
     }
 
@@ -216,36 +222,38 @@
     }
 
     private func compiledDecoder() -> @Sendable ([MLXArray]) -> [MLXArray] {
-      if let compiledDecoderFunction {
-        return compiledDecoderFunction
+      self.compiledDecoderFunction.withLock { compiledDecoderFunction in
+        if let compiledDecoderFunction {
+          return compiledDecoderFunction
+        }
+        let layerCount = self.configuration.decoderLayers
+        let model = self.model
+        let outputProjection = self.lmHead ?? self.model.embedding
+        let function = compile { inputs in
+          let crossAttention = zip(
+            inputs[3..<(3 + layerCount)],
+            inputs[(3 + layerCount)..<(3 + (2 * layerCount))]
+          )
+          .map { ProjectedAttentionKV(keys: $0, values: $1) }
+          let caches = zip(
+            inputs[(3 + (2 * layerCount))..<(3 + (3 * layerCount))],
+            inputs[(3 + (3 * layerCount))..<(3 + (4 * layerCount))]
+          )
+          .map { NeedleKVCache.State(keys: $0, values: $1) }
+          let output = model.decode(
+            inputs[0],
+            position: inputs[1],
+            crossAttentionMask: inputs[2],
+            precomputedCrossAttention: crossAttention,
+            caches: caches
+          )
+          return [outputProjection.asLinear(output.output)]
+            + output.caches.map(\.keys)
+            + output.caches.map(\.values)
+        }
+        compiledDecoderFunction = function
+        return function
       }
-      let layerCount = self.configuration.decoderLayers
-      let model = self.model
-      let outputProjection = self.lmHead ?? self.model.embedding
-      let compiledDecoderFunction = compile { inputs in
-        let crossAttention = zip(
-          inputs[3..<(3 + layerCount)],
-          inputs[(3 + layerCount)..<(3 + (2 * layerCount))]
-        )
-        .map { ProjectedAttentionKV(keys: $0, values: $1) }
-        let caches = zip(
-          inputs[(3 + (2 * layerCount))..<(3 + (3 * layerCount))],
-          inputs[(3 + (3 * layerCount))..<(3 + (4 * layerCount))]
-        )
-        .map { NeedleKVCache.State(keys: $0, values: $1) }
-        let output = model.decode(
-          inputs[0],
-          position: inputs[1],
-          crossAttentionMask: inputs[2],
-          precomputedCrossAttention: crossAttention,
-          caches: caches
-        )
-        return [outputProjection.asLinear(output.output)]
-          + output.caches.map(\.keys)
-          + output.caches.map(\.values)
-      }
-      self.compiledDecoderFunction = compiledDecoderFunction
-      return compiledDecoderFunction
     }
   }
 
@@ -288,8 +296,7 @@
       public typealias Prompt = NeedlePrompt
       public typealias GenerateParameters = NeedleMLXGenerateParameters
       public typealias GenerationParser = NeedleGenerationParser
-      public typealias GrammarCompiler = XGRCompiler
-      public typealias GrammarContext = XGRGrammarContext
+      public typealias GrammarEngine = XGrammarEngine
 
       public let languageModel: NeedleLanguageModel
 
@@ -310,7 +317,7 @@
         prompt: NeedlePrompt,
         tools: [EdgeToolDefinition],
         parameters: NeedleMLXGenerateParameters,
-        context: XGRGrammarContext
+        grammarEngine: borrowing XGrammarEngine
       ) throws -> XGRGrammar {
         try .needle(tools: tools, range: parameters.toolCallRange)
       }
@@ -325,19 +332,263 @@
       }
     }
 
-    public typealias NeedleMLXModelEngine = MLXEngine<NeedleMLXProfile>
+    // MARK: - NeedleMLXGenerationState
 
-    extension EdgeToolsModelEngine where Model == EdgeToolsMLXModel<NeedleMLXProfile> {
-      public init(from directoryURL: URL) async throws {
+    public struct NeedleMLXGenerationState {
+      public var model: MLXModelState<NeedleMLXProfile>
+
+      public init(model: sending MLXModelState<NeedleMLXProfile>) {
+        self.model = model
+      }
+    }
+
+    // MARK: - NeedleMLXContext
+
+    public final class NeedleMLXContext: Identifiable, Sendable {
+      private actor Runtime {
+        var state: NeedleMLXGenerationState?
+
+        init(model: sending MLXModelState<NeedleMLXProfile>) {
+          self.state = NeedleMLXGenerationState(model: model)
+        }
+
+        func takeState() throws -> sending NeedleMLXGenerationState {
+          guard let isolatedState = self.state.take() else {
+            throw EdgeToolsError.contextInUse
+          }
+          // The region isolation checker cannot yet express that `take()` removed the only
+          // actor-isolated reference. The value is exclusively owned by the caller after this.
+          nonisolated(unsafe) let state = isolatedState
+          return state
+        }
+
+        func restore(state: sending NeedleMLXGenerationState) {
+          precondition(self.state == nil, "A Needle MLX context state may only be restored once.")
+          self.state = state
+        }
+      }
+
+      private let runtime: Runtime
+      private let responding = Lock(false)
+      private let observationRegistrar = _ObservationRegistrar()
+
+      public var isResponding: Bool {
+        self.observationRegistrar.access(self, keyPath: \.isResponding)
+        return self.responding.withBorrowedLock { $0 }
+      }
+
+      fileprivate init(model: sending MLXModelState<NeedleMLXProfile>) {
+        self.runtime = Runtime(model: model)
+      }
+
+      fileprivate func begin() throws {
+        let didBegin = self.responding.withLock { isResponding in
+          guard !isResponding else {
+            return false
+          }
+          self.observationRegistrar.withMutation(of: self, keyPath: \.isResponding) {
+            isResponding = true
+          }
+          return true
+        }
+        guard didBegin else {
+          throw EdgeToolsError.contextInUse
+        }
+      }
+
+      fileprivate func end() {
+        self.responding.withLock { isResponding in
+          self.observationRegistrar.withMutation(of: self, keyPath: \.isResponding) {
+            isResponding = false
+          }
+        }
+      }
+
+      fileprivate func takeState() async throws -> sending NeedleMLXGenerationState {
+        do {
+          return try await self.runtime.takeState()
+        } catch {
+          self.end()
+          throw error
+        }
+      }
+
+      fileprivate func restore(state: sending NeedleMLXGenerationState) async {
+        await self.runtime.restore(state: state)
+        self.end()
+      }
+    }
+
+    extension NeedleMLXContext: Observable {}
+
+    // MARK: - NeedleMLXModelEngine
+
+    public final class NeedleMLXModelEngine:
+      EdgeToolsModelEngine, EdgeToolsPrefillableEngine
+    {
+      public typealias Context = NeedleMLXContext
+      public typealias ContextParameters = Void
+      public typealias Prompt = NeedlePrompt
+      public typealias GenerateParameters = NeedleMLXGenerateParameters
+      public typealias ModelGenerationState = NeedleMLXGenerationState
+      public typealias GenerationParser = NeedleGenerationParser
+      public typealias GrammarEngine = XGrammarEngine
+
+      private let prototype: Lock<MLXModelState<NeedleMLXProfile>>
+      private let extraStopTokenIds: Set<EdgeToolsToken.ID>
+      public let tokenizer: any EdgeToolsTokenizer
+      public let grammarEngine: XGrammarEngine
+
+      public init(
+        languageModel: sending NeedleLanguageModel,
+        tokenizer: sending any EdgeToolsTokenizer,
+        vocabularySize: Int,
+        extraStopTokenIds: Set<EdgeToolsToken.ID> = []
+      ) throws {
+        let prototype = MLXModelState<NeedleMLXProfile>(
+          languageModel: languageModel,
+          vocabularySize: vocabularySize,
+          extraStopTokenIds: extraStopTokenIds
+        )
+        self.grammarEngine = try prototype.grammarEngine(tokenizer: tokenizer)
+        self.prototype = Lock(prototype)
+        self.extraStopTokenIds = extraStopTokenIds
+        self.tokenizer = tokenizer
+      }
+
+      public func context(_ parameters: Void) -> NeedleMLXContext {
+        self.prototype.withBorrowedLock {
+          NeedleMLXContext(model: $0.contextState())
+        }
+      }
+
+      public func tokenize(
+        prompt: NeedlePrompt,
+        tools: [EdgeToolDefinition],
+        context: NeedleMLXContext
+      ) async throws -> [EdgeToolsToken] {
+        var model = self.prototype.withBorrowedLock { $0.contextState() }
+        let tokenIds = try await model.tokenIds(
+          prompt: prompt,
+          tools: tools,
+          tokenizer: self.tokenizer
+        )
+        let tokens = self.tokenizer.convertIdsToTokens(tokenIds)
+        return zip(tokenIds, tokens)
+          .compactMap { tokenId, token in
+            token.map { EdgeToolsToken(id: tokenId, stringValue: $0) }
+          }
+      }
+
+      public func generationState(
+        prompt: NeedlePrompt,
+        context: NeedleMLXContext
+      ) async throws -> NeedleMLXGenerationState {
+        try context.begin()
+        return try await context.takeState()
+      }
+
+      public func prepare(
+        prompt: inout NeedlePrompt,
+        tools: [EdgeToolDefinition],
+        parameters: NeedleMLXGenerateParameters,
+        parser: inout NeedleGenerationParser,
+        state: inout NeedleMLXGenerationState
+      ) async throws -> EdgeToolsModelPreparation {
+        try await state.model.prepare(
+          prompt: &prompt,
+          tools: tools,
+          tokenizer: self.tokenizer,
+          parameters: parameters,
+          parser: &parser
+        )
+      }
+
+      public func grammar(
+        prompt: NeedlePrompt,
+        tools: [EdgeToolDefinition],
+        parameters: NeedleMLXGenerateParameters,
+        state: NeedleMLXGenerationState
+      ) throws -> XGRGrammar {
+        try NeedleMLXProfile.grammar(
+          prompt: prompt,
+          tools: tools,
+          parameters: parameters,
+          grammarEngine: self.grammarEngine
+        )
+      }
+
+      public func decode(
+        bitmask: GrammarBitmask,
+        parameters: NeedleMLXGenerateParameters,
+        state: inout NeedleMLXGenerationState
+      ) async throws -> EdgeToolsModelSample {
+        try await state.model.decode(bitmask: bitmask, parameters: parameters)
+      }
+
+      public func stopTokenIds(state: NeedleMLXGenerationState) -> Set<EdgeToolsToken.ID> {
+        var stopTokenIds = self.extraStopTokenIds
+        if let eosTokenId = self.tokenizer.eosTokenId {
+          stopTokenIds.insert(eosTokenId)
+        }
+        return stopTokenIds
+      }
+
+      public func finalize(
+        state: consuming NeedleMLXGenerationState,
+        result: consuming Result<EdgeToolsEngineGeneration, any Error>,
+        context: NeedleMLXContext
+      ) async -> Result<EdgeToolsEngineGeneration, any Error> {
+        var state = state
+        let metadata = state.model.finish()
+        await state.model.resetGeneration()
+        // The region isolation checker cannot express that `state` is consumed here and is not
+        // accessed after it is transferred back to the context.
+        nonisolated(unsafe) let restoredState = state
+        await context.restore(state: restoredState)
+        guard case .success(var generation) = result else {
+          return result
+        }
+        generation.metadata.merge(metadata) { _, finalValue in finalValue }
+        return .success(generation)
+      }
+
+      public func prefill(
+        promptPrefix: NeedlePrompt,
+        tools: [EdgeToolDefinition],
+        context: NeedleMLXContext
+      ) async throws -> EdgeToolsEnginePrefill {
+        try context.begin()
+        var state = try await context.takeState()
+        do {
+          let prefill = try await state.model.prefill(
+            prompt: promptPrefix,
+            tools: tools,
+            tokenizer: self.tokenizer
+          )
+          await context.restore(state: state)
+          return prefill
+        } catch {
+          await state.model.resetGeneration()
+          await context.restore(state: state)
+          throw error
+        }
+      }
+
+      public func clearCaches() {
+        self.grammarEngine.clearCaches()
+      }
+
+      public convenience init(from directoryURL: URL) async throws {
         try await self.init(from: MLXModelDirectory(url: directoryURL))
       }
 
-      public init(from directory: MLXModelDirectory) async throws {
+      public convenience init(from directory: MLXModelDirectory) async throws {
         let configuration = try directory.loadConfiguration(NeedleModelConfiguration.self)
         try await self.init(from: directory, configuration: configuration)
       }
 
-      public init(
+      public convenience init(
         from directory: MLXModelDirectory,
         configuration: NeedleModelConfiguration
       ) async throws {
@@ -359,6 +610,12 @@
           vocabularySize: configuration.vocabularySize,
           extraStopTokenIds: extraStopTokenIds
         )
+      }
+    }
+
+    extension EdgeToolsSession where Engine == NeedleMLXModelEngine {
+      public func clearCaches() {
+        self.engine.clearCaches()
       }
     }
   #endif

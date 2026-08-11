@@ -7,6 +7,12 @@ private typealias MockGenerationTaskValue = Task<EdgeToolsEngineGeneration, Mock
 final class MockEngine: EdgeToolsPrefillableEngine, Sendable {
   typealias Prompt = NeedlePrompt
 
+  final class Context: Identifiable, Sendable {
+    var id: ObjectIdentifier {
+      ObjectIdentifier(self)
+    }
+  }
+
   final class GenerationTask: EdgeToolsEngineGenerationTask {
     private let task: MockGenerationTaskValue
     private let stopGeneration: @Sendable () -> Void
@@ -202,9 +208,14 @@ final class MockEngine: EdgeToolsPrefillableEngine, Sendable {
     MockEngine()
   }
 
+  func context(_ parameters: Void) -> Context {
+    Context()
+  }
+
   func tokenize(
     prompt: NeedlePrompt,
-    tools: [EdgeToolDefinition]
+    tools: [EdgeToolDefinition],
+    context: Context
   ) async throws -> [EdgeToolsToken] {
     self.tokenizeHandler?(prompt, tools) ?? []
   }
@@ -215,7 +226,8 @@ final class MockEngine: EdgeToolsPrefillableEngine, Sendable {
 
   func prefill(
     promptPrefix: NeedlePrompt,
-    tools: [EdgeToolDefinition]
+    tools: [EdgeToolDefinition],
+    context: Context
   ) async throws -> EdgeToolsEnginePrefill {
     let handler = self._prefillHandler.withLock { $0 }
     return try handler?(promptPrefix, tools)
@@ -228,6 +240,7 @@ final class MockEngine: EdgeToolsPrefillableEngine, Sendable {
     prompt: NeedlePrompt,
     tools: [EdgeToolDefinition] = [],
     parameters: GenerateParameters,
+    context: Context,
     channel: sending EdgeToolsGenerationChannel
   ) throws -> GenerationTask {
     self._generateCallCount.withLock { $0 += 1 }

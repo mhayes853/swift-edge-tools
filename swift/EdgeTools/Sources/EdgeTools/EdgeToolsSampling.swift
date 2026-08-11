@@ -4,15 +4,15 @@
 
 // MARK: - EdgeToolsSampler
 
-public struct EdgeToolsSampler<Logits: ~Copyable & ~Escapable> {
+public struct EdgeToolsSampler<Logits: ~Copyable & ~Escapable>: Sendable {
   private let body:
-    nonisolated(nonsending) (
+    nonisolated(nonsending) @Sendable (
       borrowing Logits
     ) async throws -> EdgeToolsToken.ID
 
   public init(
     _ body:
-      nonisolated(nonsending) @escaping (
+      nonisolated(nonsending) @escaping @Sendable (
         borrowing Logits
       ) async throws -> EdgeToolsToken.ID
   ) {
@@ -37,6 +37,10 @@ public struct EdgeToolsFusedSamplingParameters: Hashable, Sendable {
   public var presencePenalty: Float
   public var repetitionContextSize: Int
   public var seed: UInt64?
+
+  public static var greedy: Self {
+    Self(temperature: 0)
+  }
 
   public init(
     temperature: Float = 0.6,
