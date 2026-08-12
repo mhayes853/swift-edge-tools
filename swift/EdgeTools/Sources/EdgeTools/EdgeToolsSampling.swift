@@ -29,13 +29,13 @@ public struct EdgeToolsSampler<Logits: ~Copyable & ~Escapable>: Sendable {
 // MARK: - EdgeToolsFusedSamplingParameters
 
 public struct EdgeToolsFusedSamplingParameters: Hashable, Sendable {
-  public var temperature: Float
+  public var temperature: Float?
   public var topK: Int?
   public var topP: Float?
   public var minP: Float?
-  public var repetitionPenalty: Float
-  public var presencePenalty: Float
-  public var repetitionContextSize: Int
+  public var repetitionPenalty: Float?
+  public var presencePenalty: Float?
+  public var repetitionContextSize: Int?
   public var seed: UInt64?
 
   public static var greedy: Self {
@@ -43,16 +43,19 @@ public struct EdgeToolsFusedSamplingParameters: Hashable, Sendable {
   }
 
   public init(
-    temperature: Float = 0.6,
+    temperature: Float? = nil,
     topK: Int? = nil,
     topP: Float? = nil,
     minP: Float? = nil,
-    repetitionPenalty: Float = 1,
-    presencePenalty: Float = 0,
-    repetitionContextSize: Int = 20,
+    repetitionPenalty: Float? = nil,
+    presencePenalty: Float? = nil,
+    repetitionContextSize: Int? = nil,
     seed: UInt64? = nil
   ) {
-    precondition(repetitionPenalty > 0, "Repetition penalty must be greater than zero.")
+    precondition(
+      repetitionPenalty.map { $0 > 0 } ?? true,
+      "Repetition penalty must be greater than zero."
+    )
     self.temperature = temperature
     self.topK = topK
     self.topP = topP
@@ -68,40 +71,7 @@ public struct EdgeToolsFusedSamplingParameters: Hashable, Sendable {
   }
 
   public var penalizesHistory: Bool {
-    self.repetitionPenalty != 1 || self.presencePenalty != 0
-  }
-}
-
-// MARK: - EdgeToolsFusedSamplingOverrides
-
-public struct EdgeToolsFusedSamplingOverrides: Hashable, Sendable {
-  public var temperature: Float?
-  public var topK: Int?
-  public var topP: Float?
-  public var minP: Float?
-  public var repetitionPenalty: Float?
-  public var presencePenalty: Float?
-  public var repetitionContextSize: Int?
-  public var seed: UInt64?
-
-  public init(
-    temperature: Float? = nil,
-    topK: Int? = nil,
-    topP: Float? = nil,
-    minP: Float? = nil,
-    repetitionPenalty: Float? = nil,
-    presencePenalty: Float? = nil,
-    repetitionContextSize: Int? = nil,
-    seed: UInt64? = nil
-  ) {
-    self.temperature = temperature
-    self.topK = topK
-    self.topP = topP
-    self.minP = minP
-    self.repetitionPenalty = repetitionPenalty
-    self.presencePenalty = presencePenalty
-    self.repetitionContextSize = repetitionContextSize
-    self.seed = seed
+    (self.repetitionPenalty ?? 1) != 1 || (self.presencePenalty ?? 0) != 0
   }
 
   public var isEmpty: Bool {

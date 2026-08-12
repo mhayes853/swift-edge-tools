@@ -361,7 +361,7 @@ extension EngineRunner {
             ),
             tools: request.tools,
             parameters: DefaultMLXGenerateParameters(
-              samplingOverrides: request.sampling,
+              sampling: request.sampling,
               constraint: try request.grammar.constraint(
                 toolCallRange: request.toolCallRange
               ),

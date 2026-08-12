@@ -150,7 +150,7 @@ struct GenerationOptions: ParsableArguments {
       grammar: self.grammar,
       toolCallRange: self.toolCallRange,
       maxTokens: self.maxTokens,
-      sampling: self.sampling.overrides,
+      sampling: self.sampling.sampling,
       reasoning: EdgeToolsReasoningEffort(rawValue: self.reasoning)
     )
   }
@@ -247,8 +247,8 @@ struct SamplingOptions: ParsableArguments {
     }
   }
 
-  var overrides: EdgeToolsFusedSamplingOverrides {
-    EdgeToolsFusedSamplingOverrides(
+  var sampling: EdgeToolsFusedSamplingParameters {
+    EdgeToolsFusedSamplingParameters(
       temperature: self.temperature,
       topK: self.topK,
       topP: self.topP,
