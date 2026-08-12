@@ -24,6 +24,8 @@
       expectNoDifference(generation.response, tokenizer.decode(tokens: responseTokenIds))
       expectNoDifference(generation.text, tokenizer.decode(tokens: responseTokenIds))
       expectNoDifference(generation.prefillMetrics.tokens > 0, true)
+      expectNoDifference(generation.metadata.generationConfidence, nil)
+      expectNoDifference(generation.metadata.perTokenConfidences, nil)
     }
 
     @Test
@@ -62,7 +64,7 @@
         range: range,
         grammar: { toolsGrammar, tokenizerInfo in
           observation.recordTransform(tokenizerInfo: tokenizerInfo)
-          return toolsGrammar
+          return try toolsGrammar.copy()
         }
       )
       let task = try engine.generate(
@@ -360,10 +362,10 @@
       bitmask: GrammarBitmask,
       parameters: Parameters,
       state: inout TestGenerationState
-    ) async throws -> EdgeToolsGenerationLoop.Sample {
+    ) async throws -> EdgeToolsToken.ID {
       let tokenId = parameters.tokenIds[state.index]
       state.index += 1
-      return EdgeToolsGenerationLoop.Sample(tokenId: tokenId, confidence: 1)
+      return tokenId
     }
 
     func finalize(

@@ -70,6 +70,21 @@
     }
 
     @Test
+    func `Generate Records Mean Confidence In Range Zero To One`() async throws {
+      let engine = try await makeNeedleONNXModelEngine()
+      let generation = try await generateNeedle(using: engine)
+
+      let confidence = try #require(generation.metadata.generationConfidence)
+      expectNoDifference((0...1).contains(confidence), true)
+
+      let perToken = try #require(generation.metadata.perTokenConfidences)
+      expectNoDifference(perToken.count, generation.tokens.count)
+      for confidence in perToken {
+        expectNoDifference((0...1).contains(confidence), true)
+      }
+    }
+
+    @Test
     func `Generate Stops And Returns Stopped Generation`() async throws {
       let engine = try await makeNeedleONNXModelEngine()
       let generation = try await expectNeedleGenerationStops(using: engine)

@@ -577,7 +577,7 @@
         bitmask: GrammarBitmask,
         parameters: NeedleMLXGenerateParameters,
         state: inout NeedleMLXGenerationState
-      ) async throws -> EdgeToolsGenerationLoop.Sample {
+      ) async throws -> EdgeToolsToken.ID {
         try await state.model.decode(bitmask: bitmask, parameters: parameters)
       }
 
