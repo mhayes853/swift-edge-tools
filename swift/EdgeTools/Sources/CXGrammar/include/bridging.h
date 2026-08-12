@@ -61,6 +61,7 @@ size_t xgrammar_tokenizer_info_serialize_json(
     size_t buffer_capacity
 );
 xgrammar_tokenizer_info_t xgrammar_tokenizer_info_deserialize_json(const char* json);
+xgrammar_tokenizer_info_t xgrammar_tokenizer_info_copy(xgrammar_tokenizer_info_t tokenizer_info);
 void xgrammar_tokenizer_info_destroy(xgrammar_tokenizer_info_t tokenizer_info);
 
 xgrammar_compiler_t xgrammar_compiler_init(
@@ -69,6 +70,7 @@ xgrammar_compiler_t xgrammar_compiler_init(
     int cache_enabled,
     int64_t max_memory_bytes
 );
+xgrammar_compiler_t xgrammar_compiler_copy(xgrammar_compiler_t compiler);
 int64_t xgrammar_compiler_cache_size_bytes(xgrammar_compiler_t compiler);
 int64_t xgrammar_compiler_cache_limit_bytes(xgrammar_compiler_t compiler);
 void xgrammar_compiler_clear_cache(xgrammar_compiler_t compiler);
@@ -97,6 +99,7 @@ xgrammar_grammar_t xgrammar_grammar_init_structural_tag(
     xgrammar_tokenizer_info_t tokenizer_info
 );
 xgrammar_grammar_t xgrammar_grammar_builtin_json(void);
+xgrammar_grammar_t xgrammar_grammar_copy(xgrammar_grammar_t grammar);
 size_t xgrammar_grammar_ebnf(xgrammar_grammar_t grammar, char* buffer, size_t buffer_capacity);
 size_t xgrammar_grammar_serialize_json(xgrammar_grammar_t grammar, char* buffer, size_t buffer_capacity);
 xgrammar_grammar_t xgrammar_grammar_deserialize_json(const char* json);
@@ -122,6 +125,9 @@ size_t xgrammar_compiled_grammar_serialize_json(
 xgrammar_compiled_grammar_t xgrammar_compiled_grammar_deserialize_json(
     const char* json,
     xgrammar_tokenizer_info_t tokenizer_info
+);
+xgrammar_compiled_grammar_t xgrammar_compiled_grammar_copy(
+    xgrammar_compiled_grammar_t compiled_grammar
 );
 void xgrammar_compiled_grammar_destroy(xgrammar_compiled_grammar_t compiled_grammar);
 

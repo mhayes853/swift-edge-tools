@@ -58,8 +58,8 @@ extension GrammarBitmask: RandomAccessCollection {}
   public final class MLXBitmaskProcessor<Matcher: EdgeToolsGrammarMatcher>: LogitProcessor {
     public private(set) var matcher: Matcher
 
-    public init(matcher: Matcher) {
-      self.matcher = matcher
+    public init(matcher: consuming Matcher) {
+      self.matcher = consume matcher
     }
 
     public func prompt(_ prompt: MLXArray) {}

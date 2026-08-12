@@ -213,6 +213,11 @@ public final class XGRTokenizerInfo: @unchecked Sendable {
     try xgrammarString { xgrammar_tokenizer_info_serialize_json(self.handle, $0, $1) }
   }
 
+  /// Creates an independent tokenizer info value.
+  public func copy() throws -> XGRTokenizerInfo {
+    XGRTokenizerInfo(handle: try require(xgrammar_tokenizer_info_copy(self.handle)))
+  }
+
   /// Calls `body` with the underlying tokenizer info pointer.
   ///
   /// The pointer is only valid for the duration of `body`.
@@ -230,7 +235,7 @@ public final class XGRTokenizerInfo: @unchecked Sendable {
 // MARK: - XGRGrammar
 
 /// An XGrammar grammar.
-public final class XGRGrammar: @unchecked Sendable {
+public struct XGRGrammar: ~Copyable, @unchecked Sendable {
   // ``@unchecked Sendable`` is safe because XGrammar grammar handles are immutable after
   // construction; this reference type owns and destroys its handle exactly once.
 
@@ -308,7 +313,7 @@ public final class XGRGrammar: @unchecked Sendable {
   }
 
   /// The underlying grammar pointer.
-  fileprivate let handle: xgrammar_grammar_t
+  public let handle: xgrammar_grammar_t
 
   /// Constructs a gramamr from EBNF syntax.
   ///
@@ -496,15 +501,9 @@ public final class XGRGrammar: @unchecked Sendable {
     try xgrammarString { xgrammar_grammar_serialize_json(self.handle, $0, $1) }
   }
 
-  /// Calls `body` with the underlying grammar pointer.
-  ///
-  /// The pointer is only valid for the duration of `body`.
-  ///
-  /// - Parameters:
-  ///   - body: A closure that uses the pointer.
-  /// - Returns: The result of `body`.
-  public func withUnsafePointer<R>(_ body: (xgrammar_grammar_t) throws -> R) rethrows -> R {
-    try body(self.handle)
+  /// Creates an independent grammar with the same grammar representation.
+  public func copy() throws -> XGRGrammar {
+    XGRGrammar(handle: try require(xgrammar_grammar_copy(self.handle)))
   }
 
   /// Produces a concatenated grammar with this grammar and another grammar.
@@ -512,7 +511,7 @@ public final class XGRGrammar: @unchecked Sendable {
   /// - Parameters:
   ///   - grammar: The other grammar.
   /// - Returns: An ``XGRGrammar``.
-  public func concatenate(_ grammar: XGRGrammar) throws -> XGRGrammar {
+  public func concatenate(_ grammar: borrowing XGRGrammar) throws -> XGRGrammar {
     try EdgeToolsXGrammar.concatenate(self, grammar)
   }
 
@@ -521,25 +520,12 @@ public final class XGRGrammar: @unchecked Sendable {
   /// - Parameters:
   ///   - grammars: The other grammars, matched in order after this grammar.
   /// - Returns: An ``XGRGrammar``.
-  public func concatenate(_ grammars: XGRGrammar...) throws -> XGRGrammar {
-    try self.concatenate(grammars)
-  }
-
-  /// Produces a concatenated grammar with this grammar and other grammars.
-  ///
-  /// - Parameters:
-  ///   - grammars: The other grammars, matched in order after this grammar.
-  /// - Returns: An ``XGRGrammar``.
-  public func concatenate(_ grammars: some Sequence<XGRGrammar>) throws -> XGRGrammar {
-    try concatenatedGrammar(handles: [self.handle] + grammars.map { $0.handle })
-  }
-
   /// Produces a unioned grammar with this grammar and another grammar.
   ///
   /// - Parameters:
   ///   - grammar: The other grammar.
   /// - Returns: An ``XGRGrammar``.
-  public func union(_ grammar: XGRGrammar) throws -> XGRGrammar {
+  public func union(_ grammar: borrowing XGRGrammar) throws -> XGRGrammar {
     try EdgeToolsXGrammar.union(self, grammar)
   }
 
@@ -548,19 +534,6 @@ public final class XGRGrammar: @unchecked Sendable {
   /// - Parameters:
   ///   - grammars: The other accepted alternatives.
   /// - Returns: An ``XGRGrammar``.
-  public func union(_ grammars: XGRGrammar...) throws -> XGRGrammar {
-    try self.union(grammars)
-  }
-
-  /// Produces a unioned grammar with this grammar and other grammars.
-  ///
-  /// - Parameters:
-  ///   - grammars: The other accepted alternatives.
-  /// - Returns: An ``XGRGrammar``.
-  public func union(_ grammars: some Sequence<XGRGrammar>) throws -> XGRGrammar {
-    try unionedGrammar(handles: [self.handle] + grammars.map { $0.handle })
-  }
-
   /// Concatenates two grammars.
   ///
   /// The resulting grammar accepts an input only when it first matches ``lhs`` and then matches
@@ -570,7 +543,10 @@ public final class XGRGrammar: @unchecked Sendable {
   ///   - lhs: The grammar that matches first.
   ///   - rhs: The grammar that matches after ``lhs``.
   /// - Returns: A grammar representing the concatenation.
-  public static func + (lhs: XGRGrammar, rhs: XGRGrammar) throws -> XGRGrammar {
+  public static func + (
+    lhs: borrowing XGRGrammar,
+    rhs: borrowing XGRGrammar
+  ) throws -> XGRGrammar {
     try EdgeToolsXGrammar.concatenate(lhs, rhs)
   }
 
@@ -580,7 +556,10 @@ public final class XGRGrammar: @unchecked Sendable {
   ///   - lhs: One accepted alternative.
   ///   - rhs: The other accepted alternative.
   /// - Returns: A grammar representing the union of both alternatives.
-  public static func || (lhs: XGRGrammar, rhs: XGRGrammar) throws -> XGRGrammar {
+  public static func || (
+    lhs: borrowing XGRGrammar,
+    rhs: borrowing XGRGrammar
+  ) throws -> XGRGrammar {
     try EdgeToolsXGrammar.union(lhs, rhs)
   }
 
@@ -624,10 +603,24 @@ public struct XGRNamedGrammar: RawRepresentable, Sendable {
   /// The actual grammar representation.
   public enum Grammar: Sendable {
     /// Uses an already-created grammar.
-    case grammar(XGRGrammar)
+    case grammar(Reference)
 
     /// Uses a Lark grammar source.
     case lark(String)
+
+    /// Owns a grammar for storage in a copyable named-grammar descriptor.
+    public final class Reference: @unchecked Sendable {
+      public let grammar: XGRGrammar
+
+      public init(grammar: consuming XGRGrammar) {
+        self.grammar = consume grammar
+      }
+    }
+
+    /// Stores an owned grammar in a named-grammar descriptor.
+    public static func grammar(_ grammar: consuming XGRGrammar) -> Self {
+      .grammar(Reference(grammar: consume grammar))
+    }
   }
 
   /// The name of the grammar.
@@ -648,12 +641,12 @@ public struct XGRNamedGrammar: RawRepresentable, Sendable {
 
   public var rawValue: xgrammar_named_grammar_t {
     switch self.grammar {
-    case .grammar(let grammar):
+    case .grammar(let reference):
       xgrammar_named_grammar_t(
         name: nil,
         kind: xgrammar_named_grammar_handle,
         lark_source: nil,
-        grammar: grammar.handle
+        grammar: reference.grammar.handle
       )
     case .lark:
       xgrammar_named_grammar_t(
@@ -744,6 +737,11 @@ public struct XGRCompiledGrammar: ~Copyable, @unchecked Sendable {
   public func serializedJSON() throws -> String {
     try xgrammarString { xgrammar_compiled_grammar_serialize_json(self.handle, $0, $1) }
   }
+
+  /// Creates an independent compiled grammar with the same grammar representation.
+  public func copy() throws -> XGRCompiledGrammar {
+    XGRCompiledGrammar(handle: try require(xgrammar_compiled_grammar_copy(self.handle)))
+  }
 }
 
 // MARK: - XGRCompiler
@@ -752,9 +750,9 @@ public struct XGRCompiledGrammar: ~Copyable, @unchecked Sendable {
 ///
 /// Create one compiler per vocabulary. Reusing a compiler avoids repeating preprocessing when the
 /// same grammar or schema is compiled more than once.
-public final class XGRCompiler {
+public struct XGRCompiler: ~Copyable, @unchecked Sendable {
   /// The underlying compiler pointer.
-  private let handle: xgrammar_compiler_t
+  public let handle: xgrammar_compiler_t
 
   /// The tokenizer metadata used for every compilation by this compiler.
   public let tokenizerInfo: XGRTokenizerInfo
@@ -796,19 +794,27 @@ public final class XGRCompiler {
 
   deinit { xgrammar_compiler_destroy(self.handle) }
 
+  /// Creates a copy of this compiler and its tokenizer info.
+  public func copy() throws -> XGRCompiler {
+    XGRCompiler(
+      handle: try require(xgrammar_compiler_copy(self.handle)),
+      tokenizerInfo: try self.tokenizerInfo.copy()
+    )
+  }
+
   /// The current approximate cache size, in bytes.
   public var cacheSizeBytes: Int64 {
-    self.withUnsafePointer { xgrammar_compiler_cache_size_bytes($0) }
+    xgrammar_compiler_cache_size_bytes(self.handle)
   }
 
   /// The configured maximum cache size, in bytes.
   public var cacheLimitBytes: Int64 {
-    self.withUnsafePointer { xgrammar_compiler_cache_limit_bytes($0) }
+    xgrammar_compiler_cache_limit_bytes(self.handle)
   }
 
   /// Removes all compiled grammars from the compiler cache.
   public func clearCache() {
-    self.withUnsafePointer { xgrammar_compiler_clear_cache($0) }
+    xgrammar_compiler_clear_cache(self.handle)
   }
 
   /// Compiles a grammar for this compiler’s tokenizer vocabulary.
@@ -818,24 +824,9 @@ public final class XGRCompiler {
   /// - Parameters:
   ///   - grammar: The grammar to preprocess.
   /// - Returns: A compiled grammar ready to create an ``XGRMatcher``.
-  public func compile(_ grammar: XGRGrammar) throws -> XGRCompiledGrammar {
-    let handle = try self.withUnsafePointer {
-      try require(xgrammar_compiler_compile_grammar($0, grammar.handle))
-    }
+  public func compile(_ grammar: borrowing XGRGrammar) throws -> XGRCompiledGrammar {
+    let handle = try require(xgrammar_compiler_compile_grammar(self.handle, grammar.handle))
     return XGRCompiledGrammar(handle: handle)
-  }
-
-  /// Calls `body` with the underlying compiler pointer.
-  ///
-  /// The pointer is only valid for the duration of `body`.
-  ///
-  /// - Parameters:
-  ///   - body: A closure that uses the pointer.
-  /// - Returns: The result of `body`.
-  public func withUnsafePointer<R>(
-    _ body: (xgrammar_compiler_t) throws -> R
-  ) rethrows -> R {
-    try body(self.handle)
   }
 }
 
@@ -846,9 +837,9 @@ public final class XGRCompiler {
 /// Query ``bitmask()`` to determine which tokens are valid next, then call ``accept(tokenId:)``
 /// after selecting a token. A matcher can be reset, rolled back, or forked to manage generation
 /// branches.
-public final class XGRMatcher {
+public struct XGRMatcher: ~Copyable, @unchecked Sendable {
   /// The underlying matcher pointer.
-  private let handle: xgrammar_matcher_t
+  public let handle: xgrammar_matcher_t
 
   /// Creates a matcher for a compiled grammar.
   ///
@@ -896,12 +887,12 @@ public final class XGRMatcher {
 
   /// Indicates whether the matcher has accepted a complete valid sequence.
   public var isCompleted: Bool {
-    self.withUnsafePointer { xgrammar_matcher_is_completed($0) != 0 }
+    xgrammar_matcher_is_completed(self.handle) != 0
   }
 
   /// Indicates whether generation has been terminated by the matcher.
   public var isTerminated: Bool {
-    self.withUnsafePointer { xgrammar_matcher_is_terminated($0) != 0 }
+    xgrammar_matcher_is_terminated(self.handle) != 0
   }
 
   /// Returns the vocabulary acceptance mask for the current matcher state.
@@ -911,10 +902,10 @@ public final class XGRMatcher {
   ///
   /// - Returns: A bitmask of token IDs accepted at the current state.
   public func bitmask() -> [Int32] {
-    let bitCount = self.withUnsafePointer { Int(xgrammar_matcher_bit_count($0)) }
+    let bitCount = Int(xgrammar_matcher_bit_count(self.handle))
     var bitmask = [Int32](repeating: 0, count: (bitCount + 31) / 32)
     _ = bitmask.withUnsafeMutableBufferPointer { bitmask in
-      self.withUnsafePointer { xgrammar_matcher_bitmask($0, bitmask.baseAddress) }
+      xgrammar_matcher_bitmask(self.handle, bitmask.baseAddress)
     }
     return bitmask
   }
@@ -926,7 +917,7 @@ public final class XGRMatcher {
   /// - Returns: Whether the token is accepted by the grammar at the current state.
   @discardableResult
   public func accept(tokenId: Int) -> Bool {
-    self.withUnsafePointer { xgrammar_matcher_accept_token($0, Int32(tokenId)) != 0 }
+    xgrammar_matcher_accept_token(self.handle, Int32(tokenId)) != 0
   }
 
   /// Advances the matcher with a string.
@@ -938,8 +929,8 @@ public final class XGRMatcher {
   /// - Returns: Whether the string is accepted by the grammar at the current state.
   @discardableResult
   public func accept(string: String) -> Bool {
-    self.withUnsafePointer { handle in
-      string.withCString { xgrammar_matcher_accept_string(handle, $0) != 0 }
+    string.withCString { string in
+      xgrammar_matcher_accept_string(self.handle, string) != 0
     }
   }
 
@@ -950,12 +941,12 @@ public final class XGRMatcher {
   /// - Parameters:
   ///   - tokenCount: The number of most recently accepted tokens to remove.
   public func rollback(_ tokenCount: Int = 1) {
-    self.withUnsafePointer { xgrammar_matcher_rollback($0, Int32(tokenCount)) }
+    xgrammar_matcher_rollback(self.handle, Int32(tokenCount))
   }
 
   /// Restores the matcher to its initial state.
   public func reset() {
-    self.withUnsafePointer { xgrammar_matcher_reset($0) }
+    xgrammar_matcher_reset(self.handle)
   }
 
   /// Creates an independent matcher with the current state.
@@ -964,20 +955,7 @@ public final class XGRMatcher {
   ///
   /// - Returns: A matcher initialized with this matcher’s current state.
   public func fork() -> XGRMatcher {
-    self.withUnsafePointer { XGRMatcher(handle: xgrammar_matcher_fork($0)!) }
-  }
-
-  /// Calls `body` with the underlying matcher pointer.
-  ///
-  /// The pointer is only valid for the duration of `body`.
-  ///
-  /// - Parameters:
-  ///   - body: A closure that uses the pointer.
-  /// - Returns: The result of `body`.
-  public func withUnsafePointer<R>(
-    _ body: (xgrammar_matcher_t) throws -> R
-  ) rethrows -> R {
-    try body(self.handle)
+    XGRMatcher(handle: xgrammar_matcher_fork(self.handle)!)
   }
 }
 
@@ -992,32 +970,11 @@ public final class XGRMatcher {
 ///   - lhs: The grammar that matches first.
 ///   - rhs: The grammar that matches after ``lhs``.
 /// - Returns: A grammar representing the concatenation.
-public func concatenate(_ lhs: XGRGrammar, _ rhs: XGRGrammar) throws -> XGRGrammar {
+public func concatenate(
+  _ lhs: borrowing XGRGrammar,
+  _ rhs: borrowing XGRGrammar
+) throws -> XGRGrammar {
   try concatenatedGrammar(handles: [lhs.handle, rhs.handle])
-}
-
-/// Concatenates a sequence of grammars.
-///
-/// The resulting grammar accepts an input only when it matches each grammar in ``grammars``, in
-/// order.
-///
-/// - Parameters:
-///   - grammars: The grammars to concatenate, in matching order.
-/// - Returns: A grammar representing the concatenation.
-public func concatenate(_ grammars: XGRGrammar...) throws -> XGRGrammar {
-  try concatenate(grammars)
-}
-
-/// Concatenates a sequence of grammars.
-///
-/// The resulting grammar accepts an input only when it matches each grammar in ``grammars``, in
-/// order.
-///
-/// - Parameters:
-///   - grammars: The grammars to concatenate, in matching order.
-/// - Returns: A grammar representing the concatenation.
-public func concatenate(_ grammars: some Sequence<XGRGrammar>) throws -> XGRGrammar {
-  try concatenatedGrammar(handles: grammars.map { $0.handle })
 }
 
 /// Creates a grammar accepting either of two grammars.
@@ -1026,26 +983,11 @@ public func concatenate(_ grammars: some Sequence<XGRGrammar>) throws -> XGRGram
 ///   - lhs: One accepted alternative.
 ///   - rhs: The other accepted alternative.
 /// - Returns: A grammar representing the union of both alternatives.
-public func union(_ lhs: XGRGrammar, _ rhs: XGRGrammar) throws -> XGRGrammar {
+public func union(
+  _ lhs: borrowing XGRGrammar,
+  _ rhs: borrowing XGRGrammar
+) throws -> XGRGrammar {
   try unionedGrammar(handles: [lhs.handle, rhs.handle])
-}
-
-/// Creates a grammar accepting any of a sequence of grammars.
-///
-/// - Parameters:
-///   - grammars: The accepted alternatives.
-/// - Returns: A grammar representing the union of all alternatives.
-public func union(_ grammars: XGRGrammar...) throws -> XGRGrammar {
-  try union(grammars)
-}
-
-/// Creates a grammar accepting any of a sequence of grammars.
-///
-/// - Parameters:
-///   - grammars: The accepted alternatives.
-/// - Returns: A grammar representing the union of all alternatives.
-public func union(_ grammars: some Sequence<XGRGrammar>) throws -> XGRGrammar {
-  try unionedGrammar(handles: grammars.map { $0.handle })
 }
 
 private func concatenatedGrammar(handles: [xgrammar_grammar_t?]) throws -> XGRGrammar {
@@ -1070,7 +1012,7 @@ private func unionedGrammar(handles: [xgrammar_grammar_t?]) throws -> XGRGrammar
 ///   - grammar: The grammar to repeat.
 ///   - count: The exact number of repetitions. It must not be negative.
 /// - Returns: A grammar representing the repeated input.
-public func repeatGrammar(_ grammar: XGRGrammar, exactly count: Int) throws -> XGRGrammar {
+public func repeatGrammar(_ grammar: borrowing XGRGrammar, exactly count: Int) throws -> XGRGrammar {
   try repeatGrammar(grammar, count...count)
 }
 
@@ -1082,7 +1024,7 @@ public func repeatGrammar(_ grammar: XGRGrammar, exactly count: Int) throws -> X
 ///   - grammar: The grammar to repeat.
 ///   - range: The inclusive range of permitted repetition counts.
 /// - Returns: A grammar representing the bounded repetition.
-public func repeatGrammar(_ grammar: XGRGrammar, _ range: ClosedRange<Int>) throws -> XGRGrammar {
+public func repeatGrammar(_ grammar: borrowing XGRGrammar, _ range: ClosedRange<Int>) throws -> XGRGrammar {
   guard range.lowerBound >= 0 else { throw XGRError.invalidRepetitionRange }
   let lowerBound = try Int32(range.lowerBound, error: .invalidRepetitionRange)
   let upperBound = try Int32(range.upperBound, error: .invalidRepetitionRange)
@@ -1099,7 +1041,7 @@ public func repeatGrammar(_ grammar: XGRGrammar, _ range: ClosedRange<Int>) thro
 ///   - range: The lower bound of the unbounded repetition range.
 /// - Returns: A grammar representing the unbounded repetition.
 public func repeatGrammar(
-  _ grammar: XGRGrammar,
+  _ grammar: borrowing XGRGrammar,
   _ range: PartialRangeFrom<Int>
 ) throws -> XGRGrammar {
   guard range.lowerBound >= 0 else { throw XGRError.invalidRepetitionRange }
