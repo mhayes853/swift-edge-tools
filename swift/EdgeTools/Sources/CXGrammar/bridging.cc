@@ -37,8 +37,43 @@ namespace {
 
 thread_local char last_error[4096] = {};
 
-void clear_error() {
+}
+
+namespace xgrammar {
+
+enum class ErrorCode : uint8_t {
+    kNone,
+    kGrammar,
+};
+
+namespace {
+thread_local ErrorCode last_error_code = ErrorCode::kNone;
+}
+
+void ClearLastError() {
+    last_error_code = ErrorCode::kNone;
     last_error[0] = '\0';
+}
+
+void SetLastError(ErrorCode code, const char* message) {
+    last_error_code = code;
+    std::snprintf(last_error, sizeof(last_error), "%s", message);
+}
+
+bool HasLastError() {
+    return last_error_code != ErrorCode::kNone;
+}
+
+const char* LastErrorMessage() {
+    return last_error;
+}
+
+}  // namespace xgrammar
+
+namespace {
+
+void clear_error() {
+    xgrammar::ClearLastError();
 }
 
 void set_error_message(const std::string& message) {
@@ -56,14 +91,22 @@ auto invoke(Body&& body) -> std::invoke_result_t<Body> {
     clear_error();
 #if XGRAMMAR_CXX_EXCEPTIONS_ENABLED
     try {
-        return body();
+        auto result = body();
+        if (xgrammar::HasLastError()) {
+            return fail<std::invoke_result_t<Body>>(xgrammar::LastErrorMessage());
+        }
+        return result;
     } catch (const std::exception& error) {
         return fail<std::invoke_result_t<Body>>(error.what());
     } catch (...) {
         return fail<std::invoke_result_t<Body>>("Unknown XGrammar error.");
     }
 #else
-    return body();
+    auto result = body();
+    if (xgrammar::HasLastError()) {
+        return fail<std::invoke_result_t<Body>>(xgrammar::LastErrorMessage());
+    }
+    return result;
 #endif
 }
 
