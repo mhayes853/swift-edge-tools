@@ -3,44 +3,19 @@ import Atomics
 // MARK: - AnyGenerationTask
 
 public final class AnyGenerationTask: EdgeToolsEngineGenerationTask {
-  fileprivate enum State: UInt8 {
-    case queued
-    case running
-    case stopped
-  }
-
   public struct Stopper: Sendable {
-    fileprivate let state: ManagedAtomic<UInt8>
+    fileprivate let stopped: ManagedAtomic<Bool>
 
     public var isStopped: Bool {
-      self.state.load(ordering: .relaxed) == State.stopped.rawValue
+      self.stopped.load(ordering: .relaxed)
     }
 
-    fileprivate init(state: ManagedAtomic<UInt8>) {
-      self.state = state
+    fileprivate init(stopped: ManagedAtomic<Bool>) {
+      self.stopped = stopped
     }
 
     public func stop() {
-      _ = self.exchangeStopped()
-    }
-
-    fileprivate func begin() -> Bool {
-      self.state
-        .compareExchange(
-          expected: State.queued.rawValue,
-          desired: State.running.rawValue,
-          ordering: .relaxed
-        )
-        .exchanged
-    }
-
-    fileprivate func exchangeStopped() -> State {
-      State(
-        rawValue: self.state.exchange(
-          State.stopped.rawValue,
-          ordering: .relaxed
-        )
-      )!
+      self.stopped.store(true, ordering: .relaxed)
     }
   }
 
@@ -50,11 +25,10 @@ public final class AnyGenerationTask: EdgeToolsEngineGenerationTask {
   public init(
     operation: sending @escaping (Stopper) async throws -> EdgeToolsEngineGeneration
   ) {
-    let state = ManagedAtomic(State.queued.rawValue)
-    let stopper = Stopper(state: state)
+    let stopper = Stopper(stopped: ManagedAtomic(false))
     self.stopper = stopper
     self.task = Task {
-      guard stopper.begin() else { return .empty }
+      guard !stopper.isStopped else { return .empty }
       return try await operation(stopper)
     }
   }
@@ -64,8 +38,6 @@ public final class AnyGenerationTask: EdgeToolsEngineGenerationTask {
   }
 
   public func stop() {
-    if self.stopper.exchangeStopped() == .queued {
-      self.task.cancel()
-    }
+    self.stopper.stop()
   }
 }
