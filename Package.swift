@@ -12,10 +12,16 @@ let package = Package(
     .library(name: "EdgeToolsXGrammar", targets: ["EdgeToolsXGrammar"])
   ],
   traits: [
-    .trait(name: "Foundation", description: "Foundation-specific conveniences."),
+    .trait(name: "Foundation", description: "Foundation Essentials conveniences."),
+    .trait(
+      name: "FullFoundation",
+      description: "Full Foundation conveniences.",
+      enabledTraits: ["Foundation"]
+    ),
     .trait(name: "Atomics", description: "Atomic engine generation coordination."),
     .trait(name: "JS", description: "JavaScriptKit interoperability."),
     .trait(name: "XGrammar", description: "XGrammar-powered structured generation."),
+    .trait(name: "Needle2", description: "Needle 2 engine support."),
     .trait(
       name: "Transformers",
       description: "swift-transformers tokenizer support.",
