@@ -24,6 +24,7 @@ public struct EngineRunner: Sendable {
   public let supportsSampling: Bool
   public let supportsImages: Bool
 
+  private let metricsExtractor: any GenerationMetricsExtractor
   private let generation:
     @Sendable (GenerationRequest, sending EdgeToolsGenerationChannel) async throws ->
       EdgeToolsEngineGeneration
@@ -34,6 +35,7 @@ public struct EngineRunner: Sendable {
     supportsCustomGrammar: Bool,
     supportsSampling: Bool,
     supportsImages: Bool = false,
+    metricsExtractor: any GenerationMetricsExtractor = StandardGenerationMetricsExtractor(),
     generation:
       @escaping @Sendable (
         GenerationRequest, sending EdgeToolsGenerationChannel
@@ -44,6 +46,7 @@ public struct EngineRunner: Sendable {
     self.supportsCustomGrammar = supportsCustomGrammar
     self.supportsSampling = supportsSampling
     self.supportsImages = supportsImages
+    self.metricsExtractor = metricsExtractor
     self.generation = generation
     self.modelResetting = modelResetting
   }
@@ -58,6 +61,10 @@ public struct EngineRunner: Sendable {
   public func reset() async {
     await self.modelResetting()
   }
+
+  public func metrics(from generation: EdgeToolsEngineGeneration) -> CLIGenerationMetrics {
+    self.metricsExtractor.extract(from: generation)
+  }
 }
 
 // MARK: - Engine Adaptation
@@ -69,6 +76,7 @@ extension EngineRunner {
     supportsCustomGrammar: Bool = false,
     supportsSampling: Bool = false,
     supportsImages: Bool = false,
+    metricsExtractor: any GenerationMetricsExtractor = StandardGenerationMetricsExtractor(),
     prompt: @escaping @Sendable (GenerationRequest) -> Engine.Prompt,
     parameters: @escaping @Sendable (GenerationRequest) throws -> sending Engine.GenerateParameters,
     modelResetting: @escaping @Sendable () async -> Void = {}
@@ -78,6 +86,7 @@ extension EngineRunner {
       supportsCustomGrammar: supportsCustomGrammar,
       supportsSampling: supportsSampling,
       supportsImages: supportsImages,
+      metricsExtractor: metricsExtractor,
       generation: { request, channel in
         let task = try engine.generate(
           prompt: prompt(request),
@@ -193,6 +202,7 @@ extension EngineRunner {
       supportsCustomGrammar: implementation.supportsCustomGrammar,
       supportsSampling: implementation.supportsSampling,
       supportsImages: implementation.supportsImages,
+      metricsExtractor: implementation.metricsExtractor,
       generation: implementation.generation,
       modelResetting: implementation.modelResetting
     )
@@ -202,6 +212,11 @@ extension EngineRunner {
     var registrations: [DetectedModel: ModelRegistration] = [
       .needle: ModelRegistration(engines: Self.needleFactories)
     ]
+    if #available(macOS 26, *) {
+      registrations[.needle2] = ModelRegistration(engines: [
+        .needle2: { _ in Self.needle2() }
+      ])
+    }
     #if canImport(MLX)
       registrations[.qwen3] = ModelRegistration(engines: [
         .mlx: Self.mlxFactory { try await Qwen3MLXModelEngine(from: $0) }
@@ -307,6 +322,30 @@ extension EngineRunner {
     )
   }
 
+  @available(macOS 26, *)
+  private static func needle2() -> Self {
+    let engine = Needle2Engine()
+    return Self(
+      engine: .needle2,
+      supportsCustomGrammar: false,
+      supportsSampling: false,
+      metricsExtractor: Needle2GenerationMetricsExtractor(),
+      generation: { request, channel in
+        let context = engine.context(
+          Needle2ContextParameters(system: try needle2System(from: request.system))
+        )
+        let task = try engine.generate(
+          prompt: request.user,
+          tools: request.tools,
+          parameters: Needle2GenerateParameters(maxTokens: request.maxTokens),
+          context: context,
+          channel: channel
+        )
+        return try await task.value
+      }
+    )
+  }
+
   #if canImport(MLX)
     private static func mlxFactory<Profile: MLXModelProfile>(
       _ make: @escaping @Sendable (URL) async throws -> MLXEngine<Profile>,
@@ -408,4 +447,27 @@ private func resolvedEngine(
 
 private func needlePrompt(for request: GenerationRequest) -> NeedlePrompt {
   NeedlePrompt(system: request.system, user: request.user)
+}
+
+private func needle2System(from string: String) throws -> Needle2System {
+  guard !string.isEmpty else { return [] }
+  return try Needle2System(
+    string.split(separator: ";")
+      .map { fact in
+        let components = fact.split(separator: ":", maxSplits: 1)
+        guard components.count == 2 else {
+          throw EdgeCLIError(
+            "Needle 2 system facts must use `key: value` entries separated by semicolons."
+          )
+        }
+        let key = components[0].trimmingCharacters(in: .whitespacesAndNewlines)
+        let value = components[1].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty, !value.isEmpty else {
+          throw EdgeCLIError(
+            "Needle 2 system facts must use non-empty keys and values."
+          )
+        }
+        return Needle2System.raw(.init(rawValue: key), value)
+      }
+  )
 }

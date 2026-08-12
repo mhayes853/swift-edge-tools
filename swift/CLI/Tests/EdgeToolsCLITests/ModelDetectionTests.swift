@@ -20,6 +20,20 @@ struct `ModelDetection tests` {
   }
 
   @Test
+  func `Detects Needle2 Without External Engine Weights`() throws {
+    let directory = try temporaryModel(
+      configuration: """
+        {"model_type": "needle", "name_or_path": "Cactus-Compute/needle2"}
+        """,
+      files: []
+    )
+    let detection = try ModelDetection.detect(in: directory)
+
+    expectNoDifference(detection.model, .needle2)
+    expectNoDifference(detection.engines, EngineKind.needle2.isAvailable ? [.needle2] : [])
+  }
+
+  @Test
   func `Detects Known Model Types`() throws {
     let expected: [String: DetectedModel] = [
       "qwen3": .qwen3,
@@ -64,7 +78,8 @@ struct `ModelDetection tests` {
 
   @Test(arguments: [
     ("MLX", EngineKind.mlx),
-    ("OnNx", EngineKind.onnx)
+    ("OnNx", EngineKind.onnx),
+    ("Needle-2", EngineKind.needle2)
   ])
   func `Parses Case Insensitive Engine Names`(argument: String, expected: EngineKind) {
     expectNoDifference(EngineKind(argument: argument), expected)
