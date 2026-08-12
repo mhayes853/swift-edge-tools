@@ -16,7 +16,7 @@
     public convenience init(parameters: EdgeToolsFusedSamplingParameters) {
       self.init(
         parameters: parameters,
-        history: MLXTokenHistory(capacity: parameters.repetitionContextSize)
+        history: MLXTokenHistory(capacity: parameters.repetitionContextSize ?? 20)
       )
     }
 
@@ -108,21 +108,19 @@
     if let history {
       let indices = history.asType(.uint32)[.newAxis, 0...]
       let selected = takeAlong(logits, indices, axis: -1)
+      let repetitionPenalty = parameters.repetitionPenalty ?? 1
       let scaled = MLX.where(
         selected .< 0,
-        selected * parameters.repetitionPenalty,
-        selected / parameters.repetitionPenalty
+        selected * repetitionPenalty,
+        selected / repetitionPenalty
       )
-      let penalized =
-        parameters.presencePenalty == 0
-        ? scaled
-        : scaled - parameters.presencePenalty
+      let penalized = parameters.presencePenalty.map { scaled - $0 } ?? scaled
       logits = putAlong(logits, indices, values: penalized, axis: -1)
     }
     guard !parameters.isGreedy else { return argMax(logits, axis: -1) }
 
     let logProbabilities = logSoftmax(logits, axis: -1)
-    let temperature = 1 / parameters.temperature
+    let temperature = 1 / (parameters.temperature ?? 0.6)
     guard let topK = parameters.topK, topK > 0, topK < logits.dim(-1) else {
       return categorical(
         filteredLogProbabilities(logProbabilities, parameters: parameters) * temperature,

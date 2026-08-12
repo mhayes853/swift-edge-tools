@@ -158,7 +158,7 @@
 
   public protocol MLXGenerateParameters: EdgeToolsEngineGenerateParameters {
     var sampler: (any LogitSampler)? { get }
-    var samplingOverrides: EdgeToolsFusedSamplingOverrides { get }
+    var sampling: EdgeToolsFusedSamplingParameters { get }
     var processor: (any LogitProcessor)? { get }
     var kvCacheQuantizationBits: Int? { get }
     var kvCacheQuantizationGroupSize: Int { get }
@@ -167,8 +167,8 @@
   }
 
   extension MLXGenerateParameters {
-    public var samplingOverrides: EdgeToolsFusedSamplingOverrides {
-      EdgeToolsFusedSamplingOverrides()
+    public var sampling: EdgeToolsFusedSamplingParameters {
+      EdgeToolsFusedSamplingParameters()
     }
   }
 
@@ -182,7 +182,7 @@
       public static var `default`: Self { Self() }
 
       public var sampler: (any LogitSampler)?
-      public var samplingOverrides: EdgeToolsFusedSamplingOverrides
+      public var sampling: EdgeToolsFusedSamplingParameters
       public var processor: (any LogitProcessor)?
       public var constraint: XGRGenerationConstraint
       public var maxTokens: Int?
@@ -193,7 +193,7 @@
 
       public init(
         sampler: (any LogitSampler)? = nil,
-        samplingOverrides: EdgeToolsFusedSamplingOverrides = EdgeToolsFusedSamplingOverrides(),
+        sampling: EdgeToolsFusedSamplingParameters = EdgeToolsFusedSamplingParameters(),
         processor: (any LogitProcessor)? = nil,
         constraint: XGRGenerationConstraint = .unconstrained,
         maxTokens: Int? = 1024,
@@ -203,7 +203,7 @@
         synchronizeStreamForMemorySnapshots: Bool = true
       ) {
         self.sampler = sampler
-        self.samplingOverrides = samplingOverrides
+        self.sampling = sampling
         self.processor = processor
         self.constraint = constraint
         self.maxTokens = maxTokens
@@ -931,7 +931,7 @@
         ?? EdgeToolsFusedSamplingParameters()
       let sampler =
         parameters.sampler
-        ?? MLXFusedSampler(parameters: parameters.samplingOverrides.applying(to: defaultSampling))
+        ?? MLXFusedSampler(parameters: parameters.sampling.applying(to: defaultSampling))
       return try await self.prepare(input: input, sampler: sampler, parameters: parameters)
     }
 

@@ -97,7 +97,7 @@ struct `RunAction tests` {
         source: .test(),
         request: GenerationRequest(
           user: "hello",
-          sampling: EdgeToolsFusedSamplingOverrides(topK: 40)
+          sampling: EdgeToolsFusedSamplingParameters(topK: 40)
         )
       )
       Issue.record("Expected sampler validation to fail.")
@@ -110,17 +110,17 @@ struct `RunAction tests` {
   }
 
   @Test
-  func `Uses Model Sampling Defaults Without An Override`() {
+  func `Uses Model Sampling Defaults Without Request Sampling`() {
     let request = GenerationRequest(user: "hello")
 
     expectNoDifference(request.sampling.isEmpty, true)
   }
 
   @Test
-  func `Merges Sampling Overrides Into Model Defaults`() {
+  func `Merges Request Sampling Into Model Defaults`() {
     let request = GenerationRequest(
       user: "hello",
-      sampling: EdgeToolsFusedSamplingOverrides(minP: 0.05, seed: 1234)
+      sampling: EdgeToolsFusedSamplingParameters(minP: 0.05, seed: 1234)
     )
     let parameters = request.sampling.applying(
       to: EdgeToolsFusedSamplingParameters(
