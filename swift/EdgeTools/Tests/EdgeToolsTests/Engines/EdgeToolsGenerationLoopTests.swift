@@ -1,12 +1,12 @@
-#if XGrammar && Atomics && Foundation
+#if XGrammar && Foundation
   import CustomDump
   import EdgeTools
   import Testing
 
   @Suite
-  struct `EdgeToolsModelEngine tests` {
+  struct `EdgeToolsGenerationLoop tests` {
     @Test
-    func `Generates Through The Shared Model Engine`() async throws {
+    func `Generates Through The Shared Generation Loop`() async throws {
       let tokenizer = try testTokenizer()
       let responseTokenIds = encodedGrammarText("hello", tokenizer: tokenizer)
       let eosTokenId = try requiredTestEOSToken(tokenizer: tokenizer)
@@ -24,6 +24,8 @@
       expectNoDifference(generation.response, tokenizer.decode(tokens: responseTokenIds))
       expectNoDifference(generation.text, tokenizer.decode(tokens: responseTokenIds))
       expectNoDifference(generation.prefillMetrics.tokens > 0, true)
+      expectNoDifference(generation.metadata.generationConfidence, nil)
+      expectNoDifference(generation.metadata.perTokenConfidences, nil)
     }
 
     @Test
@@ -62,7 +64,7 @@
         range: range,
         grammar: { toolsGrammar, tokenizerInfo in
           observation.recordTransform(tokenizerInfo: tokenizerInfo)
-          return toolsGrammar
+          return try toolsGrammar.copy()
         }
       )
       let task = try engine.generate(
@@ -198,7 +200,7 @@
     }
   }
 
-  private final class TestEngine: EdgeToolsModelEngine {
+  private final class TestEngine: EdgeToolsEngine {
     typealias Context = TestContext
     typealias ContextParameters = Void
     typealias Prompt = NeedlePrompt
@@ -218,7 +220,7 @@
 
     let assets: TestAssets?
     let constraintObservation: ConstraintObservation?
-    let extraStopTokenIds: Set<EdgeToolsToken.ID>
+    let generationLoop: EdgeToolsGenerationLoop
     let tokenizer: any EdgeToolsTokenizer
     let grammarEngine: XGrammarEngine
 
@@ -243,7 +245,10 @@
       self.tokenizer = tokenizer
       self.assets = assets
       self.constraintObservation = constraintObservation
-      self.extraStopTokenIds = extraStopTokenIds
+      self.generationLoop = EdgeToolsGenerationLoop(
+        tokenizer: tokenizer,
+        extraStopTokenIds: extraStopTokenIds
+      )
     }
 
     func context(_ parameters: Void) -> TestContext {
@@ -270,9 +275,11 @@
       context: TestContext
     ) async throws -> [EdgeToolsToken] {
       let tokenIds = self.tokenizer.encode(text: prompt.user)
-      return zip(tokenIds, self.tokenizer.convertIdsToTokens(tokenIds)).compactMap {
-        tokenId, token in token.map { EdgeToolsToken(id: tokenId, stringValue: $0) }
-      }
+      return zip(tokenIds, self.tokenizer.convertIdsToTokens(tokenIds))
+        .compactMap {
+          tokenId,
+          token in token.map { EdgeToolsToken(id: tokenId, stringValue: $0) }
+        }
     }
 
     func generationState(
@@ -282,19 +289,71 @@
       try await context.takeState()
     }
 
+    func generate(
+      prompt: NeedlePrompt,
+      tools: [EdgeToolDefinition] = [],
+      parameters: sending Parameters,
+      context: TestContext,
+      channel: sending EdgeToolsGenerationChannel
+    ) throws -> AnyGenerationTask {
+      AnyGenerationTask { stopper in
+        var state = try await self.generationState(prompt: prompt, context: context)
+        var preparedPrompt = prompt
+        let result: Result<EdgeToolsEngineGeneration, any Error>
+        do {
+          result = .success(
+            try await self.generationLoop.run(
+              state: &state,
+              stopper: stopper,
+              channel: channel,
+              grammarEngine: self.grammarEngine,
+              maximumTokenCount: parameters.maxTokens,
+              grammar: { state in
+                try self.grammar(
+                  prompt: preparedPrompt,
+                  tools: tools,
+                  parameters: parameters,
+                  state: state
+                )
+              },
+              prepare: { parser, state in
+                return try await self.prepare(
+                  prompt: &preparedPrompt,
+                  tools: tools,
+                  parameters: parameters,
+                  parser: &parser,
+                  state: &state
+                )
+              },
+              decode: { bitmask, state in
+                try await self.decode(
+                  bitmask: bitmask,
+                  parameters: parameters,
+                  state: &state
+                )
+              }
+            )
+          )
+        } catch {
+          result = .failure(error)
+        }
+        return try await self.finalize(state: state, result: result, context: context).get()
+      }
+    }
+
     func prepare(
       prompt: inout NeedlePrompt,
       tools: [EdgeToolDefinition],
       parameters: Parameters,
       parser: inout NeedleGenerationParser,
       state: inout TestGenerationState
-    ) async throws -> EdgeToolsModelPreparation {
+    ) async throws -> EdgeToolsGenerationLoop.Preparation {
       let tokenIds = self.tokenizer.encode(text: prompt.user)
       self.assets?.begin()
       defer { self.assets?.end() }
       try await Task.sleep(for: parameters.preparationDelay)
       state.index = 0
-      return EdgeToolsModelPreparation(
+      return EdgeToolsGenerationLoop.Preparation(
         metrics: EdgeToolsPrefillMetrics(tokens: tokenIds.count, duration: .zero)
       )
     }
@@ -303,18 +362,10 @@
       bitmask: GrammarBitmask,
       parameters: Parameters,
       state: inout TestGenerationState
-    ) async throws -> EdgeToolsModelSample {
+    ) async throws -> EdgeToolsToken.ID {
       let tokenId = parameters.tokenIds[state.index]
       state.index += 1
-      return EdgeToolsModelSample(tokenId: tokenId, confidence: 1)
-    }
-
-    func stopTokenIds(state: TestGenerationState) -> Set<EdgeToolsToken.ID> {
-      var stopTokenIds = self.extraStopTokenIds
-      if let eosTokenId = self.tokenizer.eosTokenId {
-        stopTokenIds.insert(eosTokenId)
-      }
-      return stopTokenIds
+      return tokenId
     }
 
     func finalize(

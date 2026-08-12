@@ -18,7 +18,6 @@ let package = Package(
       description: "Full Foundation conveniences.",
       enabledTraits: ["Foundation"]
     ),
-    .trait(name: "Atomics", description: "Atomic engine generation coordination."),
     .trait(name: "JS", description: "JavaScriptKit interoperability."),
     .trait(name: "XGrammar", description: "XGrammar-powered structured generation."),
     .trait(name: "Needle2", description: "Needle 2 engine support."),
@@ -35,7 +34,7 @@ let package = Package(
     .trait(
       name: "MLX",
       description: "MLX model support.",
-      enabledTraits: ["Transformers", "Foundation", "Atomics"]
+      enabledTraits: ["Transformers", "Foundation"]
     ),
     .trait(
       name: "ONNXCore",
@@ -44,7 +43,7 @@ let package = Package(
 
         (Only enable this trait if you want to use your own ONNX build. Otherwise, enable `ONNX` directly.)
         """,
-      enabledTraits: ["XGrammar", "Atomics"]
+      enabledTraits: ["XGrammar"]
     ),
     .trait(
       name: "ONNX",
@@ -82,7 +81,7 @@ let package = Package(
         .product(name: "yyjson", package: "yyjson"),
         .product(name: "HeapModule", package: "swift-collections"),
         .product(name: "OrderedCollections", package: "swift-collections"),
-        .product(name: "Atomics", package: "swift-atomics", condition: .when(traits: ["Atomics"])),
+        .product(name: "Atomics", package: "swift-atomics"),
         .product(
           name: "JavaScriptKit",
           package: "JavaScriptKit",

@@ -61,6 +61,7 @@
       var position: Int
       var logitsTensor: Runtime.Tensor?
       var pendingTokenId: EdgeToolsToken.ID?
+      var confidence = ConfidenceState()
     }
 
     var vocabularySize: Int {
@@ -391,7 +392,7 @@
     nonisolated(nonsending) mutating func decode(
       bitmask: GrammarBitmask,
       parameters: NeedleONNXGenerateParameters
-    ) async throws -> EdgeToolsModelSample {
+    ) async throws -> EdgeToolsToken.ID {
       if let pendingTokenId = self.generation?.pendingTokenId {
         try await self.runDecoder(tokenID: pendingTokenId)
       }
@@ -415,14 +416,19 @@
         let tokenId = try await parameters.sampler.sample(logits: logits)
         return (tokenId, confidence)
       }
+      generation.confidence.add(confidence: confidence)
       parameters.processor?.didSample(tokenId: tokenId)
       generation.pendingTokenId = tokenId
       self.generation = generation
-      return EdgeToolsModelSample(tokenId: tokenId, confidence: confidence)
+      return tokenId
     }
 
-    mutating func resetGeneration() {
-      self.generation = nil
+    func finish() -> EdgeToolsMetadata {
+      guard let generation = self.generation else { return EdgeToolsMetadata() }
+      var metadata = EdgeToolsMetadata()
+      metadata.generationConfidence = generation.confidence.mean
+      metadata.perTokenConfidences = generation.confidence.perTokenConfidences
+      return metadata
     }
   }
 
@@ -459,18 +465,20 @@
       id: ObjectIdentifier,
       bitmask: GrammarBitmask,
       parameters: NeedleONNXGenerateParameters
-    ) async throws -> EdgeToolsModelSample {
+    ) async throws -> EdgeToolsToken.ID {
       guard var model = self.models[id] else {
         throw EdgeToolsError.modelNotPrepared
       }
-      let sample = try await model.decode(bitmask: bitmask, parameters: parameters)
+      let tokenId = try await model.decode(bitmask: bitmask, parameters: parameters)
       self.models[id] = model
-      return sample
+      return tokenId
     }
 
-    func reset(id: ObjectIdentifier) {
-      self.models[id]?.resetGeneration()
-      self.models[id] = nil
+    func finish(id: ObjectIdentifier) -> EdgeToolsMetadata {
+      guard let model = self.models.removeValue(forKey: id) else {
+        return EdgeToolsMetadata()
+      }
+      return model.finish()
     }
   }
 
@@ -527,7 +535,7 @@
 
   // MARK: - NeedleONNXModelEngine
 
-  public final class NeedleONNXModelEngine<Runtime: ONNXRuntime>: EdgeToolsModelEngine {
+  public final class NeedleONNXModelEngine<Runtime: ONNXRuntime>: EdgeToolsEngine {
     public typealias Context = NeedleONNXContext<Runtime>
     public typealias ContextParameters = Void
     public typealias Prompt = NeedlePrompt
@@ -537,6 +545,7 @@
     public typealias GrammarEngine = XGrammarEngine
 
     private let runtimeState: NeedleONNXRuntimeState<Runtime>
+    private let generationLoop: EdgeToolsGenerationLoop
     public let configuration: NeedleModelConfiguration
     public let tokenizer: any EdgeToolsTokenizer
     public let grammarEngine: XGrammarEngine
@@ -563,6 +572,7 @@
         encoderSession: encoderSession,
         decoderSession: decoderSession
       )
+      self.generationLoop = EdgeToolsGenerationLoop(tokenizer: tokenizer)
       self.configuration = configuration
       self.tokenizer = tokenizer
     }
@@ -588,19 +598,71 @@
       return context
     }
 
+    public func generate(
+      prompt: NeedlePrompt,
+      tools: [EdgeToolDefinition] = [],
+      parameters: sending NeedleONNXGenerateParameters,
+      context: Context,
+      channel: sending EdgeToolsGenerationChannel
+      ) throws -> AnyGenerationTask {
+        AnyGenerationTask { stopper in
+          var state = try await self.generationState(prompt: prompt, context: context)
+          var preparedPrompt = prompt
+          let result: Result<EdgeToolsEngineGeneration, any Error>
+        do {
+          result = .success(
+            try await self.generationLoop.run(
+              state: &state,
+              stopper: stopper,
+              channel: channel,
+              grammarEngine: self.grammarEngine,
+              maximumTokenCount: parameters.maxTokens,
+              grammar: { state in
+                try self.grammar(
+                  prompt: preparedPrompt,
+                  tools: tools,
+                  parameters: parameters,
+                  state: state
+                )
+              },
+              prepare: { parser, state in
+                return try await self.prepare(
+                  prompt: &preparedPrompt,
+                  tools: tools,
+                  parameters: parameters,
+                  parser: &parser,
+                  state: &state
+                )
+              },
+              decode: { bitmask, state in
+                try await self.decode(
+                  bitmask: bitmask,
+                  parameters: parameters,
+                  state: &state
+                )
+              }
+            )
+          )
+        } catch {
+          result = .failure(error)
+        }
+        return try await self.finalize(state: state, result: result, context: context).get()
+      }
+    }
+
     public func prepare(
       prompt: inout NeedlePrompt,
       tools: [EdgeToolDefinition],
       parameters: NeedleONNXGenerateParameters,
       parser: inout NeedleGenerationParser,
       state: inout Context
-    ) async throws -> EdgeToolsModelPreparation {
+    ) async throws -> EdgeToolsGenerationLoop.Preparation {
       let tokenIds = self.tokenizer.encode(text: try prompt.formatted(tools: tools))
       let clock = ContinuousClock()
       let start = clock.now
       parameters.processor?.prompt(tokenIds)
       try await self.runtimeState.prepare(id: state.id, tokenIds: tokenIds)
-      return EdgeToolsModelPreparation(
+      return EdgeToolsGenerationLoop.Preparation(
         metrics: EdgeToolsPrefillMetrics(
           tokens: tokenIds.count,
           duration: start.duration(to: clock.now)
@@ -621,7 +683,7 @@
       bitmask: GrammarBitmask,
       parameters: NeedleONNXGenerateParameters,
       state: inout Context
-    ) async throws -> EdgeToolsModelSample {
+    ) async throws -> EdgeToolsToken.ID {
       try await self.runtimeState.decode(
         id: state.id,
         bitmask: bitmask,
@@ -629,18 +691,18 @@
       )
     }
 
-    public func stopTokenIds(state: Context) -> Set<EdgeToolsToken.ID> {
-      Set(self.tokenizer.eosTokenId.map { [$0] } ?? [])
-    }
-
     public func finalize(
       state: consuming Context,
       result: consuming Result<EdgeToolsEngineGeneration, any Error>,
       context: Context
     ) async -> Result<EdgeToolsEngineGeneration, any Error> {
-      await self.runtimeState.reset(id: state.id)
+      let metadata = await self.runtimeState.finish(id: state.id)
       state.end()
-      return result
+      guard case .success(var generation) = result else {
+        return result
+      }
+      generation.metadata.merge(metadata) { _, finalValue in finalValue }
+      return .success(generation)
     }
 
     public func clearCaches() {

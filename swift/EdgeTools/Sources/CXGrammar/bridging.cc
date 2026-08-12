@@ -37,8 +37,43 @@ namespace {
 
 thread_local char last_error[4096] = {};
 
-void clear_error() {
+}
+
+namespace xgrammar {
+
+enum class ErrorCode : uint8_t {
+    kNone,
+    kGrammar,
+};
+
+namespace {
+thread_local ErrorCode last_error_code = ErrorCode::kNone;
+}
+
+void ClearLastError() {
+    last_error_code = ErrorCode::kNone;
     last_error[0] = '\0';
+}
+
+void SetLastError(ErrorCode code, const char* message) {
+    last_error_code = code;
+    std::snprintf(last_error, sizeof(last_error), "%s", message);
+}
+
+bool HasLastError() {
+    return last_error_code != ErrorCode::kNone;
+}
+
+const char* LastErrorMessage() {
+    return last_error;
+}
+
+}  // namespace xgrammar
+
+namespace {
+
+void clear_error() {
+    xgrammar::ClearLastError();
 }
 
 void set_error_message(const std::string& message) {
@@ -56,14 +91,22 @@ auto invoke(Body&& body) -> std::invoke_result_t<Body> {
     clear_error();
 #if XGRAMMAR_CXX_EXCEPTIONS_ENABLED
     try {
-        return body();
+        auto result = body();
+        if (xgrammar::HasLastError()) {
+            return fail<std::invoke_result_t<Body>>(xgrammar::LastErrorMessage());
+        }
+        return result;
     } catch (const std::exception& error) {
         return fail<std::invoke_result_t<Body>>(error.what());
     } catch (...) {
         return fail<std::invoke_result_t<Body>>("Unknown XGrammar error.");
     }
 #else
-    return body();
+    auto result = body();
+    if (xgrammar::HasLastError()) {
+        return fail<std::invoke_result_t<Body>>(xgrammar::LastErrorMessage());
+    }
+    return result;
 #endif
 }
 
@@ -294,6 +337,15 @@ xgrammar_tokenizer_info_t xgrammar_tokenizer_info_deserialize_json(const char* j
     });
 }
 
+xgrammar_tokenizer_info_t xgrammar_tokenizer_info_copy(xgrammar_tokenizer_info_t tokenizer_info) {
+    return invoke([&] {
+        if (!tokenizer_info) return fail<XGrammarTokenizerInfoHandle*>("Expected tokenizer information.");
+        return new XGrammarTokenizerInfoHandle{
+            static_cast<XGrammarTokenizerInfoHandle*>(tokenizer_info)->tokenizer_info
+        };
+    });
+}
+
 void xgrammar_tokenizer_info_destroy(xgrammar_tokenizer_info_t tokenizer_info) {
     delete static_cast<XGrammarTokenizerInfoHandle*>(tokenizer_info);
 }
@@ -310,6 +362,14 @@ xgrammar_compiler_t xgrammar_compiler_init(
         }
         const auto info = static_cast<XGrammarTokenizerInfoHandle*>(tokenizer_info)->tokenizer_info;
         return new XGrammarCompilerHandle{info, xgrammar::GrammarCompiler(info, max_threads, cache_enabled != 0, max_memory_bytes)};
+    });
+}
+
+xgrammar_compiler_t xgrammar_compiler_copy(xgrammar_compiler_t compiler) {
+    return invoke([&] {
+        if (!compiler) return fail<XGrammarCompilerHandle*>("Expected a compiler.");
+        const auto handle = static_cast<XGrammarCompilerHandle*>(compiler);
+        return new XGrammarCompilerHandle{handle->tokenizer_info, handle->compiler};
     });
 }
 
@@ -458,6 +518,15 @@ xgrammar_grammar_t xgrammar_grammar_builtin_json(void) {
     return invoke([&] { return new XGrammarGrammarHandle{xgrammar::Grammar::BuiltinJSONGrammar()}; });
 }
 
+xgrammar_grammar_t xgrammar_grammar_copy(xgrammar_grammar_t grammar) {
+    return invoke([&] {
+        if (!grammar) return fail<XGrammarGrammarHandle*>("Expected a grammar.");
+        return new XGrammarGrammarHandle{
+            static_cast<XGrammarGrammarHandle*>(grammar)->grammar
+        };
+    });
+}
+
 size_t xgrammar_grammar_ebnf(xgrammar_grammar_t grammar, char* buffer, size_t buffer_capacity) {
     return invoke([&] {
         if (!grammar) return fail<size_t>("Expected a grammar.");
@@ -599,6 +668,17 @@ xgrammar_compiled_grammar_t xgrammar_compiled_grammar_deserialize_json(
         );
         if (!compiled_grammar) return static_cast<XGrammarCompiledGrammarHandle*>(nullptr);
         return new XGrammarCompiledGrammarHandle{std::move(*compiled_grammar)};
+    });
+}
+
+xgrammar_compiled_grammar_t xgrammar_compiled_grammar_copy(
+    xgrammar_compiled_grammar_t compiled_grammar
+) {
+    return invoke([&] {
+        if (!compiled_grammar) return fail<XGrammarCompiledGrammarHandle*>("Expected a compiled grammar.");
+        return new XGrammarCompiledGrammarHandle{
+            static_cast<XGrammarCompiledGrammarHandle*>(compiled_grammar)->compiled_grammar
+        };
     });
 }
 
