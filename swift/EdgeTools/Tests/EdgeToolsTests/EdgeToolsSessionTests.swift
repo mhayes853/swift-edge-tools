@@ -831,7 +831,7 @@ private struct GetWeatherTool: EdgeTool {
 
 // MARK: - Reentrant Mock Engine
 
-private final class ReentrantMockEngine: EdgeToolsEngine {
+private final class ReentrantMockEngine: EdgeToolsEngine, EdgeToolsTokenizingEngine {
   final class Context: Identifiable, Sendable {}
 
   struct Prompt: Sendable {}

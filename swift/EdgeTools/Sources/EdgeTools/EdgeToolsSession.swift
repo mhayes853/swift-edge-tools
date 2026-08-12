@@ -85,7 +85,9 @@ extension EdgeToolsSession {
   public func context(_ parameters: Engine.ContextParameters) -> Engine.Context {
     self.engine.context(parameters)
   }
+}
 
+extension EdgeToolsSession where Engine: EdgeToolsTokenizingEngine {
   public func tokenize(
     prompt: Engine.Prompt,
     context: Engine.Context? = nil

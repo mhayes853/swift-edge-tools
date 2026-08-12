@@ -129,6 +129,13 @@ let package = Package(
         ),
         .target(name: "EdgeToolsXGrammar", condition: .when(traits: ["XGrammar"])),
         .target(
+          name: "CNeedle2",
+          condition: .when(
+            platforms: [.macOS, .iOS, .tvOS, .watchOS, .linux, .windows, .android],
+            traits: ["Needle2"]
+          )
+        ),
+        .target(
           name: "COnnxRuntime",
           condition: .when(platforms: [.macOS, .iOS, .linux, .android], traits: ["ONNXCore"])
         ),
@@ -147,7 +154,18 @@ let package = Package(
         .enableExperimentalFeature("Lifetimes"),
         .enableExperimentalFeature("AddressableTypes")
       ],
-      linkerSettings: [.linkedFramework("CoreML", .when(platforms: [.macOS, .iOS], traits: ["ONNX"]))]
+      linkerSettings: [
+        .linkedFramework("CoreML", .when(platforms: [.macOS, .iOS], traits: ["ONNX"])),
+        .linkedLibrary(
+          "c++",
+          .when(
+            platforms: [.macOS, .iOS, .tvOS, .watchOS],
+            traits: ["Needle2"]
+          )
+        ),
+        .linkedLibrary("c++", .when(platforms: [.linux], traits: ["Needle2"])),
+        .linkedLibrary("c++_shared", .when(platforms: [.android], traits: ["Needle2"]))
+      ]
     ),
     .target(
       name: "_EdgeToolsFoundation",
@@ -183,6 +201,10 @@ let package = Package(
       name: "onnxruntimeNonApple",
       path: "bin/onnxruntime-webgpu-1.27.0.artifactbundle.zip"
     ),
+    .binaryTarget(
+      name: "CNeedle2",
+      path: "bin/needle2-2.0.0.artifactbundle.zip"
+    ),
     .target(
       name: "CXGrammar",
       path: "swift/EdgeTools/Sources/CXGrammar",
@@ -203,7 +225,11 @@ let package = Package(
       ],
       plugins: [.plugin(name: "PatchPlugin")]
     ),
-    .plugin(name: "PatchPlugin", capability: .buildTool(), path: "swift/EdgeTools/Plugins/PatchPlugin"),
+    .plugin(
+      name: "PatchPlugin",
+      capability: .buildTool(),
+      path: "swift/EdgeTools/Plugins/PatchPlugin"
+    ),
     .macro(
       name: "EdgeToolsMacros",
       dependencies: [
@@ -241,6 +267,7 @@ let package = Package(
         "Models/Needle/Engines/__Snapshots__",
         "Models/Needle/Engines/MLX/__Snapshots__",
         "Models/Needle/__Snapshots__",
+        "Models/Needle2/__Snapshots__",
         "Models/__Snapshots__",
         "Models/Gemma/__Snapshots__",
         "Models/LFM/__Snapshots__",
