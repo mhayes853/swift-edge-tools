@@ -14,16 +14,6 @@ public struct EdgeToolsGenerationLoop: Sendable {
     }
   }
 
-  public struct Sample: Hashable, Sendable {
-    public var tokenId: EdgeToolsToken.ID
-    public var confidence: Float
-
-    public init(tokenId: EdgeToolsToken.ID, confidence: Float) {
-      self.tokenId = tokenId
-      self.confidence = confidence
-    }
-  }
-
   private let tokenizer: any EdgeToolsTokenizer
   public let stopTokenIds: Set<EdgeToolsToken.ID>
 
@@ -47,7 +37,7 @@ public struct EdgeToolsGenerationLoop: Sendable {
     maximumTokenCount: Int? = nil,
     grammar: (State) throws -> GrammarEngine.Grammar,
     prepare: (inout Parser, inout State) async throws -> Preparation,
-    decode: (GrammarBitmask, inout State) async throws -> Sample
+    decode: (GrammarBitmask, inout State) async throws -> EdgeToolsToken.ID
   ) async throws -> EdgeToolsEngineGeneration
   where Parser: EdgeToolsGenerationParser, GrammarEngine: EdgeToolsGrammarEngine {
     try Task.checkCancellation()
@@ -58,7 +48,7 @@ public struct EdgeToolsGenerationLoop: Sendable {
     let clock = GenerationClock()
     let generateStart = clock.now
     var parser = Parser()
-    var preparation = try await prepare(&parser, &state)
+    let preparation = try await prepare(&parser, &state)
     var matcher = try grammarEngine.matcher(
       for: grammar(state),
       stopTokenIds: self.stopTokenIds
@@ -66,7 +56,6 @@ public struct EdgeToolsGenerationLoop: Sendable {
     var detokenizer = StreamingDetokenizer()
     var generatedTokens = [EdgeToolsToken]()
     var parts = [EdgeToolsGenerationPart]()
-    var confidence = ConfidenceState()
     var durationToFirstToken: Duration?
     let maximumTokenCount = maximumTokenCount ?? .max
 
@@ -81,12 +70,11 @@ public struct EdgeToolsGenerationLoop: Sendable {
     }
 
     while let currentBitmask = bitmask {
-      let sample = try await decode(currentBitmask, &state)
+      let tokenId = try await decode(currentBitmask, &state)
       durationToFirstToken = durationToFirstToken ?? clock.duration(since: generateStart)
-      confidence.add(confidence: sample.confidence)
 
-      let tokenString = detokenizer.decode(tokenId: sample.tokenId, using: self.tokenizer)
-      let token = EdgeToolsToken(id: sample.tokenId, stringValue: tokenString)
+      let tokenString = detokenizer.decode(tokenId: tokenId, using: self.tokenizer)
+      let token = EdgeToolsToken(id: tokenId, stringValue: tokenString)
       generatedTokens.append(token)
       guard matcher.accept(tokenId: token.id) else {
         throw EdgeToolsError.grammarRejectedToken(token: token)
@@ -119,8 +107,6 @@ public struct EdgeToolsGenerationLoop: Sendable {
     }
 
     let finalDurationToFirstToken = durationToFirstToken ?? .zero
-    preparation.metadata.generationConfidence = confidence.mean
-    preparation.metadata.perTokenConfidences = confidence.perTokenConfidences
     var responseTokenIds = detokenizer.tokenIds
     if let lastTokenId = responseTokenIds.last,
       self.stopTokenIds.contains(lastTokenId)

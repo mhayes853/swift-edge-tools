@@ -852,6 +852,7 @@
       let inputContext: EdgeToolsLLMPrefillContext?
       var processor: (any LogitProcessor)?
       let sampler: any LogitSampler
+      var confidence = ConfidenceState()
       let synchronizeStreamForMemorySnapshots: Bool
       let generationStartSnapshot: Memory.Snapshot
       let postPrefillSnapshot: Memory.Snapshot
@@ -989,7 +990,7 @@
     public nonisolated(nonsending) mutating func decode(
       bitmask: GrammarBitmask,
       parameters: Profile.GenerateParameters
-    ) async throws -> EdgeToolsGenerationLoop.Sample {
+    ) async throws -> EdgeToolsToken.ID {
       guard var generation = self.generation else {
         throw EdgeToolsError.modelNotPrepared
       }
@@ -1019,15 +1020,18 @@
 
       let confidence = tokenConfidence(unorderedPair: confidenceValues.asArray(Float.self))
       let tokenId = token.item(EdgeToolsToken.ID.self)
+      generation.confidence.add(confidence: confidence)
       generation.processor?.didSample(token: token)
       generation.pendingTokenId = tokenId
       self.generation = generation
-      return EdgeToolsGenerationLoop.Sample(tokenId: tokenId, confidence: confidence)
+      return tokenId
     }
 
     public func finish() -> EdgeToolsMetadata {
       guard let generation = self.generation else { return EdgeToolsMetadata() }
       var metadata = EdgeToolsMetadata()
+      metadata.generationConfidence = generation.confidence.mean
+      metadata.perTokenConfidences = generation.confidence.perTokenConfidences
       metadata.mlxEngineGenerationStartMemorySnapshot = generation.generationStartSnapshot
       metadata.mlxEnginePostPrefillMemorySnapshot = generation.postPrefillSnapshot
       metadata.mlxEnginePostDecodeMemorySnapshot = Self.memorySnapshot(
@@ -1509,7 +1513,7 @@
       bitmask: GrammarBitmask,
       parameters: Profile.GenerateParameters,
       state: inout ModelGenerationState
-    ) async throws -> EdgeToolsGenerationLoop.Sample {
+    ) async throws -> EdgeToolsToken.ID {
       try await state.model.decode(bitmask: bitmask, parameters: parameters)
     }
 
