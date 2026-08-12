@@ -66,12 +66,12 @@ extension EngineRunner {
   private init<Engine: EdgeToolsEngine>(
     engineKind: EngineKind,
     engine: Engine,
-    supportsCustomGrammar: Bool,
-    supportsSampling: Bool,
+    supportsCustomGrammar: Bool = false,
+    supportsSampling: Bool = false,
     supportsImages: Bool = false,
     prompt: @escaping @Sendable (GenerationRequest) -> Engine.Prompt,
     parameters: @escaping @Sendable (GenerationRequest) throws -> sending Engine.GenerateParameters,
-    modelResetting: @escaping @Sendable () async -> Void
+    modelResetting: @escaping @Sendable () async -> Void = {}
   ) {
     self.init(
       engine: engineKind,
@@ -88,29 +88,6 @@ extension EngineRunner {
         return try await task.value
       },
       modelResetting: modelResetting
-    )
-  }
-}
-
-extension EngineRunner {
-  private init<Engine: EdgeToolsModelEngine>(
-    engineKind: EngineKind,
-    engine: Engine,
-    supportsCustomGrammar: Bool = false,
-    supportsSampling: Bool = false,
-    supportsImages: Bool = false,
-    prompt: @escaping @Sendable (GenerationRequest) -> Engine.Prompt,
-    parameters: @escaping @Sendable (GenerationRequest) throws -> sending Engine.GenerateParameters
-  ) {
-    self.init(
-      engineKind: engineKind,
-      engine: engine,
-      supportsCustomGrammar: supportsCustomGrammar,
-      supportsSampling: supportsSampling,
-      supportsImages: supportsImages,
-      prompt: prompt,
-      parameters: parameters,
-      modelResetting: {}
     )
   }
 }

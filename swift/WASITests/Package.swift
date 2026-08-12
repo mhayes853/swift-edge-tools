@@ -7,7 +7,7 @@ let package = Package(
   dependencies: [
     .package(
       path: "../..",
-      traits: ["XGrammar", "Atomics", "ONNXCore", "JS"]
+      traits: ["XGrammar", "ONNXCore", "JS"]
     ),
     .package(
       url: "https://github.com/swiftwasm/JavaScriptKit",

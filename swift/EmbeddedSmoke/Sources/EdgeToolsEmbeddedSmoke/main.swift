@@ -81,6 +81,14 @@ final class MockEngine: EdgeToolsEngine {
 }
 
 func runSmoke() async throws {
+  let generationTask = AnyGenerationTask { stopper in
+    stopper.stop()
+    return .empty
+  }
+  guard try await generationTask.value.wasStopped else {
+    throw SmokeError.unexpectedGenerationTaskResult
+  }
+
   let session = EdgeToolsSession(engine: MockEngine()) {
     EchoTool()
   }
@@ -108,6 +116,7 @@ func runSmoke() async throws {
 }
 
 enum SmokeError: String, Error {
+  case unexpectedGenerationTaskResult
   case unexpectedToolCallCount
   case unexpectedToolName
   case unexpectedToolInput
