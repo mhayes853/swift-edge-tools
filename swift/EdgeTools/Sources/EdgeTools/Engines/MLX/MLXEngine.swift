@@ -916,7 +916,7 @@
       tokenizer: any EdgeToolsTokenizer,
       parameters: Profile.GenerateParameters,
       parser: inout Profile.GenerationParser
-    ) async throws -> EdgeToolsModelPreparation {
+    ) async throws -> EdgeToolsGenerationLoop.Preparation {
       Profile.prepare(prompt: &prompt, tools: tools, parser: &parser)
       let input = try await self.input(
         prompt: prompt,
@@ -952,7 +952,7 @@
       input: LMInput,
       sampler: any LogitSampler,
       parameters: Profile.GenerateParameters
-    ) async throws -> EdgeToolsModelPreparation {
+    ) async throws -> EdgeToolsGenerationLoop.Preparation {
       let clock = ContinuousClock()
       let generationStartSnapshot = Self.memorySnapshot(
         synchronize: parameters.synchronizeStreamForMemorySnapshots
@@ -983,13 +983,13 @@
         generationStartSnapshot: generationStartSnapshot,
         postPrefillSnapshot: postPrefillSnapshot
       )
-      return EdgeToolsModelPreparation(metrics: metrics)
+      return EdgeToolsGenerationLoop.Preparation(metrics: metrics)
     }
 
     public nonisolated(nonsending) mutating func decode(
       bitmask: GrammarBitmask,
       parameters: Profile.GenerateParameters
-    ) async throws -> EdgeToolsModelSample {
+    ) async throws -> EdgeToolsGenerationLoop.Sample {
       guard var generation = self.generation else {
         throw EdgeToolsError.modelNotPrepared
       }
@@ -1022,7 +1022,7 @@
       generation.processor?.didSample(token: token)
       generation.pendingTokenId = tokenId
       self.generation = generation
-      return EdgeToolsModelSample(tokenId: tokenId, confidence: confidence)
+      return EdgeToolsGenerationLoop.Sample(tokenId: tokenId, confidence: confidence)
     }
 
     public func finish() -> EdgeToolsMetadata {
@@ -1376,7 +1376,7 @@
   // MARK: - MLXEngine
 
   public final class MLXEngine<Profile: MLXModelProfile>:
-    EdgeToolsModelEngine, EdgeToolsPrefillableEngine
+    EdgeToolsEngine, EdgeToolsPrefillableEngine
   where Profile.Prompt == EdgeToolsTranscript {
     public typealias Context = MLXContext<Profile>
     public typealias ContextParameters = MLXContextParameters
@@ -1387,8 +1387,8 @@
     public typealias GrammarEngine = Profile.GrammarEngine
 
     private let prototype: Lock<MLXModelState<Profile>>
-    private let extraStopTokenIds: Set<EdgeToolsToken.ID>
     private let identity = MLXEngineIdentity()
+    private let generationLoop: EdgeToolsGenerationLoop
     public let tokenizer: any EdgeToolsTokenizer
     public let grammarEngine: Profile.GrammarEngine
 
@@ -1409,7 +1409,10 @@
       )
       self.grammarEngine = try prototype.grammarEngine(tokenizer: tokenizer)
       self.prototype = Lock(prototype)
-      self.extraStopTokenIds = extraStopTokenIds
+      self.generationLoop = EdgeToolsGenerationLoop(
+        tokenizer: tokenizer,
+        extraStopTokenIds: extraStopTokenIds
+      )
       self.tokenizer = tokenizer
     }
 
@@ -1453,13 +1456,32 @@
       return self.generationState(from: try context.begin(appending: prompt))
     }
 
+    public func generate(
+      prompt: EdgeToolsTranscript.UserMessage,
+      tools: [EdgeToolDefinition] = [],
+      parameters: sending Profile.GenerateParameters,
+      context: MLXContext<Profile>,
+      channel: sending EdgeToolsGenerationChannel
+    ) throws -> AnyGenerationTask {
+      self.generationTask(
+        prompt: prompt,
+        tools: tools,
+        parameters: parameters,
+        context: context,
+        channel: channel,
+        makeState: {
+          try await self.generationState(prompt: prompt, context: context)
+        }
+      )
+    }
+
     public func prepare(
       prompt: inout EdgeToolsTranscript.UserMessage,
       tools: [EdgeToolDefinition],
       parameters: Profile.GenerateParameters,
       parser: inout Profile.GenerationParser,
       state: inout ModelGenerationState
-    ) async throws -> EdgeToolsModelPreparation {
+    ) async throws -> EdgeToolsGenerationLoop.Preparation {
       try await state.model.prepare(
         prompt: &state.transcript,
         tools: tools,
@@ -1487,16 +1509,8 @@
       bitmask: GrammarBitmask,
       parameters: Profile.GenerateParameters,
       state: inout ModelGenerationState
-    ) async throws -> EdgeToolsModelSample {
+    ) async throws -> EdgeToolsGenerationLoop.Sample {
       try await state.model.decode(bitmask: bitmask, parameters: parameters)
-    }
-
-    public func stopTokenIds(state: ModelGenerationState) -> Set<EdgeToolsToken.ID> {
-      var stopTokenIds = self.extraStopTokenIds
-      if let eosTokenId = self.tokenizer.eosTokenId {
-        stopTokenIds.insert(eosTokenId)
-      }
-      return stopTokenIds
     }
 
     public func finalize(
@@ -1511,8 +1525,7 @@
       let finalResult: Result<EdgeToolsEngineGeneration, any Error>
       switch result {
       case .success(var value):
-        let stopTokenIds = self.stopTokenIds(state: state)
-        state.model.commitGeneration(stopTokenIds: stopTokenIds)
+        state.model.commitGeneration(stopTokenIds: self.generationLoop.stopTokenIds)
         value.metadata.merge(metadata) { _, finalValue in finalValue }
         generation = value
         finalResult = .success(value)
@@ -1562,7 +1575,7 @@
       parameters: sending Profile.GenerateParameters,
       context: MLXContext<Profile>,
       channel: sending EdgeToolsGenerationChannel
-    ) throws -> some EdgeToolsEngineGenerationTask {
+    ) throws -> AnyGenerationTask {
       try self.validate(context)
       return self.generationTask(
         prompt: .user(""),
@@ -1574,6 +1587,59 @@
           self.generationState(from: try context.begin())
         }
       )
+    }
+
+    private func generationTask(
+      prompt: EdgeToolsTranscript.UserMessage,
+      tools: [EdgeToolDefinition],
+      parameters: sending Profile.GenerateParameters,
+      context: MLXContext<Profile>,
+      channel: sending EdgeToolsGenerationChannel,
+      makeState: @escaping @Sendable () async throws -> ModelGenerationState
+    ) -> AnyGenerationTask {
+      AnyGenerationTask { stopper in
+        var state = try await makeState()
+        var preparedPrompt = prompt
+        let result: Result<EdgeToolsEngineGeneration, any Error>
+        do {
+          result = .success(
+            try await self.generationLoop.run(
+              state: &state,
+              stopper: stopper,
+              channel: channel,
+              grammarEngine: self.grammarEngine,
+              maximumTokenCount: parameters.maxTokens,
+              grammar: { state in
+                try self.grammar(
+                  prompt: preparedPrompt,
+                  tools: tools,
+                  parameters: parameters,
+                  state: state
+                )
+              },
+              prepare: { parser, state in
+                return try await self.prepare(
+                  prompt: &preparedPrompt,
+                  tools: tools,
+                  parameters: parameters,
+                  parser: &parser,
+                  state: &state
+                )
+              },
+              decode: { bitmask, state in
+                try await self.decode(
+                  bitmask: bitmask,
+                  parameters: parameters,
+                  state: &state
+                )
+              }
+            )
+          )
+        } catch {
+          result = .failure(error)
+        }
+        return try await self.finalize(state: state, result: result, context: context).get()
+      }
     }
 
     private func prefill(

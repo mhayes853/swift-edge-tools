@@ -424,7 +424,7 @@
     // MARK: - NeedleMLXModelEngine
 
     public final class NeedleMLXModelEngine:
-      EdgeToolsModelEngine, EdgeToolsPrefillableEngine
+      EdgeToolsEngine, EdgeToolsPrefillableEngine
     {
       public typealias Context = NeedleMLXContext
       public typealias ContextParameters = Void
@@ -435,7 +435,7 @@
       public typealias GrammarEngine = XGrammarEngine
 
       private let prototype: Lock<MLXModelState<NeedleMLXProfile>>
-      private let extraStopTokenIds: Set<EdgeToolsToken.ID>
+      private let generationLoop: EdgeToolsGenerationLoop
       public let tokenizer: any EdgeToolsTokenizer
       public let grammarEngine: XGrammarEngine
 
@@ -452,7 +452,10 @@
         )
         self.grammarEngine = try prototype.grammarEngine(tokenizer: tokenizer)
         self.prototype = Lock(prototype)
-        self.extraStopTokenIds = extraStopTokenIds
+        self.generationLoop = EdgeToolsGenerationLoop(
+          tokenizer: tokenizer,
+          extraStopTokenIds: extraStopTokenIds
+        )
         self.tokenizer = tokenizer
       }
 
@@ -488,13 +491,65 @@
         return try await context.takeState()
       }
 
+      public func generate(
+        prompt: NeedlePrompt,
+        tools: [EdgeToolDefinition] = [],
+        parameters: sending NeedleMLXGenerateParameters,
+        context: NeedleMLXContext,
+        channel: sending EdgeToolsGenerationChannel
+      ) throws -> AnyGenerationTask {
+        AnyGenerationTask { stopper in
+          var state = try await self.generationState(prompt: prompt, context: context)
+          var preparedPrompt = prompt
+          let result: Result<EdgeToolsEngineGeneration, any Error>
+          do {
+            result = .success(
+              try await self.generationLoop.run(
+                state: &state,
+                stopper: stopper,
+                channel: channel,
+                grammarEngine: self.grammarEngine,
+                maximumTokenCount: parameters.maxTokens,
+                grammar: { state in
+                  try self.grammar(
+                    prompt: preparedPrompt,
+                    tools: tools,
+                    parameters: parameters,
+                    state: state
+                  )
+                },
+                prepare: { parser, state in
+                  return try await self.prepare(
+                    prompt: &preparedPrompt,
+                    tools: tools,
+                    parameters: parameters,
+                    parser: &parser,
+                    state: &state
+                  )
+                },
+                decode: { bitmask, state in
+                  try await self.decode(
+                    bitmask: bitmask,
+                    parameters: parameters,
+                    state: &state
+                  )
+                }
+              )
+            )
+          } catch {
+            result = .failure(error)
+          }
+          return try await self.finalize(state: state, result: result, context: context).get()
+        }
+      }
+
       public func prepare(
         prompt: inout NeedlePrompt,
         tools: [EdgeToolDefinition],
         parameters: NeedleMLXGenerateParameters,
         parser: inout NeedleGenerationParser,
         state: inout NeedleMLXGenerationState
-      ) async throws -> EdgeToolsModelPreparation {
+      ) async throws -> EdgeToolsGenerationLoop.Preparation {
         try await state.model.prepare(
           prompt: &prompt,
           tools: tools,
@@ -522,16 +577,8 @@
         bitmask: GrammarBitmask,
         parameters: NeedleMLXGenerateParameters,
         state: inout NeedleMLXGenerationState
-      ) async throws -> EdgeToolsModelSample {
+      ) async throws -> EdgeToolsGenerationLoop.Sample {
         try await state.model.decode(bitmask: bitmask, parameters: parameters)
-      }
-
-      public func stopTokenIds(state: NeedleMLXGenerationState) -> Set<EdgeToolsToken.ID> {
-        var stopTokenIds = self.extraStopTokenIds
-        if let eosTokenId = self.tokenizer.eosTokenId {
-          stopTokenIds.insert(eosTokenId)
-        }
-        return stopTokenIds
       }
 
       public func finalize(
