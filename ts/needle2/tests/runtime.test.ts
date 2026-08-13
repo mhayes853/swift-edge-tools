@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "vitest";
 import {
   needle2Runtime,
   type Needle2Initialization,
+  type Needle2Factory,
   type Needle2Provider,
   type Needle2Runtime
 } from "../dist/index.js";
@@ -61,6 +62,34 @@ test("returns the native error response for truncated generation", async () => {
   expect(result.errorCode).toBe("truncated");
 });
 
+test("isolates multiple direct runtimes sharing one native module", async () => {
+  const fake = fakeNeedleFactory();
+  const weights = new Uint8Array([1]);
+  const thermostat = await needle2Runtime({
+    provider: "direct",
+    factory: fake.factory,
+    wasm: new Uint8Array([1]),
+    weights
+  });
+  const weather = await needle2Runtime({
+    provider: "direct",
+    factory: fake.factory,
+    wasm: new Uint8Array([1]),
+    weights
+  });
+  runtimes.push(thermostat, weather);
+
+  const thermostatInitialization = initializationFor("set_thermostat");
+  const weatherInitialization = initializationFor("get_weather");
+  const thermostatPrompt = { prompt: "set it to 21 degrees", initialization: thermostatInitialization };
+  const weatherPrompt = { prompt: "what's the weather in Paris?", initialization: weatherInitialization };
+
+  expect((await thermostat.generate(thermostatPrompt)).functionCalls[0]?.name).toBe("set_thermostat");
+  expect((await weather.generate(weatherPrompt)).functionCalls[0]?.name).toBe("get_weather");
+  expect((await thermostat.generate(thermostatPrompt)).functionCalls[0]?.name).toBe("set_thermostat");
+  expect(fake.factoryCalls).toBe(1);
+});
+
 describe.each(["direct", "worker"] satisfies Needle2Provider[])(
   "Needle2Runtime with the %s provider",
   provider => {
@@ -91,3 +120,64 @@ describe.each(["direct", "worker"] satisfies Needle2Provider[])(
     });
   }
 );
+
+function initializationFor(toolName: string): Needle2Initialization {
+  return {
+    systemPrompt: "",
+    tools: [{ name: toolName, parameters: { type: "object" } }]
+  };
+}
+
+function fakeNeedleFactory(): {
+  factory: Needle2Factory;
+  factoryCalls: number;
+} {
+  const module = {
+    HEAPU8: new Uint8Array(1024),
+    activeTool: "",
+    factoryCalls: 0,
+    loadCalls: 0,
+    nextPointer: 1,
+    _needle_load(pointer: number, _length: bigint) {
+      void pointer;
+      module.loadCalls += 1;
+      return 0;
+    },
+    _needle_reset() {},
+    _malloc(capacity: number) {
+      const pointer = module.nextPointer;
+      module.nextPointer += capacity;
+      return pointer;
+    },
+    _free(_pointer: number) {},
+    UTF8ToString(_pointer: number) {
+      return JSON.stringify({
+        type: "call",
+        success: true,
+        function_calls: [{ name: module.activeTool, arguments: {} }]
+      });
+    },
+    ccall(
+      name: string,
+      _returnType: "number",
+      _argumentTypes: readonly string[],
+      argumentValues: readonly unknown[]
+    ) {
+      if (name === "needle_init") {
+        const tools = JSON.parse(String(argumentValues[1])) as Array<{ name: string }>;
+        module.activeTool = tools[0]?.name ?? "";
+      }
+      return 1;
+    }
+  };
+  const factory: Needle2Factory = async () => {
+    module.factoryCalls += 1;
+    return module;
+  };
+  return {
+    factory,
+    get factoryCalls() {
+      return module.factoryCalls;
+    }
+  };
+}

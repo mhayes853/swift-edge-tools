@@ -34,10 +34,9 @@ type Needle2EmscriptenModule = {
 export class Needle2DirectBackend implements Needle2Backend {
   readonly provider = "direct" as const;
 
-  private module: Needle2EmscriptenModule | undefined;
-  private readonly operations = new PromiseQueue();
-  private initializationFingerprint: string | undefined;
-  private weightsPointer: number | undefined;
+  private readonly sharedModule: SharedNeedle2Module;
+  private weights: Uint8Array;
+  private weightsIdentity: object | string;
   private disposed = false;
 
   static async create(
@@ -49,37 +48,122 @@ export class Needle2DirectBackend implements Needle2Backend {
       binarySourceBytes(wasm),
       binarySourceBytes(weights)
     ]);
-    const module = emscriptenModule(await factory({ wasmBinary: wasmBytes }));
-    const backend = new Needle2DirectBackend(module);
-    backend.loadImmediately(weightBytes);
+    const sharedModule = await sharedNeedle2Module(factory, wasmBytes);
+    const backend = new Needle2DirectBackend(
+      sharedModule,
+      weightBytes,
+      binarySourceIdentity(weights)
+    );
+    await sharedModule.load(backend, Promise.resolve(weightBytes), backend.weightsIdentity);
     return backend;
   }
 
-  private constructor(module: Needle2EmscriptenModule) {
-    this.module = module;
+  private constructor(
+    sharedModule: SharedNeedle2Module,
+    weights: Uint8Array,
+    weightsIdentity: object | string
+  ) {
+    this.sharedModule = sharedModule;
+    this.weights = weights.slice();
+    this.weightsIdentity = weightsIdentity;
   }
 
   generate(options: Needle2GenerateOptions): Promise<Needle2NativeGeneration> {
+    return this.sharedModule.generate(this, options);
+  }
+
+  load(weights: Needle2BinarySource): Promise<void> {
+    return this.sharedModule.load(
+      this,
+      binarySourceBytes(weights),
+      binarySourceIdentity(weights)
+    );
+  }
+
+  dispose(): Promise<void> {
+    return this.sharedModule.dispose(this);
+  }
+
+  requireActive(): void {
+    if (this.disposed) {
+      throw new Needle2Error("disposed", "This Needle 2 runtime has been disposed.");
+    }
+  }
+
+  markDisposed(): void {
+    this.disposed = true;
+  }
+
+  currentWeights(): Uint8Array {
+    return this.weights;
+  }
+
+  setWeights(weights: Uint8Array): void {
+    this.weights = weights.slice();
+  }
+
+  setWeightsIdentity(identity: object | string): void {
+    this.weightsIdentity = identity;
+  }
+
+  currentWeightsIdentity(): object | string {
+    return this.weightsIdentity;
+  }
+}
+
+class SharedNeedle2Module {
+  private readonly operations = new PromiseQueue();
+  private activeOwner: Needle2DirectBackend | undefined;
+  private activeInitializationFingerprint: string | undefined;
+  private loadedWeightsIdentity: object | string | undefined;
+  private weightsPointer: number | undefined;
+
+  constructor(private readonly module: Needle2EmscriptenModule) {}
+
+  load(
+    owner: Needle2DirectBackend,
+    weights: Promise<Uint8Array>,
+    weightsIdentity: object | string
+  ): Promise<void> {
+    return this.operations.enqueue(async () => {
+      owner.requireActive();
+      const loadedWeights = await weights;
+      owner.setWeights(loadedWeights);
+      owner.setWeightsIdentity(weightsIdentity);
+      this.loadWeights(loadedWeights, weightsIdentity);
+      this.activeOwner = owner;
+      this.activeInitializationFingerprint = undefined;
+    });
+  }
+
+  generate(
+    owner: Needle2DirectBackend,
+    options: Needle2GenerateOptions
+  ): Promise<Needle2NativeGeneration> {
     return this.operations.enqueue(() => {
-      this.requireActive();
-      const module = this.requireModule();
+      owner.requireActive();
+      this.loadWeights(owner.currentWeights(), owner.currentWeightsIdentity());
+      const initializationFingerprint = JSON.stringify(options.initialization);
+      if (
+        this.activeOwner !== owner ||
+        this.activeInitializationFingerprint !== initializationFingerprint
+      ) {
+        this.initialize(options);
+        this.activeOwner = owner;
+        this.activeInitializationFingerprint = initializationFingerprint;
+      }
+
       const maxTokens = positiveInteger(options.maxTokens ?? 256, "maxTokens");
       const outputCapacity = positiveInteger(
         options.outputCapacity ?? 65_536,
         "outputCapacity"
       );
-      const initializationFingerprint = JSON.stringify(options.initialization);
-      if (initializationFingerprint !== this.initializationFingerprint) {
-        this.initialize(options);
-        this.initializationFingerprint = initializationFingerprint;
-      }
-
-      const output = module._malloc(outputCapacity);
+      const output = this.module._malloc(outputCapacity);
       if (output === 0) {
         throw new Needle2Error("allocation-failed", "Needle 2 could not allocate its output buffer.");
       }
       try {
-        const tokenCount = module.ccall(
+        const tokenCount = this.module.ccall(
           "needle_complete",
           "number",
           ["string", "number", "number", "number"],
@@ -92,39 +176,29 @@ export class Needle2DirectBackend implements Needle2Backend {
           );
         }
         return {
-          json: module.UTF8ToString(output),
+          json: this.module.UTF8ToString(output),
           tokenCount
         };
       } finally {
-        module._free(output);
-        module._needle_reset();
+        this.module._free(output);
+        this.module._needle_reset();
       }
     });
   }
 
-  load(weights: Needle2BinarySource): Promise<void> {
-    return this.operations.enqueue(async () => {
-      this.requireActive();
-      this.loadImmediately(await binarySourceBytes(weights));
-    });
-  }
-
-  dispose(): Promise<void> {
+  dispose(owner: Needle2DirectBackend): Promise<void> {
     return this.operations.enqueue(() => {
-      if (this.weightsPointer) {
-        this.module?._free(this.weightsPointer);
+      if (this.activeOwner === owner) {
+        this.activeOwner = undefined;
+        this.activeInitializationFingerprint = undefined;
       }
-      this.disposed = true;
-      this.initializationFingerprint = undefined;
-      this.weightsPointer = undefined;
-      this.module = undefined;
+      owner.markDisposed();
     });
   }
 
   private initialize(options: Needle2GenerateOptions): void {
-    const module = this.requireModule();
     const initialization = options.initialization;
-    const result = module.ccall(
+    const result = this.module.ccall(
       "needle_init",
       "number",
       ["string", "string", "string"],
@@ -142,35 +216,53 @@ export class Needle2DirectBackend implements Needle2Backend {
     }
   }
 
-  private loadImmediately(weights: Uint8Array): void {
-    const module = this.requireModule();
-    const pointer = module._malloc(weights.byteLength);
+  private loadWeights(weights: Uint8Array, identity: object | string): void {
+    if (identity === this.loadedWeightsIdentity) {
+      return;
+    }
+    const pointer = this.module._malloc(weights.byteLength);
     if (pointer === 0) {
       throw new Needle2Error("allocation-failed", "Needle 2 could not allocate its weights buffer.");
     }
-    module.HEAPU8.set(weights, pointer);
-    const result = module._needle_load(pointer, BigInt(weights.byteLength));
+    this.module.HEAPU8.set(weights, pointer);
+    const result = this.module._needle_load(pointer, BigInt(weights.byteLength));
     if (result < 0) {
-      module._free(pointer);
+      this.module._free(pointer);
       throw new Needle2Error("loading-failed", `needle_load failed with status ${result}.`);
     }
     if (this.weightsPointer) {
-      module._free(this.weightsPointer);
+      this.module._free(this.weightsPointer);
     }
     this.weightsPointer = pointer;
-    this.initializationFingerprint = undefined;
+    this.loadedWeightsIdentity = identity;
+    this.activeInitializationFingerprint = undefined;
   }
+}
 
-  private requireActive(): void {
-    if (this.disposed) {
-      throw new Needle2Error("disposed", "This Needle 2 runtime has been disposed.");
-    }
-  }
+let sharedModule: Promise<SharedNeedle2Module> | undefined;
+let sharedModuleFactory: Needle2Factory | undefined;
 
-  private requireModule(): Needle2EmscriptenModule {
-    this.requireActive();
-    return this.module!;
+function sharedNeedle2Module(
+  factory: Needle2Factory,
+  wasm: Uint8Array
+): Promise<SharedNeedle2Module> {
+  if (!sharedModule || sharedModuleFactory !== factory) {
+    sharedModuleFactory = factory;
+    sharedModule = Promise.resolve(factory({ wasmBinary: wasm })).then(value =>
+      new SharedNeedle2Module(emscriptenModule(value))
+    );
   }
+  return sharedModule;
+}
+
+function binarySourceIdentity(source: Needle2BinarySource): object | string {
+  if (typeof source === "string") {
+    return source;
+  }
+  if (source instanceof URL) {
+    return source.href;
+  }
+  return source;
 }
 
 export type Needle2WorkerRequest =
