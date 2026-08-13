@@ -10,8 +10,8 @@ const runtime = await needle2Runtime({ provider: "worker" });
 const result = await runtime.generate({
   prompt: "Dim the living room lights to 30 percent.",
   initialization: {
-    systemFactsOptions: {
-      overrides: { assistant: "Needle" }
+    systemValues: {
+      assistant: "Needle"
     },
     tools: [
       {
@@ -32,10 +32,10 @@ const result = await runtime.generate({
 ```
 
 Use `{ provider: "direct" }` when the calling JavaScript realm may block during generation. Both
-providers expose the same asynchronous API. If `systemPrompt` is omitted, the runtime formats
-`systemFacts` (or facts collected by `defaultSystemFacts`) automatically. Use
-`defaultSystemPrompt` to format facts yourself; arbitrary fact keys are supported. Location is
-omitted by default and can be enabled with `includeLocation: true` or supplied through a provider.
+providers expose the same asynchronous API. If `systemValues` is omitted, no system facts are
+included. Use `defaultSystemValues` to collect environment values explicitly, then pass the result
+as `systemValues`. `defaultSystemPrompt` also formats values directly when needed; arbitrary fact
+keys are supported.
 
 The standalone bundle installs `needle2Runtime` directly:
 

@@ -4,12 +4,7 @@ import {
 	Needle2ProtocolError,
 	setAssetBaseURL,
 } from "./internal";
-import {
-	defaultSystemValues,
-	defaultSystemPrompt,
-	type Needle2SystemFactsProvider,
-	type Needle2SystemValuesOptions,
-} from "./system";
+import { defaultSystemPrompt, type Needle2SystemValues } from "./system";
 import type { Needle2JSONObject } from "./value";
 import type { Needle2Backend } from "./backend";
 import type { Needle2BinarySource } from "./internal";
@@ -41,9 +36,7 @@ export type Needle2ToolDefinition = {
 };
 
 export type Needle2Initialization = {
-	systemPrompt?: string;
-	systemFacts?: Needle2SystemFactsProvider;
-	systemFactsOptions?: Needle2SystemValuesOptions;
+	systemValues?: Needle2SystemValues;
 	tools: readonly Needle2ToolDefinition[];
 	toolIndexPath?: string;
 };
@@ -145,7 +138,7 @@ export class Needle2Runtime {
 		options: Needle2GenerateOptions,
 	): Promise<Needle2GenerationResult> {
 		const generation = await this.backend.generate(
-			await resolveGenerateOptions(options),
+			resolveGenerateOptions(options),
 		);
 		return parseGenerationResult(generation.json, generation.tokenCount);
 	}
@@ -165,17 +158,11 @@ export function needle2Runtime(
 	return Needle2Runtime.create(options);
 }
 
-async function resolveGenerateOptions(
+function resolveGenerateOptions(
 	options: Needle2GenerateOptions,
-): Promise<Needle2ResolvedGenerateOptions> {
+): Needle2ResolvedGenerateOptions {
 	const initialization = options.initialization;
-	let systemPrompt = initialization.systemPrompt;
-	if (systemPrompt === undefined) {
-		const facts = initialization.systemFacts
-			? await initialization.systemFacts()
-			: await defaultSystemValues(initialization.systemFactsOptions);
-		systemPrompt = defaultSystemPrompt(facts);
-	}
+	const systemPrompt = defaultSystemPrompt(initialization.systemValues);
 	return {
 		...options,
 		initialization: {
@@ -196,7 +183,9 @@ function parseGenerationResult(
 	try {
 		response = JSON.parse(json) as Record<string, unknown>;
 	} catch (cause) {
-		throw new Needle2ProtocolError("Needle 2 returned malformed JSON.", { cause });
+		throw new Needle2ProtocolError("Needle 2 returned malformed JSON.", {
+			cause,
+		});
 	}
 	if (
 		typeof response.type !== "string" ||

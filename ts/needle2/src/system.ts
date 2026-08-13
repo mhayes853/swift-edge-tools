@@ -26,10 +26,6 @@ export type Needle2SystemFactProviders = Readonly<
 	Record<string, Needle2SystemFactProvider>
 >;
 
-export type Needle2SystemFactsProvider = () =>
-	| Needle2SystemValues
-	| PromiseLike<Needle2SystemValues>;
-
 export type Needle2SystemValuesOptions = {
 	overrides?: Needle2SystemFactOverrides;
 	providers?: Needle2SystemFactProviders;
@@ -60,7 +56,9 @@ export function defaultSystemPrompt(facts: Needle2SystemValues = {}): string {
 }
 
 function isDefaultSystemKey(key: string) {
-  return DEFAULT_SYSTEM_KEYS.includes(key as (typeof DEFAULT_SYSTEM_KEYS)[number])
+	return DEFAULT_SYSTEM_KEYS.includes(
+		key as (typeof DEFAULT_SYSTEM_KEYS)[number],
+	);
 }
 
 export async function defaultSystemValues(
@@ -82,11 +80,11 @@ export async function defaultSystemValues(
 				: await providers[key]?.();
 			return [key, value] as const;
 		}),
-  );
-  values.forEach((result) => {
-    if (result.status !== "fulfilled" || result.value === null) return
-    facts[result.value[0]] = result.value[1] ?? undefined;
-	})
+	);
+	values.forEach((result) => {
+		if (result.status !== "fulfilled" || result.value === null) return;
+		facts[result.value[0]] = result.value[1] ?? undefined;
+	});
 	return facts;
 }
 
@@ -123,7 +121,7 @@ function currentLocale(): string {
 }
 
 function currentDevice(): string | undefined {
-  if (typeof navigator === "undefined") return undefined;
+	if (typeof navigator === "undefined") return undefined;
 
 	const userAgent = navigator.userAgent.toLowerCase();
 	if (/ipad|tablet|playbook|silk/.test(userAgent)) return "tablet";
@@ -137,7 +135,7 @@ async function currentBattery(): Promise<string | undefined> {
 	const batteryNavigator = navigator as Navigator & {
 		getBattery?: () => Promise<{ level: number }>;
 	};
-  if (!batteryNavigator.getBattery) return undefined;
+	if (!batteryNavigator.getBattery) return undefined;
 
 	try {
 		const battery = await batteryNavigator.getBattery();

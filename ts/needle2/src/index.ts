@@ -40,7 +40,6 @@ export type {
 	Needle2SystemFactOverrides,
 	Needle2SystemFactProvider,
 	Needle2SystemFactProviders,
-	Needle2SystemFactsProvider,
 	Needle2SystemFactValue,
 	Needle2SystemValues,
 	Needle2SystemValuesOptions,
