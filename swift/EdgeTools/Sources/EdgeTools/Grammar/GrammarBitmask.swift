@@ -102,48 +102,6 @@ extension GrammarBitmask: RandomAccessCollection {}
   }
 #endif
 
-// MARK: - Contiguous Storage
-
-public func applyBitmask(logits: inout MutableSpan<Float>, mask: GrammarBitmask) {
-  validateBitmaskCoverage(mask: mask, vocabularySize: logits.count)
-  mask.storage.withUnsafeBufferPointer { maskBytes in
-    logits.withUnsafeMutableBufferPointer { buffer in
-      guard let baseAddress = buffer.baseAddress else { return }
-      applyBitmaskSIMDRow(
-        logits: baseAddress,
-        vocabularySize: buffer.count,
-        maskBytes: maskBytes
-      )
-    }
-  }
-}
-
-@inline(always)
-private func applyBitmaskSIMDRow(
-  logits: UnsafeMutablePointer<Float>,
-  vocabularySize: Int,
-  maskBytes: UnsafeBufferPointer<UInt8>
-) {
-  var index = 0
-  while index + SIMD8<Float>.scalarCount <= vocabularySize {
-    let pointer = UnsafeMutableRawPointer(logits.advanced(by: index))
-    let values = UnsafeRawPointer(pointer).loadUnaligned(as: SIMD8<Float>.self)
-    let mask = bitmaskSIMDTable[Int(maskBytes[index >> 3])]
-    pointer.storeBytes(of: values + mask, as: SIMD8<Float>.self)
-    index += SIMD8<Float>.scalarCount
-  }
-  while index < vocabularySize {
-    logits[index] += bitmaskValue(maskBytes: maskBytes, index: index)
-    index += 1
-  }
-}
-
-@inline(always)
-private func bitmaskValue(maskBytes: UnsafeBufferPointer<UInt8>, index: Int) -> Float {
-  let tableIndex = Int(maskBytes[index >> 3]) * 8 + (index & 7)
-  return bitmaskTable[tableIndex]
-}
-
 // MARK: - Lookup Tables
 
 @usableFromInline
@@ -151,15 +109,6 @@ let bitmaskTable = (0..<256)
   .flatMap { byte in
     (0..<8).map { bit in ((byte >> bit) & 1) != 0 ? 0 : -Float.infinity }
   }
-
-@usableFromInline
-let bitmaskSIMDTable = bitmaskTable.withUnsafeBufferPointer { table in
-  (0..<256)
-    .map { byte in
-      UnsafeRawPointer(table.baseAddress!.advanced(by: byte * 8))
-        .loadUnaligned(as: SIMD8<Float>.self)
-    }
-}
 
 // MARK: - Validation
 

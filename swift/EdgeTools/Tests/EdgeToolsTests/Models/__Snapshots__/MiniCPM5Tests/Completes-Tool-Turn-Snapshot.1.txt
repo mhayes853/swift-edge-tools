@@ -514,7 +514,7 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 60 elements
+        ▿ parts: 64 elements
           ▿ EdgeToolsGenerationPart
             - reasoning: "<think>"
           ▿ EdgeToolsGenerationPart
@@ -522,27 +522,11 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: "The"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " function"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " returned"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " weather"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " information"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " for"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " Paris"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "."
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " The"
-          ▿ EdgeToolsGenerationPart
             - reasoning: " user"
           ▿ EdgeToolsGenerationPart
             - reasoning: " asked"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " about"
+            - reasoning: " for"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
@@ -558,19 +542,11 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " I"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " can"
+            - reasoning: " got"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " now"
+            - reasoning: " an"
           ▿ EdgeToolsGenerationPart
             - reasoning: " answer"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " based"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " on"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " the"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " response"
           ▿ EdgeToolsGenerationPart
             - reasoning: " from"
           ▿ EdgeToolsGenerationPart
@@ -578,62 +554,94 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " function"
           ▿ EdgeToolsGenerationPart
+            - reasoning: "."
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " The"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " answer"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " was"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: ":"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " The"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " weather"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " in"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " Paris"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " is"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " sunny"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: ","
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " temperature"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " is"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " "
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "21"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " degrees"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " Celsius"
+          ▿ EdgeToolsGenerationPart
             - reasoning: ".\n"
           ▿ EdgeToolsGenerationPart
-            - text: "\n\n"
+            - reasoning: "\n"
           ▿ EdgeToolsGenerationPart
-            - text: "The"
+            - reasoning: "I"
           ▿ EdgeToolsGenerationPart
-            - text: " weather"
+            - reasoning: " should"
           ▿ EdgeToolsGenerationPart
-            - text: " in"
+            - reasoning: " provide"
           ▿ EdgeToolsGenerationPart
-            - text: " Paris"
+            - reasoning: " this"
           ▿ EdgeToolsGenerationPart
-            - text: " is"
+            - reasoning: " information"
           ▿ EdgeToolsGenerationPart
-            - text: " currently"
+            - reasoning: " to"
           ▿ EdgeToolsGenerationPart
-            - text: " **"
+            - reasoning: " the"
           ▿ EdgeToolsGenerationPart
-            - text: "sun"
+            - reasoning: " user"
           ▿ EdgeToolsGenerationPart
-            - text: "ny"
+            - reasoning: ","
           ▿ EdgeToolsGenerationPart
-            - text: "**."
+            - reasoning: " since"
           ▿ EdgeToolsGenerationPart
-            - text: " The"
+            - reasoning: " the"
           ▿ EdgeToolsGenerationPart
-            - text: " temperature"
+            - reasoning: " function"
           ▿ EdgeToolsGenerationPart
-            - text: " is"
+            - reasoning: " returned"
           ▿ EdgeToolsGenerationPart
-            - text: " recorded"
+            - reasoning: " the"
           ▿ EdgeToolsGenerationPart
-            - text: " as"
+            - reasoning: " necessary"
           ▿ EdgeToolsGenerationPart
-            - text: " **"
+            - reasoning: " data"
           ▿ EdgeToolsGenerationPart
-            - text: "21"
+            - reasoning: "."
           ▿ EdgeToolsGenerationPart
-            - text: "°C"
+            - reasoning: " I"
           ▿ EdgeToolsGenerationPart
-            - text: "**"
+            - reasoning: " should"
           ▿ EdgeToolsGenerationPart
-            - text: " ("
+            - reasoning: " summarize"
           ▿ EdgeToolsGenerationPart
-            - text: "represented"
+            - reasoning: " it"
           ▿ EdgeToolsGenerationPart
-            - text: " as"
+            - reasoning: " for"
           ▿ EdgeToolsGenerationPart
-            - text: " "
+            - reasoning: " the"
           ▿ EdgeToolsGenerationPart
-            - text: "21"
+            - reasoning: " user"
           ▿ EdgeToolsGenerationPart
-            - text: " in"
-          ▿ EdgeToolsGenerationPart
-            - text: " Celsius"
-          ▿ EdgeToolsGenerationPart
-            - text: ")."
+            - reasoning: ".\n"
   ▿ reasoningEffort: EdgeToolsReasoningEffort
     - rawValue: "default"

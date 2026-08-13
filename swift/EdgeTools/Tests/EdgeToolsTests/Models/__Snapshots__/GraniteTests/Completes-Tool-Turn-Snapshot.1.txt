@@ -40,7 +40,7 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 15 elements
+        ▿ parts: 7 elements
           ▿ EdgeToolsGenerationPart
             - text: "The"
           ▿ EdgeToolsGenerationPart
@@ -53,22 +53,6 @@
             - text: " is"
           ▿ EdgeToolsGenerationPart
             - text: " sunny"
-          ▿ EdgeToolsGenerationPart
-            - text: " with"
-          ▿ EdgeToolsGenerationPart
-            - text: " a"
-          ▿ EdgeToolsGenerationPart
-            - text: " temperature"
-          ▿ EdgeToolsGenerationPart
-            - text: " of"
-          ▿ EdgeToolsGenerationPart
-            - text: " "
-          ▿ EdgeToolsGenerationPart
-            - text: "21"
-          ▿ EdgeToolsGenerationPart
-            - text: " degrees"
-          ▿ EdgeToolsGenerationPart
-            - text: " Celsius"
           ▿ EdgeToolsGenerationPart
             - text: "."
   ▿ reasoningEffort: EdgeToolsReasoningEffort
