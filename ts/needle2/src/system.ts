@@ -1,9 +1,40 @@
-import type {
-	Needle2SystemFactProvider,
-	Needle2SystemFactValue,
-	Needle2SystemValues,
-	Needle2SystemValuesOptions,
-} from "./types";
+export type Needle2SystemFactValue = string | number | boolean;
+
+export type Needle2SystemValues = {
+	[key: string]: Needle2SystemFactValue | undefined;
+	date?: string;
+	locale?: string;
+	device?: string;
+	battery?: string;
+	network?: string;
+	location?: string;
+	user?: string;
+	assistant?: string;
+};
+
+export type Needle2SystemFactProvider = () =>
+	| Needle2SystemFactValue
+	| null
+	| undefined
+	| PromiseLike<Needle2SystemFactValue | null | undefined>;
+
+export type Needle2SystemFactOverrides = Readonly<
+	Record<string, Needle2SystemFactValue | null>
+>;
+
+export type Needle2SystemFactProviders = Readonly<
+	Record<string, Needle2SystemFactProvider>
+>;
+
+export type Needle2SystemFactsProvider = () =>
+	| Needle2SystemValues
+	| PromiseLike<Needle2SystemValues>;
+
+export type Needle2SystemValuesOptions = {
+	overrides?: Needle2SystemFactOverrides;
+	providers?: Needle2SystemFactProviders;
+	includeLocation?: boolean;
+};
 
 const DEFAULT_SYSTEM_KEYS = [
 	"date",

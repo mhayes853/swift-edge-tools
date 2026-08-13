@@ -6,15 +6,30 @@ import {
 	Needle2Error,
 	PromiseQueue,
 	serializeBinarySource,
-	type Needle2SerializedBinarySource,
 } from "./internal";
 import type {
-	Needle2Backend,
 	Needle2BinarySource,
 	Needle2Factory,
-	Needle2NativeGeneration,
+	Needle2SerializedBinarySource,
+} from "./internal";
+import type {
+	Needle2Provider,
 	Needle2ResolvedGenerateOptions,
-} from "./types";
+} from "./runtime";
+
+export type Needle2NativeGeneration = {
+	json: string;
+	tokenCount: number;
+};
+
+export interface Needle2Backend {
+	readonly provider: Needle2Provider;
+	generate(
+		options: Needle2ResolvedGenerateOptions,
+	): Promise<Needle2NativeGeneration>;
+	load(weights: Needle2BinarySource): Promise<void>;
+	dispose(): Promise<void>;
+}
 
 type Needle2EmscriptenModule = {
 	readonly HEAPU8: Uint8Array;
