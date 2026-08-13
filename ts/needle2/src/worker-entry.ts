@@ -30,11 +30,7 @@ async function processRequest(request: Needle2WorkerRequest): Promise<void> {
 			...(result === undefined ? {} : { result }),
 		});
 	} catch (error) {
-		port.postMessage({
-			id: request.id,
-			success: false,
-			error: serializeError(error),
-		});
+		port.postMessage({ id: request.id, success: false, error: serializeError(error) });
 	}
 }
 
@@ -43,13 +39,8 @@ async function handle(
 ): Promise<Needle2WorkerResult> {
 	switch (request.operation) {
 		case "initialize":
-			if (backend) {
-				throw new Error("The Needle 2 worker is already initialized.");
-			}
-			backend = await Needle2DirectBackend.create(
-				request.wasm,
-				request.weights,
-			);
+			if (backend) throw new Error("The Needle 2 worker is already initialized.");
+			backend = await Needle2DirectBackend.create(request.wasm, request.weights);
 			return undefined;
 
 		case "generate":
@@ -67,9 +58,7 @@ async function handle(
 }
 
 function requireBackend(): Needle2Backend {
-	if (!backend) {
-		throw new Error("The Needle 2 worker is not initialized.");
-	}
+	if (!backend) throw new Error("The Needle 2 worker is not initialized.");
 	return backend;
 }
 
@@ -94,9 +83,8 @@ async function workerPort(): Promise<WorkerPort> {
 	const { parentPort } = await import(
 		/* @vite-ignore */ workerThreadsSpecifier
 	);
-	if (!parentPort) {
-		throw new Error("Needle 2 could not access its worker message port.");
-	}
+	if (!parentPort) throw new Error("Needle 2 could not access its worker message port.");
+
 	return {
 		postMessage(message) {
 			parentPort.postMessage(message);
@@ -109,10 +97,7 @@ async function workerPort(): Promise<WorkerPort> {
 
 function serializeError(value: unknown): Needle2SerializedError {
 	if (value instanceof Error) {
-		const error: Needle2SerializedError = {
-			name: value.name,
-			message: value.message,
-		};
+		const error: Needle2SerializedError = { name: value.name, message: value.message };
 		if (value.stack) {
 			error.stack = value.stack;
 		}
@@ -121,8 +106,5 @@ function serializeError(value: unknown): Needle2SerializedError {
 		}
 		return error;
 	}
-	return {
-		name: "Error",
-		message: String(value),
-	};
+	return { name: "Error", message: String(value) };
 }

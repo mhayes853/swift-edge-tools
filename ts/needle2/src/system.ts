@@ -48,26 +48,19 @@ const DEFAULT_SYSTEM_KEYS = [
 ] as const;
 
 export function defaultSystemPrompt(facts: Needle2SystemValues = {}): string {
-	const values = new Map<string, Needle2SystemFactValue>();
-	for (const key of DEFAULT_SYSTEM_KEYS) {
-		const value = facts[key];
-		if (value != null) {
-			values.set(key, value);
-		}
-	}
-	for (const [key, value] of Object.entries(facts)) {
-		if (
-			!DEFAULT_SYSTEM_KEYS.includes(
-				key as (typeof DEFAULT_SYSTEM_KEYS)[number],
-			) &&
-			value != null
-		) {
-			values.set(key, value);
-		}
-	}
-	return [...values]
-		.map(([key, value]) => `${key}: ${String(value)}`)
+	const standardValues = DEFAULT_SYSTEM_KEYS.flatMap((key) =>
+		facts[key] == null ? [] : [[key, facts[key]] as const],
+	);
+	const customValues = Object.entries(facts).filter(
+		([key, value]) => !isDefaultSystemKey(key) && value != null,
+	);
+	return [...standardValues, ...customValues]
+		.map(([key, value]) => `${key.replaceAll(";", " ")}: ${value}`)
 		.join("; ");
+}
+
+function isDefaultSystemKey(key: string) {
+  return DEFAULT_SYSTEM_KEYS.includes(key as (typeof DEFAULT_SYSTEM_KEYS)[number])
 }
 
 export async function defaultSystemValues(
@@ -82,23 +75,18 @@ export async function defaultSystemValues(
 	const keys = new Set([...Object.keys(providers), ...Object.keys(overrides)]);
 	const facts: Needle2SystemValues = {};
 
-	const values = await Promise.all(
+	const values = await Promise.allSettled(
 		[...keys].map(async (key) => {
-			const override = overrides[key];
-			const value =
-				override !== undefined
-					? override
-					: providers[key]
-						? await providers[key]()
-						: undefined;
+			const value = Object.hasOwn(overrides, key)
+				? overrides[key]
+				: await providers[key]?.();
 			return [key, value] as const;
 		}),
-	);
-	for (const [key, value] of values) {
-		if (value != null) {
-			facts[key] = value;
-		}
-	}
+  );
+  values.forEach((result) => {
+    if (result.status !== "fulfilled" || result.value === null) return
+    facts[result.value[0]] = result.value[1] ?? undefined;
+	})
 	return facts;
 }
 
@@ -135,29 +123,22 @@ function currentLocale(): string {
 }
 
 function currentDevice(): string | undefined {
-	if (typeof navigator === "undefined") {
-		return undefined;
-	}
+  if (typeof navigator === "undefined") return undefined;
+
 	const userAgent = navigator.userAgent.toLowerCase();
-	if (/ipad|tablet|playbook|silk/.test(userAgent)) {
-		return "tablet";
-	}
-	if (/mobi|android|iphone|ipod|phone/.test(userAgent)) {
-		return "phone";
-	}
+	if (/ipad|tablet|playbook|silk/.test(userAgent)) return "tablet";
+	if (/mobi|android|iphone|ipod|phone/.test(userAgent)) return "phone";
 	return "desktop";
 }
 
 async function currentBattery(): Promise<string | undefined> {
-	if (typeof navigator === "undefined") {
-		return undefined;
-	}
+	if (typeof navigator === "undefined") return undefined;
+
 	const batteryNavigator = navigator as Navigator & {
 		getBattery?: () => Promise<{ level: number }>;
 	};
-	if (!batteryNavigator.getBattery) {
-		return undefined;
-	}
+  if (!batteryNavigator.getBattery) return undefined;
+
 	try {
 		const battery = await batteryNavigator.getBattery();
 		return `${Math.round(battery.level * 100)}%`;
@@ -167,9 +148,8 @@ async function currentBattery(): Promise<string | undefined> {
 }
 
 function currentNetwork(): string | undefined {
-	if (typeof navigator === "undefined") {
-		return undefined;
-	}
+	if (typeof navigator === "undefined") return undefined;
+
 	const networkNavigator = navigator as Navigator & {
 		connection?: {
 			type?: string;
@@ -178,8 +158,7 @@ function currentNetwork(): string | undefined {
 	};
 	return (
 		networkNavigator.connection?.type ??
-		networkNavigator.connection?.effectiveType ??
-		(navigator.onLine === false ? "offline" : "online")
+		networkNavigator.connection?.effectiveType
 	);
 }
 

@@ -282,13 +282,23 @@ function sharedNeedle2Module(
 	factory: Needle2Factory,
 	wasm: Uint8Array,
 ): Promise<SharedNeedle2Module> {
-	if (!sharedModule || sharedModuleFactory !== factory) {
-		sharedModuleFactory = factory;
-		sharedModule = Promise.resolve(factory({ wasmBinary: wasm })).then(
-			(value) => new SharedNeedle2Module(emscriptenModule(value)),
-		);
+	if (sharedModule && sharedModuleFactory === factory) {
+		return sharedModule;
 	}
-	return sharedModule;
+
+	sharedModuleFactory = factory;
+	const modulePromise = Promise.resolve(factory({ wasmBinary: wasm })).then(
+		(value) => new SharedNeedle2Module(emscriptenModule(value)),
+	);
+	const cachedPromise = modulePromise.catch((error) => {
+		if (sharedModule === cachedPromise) {
+			sharedModule = undefined;
+			sharedModuleFactory = undefined;
+		}
+		throw error;
+	});
+	sharedModule = cachedPromise;
+	return cachedPromise;
 }
 
 function binarySourceIdentity(source: Needle2BinarySource): object | string {
@@ -354,6 +364,7 @@ export class Needle2WorkerBackend implements Needle2Backend {
 	private readonly pending = new Map<number, PendingRequest>();
 	private nextRequestID = 0;
 	private disposed = false;
+	private disposePromise: Promise<void> | undefined;
 
 	static async create(
 		workerURL: URL,
@@ -361,15 +372,20 @@ export class Needle2WorkerBackend implements Needle2Backend {
 		weights: Needle2BinarySource,
 		options?: WorkerOptions,
 	): Promise<Needle2WorkerBackend> {
-		const backend = new Needle2WorkerBackend(
-			await workerConnection(workerURL, options),
-		);
-		await backend.request({
-			operation: "initialize",
-			wasm: serializeBinarySource(wasm),
-			weights: serializeBinarySource(weights),
-		});
-		return backend;
+		const connection = await workerConnection(workerURL, options);
+		const backend = new Needle2WorkerBackend(connection);
+		try {
+			await backend.request({
+				operation: "initialize",
+				wasm: serializeBinarySource(wasm),
+				weights: serializeBinarySource(weights),
+			});
+			return backend;
+		} catch (error) {
+			await connection.terminate();
+			connection.revoke();
+			throw error;
+		}
 	}
 
 	private constructor(private readonly connection: WorkerConnection) {
@@ -397,10 +413,13 @@ export class Needle2WorkerBackend implements Needle2Backend {
 		});
 	}
 
-	async dispose(): Promise<void> {
-		if (this.disposed) {
-			return;
-		}
+	dispose(): Promise<void> {
+		this.disposePromise ??= this.disposeInternal();
+		return this.disposePromise;
+	}
+
+	private async disposeInternal(): Promise<void> {
+		if (this.disposed) return;
 		try {
 			await this.request({ operation: "dispose" });
 		} finally {
@@ -441,9 +460,8 @@ export class Needle2WorkerBackend implements Needle2Backend {
 
 	private receive(response: Needle2WorkerResponse): void {
 		const pending = this.pending.get(response.id);
-		if (!pending) {
-			return;
-		}
+    if (!pending) return;
+
 		this.pending.delete(response.id);
 		if (response.success) {
 			pending.resolve(response.result);
@@ -461,9 +479,8 @@ export class Needle2WorkerBackend implements Needle2Backend {
 }
 
 function emscriptenModule(value: unknown): Needle2EmscriptenModule {
-	if (typeof value !== "object" || value === null) {
-		throw invalidModule();
-	}
+  if (typeof value !== "object" || value === null) throw invalidModule();
+
 	const module = value as Partial<Needle2EmscriptenModule>;
 	if (
 		!(module.HEAPU8 instanceof Uint8Array) ||

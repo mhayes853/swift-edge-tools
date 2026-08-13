@@ -230,12 +230,12 @@ function parseGenerationResult(
 		functionCalls,
 		tokenCount,
 		metrics: {
-			...numberProperty("prefillTokensPerSecond", response.prefill_tps),
-			...numberProperty("decodeTokensPerSecond", response.decode_tps),
-			...positiveNumberProperty("peakRAMMegabytes", response.peak_ram_mb),
+			...property("prefillTokensPerSecond", response.prefill_tps, isNumber),
+			...property("decodeTokensPerSecond", response.decode_tps, isNumber),
+			...property("peakRAMMegabytes", response.peak_ram_mb, isPositiveNumber),
 		},
-		...stringProperty("reasoning", response.reasoning),
-		...numberProperty("confidence", response.confidence),
+		...property("reasoning", response.reasoning, isString),
+		...property("confidence", response.confidence, isNumber),
 	};
 	if (response.success) {
 		return { success: true, ...common };
@@ -247,29 +247,26 @@ function parseGenerationResult(
 			typeof response.error === "string"
 				? response.error
 				: "Needle 2 generation failed.",
-		...stringProperty("errorCode", response.error_code),
+		...property("errorCode", response.error_code, isString),
 	};
 }
 
-function stringProperty<Key extends string>(
+function property<Key extends string, Value>(
 	key: Key,
 	value: unknown,
-): { [Property in Key]?: string } {
-	return typeof value === "string" ? ({ [key]: value } as never) : {};
+	predicate: (value: unknown) => value is Value,
+): { [Property in Key]?: Value } {
+	return predicate(value) ? ({ [key]: value } as never) : {};
 }
 
-function numberProperty<Key extends string>(
-	key: Key,
-	value: unknown,
-): { [Property in Key]?: number } {
-	return typeof value === "number" ? ({ [key]: value } as never) : {};
+function isString(value: unknown): value is string {
+	return typeof value === "string";
 }
 
-function positiveNumberProperty<Key extends string>(
-	key: Key,
-	value: unknown,
-): { [Property in Key]?: number } {
-	return typeof value === "number" && value > 0
-		? ({ [key]: value } as never)
-		: {};
+function isNumber(value: unknown): value is number {
+	return typeof value === "number";
+}
+
+function isPositiveNumber(value: unknown): value is number {
+	return isNumber(value) && value > 0;
 }
