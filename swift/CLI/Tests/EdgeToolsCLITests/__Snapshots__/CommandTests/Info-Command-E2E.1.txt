@@ -1,5 +1,5 @@
-/models/needle
-  model       Needle
+/models/qwen3
+  model       Qwen3
   modality    text
   engines     mlx · onnx
               defaults to mlx

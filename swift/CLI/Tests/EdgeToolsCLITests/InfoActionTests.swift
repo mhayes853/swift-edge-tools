@@ -9,14 +9,14 @@ struct `InfoAction tests` {
   func `Reports The Detected Model And Engines`() async throws {
     let report = try await inspectModel(
       context: .stub(
-        directory: URL(fileURLWithPath: "/models/needle"),
+        directory: URL(fileURLWithPath: "/models/qwen3"),
         engines: [.mlx, .onnx],
         files: ["config.json", "encoder.onnx", "model.safetensors"]
       ),
       source: .test()
     )
 
-    expectNoDifference(report.model, "Needle")
+    expectNoDifference(report.model, "Qwen3")
     expectNoDifference(report.engines, ["mlx", "onnx"])
     expectNoDifference(report.defaultEngine, "mlx")
     expectNoDifference(report.unavailableEngines, [])

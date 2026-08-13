@@ -15,24 +15,7 @@
         _ = try await EdgeToolsAutoTokenizer.from(modelDirectory: directory)
       }
       expectNoDifference(error?.code, .noCompatibleTokenizer)
-      expectNoDifference(error?.message.contains("tokenizer.model"), true)
       expectNoDifference(error?.message.contains("tokenizer.json"), true)
-    }
-
-    @Test
-    func `Loads SentencePiece Tokenizer Model`() async throws {
-      let fileManager = FileManager.default
-      let directory = fileManager.temporaryDirectory.appending(path: UUID().uuidString)
-      try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
-      defer { try? fileManager.removeItem(at: directory) }
-      try fileManager.copyItem(
-        at: .testTokenizerModel,
-        to: directory.appending(path: "tokenizer.model")
-      )
-
-      await #expect(throws: Never.self) {
-        _ = try await EdgeToolsAutoTokenizer.from(modelDirectory: directory)
-      }
     }
 
     #if Transformers

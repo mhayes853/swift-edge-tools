@@ -36,11 +36,11 @@ private struct JSONStringState: Hashable, Sendable {
 }
 
 extension Array where Element == UInt8 {
-  func firstRange(of needle: [UInt8], startingAt start: Int = 0) -> Range<Int>? {
-    guard !needle.isEmpty, start <= self.count - needle.count else { return nil }
-    for index in start...(self.count - needle.count) where self[index] == needle[0] {
-      let end = index + needle.count
-      if self[index..<end].elementsEqual(needle) {
+  func firstRange(of target: [UInt8], startingAt start: Int = 0) -> Range<Int>? {
+    guard !target.isEmpty, start <= self.count - target.count else { return nil }
+    for index in start...(self.count - target.count) where self[index] == target[0] {
+      let end = index + target.count
+      if self[index..<end].elementsEqual(target) {
         return index..<end
       }
     }
@@ -68,21 +68,21 @@ extension Array where Element == UInt8 {
     return nil
   }
 
-  func firstRangeOutsideJSONString(of needle: [UInt8]) -> Range<Int>? {
+  func firstRangeOutsideJSONString(of target: [UInt8]) -> Range<Int>? {
     var index = 0
     var stringState = JSONStringState()
 
     while index < self.count {
       let byte = self[index]
-      if stringState.consume(byte), self[index...].starts(with: needle) {
-        return index..<(index + needle.count)
+      if stringState.consume(byte), self[index...].starts(with: target) {
+        return index..<(index + target.count)
       }
       index += 1
     }
     return nil
   }
 
-  func firstRange(of needle: [UInt8], outside marker: [UInt8]) -> Range<Int>? {
+  func firstRange(of target: [UInt8], outside marker: [UInt8]) -> Range<Int>? {
     var index = 0
     var isInsideMarker = false
     while index < self.count {
@@ -92,10 +92,10 @@ extension Array where Element == UInt8 {
         isInsideMarker.toggle()
         index = markerRange.upperBound
       } else if !isInsideMarker,
-        let needleRange = self.firstRange(of: needle, startingAt: index),
-        needleRange.lowerBound == index
+        let targetRange = self.firstRange(of: target, startingAt: index),
+        targetRange.lowerBound == index
       {
-        return needleRange
+        return targetRange
       } else {
         index += 1
       }
@@ -104,7 +104,7 @@ extension Array where Element == UInt8 {
   }
 
   func firstRange(
-    of needle: [UInt8],
+    of target: [UInt8],
     outsideRegionOpenedBy opener: [UInt8],
     closedBy closer: [UInt8],
     orAbortedBy aborter: [UInt8]
@@ -121,8 +121,8 @@ extension Array where Element == UInt8 {
       } else if !isInsideRegion, self[index...].starts(with: opener) {
         isInsideRegion = true
         index += opener.count
-      } else if !isInsideRegion, self[index...].starts(with: needle) {
-        return index..<(index + needle.count)
+      } else if !isInsideRegion, self[index...].starts(with: target) {
+        return index..<(index + target.count)
       } else {
         index += 1
       }

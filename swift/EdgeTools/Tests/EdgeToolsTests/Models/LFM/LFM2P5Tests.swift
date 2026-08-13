@@ -32,7 +32,7 @@ struct `LFM2P5 tests` {
     @Suite(.serialized)
     struct `LFM2P5XGRCompiler tests`: ~Copyable {
       private let compiler: XGRCompiler
-      private let tokenizer: NeedleSPTokenizer
+      private let tokenizer: TestTokenizer
       private let eosToken: EdgeToolsToken.ID
 
       init() throws {

@@ -22,19 +22,19 @@ struct `EngineRunner tests` {
   @Test
   func `Initializer Selects And Publishes The Validated Engine`() async throws {
     let detection = ModelDetection(
-      directory: URL(fileURLWithPath: "/models/needle"),
-      model: .needle,
-      engines: [.mlx, .onnx],
-      files: ["model.safetensors", "model.onnx"]
+      directory: URL(fileURLWithPath: "/models/qwen3"),
+      model: .qwen3,
+      engines: [.mlx],
+      files: ["model.safetensors"]
     )
     let runner = try await EngineRunner(
       detection: detection,
-      requestedEngine: .onnx,
+      requestedEngine: .mlx,
       hardwareUnit: .gpu,
       loader: { _, _, _ in .stub() }
     )
 
-    expectNoDifference(runner.engine, .onnx)
+    expectNoDifference(runner.engine, .mlx)
   }
 
 }

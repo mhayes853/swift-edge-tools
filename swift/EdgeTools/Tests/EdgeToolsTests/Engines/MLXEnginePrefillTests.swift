@@ -83,7 +83,7 @@
 
   private struct LLMPrefillTestProfile: MLXLLMModelProfile {
     typealias Prompt = EdgeToolsTranscript
-    typealias GenerationParser = NeedleGenerationParser
+    typealias GenerationParser = TestGenerationParser
     typealias GenerateParameters = DefaultMLXGenerateParameters
     typealias GrammarEngine = XGrammarEngine
 
@@ -123,7 +123,7 @@
   #if canImport(CoreImage) && canImport(MLXVLM)
     private struct VLMPrefillTestProfile: MLXVLMModelProfile {
       typealias Prompt = EdgeToolsTranscript
-      typealias GenerationParser = NeedleGenerationParser
+      typealias GenerationParser = TestGenerationParser
       typealias GenerateParameters = DefaultMLXGenerateParameters
       typealias GrammarEngine = XGrammarEngine
 
@@ -238,10 +238,10 @@
     return try MLXEngine<Profile>(
       languageModel: PrefillTestLanguageModel(
         sampleTokenId: sampleTokenId ?? eosTokenId,
-        vocabularySize: .needleVocabularySize
+        vocabularySize: TestTokenizer.vocabularySize
       ),
       tokenizer: tokenizer,
-      vocabularySize: .needleVocabularySize
+      vocabularySize: TestTokenizer.vocabularySize
     )
   }
 

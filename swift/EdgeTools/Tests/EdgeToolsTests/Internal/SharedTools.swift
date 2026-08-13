@@ -2,7 +2,7 @@ import EdgeTools
 
 // MARK: - Default Prompts
 
-extension NeedlePrompt {
+extension TestPrompt {
   static let sendAdventureEmailTools = [SendEmailTool()]
   static let sendAdventureEmailDefinitions = sendAdventureEmailTools.map(\.definition)
 

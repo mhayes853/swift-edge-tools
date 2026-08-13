@@ -6,7 +6,7 @@ Tool calls
        "duration" : "5 minutes"
      }
 
-Model   Needle
+Model   Qwen3
 Engine  onnx
 Load    0ms
 Memory  0 MB peak RSS

@@ -45,8 +45,8 @@ extension EdgeContext {
 
 extension EdgeContext {
   static func stub(
-    directory: URL = URL(fileURLWithPath: "/models/needle"),
-    model: DetectedModel = .needle,
+    directory: URL = URL(fileURLWithPath: "/models/qwen3"),
+    model: DetectedModel = .qwen3,
     engines: [EngineKind] = [.mlx],
     files: [String] = ["config.json", "model.safetensors"],
     runner: EngineRunner = .stub(),
@@ -148,7 +148,7 @@ extension EngineRunner {
 }
 
 extension ModelSource {
-  static func test(repo: String = "Cactus-Compute/needle") -> Self {
+  static func test(repo: String = "Qwen/Qwen3-0.6B") -> Self {
     Self(location: .huggingFace(repo: repo, revision: "main"))
   }
 }

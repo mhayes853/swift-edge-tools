@@ -24,6 +24,16 @@ public struct GrammarBitmask: Hashable, Sendable {
     precondition(bitCount.isMultiple(of: 8), "Grammar bit count must be a multiple of 8.")
     self.storage = [UInt8](repeating: value ? .max : .zero, count: bitCount / 8)
   }
+
+  /// The number of bits needed to store an XGrammar vocabulary mask.
+  ///
+  /// XGrammar packs masks into 32-bit words, so the result may be larger than the vocabulary.
+  @inlinable
+  @inline(always)
+  public static func bitCount(forVocabularySize vocabularySize: Int) -> Int {
+    precondition(vocabularySize >= 0, "Vocabulary size must not be negative.")
+    return ((vocabularySize + 31) / 32) * 32
+  }
 }
 
 // MARK: - Collection

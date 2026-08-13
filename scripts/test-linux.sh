@@ -48,7 +48,7 @@ Environment overrides:
 Examples:
   scripts/test-linux.sh
   scripts/test-linux.sh --traits ONNXCore --build-only
-  scripts/test-linux.sh --traits ONNX --filter 'CONNXRuntime tests|NeedleONNXModelEngine tests'
+  scripts/test-linux.sh --traits ONNX --filter 'CONNXRuntime tests'
   scripts/test-linux.sh --traits ONNX --all-tests --python-venv
   scripts/test-linux.sh --cli
   scripts/test-linux.sh --cli --filter 'ModelDetection tests'

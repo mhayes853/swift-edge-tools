@@ -12,7 +12,7 @@
       let eosTokenId = try requiredTestEOSToken(tokenizer: tokenizer)
       let engine = try TestEngine(tokenizer: tokenizer)
       let task = try engine.generate(
-        prompt: NeedlePrompt(system: "", user: "Prompt"),
+        prompt: TestPrompt(system: "", user: "Prompt"),
         parameters: TestEngine.Parameters(tokenIds: responseTokenIds + [eosTokenId]),
         channel: EdgeToolsGenerationChannel()
       )
@@ -40,7 +40,7 @@
         extraStopTokenIds: [alternateStopTokenId, stopTokenId]
       )
       let task = try engine.generate(
-        prompt: NeedlePrompt(system: "", user: "Prompt"),
+        prompt: TestPrompt(system: "", user: "Prompt"),
         parameters: TestEngine.Parameters(
           tokenIds: responseTokenIds + [stopTokenId, eosTokenId]
         ),
@@ -68,7 +68,7 @@
         }
       )
       let task = try engine.generate(
-        prompt: NeedlePrompt(system: "", user: "Prompt"),
+        prompt: TestPrompt(system: "", user: "Prompt"),
         parameters: TestEngine.Parameters(
           tokenIds: [eosTokenId],
           constraint: constraint
@@ -94,13 +94,13 @@
         preparationDelay: .milliseconds(50)
       )
       let first = try engine.generate(
-        prompt: NeedlePrompt(system: "", user: "First"),
+        prompt: TestPrompt(system: "", user: "First"),
         parameters: parameters,
         context: engine.context(),
         channel: EdgeToolsGenerationChannel()
       )
       let second = try engine.generate(
-        prompt: NeedlePrompt(system: "", user: "Second"),
+        prompt: TestPrompt(system: "", user: "Second"),
         parameters: parameters,
         context: engine.context(),
         channel: EdgeToolsGenerationChannel()
@@ -203,10 +203,10 @@
   private final class TestEngine: EdgeToolsEngine {
     typealias Context = TestContext
     typealias ContextParameters = Void
-    typealias Prompt = NeedlePrompt
+    typealias Prompt = TestPrompt
     typealias GenerateParameters = Parameters
     typealias ModelGenerationState = TestGenerationState
-    typealias GenerationParser = NeedleGenerationParser
+    typealias GenerationParser = TestGenerationParser
     typealias GrammarEngine = XGrammarEngine
 
     struct Parameters: EdgeToolsConstrainedGenerateParameters {
@@ -238,7 +238,7 @@
       }
       self.grammarEngine = try XGrammarEngine(
         tokenizerInfo: tokenizer.tokenizerInfo(
-          modelVocabularySize: .needleVocabularySize,
+          modelVocabularySize: TestTokenizer.vocabularySize,
           extraStopTokenIds: extraStopTokenIds
         )
       )
@@ -256,7 +256,7 @@
     }
 
     func grammar(
-      prompt: NeedlePrompt,
+      prompt: TestPrompt,
       tools: [EdgeToolDefinition],
       parameters: Parameters,
       state: TestGenerationState
@@ -270,7 +270,7 @@
     }
 
     func tokenize(
-      prompt: NeedlePrompt,
+      prompt: TestPrompt,
       tools: [EdgeToolDefinition],
       context: TestContext
     ) async throws -> [EdgeToolsToken] {
@@ -283,14 +283,14 @@
     }
 
     func generationState(
-      prompt: NeedlePrompt,
+      prompt: TestPrompt,
       context: TestContext
     ) async throws -> TestGenerationState {
       try await context.takeState()
     }
 
     func generate(
-      prompt: NeedlePrompt,
+      prompt: TestPrompt,
       tools: [EdgeToolDefinition] = [],
       parameters: sending Parameters,
       context: TestContext,
@@ -342,10 +342,10 @@
     }
 
     func prepare(
-      prompt: inout NeedlePrompt,
+      prompt: inout TestPrompt,
       tools: [EdgeToolDefinition],
       parameters: Parameters,
-      parser: inout NeedleGenerationParser,
+      parser: inout TestGenerationParser,
       state: inout TestGenerationState
     ) async throws -> EdgeToolsGenerationLoop.Preparation {
       let tokenIds = self.tokenizer.encode(text: prompt.user)

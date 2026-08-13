@@ -33,7 +33,7 @@ let package = Package(
     .trait(
       name: "ONNXCore",
       description: """
-        Needle ONNX model and runtime-provider protocols.
+        ONNX model and runtime-provider protocols.
 
         (Only enable this trait if you want to use your own ONNX build. Otherwise, enable `ONNX` directly.)
         """,
@@ -232,9 +232,6 @@ let package = Package(
       path: "swift/EdgeTools/Tests/EdgeToolsTests",
       exclude: [
         "GenerationSchema/__Snapshots__",
-        "Models/Needle/Engines/__Snapshots__",
-        "Models/Needle/Engines/MLX/__Snapshots__",
-        "Models/Needle/__Snapshots__",
         "Models/__Snapshots__",
         "Models/Gemma/__Snapshots__",
         "Models/LFM/__Snapshots__",

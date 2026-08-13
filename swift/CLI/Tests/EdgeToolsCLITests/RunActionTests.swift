@@ -16,7 +16,7 @@ struct `RunAction tests` {
     )
 
     expectNoDifference(report.response, "on it")
-    expectNoDifference(report.model, "Needle")
+    expectNoDifference(report.model, "Qwen3")
     expectNoDifference(report.engine, "onnx")
     expectNoDifference(report.toolCalls.map(\.name), ["set_timer"])
     expectNoDifference(report.metrics.decode.tokens, 2)
@@ -52,59 +52,6 @@ struct `RunAction tests` {
         source: .test(),
         requestedEngine: .onnx,
         request: GenerationRequest(user: "hello")
-      )
-    }
-  }
-
-  @Test
-  func `Rejects An MLX Hardware Unit For Another Engine Before Loading`() async throws {
-    let loads = LockedBox(0)
-    let error = await #expect(throws: EdgeCLIError.self) {
-      try await runModel(
-        context: .stub(engines: [.onnx], onMakeRunner: { loads.value += 1 }),
-        source: .test(),
-        requestedEngine: .onnx,
-        hardwareUnit: .cpu,
-        request: GenerationRequest(user: "hello")
-      )
-    }
-
-    expectNoDifference(loads.value, 0)
-    expectNoDifference(
-      try #require(error).description,
-      "--hardware-unit only applies to the mlx engine."
-    )
-  }
-
-  @Test
-  func `Throws When A Custom Grammar Is Unsupported By The Engine`() async throws {
-    let error = await #expect(throws: EdgeCLIError.self) {
-      try await runModel(
-        context: .stub(),
-        source: .test(),
-        request: GenerationRequest(user: "hello", grammar: .unconstrained)
-      )
-    }
-
-    expectNoDifference(try #require(error).description.contains("--grammar auto"), true)
-  }
-
-  @Test
-  func `Throws When Sampling Is Unsupported By The Engine`() async throws {
-    do {
-      _ = try await runModel(
-        context: .stub(),
-        source: .test(),
-        request: GenerationRequest(
-          user: "hello",
-          sampling: EdgeToolsFusedSamplingParameters(topK: 40)
-        )
-      )
-      Issue.record("Expected sampler validation to fail.")
-    } catch {
-      expectNoDifference(
-        String(describing: error),
-        "Needle on mlx always samples greedily; sampler options do not apply."
       )
     }
   }

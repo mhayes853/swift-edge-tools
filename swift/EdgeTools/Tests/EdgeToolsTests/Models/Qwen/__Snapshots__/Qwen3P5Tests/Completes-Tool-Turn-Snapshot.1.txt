@@ -176,29 +176,15 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 22 elements
+        ▿ parts: 19 elements
           ▿ EdgeToolsGenerationPart
-            - reasoning: "The"
+            - reasoning: "Paris"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " weather"
+            - reasoning: " currently"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " in"
+            - reasoning: " has"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " Paris"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " is"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " sunny"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " with"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " a"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " temperature"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " of"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " "
+            - reasoning: " **"
           ▿ EdgeToolsGenerationPart
             - reasoning: "2"
           ▿ EdgeToolsGenerationPart
@@ -208,18 +194,26 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " Celsius"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " ("
+            - reasoning: "**."
           ▿ EdgeToolsGenerationPart
-            - reasoning: "7"
+            - reasoning: " The"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "3"
+            - reasoning: " weather"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " appears"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " to"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " be"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " sunny"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " at"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " moment"
           ▿ EdgeToolsGenerationPart
             - reasoning: "."
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "8"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "°F"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: ")."
   ▿ reasoningEffort: EdgeToolsReasoningEffort
     - rawValue: "default"

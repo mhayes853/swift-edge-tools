@@ -3,7 +3,6 @@ import Foundation
 // MARK: - DetectedModel
 
 public enum DetectedModel: String, Hashable, Sendable, CaseIterable {
-  case needle
   case qwen3
   case qwen3P5
   case qwen3P5VL
@@ -24,7 +23,6 @@ public enum DetectedModel: String, Hashable, Sendable, CaseIterable {
 
   public var displayName: String {
     switch self {
-    case .needle: "Needle"
     case .qwen3: "Qwen3"
     case .qwen3P5: "Qwen3.5"
     case .qwen3P5VL: "Qwen3.5 VL"
@@ -42,7 +40,7 @@ public enum DetectedModel: String, Hashable, Sendable, CaseIterable {
 
   public var modality: Modality {
     switch self {
-    case .needle, .qwen3, .qwen3P5, .lfm2, .functionGemma, .granite, .graniteMoeHybrid,
+    case .qwen3, .qwen3P5, .lfm2, .functionGemma, .granite, .graniteMoeHybrid,
       .miniCPM5, .genericLLM:
       .text
     case .qwen3P5VL, .gemma4, .lfm2P5VL, .genericVLM:
@@ -161,13 +159,9 @@ extension ModelDetection {
 
 private struct ConfigurationHeader: Decodable {
   let modelType: String?
-  let encoderLayers: Int?
-  let decoderStartTokenId: Int?
 
   enum CodingKeys: String, CodingKey {
     case modelType = "model_type"
-    case encoderLayers = "num_encoder_layers"
-    case decoderStartTokenId = "decoder_start_token_id"
   }
 }
 
@@ -181,11 +175,7 @@ private func detectedModel(in directory: URL, files: [String]) throws -> Detecte
   let data = try Data(contentsOf: directory.appending(path: configurationFile))
   let header = try JSONDecoder().decode(ConfigurationHeader.self, from: data)
 
-  if header.encoderLayers != nil, header.decoderStartTokenId != nil {
-    return .needle
-  }
   switch header.modelType {
-  case "needle": return .needle
   case "qwen3": return .qwen3
   case "qwen3_5", "qwen3_5_text":
     return hasProcessorConfiguration(files) ? .qwen3P5VL : .qwen3P5
