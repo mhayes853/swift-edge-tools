@@ -6,8 +6,9 @@ let package = Package(
   name: "EdgeToolsWASITests",
   dependencies: [
     .package(
+      name: "swift-edge-tools",
       path: "../..",
-      traits: ["XGrammar", "ONNXCore", "JS"]
+      traits: ["XGrammar", "JS"]
     ),
     .package(
       url: "https://github.com/swiftwasm/JavaScriptKit",

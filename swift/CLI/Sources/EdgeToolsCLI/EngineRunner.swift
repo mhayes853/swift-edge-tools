@@ -117,7 +117,7 @@ extension EngineRunner {
       throw EdgeCLIError("--hardware-unit only applies to the mlx engine.")
     }
 
-    let supportsMLXFeatures = engine == .mlx && detection.model != .needle
+    let supportsMLXFeatures = engine == .mlx
     guard request.sampling.isEmpty || supportsMLXFeatures else {
       throw EdgeCLIError(
         "\(detection.model.displayName) on \(engine.rawValue) always samples greedily; sampler options do not apply."
@@ -199,9 +199,7 @@ extension EngineRunner {
   }
 
   private static let modelRegistrations: [DetectedModel: ModelRegistration] = {
-    var registrations: [DetectedModel: ModelRegistration] = [
-      .needle: ModelRegistration(engines: Self.needleFactories)
-    ]
+    var registrations = [DetectedModel: ModelRegistration]()
     #if canImport(MLX)
       registrations[.qwen3] = ModelRegistration(engines: [
         .mlx: Self.mlxFactory { try await Qwen3MLXModelEngine(from: $0) }
@@ -255,57 +253,6 @@ extension EngineRunner {
     return registrations
   }()
 
-  private static var needleFactories: [EngineKind: ModelEngineFactory] {
-    var factories: [EngineKind: ModelEngineFactory] = [
-      .onnx: { context in try await Self.needleONNX(from: context.detection.directory) }
-    ]
-    #if canImport(MLX)
-      factories[.mlx] = { context in
-        try await Self.needleMLX(
-          from: context.detection.directory,
-          hardwareUnit: context.hardwareUnit
-        )
-      }
-    #endif
-    return factories
-  }
-
-  #if canImport(MLX)
-    private static func needleMLX(
-      from directory: URL,
-      hardwareUnit: MLXHardwareUnit
-    ) async throws -> Self {
-      let engine = try await Device.withDefaultDevice(hardwareUnit.device) {
-        try await NeedleMLXModelEngine(from: directory)
-      }
-      return Self(
-        engineKind: .mlx,
-        engine: engine,
-        prompt: needlePrompt,
-        parameters: { request in
-          NeedleMLXGenerateParameters(
-            maxTokens: request.maxTokens,
-            toolCallRange: request.toolCallRange
-          )
-        }
-      )
-    }
-  #endif
-
-  private static func needleONNX(from directory: URL) async throws -> Self {
-    let engine = try await NeedleCONNXModelEngine(from: directory)
-    return Self(
-      engineKind: .onnx,
-      engine: engine,
-      prompt: needlePrompt,
-      parameters: { request in
-        NeedleONNXGenerateParameters(
-          maxTokens: request.maxTokens,
-          toolCallRange: request.toolCallRange
-        )
-      }
-    )
-  }
 
   #if canImport(MLX)
     private static func mlxFactory<Profile: MLXModelProfile>(
@@ -404,8 +351,4 @@ private func resolvedEngine(
     Supported engines: \(detection.model.supportedEngines.map(\.rawValue).joined(separator: ", ")).
     """
   )
-}
-
-private func needlePrompt(for request: GenerationRequest) -> NeedlePrompt {
-  NeedlePrompt(system: request.system, user: request.user)
 }

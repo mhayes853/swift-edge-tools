@@ -10,8 +10,8 @@ struct `EdgeToolsSession tests` {
   func `Tokenize Forwards Prompt To The Engine`() async throws {
     let expectedTokens = (0..<6).map { EdgeToolsToken(id: $0, stringValue: "t\($0)") }
     let tool = WeatherTool()
-    let prompt = NeedlePrompt(system: "sys", user: "hi")
-    let captured = Lock<(NeedlePrompt, [EdgeToolDefinition])?>(nil)
+    let prompt = TestPrompt(system: "sys", user: "hi")
+    let captured = Lock<(TestPrompt, [EdgeToolDefinition])?>(nil)
     let engine = MockEngine { prompt, tools in
       captured.withLock { $0 = (prompt, tools) }
       return expectedTokens
@@ -742,7 +742,7 @@ extension `EdgeToolsSession tests` {
   }
 }
 
-extension NeedlePrompt {
+extension TestPrompt {
   fileprivate static func test(user: String) -> Self {
     Self(system: "", user: user)
   }

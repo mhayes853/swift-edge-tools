@@ -5,9 +5,9 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
 
 image="${SWIFT_DOCKER_IMAGE:-swift:6.3.2-jammy}"
-traits="${SWIFT_TRAITS:-ONNX}"
+traits="${SWIFT_TRAITS:-XGrammar}"
 traits_explicit=0
-filter="${SWIFT_TEST_FILTER:-CONNXRuntime tests}"
+filter="${SWIFT_TEST_FILTER:-}"
 filter_explicit=0
 cache_volume="${SWIFT_DOCKER_CACHE_VOLUME:-swift-edge-tools-linux-build}"
 package_path="."
@@ -30,9 +30,8 @@ Options:
                              and the default filter runs all CLI tests.
   --package-path PATH       Package directory to build/test, relative to the repo root
                              (default: "." or "swift/CLI" with --cli).
-  --traits TRAITS           Swift package traits (default: ONNX; root package only).
-  --filter FILTER           Test filter or suite pattern (default: CONNXRuntime tests;
-                             all tests with --cli unless overridden).
+  --traits TRAITS           Swift package traits (default: XGrammar; root package only).
+  --filter FILTER           Test filter or suite pattern (all tests by default).
   --all-tests               Run all tests instead of applying a filter.
   --python-venv             Install the Python package into python/.venv.
   --default-traits          Keep the package's default traits enabled.
@@ -47,9 +46,8 @@ Environment overrides:
 
 Examples:
   scripts/test-linux.sh
-  scripts/test-linux.sh --traits ONNXCore --build-only
-  scripts/test-linux.sh --traits ONNX --filter 'CONNXRuntime tests|NeedleONNXModelEngine tests'
-  scripts/test-linux.sh --traits ONNX --all-tests --python-venv
+  scripts/test-linux.sh --traits XGrammar --build-only
+  scripts/test-linux.sh --traits XGrammar --all-tests --python-venv
   scripts/test-linux.sh --cli
   scripts/test-linux.sh --cli --filter 'ModelDetection tests'
 EOF

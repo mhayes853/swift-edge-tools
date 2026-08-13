@@ -6,8 +6,8 @@ Tool calls
        "duration" : "5 minutes"
      }
 
-Model   Needle
-Engine  onnx
+Model   Qwen3
+Engine  mlx
 Load    0ms
 Memory  0 MB peak RSS
 Prefill 10 tok  5ms  2000.0 tok/s

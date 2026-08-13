@@ -52,9 +52,9 @@ edge_tools_setup() {
     echo ""
     echo -e "${GREEN}Ready. 'edge' is on your PATH for this shell.${NC}"
     echo ""
-    echo "  edge Cactus-Compute/needle -p \"Set a timer for 20 minutes\" --tools tools.json"
-    echo "  edge info Cactus-Compute/needle"
-    echo "  edge bench Cactus-Compute/needle -p \"...\" --repeat-count 20"
+    echo "  edge Qwen/Qwen3-0.6B -p \"Set a timer for 20 minutes\" --tools tools.json"
+    echo "  edge info Qwen/Qwen3-0.6B"
+    echo "  edge bench Qwen/Qwen3-0.6B -p \"...\" --repeat-count 20"
     echo ""
     echo "Models are cached in \${HF_HOME:-~/.cache/huggingface}."
 }

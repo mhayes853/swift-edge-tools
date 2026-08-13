@@ -5,7 +5,7 @@ import Foundation
 // MARK: - ModelSourceOptions
 
 struct ModelSourceOptions: ParsableArguments {
-  @Argument(help: "A Hugging Face repo, such as Cactus-Compute/needle.")
+  @Argument(help: "A Hugging Face model repository.")
   var repo: String?
 
   @Option(help: "A local model directory, used instead of a Hugging Face repo.")

@@ -45,17 +45,10 @@ public struct EdgeToolsError: Error, Hashable, Sendable {
 extension EdgeToolsError {
   static func noCompatibleTokenizer(
     in directory: String,
-    hasSentencePieceModel: Bool,
     hasTransformersTokenizer: Bool,
     failures: [String] = []
   ) -> Self {
     var details = [String]()
-
-    if hasSentencePieceModel {
-      details.append("tokenizer.model is not a supported SentencePiece BPE model.")
-    } else {
-      details.append("tokenizer.model was not found.")
-    }
 
     #if Transformers && canImport(Tokenizers)
       if hasTransformersTokenizer {

@@ -1,4 +1,4 @@
-Needle · onnx · 2 runs (1 warmup)
+Qwen3 · mlx · 2 runs (1 warmup)
 
                    median       p95       min       max
 Prefill tok/s        2000.0    2000.0    2000.0    2000.0

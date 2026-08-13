@@ -3,10 +3,6 @@ import Foundation
 #if MLX
   import Hub
 
-  func downloadNeedle() async throws -> URL {
-    try await downloadModel(id: "Cactus-Compute/needle")
-  }
-
   func downloadQwen3() async throws -> URL {
     try await downloadModel(id: "mlx-community/Qwen3-0.6B-4bit")
   }
@@ -52,7 +48,7 @@ import Foundation
     let repo = Hub.Repo(id: id, type: .models)
     let destination = hub.localRepoLocation(repo)
 
-    if hasCompatibleTokenizer(in: destination) {
+    if FileManager.default.fileExists(atPath: destination.appending(path: "tokenizer.json").path()) {
       print("=== Model Already Downloaded At \(destination.path) ===")
       return destination
     }
@@ -61,13 +57,6 @@ import Foundation
     let url = try await hub.snapshot(from: repo)
     print("=== Finished Downloading Model To \(url.path) ===")
     return url
-  }
-
-  private func hasCompatibleTokenizer(in directory: URL) -> Bool {
-    ["tokenizer.model", "tokenizer.json"]
-      .contains {
-        FileManager.default.fileExists(atPath: directory.appending(path: $0).path())
-      }
   }
 #endif
 
