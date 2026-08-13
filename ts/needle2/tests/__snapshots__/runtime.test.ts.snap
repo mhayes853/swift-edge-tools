@@ -1,0 +1,51 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Needle2Runtime with the direct provider > generates a parsed response 1`] = `
+{
+  "confidence": 0.0036,
+  "functionCalls": [
+    {
+      "arguments": {
+        "address": "blob@gmail.com",
+        "body": "Hi, I'll go to the hiking.",
+        "subject": "Go hiking",
+      },
+      "name": "send_email",
+    },
+  ],
+  "metrics": {
+    "decodeTokensPerSecond": Any<Number>,
+    "peakRAMMegabytes": Any<Number>,
+    "prefillTokensPerSecond": Any<Number>,
+  },
+  "reasoning": "send_email tool chosen. 'to' from query 'blob@gmail.com'. 'subject' from 'asking them to go hiking' -> 'Go hiking'. 'body' from 'asking them to go hiking' -> 'Hi, I'll go to the hiking.'",
+  "success": true,
+  "tokenCount": 125,
+  "type": "call",
+}
+`;
+
+exports[`Needle2Runtime with the worker provider > generates a parsed response 1`] = `
+{
+  "confidence": 0.0036,
+  "functionCalls": [
+    {
+      "arguments": {
+        "address": "blob@gmail.com",
+        "body": "Hi, I'll go to the hiking.",
+        "subject": "Go hiking",
+      },
+      "name": "send_email",
+    },
+  ],
+  "metrics": {
+    "decodeTokensPerSecond": Any<Number>,
+    "peakRAMMegabytes": Any<Number>,
+    "prefillTokensPerSecond": Any<Number>,
+  },
+  "reasoning": "send_email tool chosen. 'to' from query 'blob@gmail.com'. 'subject' from 'asking them to go hiking' -> 'Go hiking'. 'body' from 'asking them to go hiking' -> 'Hi, I'll go to the hiking.'",
+  "success": true,
+  "tokenCount": 125,
+  "type": "call",
+}
+`;
