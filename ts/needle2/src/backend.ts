@@ -2,6 +2,7 @@
 import bundledFactory from "../vendor/needle.mjs";
 import {
 	binarySourceBytes,
+	defaultAssetURL,
 	isBrowserEnvironment,
 	Needle2Error,
 	PromiseQueue,
@@ -350,7 +351,6 @@ type WorkerConnection = {
 	onMessage(handler: (message: Needle2WorkerResponse) => void): void;
 	onError(handler: (error: Error) => void): void;
 	terminate(): void | Promise<unknown>;
-	revoke(): void;
 };
 
 type PendingRequest = {
@@ -367,12 +367,14 @@ export class Needle2WorkerBackend implements Needle2Backend {
 	private disposePromise: Promise<void> | undefined;
 
 	static async create(
-		workerURL: URL,
 		wasm: Needle2BinarySource,
 		weights: Needle2BinarySource,
 		options?: WorkerOptions,
 	): Promise<Needle2WorkerBackend> {
-		const connection = await workerConnection(workerURL, options);
+		const connection = await workerConnection(
+			defaultAssetURL("needle2.worker.mjs"),
+			options,
+		);
 		const backend = new Needle2WorkerBackend(connection);
 		try {
 			await backend.request({
@@ -383,7 +385,6 @@ export class Needle2WorkerBackend implements Needle2Backend {
 			return backend;
 		} catch (error) {
 			await connection.terminate();
-			connection.revoke();
 			throw error;
 		}
 	}
@@ -425,7 +426,6 @@ export class Needle2WorkerBackend implements Needle2Backend {
 		} finally {
 			this.disposed = true;
 			await this.connection.terminate();
-			this.connection.revoke();
 			this.failPending(
 				new Needle2Error(
 					"disposed",
@@ -460,7 +460,7 @@ export class Needle2WorkerBackend implements Needle2Backend {
 
 	private receive(response: Needle2WorkerResponse): void {
 		const pending = this.pending.get(response.id);
-    if (!pending) return;
+		if (!pending) return;
 
 		this.pending.delete(response.id);
 		if (response.success) {
@@ -479,7 +479,7 @@ export class Needle2WorkerBackend implements Needle2Backend {
 }
 
 function emscriptenModule(value: unknown): Needle2EmscriptenModule {
-  if (typeof value !== "object" || value === null) throw invalidModule();
+	if (typeof value !== "object" || value === null) throw invalidModule();
 
 	const module = value as Partial<Needle2EmscriptenModule>;
 	if (
@@ -534,7 +534,6 @@ async function workerConnection(
 		onMessage: (handler) => worker.on("message", handler),
 		onError: (handler) => worker.on("error", handler),
 		terminate: () => worker.terminate(),
-		revoke() {},
 	};
 }
 
@@ -542,27 +541,7 @@ function browserWorkerConnection(
 	url: URL,
 	options?: WorkerOptions,
 ): WorkerConnection {
-	let workerURL = url;
-	let objectURL: string | undefined;
-	if (url.origin !== location.origin) {
-		objectURL = URL.createObjectURL(
-			new Blob([`import ${JSON.stringify(url.href)};`], {
-				type: "text/javascript",
-			}),
-		);
-		try {
-			workerURL = new URL(objectURL);
-		} catch (cause) {
-			throw new Needle2Error(
-				"invalid-worker-url",
-				"Needle 2 could not create its worker URL.",
-				{
-					cause,
-				},
-			);
-		}
-	}
-	const worker = new Worker(workerURL, { ...options, type: "module" });
+	const worker = new Worker(url, { ...options, type: "module" });
 	return {
 		postMessage: (message) => worker.postMessage(message),
 		onMessage: (handler) =>
@@ -574,11 +553,6 @@ function browserWorkerConnection(
 				handler(new Error(event.message)),
 			),
 		terminate: () => worker.terminate(),
-		revoke() {
-			if (objectURL) {
-				URL.revokeObjectURL(objectURL);
-			}
-		},
 	};
 }
 

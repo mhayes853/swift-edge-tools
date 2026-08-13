@@ -31,7 +31,6 @@ export type Needle2RuntimeOptions =
 			provider: "worker";
 			wasm?: Needle2BinarySource;
 			weights?: Needle2BinarySource;
-			workerURL?: string | URL;
 			workerOptions?: WorkerOptions;
 	  };
 
@@ -137,16 +136,8 @@ export class Needle2Runtime {
 			);
 		}
 
-		const workerURL = options.workerURL
-			? new URL(options.workerURL, defaultAssetURL("./"))
-			: defaultAssetURL("needle2.worker.mjs");
 		return new Needle2Runtime(
-			await Needle2WorkerBackend.create(
-				workerURL,
-				wasm,
-				weights,
-				options.workerOptions,
-			),
+			await Needle2WorkerBackend.create(wasm, weights, options.workerOptions),
 		);
 	}
 
@@ -205,9 +196,7 @@ function parseGenerationResult(
 	try {
 		response = JSON.parse(json) as Record<string, unknown>;
 	} catch (cause) {
-		throw new Needle2ProtocolError("Needle 2 returned malformed JSON.", {
-			cause,
-		});
+		throw new Needle2ProtocolError("Needle 2 returned malformed JSON.", { cause });
 	}
 	if (
 		typeof response.type !== "string" ||
@@ -237,9 +226,7 @@ function parseGenerationResult(
 		...property("reasoning", response.reasoning, isString),
 		...property("confidence", response.confidence, isNumber),
 	};
-	if (response.success) {
-		return { success: true, ...common };
-	}
+	if (response.success) return { success: true, ...common };
 	return {
 		success: false,
 		...common,

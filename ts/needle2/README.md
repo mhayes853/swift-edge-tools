@@ -46,9 +46,10 @@ The standalone bundle installs `needle2Runtime` directly:
 </script>
 ```
 
-`wasm`, `weights`, `workerURL`, and `factory` options allow applications to override the bundled
-resources. Pass a `.cact` file through `weights`, or use `runtime.load(...)` to replace the weights
-after initialization.
+`wasm`, `weights`, and the direct provider's `factory` option allow applications to override the
+bundled resources. The worker provider always uses the bundled worker implementation. Pass a
+`.cact` file through `weights`, or use `runtime.load(...)` to replace the weights after
+initialization.
 
 `isBrowserEnvironment()` and `isNodeLikeEnvironment()` are available when applications need to
 choose behavior outside the runtime's automatic environment detection.
