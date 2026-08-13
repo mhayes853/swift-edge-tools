@@ -62,10 +62,7 @@ struct `ModelDetection tests` {
     expectNoDifference(detection.model.modality, .vision)
   }
 
-  @Test(arguments: [
-    ("MLX", EngineKind.mlx),
-    ("OnNx", EngineKind.onnx)
-  ])
+  @Test(arguments: [("MLX", EngineKind.mlx)])
   func `Parses Case Insensitive Engine Names`(argument: String, expected: EngineKind) {
     expectNoDifference(EngineKind(argument: argument), expected)
   }

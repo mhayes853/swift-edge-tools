@@ -73,22 +73,6 @@ struct `GrammarBitmaskAllPlatforms tests` {
         }
       #endif
 
-      #if ONNXCore
-        @Test
-        func `ONNX Filters Masked Tokens`() {
-          let mask = Self.mask()
-          var logits = (0..<64).map(Float.init)
-          logits.withUnsafeMutableBufferPointer {
-            var span = MutableSpan(_unsafeElements: $0)
-            applyBitmask(logits: &span, mask: mask)
-          }
-          let filtered = (0..<logits.count)
-            .filter { logits[$0] == -.infinity }
-
-          expectNoDifference(filtered, Self.expectedIndices)
-        }
-      #endif
-
       private static let expectedIndices = [0, 6, 8, 15, 31, 32, 63]
 
       private static func mask() -> GrammarBitmask {

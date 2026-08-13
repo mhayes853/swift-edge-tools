@@ -176,43 +176,113 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 19 elements
+        ▿ parts: 54 elements
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "#"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " Weather"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " Summary"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: ":"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " Paris"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "\n\n"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "**"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "Temperature"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: ":**"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " The"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " current"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " forecast"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " for"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " **"
           ▿ EdgeToolsGenerationPart
             - reasoning: "Paris"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " currently"
+            - reasoning: ","
           ▿ EdgeToolsGenerationPart
-            - reasoning: " has"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " **"
+            - reasoning: " "
           ▿ EdgeToolsGenerationPart
             - reasoning: "2"
           ▿ EdgeToolsGenerationPart
             - reasoning: "1"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " degrees"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " Celsius"
+            - reasoning: "°C"
           ▿ EdgeToolsGenerationPart
             - reasoning: "**."
           ▿ EdgeToolsGenerationPart
-            - reasoning: " The"
+            - reasoning: "\n"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "-"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " It"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " is"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " a"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " nice"
           ▿ EdgeToolsGenerationPart
             - reasoning: " weather"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " appears"
+            - reasoning: " day"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " to"
+            - reasoning: " with"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " be"
+            - reasoning: " high"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " sunny"
+            - reasoning: " daytime"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " at"
+            - reasoning: " warmth"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "."
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "\n"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "-"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " Please"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " check"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " moment"
+            - reasoning: " city"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " forecast"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " soon"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " for"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " updates"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " on"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " current"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " temperature"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: ","
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " humidity"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " and"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " light"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " conditions"
           ▿ EdgeToolsGenerationPart
             - reasoning: "."
   ▿ reasoningEffort: EdgeToolsReasoningEffort

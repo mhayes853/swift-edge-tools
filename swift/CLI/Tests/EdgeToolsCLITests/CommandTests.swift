@@ -59,8 +59,8 @@ struct `Command tests` {
   func `Info Command E2E`() async throws {
     let (context, capture) = EdgeContext.test(
       context: .stub(
-        engines: [.mlx, .onnx],
-        files: ["config.json", "decoder.onnx", "model.safetensors"]
+        engines: [.mlx],
+        files: ["config.json", "model.safetensors"]
       )
     )
 

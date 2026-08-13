@@ -21,8 +21,7 @@ edge bench Qwen/Qwen3-0.6B -p "..." --repeat-count 20 --warmup 3 --json
 ```
 
 The CLI detects models from `config.json` and selects an available registered engine from
-the model weights. MLX uses `.safetensors` weights and is preferred on Apple platforms.
-The `onnx` engine option remains available for models that register ONNX support.
+the model weights. MLX uses `.safetensors` weights.
 
 Text models include Qwen3, Qwen3.5, LFM2, FunctionGemma, Granite, Granite MoE Hybrid, and
 MiniCPM5. Qwen3.5 VL, Gemma4, and LFM2.5 VL are detected as vision models. Other supported
@@ -31,8 +30,7 @@ architectures fall back to generic text or vision MLX profiles.
 ## Package traits
 
 `Foundation` is enabled by default. `MLX`, `Transformers`, and `FoundationModels` enable it
-automatically. `XGrammar` provides structured generation, while `ONNXCore` and `ONNX` provide
-generic ONNX runtime and provider APIs for models that use them.
+automatically. `XGrammar` provides structured generation.
 
 ```sh
 swift build --disable-default-traits --traits Foundation

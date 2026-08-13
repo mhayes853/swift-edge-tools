@@ -1,5 +1,5 @@
 ▿ VLMToolTurnSnapshot
-  - response: "The dominant color visible in the image is red.\n\nThe image is\n\n<tool_call>\n<function=reportColor>\n<parameter=color>\nred\n</parameter>\n</function>\n</tool_call>"
+  - response: "The dominant color visible in the image is red."
   ▿ toolCalls: 1 element
     ▿ EdgeRawToolCall
       ▿ arguments: EdgeToolsValue

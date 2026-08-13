@@ -205,15 +205,3 @@ func argmaxScalar(
   }
   return bestIndex
 }
-
-// MARK: - ONNX
-
-#if ONNXCore
-  extension EdgeToolsSampler where Logits == ONNXTensorView<Float> {
-    public static var argmax: Self {
-      EdgeToolsSampler { logits in
-        logits.span.withUnsafeBufferPointer { argmaxContiguous($0) }
-      }
-    }
-  }
-#endif

@@ -106,7 +106,7 @@ extension EngineRunner {
     onReset: @escaping @Sendable () -> Void = {}
   ) -> Self {
     Self(
-      engine: .onnx,
+      engine: .mlx,
       supportsCustomGrammar: supportsCustomGrammar,
       supportsSampling: supportsSampling,
       supportsImages: supportsImages,
@@ -139,7 +139,7 @@ extension EngineRunner {
 
   static func failing(_ error: any Error) -> Self {
     Self(
-      engine: .onnx,
+      engine: .mlx,
       supportsCustomGrammar: true,
       supportsSampling: true,
       generation: { _, _ in throw error }

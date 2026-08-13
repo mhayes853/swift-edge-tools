@@ -17,7 +17,7 @@ struct `RunAction tests` {
 
     expectNoDifference(report.response, "on it")
     expectNoDifference(report.model, "Qwen3")
-    expectNoDifference(report.engine, "onnx")
+    expectNoDifference(report.engine, "mlx")
     expectNoDifference(report.toolCalls.map(\.name), ["set_timer"])
     expectNoDifference(report.metrics.decode.tokens, 2)
   }
@@ -42,18 +42,6 @@ struct `RunAction tests` {
     expectNoDifference(request.user, "hello")
     expectNoDifference(request.tools.map(\.name), ["ping"])
     expectNoDifference(request.toolCallRange, .bounded(1...3))
-  }
-
-  @Test
-  func `Throws When The Requested Engine Has No Weights`() async {
-    await #expect(throws: EdgeCLIError.self) {
-      _ = try await runModel(
-        context: .stub(engines: [.mlx]),
-        source: .test(),
-        requestedEngine: .onnx,
-        request: GenerationRequest(user: "hello")
-      )
-    }
   }
 
   @Test

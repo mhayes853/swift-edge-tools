@@ -57,49 +57,24 @@ public enum DetectedModel: String, Hashable, Sendable, CaseIterable {
 
 public enum EngineKind: String, CaseIterable, Sendable {
   case mlx
-  case onnx
 
   public init?(argument: String) {
     switch argument.lowercased().filter({ $0.isLetter || $0.isNumber }) {
     case "mlx": self = .mlx
-    case "onnx": self = .onnx
     default: return nil
     }
   }
 
   public var isAvailable: Bool {
-    switch self {
-    case .mlx:
-      #if canImport(MLX)
-        true
-      #else
-        false
-      #endif
-    case .onnx:
+    #if canImport(MLX)
       true
-    }
+    #else
+      false
+    #endif
   }
 
   fileprivate func hasWeights(in files: [String]) -> Bool {
-    switch self {
-    case .mlx: files.contains { $0.hasSuffix(".safetensors") }
-    case .onnx: files.contains { $0.hasSuffix(".onnx") }
-    }
-  }
-}
-
-// MARK: - EngineSelectionPlatform
-
-public enum EngineSelectionPlatform: Hashable, Sendable {
-  case apple
-  case nonApple
-
-  public static var current: Self {
-    #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
-      .apple
-    #else
-      .nonApple
-    #endif
+    files.contains { $0.hasSuffix(".safetensors") }
   }
 }
 
@@ -119,17 +94,7 @@ public struct ModelDetection: Hashable, Sendable {
   }
 
   public var defaultEngine: EngineKind? {
-    self.defaultEngine(for: .current)
-  }
-
-  public func defaultEngine(for platform: EngineSelectionPlatform) -> EngineKind? {
-    let available = self.engines.filter(self.model.supportedEngines.contains)
-    let priority: [EngineKind] =
-      switch platform {
-      case .apple: [.mlx, .onnx]
-      case .nonApple: [.onnx, .mlx]
-      }
-    return priority.first(where: available.contains)
+    self.engines.contains(.mlx) && self.model.supportedEngines.contains(.mlx) ? .mlx : nil
   }
 
   public var unavailableEngines: [EngineKind] {

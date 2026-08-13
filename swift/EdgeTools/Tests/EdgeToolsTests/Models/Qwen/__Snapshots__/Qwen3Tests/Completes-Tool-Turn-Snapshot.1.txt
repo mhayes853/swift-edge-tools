@@ -484,13 +484,15 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " with"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " Paris"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " as"
-          ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
             - reasoning: " location"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " set"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " to"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " Paris"
           ▿ EdgeToolsGenerationPart
             - reasoning: "."
           ▿ EdgeToolsGenerationPart
@@ -507,6 +509,8 @@
             - reasoning: " a"
           ▿ EdgeToolsGenerationPart
             - reasoning: " sunny"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " weather"
           ▿ EdgeToolsGenerationPart
             - reasoning: " condition"
           ▿ EdgeToolsGenerationPart
@@ -530,6 +534,8 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " Now"
           ▿ EdgeToolsGenerationPart
+            - reasoning: ","
+          ▿ EdgeToolsGenerationPart
             - reasoning: " I"
           ▿ EdgeToolsGenerationPart
             - reasoning: " need"
@@ -541,8 +547,6 @@
             - reasoning: " this"
           ▿ EdgeToolsGenerationPart
             - reasoning: " information"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " clearly"
           ▿ EdgeToolsGenerationPart
             - reasoning: " for"
           ▿ EdgeToolsGenerationPart
@@ -564,12 +568,8 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " weather"
-          ▿ EdgeToolsGenerationPart
             - reasoning: " condition"
           ▿ EdgeToolsGenerationPart
             - reasoning: ":"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " sunny"
   ▿ reasoningEffort: EdgeToolsReasoningEffort
     - rawValue: "default"
