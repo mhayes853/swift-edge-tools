@@ -1,5 +1,7 @@
-#if Needle2 && canImport(CNeedle2)
-  import CNeedle2
+#if Needle2
+  #if canImport(CNeedle2)
+    import CNeedle2
+  #endif
 
   #if Foundation
     import _EdgeToolsFoundation
@@ -37,74 +39,83 @@
 
     public var system: Needle2System {
       get {
-        self.observationRegistrar.access(self, keyPath: \.system)
+        #if !$Embedded
+          self.observationRegistrar.access(self, keyPath: \.system)
+        #endif
         return self.state.withBorrowedLock { $0.parameters.system }
       }
       set {
         self.state.withLock { state in
-          self.observationRegistrar.withMutation(of: self, keyPath: \.system) {
+          #if !$Embedded
+            self.observationRegistrar.withMutation(of: self, keyPath: \.system) {
+              state.parameters.system = newValue
+            }
+          #else
             state.parameters.system = newValue
-          }
+          #endif
         }
       }
     }
 
     public var toolIndexPath: String? {
       get {
-        self.observationRegistrar.access(self, keyPath: \.toolIndexPath)
+        #if !$Embedded
+          self.observationRegistrar.access(self, keyPath: \.toolIndexPath)
+        #endif
         return self.state.withBorrowedLock { $0.parameters.toolIndexPath }
       }
       set {
         self.state.withLock { state in
-          self.observationRegistrar.withMutation(of: self, keyPath: \.toolIndexPath) {
+          #if !$Embedded
+            self.observationRegistrar.withMutation(of: self, keyPath: \.toolIndexPath) {
+              state.parameters.toolIndexPath = newValue
+            }
+          #else
             state.parameters.toolIndexPath = newValue
-          }
+          #endif
         }
       }
     }
 
     public var isResponding: Bool {
-      self.observationRegistrar.access(self, keyPath: \.isResponding)
+      #if !$Embedded
+        self.observationRegistrar.access(self, keyPath: \.isResponding)
+      #endif
       return self.state.withBorrowedLock { $0.isResponding }
     }
 
-    fileprivate init(parameters: Needle2ContextParameters) {
+    init(parameters: Needle2ContextParameters) {
       self.state = Lock(State(parameters: parameters))
     }
 
-    fileprivate func begin(
-      prompt: String,
-      toolsJSON: String,
-      maximumTokenCount: Int32,
-      outputCapacity: Int32
-    ) throws -> Needle2Request {
+    func begin() throws -> Needle2ContextParameters {
       try self.state.withLock { state in
         guard !state.isResponding else {
           throw EdgeToolsError.contextInUse
         }
-        var request: Needle2Request!
-        self.observationRegistrar.withMutation(of: self, keyPath: \.isResponding) {
+        #if !$Embedded
+          var parameters: Needle2ContextParameters!
+          self.observationRegistrar.withMutation(of: self, keyPath: \.isResponding) {
+            state.isResponding = true
+            parameters = state.parameters
+          }
+          return parameters
+        #else
           state.isResponding = true
-          request = Needle2Request(
-            prompt: prompt,
-            initialization: Needle2Initialization(
-              systemPrompt: state.parameters.system.formatted(),
-              toolsJSON: toolsJSON,
-              toolIndexPath: state.parameters.toolIndexPath
-            ),
-            maximumTokenCount: maximumTokenCount,
-            outputCapacity: outputCapacity
-          )
-        }
-        return request
+          return state.parameters
+        #endif
       }
     }
 
-    fileprivate func finish() {
+    func finish() {
       self.state.withLock { state in
-        self.observationRegistrar.withMutation(of: self, keyPath: \.isResponding) {
+        #if !$Embedded
+          self.observationRegistrar.withMutation(of: self, keyPath: \.isResponding) {
+            state.isResponding = false
+          }
+        #else
           state.isResponding = false
-        }
+        #endif
       }
     }
   }
@@ -141,6 +152,7 @@
       }
 
       public static let invalidGenerateParameters = Self(rawValue: "invalid-generate-parameters")
+      public static let invalidJavaScriptRuntime = Self(rawValue: "invalid-javascript-runtime")
       public static let initializationFailed = Self(rawValue: "initialization-failed")
       public static let loadingFailed = Self(rawValue: "loading-failed")
       public static let generationFailed = Self(rawValue: "generation-failed")
@@ -157,6 +169,9 @@
     }
   }
 
+#endif
+
+#if Needle2 && canImport(CNeedle2)
   // MARK: - Needle2Engine
 
   @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
@@ -188,7 +203,8 @@
       channel: sending EdgeToolsGenerationChannel
     ) throws -> some EdgeToolsEngineGenerationTask {
       let maximumTokenCount = parameters.maxTokens ?? 256
-      guard maximumTokenCount > 0, let maximumTokenCount = Int32(exactly: maximumTokenCount) else {
+      guard maximumTokenCount > 0, let maximumTokenCount = Int32(exactly: maximumTokenCount)
+      else {
         throw Needle2Error(
           code: .invalidGenerateParameters,
           message: "Needle 2 maxTokens must be between 1 and Int32.max."
@@ -204,9 +220,14 @@
       }
 
       return AnyGenerationTask { stopper in
-        let request = try context.begin(
+        let contextParameters = try context.begin()
+        let request = Needle2Request(
           prompt: prompt,
-          toolsJSON: tools.needle2JSON,
+          initialization: Needle2Initialization(
+            systemPrompt: contextParameters.system.formatted(),
+            toolsJSON: tools.needle2JSON,
+            toolIndexPath: contextParameters.toolIndexPath
+          ),
           maximumTokenCount: maximumTokenCount,
           outputCapacity: outputCapacity
         )
@@ -380,118 +401,6 @@
       }
       let bytes = output[..<terminator].map(UInt8.init(bitPattern:))
       return (String(decoding: bytes, as: UTF8.self), Int(result))
-    }
-  }
-
-  // MARK: - Response
-
-  private struct Needle2Response {
-    var type: String
-    var success: Bool
-    var error: String?
-    var errorCode: String?
-    var functionCalls: [EdgeRawToolCall]
-    var reasoning: String?
-    var confidence: Float?
-    var prefillTokensPerSecond: Double?
-    var decodeTokensPerSecond: Double?
-    var peakRAMMegabytes: Double?
-
-    var parts: [EdgeToolsGenerationPart] {
-      let reasoning = self.reasoning.map { [EdgeToolsGenerationPart.reasoning($0)] } ?? []
-      return reasoning + self.functionCalls.map(EdgeToolsGenerationPart.toolCall)
-    }
-
-    init(json: String) throws {
-      let value: EdgeToolsValue
-      do {
-        value = try EdgeToolsValue(json: json)
-      } catch {
-        throw Needle2Error(
-          code: .invalidResponse,
-          message: "Needle 2 returned invalid JSON: \(error)"
-        )
-      }
-      guard case .object(let object) = value,
-        case .string(let type) = object["type"],
-        case .boolean(let success) = object["success"]
-      else {
-        throw Needle2Error(
-          code: .invalidResponse,
-          message: "Needle 2 returned a response without a valid type and success value."
-        )
-      }
-
-      self.type = type
-      self.success = success
-      self.error = object["error"]?.string
-      self.errorCode = object["error_code"]?.string
-      self.reasoning = object["reasoning"]?.string
-      self.confidence = object["confidence"]?.double.map(Float.init)
-      self.prefillTokensPerSecond = object["prefill_tps"]?.double
-      self.decodeTokensPerSecond = object["decode_tps"]?.double
-      self.peakRAMMegabytes = object["peak_ram_mb"]?.double
-      self.functionCalls = try object["function_calls"]?.needle2ToolCalls ?? []
-    }
-  }
-
-  // MARK: - Helpers
-
-  extension Array where Element == EdgeToolDefinition {
-    fileprivate var needle2JSON: String {
-      EdgeToolsValue.array(
-        self.map { tool in
-          [
-            "name": .string(tool.name.snakeCased()),
-            "description": .string(tool.description),
-            "parameters": tool.arguments.edgeToolsValue
-          ]
-        }
-      )
-      .orderedJSONString()
-    }
-  }
-
-  extension Duration {
-    fileprivate init(
-      needle2TokenCount tokenCount: Int,
-      tokensPerSecond: Double?
-    ) {
-      guard let tokensPerSecond, tokensPerSecond > 0 else {
-        self = .zero
-        return
-      }
-      let nanoseconds = Double(tokenCount) / tokensPerSecond * 1_000_000_000
-      guard nanoseconds < Double(Int64.max) else {
-        self = .zero
-        return
-      }
-      self = .nanoseconds(Int64(nanoseconds.rounded()))
-    }
-  }
-
-  extension EdgeToolsValue {
-    fileprivate var needle2ToolCalls: [EdgeRawToolCall] {
-      get throws {
-        if self.isNull {
-          return []
-        }
-        guard let values = self.array else {
-          throw Needle2Error(
-            code: .invalidResponse,
-            message: "Needle 2 returned an invalid function_calls value."
-          )
-        }
-        return try values.map { value in
-          guard let call = EdgeRawToolCall(jsonValue: value) else {
-            throw Needle2Error(
-              code: .invalidResponse,
-              message: "Needle 2 returned an invalid function call."
-            )
-          }
-          return call
-        }
-      }
     }
   }
 #endif

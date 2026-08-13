@@ -73,6 +73,10 @@ Try to prioritize using Collections/Sequence algorithms over doing things with l
 
 Private helper functions should go at the bottom of the file, not the top.
 
+Prefer `withUnsafeContinuation` over checked continuations.
+
+Parse, don't validate: turn external input into a usable internal representation instead of running a separate validation pass and continuing to use the unparsed value.
+
 DO NOT ASSUME WASI IS A SINGLE THREADED ENVIRONMENT. It is not ok to conform types to `@unchecked Sendable` just because they have a member variable that uses a type from `JavaScriptKit`, and because "JS is single-threaded". `JavaScriptKit` does not conform most of its types to Sendable because Swift WASM supports sdks that enable multithreading through web workers or other means.
 
 If a lot of public APIs are using shared package or internal scoped APIs, it's likely that the API should also be public since it has inherent useful reusability. That is, users should get the same tools as us to make their own abstractions.

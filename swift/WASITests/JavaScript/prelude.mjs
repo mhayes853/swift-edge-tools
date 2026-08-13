@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { needle2Runtime } from "../../../ts/needle2/dist/index.js";
 
 const packageName = process.env.EDGE_TOOLS_ONNX_PACKAGE ?? "onnxruntime-node";
 const importedRuntime = await import(packageName);
@@ -12,6 +13,7 @@ const importedWebRuntime =
 
 globalThis.edgeToolsONNXRuntime = importedRuntime;
 globalThis.edgeToolsWebONNXRuntime = importedWebRuntime;
+globalThis.edgeToolsNeedle2Runtime = needle2Runtime;
 globalThis.edgeToolsRejectedONNXRuntime = {
 	InferenceSession: {
 		create() {

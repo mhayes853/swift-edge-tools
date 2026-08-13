@@ -4,6 +4,14 @@
 import CompilerPluginSupport
 import PackageDescription
 
+var edgeToolsSwiftSettings: [SwiftSetting] = [
+  .enableExperimentalFeature("Lifetimes"),
+  .enableExperimentalFeature("AddressableTypes")
+]
+#if compiler(<6.4)
+  edgeToolsSwiftSettings.append(.enableExperimentalFeature("SuppressedAssociatedTypes"))
+#endif
+
 let package = Package(
   name: "swift-edge-tools",
   platforms: [.macOS(.v14), .iOS(.v17), .tvOS(.v17), .watchOS(.v10), .visionOS(.v1)],
@@ -150,10 +158,7 @@ let package = Package(
         )
       ],
       path: "swift/EdgeTools/Sources/EdgeTools",
-      swiftSettings: [
-        .enableExperimentalFeature("Lifetimes"),
-        .enableExperimentalFeature("AddressableTypes")
-      ],
+      swiftSettings: edgeToolsSwiftSettings,
       linkerSettings: [
         .linkedFramework("CoreML", .when(platforms: [.macOS, .iOS], traits: ["ONNX"])),
         .linkedLibrary(

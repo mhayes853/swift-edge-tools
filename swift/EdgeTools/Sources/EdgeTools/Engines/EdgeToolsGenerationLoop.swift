@@ -1,3 +1,5 @@
+import _Concurrency
+
 // MARK: - EdgeToolsGenerationLoop
 
 public struct EdgeToolsGenerationLoop: Sendable {

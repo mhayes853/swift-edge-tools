@@ -4,6 +4,7 @@ set -euo pipefail
 
 ROOT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEST_DIRECTORY="$ROOT_DIRECTORY/swift/WASITests"
+NEEDLE2_DIRECTORY="$ROOT_DIRECTORY/ts/needle2"
 ONNX_PACKAGE="onnxruntime-node"
 SWIFT_SDK_ID="${SWIFT_SDK_ID:-swift-6.3.2-RELEASE_wasm}"
 BUILD_ONLY=0
@@ -44,6 +45,10 @@ onnxruntime-node | onnxruntime-web) ;;
 	;;
 esac
 
+cd "$NEEDLE2_DIRECTORY"
+npm ci --ignore-scripts
+npm run build
+
 cd "$TEST_DIRECTORY"
 npm ci --ignore-scripts
 
@@ -70,6 +75,9 @@ if ((BUILD_ONLY)); then
 fi
 
 export EDGE_TOOLS_ONNX_PACKAGE="$ONNX_PACKAGE"
+if [[ "$FILTER" == *Needle2JSEngine* ]]; then
+	export EDGE_TOOLS_WASI_NEEDLE2_ONLY=1
+fi
 
 if command -v swiftly >/dev/null 2>&1; then
 	swiftly run "${COMMAND[@]}"

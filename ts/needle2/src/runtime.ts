@@ -83,7 +83,7 @@ function parseGenerationResult(json: string, tokenCount: number): Needle2Generat
     metrics: {
       ...numberProperty("prefillTokensPerSecond", response.prefill_tps),
       ...numberProperty("decodeTokensPerSecond", response.decode_tps),
-      ...numberProperty("peakRAMMegabytes", response.peak_ram_mb)
+      ...positiveNumberProperty("peakRAMMegabytes", response.peak_ram_mb)
     },
     ...stringProperty("reasoning", response.reasoning),
     ...numberProperty("confidence", response.confidence)
@@ -111,4 +111,11 @@ function numberProperty<Key extends string>(
   value: unknown
 ): { [Property in Key]?: number } {
   return typeof value === "number" ? ({ [key]: value } as never) : {};
+}
+
+function positiveNumberProperty<Key extends string>(
+  key: Key,
+  value: unknown
+): { [Property in Key]?: number } {
+  return typeof value === "number" && value > 0 ? ({ [key]: value } as never) : {};
 }

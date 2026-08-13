@@ -81,11 +81,11 @@ describe.each(["direct", "worker"] satisfies Needle2Provider[])(
         name: "send_email",
         arguments: { address: "blob@gmail.com" }
       });
+      expect(result.metrics.peakRAMMegabytes).toBeUndefined();
       expect(result).toMatchSnapshot({
         metrics: {
           prefillTokensPerSecond: expect.any(Number),
-          decodeTokensPerSecond: expect.any(Number),
-          peakRAMMegabytes: expect.any(Number)
+          decodeTokensPerSecond: expect.any(Number)
         }
       });
     });
