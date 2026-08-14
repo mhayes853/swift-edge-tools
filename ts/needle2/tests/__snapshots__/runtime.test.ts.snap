@@ -2,7 +2,7 @@
 
 exports[`Needle2Runtime with the direct provider > generates a parsed response 1`] = `
 {
-  "confidence": 0.0036,
+  "confidence": 0.9656,
   "functionCalls": [
     {
       "arguments": {
@@ -26,7 +26,7 @@ exports[`Needle2Runtime with the direct provider > generates a parsed response 1
 
 exports[`Needle2Runtime with the worker provider > generates a parsed response 1`] = `
 {
-  "confidence": 0.0036,
+  "confidence": 0.9656,
   "functionCalls": [
     {
       "arguments": {

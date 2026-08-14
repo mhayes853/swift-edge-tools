@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-version="2.0.0"
-revision="231364ff02542c4060afb5f4795801e0a09f5107"
+version="2.0.1"
+revision="17a803d95928ba33d3e9a0160e024d9565b5c3f2"
 repository="https://huggingface.co/Cactus-Compute/needle2/resolve/$revision"
 script_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repository_directory="$(dirname "$(dirname "$script_directory")")"

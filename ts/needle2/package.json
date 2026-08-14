@@ -25,7 +25,9 @@
   "scripts": {
     "assets": "node ../../scripts/needle2/prepare-ts-assets.mjs",
     "build": "vite build && vite build --mode worker && vite build --mode standalone && tsc --emitDeclarationOnly",
-    "test": "npm run build && vitest run"
+    "test": "npm run build && vitest run && npm run test:deno && npm run test:bun",
+    "test:bun": "bun test ./tests/runtime-compatibility.ts",
+    "test:deno": "deno test --allow-read tests/runtime-compatibility.ts"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

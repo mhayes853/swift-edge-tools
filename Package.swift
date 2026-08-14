@@ -180,7 +180,7 @@ let package = Package(
     ),
     .binaryTarget(
       name: "CNeedle2",
-      path: "bin/needle2-2.0.0.artifactbundle.zip"
+      path: "bin/needle2-2.0.1.artifactbundle.zip"
     ),
     .target(
       name: "CXGrammar",
