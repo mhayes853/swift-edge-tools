@@ -350,9 +350,9 @@ extension FixedWidthInteger {
 }
 
 private func edgeToolsUnqualifiedTypeName(_ type: Any.Type) -> String {
-  let reflectedName = String(reflecting: type)
-  let genericArgumentsStart = reflectedName.firstIndex(of: "<") ?? reflectedName.endIndex
-  let qualifiedName = reflectedName[..<genericArgumentsStart]
+  let describedName = String(describing: type)
+  let genericArgumentsStart = describedName.firstIndex(of: "<") ?? describedName.endIndex
+  let qualifiedName = describedName[..<genericArgumentsStart]
   let unqualifiedStart = qualifiedName.lastIndex(of: ".").map {
     qualifiedName.index(after: $0)
   } ?? qualifiedName.startIndex
