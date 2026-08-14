@@ -2,7 +2,10 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { needle2Runtime } from "../../../ts/needle2/dist/index.js";
+import {
+	defaultSystemValues,
+	needle2Runtime,
+} from "../../../ts/needle2/dist/index.js";
 
 const packageName = process.env.EDGE_TOOLS_ONNX_PACKAGE ?? "onnxruntime-node";
 const importedRuntime = await import(packageName);
@@ -55,5 +58,14 @@ if (needleFiles.every((file) => existsSync(path.join(needleDirectory, file)))) {
 }
 
 export async function setupOptions(options) {
-	return options;
+	const getImports = options.getImports;
+	return {
+		...options,
+		getImports(context) {
+			return {
+				...(getImports?.(context) ?? {}),
+				needle2DefaultSystemValues: (options) => defaultSystemValues(options),
+			};
+		},
+	};
 }

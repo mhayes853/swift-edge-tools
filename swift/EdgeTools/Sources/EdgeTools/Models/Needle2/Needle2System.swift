@@ -5,6 +5,11 @@
     import _EdgeToolsFoundation
   #endif
 
+  #if JS && canImport(JavaScriptKit)
+    import JavaScriptKit
+    import _EdgeToolsJavaScript
+  #endif
+
   #if canImport(Network)
     import Network
   #endif
@@ -80,7 +85,7 @@
       let custom = self.values.filter { !recognizedKeys.contains($0.key) }
       return (recognized + custom)
         .map { key, value in
-          "\(key.rawValue.replacingOccurrences(of: ";", with: " ")): \(value)"
+          "\(key.rawValue.split(separator: ";", omittingEmptySubsequences: false).joined(separator: " ")): \(value)"
         }
         .joined(separator: "; ")
     }
@@ -210,10 +215,7 @@
 
   #if FullFoundation
     extension Needle2System {
-      public static func date(
-        _ date: Date,
-        timeZone: TimeZone = .current
-      ) -> Self {
+      public static func date(_ date: Date, timeZone: TimeZone = .current) -> Self {
         needle2DateFormatter.withLock { formatter in
           formatter.timeZone = timeZone
           return Self.date(formatter.string(from: date))
@@ -223,45 +225,123 @@
       public static func locale(_ locale: Locale) -> Self {
         Self.locale(locale.identifier)
       }
+    }
+  #endif
 
-      public static func platformDefaults(
-        device: @Sendable () async -> Device? = {
-          await Needle2System.platformDevice()
-        },
-        battery: @Sendable () async -> Float? = {
-          await Needle2System.platformBatteryPercentage()
-        },
-        network: @Sendable () async -> Network? = {
-          await Needle2System.platformNetwork()
-        }
-      ) async -> Self {
-        async let device = device()
-        async let battery = battery()
-        async let network = network()
+  extension Needle2System {
+    public static func platformDefaults(
+      device: (@Sendable () async -> Device?)? = nil,
+      battery: (@Sendable () async -> Float?)? = nil,
+      network: (@Sendable () async -> Network?)? = nil,
+      location: (@Sendable () async -> String?)? = nil
+    ) async -> Self {
+    #if JS && canImport(JavaScriptKit) && !FullFoundation
+      async let deviceValue = device?()
+      async let batteryValue = battery?()
+      async let networkValue = network?()
+      async let locationValue = location?()
 
-        var system: Self = [.date(Date()), .locale(Locale.current)]
-        if let device = await device {
-          system.merge(.device(device))
-        }
-        if let battery = await battery {
-          system.merge(.battery(percent: battery))
-        }
-        if let network = await network {
-          system.merge(.network(network))
-        }
+      let options = JSObject()
+      let overrides = JSObject()
+      if device != nil {
+        overrides[Key.device.rawValue] = await deviceValue.map { .string($0.rawValue) } ?? .null
+      }
+      if battery != nil {
+        overrides[Key.battery.rawValue] = await batteryValue.map {
+          .string("\(formattedBatteryPercentage($0))%")
+        } ?? .null
+      }
+      if network != nil {
+        overrides[Key.network.rawValue] = await networkValue.map { .string($0.rawValue) } ?? .null
+      }
+      if location != nil {
+        overrides[Key.location.rawValue] = await locationValue.map { .string($0) } ?? .null
+      }
+      options["overrides"] = overrides.jsValue
+
+      let defaults: Self?
+      if let object = try? await _EdgeToolsJavaScript.needle2DefaultSystemValues(options) {
+        defaults = Self.javascriptSystem(from: object)
+      } else {
+        defaults = nil
+      }
+      var system = defaults ?? Self(OrderedDictionary<Key, String>())
+      guard defaults == nil else {
         return system
       }
-
-      public static func platformDevice() async -> Device? {
-        await Needle2PlatformDefaults.device
+      if let device = await deviceValue {
+        system.merge(.device(device))
       }
-
-      public static func platformBatteryPercentage() async -> Float? {
-        await Needle2PlatformDefaults.batteryPercentage()
+      if let battery = await batteryValue {
+        system.merge(.battery(percent: battery))
       }
+      if let network = await networkValue {
+        system.merge(.network(network))
+      }
+      if let location = await locationValue {
+        system.merge(.location(location))
+      }
+      return system
+    #else
+      let deviceProvider = device ?? { await Needle2System.platformDevice() }
+      let batteryProvider = battery ?? { await Needle2System.platformBatteryPercentage() }
+      let networkProvider = network ?? { await Needle2System.platformNetwork() }
+      let locationProvider = location ?? { await Needle2System.platformLocation() }
 
-      public static func platformNetwork() async -> Network? {
-        await Needle2PlatformDefaults.network
+      async let device = deviceProvider()
+      async let battery = batteryProvider()
+      async let network = networkProvider()
+      async let location = locationProvider()
+
+      #if FullFoundation
+        var system: Self = [.date(Date()), .locale(Locale.current)]
+      #else
+        var system = Self(OrderedDictionary<Key, String>())
+      #endif
+      if let device = await device {
+        system.merge(.device(device))
+      }
+      if let battery = await battery {
+        system.merge(.battery(percent: battery))
+      }
+      if let network = await network {
+        system.merge(.network(network))
+      }
+      if let location = await location {
+        system.merge(.location(location))
+      }
+      return system
+    #endif
+    }
+
+    public static func platformDevice() async -> Device? {
+      await Needle2PlatformDefaults.device
+    }
+
+    public static func platformBatteryPercentage() async -> Float? {
+      await Needle2PlatformDefaults.batteryPercentage()
+    }
+
+    public static func platformNetwork() async -> Network? {
+    #if canImport(Network) || os(Linux) || os(Android)
+      await Needle2PlatformDefaults.network
+    #else
+      Needle2PlatformDefaults.network
+    #endif
+    }
+
+    public static func platformLocation() async -> String? {
+      Needle2PlatformDefaults.location
+    }
+  }
+
+  #if JS && canImport(JavaScriptKit) && !FullFoundation
+    extension Needle2System {
+      private static func javascriptSystem(from object: JSObject) -> Self {
+        let keys: [Key] = [.date, .locale, .device, .battery, .network, .location]
+        return Self(OrderedDictionary(uniqueKeysWithValues: keys.compactMap { key in
+          object[key.rawValue].stringValue.map { (key, $0) }
+        }))
       }
     }
   #endif
@@ -397,6 +477,8 @@
     #else
       static var network: Needle2System.Network? { nil }
     #endif
+
+    static var location: String? { nil }
 
     #if os(Linux) || os(Android)
       static func unixBatteryPercentage() -> Float? {

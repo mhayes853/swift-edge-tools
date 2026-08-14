@@ -11,6 +11,9 @@ var edgeToolsSwiftSettings: [SwiftSetting] = [
 #if compiler(<6.4)
   edgeToolsSwiftSettings.append(.enableExperimentalFeature("SuppressedAssociatedTypes"))
 #endif
+let edgeToolsJavaScriptSwiftSettings = edgeToolsSwiftSettings + [
+  .enableExperimentalFeature("Extern")
+]
 
 let package = Package(
   name: "swift-edge-tools",
@@ -85,6 +88,10 @@ let package = Package(
         .target(
           name: "_EdgeToolsFoundation",
           condition: .when(traits: ["Foundation"])
+        ),
+        .target(
+          name: "_EdgeToolsJavaScript",
+          condition: .when(traits: ["JS"])
         ),
         .product(name: "yyjson", package: "yyjson"),
         .product(name: "HeapModule", package: "swift-collections"),
@@ -175,6 +182,15 @@ let package = Package(
     .target(
       name: "_EdgeToolsFoundation",
       path: "swift/EdgeTools/Sources/_EdgeToolsFoundation"
+    ),
+    .target(
+      name: "_EdgeToolsJavaScript",
+      dependencies: [
+        .product(name: "JavaScriptKit", package: "JavaScriptKit")
+      ],
+      path: "swift/EdgeTools/Sources/_EdgeToolsJavaScript",
+      swiftSettings: edgeToolsJavaScriptSwiftSettings,
+      plugins: [.plugin(name: "BridgeJS", package: "JavaScriptKit")]
     ),
     .target(
       name: "EdgeToolsXGrammar",

@@ -5,6 +5,24 @@ import Testing
 @Suite(.serialized)
 struct `Needle2JSEngine tests` {
   @Test
+  func `Loads TypeScript System Defaults`() async {
+    let system = await Needle2System.platformDefaults(
+      battery: { 62.5 },
+      location: { "test location" }
+    )
+
+    #expect(system[.date] != nil)
+    #expect(system[.locale] != nil)
+    #expect(system[.device] == "desktop")
+    #expect(system[.battery] == "62.5%")
+    #expect(system[.network] == nil)
+    #expect(system[.location] == "test location")
+
+    let suppressedDevice = await Needle2System.platformDefaults(device: { nil })
+    #expect(suppressedDevice[.device] == nil)
+  }
+
+  @Test
   func `Generates Real Tool Call Through Worker Runtime`() async throws {
     let createRuntime = try #require(JSObject.global["edgeToolsNeedle2Runtime"].object)
     let engine = try await Needle2JSEngine(createRuntime: createRuntime)

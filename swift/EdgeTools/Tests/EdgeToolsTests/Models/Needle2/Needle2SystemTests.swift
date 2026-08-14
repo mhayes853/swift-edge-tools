@@ -66,12 +66,14 @@
         let system = await Needle2System.platformDefaults(
           device: { nil },
           battery: { 62.5 },
-          network: { nil }
+          network: { nil },
+          location: { "test location" }
         )
 
         expectNoDifference(system[.device], nil)
         expectNoDifference(system[.battery], "62.5%")
         expectNoDifference(system[.network], nil)
+        expectNoDifference(system[.location], "test location")
       }
     #endif
 

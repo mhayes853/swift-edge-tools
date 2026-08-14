@@ -79,6 +79,23 @@
     }
   }
 
+  // MARK: - JSValue
+
+  extension JSValue {
+    var stringValue: String? {
+      if let string = string {
+        return string
+      }
+      if let boolean = boolean {
+        return String(boolean)
+      }
+      if let number = number {
+        return String(number)
+      }
+      return nil
+    }
+  }
+
   // MARK: - EdgeToolsValue
 
   extension EdgeToolsValue: ConvertibleToJSValue {
