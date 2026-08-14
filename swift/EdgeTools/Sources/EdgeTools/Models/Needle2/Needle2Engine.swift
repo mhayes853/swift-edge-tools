@@ -3,7 +3,7 @@
     import CNeedle2
   #endif
 
-  #if Foundation
+  #if FoundationEssentials
     import _EdgeToolsFoundation
   #endif
 
@@ -295,7 +295,7 @@
     }
   }
 
-  #if Foundation
+  #if FoundationEssentials
     @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
     extension Needle2Engine {
       public static func load(_ data: Data) throws {

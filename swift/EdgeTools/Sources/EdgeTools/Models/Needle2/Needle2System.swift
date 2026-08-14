@@ -1,7 +1,7 @@
 #if Needle2
   import OrderedCollections
 
-  #if FullFoundation
+  #if Foundation
     import _EdgeToolsFoundation
   #endif
 
@@ -211,9 +211,9 @@
     }
   }
 
-  // MARK: - Full Foundation
+  // MARK: - Foundation
 
-  #if FullFoundation
+  #if Foundation
     extension Needle2System {
       public static func date(_ date: Date, timeZone: TimeZone = .current) -> Self {
         needle2DateFormatter.withLock { formatter in
@@ -235,7 +235,7 @@
       network: (@Sendable () async -> Network?)? = nil,
       location: (@Sendable () async -> String?)? = nil
     ) async -> Self {
-    #if JS && canImport(JavaScriptKit) && !FullFoundation
+    #if JS && canImport(JavaScriptKit) && !Foundation
       async let deviceValue = device?()
       async let batteryValue = battery?()
       async let networkValue = network?()
@@ -293,7 +293,7 @@
       async let network = networkProvider()
       async let location = locationProvider()
 
-      #if FullFoundation
+      #if Foundation
         var system: Self = [.date(Date()), .locale(Locale.current)]
       #else
         var system = Self(OrderedDictionary<Key, String>())
@@ -335,7 +335,7 @@
     }
   }
 
-  #if JS && canImport(JavaScriptKit) && !FullFoundation
+  #if JS && canImport(JavaScriptKit) && !Foundation
     extension Needle2System {
       private static func javascriptSystem(from object: JSObject) -> Self {
         let keys: [Key] = [.date, .locale, .device, .battery, .network, .location]
@@ -354,7 +354,7 @@
     return String(rounded)
   }
 
-  #if FullFoundation
+  #if Foundation
     private let needle2DateFormatter = Lock(makeNeedle2DateFormatter())
 
     private func makeNeedle2DateFormatter() -> DateFormatter {

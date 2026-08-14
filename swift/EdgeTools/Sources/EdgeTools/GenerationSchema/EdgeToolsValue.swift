@@ -1,7 +1,7 @@
 import OrderedCollections
 import yyjson
 
-#if Foundation
+#if FoundationEssentials
   import _EdgeToolsFoundation
 #endif
 

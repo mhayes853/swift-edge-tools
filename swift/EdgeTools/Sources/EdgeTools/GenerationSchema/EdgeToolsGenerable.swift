@@ -1,6 +1,6 @@
 import OrderedCollections
 
-#if Foundation
+#if FoundationEssentials
   import _EdgeToolsFoundation
 #endif
 
@@ -161,7 +161,7 @@ extension UInt128: EdgeToolsGenerable {}
 
 // MARK: - Foundation
 
-#if Foundation
+#if FoundationEssentials
   extension Data: EdgeToolsGenerable {
     public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema { .string }
 

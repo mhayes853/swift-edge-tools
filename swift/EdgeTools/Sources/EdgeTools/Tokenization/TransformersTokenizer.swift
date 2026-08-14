@@ -2,7 +2,7 @@
   import EdgeToolsXGrammar
 #endif
 
-#if Foundation
+#if FoundationEssentials
   import _EdgeToolsFoundation
 #endif
 
@@ -71,7 +71,7 @@
 
 // MARK: - HF Backend JSON
 
-#if Foundation
+#if FoundationEssentials
   package func loadHuggingFaceBackendJSON(from tokenizerURL: URL) throws -> String {
     try Data(contentsOf: tokenizerURL)
       .withUnsafeBytes { buffer in

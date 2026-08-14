@@ -1,4 +1,4 @@
-#if Foundation
+#if FoundationEssentials
   import CustomDump
   import EdgeTools
   import Foundation

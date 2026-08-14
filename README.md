@@ -29,12 +29,20 @@ architectures fall back to generic text or vision MLX profiles.
 
 ## Package traits
 
-`Foundation` is enabled by default. `MLX`, `Transformers`, and `FoundationModels` enable it
-automatically. `XGrammar` provides structured generation.
+`Foundation` is enabled by default and includes the `FoundationEssentials` trait. The
+`FoundationEssentials` trait provides the lightweight Foundation compatibility layer used
+for conveniences such as `URL`-based model loading and Foundation `Codable` integrations.
+The `Foundation` trait adds full Foundation conveniences.
+
+`FoundationEssentials` can be enabled independently, while `Foundation` enables both:
 
 ```sh
+swift build --disable-default-traits --traits FoundationEssentials
 swift build --disable-default-traits --traits Foundation
 ```
+
+`MLX`, `Transformers`, and `FoundationModels` enable `FoundationEssentials` automatically.
+`XGrammar` provides structured generation.
 
 ## Using a model engine
 

@@ -1,4 +1,4 @@
-#if XGrammar && Foundation
+#if XGrammar && FoundationEssentials
   import CustomDump
   import EdgeTools
   import Testing

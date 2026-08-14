@@ -2,7 +2,7 @@
   import EdgeToolsXGrammar
 #endif
 
-#if Foundation
+#if FoundationEssentials
   import _EdgeToolsFoundation
 #endif
 

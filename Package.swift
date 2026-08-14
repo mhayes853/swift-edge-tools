@@ -23,11 +23,11 @@ let package = Package(
     .library(name: "EdgeToolsXGrammar", targets: ["EdgeToolsXGrammar"])
   ],
   traits: [
-    .trait(name: "Foundation", description: "Foundation Essentials conveniences."),
+    .trait(name: "FoundationEssentials", description: "Foundation Essentials conveniences."),
     .trait(
-      name: "FullFoundation",
+      name: "Foundation",
       description: "Full Foundation conveniences.",
-      enabledTraits: ["Foundation"]
+      enabledTraits: ["FoundationEssentials"]
     ),
     .trait(name: "JS", description: "JavaScriptKit interoperability."),
     .trait(name: "XGrammar", description: "XGrammar-powered structured generation."),
@@ -35,17 +35,17 @@ let package = Package(
     .trait(
       name: "Transformers",
       description: "swift-transformers tokenizer support.",
-      enabledTraits: ["Foundation"]
+      enabledTraits: ["FoundationEssentials"]
     ),
     .trait(
       name: "FoundationModels",
       description: "Apple FoundationModels interoperability.",
-      enabledTraits: ["Foundation"]
+      enabledTraits: ["FoundationEssentials"]
     ),
     .trait(
       name: "MLX",
       description: "MLX model support.",
-      enabledTraits: ["Transformers", "Foundation"]
+      enabledTraits: ["Transformers", "FoundationEssentials"]
     ),
     .default(enabledTraits: ["Foundation"])
   ],
@@ -73,7 +73,7 @@ let package = Package(
         "EdgeToolsMacros",
         .target(
           name: "_EdgeToolsFoundation",
-          condition: .when(traits: ["Foundation"])
+          condition: .when(traits: ["FoundationEssentials"])
         ),
         .target(
           name: "_EdgeToolsJavaScript",

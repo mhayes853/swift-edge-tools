@@ -3,7 +3,7 @@
   import EdgeTools
   import Testing
 
-  #if FullFoundation
+  #if Foundation
     import Foundation
   #endif
 
@@ -51,7 +51,7 @@
       )
     }
 
-    #if FullFoundation
+    #if Foundation
       @Test
       func `Formats Platform Defaults`() async {
         let system = await Needle2System.platformDefaults()
@@ -91,7 +91,7 @@
       )
     }
 
-    #if FullFoundation
+    #if Foundation
       @Test
       func `Formats Foundation Date And Locale`() {
         let date = Date(timeIntervalSince1970: 1_774_184_400)

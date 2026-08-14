@@ -1,4 +1,4 @@
-#if Foundation
+#if FoundationEssentials
   import _EdgeToolsFoundation
 #endif
 
@@ -9,7 +9,7 @@
 // MARK: - EdgeToolsAutoTokenizer
 
 public enum EdgeToolsAutoTokenizer {
-  #if Foundation
+  #if FoundationEssentials
     public static func from(
       modelDirectory directoryURL: URL
     ) async throws -> sending any EdgeToolsTokenizer {
@@ -41,7 +41,7 @@ public enum EdgeToolsAutoTokenizer {
   #endif
 }
 
-#if Transformers && Foundation && canImport(Tokenizers)
+#if Transformers && FoundationEssentials && canImport(Tokenizers)
   private func loadTransformersTokenizer(
     from directoryURL: URL,
     tokenizerURL: URL

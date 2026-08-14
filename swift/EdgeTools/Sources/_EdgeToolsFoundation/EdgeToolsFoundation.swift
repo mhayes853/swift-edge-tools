@@ -1,4 +1,4 @@
-#if FullFoundation
+#if Foundation
   @_exported import Foundation
 #elseif canImport(FoundationEssentials)
   @_exported import FoundationEssentials
