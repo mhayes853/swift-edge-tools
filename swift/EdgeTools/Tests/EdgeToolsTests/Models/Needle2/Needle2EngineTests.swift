@@ -5,7 +5,7 @@
   import SnapshotTesting
   import Testing
 
-  @Suite(.serialized, .extendedNeedleInference())
+  @Suite(.serialized)
   struct `Needle2Engine tests` {
     @Test
     @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
@@ -44,6 +44,47 @@
 
     @Test
     @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
+    func `Extracts Structured Data Through Session`() async throws {
+      let session = EdgeToolsSession(engine: Needle2Engine())
+      let invoice = try await session.extract(
+        prompt: "Extract this invoice: Acme Corp, total $1,200.00, due 2026-09-01.",
+        as: Needle2Invoice.self,
+        context: nil
+      )
+
+      let extractedInvoice = try #require(invoice)
+      expectNoDifference(extractedInvoice.vendor, "Acme Corp")
+      expectNoDifference(extractedInvoice.total, 1200)
+      expectNoDifference(extractedInvoice.dueDate, "2026-09-01")
+    }
+
+    @Test
+    @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
+    func `Extracts Structured Data Through Needle 2`() async throws {
+      let engine = Needle2Engine()
+      let context = engine.context()
+      let task = try engine.generate(
+        prompt: "Extract this invoice: Acme Corp, total $1,200.00, due 2026-09-01.",
+        tools: [Needle2Invoice.definition],
+        parameters: .default,
+        context: context,
+        channel: EdgeToolsGenerationChannel()
+      )
+      let generation = try await task.value
+
+      expectNoDifference(generation.wasStopped, false)
+      expectNoDifference(generation.toolCalls.count, 1)
+      expectNoDifference(
+        generation.toolCalls.first?.name,
+        Needle2Invoice.extractionToolDefinition.name
+      )
+      withKnownIssue {
+        assertSnapshot(of: generation.parts, as: .dump, record: .all)
+      }
+    }
+
+    @Test
+    @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
     func `Stopped Generation Completes With Its Response`() async throws {
       let engine = Needle2Engine()
       let context = engine.context()
@@ -78,5 +119,22 @@
       expectNoDifference(emittedParts.withLock { $0 }, [])
       expectNoDifference(generation.metadata.needle2PeakRAMMegabytes != nil, true)
     }
+  }
+
+  @EdgeToolsGenerable
+  private struct Needle2Invoice: Equatable, Sendable {
+    @EdgeToolsGuide(.description("The vendor on the invoice."))
+    var vendor: String
+
+    @EdgeToolsGuide(.description("The total amount on the invoice."))
+    var total: Double
+
+    @EdgeToolsGuide(
+      key: "due_date",
+      .description("The due date on the invoice.")
+    )
+    var dueDate: String
+
+    static var definition: EdgeToolDefinition { Self.extractionToolDefinition }
   }
 #endif

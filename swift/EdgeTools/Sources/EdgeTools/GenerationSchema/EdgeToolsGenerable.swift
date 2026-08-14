@@ -14,6 +14,21 @@ import OrderedCollections
 public protocol EdgeToolsGenerable: ConvertibleFromEdgeToolsValue, ConvertibleToEdgeToolsValue {
   /// The generation schema describing this type.
   static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema { get }
+
+  /// The tool definition used when this type is exposed as an extraction tool.
+  static var extractionToolDefinition: EdgeToolDefinition { get }
+}
+
+extension EdgeToolsGenerable {
+  public static var extractionToolDefinition: EdgeToolDefinition {
+    let schema = Self.edgeToolsGenerationSchema
+    return EdgeToolDefinition(
+      name: edgeToolsUnqualifiedTypeName(Self.self).snakeCased(),
+      description: schema.objectValue?[.description]?.string
+        ?? "Extract structured data from the input.",
+      arguments: schema
+    )
+  }
 }
 
 // MARK: - ConvertibleFromEdgeToolsValue
@@ -332,4 +347,14 @@ extension FixedWidthInteger {
     }
     return value
   }
+}
+
+private func edgeToolsUnqualifiedTypeName(_ type: Any.Type) -> String {
+  let reflectedName = String(reflecting: type)
+  let genericArgumentsStart = reflectedName.firstIndex(of: "<") ?? reflectedName.endIndex
+  let qualifiedName = reflectedName[..<genericArgumentsStart]
+  let unqualifiedStart = qualifiedName.lastIndex(of: ".").map {
+    qualifiedName.index(after: $0)
+  } ?? qualifiedName.startIndex
+  return String(qualifiedName[unqualifiedStart...])
 }
