@@ -53,6 +53,44 @@
 
     #if FullFoundation
       @Test
+      func `Formats Platform Defaults`() async {
+        let system = await Needle2System.platformDefaults()
+
+        expectNoDifference(system[.date] != nil, true)
+        expectNoDifference(system[.locale], Locale.current.identifier)
+        expectNoDifference(system.formatted().hasPrefix("date: "), true)
+      }
+
+      @Test
+      func `Overrides Platform Default Providers`() async {
+        let system = await Needle2System.platformDefaults(
+          device: { nil },
+          battery: { 62.5 },
+          network: { nil }
+        )
+
+        expectNoDifference(system[.device], nil)
+        expectNoDifference(system[.battery], "62.5%")
+        expectNoDifference(system[.network], nil)
+      }
+    #endif
+
+    @Test
+    func `Formats Facts In TypeScript Order And Sanitizes Keys`() {
+      let system: Needle2System = [
+        .assistant("Needle"),
+        .raw(.init(rawValue: "custom;key"), "value"),
+        .date("today")
+      ]
+
+      expectNoDifference(
+        system.formatted(),
+        "date: today; assistant: Needle; custom key: value"
+      )
+    }
+
+    #if FullFoundation
+      @Test
       func `Formats Foundation Date And Locale`() {
         let date = Date(timeIntervalSince1970: 1_774_184_400)
         let system: Needle2System = [
