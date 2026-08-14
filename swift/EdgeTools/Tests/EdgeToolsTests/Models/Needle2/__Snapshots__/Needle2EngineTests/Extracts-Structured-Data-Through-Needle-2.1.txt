@@ -1,0 +1,20 @@
+▿ 2 elements
+  ▿ EdgeToolsGenerationPart
+    - reasoning: "vendor \'Acme Corp\' from query; total 1200.00 from \'$1,200.00\'; due_date \'2026-09-01\' from \'2026-09-01\'."
+  ▿ EdgeToolsGenerationPart
+    ▿ toolCall: EdgeRawToolCall
+      ▿ arguments: EdgeToolsValue
+        ▿ object: 3 key/value pairs
+          ▿ (2 elements)
+            - key: "due_date"
+            ▿ value: EdgeToolsValue
+              - string: "2026-09-01"
+          ▿ (2 elements)
+            - key: "total"
+            ▿ value: EdgeToolsValue
+              - number: 1200.0
+          ▿ (2 elements)
+            - key: "vendor"
+            ▿ value: EdgeToolsValue
+              - string: "Acme Corp"
+      - name: "needle2_invoice"
