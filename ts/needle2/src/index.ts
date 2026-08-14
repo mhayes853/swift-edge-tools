@@ -15,6 +15,7 @@ export type {
 	Needle2JSONValue,
 } from "./value";
 export type {
+	Needle2Engine,
 	Needle2Provider,
 	Needle2RuntimeOptions,
 	Needle2FunctionCall,

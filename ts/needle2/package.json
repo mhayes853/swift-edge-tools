@@ -24,10 +24,13 @@
   },
   "scripts": {
     "assets": "node ../../scripts/needle2/prepare-ts-assets.mjs",
+    "native:build": "bash ../../scripts/needle2/build-native.sh",
     "build": "vite build && vite build --mode worker && vite build --mode standalone && tsc --emitDeclarationOnly",
     "test": "npm run build && vitest run && npm run test:deno && npm run test:bun",
     "test:bun": "bun test ./tests/runtime-compatibility.ts",
-    "test:deno": "deno test --allow-read tests/runtime-compatibility.ts"
+    "test:deno": "deno test --allow-read tests/runtime-compatibility.ts",
+    "test:native": "npm run native:build && node --experimental-strip-types --test tests/native-compatibility.ts",
+    "test:native-library": "npm run native:build && deno test --allow-ffi --allow-read tests/native-library-compatibility.ts && bun test ./tests/native-library-compatibility.ts"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

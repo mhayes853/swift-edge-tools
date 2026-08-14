@@ -1,11 +1,11 @@
-import {
-	Needle2DirectBackend,
-	type Needle2SerializedError,
-	type Needle2WorkerRequest,
-	type Needle2WorkerResponse,
-	type Needle2WorkerResult,
+import type {
+	Needle2SerializedError,
+	Needle2WorkerRequest,
+	Needle2WorkerResponse,
+	Needle2WorkerResult,
 } from "./backend";
-import { PromiseQueue } from "./internal";
+import { PromiseQueue, setAssetBaseURL } from "./internal";
+import { Needle2WASMBinding, Needle2NativeBinding } from "./bindings";
 import type { Needle2Backend } from "./backend";
 
 type WorkerPort = {
@@ -13,6 +13,13 @@ type WorkerPort = {
 	onMessage(handler: (message: Needle2WorkerRequest) => void): void;
 };
 
+try {
+	setAssetBaseURL(new URL(import.meta.url));
+} catch (cause) {
+	throw new Error("Needle 2 worker could not determine its module URL.", {
+		cause,
+	});
+}
 const port = await workerPort();
 let backend: Needle2Backend | undefined;
 const operations = new PromiseQueue();
@@ -30,7 +37,11 @@ async function processRequest(request: Needle2WorkerRequest): Promise<void> {
 			...(result === undefined ? {} : { result }),
 		});
 	} catch (error) {
-		port.postMessage({ id: request.id, success: false, error: serializeError(error) });
+		port.postMessage({
+			id: request.id,
+			success: false,
+			error: serializeError(error),
+		});
 	}
 }
 
@@ -40,7 +51,11 @@ async function handle(
 	switch (request.operation) {
 		case "initialize":
 			if (backend) throw new Error("The Needle 2 worker is already initialized.");
-			backend = await Needle2DirectBackend.create(request.wasm, request.weights);
+			if (request.engine === "native") {
+				backend = await Needle2NativeBinding.create(request.weights);
+			} else {
+				backend = await Needle2WASMBinding.create(request.wasm, request.weights);
+			}
 			return undefined;
 
 		case "generate":
@@ -80,10 +95,9 @@ async function workerPort(): Promise<WorkerPort> {
 	}
 
 	const workerThreadsSpecifier = "node:worker_threads";
-	const { parentPort } = await import(
-		/* @vite-ignore */ workerThreadsSpecifier
-	);
-	if (!parentPort) throw new Error("Needle 2 could not access its worker message port.");
+	const { parentPort } = await import(/* @vite-ignore */ workerThreadsSpecifier);
+	if (!parentPort)
+		throw new Error("Needle 2 could not access its worker message port.");
 
 	return {
 		postMessage(message) {
@@ -97,7 +111,10 @@ async function workerPort(): Promise<WorkerPort> {
 
 function serializeError(value: unknown): Needle2SerializedError {
 	if (value instanceof Error) {
-		const error: Needle2SerializedError = { name: value.name, message: value.message };
+		const error: Needle2SerializedError = {
+			name: value.name,
+			message: value.message,
+		};
 		if (value.stack) {
 			error.stack = value.stack;
 		}

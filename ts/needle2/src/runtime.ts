@@ -1,6 +1,8 @@
 import { Needle2DirectBackend, Needle2WorkerBackend } from "./backend";
+import { Needle2NativeBinding, defaultNativeFactory } from "./bindings";
 import {
 	defaultAssetURL,
+	Needle2Error,
 	Needle2ProtocolError,
 	setAssetBaseURL,
 } from "./internal";
@@ -10,6 +12,7 @@ import type { Needle2Backend } from "./backend";
 import type { Needle2BinarySource } from "./internal";
 
 export type Needle2Provider = "direct" | "worker";
+export type Needle2Engine = "wasm" | "native" | "auto";
 
 export type Needle2Factory = (options: {
 	wasmBinary: Uint8Array;
@@ -21,12 +24,14 @@ export type Needle2RuntimeOptions =
 			wasm?: Needle2BinarySource;
 			weights?: Needle2BinarySource;
 			factory?: Needle2Factory;
+			engine?: Needle2Engine;
 	  }
 	| {
 			provider: "worker";
 			wasm?: Needle2BinarySource;
 			weights?: Needle2BinarySource;
 			workerOptions?: WorkerOptions;
+			engine?: Needle2Engine;
 	  };
 
 export type Needle2ToolDefinition = {
@@ -121,16 +126,43 @@ export class Needle2Runtime {
 
 	/** @internal */
 	static async create(options: Needle2RuntimeOptions): Promise<Needle2Runtime> {
-		const wasm = options.wasm ?? defaultAssetURL("needle.wasm");
 		const weights = options.weights ?? defaultAssetURL("needle2.cact");
+		const engine = options.engine ?? "wasm";
 		if (options.provider === "direct") {
+			const nativeFactory = defaultNativeFactory();
+			if (engine === "native" || (engine === "auto" && nativeFactory)) {
+				if (!nativeFactory) {
+					throw new Needle2Error(
+						"native-unavailable",
+						"A native Needle 2 factory is required for the native engine.",
+					);
+				}
+				return new Needle2Runtime(await Needle2NativeBinding.create(weights));
+			}
+
+			const wasm = options.wasm ?? defaultAssetURL("needle.wasm");
 			return new Needle2Runtime(
 				await Needle2DirectBackend.create(wasm, weights, options.factory),
 			);
 		}
 
+		const nativeFactory = defaultNativeFactory();
+		if (engine === "native" && !nativeFactory) {
+			throw new Needle2Error(
+				"native-worker-unavailable",
+				"The native worker is unavailable in this runtime.",
+			);
+		}
+		const wasm = options.wasm ?? defaultAssetURL("needle.wasm");
 		return new Needle2Runtime(
-			await Needle2WorkerBackend.create(wasm, weights, options.workerOptions),
+			await Needle2WorkerBackend.create(
+				wasm,
+				weights,
+				options.workerOptions,
+				engine === "native" || (engine === "auto" && nativeFactory)
+					? "native"
+					: "wasm",
+			),
 		);
 	}
 
