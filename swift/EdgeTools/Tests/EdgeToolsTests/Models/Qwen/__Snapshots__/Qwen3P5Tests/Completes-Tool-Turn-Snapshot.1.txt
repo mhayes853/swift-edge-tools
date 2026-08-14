@@ -176,7 +176,7 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 22 elements
+        ▿ parts: 17 elements
           ▿ EdgeToolsGenerationPart
             - reasoning: "The"
           ▿ EdgeToolsGenerationPart
@@ -186,11 +186,13 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " Paris"
           ▿ EdgeToolsGenerationPart
+            - reasoning: " today"
+          ▿ EdgeToolsGenerationPart
             - reasoning: " is"
           ▿ EdgeToolsGenerationPart
             - reasoning: " sunny"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " with"
+            - reasoning: " at"
           ▿ EdgeToolsGenerationPart
             - reasoning: " a"
           ▿ EdgeToolsGenerationPart
@@ -208,18 +210,6 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " Celsius"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " ("
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "7"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "3"
-          ▿ EdgeToolsGenerationPart
             - reasoning: "."
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "8"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "°F"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: ")."
   ▿ reasoningEffort: EdgeToolsReasoningEffort
     - rawValue: "default"

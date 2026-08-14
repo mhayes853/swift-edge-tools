@@ -13,21 +13,11 @@ public enum EdgeToolsAutoTokenizer {
     public static func from(
       modelDirectory directoryURL: URL
     ) async throws -> sending any EdgeToolsTokenizer {
-      let sentencePieceURL = directoryURL.appending(path: "tokenizer.model")
       let transformersURL = directoryURL.appending(path: "tokenizer.json")
-      let hasSentencePieceModel = FileManager.default.fileExists(atPath: sentencePieceURL.path())
       let hasTransformersTokenizer = FileManager.default.fileExists(
         atPath: transformersURL.path()
       )
       var failures = [String]()
-
-      if hasSentencePieceModel {
-        do {
-          return try NeedleSPTokenizer(modelURL: sentencePieceURL)
-        } catch {
-          failures.append("tokenizer.model could not be loaded: \(error)")
-        }
-      }
 
       #if Transformers && canImport(Tokenizers)
         if hasTransformersTokenizer {
@@ -44,7 +34,6 @@ public enum EdgeToolsAutoTokenizer {
 
       throw EdgeToolsError.noCompatibleTokenizer(
         in: directoryURL.path(),
-        hasSentencePieceModel: hasSentencePieceModel,
         hasTransformersTokenizer: hasTransformersTokenizer,
         failures: failures
       )

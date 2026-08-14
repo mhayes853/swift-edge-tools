@@ -45,8 +45,8 @@ extension EdgeContext {
 
 extension EdgeContext {
   static func stub(
-    directory: URL = URL(fileURLWithPath: "/models/needle"),
-    model: DetectedModel = .needle,
+    directory: URL = URL(fileURLWithPath: "/models/qwen3"),
+    model: DetectedModel = .qwen3,
     engines: [EngineKind] = [.mlx],
     files: [String] = ["config.json", "model.safetensors"],
     runner: EngineRunner = .stub(),
@@ -108,7 +108,7 @@ extension EngineRunner {
     onReset: @escaping @Sendable () -> Void = {}
   ) -> Self {
     Self(
-      engine: .onnx,
+      engine: .mlx,
       supportsCustomGrammar: supportsCustomGrammar,
       supportsSampling: supportsSampling,
       supportsImages: supportsImages,
@@ -143,7 +143,7 @@ extension EngineRunner {
 
   static func failing(_ error: any Error) -> Self {
     Self(
-      engine: .onnx,
+      engine: .mlx,
       supportsCustomGrammar: true,
       supportsSampling: true,
       generation: { _, _ in throw error }
@@ -152,7 +152,7 @@ extension EngineRunner {
 }
 
 extension ModelSource {
-  static func test(repo: String = "Cactus-Compute/needle") -> Self {
+  static func test(repo: String = "Qwen/Qwen3-0.6B") -> Self {
     Self(location: .huggingFace(repo: repo, revision: "main"))
   }
 }

@@ -8,7 +8,7 @@ public struct GenerationRequest: Sendable {
   public var grammar: GrammarOption
   public var toolCallRange: GrammarToolCallRange
   public var maxTokens: Int?
-  public var sampling: EdgeToolsFusedSamplingOverrides
+  public var sampling: EdgeToolsFusedSamplingParameters
   public var reasoning: EdgeToolsReasoningEffort
 
   public init(
@@ -19,7 +19,7 @@ public struct GenerationRequest: Sendable {
     grammar: GrammarOption = .auto,
     toolCallRange: GrammarToolCallRange = .unbounded(minimum: 0),
     maxTokens: Int? = 1024,
-    sampling: EdgeToolsFusedSamplingOverrides = EdgeToolsFusedSamplingOverrides(),
+    sampling: EdgeToolsFusedSamplingParameters = EdgeToolsFusedSamplingParameters(),
     reasoning: EdgeToolsReasoningEffort = .default
   ) {
     self.system = system

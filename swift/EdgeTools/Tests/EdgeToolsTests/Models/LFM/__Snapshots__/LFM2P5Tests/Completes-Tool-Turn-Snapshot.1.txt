@@ -40,11 +40,9 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 29 elements
+        ▿ parts: 15 elements
           ▿ EdgeToolsGenerationPart
             - text: "The"
-          ▿ EdgeToolsGenerationPart
-            - text: " current"
           ▿ EdgeToolsGenerationPart
             - text: " weather"
           ▿ EdgeToolsGenerationPart
@@ -54,13 +52,9 @@
           ▿ EdgeToolsGenerationPart
             - text: " is"
           ▿ EdgeToolsGenerationPart
-            - text: " **"
+            - text: " currently"
           ▿ EdgeToolsGenerationPart
-            - text: "sun"
-          ▿ EdgeToolsGenerationPart
-            - text: "ny"
-          ▿ EdgeToolsGenerationPart
-            - text: "**"
+            - text: " sunny"
           ▿ EdgeToolsGenerationPart
             - text: " with"
           ▿ EdgeToolsGenerationPart
@@ -70,34 +64,12 @@
           ▿ EdgeToolsGenerationPart
             - text: " of"
           ▿ EdgeToolsGenerationPart
-            - text: " **"
+            - text: " "
           ▿ EdgeToolsGenerationPart
             - text: "21"
           ▿ EdgeToolsGenerationPart
             - text: "°C"
           ▿ EdgeToolsGenerationPart
-            - text: "**"
-          ▿ EdgeToolsGenerationPart
             - text: "."
-          ▿ EdgeToolsGenerationPart
-            - text: " Let"
-          ▿ EdgeToolsGenerationPart
-            - text: " me"
-          ▿ EdgeToolsGenerationPart
-            - text: " know"
-          ▿ EdgeToolsGenerationPart
-            - text: " if"
-          ▿ EdgeToolsGenerationPart
-            - text: " you"
-          ▿ EdgeToolsGenerationPart
-            - text: "\'d"
-          ▿ EdgeToolsGenerationPart
-            - text: " like"
-          ▿ EdgeToolsGenerationPart
-            - text: " additional"
-          ▿ EdgeToolsGenerationPart
-            - text: " details"
-          ▿ EdgeToolsGenerationPart
-            - text: "!"
   ▿ reasoningEffort: EdgeToolsReasoningEffort
     - rawValue: "default"

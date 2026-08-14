@@ -19,8 +19,6 @@
       rawValue: "incompatible-tokenizer-vocabulary"
     )
 
-    /// An invalid Needle tokenizer for generation.
-    public static let invalidNeedleTokenizer = Self(rawValue: "invalid-needle-tokenizer")
   }
 
   extension XGRError {

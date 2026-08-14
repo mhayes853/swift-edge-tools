@@ -126,7 +126,7 @@ extension EngineRunner {
       throw EdgeCLIError("--hardware-unit only applies to the mlx engine.")
     }
 
-    let supportsMLXFeatures = engine == .mlx && detection.model != .needle
+    let supportsMLXFeatures = engine == .mlx
     guard request.sampling.isEmpty || supportsMLXFeatures else {
       throw EdgeCLIError(
         "\(detection.model.displayName) on \(engine.rawValue) always samples greedily; sampler options do not apply."
@@ -202,16 +202,13 @@ extension EngineRunner {
       supportsCustomGrammar: implementation.supportsCustomGrammar,
       supportsSampling: implementation.supportsSampling,
       supportsImages: implementation.supportsImages,
-      metricsExtractor: implementation.metricsExtractor,
       generation: implementation.generation,
       modelResetting: implementation.modelResetting
     )
   }
 
   private static let modelRegistrations: [DetectedModel: ModelRegistration] = {
-    var registrations: [DetectedModel: ModelRegistration] = [
-      .needle: ModelRegistration(engines: Self.needleFactories)
-    ]
+    var registrations: [DetectedModel: ModelRegistration] = [:]
     if #available(macOS 26, *) {
       registrations[.needle2] = ModelRegistration(engines: [
         .needle2: { _ in Self.needle2() }
@@ -269,58 +266,6 @@ extension EngineRunner {
     #endif
     return registrations
   }()
-
-  private static var needleFactories: [EngineKind: ModelEngineFactory] {
-    var factories: [EngineKind: ModelEngineFactory] = [
-      .onnx: { context in try await Self.needleONNX(from: context.detection.directory) }
-    ]
-    #if canImport(MLX)
-      factories[.mlx] = { context in
-        try await Self.needleMLX(
-          from: context.detection.directory,
-          hardwareUnit: context.hardwareUnit
-        )
-      }
-    #endif
-    return factories
-  }
-
-  #if canImport(MLX)
-    private static func needleMLX(
-      from directory: URL,
-      hardwareUnit: MLXHardwareUnit
-    ) async throws -> Self {
-      let engine = try await Device.withDefaultDevice(hardwareUnit.device) {
-        try await NeedleMLXModelEngine(from: directory)
-      }
-      return Self(
-        engineKind: .mlx,
-        engine: engine,
-        prompt: needlePrompt,
-        parameters: { request in
-          NeedleMLXGenerateParameters(
-            maxTokens: request.maxTokens,
-            toolCallRange: request.toolCallRange
-          )
-        }
-      )
-    }
-  #endif
-
-  private static func needleONNX(from directory: URL) async throws -> Self {
-    let engine = try await NeedleCONNXModelEngine(from: directory)
-    return Self(
-      engineKind: .onnx,
-      engine: engine,
-      prompt: needlePrompt,
-      parameters: { request in
-        NeedleONNXGenerateParameters(
-          maxTokens: request.maxTokens,
-          toolCallRange: request.toolCallRange
-        )
-      }
-    )
-  }
 
   @available(macOS 26, *)
   private static func needle2() -> Self {
@@ -400,7 +345,7 @@ extension EngineRunner {
             ),
             tools: request.tools,
             parameters: DefaultMLXGenerateParameters(
-              samplingOverrides: request.sampling,
+              sampling: request.sampling,
               constraint: try request.grammar.constraint(
                 toolCallRange: request.toolCallRange
               ),
@@ -415,6 +360,29 @@ extension EngineRunner {
       )
     }
   #endif
+}
+
+private func needle2System(from string: String) throws -> Needle2System {
+  guard !string.isEmpty else { return [] }
+  return try Needle2System(
+    string.split(separator: ";")
+      .map { fact in
+        let components = fact.split(separator: ":", maxSplits: 1)
+        guard components.count == 2 else {
+          throw EdgeCLIError(
+            "Needle 2 system facts must use `key: value` entries separated by semicolons."
+          )
+        }
+        let key = components[0].trimmingCharacters(in: .whitespacesAndNewlines)
+        let value = components[1].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty, !value.isEmpty else {
+          throw EdgeCLIError(
+            "Needle 2 system facts must use non-empty keys and values."
+          )
+        }
+        return Needle2System.raw(.init(rawValue: key), value)
+      }
+  )
 }
 
 private func resolvedEngine(
@@ -442,32 +410,5 @@ private func resolvedEngine(
     No usable engine for \(detection.model.displayName) in \(detection.directory.path()). \
     Supported engines: \(detection.model.supportedEngines.map(\.rawValue).joined(separator: ", ")).
     """
-  )
-}
-
-private func needlePrompt(for request: GenerationRequest) -> NeedlePrompt {
-  NeedlePrompt(system: request.system, user: request.user)
-}
-
-private func needle2System(from string: String) throws -> Needle2System {
-  guard !string.isEmpty else { return [] }
-  return try Needle2System(
-    string.split(separator: ";")
-      .map { fact in
-        let components = fact.split(separator: ":", maxSplits: 1)
-        guard components.count == 2 else {
-          throw EdgeCLIError(
-            "Needle 2 system facts must use `key: value` entries separated by semicolons."
-          )
-        }
-        let key = components[0].trimmingCharacters(in: .whitespacesAndNewlines)
-        let value = components[1].trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !key.isEmpty, !value.isEmpty else {
-          throw EdgeCLIError(
-            "Needle 2 system facts must use non-empty keys and values."
-          )
-        }
-        return Needle2System.raw(.init(rawValue: key), value)
-      }
   )
 }

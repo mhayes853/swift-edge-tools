@@ -47,20 +47,6 @@ let package = Package(
       description: "MLX model support.",
       enabledTraits: ["Transformers", "Foundation"]
     ),
-    .trait(
-      name: "ONNXCore",
-      description: """
-        Needle ONNX model and runtime-provider protocols.
-
-        (Only enable this trait if you want to use your own ONNX build. Otherwise, enable `ONNX` directly.)
-        """,
-      enabledTraits: ["XGrammar"]
-    ),
-    .trait(
-      name: "ONNX",
-      description: "Vendored ONNX Runtime support.",
-      enabledTraits: ["ONNXCore", "Transformers"]
-    ),
     .default(enabledTraits: ["Foundation"])
   ],
   dependencies: [
@@ -150,10 +136,6 @@ let package = Package(
             traits: ["Needle2"]
           )
         ),
-        .target(
-          name: "COnnxRuntime",
-          condition: .when(platforms: [.macOS, .iOS, .linux, .android], traits: ["ONNXCore"])
-        ),
         .product(
           name: "Tokenizers",
           package: "swift-transformers",
@@ -167,7 +149,6 @@ let package = Package(
       path: "swift/EdgeTools/Sources/EdgeTools",
       swiftSettings: edgeToolsSwiftSettings,
       linkerSettings: [
-        .linkedFramework("CoreML", .when(platforms: [.macOS, .iOS], traits: ["ONNX"])),
         .linkedLibrary(
           "c++",
           .when(
@@ -196,31 +177,6 @@ let package = Package(
       name: "EdgeToolsXGrammar",
       dependencies: ["CXGrammar"],
       path: "swift/EdgeTools/Sources/EdgeToolsXGrammar"
-    ),
-    .target(
-      name: "COnnxRuntime",
-      dependencies: [
-        .target(
-          name: "onnxruntime",
-          condition: .when(platforms: [.macOS, .iOS], traits: ["ONNX"])
-        ),
-        .target(
-          name: "onnxruntimeNonApple",
-          condition: .when(platforms: [.linux, .android], traits: ["ONNX"])
-        )
-      ],
-      path: "swift/EdgeTools/Sources/COnnxRuntime",
-      exclude: ["LICENSE"],
-      publicHeadersPath: "include"
-    ),
-    .binaryTarget(
-      name: "onnxruntime",
-      url: "https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.27.0.zip",
-      checksum: "8c74edd600eafc3055de9e8f7a9602afee44ed516913cb5e132bca02cc34622c"
-    ),
-    .binaryTarget(
-      name: "onnxruntimeNonApple",
-      path: "bin/onnxruntime-webgpu-1.27.0.artifactbundle.zip"
     ),
     .binaryTarget(
       name: "CNeedle2",
@@ -274,10 +230,6 @@ let package = Package(
       name: "EdgeToolsTests",
       dependencies: [
         "EdgeTools",
-        .target(
-          name: "COnnxRuntime",
-          condition: .when(platforms: [.macOS, .iOS, .linux, .android], traits: ["ONNX"])
-        ),
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
         .product(name: "CustomDump", package: "swift-custom-dump"),
         .product(name: "Hub", package: "swift-transformers", condition: .when(traits: ["MLX"]))
@@ -285,9 +237,6 @@ let package = Package(
       path: "swift/EdgeTools/Tests/EdgeToolsTests",
       exclude: [
         "GenerationSchema/__Snapshots__",
-        "Models/Needle/Engines/__Snapshots__",
-        "Models/Needle/Engines/MLX/__Snapshots__",
-        "Models/Needle/__Snapshots__",
         "Models/Needle2/__Snapshots__",
         "Models/__Snapshots__",
         "Models/Gemma/__Snapshots__",

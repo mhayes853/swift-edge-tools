@@ -5,7 +5,6 @@ set -euo pipefail
 ROOT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEST_DIRECTORY="$ROOT_DIRECTORY/swift/WASITests"
 NEEDLE2_DIRECTORY="$ROOT_DIRECTORY/ts/needle2"
-ONNX_PACKAGE="onnxruntime-node"
 SWIFT_SDK_ID="${SWIFT_SDK_ID:-swift-6.3.2-RELEASE_wasm}"
 BUILD_ONLY=0
 FILTER=""
@@ -13,10 +12,6 @@ SWIFT_ARGUMENTS=()
 
 while (($#)); do
 	case "$1" in
-	--onnx-package)
-		ONNX_PACKAGE="$2"
-		shift 2
-		;;
 	--filter)
 		FILTER="$2"
 		shift 2
@@ -36,14 +31,6 @@ while (($#)); do
 		;;
 	esac
 done
-
-case "$ONNX_PACKAGE" in
-onnxruntime-node | onnxruntime-web) ;;
-*)
-	echo "Unsupported ONNX package: $ONNX_PACKAGE" >&2
-	exit 2
-	;;
-esac
 
 cd "$NEEDLE2_DIRECTORY"
 npm ci --ignore-scripts
@@ -74,7 +61,6 @@ if ((BUILD_ONLY)); then
 	COMMAND+=(--build-only)
 fi
 
-export EDGE_TOOLS_ONNX_PACKAGE="$ONNX_PACKAGE"
 if [[ "$FILTER" == *Needle2JSEngine* ]]; then
 	export EDGE_TOOLS_WASI_NEEDLE2_ONLY=1
 fi

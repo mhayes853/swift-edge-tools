@@ -24,7 +24,7 @@ struct `Command tests` {
 
     try await EdgeCommand.run(
       arguments: [
-        "--path", "/models/needle", "--stream", "none", "--reasoning", "custom-level"
+        "--path", "/models/qwen3", "--stream", "none", "--reasoning", "custom-level"
       ],
       context: context
     )
@@ -45,7 +45,7 @@ struct `Command tests` {
 
     try await EdgeCommand.run(
       arguments: [
-        "bench", "--path", "/models/needle", "--prompt", "hello",
+        "bench", "--path", "/models/qwen3", "--prompt", "hello",
         "--repeat-count", "2", "--warmup", "1"
       ],
       context: context
@@ -59,13 +59,13 @@ struct `Command tests` {
   func `Info Command E2E`() async throws {
     let (context, capture) = EdgeContext.test(
       context: .stub(
-        engines: [.mlx, .onnx],
-        files: ["config.json", "decoder.onnx", "model.safetensors"]
+        engines: [.mlx],
+        files: ["config.json", "model.safetensors"]
       )
     )
 
     try await EdgeCommand.run(
-      arguments: ["info", "--path", "/models/needle"],
+      arguments: ["info", "--path", "/models/qwen3"],
       context: context
     )
 
@@ -80,7 +80,7 @@ struct `Command tests` {
     do {
       try await EdgeCommand.run(
         arguments: [
-          "--path", "/models/needle", "--prompt", "hello",
+          "--path", "/models/qwen3", "--prompt", "hello",
           "--min-tool-calls", "3", "--max-tool-calls", "2"
         ],
         context: context
@@ -103,7 +103,7 @@ struct `Command tests` {
 
     try await EdgeCommand.run(
       arguments: [
-        "--path", "/models/needle", "--prompt", "hello", "--stream", "none",
+        "--path", "/models/qwen3", "--prompt", "hello", "--stream", "none",
         "--temperature", "0.7", "--top-k", "40", "--top-p", "0.9", "--min-p", "0.05",
         "--repetition-penalty", "1.1", "--presence-penalty", "0.2",
         "--repetition-context-size", "32", "--seed", "1234"
@@ -125,7 +125,7 @@ struct `Command tests` {
   @Test
   func `Rejects Negative Maximum Tokens`() async {
     await expectCommandError(
-      arguments: ["--path", "/models/needle", "--prompt", "hello", "--max-tokens=-1"],
+      arguments: ["--path", "/models/qwen3", "--prompt", "hello", "--max-tokens=-1"],
       message: "--max-tokens must be at least 0."
     )
   }
@@ -140,7 +140,7 @@ struct `Command tests` {
   ])
   func `Rejects Nonfinite Sampling Values`(options: [String], message: String) async {
     await expectCommandError(
-      arguments: ["--path", "/models/needle", "--prompt", "hello"] + options,
+      arguments: ["--path", "/models/qwen3", "--prompt", "hello"] + options,
       message: message
     )
   }
@@ -153,7 +153,7 @@ struct `Command tests` {
 
     await expectCommandError(
       arguments: [
-        "--path", "/models/needle", "--prompt", "hello", "--image", directory.path()
+        "--path", "/models/qwen3", "--prompt", "hello", "--image", directory.path()
       ],
       message: "No image file at \(directory.path())."
     )
@@ -178,7 +178,7 @@ struct `Command tests` {
     await #expect(throws: EdgeCLIError("engine exploded")) {
       try await EdgeCommand.run(
         arguments: [
-          "bench", "--path", "/models/needle", "--prompt", "hello", "--warmup", "0"
+          "bench", "--path", "/models/qwen3", "--prompt", "hello", "--warmup", "0"
         ],
         context: context
       )

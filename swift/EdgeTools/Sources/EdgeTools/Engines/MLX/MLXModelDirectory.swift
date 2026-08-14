@@ -168,14 +168,19 @@
 
     var samplingParameters: EdgeToolsFusedSamplingParameters? {
       guard self.doSample != false else { return EdgeToolsFusedSamplingParameters(temperature: 0) }
-      guard let temperature = self.temperature else { return nil }
+      guard
+        self.temperature != nil || self.topK != nil || self.topP != nil || self.minP != nil
+          || self.repetitionPenalty != nil || self.presencePenalty != nil
+      else {
+        return nil
+      }
       return EdgeToolsFusedSamplingParameters(
-        temperature: temperature,
+        temperature: self.temperature,
         topK: self.topK,
         topP: self.topP,
         minP: self.minP,
-        repetitionPenalty: self.repetitionPenalty ?? 1,
-        presencePenalty: self.presencePenalty ?? 0
+        repetitionPenalty: self.repetitionPenalty,
+        presencePenalty: self.presencePenalty
       )
     }
   }

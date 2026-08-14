@@ -16,7 +16,7 @@
       let engine = try MLXEngine<ContextTestProfile>(
         languageModel: ContextTestLanguageModel(eosTokenId: eosTokenId),
         tokenizer: tokenizer,
-        vocabularySize: .needleVocabularySize
+        vocabularySize: TestTokenizer.vocabularySize
       )
       let session = EdgeToolsSession(engine: engine)
       let context = session.context(
@@ -64,7 +64,7 @@
           copyCounter: copyCounter
         ),
         tokenizer: tokenizer,
-        vocabularySize: .needleVocabularySize
+        vocabularySize: TestTokenizer.vocabularySize
       )
       let session = EdgeToolsSession(engine: engine)
       let context = session.context(
@@ -108,12 +108,12 @@
       let firstEngine = try MLXEngine<ContextTestProfile>(
         languageModel: ContextTestLanguageModel(eosTokenId: eosTokenId),
         tokenizer: tokenizer,
-        vocabularySize: .needleVocabularySize
+        vocabularySize: TestTokenizer.vocabularySize
       )
       let secondEngine = try MLXEngine<ContextTestProfile>(
         languageModel: ContextTestLanguageModel(eosTokenId: eosTokenId),
         tokenizer: tokenizer,
-        vocabularySize: .needleVocabularySize
+        vocabularySize: TestTokenizer.vocabularySize
       )
       let context = firstEngine.context()
 
@@ -127,7 +127,7 @@
 
   private struct ContextTestProfile: MLXLLMModelProfile {
     typealias Prompt = EdgeToolsTranscript
-    typealias GenerationParser = NeedleGenerationParser
+    typealias GenerationParser = TestGenerationParser
     typealias GenerateParameters = DefaultMLXGenerateParameters
     typealias GrammarEngine = XGrammarEngine
 
@@ -267,7 +267,7 @@
   private final class ForkTestLanguageModel: Module, LanguageModel {
     let eosTokenId: EdgeToolsToken.ID
     let copyCounter: CacheCopyCounter
-    var vocabularySize: Int { .needleVocabularySize }
+    var vocabularySize: Int { TestTokenizer.vocabularySize }
 
     init(eosTokenId: EdgeToolsToken.ID, copyCounter: CacheCopyCounter) {
       self.eosTokenId = eosTokenId
@@ -308,7 +308,7 @@
     Module, LanguageModel, KVCacheDimensionProvider
   {
     let eosTokenId: EdgeToolsToken.ID
-    var vocabularySize: Int { .needleVocabularySize }
+    var vocabularySize: Int { TestTokenizer.vocabularySize }
     var kvHeads: [Int] { [1] }
 
     init(eosTokenId: EdgeToolsToken.ID) {
