@@ -176,9 +176,19 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 17 elements
+        ▿ parts: 43 elements
           ▿ EdgeToolsGenerationPart
-            - reasoning: "The"
+            - reasoning: "Here"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " is"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " summary"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " of"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
           ▿ EdgeToolsGenerationPart
             - reasoning: " weather"
           ▿ EdgeToolsGenerationPart
@@ -186,19 +196,15 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " Paris"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " today"
+            - reasoning: ":"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " is"
+            - reasoning: "\n"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " sunny"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " at"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " a"
+            - reasoning: "The"
           ▿ EdgeToolsGenerationPart
             - reasoning: " temperature"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " of"
+            - reasoning: " is"
           ▿ EdgeToolsGenerationPart
             - reasoning: " "
           ▿ EdgeToolsGenerationPart
@@ -206,9 +212,55 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: "1"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " degrees"
+            - reasoning: "°C"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " Celsius"
+            - reasoning: " ("
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "s"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "unny"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: ")."
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " This"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " is"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " pleasant"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " and"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " comfortable"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " for"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " outdoor"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " activities"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: ","
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " ideal"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " for"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " summer"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " or"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " mild"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " winter"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " days"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " in"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " mid"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "-"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "October"
           ▿ EdgeToolsGenerationPart
             - reasoning: "."
   ▿ reasoningEffort: EdgeToolsReasoningEffort

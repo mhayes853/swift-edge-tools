@@ -474,9 +474,13 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " called"
           ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
             - reasoning: " get"
           ▿ EdgeToolsGenerationPart
             - reasoning: "Weather"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " function"
           ▿ EdgeToolsGenerationPart
             - reasoning: " with"
           ▿ EdgeToolsGenerationPart
@@ -540,36 +544,32 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " clearly"
           ▿ EdgeToolsGenerationPart
+            - reasoning: " for"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " user"
+          ▿ EdgeToolsGenerationPart
             - reasoning: ".\n\n"
           ▿ EdgeToolsGenerationPart
             - reasoning: "First"
           ▿ EdgeToolsGenerationPart
             - reasoning: ","
           ▿ EdgeToolsGenerationPart
+            - reasoning: " I"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " should"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " state"
+          ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
             - reasoning: " weather"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " in"
+            - reasoning: " condition"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " Paris"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " is"
+            - reasoning: ":"
           ▿ EdgeToolsGenerationPart
             - reasoning: " sunny"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "."
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " That"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " means"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " it"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "\'s"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " bright"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " and"
   ▿ reasoningEffort: EdgeToolsReasoningEffort
     - rawValue: "default"

@@ -22,6 +22,7 @@ struct `EdgeToolsEncoding tests` {
     )
   }
 
+#if FoundationEssentials
   @Test
   func `Data Encodes To UTF8 String Value`() {
     let data = Data("blob".utf8)
@@ -36,6 +37,7 @@ struct `EdgeToolsEncoding tests` {
       .string("12345.67890123456789")
     )
   }
+#endif
 
   #if canImport(CoreGraphics)
     @Test
@@ -209,6 +211,7 @@ struct `EdgeToolsEncoding tests` {
 
 @Suite
 struct `EdgeToolsGenerableInitialization tests` {
+#if FoundationEssentials
   @Test
   func `Initializes Data From UTF8 String`() throws {
     expectNoDifference(try Data(edgeToolsValue: "blob"), Data("blob".utf8))
@@ -223,6 +226,7 @@ struct `EdgeToolsGenerableInitialization tests` {
       Decimal(string: "12345.67890123456789")
     )
   }
+#endif
 
   @Test
   func `Initializes Optional`() throws {

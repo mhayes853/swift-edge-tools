@@ -44,6 +44,8 @@
           ▿ EdgeToolsGenerationPart
             - text: "The"
           ▿ EdgeToolsGenerationPart
+            - text: " current"
+          ▿ EdgeToolsGenerationPart
             - text: " weather"
           ▿ EdgeToolsGenerationPart
             - text: " in"
@@ -51,8 +53,6 @@
             - text: " Paris"
           ▿ EdgeToolsGenerationPart
             - text: " is"
-          ▿ EdgeToolsGenerationPart
-            - text: " currently"
           ▿ EdgeToolsGenerationPart
             - text: " sunny"
           ▿ EdgeToolsGenerationPart

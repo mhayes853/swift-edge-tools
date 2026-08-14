@@ -15,6 +15,7 @@ build_only=0
 disable_default_traits=1
 install_python_venv=0
 install_needle2_runtime=0
+install_node=1
 extra_arguments=()
 
 usage() {
@@ -183,13 +184,17 @@ restore_resolved() {
 }
 trap restore_resolved EXIT
 
-if ((install_python_venv || install_needle2_runtime)); then
+if ((install_node || install_python_venv || install_needle2_runtime)); then
 	docker_arguments+=(
 		--env "INSTALL_NEEDLE2_RUNTIME=$install_needle2_runtime"
+		--env "INSTALL_NODE=$install_node"
 		--env "INSTALL_PYTHON_VENV=$install_python_venv"
 	)
 	setup_script='set -euo pipefail
 apt-get update
+if [[ "$INSTALL_NODE" == 1 ]]; then
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs npm
+fi
 if [[ "$INSTALL_NEEDLE2_RUNTIME" == 1 ]]; then
   DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libc++-dev libc++abi-dev
   needle2_library_path="$(dirname "$(find /usr/lib/llvm-* -name libc++.so -print -quit)")"
