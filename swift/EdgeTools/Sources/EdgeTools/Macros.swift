@@ -8,7 +8,11 @@ import OrderedCollections
 /// labeled associated values use their labels as keys and unlabeled values use positional keys
 /// such as `_0` and `_1`.
 @attached(extension, conformances: EdgeToolsGenerable)
-@attached(member, names: named(edgeToolsGenerationSchema), named(init), named(edgeToolsValue))
+@attached(
+  member,
+  names: named(edgeToolsGenerationSchema), named(extractionToolDefinition), named(init),
+  named(edgeToolsValue)
+)
 @attached(memberAttribute)
 public macro EdgeToolsGenerable(
   _ schema: EdgeToolsGenerationSchema...

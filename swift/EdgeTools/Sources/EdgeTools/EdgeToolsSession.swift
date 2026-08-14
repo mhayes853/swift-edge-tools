@@ -102,6 +102,33 @@ extension EdgeToolsSession where Engine: EdgeToolsTokenizingEngine {
   }
 }
 
+// MARK: - Extraction
+
+extension EdgeToolsSession {
+  @concurrent
+  public func extract<Response: EdgeToolsGenerable>(
+    prompt: Engine.Prompt,
+    as type: Response.Type,
+    context: Engine.Context? = nil,
+    parameters: sending Engine.GenerateParameters = .default
+  ) async throws -> Response? {
+    let definition = Response.extractionToolDefinition
+    let task = try self.engine.generate(
+      prompt: prompt,
+      tools: [definition],
+      parameters: parameters,
+      context: self.resolveContext(context),
+      channel: EdgeToolsGenerationChannel()
+    )
+    let generation = try await task.value
+    let call = generation.toolCalls.first { $0.name == definition.name }
+    guard let call else {
+      return nil
+    }
+    return try Response(edgeToolsValue: call.arguments)
+  }
+}
+
 extension EdgeToolsSession where Engine: EdgeToolsPrefillableEngine {
   public func prefill(
     promptPrefix: Engine.Prompt,

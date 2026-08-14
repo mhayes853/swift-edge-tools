@@ -82,6 +82,41 @@ struct `EdgeToolsSession tests` {
   }
 
   @Test
+  func `Extracts A Typed Value Without Invoking Tools`() async throws {
+    let tokenizer = try testTokenizer()
+    let rawToolCall = #"<tool_call> [{"name":"weather_args","arguments":{"location":"Seoul"}}]"#
+    let toolTokens = rawToolCall.tokenize(using: tokenizer)
+    let engine = MockEngine(script: toolTokens.map { .token($0) } + [.finish])
+    let session = EdgeToolsSession(engine: engine) { WeatherTool() }
+
+    let value = try await session.extract(
+      prompt: .test(user: "weather?"),
+      as: WeatherArgs.self,
+      context: nil
+    )
+
+    expectNoDifference(value?.location, "Seoul")
+    expectNoDifference(
+      engine.generationTools,
+      [[WeatherArgs.extractionToolDefinition]]
+    )
+  }
+
+  @Test
+  func `Extraction Returns Nil Without A Tool Call`() async throws {
+    let engine = MockEngine(script: [.finish])
+    let session = EdgeToolsSession(engine: engine)
+
+    let value = try await session.extract(
+      prompt: .test(user: "not structured"),
+      as: WeatherArgs.self,
+      context: nil
+    )
+
+    expectNoDifference(value, nil)
+  }
+
+  @Test
   func `Engine Generation Returns Raw Tool Calls`() async throws {
     let tokenizer = try testTokenizer()
     let rawToolCall = #"<tool_call> [{"name":"unknown","arguments":{"value":1}}]"#
