@@ -6,7 +6,7 @@ import Testing
 @Suite
 struct `ModelDetection tests` {
   @Test
-  func `Detects Needle From Encoder Decoder Configuration`() throws {
+  func `Falls Back To Generic LLM For Encoder Decoder Configuration`() throws {
     let directory = try temporaryModel(
       configuration: """
         {"num_encoder_layers": 4, "num_decoder_layers": 4, "decoder_start_token_id": 1}
@@ -15,8 +15,22 @@ struct `ModelDetection tests` {
     )
     let detection = try ModelDetection.detect(in: directory)
 
-    expectNoDifference(detection.model, .needle)
+    expectNoDifference(detection.model, .genericLLM)
     expectNoDifference(detection.engines, EngineKind.mlx.isAvailable ? [.mlx] : [])
+  }
+
+  @Test
+  func `Detects Needle2 Without External Engine Weights`() throws {
+    let directory = try temporaryModel(
+      configuration: """
+        {"model_type": "needle", "name_or_path": "Cactus-Compute/needle2"}
+        """,
+      files: []
+    )
+    let detection = try ModelDetection.detect(in: directory)
+
+    expectNoDifference(detection.model, .needle2)
+    expectNoDifference(detection.engines, EngineKind.needle2.isAvailable ? [.needle2] : [])
   }
 
   @Test
@@ -62,10 +76,7 @@ struct `ModelDetection tests` {
     expectNoDifference(detection.model.modality, .vision)
   }
 
-  @Test(arguments: [
-    ("MLX", EngineKind.mlx),
-    ("OnNx", EngineKind.onnx)
-  ])
+  @Test(arguments: [("MLX", EngineKind.mlx), ("Needle-2", EngineKind.needle2)])
   func `Parses Case Insensitive Engine Names`(argument: String, expected: EngineKind) {
     expectNoDifference(EngineKind(argument: argument), expected)
   }
@@ -142,49 +153,6 @@ struct `ModelDetection tests` {
 
     expectNoDifference(detection.model, .genericVLM)
     expectNoDifference(detection.model.modality, .vision)
-  }
-
-  @Test
-  func `Only Reports Engines That Have Weights Present`() throws {
-    let directory = try temporaryModel(
-      configuration: """
-        {"num_encoder_layers": 4, "num_decoder_layers": 4, "decoder_start_token_id": 1}
-        """,
-      files: ["encoder.onnx", "decoder.onnx"]
-    )
-    let detection = try ModelDetection.detect(in: directory)
-
-    expectNoDifference(detection.engines, [.onnx])
-    expectNoDifference(detection.defaultEngine, .onnx)
-  }
-
-  @Test
-  func `Reports Every Engine With Matching Weights`() throws {
-    let directory = try temporaryModel(
-      configuration: """
-        {"num_encoder_layers": 4, "num_decoder_layers": 4, "decoder_start_token_id": 1}
-        """,
-      files: ["model.safetensors", "encoder.onnx", "decoder.onnx"]
-    )
-    let detection = try ModelDetection.detect(in: directory)
-
-    expectNoDifference(
-      detection.engines,
-      [EngineKind.mlx, .onnx].filter(\.isAvailable)
-    )
-  }
-
-  @Test
-  func `Prioritizes MLX On Apple And ONNX Elsewhere`() {
-    let detection = ModelDetection(
-      directory: URL(fileURLWithPath: "/models/needle"),
-      model: .needle,
-      engines: [.mlx, .onnx],
-      files: ["model.safetensors", "encoder.onnx", "decoder.onnx"]
-    )
-
-    expectNoDifference(detection.defaultEngine(for: .apple), .mlx)
-    expectNoDifference(detection.defaultEngine(for: .nonApple), .onnx)
   }
 
   @Test

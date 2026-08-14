@@ -29,6 +29,8 @@ public struct EdgeToolsError: Error, Hashable, Sendable {
     public static let modelNotPrepared = Self(rawValue: "model-not-prepared")
     public static let invalidMedia = Self(rawValue: "invalid-media")
     public static let unsupportedMedia = Self(rawValue: "unsupported-media")
+    public static let contextInUse = Self(rawValue: "context-in-use")
+    public static let incompatibleContext = Self(rawValue: "incompatible-context")
   }
 
   public let code: Code
@@ -43,17 +45,10 @@ public struct EdgeToolsError: Error, Hashable, Sendable {
 extension EdgeToolsError {
   static func noCompatibleTokenizer(
     in directory: String,
-    hasSentencePieceModel: Bool,
     hasTransformersTokenizer: Bool,
     failures: [String] = []
   ) -> Self {
     var details = [String]()
-
-    if hasSentencePieceModel {
-      details.append("tokenizer.model is not a supported SentencePiece BPE model.")
-    } else {
-      details.append("tokenizer.model was not found.")
-    }
 
     #if Transformers && canImport(Tokenizers)
       if hasTransformersTokenizer {
@@ -143,4 +138,14 @@ extension EdgeToolsError {
   static func unsupportedMedia(_ message: String) -> Self {
     Self(code: .unsupportedMedia, message: message)
   }
+
+  static let contextInUse = Self(
+    code: .contextInUse,
+    message: "The context already has an active generation."
+  )
+
+  static let incompatibleContext = Self(
+    code: .incompatibleContext,
+    message: "The context was created by a different engine."
+  )
 }

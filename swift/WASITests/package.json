@@ -1,9 +1,5 @@
 {
   "name": "swift-edge-tools-wasi-tests",
   "private": true,
-  "type": "module",
-  "dependencies": {
-    "onnxruntime-node": "1.27.0",
-    "onnxruntime-web": "1.27.0"
-  }
+  "type": "module"
 }

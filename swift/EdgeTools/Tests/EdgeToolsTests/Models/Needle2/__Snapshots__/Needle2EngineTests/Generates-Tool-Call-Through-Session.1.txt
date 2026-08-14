@@ -1,0 +1,20 @@
+▿ 2 elements
+  ▿ EdgeToolsGenerationPart
+    - reasoning: "send_email tool chosen. \'to\' from query \'blob@gmail.com\'. \'subject\' from \'asking them to go hiking\' -> \'Go hiking\'. \'body\' from \'asking them to go hiking\' -> \'Hi, I\'ll go to the hiking.\'"
+  ▿ EdgeToolsGenerationPart
+    ▿ toolCall: EdgeRawToolCall
+      ▿ arguments: EdgeToolsValue
+        ▿ object: 3 key/value pairs
+          ▿ (2 elements)
+            - key: "address"
+            ▿ value: EdgeToolsValue
+              - string: "blob@gmail.com"
+          ▿ (2 elements)
+            - key: "body"
+            ▿ value: EdgeToolsValue
+              - string: "Hi, I\'ll go to the hiking."
+          ▿ (2 elements)
+            - key: "subject"
+            ▿ value: EdgeToolsValue
+              - string: "Go hiking"
+      - name: "send_email"

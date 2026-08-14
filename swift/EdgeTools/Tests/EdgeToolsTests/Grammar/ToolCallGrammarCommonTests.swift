@@ -6,7 +6,7 @@
   @Suite
   struct `ToolCallGrammarCommon tests`: ~Copyable {
     private let compiler: XGRCompiler
-    private let tokenizer: NeedleSPTokenizer
+    private let tokenizer: TestTokenizer
     private let eosToken: EdgeToolsToken.ID
 
     init() throws {
@@ -155,30 +155,6 @@
   }
 
   let toolCallGrammarTestFixtures = [
-    ToolCallGrammarTestFixture(
-      name: "Needle",
-      makeGrammar: { try XGRGrammar.needle(tools: $0, range: $1) },
-      makeGenerationParser: { NeedleGenerationParser() },
-      expectedComplexName: "complex_tool",
-      emptyCall: "<tool_call> []",
-      simpleCall: #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#,
-      twoCalls:
-        """
-        <tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":\
-        "get_weather","arguments":{"location":"Paris"}}]
-        """,
-      unknownToolCall: #"<tool_call> [{"name":"unknown","arguments":{"location":"Seoul"}}]"#,
-      wrongTypeCall: #"<tool_call> [{"name":"integer_tool","arguments":{"value":"oops"}}]"#,
-      complexCall:
-        """
-        <tool_call> [{"name":"complex_tool","arguments":{"title":"alpha","count":3.5,"enabled":true,\
-        "mode":"execute","ticket_id":"ABC-12","priority":4,"routing":{"region":"us-west"},"labels":{\
-        "ALPHA":1,"BETA_LABEL":2},"window":3,"tuple_args":["alpha",2,true],"optional_note":null,"tags":[\
-        "a","b"],"config":{"threshold":0.75,"flags":[true,false]}}}]
-        """,
-      ruleNamedCall:
-        #"<tool_call> [{"name":"rule_named_tool","arguments":{"root":"a","xml_object":"b"}}]"#
-    ),
     ToolCallGrammarTestFixture(
       name: "Qwen JSON",
       makeGrammar: { try XGRGrammar.qwenJSON(tools: $0, range: $1) },

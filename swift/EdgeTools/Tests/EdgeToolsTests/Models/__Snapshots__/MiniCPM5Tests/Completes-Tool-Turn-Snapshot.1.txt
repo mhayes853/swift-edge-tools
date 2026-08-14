@@ -1,4 +1,4 @@
-▿ EdgeToolsConversationalPrompt
+▿ EdgeToolsTranscript
   ▿ messages: 5 elements
     ▿ Message
       ▿ system: SystemMessage
@@ -542,104 +542,104 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " I"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " can"
+            - reasoning: " received"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " provide"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " the"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " information"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " based"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " on"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " the"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " function"
+            - reasoning: " a"
           ▿ EdgeToolsGenerationPart
             - reasoning: " response"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "."
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " The"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " function"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " returned"
+            - reasoning: " from"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " weather"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " details"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " for"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " Paris"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: ","
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " and"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " it"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " was"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " successful"
+            - reasoning: " function"
           ▿ EdgeToolsGenerationPart
             - reasoning: "."
           ▿ EdgeToolsGenerationPart
             - reasoning: " The"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " answer"
+            - reasoning: " response"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " indicates"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " that"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " current"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " weather"
           ▿ EdgeToolsGenerationPart
             - reasoning: " is"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " formatted"
+            - reasoning: " sunny"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " with"
+            - reasoning: ","
           ▿ EdgeToolsGenerationPart
-            - reasoning: " structure"
+            - reasoning: " temperature"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " and"
+            - reasoning: " is"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " "
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "21"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "°C"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "."
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " I"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " should"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " use"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " this"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " information"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " to"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " provide"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " a"
           ▿ EdgeToolsGenerationPart
             - reasoning: " summary"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " as"
+            - reasoning: " to"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " specified"
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " user"
           ▿ EdgeToolsGenerationPart
             - reasoning: ".\n"
           ▿ EdgeToolsGenerationPart
             - text: "\n\n"
           ▿ EdgeToolsGenerationPart
-            - text: "I"
-          ▿ EdgeToolsGenerationPart
-            - text: " don"
-          ▿ EdgeToolsGenerationPart
-            - text: "\'t"
-          ▿ EdgeToolsGenerationPart
-            - text: " have"
-          ▿ EdgeToolsGenerationPart
-            - text: " access"
-          ▿ EdgeToolsGenerationPart
-            - text: " to"
-          ▿ EdgeToolsGenerationPart
-            - text: " the"
-          ▿ EdgeToolsGenerationPart
-            - text: " current"
-          ▿ EdgeToolsGenerationPart
-            - text: " weather"
-          ▿ EdgeToolsGenerationPart
-            - text: " data"
+            - text: "Currently"
           ▿ EdgeToolsGenerationPart
             - text: ","
           ▿ EdgeToolsGenerationPart
-            - text: " but"
+            - text: " the"
           ▿ EdgeToolsGenerationPart
-            - text: " I"
+            - text: " weather"
           ▿ EdgeToolsGenerationPart
-            - text: " can"
+            - text: " in"
+          ▿ EdgeToolsGenerationPart
+            - text: " Paris"
+          ▿ EdgeToolsGenerationPart
+            - text: " is"
+          ▿ EdgeToolsGenerationPart
+            - text: ":\n"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n"
+          ▿ EdgeToolsGenerationPart
+            - text: "-"
+          ▿ EdgeToolsGenerationPart
+            - text: " **"
+          ▿ EdgeToolsGenerationPart
+            - text: "Condition"
+          ▿ EdgeToolsGenerationPart
+            - text: ":**"
   ▿ reasoningEffort: EdgeToolsReasoningEffort
     - rawValue: "default"

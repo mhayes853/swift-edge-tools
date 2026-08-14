@@ -19,8 +19,6 @@
       rawValue: "incompatible-tokenizer-vocabulary"
     )
 
-    /// An invalid Needle tokenizer for generation.
-    public static let invalidNeedleTokenizer = Self(rawValue: "invalid-needle-tokenizer")
   }
 
   extension XGRError {
@@ -82,45 +80,47 @@
 
   extension XGRMatcher: EdgeToolsGrammarMatcher {}
 
-  // MARK: - Grammar Context
+  // MARK: - XGrammarEngine
 
-  public struct XGRGrammarContext {
+  public final class XGrammarEngine: EdgeToolsGrammarEngine {
+    public typealias Matcher = XGRMatcher
+
+    private struct State: ~Copyable {
+      let compiler: XGRCompiler
+      let matcherPool: XGRToolCallMatcherPool
+    }
+
     public let tokenizerInfo: XGRTokenizerInfo
+    private let state: Lock<State>
 
-    private let matcherPool = XGRToolCallMatcherPool()
-
-    public init(tokenizerInfo: XGRTokenizerInfo) {
+    public init(tokenizerInfo: XGRTokenizerInfo) throws {
       self.tokenizerInfo = tokenizerInfo
+      self.state = try Lock {
+        State(
+          compiler: try XGRCompiler(tokenizerInfo: tokenizerInfo),
+          matcherPool: XGRToolCallMatcherPool()
+        )
+      }
     }
-
-    fileprivate func matcher(
-      for grammar: XGRGrammar,
-      compiler: XGRCompiler,
-      stopTokenIds: Set<EdgeToolsToken.ID>
-    ) throws -> XGRMatcher {
-      let matcher = try self.matcherPool.matcher(
-        grammar: grammar,
-        compilingWith: compiler,
-        stopTokenIds: stopTokenIds
-      )
-      matcher.reset()
-      return matcher
-    }
-
-    func clearMatcherCache() {
-      self.matcherPool.clear()
-    }
-  }
-
-  extension XGRCompiler: EdgeToolsGrammarCompiler {
-    public typealias Context = XGRGrammarContext
 
     public func matcher(
-      for grammar: XGRGrammar,
-      context: borrowing XGRGrammarContext,
+      for grammar: borrowing XGRGrammar,
       stopTokenIds: Set<EdgeToolsToken.ID>
     ) throws -> XGRMatcher {
-      try context.matcher(for: grammar, compiler: self, stopTokenIds: stopTokenIds)
+      try self.state.withLock { state in
+        try state.matcherPool.matcher(
+          grammar: grammar,
+          compilingWith: state.compiler,
+          stopTokenIds: stopTokenIds
+        )
+      }
+    }
+
+    public func clearCaches() {
+      self.state.withLock { state in
+        state.matcherPool.clear()
+        state.compiler.clearCache()
+      }
     }
   }
 
@@ -167,13 +167,21 @@
 
   // MARK: - XGRGenerationConstraint
 
+  private final class XGRGrammarBox: @unchecked Sendable {
+    let grammar: XGRGrammar
+
+    init(grammar: consuming XGRGrammar) {
+      self.grammar = consume grammar
+    }
+  }
+
   public struct XGRGenerationConstraint: Sendable {
     private enum Kind: Sendable {
       case unconstrained
-      case grammar(XGRGrammar)
+      case grammar(XGRGrammarBox)
       case toolsWithGrammar(
         range: GrammarToolCallRange = .unbounded(minimum: 0),
-        grammar: (@Sendable (XGRGrammar, XGRTokenizerInfo) throws -> XGRGrammar)? = nil
+        grammar: (@Sendable (borrowing XGRGrammar, XGRTokenizerInfo) throws -> XGRGrammar)? = nil
       )
     }
 
@@ -181,13 +189,13 @@
 
     public static let unconstrained = Self(kind: .unconstrained)
 
-    public static func grammar(_ grammar: XGRGrammar) -> Self {
-      Self(kind: .grammar(grammar))
+    public static func grammar(_ grammar: consuming XGRGrammar) -> Self {
+      Self(kind: .grammar(XGRGrammarBox(grammar: consume grammar)))
     }
 
     public static func toolsWithGrammar(
       range: GrammarToolCallRange = .unbounded(minimum: 0),
-      grammar: (@Sendable (XGRGrammar, XGRTokenizerInfo) throws -> XGRGrammar)? = nil
+      grammar: (@Sendable (borrowing XGRGrammar, XGRTokenizerInfo) throws -> XGRGrammar)? = nil
     ) -> Self {
       Self(kind: .toolsWithGrammar(range: range, grammar: grammar))
     }
@@ -195,16 +203,17 @@
     public static let tools = Self.toolsWithGrammar()
 
     public static func toolsOrGrammar(
-      _ userGrammar: XGRGrammar,
+      _ userGrammar: consuming XGRGrammar,
       range: GrammarToolCallRange = .unbounded(minimum: 0),
-      transform: (@Sendable (XGRGrammar, XGRTokenizerInfo) throws -> XGRGrammar)? = nil
+      transform: (@Sendable (borrowing XGRGrammar, XGRTokenizerInfo) throws -> XGRGrammar)? = nil
     ) -> Self {
-      toolsWithGrammar(
+      let userGrammar = XGRGrammarBox(grammar: consume userGrammar)
+      return toolsWithGrammar(
         range: range,
         grammar: { toolsGrammar, tokenizerInfo in
-          let resolvedToolsGrammar =
-            try transform?(toolsGrammar, tokenizerInfo) ?? toolsGrammar
-          return try resolvedToolsGrammar.union(userGrammar)
+          guard let transform else { return try toolsGrammar.copy() }
+          let resolvedToolsGrammar = try transform(toolsGrammar, tokenizerInfo)
+          return try resolvedToolsGrammar.union(userGrammar.grammar)
         }
       )
     }
@@ -215,7 +224,7 @@
   }
 
   extension XGRGenerationConstraint: EdgeToolsGenerationConstraint {
-    public typealias Context = XGRGrammarContext
+    public typealias Context = XGrammarEngine
 
     public var toolCallRange: GrammarToolCallRange? {
       guard case .toolsWithGrammar(let range, _) = self.kind else { return nil }
@@ -223,17 +232,18 @@
     }
 
     public func grammar(
-      toolCallGrammar: XGRGrammar?,
-      context: XGRGrammarContext
+      toolCallGrammar: consuming XGRGrammar?,
+      context: XGrammarEngine
     ) throws -> XGRGrammar {
       switch self.kind {
       case .unconstrained:
         return .universal
       case .grammar(let grammar):
-        return grammar
+        return try grammar.grammar.copy()
       case .toolsWithGrammar(_, let transform):
-        let grammar = toolCallGrammar ?? .universal
-        return try transform?(grammar, context.tokenizerInfo) ?? grammar
+        let grammar = toolCallGrammar ?? XGRGrammar.universal
+        guard let transform else { return grammar }
+        return try transform(grammar, context.tokenizerInfo)
       }
     }
   }
@@ -489,7 +499,7 @@
     }
 
     static func repeatingToolCall(
-      _ call: XGRGrammar,
+      _ call: borrowing XGRGrammar,
       separator: String,
       range: GrammarToolCallRange
     ) throws -> XGRGrammar {
@@ -520,8 +530,8 @@
     }
 
     private static func boundedToolCalls(
-      _ call: XGRGrammar,
-      separatedCall: XGRGrammar,
+      _ call: borrowing XGRGrammar,
+      separatedCall: borrowing XGRGrammar,
       minimum: Int,
       maximum: Int
     ) throws -> XGRGrammar {
@@ -537,7 +547,7 @@
 
   final class XGRToolCallMatcherPool {
     private let maxCount: Int
-    private var entries = [String: XGRMatcher]()
+    private var entries = [String: XGRMatcherBox]()
     private var order = [String]()
 
     init(maxCount: Int = 8) {
@@ -545,15 +555,15 @@
     }
 
     func matcher(
-      grammar: XGRGrammar,
-      compilingWith compiler: XGRCompiler,
+      grammar: borrowing XGRGrammar,
+      compilingWith compiler: borrowing XGRCompiler,
       stopTokenIds: Set<EdgeToolsToken.ID>
     ) throws -> XGRMatcher {
       let sortedStopTokenIds = stopTokenIds.sorted()
       let key = "\(grammar.ebnf)\u{0}\(sortedStopTokenIds.map(String.init).joined(separator: ","))"
       if let cached = self.entries[key] {
         self.touch(key)
-        return cached.fork()
+        return cached.matcher.fork()
       }
       let compiledGrammar = try compiler.compile(grammar)
       let matcher = try XGRMatcher(
@@ -575,15 +585,23 @@
 
     private func insert(
       _ key: String,
-      matcher: XGRMatcher
+      matcher: consuming XGRMatcher
     ) -> XGRMatcher {
       if self.entries.count >= self.maxCount, let leastRecentlyUsed = self.order.first {
         self.entries.removeValue(forKey: leastRecentlyUsed)
         self.order.removeFirst()
       }
-      self.entries[key] = matcher
+      self.entries[key] = XGRMatcherBox(matcher: consume matcher)
       self.order.append(key)
-      return matcher.fork()
+      return self.entries[key]!.matcher.fork()
+    }
+  }
+
+  private final class XGRMatcherBox {
+    var matcher: XGRMatcher
+
+    init(matcher: consuming XGRMatcher) {
+      self.matcher = consume matcher
     }
   }
 

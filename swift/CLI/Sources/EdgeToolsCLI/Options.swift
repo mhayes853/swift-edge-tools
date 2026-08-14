@@ -5,7 +5,7 @@ import Foundation
 // MARK: - ModelSourceOptions
 
 struct ModelSourceOptions: ParsableArguments {
-  @Argument(help: "A Hugging Face repo, such as Cactus-Compute/needle.")
+  @Argument(help: "A Hugging Face model repository.")
   var repo: String?
 
   @Option(help: "A local model directory, used instead of a Hugging Face repo.")
@@ -145,12 +145,12 @@ struct GenerationOptions: ParsableArguments {
     GenerationRequest(
       system: self.system,
       user: prompt,
-      images: self.image.map { [EdgeToolsConversationalPrompt.Asset(path: $0)] } ?? [],
+      images: self.image.map { [EdgeToolsTranscript.Asset(path: $0)] } ?? [],
       tools: tools,
       grammar: self.grammar,
       toolCallRange: self.toolCallRange,
       maxTokens: self.maxTokens,
-      sampling: self.sampling.overrides,
+      sampling: self.sampling.sampling,
       reasoning: EdgeToolsReasoningEffort(rawValue: self.reasoning)
     )
   }
@@ -247,8 +247,8 @@ struct SamplingOptions: ParsableArguments {
     }
   }
 
-  var overrides: EdgeToolsFusedSamplingOverrides {
-    EdgeToolsFusedSamplingOverrides(
+  var sampling: EdgeToolsFusedSamplingParameters {
+    EdgeToolsFusedSamplingParameters(
       temperature: self.temperature,
       topK: self.topK,
       topP: self.topP,

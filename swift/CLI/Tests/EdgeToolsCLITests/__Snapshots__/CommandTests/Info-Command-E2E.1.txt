@@ -1,6 +1,6 @@
-/models/needle
-  model       Needle
+/models/qwen3
+  model       Qwen3
   modality    text
-  engines     mlx · onnx
+  engines     mlx
               defaults to mlx
-  files       config.json · decoder.onnx · model.safetensors
+  files       config.json · model.safetensors

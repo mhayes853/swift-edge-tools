@@ -8,32 +8,35 @@ import OrderedCollections
   // MARK: - MiniCPM5 Model
 
   public struct MiniCPM5MLXProfile: MLXLLMModelProfile {
-    public typealias Prompt = EdgeToolsConversationalPrompt
+    public typealias Prompt = EdgeToolsTranscript
     public typealias GenerationParser = MiniCPM5GenerationParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
-    public typealias GrammarCompiler = XGRCompiler
-    public typealias GrammarContext = XGRGrammarContext
+    public typealias GrammarEngine = XGrammarEngine
 
     public static func grammar(
-      prompt: EdgeToolsConversationalPrompt,
+      prompt: EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
       parameters: DefaultMLXGenerateParameters,
-      context: XGRGrammarContext
+      grammarEngine: borrowing XGrammarEngine
     ) throws -> XGRGrammar {
-      try Self.constrainedGrammar(tools: tools, parameters: parameters, context: context) { range in
+      try Self.constrainedGrammar(
+        tools: tools,
+        parameters: parameters,
+        grammarEngine: grammarEngine
+      ) { range in
         let toolCalls = try XGRGrammar.miniCPM5(tools: tools, range: range)
         guard prompt.reasoningEffort.isEnabled else { return toolCalls }
-        return try XGRGrammar.qwenReasoning().concatenate(toolCalls)
+        return try .qwenReasoning().concatenate(toolCalls)
       }
     }
 
-    public static func templateContext(prompt: EdgeToolsConversationalPrompt) -> [String: any Sendable]? {
+    public static func templateContext(prompt: EdgeToolsTranscript) -> [String: any Sendable]? {
       guard prompt.reasoningEffort != .default else { return nil }
       return ["enable_thinking": prompt.reasoningEffort.isEnabled]
     }
 
     public static func prepare(
-      prompt: inout EdgeToolsConversationalPrompt,
+      prompt: inout EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
       parser: inout MiniCPM5GenerationParser
     ) {
@@ -247,14 +250,15 @@ private enum MiniCPM5ToolCalls {
   private func miniCPM5RawWordRules(excluding word: String) -> [XGREBNFDocument.Rule] {
     let characters = Array(word)
     let name = "mini_cpm_raw_\(characters[0])"
-    let chain = characters.indices.dropFirst().map { index -> XGREBNFDocument.Rule in
-      let character = characters[index]
-      let next = index == characters.count - 1 ? "mini_cpm_raw_suffix" : "\(name)_\(index + 1)"
-      return XGREBNFDocument.Rule(
-        name: "\(name)_\(index)",
-        body: #"("") | ([^<&\r\n\#(character)] mini_cpm_tail) | ("\#(character)" \#(next))"#
-      )
-    }
+    let chain = characters.indices.dropFirst()
+      .map { index -> XGREBNFDocument.Rule in
+        let character = characters[index]
+        let next = index == characters.count - 1 ? "mini_cpm_raw_suffix" : "\(name)_\(index + 1)"
+        return XGREBNFDocument.Rule(
+          name: "\(name)_\(index)",
+          body: #"("") | ([^<&\r\n\#(character)] mini_cpm_tail) | ("\#(character)" \#(next))"#
+        )
+      }
     return [XGREBNFDocument.Rule(name: name, body: #""\#(characters[0])" \#(name)_1"#)] + chain
   }
 
@@ -272,9 +276,10 @@ private enum MiniCPM5ToolCalls {
       guard !name.hasPrefix("basic_"), !isMiniCPM5TopLevelArgumentRule(name),
         !names.contains(name),
         !(literals[name] ?? []).contains(where: { $0 == "{" || $0 == "[" }),
-        !(references[name] ?? []).contains(where: {
-          ["basic_object", "basic_array", "basic_any"].contains($0)
-        })
+        !(references[name] ?? [])
+          .contains(where: {
+            ["basic_object", "basic_array", "basic_any"].contains($0)
+          })
       else { continue }
       names.insert(name)
       pending.append(contentsOf: references[name] ?? [])

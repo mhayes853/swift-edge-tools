@@ -3,7 +3,7 @@
 
   // MARK: - EdgeToolsLLMPrefillContext
 
-  package struct EdgeToolsLLMPrefillContext: Hashable {
+  struct EdgeToolsLLMPrefillContext: Hashable {
     private enum Message: Hashable {
       case system(String)
       case user(String, images: [Asset], videos: [Asset], audio: [Asset])
@@ -21,7 +21,7 @@
       case bytes([UInt8], mimeType: EdgeToolsMIMEType?)
       case file(path: String, modificationDate: Date)
 
-      init(_ asset: EdgeToolsConversationalPrompt.Asset) {
+      init(_ asset: EdgeToolsTranscript.Asset) {
         switch asset.content {
         case .bytes(let bytes):
           self = .bytes(bytes, mimeType: asset.mimeType)
@@ -43,7 +43,7 @@
     private let media: [Media]
     private let tools: [EdgeToolDefinition]
 
-    package init(prompt: EdgeToolsConversationalPrompt, tools: [EdgeToolDefinition]) {
+    init(prompt: EdgeToolsTranscript, tools: [EdgeToolDefinition]) {
       let messages: [Message] = prompt.messages.map { message in
         switch message {
         case .system(let message):
@@ -71,7 +71,7 @@
       self.tools = tools
     }
 
-    package func hasMediaPrefix(in other: Self) -> Bool {
+    func hasMediaPrefix(in other: Self) -> Bool {
       self.media.count <= other.media.count
         && zip(self.media, other.media).allSatisfy(==)
     }

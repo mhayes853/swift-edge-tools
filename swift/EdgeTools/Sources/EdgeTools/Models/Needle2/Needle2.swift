@@ -1,0 +1,124 @@
+#if Needle2
+  import OrderedCollections
+
+  // MARK: - Needle2Response
+
+  struct Needle2Response: Sendable {
+    var type: String
+    var success: Bool
+    var error: String?
+    var errorCode: String?
+    var functionCalls: [EdgeRawToolCall]
+    var reasoning: String?
+    var confidence: Float?
+    var prefillTokensPerSecond: Double?
+    var decodeTokensPerSecond: Double?
+    var peakRAMMegabytes: Double?
+    var tokenCount: Int?
+
+    var parts: [EdgeToolsGenerationPart] {
+      let reasoning = self.reasoning.map { [EdgeToolsGenerationPart.reasoning($0)] } ?? []
+      return reasoning + self.functionCalls.map(EdgeToolsGenerationPart.toolCall)
+    }
+
+    init(json: String) throws {
+      let value: EdgeToolsValue
+      do {
+        value = try EdgeToolsValue(json: json)
+      } catch {
+        throw Needle2Error(
+          code: .invalidResponse,
+          message: "Needle 2 returned invalid JSON."
+        )
+      }
+      guard case .object(let object) = value,
+        case .string(let type) = object["type"],
+        case .boolean(let success) = object["success"]
+      else {
+        throw Needle2Error(
+          code: .invalidResponse,
+          message: "Needle 2 returned a response without a valid type and success value."
+        )
+      }
+
+      self.type = type
+      self.success = success
+      self.error = object["error"]?.string
+      self.errorCode = object["error_code"]?.string
+      self.reasoning = object["reasoning"]?.string
+      self.confidence = object["confidence"]?.double.map(Float.init)
+      self.prefillTokensPerSecond = object["prefill_tps"]?.double
+      self.decodeTokensPerSecond = object["decode_tps"]?.double
+      self.peakRAMMegabytes = object["peak_ram_mb"]?.double
+      self.tokenCount = nil
+      self.functionCalls = try object["function_calls"]?.needle2ToolCalls ?? []
+    }
+  }
+
+  // MARK: - Tools
+
+  extension Array where Element == EdgeToolDefinition {
+    var needle2Value: EdgeToolsValue {
+      .array(
+        self.map { tool in
+          [
+            "name": .string(tool.name.snakeCased()),
+            "description": .string(tool.description),
+            "parameters": tool.arguments.edgeToolsValue
+          ]
+        }
+      )
+    }
+
+    var needle2JSON: String {
+      self.needle2Value.orderedJSONString()
+    }
+  }
+
+  extension EdgeToolsValue {
+    var needle2ToolCalls: [EdgeRawToolCall] {
+      get throws {
+        if self.isNull {
+          return []
+        }
+        guard case .array(let values) = self else {
+          throw Needle2Error(
+            code: .invalidResponse,
+            message: "Needle 2 returned an invalid function_calls value."
+          )
+        }
+        var calls = [EdgeRawToolCall]()
+        for value in values {
+          guard let call = EdgeRawToolCall(jsonValue: value) else {
+            throw Needle2Error(
+              code: .invalidResponse,
+              message: "Needle 2 returned an invalid function call."
+            )
+          }
+          calls.append(call)
+        }
+        return calls
+      }
+    }
+  }
+
+  // MARK: - Duration
+
+  extension Duration {
+    init(
+      needle2TokenCount tokenCount: Int,
+      tokensPerSecond: Double?
+    ) {
+      guard let tokensPerSecond, tokensPerSecond > 0 else {
+        self = .zero
+        return
+      }
+      let nanoseconds = Double(tokenCount) / tokensPerSecond * 1_000_000_000
+      guard nanoseconds < Double(Int64.max) else {
+        self = .zero
+        return
+      }
+      self = .nanoseconds(Int64(nanoseconds.rounded()))
+    }
+  }
+#endif

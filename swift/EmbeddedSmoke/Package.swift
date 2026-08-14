@@ -5,7 +5,7 @@ import PackageDescription
 let package = Package(
   name: "EdgeToolsEmbeddedSmoke",
   dependencies: [
-    .package(path: "../..", traits: []),
+    .package(name: "swift-edge-tools", path: "../..", traits: []),
     .package(url: "https://github.com/apple/swift-collections", from: "1.6.0")
   ],
   targets: [

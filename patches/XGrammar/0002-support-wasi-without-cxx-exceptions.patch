@@ -10,20 +10,28 @@ index 706393d..b86cdc2 100644
  #include <cctype>
  #include <cstdint>
  #include <limits>
-@@ -59,7 +60,19 @@ struct Location {
+@@ -37,3 +37,6 @@ struct Location {
+-[[noreturn]] void RaiseLarkError(
++#if !defined(__wasi__)
++[[noreturn]]
++#endif
++void RaiseLarkError(
+     const std::string& source, const Location& location, const std::string& message
+ ) {
+@@ -59,7 +62,19 @@ struct Location {
    if (!line_text.empty()) {
      os << "\n" << line_text << "\n" << std::string(std::max(0, location.column - 1), ' ') << "^";
    }
 +#if defined(__wasi__)
-+  XGRAMMAR_LOG(FATAL) << os.str();
++  SetLastError(ErrorCode::kGrammar, os.str().c_str());
 +#else
    throw XGrammarError(os.str());
 +#endif
 +}
 +
-+[[noreturn]] void RaiseLarkConfigurationError(const std::string& message) {
++void RaiseLarkConfigurationError(const std::string& message) {
 +#if defined(__wasi__)
-+  XGRAMMAR_LOG(FATAL) << message;
++  SetLastError(ErrorCode::kGrammar, message.c_str());
 +#else
 +  throw XGrammarError(message);
 +#endif
@@ -206,12 +214,38 @@ index 706393d..b86cdc2 100644
      }
    }
    auto tokens = LarkLexer(lark_string).Tokenize();
+@@ -378,3 +378,4 @@ class LarkLexer {
+     }
+     RaiseLarkError(source_, location, "unterminated string literal");
++    return {};
+   }
+@@ -409,3 +410,4 @@ class LarkLexer {
+     }
+     RaiseLarkError(source_, location, "unterminated regular expression");
++    return {};
+   }
+@@ -972,3 +974,4 @@ class LarkParser {
+     }
+     RaiseLarkError(source_, token.location, "expected grammar expression");
++    return {};
+   }
+@@ -1448,4 +1451,5 @@ class LarkCompiler {
+     RaiseLarkError(
+         source_, node.location, "only the regular-expression flag 's' is currently supported"
+     );
++    return {};
+   }
+@@ -1661,3 +1665,4 @@ class LarkCompiler {
+     }
+     RaiseLarkError(source_, node.location, "unsupported grammar node");
++    return {};
+   }
 diff --git a/cpp/support/no_exceptions.h b/cpp/support/no_exceptions.h
 new file mode 100644
 index 0000000..f234813
 --- /dev/null
 +++ b/cpp/support/no_exceptions.h
-@@ -0,0 +1,21 @@
+@@ -0,0 +1,37 @@
 +/*!
 + * Copyright (c) 2026 by Contributors
 + * \file xgrammar/support/no_exceptions.h
@@ -219,6 +253,8 @@ index 0000000..f234813
 + */
 +#ifndef XGRAMMAR_SUPPORT_NO_EXCEPTIONS_H_
 +#define XGRAMMAR_SUPPORT_NO_EXCEPTIONS_H_
++
++#include <cstdint>
 +
 +#if defined(XGRAMMAR_CXX_EXCEPTIONS_ENABLED) && !XGRAMMAR_CXX_EXCEPTIONS_ENABLED
 +#ifdef __cpp_exceptions
@@ -231,5 +267,19 @@ index 0000000..f234813
 +#define PICOJSON_DISABLE_EXCEPTION 1
 +#endif
 +#endif
++
++namespace xgrammar {
++
++enum class ErrorCode : uint8_t {
++  kNone,
++  kGrammar,
++};
++
++void ClearLastError();
++void SetLastError(ErrorCode code, const char* message);
++bool HasLastError();
++const char* LastErrorMessage();
++
++}  // namespace xgrammar
 +
 +#endif  // XGRAMMAR_SUPPORT_NO_EXCEPTIONS_H_

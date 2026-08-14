@@ -1,6 +1,6 @@
 // MARK: - EdgeToolsGrammarMatcher
 
-public protocol EdgeToolsGrammarMatcher {
+public protocol EdgeToolsGrammarMatcher: ~Copyable {
   var isTerminated: Bool { get }
 
   mutating func grammarBitmask() -> GrammarBitmask
@@ -9,16 +9,14 @@ public protocol EdgeToolsGrammarMatcher {
   mutating func accept(tokenId: EdgeToolsToken.ID) -> Bool
 }
 
-// MARK: - EdgeToolsGrammarCompiler
+// MARK: - EdgeToolsGrammarEngine
 
-public protocol EdgeToolsGrammarCompiler {
-  associatedtype Grammar: Sendable
-  associatedtype Context = Void
-  associatedtype Matcher: EdgeToolsGrammarMatcher
+public protocol EdgeToolsGrammarEngine: Sendable {
+  associatedtype Grammar: Sendable & ~Copyable
+  associatedtype Matcher: EdgeToolsGrammarMatcher & ~Copyable
 
-  mutating func matcher(
-    for grammar: Grammar,
-    context: borrowing Context,
+  func matcher(
+    for grammar: borrowing Grammar,
     stopTokenIds: Set<EdgeToolsToken.ID>
   ) throws -> Matcher
 }
@@ -26,12 +24,12 @@ public protocol EdgeToolsGrammarCompiler {
 // MARK: - EdgeToolsGenerationConstraint
 
 public protocol EdgeToolsGenerationConstraint: Sendable {
-  associatedtype Grammar: Sendable
+  associatedtype Grammar: Sendable & ~Copyable
   associatedtype Context
 
   var toolCallRange: GrammarToolCallRange? { get }
 
-  func grammar(toolCallGrammar: Grammar?, context: Context) throws -> Grammar
+  func grammar(toolCallGrammar: consuming Grammar?, context: Context) throws -> Grammar
 }
 
 // MARK: - EdgeToolsConstrainedGenerateParameters

@@ -4,6 +4,17 @@
 import CompilerPluginSupport
 import PackageDescription
 
+var edgeToolsSwiftSettings: [SwiftSetting] = [
+  .enableExperimentalFeature("Lifetimes"),
+  .enableExperimentalFeature("AddressableTypes")
+]
+#if compiler(<6.4)
+  edgeToolsSwiftSettings.append(.enableExperimentalFeature("SuppressedAssociatedTypes"))
+#endif
+let edgeToolsJavaScriptSwiftSettings = edgeToolsSwiftSettings + [
+  .enableExperimentalFeature("Extern")
+]
+
 let package = Package(
   name: "swift-edge-tools",
   platforms: [.macOS(.v14), .iOS(.v17), .tvOS(.v17), .watchOS(.v10), .visionOS(.v1)],
@@ -12,10 +23,15 @@ let package = Package(
     .library(name: "EdgeToolsXGrammar", targets: ["EdgeToolsXGrammar"])
   ],
   traits: [
-    .trait(name: "Foundation", description: "Foundation-specific conveniences."),
-    .trait(name: "Atomics", description: "Atomic engine generation coordination."),
+    .trait(name: "Foundation", description: "Foundation Essentials conveniences."),
+    .trait(
+      name: "FullFoundation",
+      description: "Full Foundation conveniences.",
+      enabledTraits: ["Foundation"]
+    ),
     .trait(name: "JS", description: "JavaScriptKit interoperability."),
     .trait(name: "XGrammar", description: "XGrammar-powered structured generation."),
+    .trait(name: "Needle2", description: "Needle 2 engine support."),
     .trait(
       name: "Transformers",
       description: "swift-transformers tokenizer support.",
@@ -29,21 +45,7 @@ let package = Package(
     .trait(
       name: "MLX",
       description: "MLX model support.",
-      enabledTraits: ["Transformers", "Foundation", "Atomics"]
-    ),
-    .trait(
-      name: "ONNXCore",
-      description: """
-        Needle ONNX model and runtime-provider protocols.
-
-        (Only enable this trait if you want to use your own ONNX build. Otherwise, enable `ONNX` directly.)
-        """,
-      enabledTraits: ["XGrammar", "Atomics"]
-    ),
-    .trait(
-      name: "ONNX",
-      description: "Vendored ONNX Runtime support.",
-      enabledTraits: ["ONNXCore", "Transformers"]
+      enabledTraits: ["Transformers", "Foundation"]
     ),
     .default(enabledTraits: ["Foundation"])
   ],
@@ -73,10 +75,14 @@ let package = Package(
           name: "_EdgeToolsFoundation",
           condition: .when(traits: ["Foundation"])
         ),
+        .target(
+          name: "_EdgeToolsJavaScript",
+          condition: .when(traits: ["JS"])
+        ),
         .product(name: "yyjson", package: "yyjson"),
         .product(name: "HeapModule", package: "swift-collections"),
         .product(name: "OrderedCollections", package: "swift-collections"),
-        .product(name: "Atomics", package: "swift-atomics", condition: .when(traits: ["Atomics"])),
+        .product(name: "Atomics", package: "swift-atomics"),
         .product(
           name: "JavaScriptKit",
           package: "JavaScriptKit",
@@ -124,8 +130,11 @@ let package = Package(
         ),
         .target(name: "EdgeToolsXGrammar", condition: .when(traits: ["XGrammar"])),
         .target(
-          name: "COnnxRuntime",
-          condition: .when(platforms: [.macOS, .iOS, .linux, .android], traits: ["ONNXCore"])
+          name: "CNeedle2",
+          condition: .when(
+            platforms: [.macOS, .iOS, .tvOS, .watchOS, .linux, .windows, .android],
+            traits: ["Needle2"]
+          )
         ),
         .product(
           name: "Tokenizers",
@@ -138,45 +147,40 @@ let package = Package(
         )
       ],
       path: "swift/EdgeTools/Sources/EdgeTools",
-      swiftSettings: [
-        .enableExperimentalFeature("Lifetimes"),
-        .enableExperimentalFeature("AddressableTypes")
-      ],
-      linkerSettings: [.linkedFramework("CoreML", .when(platforms: [.macOS, .iOS], traits: ["ONNX"]))]
+      swiftSettings: edgeToolsSwiftSettings,
+      linkerSettings: [
+        .linkedLibrary(
+          "c++",
+          .when(
+            platforms: [.macOS, .iOS, .tvOS, .watchOS],
+            traits: ["Needle2"]
+          )
+        ),
+        .linkedLibrary("c++", .when(platforms: [.linux], traits: ["Needle2"])),
+        .linkedLibrary("c++_shared", .when(platforms: [.android], traits: ["Needle2"]))
+      ]
     ),
     .target(
       name: "_EdgeToolsFoundation",
       path: "swift/EdgeTools/Sources/_EdgeToolsFoundation"
     ),
     .target(
+      name: "_EdgeToolsJavaScript",
+      dependencies: [
+        .product(name: "JavaScriptKit", package: "JavaScriptKit")
+      ],
+      path: "swift/EdgeTools/Sources/_EdgeToolsJavaScript",
+      swiftSettings: edgeToolsJavaScriptSwiftSettings,
+      plugins: [.plugin(name: "BridgeJS", package: "JavaScriptKit")]
+    ),
+    .target(
       name: "EdgeToolsXGrammar",
       dependencies: ["CXGrammar"],
       path: "swift/EdgeTools/Sources/EdgeToolsXGrammar"
     ),
-    .target(
-      name: "COnnxRuntime",
-      dependencies: [
-        .target(
-          name: "onnxruntime",
-          condition: .when(platforms: [.macOS, .iOS], traits: ["ONNX"])
-        ),
-        .target(
-          name: "onnxruntimeNonApple",
-          condition: .when(platforms: [.linux, .android], traits: ["ONNX"])
-        )
-      ],
-      path: "swift/EdgeTools/Sources/COnnxRuntime",
-      exclude: ["LICENSE"],
-      publicHeadersPath: "include"
-    ),
     .binaryTarget(
-      name: "onnxruntime",
-      url: "https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.27.0.zip",
-      checksum: "8c74edd600eafc3055de9e8f7a9602afee44ed516913cb5e132bca02cc34622c"
-    ),
-    .binaryTarget(
-      name: "onnxruntimeNonApple",
-      path: "bin/onnxruntime-webgpu-1.27.0.artifactbundle.zip"
+      name: "CNeedle2",
+      path: "bin/needle2-2.0.0.artifactbundle.zip"
     ),
     .target(
       name: "CXGrammar",
@@ -198,7 +202,11 @@ let package = Package(
       ],
       plugins: [.plugin(name: "PatchPlugin")]
     ),
-    .plugin(name: "PatchPlugin", capability: .buildTool(), path: "swift/EdgeTools/Plugins/PatchPlugin"),
+    .plugin(
+      name: "PatchPlugin",
+      capability: .buildTool(),
+      path: "swift/EdgeTools/Plugins/PatchPlugin"
+    ),
     .macro(
       name: "EdgeToolsMacros",
       dependencies: [
@@ -222,10 +230,6 @@ let package = Package(
       name: "EdgeToolsTests",
       dependencies: [
         "EdgeTools",
-        .target(
-          name: "COnnxRuntime",
-          condition: .when(platforms: [.macOS, .iOS, .linux, .android], traits: ["ONNX"])
-        ),
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
         .product(name: "CustomDump", package: "swift-custom-dump"),
         .product(name: "Hub", package: "swift-transformers", condition: .when(traits: ["MLX"]))
@@ -233,9 +237,7 @@ let package = Package(
       path: "swift/EdgeTools/Tests/EdgeToolsTests",
       exclude: [
         "GenerationSchema/__Snapshots__",
-        "Models/Needle/Engines/__Snapshots__",
-        "Models/Needle/Engines/MLX/__Snapshots__",
-        "Models/Needle/__Snapshots__",
+        "Models/Needle2/__Snapshots__",
         "Models/__Snapshots__",
         "Models/Gemma/__Snapshots__",
         "Models/LFM/__Snapshots__",

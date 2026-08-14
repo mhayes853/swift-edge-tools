@@ -36,7 +36,7 @@ struct `GenerationParserCommon tests` {
         #"<tool_call>{"name":"lookup","arguments":{"location":"Paris"}}</tool_call>"#,
         " I will let you know."
       ],
-      using: { Qwen3GenerationParser() }
+      using: { TestGenerationParser() }
     )
 
     expectNoDifference(
@@ -46,27 +46,6 @@ struct `GenerationParserCommon tests` {
         .toolCall(EdgeRawToolCall(name: "lookup", arguments: ["location": "Paris"])),
         .text(" I will let you know.")
       ]
-    )
-  }
-
-  @Test
-  func `Parses Needle Tool Calls From Tokenizer Tokens`() throws {
-    let source = #"<tool_call> [{"name":"lookup","arguments":{"location":"Paris"}}]"#
-    let tokenizer = try testTokenizer()
-    let tokens: [EdgeToolsToken] = tokenizer.tokenize(text: source).enumerated()
-      .compactMap {
-        index,
-        string in
-        guard let id = tokenizer.convertTokenToId(string) else { return nil }
-        if index == 0, string.hasPrefix("▁") { return nil }
-        return EdgeToolsToken(id: id, stringValue: string)
-      }
-    var parser = NeedleGenerationParser()
-    let parts = tokens.flatMap { parser.accept(token: $0) } + parser.finish()
-
-    expectNoDifference(
-      parts.compactMap(\.toolCall),
-      [EdgeRawToolCall(name: "lookup", arguments: ["location": "Paris"])]
     )
   }
 
@@ -94,12 +73,6 @@ private struct GenerationParserTestFixture: Sendable, CustomStringConvertible {
 }
 
 private let generationParserTestFixtures = [
-  GenerationParserTestFixture(
-    name: "Needle",
-    makeParser: { NeedleGenerationParser() },
-    source: [#"<tool_call> [{"name":"lookup","arguments":{"location":"Paris"}}]"#],
-    call: EdgeRawToolCall(name: "lookup", arguments: ["location": "Paris"])
-  ),
   GenerationParserTestFixture(
     name: "Qwen3",
     makeParser: { Qwen3GenerationParser() },

@@ -12,41 +12,38 @@ public struct RunReport: Encodable {
   public struct Metrics: Encodable {
     public let load: Duration
     public let endToEnd: Duration
-    public let prefill: EdgeToolsPrefillMetrics
-    public let decode: EdgeToolsDecodeMetrics
+    public let generation: CLIGenerationMetrics
     public let peakResident: MemoryByteCount
     public let peakGPU: MemoryByteCount
 
     enum CodingKeys: String, CodingKey {
       case loadMilliseconds
       case endToEndMilliseconds
-      case timeToFirstTokenMilliseconds
-      case prefillTokens
-      case prefillMilliseconds
-      case prefillTokensPerSecond
-      case decodeTokens
-      case decodeMilliseconds
-      case decodeTokensPerSecond
       case peakResidentBytes
       case peakGPUBytes
     }
 
     public func encode(to encoder: any Encoder) throws {
-      var container = encoder.container(keyedBy: CodingKeys.self)
-      try container.encode(self.load.milliseconds, forKey: .loadMilliseconds)
-      try container.encode(self.endToEnd.milliseconds, forKey: .endToEndMilliseconds)
+      var container = encoder.container(keyedBy: DynamicCodingKey.self)
       try container.encode(
-        self.decode.durationToFirstToken.milliseconds,
-        forKey: .timeToFirstTokenMilliseconds
+        self.load.milliseconds,
+        forKey: DynamicCodingKey(CodingKeys.loadMilliseconds.rawValue)
       )
-      try container.encode(self.prefill.tokens, forKey: .prefillTokens)
-      try container.encode(self.prefill.duration.milliseconds, forKey: .prefillMilliseconds)
-      try container.encode(self.prefill.tokensPerSecond, forKey: .prefillTokensPerSecond)
-      try container.encode(self.decode.tokens, forKey: .decodeTokens)
-      try container.encode(self.decode.duration.milliseconds, forKey: .decodeMilliseconds)
-      try container.encode(self.decode.tokensPerSecond, forKey: .decodeTokensPerSecond)
-      try container.encode(self.peakResident, forKey: .peakResidentBytes)
-      try container.encode(self.peakGPU, forKey: .peakGPUBytes)
+      try container.encode(
+        self.endToEnd.milliseconds,
+        forKey: DynamicCodingKey(CodingKeys.endToEndMilliseconds.rawValue)
+      )
+      for metric in self.generation.metrics {
+        try container.encode(metric.value, forKey: DynamicCodingKey(metric.jsonKey))
+      }
+      try container.encode(
+        self.peakResident,
+        forKey: DynamicCodingKey(CodingKeys.peakResidentBytes.rawValue)
+      )
+      try container.encode(
+        self.peakGPU,
+        forKey: DynamicCodingKey(CodingKeys.peakGPUBytes.rawValue)
+      )
     }
   }
 
@@ -85,13 +82,9 @@ extension RunReport {
         + (metrics.peakGPU.isEmpty ? "" : " · \(metrics.peakGPU.displayText) peak GPU")
     )
     lines.append(
-      "Prefill \(metrics.prefill.tokens) tok  \(metrics.prefill.duration.displayText)  "
-        + metrics.prefill.tokensPerSecond.tokenRateText
-    )
-    lines.append(
-      "Decode  \(metrics.decode.tokens) tok  \(metrics.decode.duration.displayText)  "
-        + metrics.decode.tokensPerSecond.tokenRateText
-        + "  TTFT \(metrics.decode.durationToFirstToken.displayText)"
+      contentsOf: metrics.generation.groups.map {
+        $0.label.rightPadded(to: 8) + $0.metrics.map(\.displayText).joined(separator: "  ")
+      }
     )
     lines.append("E2E     \(metrics.endToEnd.displayText) (excludes load)")
     return lines.joined(separator: "\n")

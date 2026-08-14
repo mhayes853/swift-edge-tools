@@ -16,6 +16,8 @@ struct EchoTool: EdgeTool {
 }
 
 final class MockEngine: EdgeToolsEngine {
+  final class Context: Identifiable, Sendable {}
+
   struct GenerateParameters: EdgeToolsEngineGenerateParameters {
     static let `default` = GenerateParameters()
     var maxTokens: Int? { nil }
@@ -37,9 +39,14 @@ final class MockEngine: EdgeToolsEngine {
 
   struct Prompt: Sendable {}
 
+  func context(_ parameters: Void) -> Context {
+    Context()
+  }
+
   func tokenize(
     prompt: Prompt,
-    tools: [EdgeToolDefinition]
+    tools: [EdgeToolDefinition],
+    context: Context
   ) async throws -> [EdgeToolsToken] {
     []
   }
@@ -48,6 +55,7 @@ final class MockEngine: EdgeToolsEngine {
     prompt: Prompt,
     tools: [EdgeToolDefinition],
     parameters: GenerateParameters,
+    context: Context,
     channel: sending EdgeToolsGenerationChannel
   ) throws -> GenerationTask {
     let token = EdgeToolsToken(id: 0, stringValue: "calling")
@@ -73,10 +81,18 @@ final class MockEngine: EdgeToolsEngine {
 }
 
 func runSmoke() async throws {
+  let generationTask = AnyGenerationTask { stopper in
+    stopper.stop()
+    return .empty
+  }
+  guard try await generationTask.value.wasStopped else {
+    throw SmokeError.unexpectedGenerationTaskResult
+  }
+
   let session = EdgeToolsSession(engine: MockEngine()) {
     EchoTool()
   }
-  let generation = try await session.generate(prompt: MockEngine.Prompt())
+  let generation = try await session.generate(prompt: MockEngine.Prompt(), context: nil)
 
   guard generation.toolCalls.count == 1 else { throw SmokeError.unexpectedToolCallCount }
   let call = generation.toolCalls[0]
@@ -100,6 +116,7 @@ func runSmoke() async throws {
 }
 
 enum SmokeError: String, Error {
+  case unexpectedGenerationTaskResult
   case unexpectedToolCallCount
   case unexpectedToolName
   case unexpectedToolInput

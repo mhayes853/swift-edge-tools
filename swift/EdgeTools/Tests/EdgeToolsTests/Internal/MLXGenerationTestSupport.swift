@@ -12,18 +12,19 @@
     case missingToolOutput
     case missingFinalResponse
     case missingReasoning
+    case missingUserMessage
     case failedToCreateImage
     case failedToCreateVideo
     case failedToAppendVideoFrame
     case failedToFinishVideo
   }
 
-  func completeWeatherTurn<Engine: EdgeToolsEngine>(
-    using engine: Engine
-  ) async throws -> EdgeToolsConversationalPrompt
+  func completeWeatherTurn<Profile: MLXModelProfile>(
+    using engine: MLXEngine<Profile>
+  ) async throws -> EdgeToolsTranscript
   where
-    Engine.Prompt == EdgeToolsConversationalPrompt,
-    Engine.GenerateParameters == DefaultMLXGenerateParameters
+    Profile.Prompt == EdgeToolsTranscript,
+    Profile.GenerateParameters == DefaultMLXGenerateParameters
   {
     try await completeToolTurn(
       using: engine,
@@ -45,18 +46,19 @@
     var response: String
   }
 
-  func completeWeatherTurn<Engine: EdgeToolsEngine>(
-    using session: EdgeToolsSession<Engine>,
+  func completeWeatherTurn<Profile: MLXModelProfile>(
+    using session: EdgeToolsSession<MLXEngine<Profile>>,
     sampling parameters: EdgeToolsFusedSamplingParameters
   ) async throws -> SessionWeatherTurnSnapshot
   where
-    Engine.Prompt == EdgeToolsConversationalPrompt,
-    Engine.GenerateParameters == DefaultMLXGenerateParameters
+    Profile.Prompt == EdgeToolsTranscript,
+    Profile.GenerateParameters == DefaultMLXGenerateParameters
   {
-    var transcript = EdgeToolsConversationalPrompt.weatherTest
-    transcript.reasoningEffort = .none
+    let turn = try splitUserMessage(from: .weatherTest)
+    let context = session.context(transcript: turn.transcript, reasoningEffort: .none)
     let toolGeneration = try await session.generate(
-      prompt: transcript,
+      prompt: turn.userMessage,
+      context: context,
       parameters: DefaultMLXGenerateParameters(
         sampler: MLXFusedSampler(parameters: parameters),
         constraint: .toolsWithGrammar(range: .exact(1)),
@@ -70,17 +72,18 @@
       throw MLXGenerationTestError.missingToolOutput
     }
 
-    transcript.messages.append(.init(generation: toolGeneration.engineGeneration))
-    transcript.messages.append(.tool(name: "getWeather", response: .string(toolOutput)))
-    let responseGeneration = try await session.generate(
-      prompt: transcript,
+    context.transcript.messages.append(.tool(name: "getWeather", response: .string(toolOutput)))
+    let responseTask = try session.engine.generate(
+      tools: [],
       parameters: DefaultMLXGenerateParameters(
         sampler: MLXFusedSampler(parameters: parameters),
         constraint: .unconstrained,
         maxTokens: 64
-      )
+      ),
+      context: context,
+      channel: EdgeToolsGenerationChannel()
     )
-    let response = responseGeneration.response
+    let response = try await responseTask.value.response
     guard !response.isEmpty else { throw MLXGenerationTestError.missingFinalResponse }
     return SessionWeatherTurnSnapshot(
       toolCalls: toolGeneration.engineGeneration.toolCalls,
@@ -106,25 +109,23 @@
     }
   }
 
-  func generateReasoning<Engine: EdgeToolsEngine>(
-    using engine: Engine
+  func generateReasoning<Profile: MLXModelProfile>(
+    using engine: MLXEngine<Profile>
   ) async throws -> EdgeToolsEngineGeneration
   where
-    Engine.Prompt == EdgeToolsConversationalPrompt,
-    Engine.GenerateParameters == DefaultMLXGenerateParameters
+    Profile.Prompt == EdgeToolsTranscript,
+    Profile.GenerateParameters == DefaultMLXGenerateParameters
   {
-    let prompt = EdgeToolsConversationalPrompt(
-      messages: [
-        .user(
-          "Think carefully before answering: what is the sum of 19 and 23? Keep the final answer brief."
-        )
-      ],
-      reasoningEffort: .high
+    let context = engine.context(
+      MLXContextParameters(reasoningEffort: .high)
     )
     let task = try engine.generate(
-      prompt: prompt,
+      prompt: .user(
+        "Think carefully before answering: what is the sum of 19 and 23? Keep the final answer brief."
+      ),
       tools: [],
       parameters: DefaultMLXGenerateParameters(maxTokens: 512),
+      context: context,
       channel: EdgeToolsGenerationChannel()
     )
     let generation = try await task.value
@@ -134,7 +135,7 @@
     return generation
   }
 
-  extension EdgeToolsConversationalPrompt {
+  extension EdgeToolsTranscript {
     static let weatherTest = Self(messages: [
       .system(
         "Use getWeather when needed. After receiving its result, summarize it for the user."
@@ -182,38 +183,36 @@
     var response: String
   }
 
-  func describeRedImage<Engine: EdgeToolsEngine>(
-    using engine: Engine
+  func describeRedImage<Profile: MLXModelProfile>(
+    using engine: MLXEngine<Profile>
   ) async throws -> String
   where
-    Engine.Prompt == EdgeToolsConversationalPrompt,
-    Engine.GenerateParameters == DefaultMLXGenerateParameters
+    Profile.Prompt == EdgeToolsTranscript,
+    Profile.GenerateParameters == DefaultMLXGenerateParameters
   {
-    let prompt = EdgeToolsConversationalPrompt(messages: [
-      .user(
+    let task = try engine.generate(
+      prompt: .user(
         "What is the dominant color in this image? Answer briefly.",
         images: [try redImageAsset()]
-      )
-    ])
-    let task = try engine.generate(
-      prompt: prompt,
+      ),
       tools: [],
       parameters: DefaultMLXGenerateParameters(maxTokens: 64),
+      context: engine.context(),
       channel: EdgeToolsGenerationChannel()
     )
     return try await task.value.response
   }
 
-  func completeImageColorTurn<Engine: EdgeToolsEngine>(
-    using engine: Engine
+  func completeImageColorTurn<Profile: MLXModelProfile>(
+    using engine: MLXEngine<Profile>
   ) async throws -> VLMToolTurnSnapshot
   where
-    Engine.Prompt == EdgeToolsConversationalPrompt,
-    Engine.GenerateParameters == DefaultMLXGenerateParameters
+    Profile.Prompt == EdgeToolsTranscript,
+    Profile.GenerateParameters == DefaultMLXGenerateParameters
   {
     let turn = try await completeToolTurn(
       using: engine,
-      prompt: EdgeToolsConversationalPrompt(messages: [
+      prompt: EdgeToolsTranscript(messages: [
         .system(
           "Inspect the image and call reportColor with its dominant color. After the tool result, summarize it."
         ),
@@ -226,30 +225,32 @@
     return VLMToolTurnSnapshot(toolCalls: turn.toolCalls, response: turn.response)
   }
 
-  private func completeToolTurn<Engine: EdgeToolsEngine>(
-    using engine: Engine,
-    prompt: EdgeToolsConversationalPrompt,
+  private func completeToolTurn<Profile: MLXModelProfile>(
+    using engine: MLXEngine<Profile>,
+    prompt: EdgeToolsTranscript,
     tool: EdgeToolDefinition,
     toolResponse: EdgeToolsValue,
     toolMaxTokens: Int
   ) async throws -> (
-    transcript: EdgeToolsConversationalPrompt,
+    transcript: EdgeToolsTranscript,
     toolCalls: [EdgeRawToolCall],
     response: String
   )
   where
-    Engine.Prompt == EdgeToolsConversationalPrompt,
-    Engine.GenerateParameters == DefaultMLXGenerateParameters
+    Profile.Prompt == EdgeToolsTranscript,
+    Profile.GenerateParameters == DefaultMLXGenerateParameters
   {
-    var transcript = prompt
+    let turn = try splitUserMessage(from: prompt)
+    let context = engine.context(MLXContextParameters(transcript: turn.transcript))
     let toolGenerationTask = try engine.generate(
-      prompt: transcript,
+      prompt: turn.userMessage,
       tools: [tool],
       parameters: DefaultMLXGenerateParameters(
         sampler: ArgMaxSampler(),
         constraint: .toolsWithGrammar(range: .exact(1)),
         maxTokens: toolMaxTokens
       ),
+      context: context,
       channel: EdgeToolsGenerationChannel()
     )
     let toolGeneration = try await toolGenerationTask.value
@@ -257,13 +258,12 @@
       throw MLXGenerationTestError.missingToolCall
     }
 
-    transcript.messages.append(.init(generation: toolGeneration))
-    transcript.messages.append(.tool(name: tool.name, response: toolResponse))
+    context.transcript.messages.append(.tool(name: tool.name, response: toolResponse))
 
     let responseGenerationTask = try engine.generate(
-      prompt: transcript,
       tools: [],
       parameters: DefaultMLXGenerateParameters(maxTokens: 64),
+      context: context,
       channel: EdgeToolsGenerationChannel()
     )
     let responseGeneration = try await responseGenerationTask.value
@@ -271,75 +271,72 @@
       throw MLXGenerationTestError.missingFinalResponse
     }
 
-    transcript.messages.append(.init(generation: responseGeneration))
     return (
-      transcript: transcript,
+      transcript: context.transcript,
       toolCalls: toolGeneration.toolCalls,
       response: responseGeneration.response
     )
   }
 
-  func describeRedVideo<Engine: EdgeToolsEngine>(
-    using engine: Engine
+  func describeRedVideo<Profile: MLXModelProfile>(
+    using engine: MLXEngine<Profile>
   ) async throws -> String
   where
-    Engine.Prompt == EdgeToolsConversationalPrompt,
-    Engine.GenerateParameters == DefaultMLXGenerateParameters
+    Profile.Prompt == EdgeToolsTranscript,
+    Profile.GenerateParameters == DefaultMLXGenerateParameters
   {
     let video = try await redVideoAsset()
     defer { video.remove() }
-    let prompt = EdgeToolsConversationalPrompt(messages: [
-      .user(
-        "What is the dominant color in this video? Answer briefly.",
-        videos: [video.asset]
-      )
-    ])
+    let prompt = EdgeToolsTranscript.UserMessage(
+      "What is the dominant color in this video? Answer briefly.",
+      videos: [video.asset]
+    )
     let task = try engine.generate(
       prompt: prompt,
       tools: [],
       parameters: DefaultMLXGenerateParameters(maxTokens: 64),
+      context: engine.context(),
       channel: EdgeToolsGenerationChannel()
     )
     return try await task.value.response
   }
 
-  func describeRedImageAndVideo<Engine: EdgeToolsEngine>(
-    using engine: Engine
+  func describeRedImageAndVideo<Profile: MLXModelProfile>(
+    using engine: MLXEngine<Profile>
   ) async throws -> String
   where
-    Engine.Prompt == EdgeToolsConversationalPrompt,
-    Engine.GenerateParameters == DefaultMLXGenerateParameters
+    Profile.Prompt == EdgeToolsTranscript,
+    Profile.GenerateParameters == DefaultMLXGenerateParameters
   {
     let video = try await redVideoAsset()
     defer { video.remove() }
-    let prompt = EdgeToolsConversationalPrompt(messages: [
-      .user(
-        "What is the dominant color across the image and video? Answer briefly.",
-        images: [try redImageAsset()],
-        videos: [video.asset]
-      )
-    ])
+    let prompt = EdgeToolsTranscript.UserMessage(
+      "What is the dominant color across the image and video? Answer briefly.",
+      images: [try redImageAsset()],
+      videos: [video.asset]
+    )
     let task = try engine.generate(
       prompt: prompt,
       tools: [],
       parameters: DefaultMLXGenerateParameters(maxTokens: 64),
+      context: engine.context(),
       channel: EdgeToolsGenerationChannel()
     )
     return try await task.value.response
   }
 
-  func completeVideoColorTurn<Engine: EdgeToolsEngine>(
-    using engine: Engine
+  func completeVideoColorTurn<Profile: MLXModelProfile>(
+    using engine: MLXEngine<Profile>
   ) async throws -> VLMToolTurnSnapshot
   where
-    Engine.Prompt == EdgeToolsConversationalPrompt,
-    Engine.GenerateParameters == DefaultMLXGenerateParameters
+    Profile.Prompt == EdgeToolsTranscript,
+    Profile.GenerateParameters == DefaultMLXGenerateParameters
   {
     let video = try await redVideoAsset()
     defer { video.remove() }
     let turn = try await completeToolTurn(
       using: engine,
-      prompt: EdgeToolsConversationalPrompt(messages: [
+      prompt: EdgeToolsTranscript(messages: [
         .system(
           "Inspect the video and call reportColor with its dominant color. After the tool result, summarize it."
         ),
@@ -352,7 +349,20 @@
     return VLMToolTurnSnapshot(toolCalls: turn.toolCalls, response: turn.response)
   }
 
-  private func redImageAsset() throws -> EdgeToolsConversationalPrompt.Asset {
+  private func splitUserMessage(
+    from transcript: EdgeToolsTranscript
+  ) throws -> (
+    transcript: EdgeToolsTranscript,
+    userMessage: EdgeToolsTranscript.UserMessage
+  ) {
+    var transcript = transcript
+    guard case .user(let userMessage) = transcript.messages.popLast() else {
+      throw MLXGenerationTestError.missingUserMessage
+    }
+    return (transcript, userMessage)
+  }
+
+  private func redImageAsset() throws -> EdgeToolsTranscript.Asset {
     let width = 128
     let height = 128
     guard
@@ -389,11 +399,11 @@
     guard CGImageDestinationFinalize(destination) else {
       throw MLXGenerationTestError.failedToCreateImage
     }
-    return EdgeToolsConversationalPrompt.Asset(bytes: Array(data as Data), mimeTypeOverride: .png)
+    return EdgeToolsTranscript.Asset(bytes: Array(data as Data), mimeTypeOverride: .png)
   }
 
   private struct VideoTestAsset {
-    let asset: EdgeToolsConversationalPrompt.Asset
+    let asset: EdgeToolsTranscript.Asset
     let url: URL
 
     func remove() {
@@ -457,7 +467,7 @@
       throw MLXGenerationTestError.failedToFinishVideo
     }
     return VideoTestAsset(
-      asset: EdgeToolsConversationalPrompt.Asset(path: url.path(), mimeTypeOverride: .mp4),
+      asset: EdgeToolsTranscript.Asset(path: url.path(), mimeTypeOverride: .mp4),
       url: url
     )
   }

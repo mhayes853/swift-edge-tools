@@ -42,8 +42,7 @@ public func runModel(
     metrics: RunReport.Metrics(
       load: loaded.loadDuration,
       endToEnd: start.duration(to: context.now()),
-      prefill: generation.prefillMetrics,
-      decode: generation.decodeMetrics,
+      generation: loaded.runner.metrics(from: generation),
       peakResident: peakMemory.resident,
       peakGPU: peakMemory.gpu
     )
@@ -85,8 +84,7 @@ public func benchmarkModel(
     samples.append(
       BenchSample(
         endToEnd: start.duration(to: context.now()),
-        prefill: generation.prefillMetrics,
-        decode: generation.decodeMetrics,
+        metrics: loaded.runner.metrics(from: generation),
         madeToolCalls: !generation.toolCalls.isEmpty
       )
     )
@@ -121,7 +119,6 @@ public func inspectModel(
 
 public struct BenchSample: Sendable {
   public let endToEnd: Duration
-  public let prefill: EdgeToolsPrefillMetrics
-  public let decode: EdgeToolsDecodeMetrics
+  public let metrics: CLIGenerationMetrics
   public let madeToolCalls: Bool
 }

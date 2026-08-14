@@ -40,7 +40,7 @@ struct `EdgeToolsEncoding tests` {
       "name": "Blob",
       "display_age": 42,
       "nickname": "blob",
-      "tags": ["swift", "needle"],
+      "tags": ["swift", "tools"],
       "metadata": ["role": "admin"],
       "address": ["city": "Brooklyn"]
     ]
@@ -251,7 +251,7 @@ struct `EdgeToolsGenerableInitialization tests` {
       "name": "Blob",
       "display_age": 42,
       "nickname": .null,
-      "tags": ["swift", "needle"],
+      "tags": ["swift", "tools"],
       "metadata": ["role": "admin"],
       "address": ["city": "Brooklyn"]
     ]
@@ -261,7 +261,7 @@ struct `EdgeToolsGenerableInitialization tests` {
     expectNoDifference(user.name, "Blob")
     expectNoDifference(user.age, 42)
     expectNoDifference(user.nickname, nil)
-    expectNoDifference(user.tags, ["swift", "needle"])
+    expectNoDifference(user.tags, ["swift", "tools"])
     expectNoDifference(user.metadata, ["role": "admin"])
     expectNoDifference(user.address.city, "Brooklyn")
     expectNoDifference(user.ignoredOptional, nil)
@@ -303,21 +303,6 @@ struct `SchemaComposition tests` {
       OrderedKeyJSONWriter.encode(value),
       #"{"escaped":"null\u0000byte","nonfinite":null}"#
     )
-  }
-
-  @Test
-  func `Edge Tools Value Object Preserves Key Ordering`() {
-    let value: EdgeToolsValue = .object([
-      "b": 2,
-      "a": 1,
-      "c": 3
-    ])
-
-    guard case .object(let object) = value else {
-      Issue.record("Expected object value.")
-      return
-    }
-    expectNoDifference(Array(object.keys), ["b", "a", "c"])
   }
 
   @Test

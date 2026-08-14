@@ -31,6 +31,13 @@ struct `XGrammarWASI tests` {
   }
 
   @Test
+  func `Invalid Lark Grammar Throws`() {
+    #expect(throws: XGRError.self) {
+      _ = try XGRGrammar.lark("start: [")
+    }
+  }
+
+  @Test
   func `Invalid Structural Tag Throws`() {
     #expect(throws: XGRError.self) {
       _ = try XGRGrammar.structuralTagJSON("not json")

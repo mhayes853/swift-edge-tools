@@ -1,0 +1,38 @@
+{
+  "name": "@edge-tools/needle2",
+  "version": "0.1.0",
+  "description": "Direct and Web Worker JavaScript runtime for Needle 2",
+  "type": "module",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "LICENSE-Needle2"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./worker": "./dist/needle2.worker.mjs",
+    "./needle.wasm": "./dist/needle.wasm",
+    "./needle2.cact": "./dist/needle2.cact",
+    "./standalone": "./dist/needle2.min.js"
+  },
+  "scripts": {
+    "assets": "node ../../scripts/needle2/prepare-ts-assets.mjs",
+    "build": "vite build && vite build --mode worker && vite build --mode standalone && tsc --emitDeclarationOnly",
+    "test": "npm run build && vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@vitest/browser-playwright": "^4.0.0",
+    "playwright": "^1.55.0",
+    "typescript": "^5.9.0",
+    "vite": "^7.0.0",
+    "vitest": "^4.0.0"
+  }
+}

@@ -1,4 +1,4 @@
-▿ EdgeToolsConversationalPrompt
+▿ EdgeToolsTranscript
   ▿ messages: 5 elements
     ▿ Message
       ▿ system: SystemMessage
@@ -74,9 +74,9 @@
           ▿ EdgeToolsGenerationPart
             - text: "1"
           ▿ EdgeToolsGenerationPart
-            - text: "°"
+            - text: " degrees"
           ▿ EdgeToolsGenerationPart
-            - text: "C"
+            - text: " Celsius"
           ▿ EdgeToolsGenerationPart
             - text: "**."
   ▿ reasoningEffort: EdgeToolsReasoningEffort

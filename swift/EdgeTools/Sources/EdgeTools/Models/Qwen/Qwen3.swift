@@ -6,34 +6,35 @@
   // MARK: - Qwen3 Model
 
   public struct Qwen3MLXProfile: MLXLLMModelProfile {
-    public typealias Prompt = EdgeToolsConversationalPrompt
+    public typealias Prompt = EdgeToolsTranscript
     public typealias GenerationParser = Qwen3GenerationParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
-    public typealias GrammarCompiler = XGRCompiler
-    public typealias GrammarContext = XGRGrammarContext
+    public typealias GrammarEngine = XGrammarEngine
 
     public static func grammar(
-      prompt: EdgeToolsConversationalPrompt,
+      prompt: EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
       parameters: DefaultMLXGenerateParameters,
-      context: XGRGrammarContext
+      grammarEngine: borrowing XGrammarEngine
     ) throws -> XGRGrammar {
-      try Self.constrainedGrammar(tools: tools, parameters: parameters, context: context) { range in
+      try Self.constrainedGrammar(
+        tools: tools,
+        parameters: parameters,
+        grammarEngine: grammarEngine
+      ) { range in
         let toolCalls = try XGRGrammar.qwen3(tools: tools, range: range)
         guard prompt.reasoningEffort.isEnabled else { return toolCalls }
         return try XGRGrammar.qwenReasoning().concatenate(toolCalls)
       }
     }
 
-    public static func templateContext(
-      prompt: EdgeToolsConversationalPrompt
-    ) -> [String: any Sendable]? {
+    public static func templateContext(prompt: EdgeToolsTranscript) -> [String: any Sendable]? {
       guard prompt.reasoningEffort != .default else { return nil }
       return ["enable_thinking": prompt.reasoningEffort.isEnabled]
     }
 
     public static func defaultSampling(
-      prompt: EdgeToolsConversationalPrompt,
+      prompt: EdgeToolsTranscript,
       parameters: DefaultMLXGenerateParameters
     ) -> EdgeToolsFusedSamplingParameters? {
       prompt.reasoningEffort.isEnabled

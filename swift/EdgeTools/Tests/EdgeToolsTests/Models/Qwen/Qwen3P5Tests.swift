@@ -11,11 +11,11 @@ struct `Qwen3P5 tests` {
     @Test
     func `Default Sampling Follows The Reasoning Effort`() {
       let thinking = Qwen3P5MLXProfile.defaultSampling(
-        prompt: EdgeToolsConversationalPrompt(messages: [.user("hi")], reasoningEffort: .high),
+        prompt: EdgeToolsTranscript(messages: [.user("hi")], reasoningEffort: .high),
         parameters: DefaultMLXGenerateParameters()
       )
       let nonThinking = Qwen3P5MLXProfile.defaultSampling(
-        prompt: EdgeToolsConversationalPrompt(messages: [.user("hi")], reasoningEffort: .none),
+        prompt: EdgeToolsTranscript(messages: [.user("hi")], reasoningEffort: .none),
         parameters: DefaultMLXGenerateParameters()
       )
 
@@ -28,7 +28,7 @@ struct `Qwen3P5 tests` {
   #endif
 
   #if MLX && XGrammar && canImport(MLX) && !os(WASI)
-    @Suite(.serialized, .enabledIfXcode())
+    @Suite(.serialized, .enabledIfMLXTests())
     struct `Qwen3P5MLXModelEngine tests` {
       @Test
       func `Completes Tool Turn Snapshot`() async throws {

@@ -4,20 +4,23 @@
 
 #if MLX && XGrammar && canImport(MLX)
   public struct FunctionGemmaMLXProfile: MLXLLMModelProfile {
-    public typealias Prompt = EdgeToolsConversationalPrompt
+    public typealias Prompt = EdgeToolsTranscript
     public typealias GenerationParser = FunctionGemmaGenerationParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
-    public typealias GrammarCompiler = XGRCompiler
-    public typealias GrammarContext = XGRGrammarContext
+    public typealias GrammarEngine = XGrammarEngine
 
     public static func grammar(
-      prompt: EdgeToolsConversationalPrompt,
+      prompt: EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
       parameters: DefaultMLXGenerateParameters,
-      context: XGRGrammarContext
+      grammarEngine: borrowing XGrammarEngine
     ) throws -> XGRGrammar {
-      try Self.constrainedGrammar(tools: tools, parameters: parameters, context: context) {
-        try XGRGrammar.functionGemma(tools: tools, range: $0)
+      try Self.constrainedGrammar(
+        tools: tools,
+        parameters: parameters,
+        grammarEngine: grammarEngine
+      ) {
+        try .functionGemma(tools: tools, range: $0)
       }
     }
   }

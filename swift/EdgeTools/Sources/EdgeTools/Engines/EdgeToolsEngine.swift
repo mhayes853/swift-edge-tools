@@ -1,18 +1,73 @@
 // MARK: - EdgeToolsEngine
 
 public protocol EdgeToolsEngine: Sendable {
+  associatedtype Context: Identifiable & Sendable where Context.ID: Sendable
+  associatedtype ContextParameters: Sendable = Void
   associatedtype Prompt: Sendable
   associatedtype GenerateParameters: EdgeToolsEngineGenerateParameters
   associatedtype GenerationTask: EdgeToolsEngineGenerationTask
 
-  func tokenize(prompt: Prompt, tools: [EdgeToolDefinition]) async throws -> [EdgeToolsToken]
+  func context() -> Context
+  func context(_ parameters: ContextParameters) -> Context
 
   func generate(
     prompt: Prompt,
     tools: [EdgeToolDefinition],
     parameters: sending GenerateParameters,
+    context: Context,
     channel: sending EdgeToolsGenerationChannel
   ) throws -> GenerationTask
+}
+
+extension EdgeToolsEngine where ContextParameters == Void {
+  public func context() -> Context {
+    self.context(())
+  }
+}
+
+extension EdgeToolsEngine {
+  public func context<Parameters>() -> Context
+  where ContextParameters == Parameters? {
+    self.context(nil)
+  }
+
+  public func generate(
+    prompt: Prompt,
+    tools: [EdgeToolDefinition] = [],
+    parameters: sending GenerateParameters,
+    channel: sending EdgeToolsGenerationChannel
+  ) throws -> GenerationTask {
+    try self.generate(
+      prompt: prompt,
+      tools: tools,
+      parameters: parameters,
+      context: self.context(),
+      channel: channel
+    )
+  }
+}
+
+// MARK: - EdgeToolsTokenizingEngine
+
+public protocol EdgeToolsTokenizingEngine: EdgeToolsEngine {
+  func tokenize(
+    prompt: Prompt,
+    tools: [EdgeToolDefinition],
+    context: Context
+  ) async throws -> [EdgeToolsToken]
+}
+
+extension EdgeToolsTokenizingEngine {
+  public func tokenize(
+    prompt: Prompt,
+    tools: [EdgeToolDefinition] = []
+  ) async throws -> [EdgeToolsToken] {
+    try await self.tokenize(
+      prompt: prompt,
+      tools: tools,
+      context: self.context()
+    )
+  }
 }
 
 // MARK: - EdgeToolsPrefillableEngine
@@ -20,7 +75,8 @@ public protocol EdgeToolsEngine: Sendable {
 public protocol EdgeToolsPrefillableEngine: EdgeToolsEngine {
   func prefill(
     promptPrefix: Prompt,
-    tools: [EdgeToolDefinition]
+    tools: [EdgeToolDefinition],
+    context: Context
   ) async throws -> EdgeToolsEnginePrefill
 }
 

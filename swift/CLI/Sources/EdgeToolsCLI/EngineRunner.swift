@@ -24,6 +24,7 @@ public struct EngineRunner: Sendable {
   public let supportsSampling: Bool
   public let supportsImages: Bool
 
+  private let metricsExtractor: any GenerationMetricsExtractor
   private let generation:
     @Sendable (GenerationRequest, sending EdgeToolsGenerationChannel) async throws ->
       EdgeToolsEngineGeneration
@@ -34,6 +35,7 @@ public struct EngineRunner: Sendable {
     supportsCustomGrammar: Bool,
     supportsSampling: Bool,
     supportsImages: Bool = false,
+    metricsExtractor: any GenerationMetricsExtractor = StandardGenerationMetricsExtractor(),
     generation:
       @escaping @Sendable (
         GenerationRequest, sending EdgeToolsGenerationChannel
@@ -44,6 +46,7 @@ public struct EngineRunner: Sendable {
     self.supportsCustomGrammar = supportsCustomGrammar
     self.supportsSampling = supportsSampling
     self.supportsImages = supportsImages
+    self.metricsExtractor = metricsExtractor
     self.generation = generation
     self.modelResetting = modelResetting
   }
@@ -58,6 +61,10 @@ public struct EngineRunner: Sendable {
   public func reset() async {
     await self.modelResetting()
   }
+
+  public func metrics(from generation: EdgeToolsEngineGeneration) -> CLIGenerationMetrics {
+    self.metricsExtractor.extract(from: generation)
+  }
 }
 
 // MARK: - Engine Adaptation
@@ -66,18 +73,20 @@ extension EngineRunner {
   private init<Engine: EdgeToolsEngine>(
     engineKind: EngineKind,
     engine: Engine,
-    supportsCustomGrammar: Bool,
-    supportsSampling: Bool,
+    supportsCustomGrammar: Bool = false,
+    supportsSampling: Bool = false,
     supportsImages: Bool = false,
+    metricsExtractor: any GenerationMetricsExtractor = StandardGenerationMetricsExtractor(),
     prompt: @escaping @Sendable (GenerationRequest) -> Engine.Prompt,
     parameters: @escaping @Sendable (GenerationRequest) throws -> sending Engine.GenerateParameters,
-    modelResetting: @escaping @Sendable () async -> Void
+    modelResetting: @escaping @Sendable () async -> Void = {}
   ) {
     self.init(
       engine: engineKind,
       supportsCustomGrammar: supportsCustomGrammar,
       supportsSampling: supportsSampling,
       supportsImages: supportsImages,
+      metricsExtractor: metricsExtractor,
       generation: { request, channel in
         let task = try engine.generate(
           prompt: prompt(request),
@@ -88,29 +97,6 @@ extension EngineRunner {
         return try await task.value
       },
       modelResetting: modelResetting
-    )
-  }
-}
-
-extension EngineRunner {
-  private init<Model: EdgeToolsModel>(
-    engineKind: EngineKind,
-    engine: EdgeToolsModelEngine<Model>,
-    supportsCustomGrammar: Bool = false,
-    supportsSampling: Bool = false,
-    supportsImages: Bool = false,
-    prompt: @escaping @Sendable (GenerationRequest) -> Model.Prompt,
-    parameters: @escaping @Sendable (GenerationRequest) throws -> sending Model.GenerateParameters
-  ) {
-    self.init(
-      engineKind: engineKind,
-      engine: engine,
-      supportsCustomGrammar: supportsCustomGrammar,
-      supportsSampling: supportsSampling,
-      supportsImages: supportsImages,
-      prompt: prompt,
-      parameters: parameters,
-      modelResetting: { await engine.resetGeneration() }
     )
   }
 }
@@ -140,7 +126,7 @@ extension EngineRunner {
       throw EdgeCLIError("--hardware-unit only applies to the mlx engine.")
     }
 
-    let supportsMLXFeatures = engine == .mlx && detection.model != .needle
+    let supportsMLXFeatures = engine == .mlx
     guard request.sampling.isEmpty || supportsMLXFeatures else {
       throw EdgeCLIError(
         "\(detection.model.displayName) on \(engine.rawValue) always samples greedily; sampler options do not apply."
@@ -222,9 +208,12 @@ extension EngineRunner {
   }
 
   private static let modelRegistrations: [DetectedModel: ModelRegistration] = {
-    var registrations: [DetectedModel: ModelRegistration] = [
-      .needle: ModelRegistration(engines: Self.needleFactories)
-    ]
+    var registrations: [DetectedModel: ModelRegistration] = [:]
+    if #available(macOS 26, *) {
+      registrations[.needle2] = ModelRegistration(engines: [
+        .needle2: { _ in Self.needle2() }
+      ])
+    }
     #if canImport(MLX)
       registrations[.qwen3] = ModelRegistration(engines: [
         .mlx: Self.mlxFactory { try await Qwen3MLXModelEngine(from: $0) }
@@ -278,54 +267,26 @@ extension EngineRunner {
     return registrations
   }()
 
-  private static var needleFactories: [EngineKind: ModelEngineFactory] {
-    var factories: [EngineKind: ModelEngineFactory] = [
-      .onnx: { context in try await Self.needleONNX(from: context.detection.directory) }
-    ]
-    #if canImport(MLX)
-      factories[.mlx] = { context in
-        try await Self.needleMLX(
-          from: context.detection.directory,
-          hardwareUnit: context.hardwareUnit
-        )
-      }
-    #endif
-    return factories
-  }
-
-  #if canImport(MLX)
-    private static func needleMLX(
-      from directory: URL,
-      hardwareUnit: MLXHardwareUnit
-    ) async throws -> Self {
-      let engine = try await Device.withDefaultDevice(hardwareUnit.device) {
-        try await NeedleMLXModelEngine(from: directory)
-      }
-      return Self(
-        engineKind: .mlx,
-        engine: engine,
-        prompt: needlePrompt,
-        parameters: { request in
-          NeedleMLXGenerateParameters(
-            maxTokens: request.maxTokens,
-            toolCallRange: request.toolCallRange
-          )
-        }
-      )
-    }
-  #endif
-
-  private static func needleONNX(from directory: URL) async throws -> Self {
-    let engine = try await NeedleCONNXModelEngine(from: directory)
+  @available(macOS 26, *)
+  private static func needle2() -> Self {
+    let engine = Needle2Engine()
     return Self(
-      engineKind: .onnx,
-      engine: engine,
-      prompt: needlePrompt,
-      parameters: { request in
-        NeedleONNXGenerateParameters(
-          maxTokens: request.maxTokens,
-          toolCallRange: request.toolCallRange
+      engine: .needle2,
+      supportsCustomGrammar: false,
+      supportsSampling: false,
+      metricsExtractor: Needle2GenerationMetricsExtractor(),
+      generation: { request, channel in
+        let context = engine.context(
+          Needle2ContextParameters(system: try needle2System(from: request.system))
         )
+        let task = try engine.generate(
+          prompt: request.user,
+          tools: request.tools,
+          parameters: Needle2GenerateParameters(maxTokens: request.maxTokens),
+          context: context,
+          channel: channel
+        )
+        return try await task.value
       }
     )
   }
@@ -336,10 +297,9 @@ extension EngineRunner {
       supportsImages: Bool = false
     ) -> ModelEngineFactory
     where
-      Profile.Prompt == EdgeToolsConversationalPrompt,
+      Profile.Prompt == EdgeToolsTranscript,
       Profile.GenerateParameters == DefaultMLXGenerateParameters,
-      Profile.GrammarCompiler == XGRCompiler,
-      Profile.GrammarContext == XGRGrammarContext
+      Profile.GrammarEngine == XGrammarEngine
     {
       { context in
         try await Self.mlx(
@@ -357,32 +317,72 @@ extension EngineRunner {
       make: () async throws -> MLXEngine<Profile>
     ) async throws -> Self
     where
-      Profile.Prompt == EdgeToolsConversationalPrompt,
+      Profile.Prompt == EdgeToolsTranscript,
       Profile.GenerateParameters == DefaultMLXGenerateParameters,
-      Profile.GrammarCompiler == XGRCompiler,
-      Profile.GrammarContext == XGRGrammarContext
+      Profile.GrammarEngine == XGrammarEngine
     {
       let engine = try await Device.withDefaultDevice(hardwareUnit.device) {
         try await make()
       }
       return Self(
-        engineKind: .mlx,
-        engine: engine,
+        engine: .mlx,
         supportsCustomGrammar: true,
         supportsSampling: true,
         supportsImages: supportsImages,
-        prompt: llmPrompt,
-        parameters: { request in
-          DefaultMLXGenerateParameters(
-            samplingOverrides: request.sampling,
-            constraint: try request.grammar.constraint(toolCallRange: request.toolCallRange),
-            maxTokens: request.maxTokens
+        generation: { request, channel in
+          let context = engine.context(
+            MLXContextParameters(
+              transcript: EdgeToolsTranscript(
+                messages: request.system.isEmpty ? [] : [.system(request.system)]
+              ),
+              reasoningEffort: request.reasoning
+            )
           )
+          let task = try engine.generate(
+            prompt: .user(
+              request.user,
+              images: request.images
+            ),
+            tools: request.tools,
+            parameters: DefaultMLXGenerateParameters(
+              sampling: request.sampling,
+              constraint: try request.grammar.constraint(
+                toolCallRange: request.toolCallRange
+              ),
+              maxTokens: request.maxTokens
+            ),
+            context: context,
+            channel: channel
+          )
+          return try await task.value
         },
-        modelResetting: { await engine.resetGeneration() }
+        modelResetting: {}
       )
     }
   #endif
+}
+
+private func needle2System(from string: String) throws -> Needle2System {
+  guard !string.isEmpty else { return [] }
+  return try Needle2System(
+    string.split(separator: ";")
+      .map { fact in
+        let components = fact.split(separator: ":", maxSplits: 1)
+        guard components.count == 2 else {
+          throw EdgeCLIError(
+            "Needle 2 system facts must use `key: value` entries separated by semicolons."
+          )
+        }
+        let key = components[0].trimmingCharacters(in: .whitespacesAndNewlines)
+        let value = components[1].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty, !value.isEmpty else {
+          throw EdgeCLIError(
+            "Needle 2 system facts must use non-empty keys and values."
+          )
+        }
+        return Needle2System.raw(.init(rawValue: key), value)
+      }
+  )
 }
 
 private func resolvedEngine(
@@ -412,20 +412,3 @@ private func resolvedEngine(
     """
   )
 }
-
-private func needlePrompt(for request: GenerationRequest) -> NeedlePrompt {
-  NeedlePrompt(system: request.system, user: request.user)
-}
-
-#if canImport(MLX)
-  private func llmPrompt(for request: GenerationRequest) -> EdgeToolsConversationalPrompt {
-    var messages = [EdgeToolsConversationalPrompt.Message]()
-    if !request.system.isEmpty { messages.append(.system(request.system)) }
-    messages.append(.user(request.user, images: request.images))
-    return EdgeToolsConversationalPrompt(
-      messages: messages,
-      reasoningEffort: request.reasoning
-    )
-  }
-
-#endif

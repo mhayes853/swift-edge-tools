@@ -8,7 +8,7 @@
     @Suite
     struct `XGRMatcher tests`: ~Copyable {
       private let engine: XGRCompiler
-      private let tokenizer: NeedleSPTokenizer
+      private let tokenizer: TestTokenizer
       private let eosToken: EdgeToolsToken.ID
 
       init() throws {
@@ -40,20 +40,16 @@
       @Test
       func `Rollback Allows Accepting Alternative Branch`() throws {
         let matcher = try self.engine.makeMatcher(try genericGrammar())
-
-        let firstBitmask = matcher.grammarBitmask()
-        let firstAllowedIndex = firstBitmask.storage
-          .enumerated()
-          .flatMap { word in (0..<32).map { (word.offset, $0) } }
-          .first { (wordIndex, bit) in
-            (firstBitmask.storage[wordIndex] & (1 << bit)) != 0
-          }
-        guard let (wordIndex, bit) = firstAllowedIndex else {
-          Issue.record("Expected at least one allowed token in the initial bitmask")
+        guard let firstToken = encodedGrammarText(
+          genericGrammarText,
+          tokenizer: self.tokenizer
+        )
+        .first else {
+          Issue.record("Tokenizer produced no tokens for the grammar fixture")
           return
         }
-        let firstAllowed = wordIndex * 32 + bit
-        expectNoDifference(matcher.accept(tokenId: EdgeToolsToken.ID(firstAllowed)), true)
+        expectNoDifference(matcher.grammarBitmask()[firstToken], true)
+        expectNoDifference(matcher.accept(tokenId: firstToken), true)
 
         matcher.rollback(1)
         expectNoDifference(matcher.isCompleted, false)
@@ -136,7 +132,10 @@
       func `Bitmask Has Expected Size`() throws {
         let matcher = try self.engine.makeMatcher(try genericGrammar())
         let bitmask = matcher.grammarBitmask()
-        expectNoDifference(bitmask.count, 8192)
+        let expectedBitCount = GrammarBitmask.bitCount(
+          forVocabularySize: TestTokenizer.vocabularySize
+        )
+        expectNoDifference(bitmask.count, expectedBitCount)
       }
 
       @Test(arguments: [
@@ -160,7 +159,7 @@
     @Suite(.serialized)
     struct `MemoryUsage tests`: ~Copyable {
       private let engine: XGRCompiler
-      private let tokenizer: NeedleSPTokenizer
+      private let tokenizer: TestTokenizer
 
       init() throws {
         let tokenizer = try testTokenizer()

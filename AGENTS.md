@@ -11,7 +11,7 @@ To understand the differences between this framework, and similar frameworks for
 | Category          | Edge Tools                                                   | Others (eg. FoundationModels, swift-transformers, etc.)      |
 |-------------------|--------------------------------------------------------------|--------------------------------------------------------------|
 | Model Support     | Primarily tiny on-device models (<1B parameters) with support for various architectures (Simple Attention Networks, Seq2Seq, Decoder-only, Encoder-only, etc) that are capable of making tool calls. | Any model capable of chatting, which includes frontier models. Primarily limited to autoregressive decoder-only models. |
-| Engine Support    | On-device engines that run on consumer hardware or embedded devices (MLX, ONNX, CoreML, etc). May even support entirely-model specific engines depending on the use-case and whether or not the model warrants it. | Any engine that supports a chat interface. Often includes REST APIs over the network. |
+| Engine Support    | On-device engines that run on consumer hardware or embedded devices (MLX, CoreML, etc). May even support entirely-model specific engines depending on the use-case and whether or not the model warrants it. | Any engine that supports a chat interface. Often includes REST APIs over the network. |
 | Platform Support  | Anywhere Swift runs, including WASM, Windows, Android, and allocating embedded environments. | Often Apple-platforms only, and maybe Linux and Android if lucky. |
 | Design Philosophy | Drop in anywhere whether in a typical SwiftUI view/view model, backend endpoint, or even within other frameworks like FoundationModels. You pick and choose which parts of the framework to use depending on the scenario. | An all-consuming framework meant to handle the conversation workflow E2E. This makes it easy to use for application development at the expense of creating a black box. |
 | Optimizations     | Certain models that fit the ideals of the framework (tiny, tool-calling capable) best will often have dedicated optimzations. This requires more work/complexity, but leads to better overall performance. | All models are treated equal. Less model-specific complexity, but comes at the cost of obtaining maximum performance. |
@@ -72,6 +72,10 @@ Try not to be overly verbose, focus on making things condensed.
 Try to prioritize using Collections/Sequence algorithms over doing things with loops as long as it doesn't look too crazy.
 
 Private helper functions should go at the bottom of the file, not the top.
+
+Prefer `withUnsafeContinuation` over checked continuations.
+
+Parse, don't validate: turn external input into a usable internal representation instead of running a separate validation pass and continuing to use the unparsed value.
 
 DO NOT ASSUME WASI IS A SINGLE THREADED ENVIRONMENT. It is not ok to conform types to `@unchecked Sendable` just because they have a member variable that uses a type from `JavaScriptKit`, and because "JS is single-threaded". `JavaScriptKit` does not conform most of its types to Sendable because Swift WASM supports sdks that enable multithreading through web workers or other means.
 

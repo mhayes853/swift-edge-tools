@@ -63,6 +63,31 @@ struct `BenchAction tests` {
   }
 
   @Test
+  func `Aggregates Metrics Declared By The Engines Extractor`() async throws {
+    var metadata = EdgeToolsMetadata()
+    metadata.needle2PrefillTokensPerSecond = 800
+    metadata.needle2DecodeTokensPerSecond = 100
+    metadata.needle2PeakRAMMegabytes = 32
+    let report = try await benchmarkModel(
+      context: .stub(
+        runner: .stub(
+          metadata: metadata,
+          metricsExtractor: Needle2GenerationMetricsExtractor()
+        )
+      ),
+      source: .test(),
+      request: GenerationRequest(user: "hello"),
+      runs: 2,
+      warmup: 0
+    )
+
+    expectNoDifference(report.prefillRates.median, 800)
+    expectNoDifference(report.decodeRates.median, 100)
+    expectNoDifference(report.displayText().contains("TTFT"), false)
+    expectNoDifference(report.displayText().contains("Peak RAM          32.0 MB"), true)
+  }
+
+  @Test
   func `Propagates Engine Failures`() async {
     await #expect(throws: EdgeCLIError("engine exploded")) {
       try await benchmarkModel(

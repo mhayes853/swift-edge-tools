@@ -16,10 +16,37 @@ struct `RunAction tests` {
     )
 
     expectNoDifference(report.response, "on it")
-    expectNoDifference(report.model, "Needle")
-    expectNoDifference(report.engine, "onnx")
+    expectNoDifference(report.model, "Qwen3")
+    expectNoDifference(report.engine, "mlx")
     expectNoDifference(report.toolCalls.map(\.name), ["set_timer"])
-    expectNoDifference(report.metrics.decode.tokens, 2)
+    expectNoDifference(report.metrics.generation["decodeTokens"], 2)
+  }
+
+  @Test
+  func `Uses The Engines Metric Extractor For User Facing Reports`() async throws {
+    var metadata = EdgeToolsMetadata()
+    metadata.needle2PrefillTokensPerSecond = 847.5
+    metadata.needle2DecodeTokensPerSecond = 96.25
+    metadata.needle2PeakRAMMegabytes = 31.75
+    let report = try await runModel(
+      context: .stub(
+        runner: .stub(
+          metadata: metadata,
+          metricsExtractor: Needle2GenerationMetricsExtractor()
+        )
+      ),
+      source: .test(),
+      request: GenerationRequest(user: "hello")
+    )
+
+    expectNoDifference(
+      report.metrics.generation.groups.map(\.label),
+      ["Prefill", "Decode", "RAM"]
+    )
+    expectNoDifference(report.metrics.generation["prefillTokensPerSecond"], 847.5)
+    expectNoDifference(report.metrics.generation["decodeTokensPerSecond"], 96.25)
+    expectNoDifference(report.metrics.generation["timeToFirstTokenMilliseconds"], nil)
+    expectNoDifference(report.metrics.generation["needle2PeakRAMMegabytes"], 31.75)
   }
 
   @Test
@@ -45,82 +72,17 @@ struct `RunAction tests` {
   }
 
   @Test
-  func `Throws When The Requested Engine Has No Weights`() async {
-    await #expect(throws: EdgeCLIError.self) {
-      _ = try await runModel(
-        context: .stub(engines: [.mlx]),
-        source: .test(),
-        requestedEngine: .onnx,
-        request: GenerationRequest(user: "hello")
-      )
-    }
-  }
-
-  @Test
-  func `Rejects An MLX Hardware Unit For Another Engine Before Loading`() async throws {
-    let loads = LockedBox(0)
-    let error = await #expect(throws: EdgeCLIError.self) {
-      try await runModel(
-        context: .stub(engines: [.onnx], onMakeRunner: { loads.value += 1 }),
-        source: .test(),
-        requestedEngine: .onnx,
-        hardwareUnit: .cpu,
-        request: GenerationRequest(user: "hello")
-      )
-    }
-
-    expectNoDifference(loads.value, 0)
-    expectNoDifference(
-      try #require(error).description,
-      "--hardware-unit only applies to the mlx engine."
-    )
-  }
-
-  @Test
-  func `Throws When A Custom Grammar Is Unsupported By The Engine`() async throws {
-    let error = await #expect(throws: EdgeCLIError.self) {
-      try await runModel(
-        context: .stub(),
-        source: .test(),
-        request: GenerationRequest(user: "hello", grammar: .unconstrained)
-      )
-    }
-
-    expectNoDifference(try #require(error).description.contains("--grammar auto"), true)
-  }
-
-  @Test
-  func `Throws When Sampling Is Unsupported By The Engine`() async throws {
-    do {
-      _ = try await runModel(
-        context: .stub(),
-        source: .test(),
-        request: GenerationRequest(
-          user: "hello",
-          sampling: EdgeToolsFusedSamplingOverrides(topK: 40)
-        )
-      )
-      Issue.record("Expected sampler validation to fail.")
-    } catch {
-      expectNoDifference(
-        String(describing: error),
-        "Needle on mlx always samples greedily; sampler options do not apply."
-      )
-    }
-  }
-
-  @Test
-  func `Uses Model Sampling Defaults Without An Override`() {
+  func `Uses Model Sampling Defaults Without Request Sampling`() {
     let request = GenerationRequest(user: "hello")
 
     expectNoDifference(request.sampling.isEmpty, true)
   }
 
   @Test
-  func `Merges Sampling Overrides Into Model Defaults`() {
+  func `Merges Request Sampling Into Model Defaults`() {
     let request = GenerationRequest(
       user: "hello",
-      sampling: EdgeToolsFusedSamplingOverrides(minP: 0.05, seed: 1234)
+      sampling: EdgeToolsFusedSamplingParameters(minP: 0.05, seed: 1234)
     )
     let parameters = request.sampling.applying(
       to: EdgeToolsFusedSamplingParameters(
@@ -214,4 +176,4 @@ struct `RunAction tests` {
   }
 }
 
-private typealias Asset = EdgeToolsConversationalPrompt.Asset
+private typealias Asset = EdgeToolsTranscript.Asset

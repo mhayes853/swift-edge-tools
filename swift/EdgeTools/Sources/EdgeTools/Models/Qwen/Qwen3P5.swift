@@ -8,34 +8,35 @@ import OrderedCollections
   // MARK: - Qwen3P5 Model
 
   public struct Qwen3P5MLXProfile: MLXLLMModelProfile {
-    public typealias Prompt = EdgeToolsConversationalPrompt
+    public typealias Prompt = EdgeToolsTranscript
     public typealias GenerationParser = Qwen3P5GenerationParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
-    public typealias GrammarCompiler = XGRCompiler
-    public typealias GrammarContext = XGRGrammarContext
+    public typealias GrammarEngine = XGrammarEngine
 
     public static func grammar(
-      prompt: EdgeToolsConversationalPrompt,
+      prompt: EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
       parameters: DefaultMLXGenerateParameters,
-      context: XGRGrammarContext
+      grammarEngine: borrowing XGrammarEngine
     ) throws -> XGRGrammar {
-      try Self.constrainedGrammar(tools: tools, parameters: parameters, context: context) { range in
+      try Self.constrainedGrammar(
+        tools: tools,
+        parameters: parameters,
+        grammarEngine: grammarEngine
+      ) { range in
         let toolCalls = try XGRGrammar.qwen3P5(tools: tools, range: range)
         guard prompt.reasoningEffort.isEnabled else { return toolCalls }
         return try XGRGrammar.qwenReasoning().concatenate(toolCalls)
       }
     }
 
-    public static func templateContext(
-      prompt: EdgeToolsConversationalPrompt
-    ) -> [String: any Sendable]? {
+    public static func templateContext(prompt: EdgeToolsTranscript) -> [String: any Sendable]? {
       guard prompt.reasoningEffort != .default else { return nil }
       return ["enable_thinking": prompt.reasoningEffort.isEnabled]
     }
 
     public static func prepare(
-      prompt: inout EdgeToolsConversationalPrompt,
+      prompt: inout EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
       parser: inout Qwen3P5GenerationParser
     ) {
@@ -44,7 +45,7 @@ import OrderedCollections
     }
 
     public static func defaultSampling(
-      prompt: EdgeToolsConversationalPrompt,
+      prompt: EdgeToolsTranscript,
       parameters: DefaultMLXGenerateParameters
     ) -> EdgeToolsFusedSamplingParameters? {
       prompt.reasoningEffort.isEnabled
@@ -69,34 +70,35 @@ import OrderedCollections
   // MARK: - Qwen3P5 VLM Model
 
   public struct Qwen3P5VLMLXProfile: MLXVLMModelProfile {
-    public typealias Prompt = EdgeToolsConversationalPrompt
+    public typealias Prompt = EdgeToolsTranscript
     public typealias GenerationParser = Qwen3P5GenerationParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
-    public typealias GrammarCompiler = XGRCompiler
-    public typealias GrammarContext = XGRGrammarContext
+    public typealias GrammarEngine = XGrammarEngine
 
     public static func grammar(
-      prompt: EdgeToolsConversationalPrompt,
+      prompt: EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
       parameters: DefaultMLXGenerateParameters,
-      context: XGRGrammarContext
+      grammarEngine: borrowing XGrammarEngine
     ) throws -> XGRGrammar {
-      try Self.constrainedGrammar(tools: tools, parameters: parameters, context: context) { range in
+      try Self.constrainedGrammar(
+        tools: tools,
+        parameters: parameters,
+        grammarEngine: grammarEngine
+      ) { range in
         let toolCalls = try XGRGrammar.qwen3P5(tools: tools, range: range)
         guard prompt.reasoningEffort.isEnabled else { return toolCalls }
         return try XGRGrammar.qwenReasoning().concatenate(toolCalls)
       }
     }
 
-    public static func templateContext(
-      prompt: EdgeToolsConversationalPrompt
-    ) -> [String: any Sendable]? {
+    public static func templateContext(prompt: EdgeToolsTranscript) -> [String: any Sendable]? {
       guard prompt.reasoningEffort != .default else { return nil }
       return ["enable_thinking": prompt.reasoningEffort.isEnabled]
     }
 
     public static func prepare(
-      prompt: inout EdgeToolsConversationalPrompt,
+      prompt: inout EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
       parser: inout Qwen3P5GenerationParser
     ) {
@@ -105,7 +107,7 @@ import OrderedCollections
     }
 
     public static func defaultSampling(
-      prompt: EdgeToolsConversationalPrompt,
+      prompt: EdgeToolsTranscript,
       parameters: DefaultMLXGenerateParameters
     ) -> EdgeToolsFusedSamplingParameters? {
       prompt.reasoningEffort.isEnabled
@@ -119,16 +121,46 @@ import OrderedCollections
     }
 
     public static nonisolated(nonsending) func input(
-      prompt: EdgeToolsConversationalPrompt,
+      prompt: EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer,
       processor: (any UserInputProcessor)?
     ) async throws -> LMInput {
+      try await self.input(
+        prompt: prompt,
+        tools: tools,
+        processor: processor,
+        addGenerationPrompt: true
+      )
+    }
+
+    public static nonisolated(nonsending) func prefillInput(
+      prompt: EdgeToolsTranscript,
+      tools: [EdgeToolDefinition],
+      tokenizer: any EdgeToolsTokenizer,
+      processor: (any UserInputProcessor)?
+    ) async throws -> LMInput {
+      try await self.input(
+        prompt: prompt,
+        tools: tools,
+        processor: processor,
+        addGenerationPrompt: false
+      )
+    }
+
+    private static nonisolated(nonsending) func input(
+      prompt: EdgeToolsTranscript,
+      tools: [EdgeToolDefinition],
+      processor: (any UserInputProcessor)?,
+      addGenerationPrompt: Bool
+    ) async throws -> LMInput {
       guard let processor else { throw EdgeToolsError.failedToLoadConfiguration }
+      var templateContext = Self.templateContext(prompt: prompt) ?? [:]
+      templateContext["add_generation_prompt"] = addGenerationPrompt
       return try await prompt.mlxVLMInput(
         tools: tools,
         processor: processor,
-        additionalContext: Self.templateContext(prompt: prompt)
+        additionalContext: templateContext
       ) { message in
         switch message {
         case .user(let message):
@@ -265,9 +297,7 @@ public struct Qwen3P5GenerationParser: EdgeToolsGenerationParser, Sendable {
       let arguments = Self.xmlToolArguments(for: tool)
       let prefix = try XGRGrammar.literal("<tool_call><function=\(tool.name)>")
       let withArguments = try prefix.concatenate(arguments)
-      return try withArguments.concatenate(
-        XGRGrammar.literal("</function></tool_call>")
-      )
+      return try withArguments.concatenate(.literal("</function></tool_call>"))
     }
   }
 #endif

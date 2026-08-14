@@ -1,12 +1,17 @@
-public struct EdgeToolsLogitsProcessor<Prompt, Logits: ~Copyable & ~Escapable> {
-  private let promptBody: (Prompt) -> Void
-  private let processBody: nonisolated(nonsending) (inout Logits) async throws -> Void
-  private let didSampleBody: (EdgeToolsToken.ID) -> Void
+public struct EdgeToolsLogitsProcessor<Prompt: Sendable, Logits: ~Copyable & ~Escapable>:
+  Sendable
+{
+  private let promptBody: @Sendable (Prompt) -> Void
+  private let processBody: nonisolated(nonsending) @Sendable (inout Logits) async throws -> Void
+  private let didSampleBody: @Sendable (EdgeToolsToken.ID) -> Void
 
   public init(
-    prompt: @escaping (Prompt) -> Void = { _ in },
-    process: nonisolated(nonsending) @escaping (inout Logits) async throws -> Void,
-    didSample: @escaping (EdgeToolsToken.ID) -> Void = { _ in }
+    prompt: @escaping @Sendable (Prompt) -> Void = { _ in },
+    process:
+      nonisolated(nonsending) @escaping @Sendable (
+        inout Logits
+      ) async throws -> Void,
+    didSample: @escaping @Sendable (EdgeToolsToken.ID) -> Void = { _ in }
   ) {
     self.promptBody = prompt
     self.processBody = process

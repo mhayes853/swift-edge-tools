@@ -107,7 +107,7 @@ struct `ReasoningGenerationParser tests` {
     )
 
     expectNoDifference(
-      EdgeToolsConversationalPrompt.Message(generation: generation),
+      EdgeToolsTranscript.Message(generation: generation),
       .assistant([.text("The forecast is sunny.")])
     )
   }

@@ -3,23 +3,23 @@ import EdgeTools
 public struct GenerationRequest: Sendable {
   public var system: String
   public var user: String
-  public var images: [EdgeToolsConversationalPrompt.Asset]
+  public var images: [EdgeToolsTranscript.Asset]
   public var tools: [EdgeToolDefinition]
   public var grammar: GrammarOption
   public var toolCallRange: GrammarToolCallRange
   public var maxTokens: Int?
-  public var sampling: EdgeToolsFusedSamplingOverrides
+  public var sampling: EdgeToolsFusedSamplingParameters
   public var reasoning: EdgeToolsReasoningEffort
 
   public init(
     system: String = "",
     user: String,
-    images: [EdgeToolsConversationalPrompt.Asset] = [],
+    images: [EdgeToolsTranscript.Asset] = [],
     tools: [EdgeToolDefinition] = [],
     grammar: GrammarOption = .auto,
     toolCallRange: GrammarToolCallRange = .unbounded(minimum: 0),
     maxTokens: Int? = 1024,
-    sampling: EdgeToolsFusedSamplingOverrides = EdgeToolsFusedSamplingOverrides(),
+    sampling: EdgeToolsFusedSamplingParameters = EdgeToolsFusedSamplingParameters(),
     reasoning: EdgeToolsReasoningEffort = .default
   ) {
     self.system = system
