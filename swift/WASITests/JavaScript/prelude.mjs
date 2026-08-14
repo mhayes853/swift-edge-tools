@@ -1,3 +1,19 @@
+import {
+	defaultSystemValues,
+	needle2Runtime,
+} from "../../../ts/needle2/dist/index.js";
+
+globalThis.edgeToolsNeedle2Runtime = needle2Runtime;
+
 export async function setupOptions(options) {
-	return options;
+	const getImports = options.getImports;
+	return {
+		...options,
+		getImports(context) {
+			return {
+				...(getImports?.(context) ?? {}),
+				needle2DefaultSystemValues: (options) => defaultSystemValues(options),
+			};
+		},
+	};
 }

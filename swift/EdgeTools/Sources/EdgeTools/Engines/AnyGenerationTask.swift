@@ -1,4 +1,5 @@
 import Atomics
+import _Concurrency
 
 // MARK: - AnyGenerationTask
 

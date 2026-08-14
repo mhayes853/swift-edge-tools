@@ -79,7 +79,7 @@ jobs:
   #       run: df -h
   #     - name: Run tests
   #       run: >
-  #         scripts/test-linux.sh --traits ONNX --all-tests --python-venv
+  #         scripts/test-linux.sh --all-tests --python-venv
 
   # android:
   #   name: Android Build
@@ -99,7 +99,6 @@ jobs:
   #         swift-build-flags: >
   #           --disable-experimental-prebuilts
   #           --disable-default-traits
-  #           --traits ONNX
   #         build-tests: false
   #         run-tests: false
 
@@ -119,7 +118,10 @@ jobs:
           set -euo pipefail
           tag="$(scripts/smoke-embedded.sh --print-snapshot)"
           toolchain="$(
-            sed -E 's/^swift-(.+)-DEVELOPMENT-SNAPSHOT-(.+)-a$/\1-snapshot-\2/' <<<"$tag"
+            sed -E '
+              s/^swift-//
+              s/-DEVELOPMENT-SNAPSHOT-/-snapshot-/
+            ' <<<"$tag"
           )"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "toolchain=$toolchain" >> "$GITHUB_OUTPUT"
@@ -134,7 +136,8 @@ jobs:
         if: steps.toolchain-cache.outputs.cache-hit != 'true'
         run: |
           set -ex
-          curl -O "https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz"
+          swiftly_url="https://download.swift.org/swiftly/linux"
+          curl -O "$swiftly_url/swiftly-$(uname -m).tar.gz"
           tar zxf "swiftly-$(uname -m).tar.gz"
           ./swiftly init --quiet-shell-followup --assume-yes --skip-install
           # shellcheck source=/dev/null
@@ -152,9 +155,11 @@ jobs:
         run: |
           set -euo pipefail
           echo "$HOME/.local/share/swiftly/bin" >> "$GITHUB_PATH"
-          # NB: The repository pins a release toolchain in .swift-version, which would otherwise
-          # win over the snapshot that matches the Swift SDK.
-          "$HOME/.local/share/swiftly/bin/swiftly" use "${{ steps.snapshot.outputs.toolchain }}"
+          # NB: The repository pins a release toolchain in
+          # .swift-version, which would otherwise win over the snapshot that
+          # matches the Swift SDK.
+          "$HOME/.local/share/swiftly/bin/swiftly" use \
+            "${{ steps.snapshot.outputs.toolchain }}"
       - name: Cache Swift SDKs
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
@@ -168,7 +173,8 @@ jobs:
             swift/EmbeddedSmoke/.build
           key: >-
             spm-embedded-${{ runner.os }}-${{ steps.snapshot.outputs.tag }}-${{
-            hashFiles('Package.resolved', 'swift/EmbeddedSmoke/Package.resolved') }}
+            hashFiles('Package.resolved',
+            'swift/EmbeddedSmoke/Package.resolved') }}
           restore-keys: |
             spm-embedded-${{ runner.os }}-${{ steps.snapshot.outputs.tag }}-
       - name: Run the embedded smoke test
@@ -177,7 +183,7 @@ jobs:
         run: scripts/smoke-embedded.sh
 
   # windows:
-  #   name: Windows ONNXCore Build
+  #   name: Windows Build
   #   runs-on: windows-latest
   #   timeout-minutes: 20
   #   steps:
@@ -195,4 +201,3 @@ jobs:
   #     - name: Build Swift package
   #       run: >
   #         swift build --disable-experimental-prebuilts
-  #         --disable-default-traits --traits ONNXCore

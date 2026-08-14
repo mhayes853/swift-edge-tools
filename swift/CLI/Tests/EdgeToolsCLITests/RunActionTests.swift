@@ -19,7 +19,34 @@ struct `RunAction tests` {
     expectNoDifference(report.model, "Qwen3")
     expectNoDifference(report.engine, "mlx")
     expectNoDifference(report.toolCalls.map(\.name), ["set_timer"])
-    expectNoDifference(report.metrics.decode.tokens, 2)
+    expectNoDifference(report.metrics.generation["decodeTokens"], 2)
+  }
+
+  @Test
+  func `Uses The Engines Metric Extractor For User Facing Reports`() async throws {
+    var metadata = EdgeToolsMetadata()
+    metadata.needle2PrefillTokensPerSecond = 847.5
+    metadata.needle2DecodeTokensPerSecond = 96.25
+    metadata.needle2PeakRAMMegabytes = 31.75
+    let report = try await runModel(
+      context: .stub(
+        runner: .stub(
+          metadata: metadata,
+          metricsExtractor: Needle2GenerationMetricsExtractor()
+        )
+      ),
+      source: .test(),
+      request: GenerationRequest(user: "hello")
+    )
+
+    expectNoDifference(
+      report.metrics.generation.groups.map(\.label),
+      ["Prefill", "Decode", "RAM"]
+    )
+    expectNoDifference(report.metrics.generation["prefillTokensPerSecond"], 847.5)
+    expectNoDifference(report.metrics.generation["decodeTokensPerSecond"], 96.25)
+    expectNoDifference(report.metrics.generation["timeToFirstTokenMilliseconds"], nil)
+    expectNoDifference(report.metrics.generation["needle2PeakRAMMegabytes"], 31.75)
   }
 
   @Test

@@ -4,6 +4,17 @@
 import CompilerPluginSupport
 import PackageDescription
 
+var edgeToolsSwiftSettings: [SwiftSetting] = [
+  .enableExperimentalFeature("Lifetimes"),
+  .enableExperimentalFeature("AddressableTypes")
+]
+#if compiler(<6.4)
+  edgeToolsSwiftSettings.append(.enableExperimentalFeature("SuppressedAssociatedTypes"))
+#endif
+let edgeToolsJavaScriptSwiftSettings = edgeToolsSwiftSettings + [
+  .enableExperimentalFeature("Extern")
+]
+
 let package = Package(
   name: "swift-edge-tools",
   platforms: [.macOS(.v14), .iOS(.v17), .tvOS(.v17), .watchOS(.v10), .visionOS(.v1)],
@@ -12,9 +23,15 @@ let package = Package(
     .library(name: "EdgeToolsXGrammar", targets: ["EdgeToolsXGrammar"])
   ],
   traits: [
-    .trait(name: "Foundation", description: "Foundation-specific conveniences."),
+    .trait(name: "Foundation", description: "Foundation Essentials conveniences."),
+    .trait(
+      name: "FullFoundation",
+      description: "Full Foundation conveniences.",
+      enabledTraits: ["Foundation"]
+    ),
     .trait(name: "JS", description: "JavaScriptKit interoperability."),
     .trait(name: "XGrammar", description: "XGrammar-powered structured generation."),
+    .trait(name: "Needle2", description: "Needle 2 engine support."),
     .trait(
       name: "Transformers",
       description: "swift-transformers tokenizer support.",
@@ -57,6 +74,10 @@ let package = Package(
         .target(
           name: "_EdgeToolsFoundation",
           condition: .when(traits: ["Foundation"])
+        ),
+        .target(
+          name: "_EdgeToolsJavaScript",
+          condition: .when(traits: ["JS"])
         ),
         .product(name: "yyjson", package: "yyjson"),
         .product(name: "HeapModule", package: "swift-collections"),
@@ -108,6 +129,13 @@ let package = Package(
           condition: .when(platforms: [.macOS], traits: ["MLX"])
         ),
         .target(name: "EdgeToolsXGrammar", condition: .when(traits: ["XGrammar"])),
+        .target(
+          name: "CNeedle2",
+          condition: .when(
+            platforms: [.macOS, .iOS, .tvOS, .watchOS, .linux, .windows, .android],
+            traits: ["Needle2"]
+          )
+        ),
         .product(
           name: "Tokenizers",
           package: "swift-transformers",
@@ -119,9 +147,17 @@ let package = Package(
         )
       ],
       path: "swift/EdgeTools/Sources/EdgeTools",
-      swiftSettings: [
-        .enableExperimentalFeature("Lifetimes"),
-        .enableExperimentalFeature("AddressableTypes")
+      swiftSettings: edgeToolsSwiftSettings,
+      linkerSettings: [
+        .linkedLibrary(
+          "c++",
+          .when(
+            platforms: [.macOS, .iOS, .tvOS, .watchOS],
+            traits: ["Needle2"]
+          )
+        ),
+        .linkedLibrary("c++", .when(platforms: [.linux], traits: ["Needle2"])),
+        .linkedLibrary("c++_shared", .when(platforms: [.android], traits: ["Needle2"]))
       ]
     ),
     .target(
@@ -129,9 +165,22 @@ let package = Package(
       path: "swift/EdgeTools/Sources/_EdgeToolsFoundation"
     ),
     .target(
+      name: "_EdgeToolsJavaScript",
+      dependencies: [
+        .product(name: "JavaScriptKit", package: "JavaScriptKit")
+      ],
+      path: "swift/EdgeTools/Sources/_EdgeToolsJavaScript",
+      swiftSettings: edgeToolsJavaScriptSwiftSettings,
+      plugins: [.plugin(name: "BridgeJS", package: "JavaScriptKit")]
+    ),
+    .target(
       name: "EdgeToolsXGrammar",
       dependencies: ["CXGrammar"],
       path: "swift/EdgeTools/Sources/EdgeToolsXGrammar"
+    ),
+    .binaryTarget(
+      name: "CNeedle2",
+      path: "bin/needle2-2.0.0.artifactbundle.zip"
     ),
     .target(
       name: "CXGrammar",
@@ -153,7 +202,11 @@ let package = Package(
       ],
       plugins: [.plugin(name: "PatchPlugin")]
     ),
-    .plugin(name: "PatchPlugin", capability: .buildTool(), path: "swift/EdgeTools/Plugins/PatchPlugin"),
+    .plugin(
+      name: "PatchPlugin",
+      capability: .buildTool(),
+      path: "swift/EdgeTools/Plugins/PatchPlugin"
+    ),
     .macro(
       name: "EdgeToolsMacros",
       dependencies: [
@@ -184,6 +237,7 @@ let package = Package(
       path: "swift/EdgeTools/Tests/EdgeToolsTests",
       exclude: [
         "GenerationSchema/__Snapshots__",
+        "Models/Needle2/__Snapshots__",
         "Models/__Snapshots__",
         "Models/Gemma/__Snapshots__",
         "Models/LFM/__Snapshots__",

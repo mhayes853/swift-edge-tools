@@ -4,7 +4,7 @@ import Foundation
 private typealias MockGenerationError = any Error
 private typealias MockGenerationTaskValue = Task<EdgeToolsEngineGeneration, MockGenerationError>
 
-final class MockEngine: EdgeToolsPrefillableEngine, Sendable {
+final class MockEngine: EdgeToolsPrefillableEngine, EdgeToolsTokenizingEngine, Sendable {
   typealias Prompt = TestPrompt
 
   final class Context: Identifiable, Sendable {

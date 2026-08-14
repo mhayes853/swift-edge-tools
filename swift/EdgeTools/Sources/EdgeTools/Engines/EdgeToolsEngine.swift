@@ -10,12 +10,6 @@ public protocol EdgeToolsEngine: Sendable {
   func context() -> Context
   func context(_ parameters: ContextParameters) -> Context
 
-  func tokenize(
-    prompt: Prompt,
-    tools: [EdgeToolDefinition],
-    context: Context
-  ) async throws -> [EdgeToolsToken]
-
   func generate(
     prompt: Prompt,
     tools: [EdgeToolDefinition],
@@ -37,17 +31,6 @@ extension EdgeToolsEngine {
     self.context(nil)
   }
 
-  public func tokenize(
-    prompt: Prompt,
-    tools: [EdgeToolDefinition] = []
-  ) async throws -> [EdgeToolsToken] {
-    try await self.tokenize(
-      prompt: prompt,
-      tools: tools,
-      context: self.context()
-    )
-  }
-
   public func generate(
     prompt: Prompt,
     tools: [EdgeToolDefinition] = [],
@@ -60,6 +43,29 @@ extension EdgeToolsEngine {
       parameters: parameters,
       context: self.context(),
       channel: channel
+    )
+  }
+}
+
+// MARK: - EdgeToolsTokenizingEngine
+
+public protocol EdgeToolsTokenizingEngine: EdgeToolsEngine {
+  func tokenize(
+    prompt: Prompt,
+    tools: [EdgeToolDefinition],
+    context: Context
+  ) async throws -> [EdgeToolsToken]
+}
+
+extension EdgeToolsTokenizingEngine {
+  public func tokenize(
+    prompt: Prompt,
+    tools: [EdgeToolDefinition] = []
+  ) async throws -> [EdgeToolsToken] {
+    try await self.tokenize(
+      prompt: prompt,
+      tools: tools,
+      context: self.context()
     )
   }
 }

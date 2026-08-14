@@ -176,43 +176,23 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 41 elements
+        ▿ parts: 17 elements
           ▿ EdgeToolsGenerationPart
-            - reasoning: "Based"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " on"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " the"
+            - reasoning: "The"
           ▿ EdgeToolsGenerationPart
             - reasoning: " weather"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " data"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: ","
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " the"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " forecast"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " indicates"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " **"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "s"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "unny"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "**"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " weather"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " conditions"
           ▿ EdgeToolsGenerationPart
             - reasoning: " in"
           ▿ EdgeToolsGenerationPart
             - reasoning: " Paris"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " with"
+            - reasoning: " today"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " is"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " sunny"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " at"
           ▿ EdgeToolsGenerationPart
             - reasoning: " a"
           ▿ EdgeToolsGenerationPart
@@ -220,9 +200,7 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " of"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " approximately"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " **"
+            - reasoning: " "
           ▿ EdgeToolsGenerationPart
             - reasoning: "2"
           ▿ EdgeToolsGenerationPart
@@ -231,32 +209,6 @@
             - reasoning: " degrees"
           ▿ EdgeToolsGenerationPart
             - reasoning: " Celsius"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "**."
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " This"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " suggests"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " pleasant"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " outdoor"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " weather"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " suitable"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " for"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " typical"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " activities"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " or"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " general"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " comfort"
           ▿ EdgeToolsGenerationPart
             - reasoning: "."
   ▿ reasoningEffort: EdgeToolsReasoningEffort

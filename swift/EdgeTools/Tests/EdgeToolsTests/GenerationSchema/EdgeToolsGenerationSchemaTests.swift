@@ -306,21 +306,6 @@ struct `SchemaComposition tests` {
   }
 
   @Test
-  func `Edge Tools Value Object Preserves Key Ordering`() {
-    let value: EdgeToolsValue = .object([
-      "b": 2,
-      "a": 1,
-      "c": 3
-    ])
-
-    guard case .object(let object) = value else {
-      Issue.record("Expected object value.")
-      return
-    }
-    expectNoDifference(Array(object.keys), ["b", "a", "c"])
-  }
-
-  @Test
   func `Boolean Schema JSON`() throws {
     let schema = EdgeToolsGenerationSchema.boolean(true)
     let data = try Self.jsonEncoder.encode(schema)

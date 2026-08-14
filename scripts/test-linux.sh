@@ -14,6 +14,7 @@ package_path="."
 build_only=0
 disable_default_traits=1
 install_python_venv=0
+install_needle2_runtime=0
 extra_arguments=()
 
 usage() {
@@ -125,6 +126,10 @@ if [[ "$package_path" != "." ]]; then
 	disable_default_traits=0
 fi
 
+case ",$traits," in
+*,Needle2,*) install_needle2_runtime=1 ;;
+esac
+
 swift_command="test"
 if ((build_only)); then
 	swift_command="build"
@@ -178,16 +183,27 @@ restore_resolved() {
 }
 trap restore_resolved EXIT
 
-if ((install_python_venv)); then
+if ((install_python_venv || install_needle2_runtime)); then
+	docker_arguments+=(
+		--env "INSTALL_NEEDLE2_RUNTIME=$install_needle2_runtime"
+		--env "INSTALL_PYTHON_VENV=$install_python_venv"
+	)
 	setup_script='set -euo pipefail
 apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install -y python3-venv
-python3 -m venv /workspace/python/.venv
-/workspace/python/.venv/bin/python -m pip install --no-cache-dir \
-  --index-url https://download.pytorch.org/whl/cpu torch==2.11.0
-/workspace/python/.venv/bin/python -m pip install --no-cache-dir -e /workspace/python
-exec "$@"'
-	echo "+ docker ${docker_arguments[*]} $image bash -c <python-setup> swift ${swift_arguments[*]}"
+if [[ "$INSTALL_NEEDLE2_RUNTIME" == 1 ]]; then
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libc++-dev libc++abi-dev
+  needle2_library_path="$(dirname "$(find /usr/lib/llvm-* -name libc++.so -print -quit)")"
+  export LIBRARY_PATH="$needle2_library_path${LIBRARY_PATH:+:$LIBRARY_PATH}"
+fi
+if [[ "$INSTALL_PYTHON_VENV" == 1 ]]; then
+  DEBIAN_FRONTEND=noninteractive apt-get install -y python3-venv
+  python3 -m venv /workspace/python/.venv
+  /workspace/python/.venv/bin/python -m pip install --no-cache-dir \
+    --index-url https://download.pytorch.org/whl/cpu torch==2.11.0
+  /workspace/python/.venv/bin/python -m pip install --no-cache-dir -e /workspace/python
+fi
+	exec "$@"'
+	echo "+ docker ${docker_arguments[*]} $image bash -c <dependency-setup> swift ${swift_arguments[*]}"
 	docker "${docker_arguments[@]}" "$image" \
 		bash -c "$setup_script" bash swift "${swift_arguments[@]}"
 else

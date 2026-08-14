@@ -102,6 +102,8 @@ extension EngineRunner {
     supportsSampling: Bool = true,
     supportsImages: Bool = false,
     decodeDuration: Duration = .milliseconds(20),
+    metadata: EdgeToolsMetadata = [:],
+    metricsExtractor: any GenerationMetricsExtractor = StandardGenerationMetricsExtractor(),
     onGenerate: @escaping @Sendable (GenerationRequest) -> Void = { _ in },
     onReset: @escaping @Sendable () -> Void = {}
   ) -> Self {
@@ -110,6 +112,7 @@ extension EngineRunner {
       supportsCustomGrammar: supportsCustomGrammar,
       supportsSampling: supportsSampling,
       supportsImages: supportsImages,
+      metricsExtractor: metricsExtractor,
       generation: { request, channel in
         onGenerate(request)
         for (index, token) in tokens.enumerated() {
@@ -130,7 +133,8 @@ extension EngineRunner {
           tokens: tokens.enumerated()
             .map { EdgeToolsToken(id: $0.offset, stringValue: $0.element) },
           response: response,
-          parts: toolCalls.map(EdgeToolsGenerationPart.toolCall)
+          parts: toolCalls.map(EdgeToolsGenerationPart.toolCall),
+          metadata: metadata
         )
       },
       modelResetting: { onReset() }

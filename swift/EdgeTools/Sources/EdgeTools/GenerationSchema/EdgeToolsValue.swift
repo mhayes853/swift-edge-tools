@@ -48,6 +48,67 @@ public enum EdgeToolsValue: Hashable, Sendable {
   }
 }
 
+// MARK: - Case Values
+
+extension EdgeToolsValue {
+  public var string: String? {
+    guard case .string(let value) = self else {
+      return nil
+    }
+    return value
+  }
+
+  public var boolean: Bool? {
+    guard case .boolean(let value) = self else {
+      return nil
+    }
+    return value
+  }
+
+  public var array: [Self]? {
+    guard case .array(let value) = self else {
+      return nil
+    }
+    return value
+  }
+
+  public var object: OrderedDictionary<String, Self>? {
+    guard case .object(let value) = self else {
+      return nil
+    }
+    return value
+  }
+
+  public var number: Double? {
+    guard case .number(let value) = self else {
+      return nil
+    }
+    return value
+  }
+
+  public var integer: Int? {
+    guard case .integer(let value) = self else {
+      return nil
+    }
+    return value
+  }
+
+  public var double: Double? {
+    switch self {
+    case .integer(let value): Double(value)
+    case .number(let value): value
+    default: nil
+    }
+  }
+
+  public var isNull: Bool {
+    if case .null = self {
+      return true
+    }
+    return false
+  }
+}
+
 // MARK: - Codable
 
 extension EdgeToolsValue: EdgeToolsEncodable {

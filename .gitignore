@@ -21,5 +21,6 @@ python/build
 .ruff_cache
 
 node_modules/
+/ts/needle2/dist/
 
 .build

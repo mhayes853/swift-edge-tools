@@ -4,6 +4,7 @@ set -euo pipefail
 
 ROOT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEST_DIRECTORY="$ROOT_DIRECTORY/swift/WASITests"
+NEEDLE2_DIRECTORY="$ROOT_DIRECTORY/ts/needle2"
 SWIFT_SDK_ID="${SWIFT_SDK_ID:-swift-6.3.2-RELEASE_wasm}"
 BUILD_ONLY=0
 FILTER=""
@@ -31,7 +32,12 @@ while (($#)); do
 	esac
 done
 
+cd "$NEEDLE2_DIRECTORY"
+npm ci --ignore-scripts
+npm run build
+
 cd "$TEST_DIRECTORY"
+npm ci --ignore-scripts
 
 COMMAND=(
 	swift package
@@ -53,6 +59,10 @@ if [[ -n "$FILTER" ]]; then
 fi
 if ((BUILD_ONLY)); then
 	COMMAND+=(--build-only)
+fi
+
+if [[ "$FILTER" == *Needle2JSEngine* ]]; then
+	export EDGE_TOOLS_WASI_NEEDLE2_ONLY=1
 fi
 
 if command -v swiftly >/dev/null 2>&1; then
