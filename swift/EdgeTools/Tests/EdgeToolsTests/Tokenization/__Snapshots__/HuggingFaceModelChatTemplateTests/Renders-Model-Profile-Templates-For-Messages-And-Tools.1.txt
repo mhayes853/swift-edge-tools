@@ -1,0 +1,356 @@
+# FunctionGemma
+
+## No Generation
+<bos><start_of_turn>developer
+You are concise.<start_function_declaration>declaration:weather{description:<escape>Gets the weather.<escape>,parameters:{ properties:{ location:{description:<escape><escape>,type:<escape>STRING<escape>}},type:<escape>OBJECT<escape>}}<end_function_declaration><end_of_turn>
+<start_of_turn>user
+What is the weather?<end_of_turn>
+<start_of_turn>model
+I will check.<end_of_turn>
+
+
+## Generation
+<bos><start_of_turn>developer
+You are concise.<start_function_declaration>declaration:weather{description:<escape>Gets the weather.<escape>,parameters:{ properties:{ location:{description:<escape><escape>,type:<escape>STRING<escape>}},type:<escape>OBJECT<escape>}}<end_function_declaration><end_of_turn>
+<start_of_turn>user
+What is the weather?<end_of_turn>
+<start_of_turn>model
+I will check.<end_of_turn>
+<start_of_turn>model
+
+
+# Gemma4
+
+## No Generation
+<bos><|turn>system
+You are concise.<|tool>declaration:weather{description:<|"|>Gets the weather.<|"|>,parameters:{ properties:{ location:{ type:<|"|>STRING<|"|>}},type:<|"|>OBJECT<|"|>}}<tool|><turn|>
+
+<|turn>user
+What is the weather?<turn|>
+<|turn>model
+I will check.<turn|>
+
+
+## Generation
+<bos><|turn>system
+You are concise.<|tool>declaration:weather{description:<|"|>Gets the weather.<|"|>,parameters:{ properties:{ location:{ type:<|"|>STRING<|"|>}},type:<|"|>OBJECT<|"|>}}<tool|><turn|>
+
+<|turn>user
+What is the weather?<turn|>
+<|turn>model
+I will check.<turn|>
+<|turn>model
+
+
+# Granite
+
+## No Generation
+<|start_of_role|>system<|end_of_role|>You are concise.
+
+You are a helpful assistant with access to the following tools. You may call one or more tools to assist with the user query.
+
+You are provided with function signatures within <tools></tools> XML tags:
+<tools>
+{"function":{"description":"Gets the weather.","name":"weather","parameters":{"properties":{"location":{"type":"string"}},"type":"object"}},"type":"function"}
+</tools>
+
+For each tool call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:
+<tool_call>
+{"name": <function-name>, "arguments": <args-json-object>}
+</tool_call>. If a tool does not exist in the provided list of tools, notify the user that you do not have the ability to fulfill the request.<|end_of_text|>
+<|start_of_role|>user<|end_of_role|>What is the weather?<|end_of_text|>
+<|start_of_role|>assistant<|end_of_role|>I will check.<|end_of_text|>
+
+
+## Generation
+<|start_of_role|>system<|end_of_role|>You are concise.
+
+You are a helpful assistant with access to the following tools. You may call one or more tools to assist with the user query.
+
+You are provided with function signatures within <tools></tools> XML tags:
+<tools>
+{"function":{"description":"Gets the weather.","name":"weather","parameters":{"properties":{"location":{"type":"string"}},"type":"object"}},"type":"function"}
+</tools>
+
+For each tool call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:
+<tool_call>
+{"name": <function-name>, "arguments": <args-json-object>}
+</tool_call>. If a tool does not exist in the provided list of tools, notify the user that you do not have the ability to fulfill the request.<|end_of_text|>
+<|start_of_role|>user<|end_of_role|>What is the weather?<|end_of_text|>
+<|start_of_role|>assistant<|end_of_role|>I will check.<|end_of_text|>
+<|start_of_role|>assistant<|end_of_role|>
+
+# LFM2P5
+
+## No Generation
+<|startoftext|><|im_start|>system
+You are concise.
+List of tools: [{"function":{"description":"Gets the weather.","name":"weather","parameters":{"properties":{"location":{"type":"string"}},"type":"object"}},"type":"function"}]<|im_end|>
+<|im_start|>user
+What is the weather?<|im_end|>
+<|im_start|>assistant
+I will check.<|im_end|>
+
+
+## Generation
+<|startoftext|><|im_start|>system
+You are concise.
+List of tools: [{"function":{"description":"Gets the weather.","name":"weather","parameters":{"properties":{"location":{"type":"string"}},"type":"object"}},"type":"function"}]<|im_end|>
+<|im_start|>user
+What is the weather?<|im_end|>
+<|im_start|>assistant
+I will check.<|im_end|>
+<|im_start|>assistant
+
+
+# LFM2P5Thinking
+
+## No Generation
+<|startoftext|><|im_start|>system
+You are concise.
+List of tools: [{"function":{"description":"Gets the weather.","name":"weather","parameters":{"properties":{"location":{"type":"string"}},"type":"object"}},"type":"function"}]<|im_end|>
+<|im_start|>user
+What is the weather?<|im_end|>
+<|im_start|>assistant
+I will check.<|im_end|>
+
+
+## Generation
+<|startoftext|><|im_start|>system
+You are concise.
+List of tools: [{"function":{"description":"Gets the weather.","name":"weather","parameters":{"properties":{"location":{"type":"string"}},"type":"object"}},"type":"function"}]<|im_end|>
+<|im_start|>user
+What is the weather?<|im_end|>
+<|im_start|>assistant
+I will check.<|im_end|>
+<|im_start|>assistant
+
+
+# LFM2P5VL
+
+## No Generation
+
+{- bos_token }}<|im_start|>system
+You are concise.
+
+Today's date: 2020-01-02
+
+List of tools: [{"function":{"description":"Gets the weather.","name":"weather","parameters":{"properties":{"location":{"type":"string"}},"type":"object"}},"type":"function"}]<|im_end|>
+<|im_start|>user
+What is the weather?<|im_end|>
+<|im_start|>assistant
+I will check.<|im_end|>
+
+
+## Generation
+
+{- bos_token }}<|im_start|>system
+You are concise.
+
+Today's date: 2020-01-02
+
+List of tools: [{"function":{"description":"Gets the weather.","name":"weather","parameters":{"properties":{"location":{"type":"string"}},"type":"object"}},"type":"function"}]<|im_end|>
+<|im_start|>user
+What is the weather?<|im_end|>
+<|im_start|>assistant
+I will check.<|im_end|>
+<|im_start|>assistant
+
+
+# MiniCPM5
+
+## No Generation
+<s><|im_start|>system
+You are concise.
+
+# Tools
+
+You are provided with function signatures within <tools></tools> XML tags:
+<tools>
+{"function":{"description":"Gets the weather.","name":"weather","parameters":{"properties":{"location":{"type":"string"}},"type":"object"}},"type":"function"}
+</tools>
+
+Tool usage guidelines:
+- You may call zero or more functions. If no function calls are needed, just answer normally and do not include any <function ... </function>.
+- When calling a function, return an XML object within <function ... </function> using:
+<function name="function-name"><param name="param-name">param-value</param></function>
+- param-value may be multi-line. If it contains <, & or newline characters, wrap it in a CDATA block: <param name="param-name"><![CDATA[...multi-line value...]]></param><|im_end|>
+<|im_start|>user
+What is the weather?<|im_end|>
+<|im_start|>assistant
+I will check.<|im_end|>
+
+
+## Generation
+<s><|im_start|>system
+You are concise.
+
+# Tools
+
+You are provided with function signatures within <tools></tools> XML tags:
+<tools>
+{"function":{"description":"Gets the weather.","name":"weather","parameters":{"properties":{"location":{"type":"string"}},"type":"object"}},"type":"function"}
+</tools>
+
+Tool usage guidelines:
+- You may call zero or more functions. If no function calls are needed, just answer normally and do not include any <function ... </function>.
+- When calling a function, return an XML object within <function ... </function> using:
+<function name="function-name"><param name="param-name">param-value</param></function>
+- param-value may be multi-line. If it contains <, & or newline characters, wrap it in a CDATA block: <param name="param-name"><![CDATA[...multi-line value...]]></param><|im_end|>
+<|im_start|>user
+What is the weather?<|im_end|>
+<|im_start|>assistant
+I will check.<|im_end|>
+<|im_start|>assistant
+
+
+# Qwen3
+
+## No Generation
+<|im_start|>system
+You are concise.
+
+# Tools
+
+You may call one or more functions to assist with the user query.
+
+You are provided with function signatures within <tools></tools> XML tags:
+<tools>
+{"function":{"description":"Gets the weather.","name":"weather","parameters":{"properties":{"location":{"type":"string"}},"type":"object"}},"type":"function"}
+</tools>
+
+For each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:
+<tool_call>
+{"name": <function-name>, "arguments": <args-json-object>}
+</tool_call><|im_end|>
+<|im_start|>user
+What is the weather?<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+I will check.<|im_end|>
+
+
+## Generation
+<|im_start|>system
+You are concise.
+
+# Tools
+
+You may call one or more functions to assist with the user query.
+
+You are provided with function signatures within <tools></tools> XML tags:
+<tools>
+{"function":{"description":"Gets the weather.","name":"weather","parameters":{"properties":{"location":{"type":"string"}},"type":"object"}},"type":"function"}
+</tools>
+
+For each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:
+<tool_call>
+{"name": <function-name>, "arguments": <args-json-object>}
+</tool_call><|im_end|>
+<|im_start|>user
+What is the weather?<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+I will check.<|im_end|>
+<|im_start|>assistant
+
+
+# Qwen3P5
+
+## No Generation
+<|im_start|>system
+# Tools
+
+You have access to the following functions:
+
+<tools>
+{"function":{"description":"Gets the weather.","name":"weather","parameters":{"properties":{"location":{"type":"string"}},"type":"object"}},"type":"function"}
+</tools>
+
+If you choose to call a function ONLY reply in the following format with NO suffix:
+
+<tool_call>
+<function=example_function_name>
+<parameter=example_parameter_1>
+value_1
+</parameter>
+<parameter=example_parameter_2>
+This is the value for the second parameter
+that can span
+multiple lines
+</parameter>
+</function>
+</tool_call>
+
+<IMPORTANT>
+Reminder:
+- Function calls MUST follow the specified format: an inner <function=...></function> block must be nested within <tool_call></tool_call> XML tags
+- Required parameters MUST be specified
+- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after
+- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls
+</IMPORTANT>
+
+You are concise.<|im_end|>
+<|im_start|>user
+What is the weather?<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+I will check.<|im_end|>
+
+
+## Generation
+<|im_start|>system
+# Tools
+
+You have access to the following functions:
+
+<tools>
+{"function":{"description":"Gets the weather.","name":"weather","parameters":{"properties":{"location":{"type":"string"}},"type":"object"}},"type":"function"}
+</tools>
+
+If you choose to call a function ONLY reply in the following format with NO suffix:
+
+<tool_call>
+<function=example_function_name>
+<parameter=example_parameter_1>
+value_1
+</parameter>
+<parameter=example_parameter_2>
+This is the value for the second parameter
+that can span
+multiple lines
+</parameter>
+</function>
+</tool_call>
+
+<IMPORTANT>
+Reminder:
+- Function calls MUST follow the specified format: an inner <function=...></function> block must be nested within <tool_call></tool_call> XML tags
+- Required parameters MUST be specified
+- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after
+- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls
+</IMPORTANT>
+
+You are concise.<|im_end|>
+<|im_start|>user
+What is the weather?<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+I will check.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+

@@ -18,14 +18,30 @@
       expectNoDifference(error?.message.contains("tokenizer.json"), true)
     }
 
-    #if Transformers
+    #if !HuggingFaceTokenizers
       @Test
-      func `Loads Transformers Tokenizer JSON`() async throws {
-        let directory = try self.makeTransformersTokenizerDirectory()
+      func `Reports The Missing Trait When A Tokenizer Cannot Be Read`() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try Data("{}".utf8).write(to: directory.appending(path: "tokenizer.json"))
+
+        let error = await #expect(throws: EdgeToolsError.self) {
+          _ = try await EdgeToolsAutoTokenizer.from(modelDirectory: directory)
+        }
+        expectNoDifference(error?.code, .noCompatibleTokenizer)
+        expectNoDifference(error?.message.contains("HuggingFaceTokenizers"), true)
+      }
+    #endif
+
+    #if HuggingFaceTokenizers
+      @Test
+      func `Loads Hugging Face Tokenizer JSON`() async throws {
+        let directory = try self.makeHuggingFaceTokenizerDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
 
         let tokenizer = try await EdgeToolsAutoTokenizer.from(modelDirectory: directory)
-        let preTrainedTokenizer = try #require(tokenizer as? TransformersTokenizer)
+        let preTrainedTokenizer = try #require(tokenizer as? HuggingFaceTokenizer)
         let tokenIDs = (
           preTrainedTokenizer.bosTokenId,
           preTrainedTokenizer.eosTokenId,
@@ -37,7 +53,7 @@
         expectNoDifference(preTrainedTokenizer.backendJSON.contains("\"model\""), false)
       }
 
-      private func makeTransformersTokenizerDirectory() throws -> URL {
+      private func makeHuggingFaceTokenizerDirectory() throws -> URL {
         let fileManager = FileManager.default
         let directory = fileManager.temporaryDirectory.appending(path: UUID().uuidString)
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)

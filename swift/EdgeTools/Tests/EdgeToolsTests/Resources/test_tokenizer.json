@@ -3,10 +3,10 @@
   "truncation": null,
   "padding": null,
   "added_tokens": [
-    { "id": 0, "content": "<bos>", "special": true },
-    { "id": 1, "content": "<pad>", "special": true },
-    { "id": 2, "content": "<eos>", "special": true },
-    { "id": 3, "content": "<unk>", "special": true }
+    { "id": 0, "content": "<bos>", "single_word": false, "lstrip": false, "rstrip": false, "normalized": false, "special": true },
+    { "id": 1, "content": "<pad>", "single_word": false, "lstrip": false, "rstrip": false, "normalized": false, "special": true },
+    { "id": 2, "content": "<eos>", "single_word": false, "lstrip": false, "rstrip": false, "normalized": false, "special": true },
+    { "id": 3, "content": "<unk>", "single_word": false, "lstrip": false, "rstrip": false, "normalized": false, "special": true }
   ],
   "model": {
     "type": "BPE",
@@ -17,9 +17,20 @@
       "<unk>": 3,
       "offline": 4,
       "path": 5,
-      "_": 6
+      "_": 6,
+      "o": 7,
+      "f": 8,
+      "l": 9,
+      "i": 10,
+      "n": 11,
+      "e": 12,
+      "of": 13,
+      "off": 14,
+      "offl": 15,
+      "offli": 16,
+      "offlin": 17
     },
-    "merges": ["off line", "li ne", "pa th", "_ of", "_ pa"],
+    "merges": ["o f", "of f", "off l", "offl i", "offli n", "offlin e"],
     "continuing_subword_prefix": "",
     "end_of_word_suffix": "",
     "unk_token": "<unk>"

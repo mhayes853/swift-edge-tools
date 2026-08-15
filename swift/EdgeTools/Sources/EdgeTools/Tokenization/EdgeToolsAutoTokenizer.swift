@@ -2,10 +2,6 @@
   import _EdgeToolsFoundation
 #endif
 
-#if Transformers && canImport(Tokenizers)
-  import Tokenizers
-#endif
-
 // MARK: - EdgeToolsAutoTokenizer
 
 public enum EdgeToolsAutoTokenizer {
@@ -13,51 +9,62 @@ public enum EdgeToolsAutoTokenizer {
     public static func from(
       modelDirectory directoryURL: URL
     ) async throws -> sending any EdgeToolsTokenizer {
-      let transformersURL = directoryURL.appending(path: "tokenizer.json")
-      let hasTransformersTokenizer = FileManager.default.fileExists(
-        atPath: transformersURL.path()
-      )
-      var failures = [String]()
+      let tokenizerJSON = contents(of: directoryURL.appending(path: "tokenizer.json"))
+      guard let tokenizerJSON else {
+        throw EdgeToolsError.noCompatibleTokenizer(
+          in: directoryURL.path(),
+          hasHuggingFaceTokenizer: false
+        )
+      }
 
-      #if Transformers && canImport(Tokenizers)
-        if hasTransformersTokenizer {
-          do {
-            return try await loadTransformersTokenizer(
-              from: directoryURL,
-              tokenizerURL: transformersURL
-            )
-          } catch {
-            failures.append("tokenizer.json could not be loaded: \(error)")
-          }
+      #if HuggingFaceTokenizers && canImport(CTokenizers)
+        do {
+          return try HuggingFaceTokenizer(
+            tokenizerJSON: tokenizerJSON,
+            configuration: contents(of: directoryURL.appending(path: "tokenizer_config.json")),
+            chatTemplate: try loadChatTemplate(from: directoryURL)
+          )
+        } catch {
+          throw EdgeToolsError.noCompatibleTokenizer(
+            in: directoryURL.path(),
+            hasHuggingFaceTokenizer: true,
+            failures: ["\(error)"]
+          )
         }
+      #else
+        throw EdgeToolsError.noCompatibleTokenizer(
+          in: directoryURL.path(),
+          hasHuggingFaceTokenizer: true
+        )
       #endif
-
-      throw EdgeToolsError.noCompatibleTokenizer(
-        in: directoryURL.path(),
-        hasTransformersTokenizer: hasTransformersTokenizer,
-        failures: failures
-      )
     }
   #endif
 }
 
-#if Transformers && FoundationEssentials && canImport(Tokenizers)
-  private func loadTransformersTokenizer(
-    from directoryURL: URL,
-    tokenizerURL: URL
-  ) async throws -> sending any EdgeToolsTokenizer {
-    let tokenizer = try await AutoTokenizer.from(modelFolder: directoryURL)
-    guard let tokenizer = tokenizer as? PreTrainedTokenizer else {
-      throw EdgeToolsError(
-        code: .unsupportedTransformersTokenizer,
-        message: "swift-transformers created an unsupported tokenizer type from \(tokenizerURL)."
-      )
-    }
-    let backendJSON = try loadHuggingFaceBackendJSON(from: tokenizerURL)
+// MARK: - Helpers
 
-    return TransformersTokenizer(
-      tokenizer: tokenizer,
-      backendJSON: backendJSON
-    )
+#if FoundationEssentials
+  private func contents(of fileURL: URL) -> Data? {
+    try? Data(contentsOf: fileURL)
+  }
+#endif
+
+#if HuggingFaceTokenizers && FoundationEssentials && canImport(CTokenizers)
+  private func loadChatTemplate(from directoryURL: URL) throws -> String? {
+    if let jinja = contents(of: directoryURL.appending(path: "chat_template.jinja")) {
+      return String(decoding: jinja, as: UTF8.self)
+    }
+    guard let json = contents(of: directoryURL.appending(path: "chat_template.json")) else {
+      return nil
+    }
+    return try JSONDecoder().decode(ChatTemplateFile.self, from: json).chatTemplate
+  }
+
+  private struct ChatTemplateFile: Decodable {
+    let chatTemplate: String
+
+    enum CodingKeys: String, CodingKey {
+      case chatTemplate = "chat_template"
+    }
   }
 #endif

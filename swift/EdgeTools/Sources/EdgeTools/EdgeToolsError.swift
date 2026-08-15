@@ -9,9 +9,6 @@ public struct EdgeToolsError: Error, Hashable, Sendable {
     }
 
     public static let noCompatibleTokenizer = Self(rawValue: "no-compatible-tokenizer")
-    public static let unsupportedTransformersTokenizer = Self(
-      rawValue: "unsupported-transformers-tokenizer"
-    )
     public static let invalidHuggingFaceBackendJSON = Self(
       rawValue: "invalid-hugging-face-backend-json"
     )
@@ -45,25 +42,25 @@ public struct EdgeToolsError: Error, Hashable, Sendable {
 extension EdgeToolsError {
   static func noCompatibleTokenizer(
     in directory: String,
-    hasTransformersTokenizer: Bool,
+    hasHuggingFaceTokenizer: Bool,
     failures: [String] = []
   ) -> Self {
     var details = [String]()
 
-    #if Transformers && canImport(Tokenizers)
-      if hasTransformersTokenizer {
-        details.append("tokenizer.json is not a supported Transformers tokenizer.")
+    #if HuggingFaceTokenizers && canImport(CTokenizers)
+      if hasHuggingFaceTokenizer {
+        details.append("tokenizer.json is not a supported Hugging Face tokenizer.")
       } else {
         details.append("tokenizer.json was not found.")
       }
     #else
-      if hasTransformersTokenizer {
+      if hasHuggingFaceTokenizer {
         details.append(
-          "tokenizer.json exists, but the Transformers trait is not enabled. Enable Transformers to load it."
+          "tokenizer.json exists, but the HuggingFaceTokenizers trait is not enabled."
         )
       } else {
         details.append(
-          "The Transformers trait is not enabled; enable it to search for tokenizer.json."
+          "The HuggingFaceTokenizers trait is not enabled; enable it to search for tokenizer.json."
         )
       }
     #endif

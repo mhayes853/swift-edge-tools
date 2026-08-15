@@ -33,8 +33,8 @@ let package = Package(
     .trait(name: "XGrammar", description: "XGrammar-powered structured generation."),
     .trait(name: "Needle2", description: "Needle 2 engine support."),
     .trait(
-      name: "Transformers",
-      description: "swift-transformers tokenizer support.",
+      name: "HuggingFaceTokenizers",
+      description: "Hugging Face tokenizer and chat-template support.",
       enabledTraits: ["FoundationEssentials"]
     ),
     .trait(
@@ -45,7 +45,7 @@ let package = Package(
     .trait(
       name: "MLX",
       description: "MLX model support.",
-      enabledTraits: ["Transformers", "FoundationEssentials"]
+      enabledTraits: ["HuggingFaceTokenizers", "FoundationEssentials"]
     ),
     .default(enabledTraits: ["Foundation"])
   ],
@@ -57,6 +57,7 @@ let package = Package(
     .package(url: "https://github.com/pointfreeco/swift-macro-testing", from: "0.6.5"),
     .package(url: "https://github.com/swiftlang/swift-syntax", "600.0.0"..<"603.0.0"),
     .package(url: "https://github.com/huggingface/swift-transformers", from: "1.3.0"),
+    .package(url: "https://github.com/huggingface/swift-jinja.git", from: "2.4.2"),
     .package(
       url: "https://github.com/ibireme/yyjson.git",
       revision: "de3700ab1778e236a8a571058463b6a5888cf262",
@@ -119,11 +120,6 @@ let package = Package(
           condition: .when(platforms: [.macOS], traits: ["MLX"])
         ),
         .product(
-          name: "MLXHuggingFace",
-          package: "mlx-swift-lm",
-          condition: .when(platforms: [.macOS], traits: ["MLX"])
-        ),
-        .product(
           name: "MLXVLM",
           package: "mlx-swift-lm",
           condition: .when(platforms: [.macOS], traits: ["MLX"])
@@ -136,14 +132,19 @@ let package = Package(
             traits: ["Needle2"]
           )
         ),
-        .product(
-          name: "Tokenizers",
-          package: "swift-transformers",
+        .target(
+          name: "CTokenizers",
           condition: .when(
-            // TODO: - watchOS has compilation issues in Hub https://github.com/huggingface/swift-huggingface/pull/58
-            platforms: [.macOS, .iOS, .tvOS, .visionOS, .linux],
-            traits: ["Transformers"]
+            platforms: [
+              .macOS, .iOS, .tvOS, .watchOS, .visionOS, .linux, .android, .windows
+            ],
+            traits: ["HuggingFaceTokenizers"]
           )
+        ),
+        .product(
+          name: "Jinja",
+          package: "swift-jinja",
+          condition: .when(traits: ["HuggingFaceTokenizers"])
         )
       ],
       path: "swift/EdgeTools/Sources/EdgeTools",
@@ -181,6 +182,10 @@ let package = Package(
     .binaryTarget(
       name: "CNeedle2",
       path: "bin/needle2-2.0.1.artifactbundle.zip"
+    ),
+    .binaryTarget(
+      name: "CTokenizers",
+      path: "bin/tokenizers-0.1.0.artifactbundle.zip"
     ),
     .target(
       name: "CXGrammar",
@@ -241,7 +246,8 @@ let package = Package(
         "Models/__Snapshots__",
         "Models/Gemma/__Snapshots__",
         "Models/LFM/__Snapshots__",
-        "Models/Qwen/__Snapshots__"
+        "Models/Qwen/__Snapshots__",
+        "Tokenization/__Snapshots__"
       ],
       resources: [.process("Resources")]
     )

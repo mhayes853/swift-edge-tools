@@ -50,7 +50,7 @@
 
   public typealias LFM2P5VLMLXModelEngine = MLXEngine<LFM2P5VLMLXProfile>
 
-  #if canImport(Tokenizers)
+  #if HuggingFaceTokenizers && canImport(CTokenizers)
     extension MLXEngine where Profile == LFM2P5VLMLXProfile {
       public convenience init(from directoryURL: URL) async throws {
         try await self.init(from: MLXModelDirectory(url: directoryURL))
@@ -78,7 +78,7 @@
     ) throws -> UserInput {
       try self.mlxUserInput(
         tools: tools,
-        additionalContext: ["add_generation_prompt": addGenerationPrompt]
+        additionalContext: ["add_generation_prompt": .boolean(addGenerationPrompt)]
       ) { message in
         guard case .user(let message) = message else {
           return try message.mlxMessage()

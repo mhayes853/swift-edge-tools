@@ -13,6 +13,10 @@ public protocol EdgeToolsTokenizer: Sendable {
   var bosTokenId: EdgeToolsToken.ID? { borrowing get }
   var eosTokenId: EdgeToolsToken.ID? { borrowing get }
 
+  var unknownToken: String? { borrowing get }
+  var bosToken: String? { borrowing get }
+  var eosToken: String? { borrowing get }
+
   func encode(text: String) -> [EdgeToolsToken.ID]
   func decode(tokens: [EdgeToolsToken.ID]) -> String
   func convertTokensToIds(_ tokens: [String]) -> [EdgeToolsToken.ID?]
@@ -46,6 +50,24 @@ extension EdgeToolsTokenizer {
     guard let tokenID = self.eosTokenId else { return nil }
     return self.convertIdToToken(tokenID)
   }
+}
+
+// MARK: - EdgeToolsChatTokenizer
+
+public protocol EdgeToolsChatTokenizer: EdgeToolsTokenizer {
+  func renderChatTemplate(
+    messages: [EdgeToolsValue],
+    tools: [EdgeToolsValue]?,
+    addGenerationPrompt: Bool,
+    additionalContext: [String: EdgeToolsValue]?
+  ) throws -> String
+
+  func applyChatTemplate(
+    messages: [EdgeToolsValue],
+    tools: [EdgeToolsValue]?,
+    addGenerationPrompt: Bool,
+    additionalContext: [String: EdgeToolsValue]?
+  ) throws -> [EdgeToolsToken.ID]
 }
 
 // MARK: - XGRTokenizer
