@@ -1,5 +1,5 @@
-import { needle2Runtime } from "./index";
-import { setAssetBaseURL } from "./internal";
+import { needle2Runtime } from "./index.js";
+import { setAssetBaseURL } from "./internal.js";
 
 const script = typeof document === "undefined" ? undefined : document.currentScript;
 if (script && "src" in script && script.src) {

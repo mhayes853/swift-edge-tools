@@ -1,20 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { needle2Runtime } from "../dist/index.js";
-
-const initialization = {
-	tools: [
-		{
-			name: "set_thermostat",
-			description: "Set the thermostat temperature.",
-			parameters: {
-				type: "object",
-				properties: { temperature: { type: "integer" } },
-				required: ["temperature"],
-			},
-		},
-	],
-};
+import { needle2Runtime } from "@edge-tools/needle2";
+import { thermostatInitialization } from "./support.ts";
 
 test("native addon generates a tool call", async () => {
 	const first = await needle2Runtime({
@@ -26,7 +13,10 @@ test("native addon generates a tool call", async () => {
 		engine: "native",
 	});
 	try {
-		const prompt = { prompt: "set the thermostat to 21 degrees", initialization };
+		const prompt = {
+			prompt: "set the thermostat to 21 degrees",
+			initialization: thermostatInitialization,
+		};
 		const firstResult = await first.generate(prompt);
 		const secondResult = await second.generate(prompt);
 		assert.equal(firstResult.success, true);
@@ -51,7 +41,7 @@ test("native addon works in a worker", async () => {
 	try {
 		const result = await runtime.generate({
 			prompt: "set the thermostat to 21 degrees",
-			initialization,
+				initialization: thermostatInitialization,
 		});
 		assert.equal(result.success, true);
 		assert.deepEqual(result.functionCalls, [

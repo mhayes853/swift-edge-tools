@@ -3,10 +3,10 @@ import type {
 	Needle2WorkerRequest,
 	Needle2WorkerResponse,
 	Needle2WorkerResult,
-} from "./backend";
-import { PromiseQueue, setAssetBaseURL } from "./internal";
-import { Needle2WASMBinding, Needle2NativeBinding } from "./bindings";
-import type { Needle2Backend } from "./backend";
+} from "./backend.js";
+import { PromiseQueue, setAssetBaseURL } from "./internal.js";
+import { Needle2WASMBinding, Needle2NativeBinding } from "./bindings.js";
+import type { Needle2Backend } from "./backend.js";
 
 type WorkerPort = {
 	postMessage(message: Needle2WorkerResponse): void;
@@ -53,9 +53,15 @@ async function handle(
 			if (backend) throw new Error("The Needle 2 worker is already initialized.");
 			if (request.engine === "native") {
 				backend = await Needle2NativeBinding.create(request.weights);
-			} else {
-				backend = await Needle2WASMBinding.create(request.wasm, request.weights);
+				return undefined;
 			}
+			if (request.engine === "auto") {
+				backend = await Needle2NativeBinding.createIfAvailable(request.weights);
+				if (backend) {
+					return undefined;
+				}
+			}
+			backend = await Needle2WASMBinding.create(request.wasm, request.weights);
 			return undefined;
 
 		case "generate":

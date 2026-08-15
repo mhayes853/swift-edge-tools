@@ -5,9 +5,9 @@ import {
 	defaultAssetURL,
 	Needle2Error,
 	PromiseQueue,
-} from "./internal";
-import type { Needle2BinarySource, Needle2Factory } from "./internal";
-import type { Needle2ResolvedGenerateOptions } from "./runtime";
+} from "./internal.js";
+import type { Needle2BinarySource, Needle2Factory } from "./internal.js";
+import type { Needle2ResolvedGenerateOptions } from "./runtime.js";
 
 export type Needle2NativeGeneration = {
 	json: string;
@@ -227,9 +227,9 @@ class SharedNeedle2Binding<RawBinding extends Needle2RawBinding> {
 		return this.operations.enqueue(async () => {
 			owner.requireActive();
 			const loadedWeights = await weights;
+			this.loadWeights(loadedWeights, weightsIdentity);
 			owner.setWeights(loadedWeights);
 			owner.setWeightsIdentity(weightsIdentity);
-			this.loadWeights(loadedWeights, weightsIdentity);
 			this.activeOwner = owner;
 			this.activeInitializationFingerprint = undefined;
 		});
@@ -310,7 +310,7 @@ class ManagedNeedle2Binding implements Needle2Binding, Needle2BindingOwner {
 		return this.sharedBinding.load(
 			this,
 			binarySourceBytes(weights),
-			binarySourceIdentity(weights),
+			{},
 		);
 	}
 
@@ -393,8 +393,8 @@ export class Needle2NativeBinding extends ManagedNeedle2Binding {
 	static async create(
 		weights: Needle2BinarySource,
 	): Promise<Needle2NativeBinding> {
-		const weightBytes = await binarySourceBytes(weights);
 		const module = await loadNativeModule();
+		const weightBytes = await binarySourceBytes(weights);
 		const sharedBinding = sharedNativeBinding(module);
 		const binding = new Needle2NativeBinding(
 			sharedBinding,
@@ -407,6 +407,19 @@ export class Needle2NativeBinding extends ManagedNeedle2Binding {
 			binding.weightsIdentity,
 		);
 		return binding;
+	}
+
+	static async createIfAvailable(
+		weights: Needle2BinarySource,
+	): Promise<Needle2NativeBinding | undefined> {
+		if (!defaultNativeFactory()) {
+			return undefined;
+		}
+		try {
+			return await Needle2NativeBinding.create(weights);
+		} catch {
+			return undefined;
+		}
 	}
 }
 

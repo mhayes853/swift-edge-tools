@@ -3,17 +3,18 @@ export {
 	isNodeLikeEnvironment,
 	Needle2Error,
 	Needle2ProtocolError,
-} from "./internal";
+} from "./internal.js";
 export type {
 	Needle2BinarySource,
 	Needle2Factory,
 	Needle2SerializedBinarySource,
-} from "./internal";
+	Needle2WorkerOptions,
+} from "./internal.js";
 export type {
 	Needle2JSONObject,
 	Needle2JSONPrimitive,
 	Needle2JSONValue,
-} from "./value";
+} from "./value.js";
 export type {
 	Needle2Engine,
 	Needle2Provider,
@@ -28,7 +29,7 @@ export type {
 	Needle2ResponseType,
 	Needle2ResolvedGenerateOptions,
 	Needle2ToolDefinition,
-} from "./runtime";
+} from "./runtime.js";
 export type {
 	Needle2Backend,
 	Needle2NativeGeneration,
@@ -36,7 +37,7 @@ export type {
 	Needle2WorkerRequest,
 	Needle2WorkerResponse,
 	Needle2WorkerResult,
-} from "./backend";
+} from "./backend.js";
 export type {
 	Needle2SystemFactOverrides,
 	Needle2SystemFactProvider,
@@ -44,6 +45,6 @@ export type {
 	Needle2SystemFactValue,
 	Needle2SystemValues,
 	Needle2SystemValuesOptions,
-} from "./system";
-export { Needle2Runtime, needle2Runtime } from "./runtime";
-export { defaultSystemValues, defaultSystemPrompt } from "./system";
+} from "./system.js";
+export { Needle2Runtime, needle2Runtime } from "./runtime.js";
+export { defaultSystemValues, defaultSystemPrompt } from "./system.js";

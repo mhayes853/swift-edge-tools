@@ -61,8 +61,11 @@ runtime test needs read permission for the bundled WASM and model assets; its co
 the Bun tests.
 
 Native bindings can be built from the distributed static library with
-`npm run native:build`. When `engine: "native"` is selected, the runtime automatically locates the
-packaged native addon or shared library for the current host runtime:
+`npm run native:build`. The installed package includes the build script and native wrapper source;
+the script downloads only the current host's pinned, checksum-verified static library and writes the
+result to `dist/native`. When `engine: "native"` is selected, the runtime locates the resulting
+native addon or shared library automatically. The build currently supports Apple silicon macOS and
+x86-64 or ARM64 Linux, and requires `curl`, Clang/C++, and Node development headers:
 
 ```ts
 import { needle2Runtime } from "@edge-tools/needle2";
@@ -76,7 +79,8 @@ const runtime = await needle2Runtime({
 Node uses the N-API addon; Deno and Bun use the C ABI shared library. `npm run test:native` tests
 the Node addon, while `npm run test:native-library` tests the shared library through Deno and Bun.
 Native generation uses the same process-global serialization as the WASM direct backend because the
-underlying C engine is global-state based.
+underlying C engine is global-state based. Use `engine: "auto"` to prefer an available native build
+and fall back to WASM when native loading is unavailable.
 
 The wrapper is MIT licensed. The redistributed Needle 2 engine, WASM, and default weights are
 provided by Cactus Compute under Apache-2.0; its license is included as `LICENSE-Needle2`.

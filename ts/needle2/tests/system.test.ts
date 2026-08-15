@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { defaultSystemValues, defaultSystemPrompt } from "../src/system";
+import { defaultSystemValues, defaultSystemPrompt } from "@edge-tools/needle2";
 
 describe("Needle2 system facts tests", () => {
 	test("formats standard and arbitrary facts in a stable order", () => {
