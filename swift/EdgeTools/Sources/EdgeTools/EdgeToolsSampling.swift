@@ -1,25 +1,11 @@
 // MARK: - EdgeToolsSampler
 
-public struct EdgeToolsSampler<Logits: ~Copyable & ~Escapable>: Sendable {
-  private let body:
-    nonisolated(nonsending) @Sendable (
-      borrowing Logits
-    ) async throws -> EdgeToolsToken.ID
+public protocol EdgeToolsSampler<Logits>: Sendable {
+  associatedtype Logits: ~Copyable & ~Escapable
 
-  public init(
-    _ body:
-      nonisolated(nonsending) @escaping @Sendable (
-        borrowing Logits
-      ) async throws -> EdgeToolsToken.ID
-  ) {
-    self.body = body
-  }
-
-  public nonisolated(nonsending) func sample(
+  nonisolated(nonsending) func sample(
     logits: borrowing Logits
-  ) async throws -> EdgeToolsToken.ID {
-    try await self.body(logits)
-  }
+  ) async throws -> EdgeToolsToken.ID
 }
 
 // MARK: - EdgeToolsFusedSamplingParameters
