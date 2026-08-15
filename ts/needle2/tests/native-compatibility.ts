@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { needle2Runtime } from "@edge-tools/needle2";
+import { needle2 } from "@edge-tools/needle2";
 import { thermostatFunctionCalls, thermostatRequest } from "./support.ts";
 
 test("native addon generates a tool call", async () => {
-	const first = await needle2Runtime({
+	const first = await needle2({
 		provider: "direct",
 		engine: "native",
 	});
-	const second = await needle2Runtime({
+	const second = await needle2({
 		provider: "direct",
 		engine: "native",
 	});
@@ -25,7 +25,7 @@ test("native addon generates a tool call", async () => {
 });
 
 test("native addon works in a worker", async () => {
-	const runtime = await needle2Runtime({
+	const runtime = await needle2({
 		provider: "worker",
 		engine: "native",
 	});

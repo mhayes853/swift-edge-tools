@@ -8,7 +8,7 @@
     <script src="/needle2.min.js"></script>
     <script>
       globalThis.needle2Result = (async () => {
-        const runtime = await needle2Runtime({ provider: "direct" });
+        const runtime = await needle2({ provider: "direct" });
         try {
           const result = await runtime.generate({
             prompt: "set the thermostat to 21 degrees",

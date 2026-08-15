@@ -41,5 +41,5 @@ export type {
 	Needle2SystemValues,
 	Needle2SystemValuesOptions,
 } from "./system.js";
-export { Needle2Runtime, needle2Runtime } from "./runtime.js";
+export { Needle2Runtime, needle2 } from "./runtime.js";
 export { defaultSystemValues, defaultSystemPrompt } from "./system.js";

@@ -158,7 +158,7 @@ export class Needle2Runtime {
 	}
 }
 
-export function needle2Runtime(
+export function needle2(
 	options: Needle2RuntimeOptions,
 ): Promise<Needle2Runtime> {
 	return Needle2Runtime.create(options);

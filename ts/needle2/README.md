@@ -4,9 +4,9 @@ Needle 2 can run in a dedicated Web Worker or directly in the current JavaScript
 runtime automatically loads the bundled engine and default weights.
 
 ```ts
-import { needle2Runtime } from "@edge-tools/needle2";
+import { needle2 } from "@edge-tools/needle2";
 
-const runtime = await needle2Runtime({ provider: "worker" });
+const runtime = await needle2({ provider: "worker" });
 const result = await runtime.generate({
   prompt: "Dim the living room lights to 30 percent.",
   initialization: {
@@ -37,12 +37,12 @@ included. Use `defaultSystemValues` to collect environment values explicitly, th
 as `systemValues`. `defaultSystemPrompt` also formats values directly when needed; arbitrary fact
 keys are supported.
 
-The standalone bundle installs `needle2Runtime` directly:
+The standalone bundle installs `needle2` directly:
 
 ```html
 <script src="https://example.com/needle2.min.js"></script>
 <script>
-  const runtime = await needle2Runtime({ provider: "worker" });
+  const runtime = await needle2({ provider: "worker" });
 </script>
 ```
 
@@ -65,9 +65,9 @@ native addon or shared library automatically. The build currently supports Apple
 x86-64 or ARM64 Linux, and requires `curl`, Clang/C++, and Node development headers:
 
 ```ts
-import { needle2Runtime } from "@edge-tools/needle2";
+import { needle2 } from "@edge-tools/needle2";
 
-const runtime = await needle2Runtime({
+const runtime = await needle2({
   provider: "direct",
   engine: "native"
 });

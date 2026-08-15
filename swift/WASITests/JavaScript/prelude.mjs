@@ -1,9 +1,9 @@
 import {
 	defaultSystemValues,
-	needle2Runtime,
+	needle2,
 } from "../../../ts/needle2/dist/index.js";
 
-globalThis.edgeToolsNeedle2Runtime = needle2Runtime;
+globalThis.edgeToolsNeedle2Runtime = needle2;
 
 export async function setupOptions(options) {
 	const getImports = options.getImports;

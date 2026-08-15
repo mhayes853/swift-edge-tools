@@ -22,7 +22,7 @@ export default defineConfig(({ mode }) => {
       lib: {
         entry: resolve(import.meta.dirname, entry),
         formats: [mode === "standalone" ? "iife" : "es"],
-        name: mode === "standalone" ? "needle2Runtime" : undefined,
+        name: mode === "standalone" ? "needle2" : undefined,
         fileName: () => fileName
       },
       minify: mode === "standalone",

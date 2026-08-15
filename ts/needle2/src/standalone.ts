@@ -1,3 +1,3 @@
-import { needle2Runtime } from "./index.js";
+import { needle2 } from "./index.js";
 
-export default needle2Runtime;
+export default needle2;

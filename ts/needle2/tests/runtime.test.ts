@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "vitest";
-import { needle2Runtime } from "@edge-tools/needle2";
+import { needle2 } from "@edge-tools/needle2";
 import type {
 	Needle2Initialization,
 	Needle2Factory,
@@ -56,7 +56,7 @@ afterEach(async () => {
 });
 
 test("returns the native error response for truncated generation", async () => {
-	const runtime = await needle2Runtime({ provider: "direct" });
+	const runtime = await needle2({ provider: "direct" });
 	runtimes.push(runtime);
 
 	const result = await runtime.generate({
@@ -76,8 +76,8 @@ test("returns the native error response for truncated generation", async () => {
 });
 
 test("isolates multiple direct runtimes sharing one native module", async () => {
-	const thermostat = await needle2Runtime({ provider: "direct" });
-	const weather = await needle2Runtime({ provider: "direct" });
+	const thermostat = await needle2({ provider: "direct" });
+	const weather = await needle2({ provider: "direct" });
 	runtimes.push(thermostat, weather);
 
 	const thermostatPrompt = {
@@ -105,7 +105,7 @@ describe.each([
 	"worker",
 ] satisfies Needle2Provider[])("Needle2Runtime with the %s provider", (provider) => {
 	test("generates a parsed response", async () => {
-		const runtime = await needle2Runtime({ provider });
+		const runtime = await needle2({ provider });
 		runtimes.push(runtime);
 
 		const result = await runtime.generate({
@@ -131,7 +131,7 @@ describe.each([
 	});
 
 	test("rejects generation after disposal", async () => {
-		const runtime = await needle2Runtime({ provider });
+		const runtime = await needle2({ provider });
 		runtimes.push(runtime);
 		await runtime.dispose();
 
@@ -157,13 +157,13 @@ test("shares initial weights but reloads an explicitly loaded source", async () 
 	});
 	const wasm = new Uint8Array([0]);
 	const weights = new Uint8Array([1]);
-	const first = await needle2Runtime({
+	const first = await needle2({
 		provider: "direct",
 		factory,
 		wasm,
 		weights,
 	});
-	const second = await needle2Runtime({
+	const second = await needle2({
 		provider: "direct",
 		factory,
 		wasm,
@@ -181,7 +181,7 @@ describe.each([
 	"worker",
 ] satisfies Needle2Provider[])("Needle2Runtime auto engine with the %s provider", (provider) => {
 	test("falls back to WASM when native artifacts are unavailable", async () => {
-		const runtime = await needle2Runtime({ provider, engine: "auto" });
+		const runtime = await needle2({ provider, engine: "auto" });
 		runtimes.push(runtime);
 
 		const result = await runtime.generate(thermostatRequest);

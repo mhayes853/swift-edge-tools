@@ -1,7 +1,7 @@
-import { needle2Runtime } from "@edge-tools/needle2";
+import { needle2 } from "@edge-tools/needle2";
 
-globalThis.createNeedle2Runtime = needle2Runtime;
+globalThis.createNeedle2Runtime = needle2;
 
 declare global {
-  var createNeedle2Runtime: typeof needle2Runtime;
+  var createNeedle2Runtime: typeof needle2;
 }
