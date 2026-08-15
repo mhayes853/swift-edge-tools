@@ -6,6 +6,7 @@ import type {
 	Needle2Provider,
 	Needle2Runtime,
 } from "@edge-tools/needle2";
+import { thermostatInitialization, thermostatRequest } from "./support.ts";
 
 const runtimes: Needle2Runtime[] = [];
 const emailInitialization: Needle2Initialization = {
@@ -32,6 +33,19 @@ const emailInitialization: Needle2Initialization = {
 					},
 				},
 				required: ["address", "subject", "body"],
+			},
+		},
+	],
+};
+const weatherInitialization: Needle2Initialization = {
+	tools: [
+		{
+			name: "get_weather",
+			description: "Get the weather for a city.",
+			parameters: {
+				type: "object",
+				properties: { city: { type: "string" } },
+				required: ["city"],
 			},
 		},
 	],
@@ -66,8 +80,6 @@ test("isolates multiple direct runtimes sharing one native module", async () => 
 	const weather = await needle2Runtime({ provider: "direct" });
 	runtimes.push(thermostat, weather);
 
-	const thermostatInitialization = initializationFor("set_thermostat");
-	const weatherInitialization = initializationFor("get_weather");
 	const thermostatPrompt = {
 		prompt: "set it to 21 degrees",
 		initialization: thermostatInitialization,
@@ -117,6 +129,16 @@ describe.each([
 			},
 		});
 	});
+
+	test("rejects generation after disposal", async () => {
+		const runtime = await needle2Runtime({ provider });
+		runtimes.push(runtime);
+		await runtime.dispose();
+
+		await expect(runtime.generate(thermostatRequest)).rejects.toMatchObject({
+			code: "disposed",
+		});
+	});
 });
 
 test("shares initial weights but reloads an explicitly loaded source", async () => {
@@ -162,34 +184,9 @@ describe.each([
 		const runtime = await needle2Runtime({ provider, engine: "auto" });
 		runtimes.push(runtime);
 
-		const result = await runtime.generate({
-			prompt: "set it to 21 degrees",
-			initialization: initializationFor("set_thermostat"),
-		});
+		const result = await runtime.generate(thermostatRequest);
 
 		expect(result.success).toBe(true);
 		expect(result.functionCalls[0]?.name).toBe("set_thermostat");
 	});
 });
-
-function initializationFor(toolName: string): Needle2Initialization {
-	return {
-		tools: [
-			{
-				name: toolName,
-				description:
-					toolName === "set_thermostat"
-						? "Set the thermostat temperature."
-						: "Get the weather for a city.",
-				parameters: {
-					type: "object",
-					properties:
-						toolName === "set_thermostat"
-							? { temperature: { type: "integer" } }
-							: { city: { type: "string" } },
-					required: [toolName === "set_thermostat" ? "temperature" : "city"],
-				},
-			},
-		],
-	};
-}

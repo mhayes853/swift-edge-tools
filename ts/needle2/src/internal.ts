@@ -9,8 +9,6 @@ export type Needle2WorkerOptions = {
 	name?: string;
 };
 
-let assetBaseURL: URL | undefined;
-
 export class Needle2Error extends Error {
 	readonly code: string;
 
@@ -57,10 +55,6 @@ export function isNodeLikeEnvironment(): boolean {
 	);
 }
 
-export function setAssetBaseURL(url: URL): void {
-	assetBaseURL = url;
-}
-
 export function defaultAssetURL(name: string): URL {
 	if (name === "needle.wasm") {
 		return new URL(/* @vite-ignore */ "__needle2_wasm__", import.meta.url);
@@ -71,10 +65,7 @@ export function defaultAssetURL(name: string): URL {
 	if (name === "needle2.worker.mjs") {
 		return new URL(/* @vite-ignore */ "__needle2_worker__", import.meta.url);
 	}
-	if (!assetBaseURL) {
-		throw new Error("Needle 2 could not determine its default asset URL.");
-	}
-	return new URL(name, assetBaseURL);
+	return new URL(name, import.meta.url);
 }
 
 export function serializeBinarySource(

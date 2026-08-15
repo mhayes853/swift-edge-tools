@@ -1,11 +1,6 @@
-import { Needle2DirectBackend, Needle2WorkerBackend } from "./backend.js";
-import { Needle2NativeBinding, defaultNativeFactory } from "./bindings.js";
-import {
-	defaultAssetURL,
-	Needle2Error,
-	Needle2ProtocolError,
-	setAssetBaseURL,
-} from "./internal.js";
+import { Needle2WorkerBackend } from "./backend.js";
+import { createNeedle2Binding } from "./bindings.js";
+import { defaultAssetURL, Needle2ProtocolError } from "./internal.js";
 import { defaultSystemPrompt, type Needle2SystemValues } from "./system.js";
 import type { Needle2JSONObject } from "./value.js";
 import type { Needle2Backend } from "./backend.js";
@@ -111,12 +106,6 @@ export type Needle2GenerationResult =
 	| Needle2GenerationSuccess
 	| Needle2GenerationFailure;
 
-try {
-	setAssetBaseURL(new URL(import.meta.url));
-} catch (cause) {
-	throw new Error("Needle 2 could not determine its module URL.", { cause });
-}
-
 export class Needle2Runtime {
 	readonly provider: Needle2Provider;
 
@@ -129,27 +118,17 @@ export class Needle2Runtime {
 		const weights = options.weights ?? defaultAssetURL("needle2.cact");
 		const engine = options.engine ?? "wasm";
 		if (options.provider === "direct") {
-			if (engine === "native") {
-				requireNativeFactory();
-				return new Needle2Runtime(await Needle2NativeBinding.create(weights));
-			}
-			if (engine === "auto") {
-				const nativeBinding =
-					await Needle2NativeBinding.createIfAvailable(weights);
-				if (nativeBinding) {
-					return new Needle2Runtime(nativeBinding);
-				}
-			}
-
 			const wasm = options.wasm ?? defaultAssetURL("needle.wasm");
 			return new Needle2Runtime(
-				await Needle2DirectBackend.create(wasm, weights, options.factory),
+				await createNeedle2Binding(
+					engine,
+					wasm,
+					weights,
+					options.factory,
+				),
 			);
 		}
 
-		if (engine === "native") {
-			requireNativeFactory();
-		}
 		const wasm = options.wasm ?? defaultAssetURL("needle.wasm");
 		return new Needle2Runtime(
 			await Needle2WorkerBackend.create(
@@ -272,14 +251,4 @@ function isNumber(value: unknown): value is number {
 
 function isPositiveNumber(value: unknown): value is number {
 	return isNumber(value) && value > 0;
-}
-
-function requireNativeFactory(): void {
-	if (defaultNativeFactory()) {
-		return;
-	}
-	throw new Needle2Error(
-		"native-unavailable",
-		"The native Needle 2 engine is unavailable in this runtime.",
-	);
 }

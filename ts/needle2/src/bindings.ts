@@ -7,7 +7,10 @@ import {
 	PromiseQueue,
 } from "./internal.js";
 import type { Needle2BinarySource, Needle2Factory } from "./internal.js";
-import type { Needle2ResolvedGenerateOptions } from "./runtime.js";
+import type {
+	Needle2Engine,
+	Needle2ResolvedGenerateOptions,
+} from "./runtime.js";
 
 export type Needle2NativeGeneration = {
 	json: string;
@@ -21,6 +24,25 @@ export interface Needle2Binding {
 	): Promise<Needle2NativeGeneration>;
 	load(weights: Needle2BinarySource): Promise<void>;
 	dispose(): Promise<void>;
+}
+
+export async function createNeedle2Binding(
+	engine: Needle2Engine,
+	wasm: Needle2BinarySource,
+	weights: Needle2BinarySource,
+	factory?: Needle2Factory,
+): Promise<Needle2Binding> {
+	if (engine === "native") {
+		return Needle2NativeBinding.create(weights);
+	}
+	if (engine === "auto") {
+		try {
+			return await Needle2NativeBinding.create(weights);
+		} catch {
+			return Needle2WASMBinding.create(wasm, weights, factory);
+		}
+	}
+	return Needle2WASMBinding.create(wasm, weights, factory);
 }
 
 export type Needle2NativeModule = {
@@ -62,18 +84,9 @@ const denoSymbols = {
 
 let nativeModulePromise: Promise<Needle2NativeModule> | undefined;
 
-export function defaultNativeFactory():
-	| (() => Promise<Needle2NativeModule>)
-	| undefined {
-	if (!isNodeRuntime() && !isCAbiRuntime()) return undefined;
-	return loadNativeModule;
-}
-
 function loadNativeModule(): Promise<Needle2NativeModule> {
 	if (nativeModulePromise) return nativeModulePromise;
-	const promise = isNodeRuntime()
-		? loadNodeAddon()
-		: loadCAbiLibrary(defaultAssetURL(`native/${nativeLibraryFilename()}`));
+	const promise = loadUncachedNativeModule();
 	nativeModulePromise = promise.catch((error) => {
 		nativeModulePromise = undefined;
 		throw error;
@@ -195,14 +208,11 @@ function decodeOutput(output: Uint8Array): string {
 	);
 }
 
-interface Needle2BindingOwner {
-	requireActive(): void;
-	markDisposed(): void;
-	currentWeights(): Uint8Array;
-	setWeights(weights: Uint8Array): void;
-	currentWeightsIdentity(): object | string;
-	setWeightsIdentity(identity: object | string): void;
-}
+type Needle2BindingState = {
+	disposed: boolean;
+	weights: Uint8Array;
+	weightsIdentity: object | string;
+};
 
 interface Needle2RawBinding {
 	loadWeights(weights: Uint8Array): number | undefined;
@@ -211,37 +221,39 @@ interface Needle2RawBinding {
 	reset(): void;
 }
 
-class SharedNeedle2Binding<RawBinding extends Needle2RawBinding> {
+class SharedNeedle2Binding {
 	private readonly operations = new PromiseQueue();
-	private activeOwner: Needle2BindingOwner | undefined;
+	private activeOwner: object | undefined;
 	private activeInitializationFingerprint: string | undefined;
 	private loadedWeightsIdentity: object | string | undefined;
 
-	constructor(private readonly rawBinding: RawBinding) {}
+	constructor(private readonly rawBinding: Needle2RawBinding) {}
 
 	load(
-		owner: Needle2BindingOwner,
+		owner: object,
+		state: Needle2BindingState,
 		weights: Promise<Uint8Array>,
 		weightsIdentity: object | string,
 	): Promise<void> {
 		return this.operations.enqueue(async () => {
-			owner.requireActive();
+			requireActive(state);
 			const loadedWeights = await weights;
 			this.loadWeights(loadedWeights, weightsIdentity);
-			owner.setWeights(loadedWeights);
-			owner.setWeightsIdentity(weightsIdentity);
+			state.weights = loadedWeights.slice();
+			state.weightsIdentity = weightsIdentity;
 			this.activeOwner = owner;
 			this.activeInitializationFingerprint = undefined;
 		});
 	}
 
 	generate(
-		owner: Needle2BindingOwner,
+		owner: object,
+		state: Needle2BindingState,
 		options: Needle2ResolvedGenerateOptions,
 	): Promise<Needle2NativeGeneration> {
 		return this.operations.enqueue(() => {
-			owner.requireActive();
-			this.loadWeights(owner.currentWeights(), owner.currentWeightsIdentity());
+			requireActive(state);
+			this.loadWeights(state.weights, state.weightsIdentity);
 			const initializationFingerprint = JSON.stringify(options.initialization);
 			if (
 				this.activeOwner !== owner ||
@@ -260,13 +272,13 @@ class SharedNeedle2Binding<RawBinding extends Needle2RawBinding> {
 		});
 	}
 
-	dispose(owner: Needle2BindingOwner): Promise<void> {
+	dispose(owner: object, state: Needle2BindingState): Promise<void> {
 		return this.operations.enqueue(() => {
 			if (this.activeOwner === owner) {
 				this.activeOwner = undefined;
 				this.activeInitializationFingerprint = undefined;
 			}
-			owner.markDisposed();
+			state.disposed = true;
 		});
 	}
 
@@ -285,66 +297,51 @@ class SharedNeedle2Binding<RawBinding extends Needle2RawBinding> {
 	}
 }
 
-class ManagedNeedle2Binding implements Needle2Binding, Needle2BindingOwner {
+class ManagedNeedle2Binding implements Needle2Binding {
 	readonly provider = "direct" as const;
-	protected weights: Uint8Array;
-	protected weightsIdentity: object | string;
-	private disposed = false;
+	private readonly state: Needle2BindingState;
 
-	constructor(
-		protected readonly sharedBinding: SharedNeedle2Binding<Needle2RawBinding>,
+	protected constructor(
+		private readonly sharedBinding: SharedNeedle2Binding,
 		weights: Uint8Array,
 		weightsIdentity: object | string,
 	) {
-		this.weights = weights.slice();
-		this.weightsIdentity = weightsIdentity;
+		this.state = {
+			disposed: false,
+			weights,
+			weightsIdentity,
+		};
 	}
 
 	generate(
 		options: Needle2ResolvedGenerateOptions,
 	): Promise<Needle2NativeGeneration> {
-		return this.sharedBinding.generate(this, options);
+		return this.sharedBinding.generate(this, this.state, options);
 	}
 
 	load(weights: Needle2BinarySource): Promise<void> {
 		return this.sharedBinding.load(
 			this,
+			this.state,
 			binarySourceBytes(weights),
 			{},
 		);
 	}
 
 	dispose(): Promise<void> {
-		return this.sharedBinding.dispose(this);
+		return this.sharedBinding.dispose(this, this.state);
 	}
 
-	requireActive(): void {
-		if (this.disposed) {
-			throw new Needle2Error(
-				"disposed",
-				"This Needle 2 runtime has been disposed.",
-			);
-		}
-	}
-
-	markDisposed(): void {
-		this.disposed = true;
-	}
-
-	currentWeights(): Uint8Array {
-		return this.weights;
-	}
-
-	setWeights(weights: Uint8Array): void {
-		this.weights = weights.slice();
-	}
-
-	currentWeightsIdentity(): object | string {
-		return this.weightsIdentity;
-	}
-
-	setWeightsIdentity(identity: object | string): void {
-		this.weightsIdentity = identity;
+	protected loadInitial(
+		weights: Uint8Array,
+		weightsIdentity: object | string,
+	): Promise<void> {
+		return this.sharedBinding.load(
+			this,
+			this.state,
+			Promise.resolve(weights),
+			weightsIdentity,
+		);
 	}
 }
 
@@ -358,68 +355,33 @@ export class Needle2WASMBinding extends ManagedNeedle2Binding {
 			binarySourceBytes(wasm),
 			binarySourceBytes(weights),
 		]);
-		const rawBinding = await createWasmBinding(factory, wasmBytes);
+		const sharedBinding = await createWasmBinding(factory, wasmBytes);
+		const weightsIdentity = binarySourceIdentity(weights);
 		const binding = new Needle2WASMBinding(
-			rawBinding.sharedBinding,
+			sharedBinding,
 			weightBytes,
-			binarySourceIdentity(weights),
+			weightsIdentity,
 		);
-		await rawBinding.sharedBinding.load(
-			binding,
-			Promise.resolve(weightBytes),
-			binding.weightsIdentity,
-		);
+		await binding.loadInitial(weightBytes, weightsIdentity);
 		return binding;
-	}
-
-	private constructor(
-		sharedBinding: SharedNeedle2Binding<Needle2RawBinding>,
-		weights: Uint8Array,
-		weightsIdentity: object | string,
-	) {
-		super(sharedBinding, weights, weightsIdentity);
 	}
 }
 
 export class Needle2NativeBinding extends ManagedNeedle2Binding {
-	private constructor(
-		sharedBinding: SharedNeedle2Binding<Needle2RawBinding>,
-		weights: Uint8Array,
-		weightsIdentity: object | string,
-	) {
-		super(sharedBinding, weights, weightsIdentity);
-	}
-
 	static async create(
 		weights: Needle2BinarySource,
 	): Promise<Needle2NativeBinding> {
 		const module = await loadNativeModule();
 		const weightBytes = await binarySourceBytes(weights);
 		const sharedBinding = sharedNativeBinding(module);
+		const weightsIdentity = binarySourceIdentity(weights);
 		const binding = new Needle2NativeBinding(
 			sharedBinding,
 			weightBytes,
-			binarySourceIdentity(weights),
+			weightsIdentity,
 		);
-		await sharedBinding.load(
-			binding,
-			Promise.resolve(weightBytes),
-			binding.weightsIdentity,
-		);
+		await binding.loadInitial(weightBytes, weightsIdentity);
 		return binding;
-	}
-
-	static async createIfAvailable(
-		weights: Needle2BinarySource,
-	): Promise<Needle2NativeBinding | undefined> {
-		if (!defaultNativeFactory()) {
-			return undefined;
-		}
-		try {
-			return await Needle2NativeBinding.create(weights);
-		} catch {
-			return undefined;
-		}
 	}
 }
 
@@ -521,24 +483,20 @@ class WasmRawBinding implements Needle2RawBinding {
 	}
 }
 
-let sharedWasmModule:
-	| Promise<SharedNeedle2Binding<Needle2RawBinding>>
-	| undefined;
+let sharedWasmModule: Promise<SharedNeedle2Binding> | undefined;
 let sharedWasmFactory: Needle2Factory | undefined;
 
 async function createWasmBinding(
 	factory: Needle2Factory,
 	wasm: Uint8Array,
-): Promise<{ sharedBinding: SharedNeedle2Binding<Needle2RawBinding> }> {
+): Promise<SharedNeedle2Binding> {
 	if (sharedWasmModule && sharedWasmFactory === factory) {
-		return { sharedBinding: await sharedWasmModule };
+		return sharedWasmModule;
 	}
 	sharedWasmFactory = factory;
 	const modulePromise = Promise.resolve(factory({ wasmBinary: wasm })).then(
 		(value) =>
-			new SharedNeedle2Binding<Needle2RawBinding>(
-				new WasmRawBinding(emscriptenModule(value)),
-			),
+			new SharedNeedle2Binding(new WasmRawBinding(emscriptenModule(value))),
 	);
 	const cachedPromise = modulePromise.catch((error) => {
 		if (sharedWasmModule === cachedPromise) {
@@ -548,27 +506,18 @@ async function createWasmBinding(
 		throw error;
 	});
 	sharedWasmModule = cachedPromise;
-	return { sharedBinding: await cachedPromise };
+	return cachedPromise;
 }
 
-let sharedNativeBindingState:
-	| {
-			key: Needle2NativeModule;
-			binding: SharedNeedle2Binding<Needle2RawBinding>;
-	  }
-	| undefined;
+let sharedNativeBindingInstance: SharedNeedle2Binding | undefined;
 
 function sharedNativeBinding(
 	module: Needle2NativeModule,
-): SharedNeedle2Binding<Needle2RawBinding> {
-	if (sharedNativeBindingState?.key === module) {
-		return sharedNativeBindingState.binding;
-	}
-	const binding = new SharedNeedle2Binding<Needle2RawBinding>(
+): SharedNeedle2Binding {
+	sharedNativeBindingInstance ??= new SharedNeedle2Binding(
 		new NativeRawBinding(module),
 	);
-	sharedNativeBindingState = { key: module, binding };
-	return binding;
+	return sharedNativeBindingInstance;
 }
 
 class NativeRawBinding implements Needle2RawBinding {
@@ -682,4 +631,30 @@ function binarySourceIdentity(source: Needle2BinarySource): object | string {
 	if (typeof source === "string") return source;
 	if (source instanceof URL) return source.href;
 	return source;
+}
+
+function loadUncachedNativeModule(): Promise<Needle2NativeModule> {
+	if (isNodeRuntime()) {
+		return loadNodeAddon();
+	}
+	if (isCAbiRuntime()) {
+		return loadCAbiLibrary(
+			defaultAssetURL(`native/${nativeLibraryFilename()}`),
+		);
+	}
+	return Promise.reject(
+		new Needle2Error(
+			"native-unavailable",
+			"The native Needle 2 engine is unavailable in this runtime.",
+		),
+	);
+}
+
+function requireActive(state: Needle2BindingState): void {
+	if (state.disposed) {
+		throw new Needle2Error(
+			"disposed",
+			"This Needle 2 runtime has been disposed.",
+		);
+	}
 }

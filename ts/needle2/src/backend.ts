@@ -57,11 +57,10 @@ export type Needle2WorkerResponse =
 	| { id: number; success: true; result?: Needle2WorkerResult }
 	| { id: number; success: false; error: Needle2SerializedError };
 
-type Needle2WorkerRequestInput = Needle2WorkerRequest extends infer Request
-	? Request extends { id: number }
-		? Omit<Request, "id">
-		: never
+type WithoutID<Request> = Request extends { id: number }
+	? Omit<Request, "id">
 	: never;
+type Needle2WorkerRequestInput = WithoutID<Needle2WorkerRequest>;
 
 type WorkerConnection = {
 	postMessage(message: Needle2WorkerRequest): void;
@@ -80,8 +79,7 @@ export class Needle2WorkerBackend implements Needle2Backend {
 
 	private readonly pending = new Map<number, PendingRequest>();
 	private nextRequestID = 0;
-	private disposed = false;
-	private failure: Error | undefined;
+	private terminalError: Error | undefined;
 	private disposePromise: Promise<void> | undefined;
 
 	static async create(
@@ -140,33 +138,29 @@ export class Needle2WorkerBackend implements Needle2Backend {
 	}
 
 	private async disposeInternal(): Promise<void> {
-		if (this.disposed) return;
-		if (this.failure) {
-			this.disposed = true;
+		if (this.terminalError) {
 			await this.connection.terminate();
 			return;
 		}
+		const disposedError = new Needle2Error(
+			"disposed",
+			"This Needle 2 runtime has been disposed.",
+		);
+		const request = this.request({ operation: "dispose" });
+		this.terminalError = disposedError;
 		try {
-			await this.request({ operation: "dispose" });
+			await request;
 		} finally {
-			this.disposed = true;
 			await this.connection.terminate();
-			this.failPending(
-				new Needle2Error("disposed", "This Needle 2 runtime has been disposed."),
-			);
+			this.failPending(disposedError);
 		}
 	}
 
 	private request(
 		request: Needle2WorkerRequestInput,
 	): Promise<Needle2WorkerResult> {
-		if (this.failure) {
-			return Promise.reject(this.failure);
-		}
-		if (this.disposed) {
-			return Promise.reject(
-				new Needle2Error("disposed", "This Needle 2 runtime has been disposed."),
-			);
+		if (this.terminalError) {
+			return Promise.reject(this.terminalError);
 		}
 		const id = this.nextRequestID++;
 		return new Promise((resolve, reject) => {
@@ -198,10 +192,11 @@ export class Needle2WorkerBackend implements Needle2Backend {
 	}
 
 	private handleFailure(error: Error): void {
-		if (this.disposed || this.failure) {
+		if (this.terminalError) {
+			this.failPending(this.terminalError);
 			return;
 		}
-		this.failure = error;
+		this.terminalError = error;
 		this.failPending(error);
 		void this.connection.terminate().catch(() => undefined);
 	}

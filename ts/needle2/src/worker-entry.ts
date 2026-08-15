@@ -4,8 +4,8 @@ import type {
 	Needle2WorkerResponse,
 	Needle2WorkerResult,
 } from "./backend.js";
-import { PromiseQueue, setAssetBaseURL } from "./internal.js";
-import { Needle2WASMBinding, Needle2NativeBinding } from "./bindings.js";
+import { PromiseQueue } from "./internal.js";
+import { createNeedle2Binding } from "./bindings.js";
 import type { Needle2Backend } from "./backend.js";
 
 type WorkerPort = {
@@ -13,13 +13,6 @@ type WorkerPort = {
 	onMessage(handler: (message: Needle2WorkerRequest) => void): void;
 };
 
-try {
-	setAssetBaseURL(new URL(import.meta.url));
-} catch (cause) {
-	throw new Error("Needle 2 worker could not determine its module URL.", {
-		cause,
-	});
-}
 const port = await workerPort();
 let backend: Needle2Backend | undefined;
 const operations = new PromiseQueue();
@@ -51,17 +44,11 @@ async function handle(
 	switch (request.operation) {
 		case "initialize":
 			if (backend) throw new Error("The Needle 2 worker is already initialized.");
-			if (request.engine === "native") {
-				backend = await Needle2NativeBinding.create(request.weights);
-				return undefined;
-			}
-			if (request.engine === "auto") {
-				backend = await Needle2NativeBinding.createIfAvailable(request.weights);
-				if (backend) {
-					return undefined;
-				}
-			}
-			backend = await Needle2WASMBinding.create(request.wasm, request.weights);
+			backend = await createNeedle2Binding(
+				request.engine,
+				request.wasm,
+				request.weights,
+			);
 			return undefined;
 
 		case "generate":
