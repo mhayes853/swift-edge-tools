@@ -51,9 +51,6 @@ bundled resources. The worker provider always uses the bundled worker implementa
 `.cact` file through `weights`, or use `runtime.load(...)` to replace the weights after
 initialization.
 
-`isBrowserEnvironment()` and `isNodeLikeEnvironment()` are available when applications need to
-choose behavior outside the runtime's automatic environment detection.
-
 Run the full package test suite with `npm test`. It builds the package, runs the Node and browser
 Vitest suites, and then runs the direct and worker providers under both Deno and Bun. The Deno
 runtime test needs read permission for the bundled WASM and model assets; its command is
