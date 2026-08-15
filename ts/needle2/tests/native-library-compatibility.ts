@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { needle2Runtime } from "../dist/index.js";
+import { needle2Runtime } from "@edge-tools/needle2";
+import { thermostatFunctionCalls, thermostatRequest } from "./support.ts";
 
 for (const provider of ["direct", "worker"] as const) {
 	test(`${provider} C ABI native library generates a tool call`, async () => {
@@ -9,29 +10,9 @@ for (const provider of ["direct", "worker"] as const) {
 			engine: "native",
 		});
 		try {
-			const result = await runtime.generate({
-				prompt: "set the thermostat to 21 degrees",
-				initialization: {
-					tools: [
-						{
-							name: "set_thermostat",
-							description: "Set the thermostat temperature.",
-							parameters: {
-								type: "object",
-								properties: { temperature: { type: "integer" } },
-								required: ["temperature"],
-							},
-						},
-					],
-				},
-			});
+			const result = await runtime.generate(thermostatRequest);
 			assert.equal(result.success, true);
-			assert.deepEqual(result.functionCalls, [
-				{
-					name: "set_thermostat",
-					arguments: { temperature: 21 },
-				},
-			]);
+			assert.deepEqual(result.functionCalls, thermostatFunctionCalls);
 		} finally {
 			await runtime.dispose();
 		}

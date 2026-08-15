@@ -1,21 +1,23 @@
-import type { Needle2NativeGeneration } from "./bindings";
+import type { Needle2NativeGeneration } from "./bindings.js";
 import {
 	defaultAssetURL,
 	Needle2Error,
-	isBrowserEnvironment,
+	isNodeLikeEnvironment,
 	serializeBinarySource,
-} from "./internal";
+} from "./internal.js";
 import type {
 	Needle2BinarySource,
 	Needle2SerializedBinarySource,
-} from "./internal";
+	Needle2WorkerOptions,
+} from "./internal.js";
 import type {
+	Needle2Engine,
 	Needle2Provider,
 	Needle2ResolvedGenerateOptions,
-} from "./runtime";
+} from "./runtime.js";
 
-export { Needle2WASMBinding as Needle2DirectBackend } from "./bindings";
-export type { Needle2NativeGeneration } from "./bindings";
+export { Needle2WASMBinding as Needle2DirectBackend } from "./bindings.js";
+export type { Needle2NativeGeneration } from "./bindings.js";
 
 export interface Needle2Backend {
 	readonly provider: Needle2Provider;
@@ -32,7 +34,7 @@ export type Needle2WorkerRequest =
 			operation: "initialize";
 			wasm: Needle2SerializedBinarySource;
 			weights: Needle2SerializedBinarySource;
-			engine: "wasm" | "native";
+			engine: Needle2Engine;
 	  }
 	| {
 			id: number;
@@ -55,17 +57,16 @@ export type Needle2WorkerResponse =
 	| { id: number; success: true; result?: Needle2WorkerResult }
 	| { id: number; success: false; error: Needle2SerializedError };
 
-type Needle2WorkerRequestInput = Needle2WorkerRequest extends infer Request
-	? Request extends { id: number }
-		? Omit<Request, "id">
-		: never
+type WithoutID<Request> = Request extends { id: number }
+	? Omit<Request, "id">
 	: never;
+type Needle2WorkerRequestInput = WithoutID<Needle2WorkerRequest>;
 
 type WorkerConnection = {
 	postMessage(message: Needle2WorkerRequest): void;
 	onMessage(handler: (message: Needle2WorkerResponse) => void): void;
-	onError(handler: (error: Error) => void): void;
-	terminate(): void | Promise<unknown>;
+	onFailure(handler: (error: Error) => void): void;
+	terminate(): Promise<void>;
 };
 
 type PendingRequest = {
@@ -78,14 +79,14 @@ export class Needle2WorkerBackend implements Needle2Backend {
 
 	private readonly pending = new Map<number, PendingRequest>();
 	private nextRequestID = 0;
-	private disposed = false;
+	private terminalError: Error | undefined;
 	private disposePromise: Promise<void> | undefined;
 
 	static async create(
 		wasm: Needle2BinarySource,
 		weights: Needle2BinarySource,
-		options?: WorkerOptions,
-		engine: "wasm" | "native" = "wasm",
+		options?: Needle2WorkerOptions,
+		engine: Needle2Engine = "wasm",
 	): Promise<Needle2WorkerBackend> {
 		const connection = await workerConnection(
 			defaultAssetURL("needle2.worker.mjs"),
@@ -108,7 +109,7 @@ export class Needle2WorkerBackend implements Needle2Backend {
 
 	private constructor(private readonly connection: WorkerConnection) {
 		connection.onMessage((message) => this.receive(message));
-		connection.onError((error) => this.failPending(error));
+		connection.onFailure((error) => this.handleFailure(error));
 	}
 
 	async generate(
@@ -137,25 +138,29 @@ export class Needle2WorkerBackend implements Needle2Backend {
 	}
 
 	private async disposeInternal(): Promise<void> {
-		if (this.disposed) return;
-		try {
-			await this.request({ operation: "dispose" });
-		} finally {
-			this.disposed = true;
+		if (this.terminalError) {
 			await this.connection.terminate();
-			this.failPending(
-				new Needle2Error("disposed", "This Needle 2 runtime has been disposed."),
-			);
+			return;
+		}
+		const disposedError = new Needle2Error(
+			"disposed",
+			"This Needle 2 runtime has been disposed.",
+		);
+		const request = this.request({ operation: "dispose" });
+		this.terminalError = disposedError;
+		try {
+			await request;
+		} finally {
+			await this.connection.terminate();
+			this.failPending(disposedError);
 		}
 	}
 
 	private request(
 		request: Needle2WorkerRequestInput,
 	): Promise<Needle2WorkerResult> {
-		if (this.disposed) {
-			return Promise.reject(
-				new Needle2Error("disposed", "This Needle 2 runtime has been disposed."),
-			);
+		if (this.terminalError) {
+			return Promise.reject(this.terminalError);
 		}
 		const id = this.nextRequestID++;
 		return new Promise((resolve, reject) => {
@@ -185,14 +190,30 @@ export class Needle2WorkerBackend implements Needle2Backend {
 		for (const pending of this.pending.values()) pending.reject(error);
 		this.pending.clear();
 	}
+
+	private handleFailure(error: Error): void {
+		if (this.terminalError) {
+			this.failPending(this.terminalError);
+			return;
+		}
+		this.terminalError = error;
+		this.failPending(error);
+		void this.connection.terminate().catch(() => undefined);
+	}
 }
 
 async function workerConnection(
 	url: URL,
-	options?: WorkerOptions,
+	options?: Needle2WorkerOptions,
 ): Promise<WorkerConnection> {
-	if (isBrowserEnvironment() && typeof Worker !== "undefined") {
+	if (typeof Worker !== "undefined") {
 		return browserWorkerConnection(url, options);
+	}
+	if (!isNodeLikeEnvironment()) {
+		throw new Needle2Error(
+			"worker-unavailable",
+			"This runtime does not provide Web Workers or Node worker threads.",
+		);
 	}
 
 	const workerThreadsSpecifier = "node:worker_threads";
@@ -206,14 +227,26 @@ async function workerConnection(
 	return {
 		postMessage: (message) => worker.postMessage(message),
 		onMessage: (handler) => worker.on("message", handler),
-		onError: (handler) => worker.on("error", handler),
-		terminate: () => worker.terminate(),
+		onFailure(handler) {
+			worker.on("error", handler);
+			worker.on("exit", (code: number) =>
+				handler(
+					new Needle2Error(
+						"worker-exited",
+						`The Needle 2 worker exited with status ${code}.`,
+					),
+				),
+			);
+		},
+		async terminate() {
+			await worker.terminate();
+		},
 	};
 }
 
 function browserWorkerConnection(
 	url: URL,
-	options?: WorkerOptions,
+	options?: Needle2WorkerOptions,
 ): WorkerConnection {
 	const worker = new Worker(url, { ...options, type: "module" });
 	return {
@@ -222,11 +255,22 @@ function browserWorkerConnection(
 			worker.addEventListener("message", (event) =>
 				handler(event.data as Needle2WorkerResponse),
 			),
-		onError: (handler) =>
+		onFailure(handler) {
 			worker.addEventListener("error", (event) =>
 				handler(new Error(event.message)),
-			),
-		terminate: () => worker.terminate(),
+			);
+			worker.addEventListener("messageerror", () =>
+				handler(
+					new Needle2Error(
+						"worker-message-error",
+						"The Needle 2 worker received an unreadable message.",
+					),
+				),
+			);
+		},
+		async terminate() {
+			worker.terminate();
+		},
 	};
 }
 

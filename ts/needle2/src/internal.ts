@@ -4,7 +4,10 @@ export type Needle2Factory = (options: {
 }) => unknown | PromiseLike<unknown>;
 export type Needle2SerializedBinarySource = string | Uint8Array;
 
-let assetBaseURL: URL | undefined;
+export type Needle2WorkerOptions = {
+	credentials?: "omit" | "same-origin" | "include";
+	name?: string;
+};
 
 export class Needle2Error extends Error {
 	readonly code: string;
@@ -46,18 +49,23 @@ export function isBrowserEnvironment(): boolean {
 }
 
 export function isNodeLikeEnvironment(): boolean {
-	return !isBrowserEnvironment();
-}
-
-export function setAssetBaseURL(url: URL): void {
-	assetBaseURL = url;
+	return (
+		globalThis.process?.versions?.node !== undefined ||
+		typeof (globalThis as { Bun?: unknown }).Bun !== "undefined"
+	);
 }
 
 export function defaultAssetURL(name: string): URL {
-	if (!assetBaseURL) {
-		throw new Error("Needle 2 could not determine its default asset URL.");
+	if (name === "needle.wasm") {
+		return new URL(/* @vite-ignore */ "__needle2_wasm__", import.meta.url);
 	}
-	return new URL(name, assetBaseURL);
+	if (name === "needle2.cact") {
+		return new URL(/* @vite-ignore */ "__needle2_weights__", import.meta.url);
+	}
+	if (name === "needle2.worker.mjs") {
+		return new URL(/* @vite-ignore */ "__needle2_worker__", import.meta.url);
+	}
+	return new URL(name, import.meta.url);
 }
 
 export function serializeBinarySource(
@@ -88,14 +96,26 @@ export async function binarySourceBytes(
 	const url =
 		source instanceof URL ? source : new URL(source, fallbackBaseURL());
 	if (url.protocol === "file:") {
-		if (!isNodeLikeEnvironment()) {
-			throw new Error(
-				`The ${url.href} file URL is unavailable outside a Node-like environment.`,
-			);
+		const deno = (
+			globalThis as { Deno?: { readFile(url: URL): Promise<Uint8Array> } }
+		).Deno;
+		if (deno) {
+			return deno.readFile(url);
 		}
-		const fileSystemSpecifier = "node:fs/promises";
-		const { readFile } = await import(/* @vite-ignore */ fileSystemSpecifier);
-		return new Uint8Array(await readFile(url));
+		const bun = (
+			globalThis as {
+				Bun?: { file(url: URL): { arrayBuffer(): Promise<ArrayBuffer> } };
+			}
+		).Bun;
+		if (bun) {
+			return new Uint8Array(await bun.file(url).arrayBuffer());
+		}
+		if (isNodeLikeEnvironment()) {
+			const fileSystemSpecifier = "node:fs/promises";
+			const { readFile } = await import(/* @vite-ignore */ fileSystemSpecifier);
+			return new Uint8Array(await readFile(url));
+		}
+		throw new Error(`The ${url.href} file URL is unavailable in this runtime.`);
 	}
 
 	const response = await fetch(url);

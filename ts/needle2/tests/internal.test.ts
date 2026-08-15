@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { PromiseQueue } from "../src/internal";
+import { PromiseQueue } from "../src/internal.js";
 
 describe("PromiseQueue tests", () => {
   test("serializes operations and continues after an error", async () => {

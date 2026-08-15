@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Needle 2 standalone fixture</title>
+  </head>
+  <body>
+    <script src="/needle2.min.js"></script>
+    <script>
+      globalThis.needle2Result = (async () => {
+        const runtime = await needle2Runtime({ provider: "direct" });
+        try {
+          const result = await runtime.generate({
+            prompt: "set the thermostat to 21 degrees",
+            initialization: {
+              tools: [
+                {
+                  name: "set_thermostat",
+                  description: "Set the thermostat temperature.",
+                  parameters: {
+                    type: "object",
+                    properties: { temperature: { type: "integer" } },
+                    required: ["temperature"]
+                  }
+                }
+              ]
+            }
+          });
+          return {
+            success: result.success,
+            functionName: result.functionCalls[0]?.name
+          };
+        } finally {
+          await runtime.dispose();
+        }
+      })().catch((error) => ({ error: error.stack ?? String(error) }));
+    </script>
+  </body>
+</html>

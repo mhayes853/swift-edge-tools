@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, test } from "vitest";
-import { needle2Runtime } from "../dist/index.js";
+import { needle2Runtime } from "@edge-tools/needle2";
 import type {
 	Needle2Initialization,
+	Needle2Factory,
 	Needle2Provider,
 	Needle2Runtime,
-} from "../dist/runtime.js";
+} from "@edge-tools/needle2";
+import { thermostatInitialization, thermostatRequest } from "./support.ts";
 
 const runtimes: Needle2Runtime[] = [];
 const emailInitialization: Needle2Initialization = {
@@ -31,6 +33,19 @@ const emailInitialization: Needle2Initialization = {
 					},
 				},
 				required: ["address", "subject", "body"],
+			},
+		},
+	],
+};
+const weatherInitialization: Needle2Initialization = {
+	tools: [
+		{
+			name: "get_weather",
+			description: "Get the weather for a city.",
+			parameters: {
+				type: "object",
+				properties: { city: { type: "string" } },
+				required: ["city"],
 			},
 		},
 	],
@@ -65,8 +80,6 @@ test("isolates multiple direct runtimes sharing one native module", async () => 
 	const weather = await needle2Runtime({ provider: "direct" });
 	runtimes.push(thermostat, weather);
 
-	const thermostatInitialization = initializationFor("set_thermostat");
-	const weatherInitialization = initializationFor("get_weather");
 	const thermostatPrompt = {
 		prompt: "set it to 21 degrees",
 		initialization: thermostatInitialization,
@@ -116,26 +129,64 @@ describe.each([
 			},
 		});
 	});
+
+	test("rejects generation after disposal", async () => {
+		const runtime = await needle2Runtime({ provider });
+		runtimes.push(runtime);
+		await runtime.dispose();
+
+		await expect(runtime.generate(thermostatRequest)).rejects.toMatchObject({
+			code: "disposed",
+		});
+	});
 });
 
-function initializationFor(toolName: string): Needle2Initialization {
-	return {
-		tools: [
-			{
-				name: toolName,
-				description:
-					toolName === "set_thermostat"
-						? "Set the thermostat temperature."
-						: "Get the weather for a city.",
-				parameters: {
-					type: "object",
-					properties:
-						toolName === "set_thermostat"
-							? { temperature: { type: "integer" } }
-							: { city: { type: "string" } },
-					required: [toolName === "set_thermostat" ? "temperature" : "city"],
-				},
-			},
-		],
-	};
-}
+test("shares initial weights but reloads an explicitly loaded source", async () => {
+	let loadCount = 0;
+	const factory: Needle2Factory = () => ({
+		HEAPU8: new Uint8Array(16),
+		_needle_load: () => {
+			loadCount += 1;
+			return 0;
+		},
+		_needle_reset() {},
+		_malloc: () => 1,
+		_free() {},
+		UTF8ToString: () => "",
+		ccall: () => 0,
+	});
+	const wasm = new Uint8Array([0]);
+	const weights = new Uint8Array([1]);
+	const first = await needle2Runtime({
+		provider: "direct",
+		factory,
+		wasm,
+		weights,
+	});
+	const second = await needle2Runtime({
+		provider: "direct",
+		factory,
+		wasm,
+		weights,
+	});
+	runtimes.push(first, second);
+
+	expect(loadCount).toBe(1);
+	await first.load(weights);
+	expect(loadCount).toBe(2);
+});
+
+describe.each([
+	"direct",
+	"worker",
+] satisfies Needle2Provider[])("Needle2Runtime auto engine with the %s provider", (provider) => {
+	test("falls back to WASM when native artifacts are unavailable", async () => {
+		const runtime = await needle2Runtime({ provider, engine: "auto" });
+		runtimes.push(runtime);
+
+		const result = await runtime.generate(thermostatRequest);
+
+		expect(result.success).toBe(true);
+		expect(result.functionCalls[0]?.name).toBe("set_thermostat");
+	});
+});
