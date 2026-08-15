@@ -1,9 +1,4 @@
-export {
-	isBrowserEnvironment,
-	isNodeLikeEnvironment,
-	Needle2Error,
-	Needle2ProtocolError,
-} from "./internal.js";
+export { Needle2Error, Needle2ProtocolError } from "./internal.js";
 export type {
 	Needle2BinarySource,
 	Needle2Factory,
