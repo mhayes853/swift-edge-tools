@@ -12,6 +12,10 @@ import EdgeToolsCore
   import CTokenizers
 #endif
 
+#if ChatTemplates && canImport(EdgeToolsChatTemplates)
+  import EdgeToolsChatTemplates
+#endif
+
 #if HuggingFaceTokenizers && FoundationEssentials && canImport(CTokenizers)
   import OrderedCollections
 #endif
@@ -514,23 +518,10 @@ import EdgeToolsCore
   }
 
   func nativeRenderTemplate(_ source: String, context: EdgeToolsValue) throws -> String {
-    try Array(source.utf8).withUnsafeBufferPointer { source in
-      try Array(context.orderedJSONString().utf8).withUnsafeBufferPointer { context in
-        let estimate = source.count + context.count + 4096
-        return try withNativeBuffer(capacity: estimate) { text, capacity, count in
-          hf_template_render(
-            source.baseAddress,
-            source.count,
-            context.baseAddress,
-            context.count,
-            text,
-            capacity,
-            count
-          )
-        } transform: { text in
-          String(decoding: text, as: UTF8.self)
-        }
-      }
+    do {
+      return try EdgeToolsChatTemplate(source: source).render(context: context)
+    } catch let error as EdgeToolsChatTemplateError {
+      throw EdgeToolsTokenizerError(code: .nativeFailure, message: error.message)
     }
   }
 

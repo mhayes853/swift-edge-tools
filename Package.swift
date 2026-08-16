@@ -21,6 +21,7 @@ let package = Package(
   products: [
     .library(name: "EdgeTools", targets: ["EdgeTools"]),
     .library(name: "EdgeToolsTokenizers", targets: ["EdgeToolsTokenizers"]),
+    .library(name: "EdgeToolsChatTemplates", targets: ["EdgeToolsChatTemplates"]),
     .library(name: "EdgeToolsXGrammar", targets: ["EdgeToolsXGrammar"])
   ],
   traits: [
@@ -34,9 +35,13 @@ let package = Package(
     .trait(name: "XGrammar", description: "XGrammar-powered structured generation."),
     .trait(name: "Needle2", description: "Needle 2 engine support."),
     .trait(
+      name: "ChatTemplates",
+      description: "Jinja chat-template rendering support."
+    ),
+    .trait(
       name: "HuggingFaceTokenizers",
       description: "Hugging Face tokenizer and chat-template support.",
-      enabledTraits: ["FoundationEssentials"]
+      enabledTraits: ["FoundationEssentials", "ChatTemplates"]
     ),
     .trait(
       name: "FoundationModels",
@@ -184,10 +189,45 @@ let package = Package(
             ],
             traits: ["HuggingFaceTokenizers"]
           )
+        ),
+        .target(
+          name: "EdgeToolsChatTemplates",
+          condition: .when(
+            platforms: [
+              .macOS, .iOS, .tvOS, .watchOS, .visionOS, .linux, .android, .windows
+            ],
+            traits: ["ChatTemplates"]
+          )
         )
       ],
       path: "swift/EdgeTools/Sources/EdgeToolsTokenizers",
       swiftSettings: edgeToolsSwiftSettings
+    ),
+    .target(
+      name: "EdgeToolsChatTemplates",
+      dependencies: [
+        "EdgeToolsCore",
+        .target(
+          name: "CMinja",
+          condition: .when(
+            platforms: [
+              .macOS, .iOS, .tvOS, .watchOS, .visionOS, .linux, .android, .windows
+            ]
+          )
+        )
+      ],
+      path: "swift/EdgeTools/Sources/EdgeToolsChatTemplates",
+      swiftSettings: edgeToolsSwiftSettings
+    ),
+    .target(
+      name: "CMinja",
+      path: "swift/EdgeTools/Sources/CMinja",
+      exclude: ["minja/LICENSE", "minja/PIN", "nlohmann/PIN"],
+      sources: ["render.cc"],
+      publicHeadersPath: "include",
+      cxxSettings: [
+        .headerSearchPath(".")
+      ]
     ),
     .target(
       name: "_EdgeToolsJavaScript",
