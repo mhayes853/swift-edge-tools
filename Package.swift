@@ -53,6 +53,20 @@ let package = Package(
       description: "MLX model support.",
       enabledTraits: ["HuggingFaceTokenizers", "FoundationEssentials"]
     ),
+    .trait(
+      name: "LlamaCore",
+      description: """
+        llama.cpp engine and runtime protocols. \
+        (Only enable this trait if you want to use your own llama.cpp build. \
+        Otherwise, enable `Llama` directly.)
+        """,
+      enabledTraits: ["ChatTemplates"]
+    ),
+    .trait(
+      name: "Llama",
+      description: "Vendored cactus-patched llama.cpp support.",
+      enabledTraits: ["LlamaCore"]
+    ),
     .default(enabledTraits: ["Foundation"])
   ],
   dependencies: [
@@ -133,6 +147,19 @@ let package = Package(
         .target(name: "EdgeToolsTokenizers"),
         .target(name: "EdgeToolsXGrammar", condition: .when(traits: ["XGrammar"])),
         .target(
+          name: "EdgeToolsChatTemplates",
+          condition: .when(
+            platforms: [
+              .macOS, .iOS, .tvOS, .watchOS, .visionOS, .linux, .android, .windows
+            ],
+            traits: ["LlamaCore"]
+          )
+        ),
+        .target(
+          name: "CLlama",
+          condition: .when(platforms: [.macOS, .iOS], traits: ["Llama"])
+        ),
+        .target(
           name: "CNeedle2",
           condition: .when(
             platforms: [.macOS, .iOS, .tvOS, .watchOS, .linux, .windows, .android],
@@ -151,7 +178,11 @@ let package = Package(
           )
         ),
         .linkedLibrary("c++", .when(platforms: [.linux], traits: ["Needle2"])),
-        .linkedLibrary("c++_shared", .when(platforms: [.android], traits: ["Needle2"]))
+        .linkedLibrary("c++_shared", .when(platforms: [.android], traits: ["Needle2"])),
+        .linkedFramework("Metal", .when(platforms: [.macOS, .iOS], traits: ["Llama"])),
+        .linkedFramework("MetalKit", .when(platforms: [.macOS, .iOS], traits: ["Llama"])),
+        .linkedFramework("Accelerate", .when(platforms: [.macOS, .iOS], traits: ["Llama"])),
+        .linkedLibrary("c++", .when(platforms: [.macOS, .iOS], traits: ["Llama"]))
       ]
     ),
     .target(
@@ -246,6 +277,10 @@ let package = Package(
     .binaryTarget(
       name: "CNeedle2",
       path: "bin/needle2-2.0.1.artifactbundle.zip"
+    ),
+    .binaryTarget(
+      name: "CLlama",
+      path: "bin/llama-b10076.artifactbundle.zip"
     ),
     .binaryTarget(
       name: "CTokenizers",

@@ -333,6 +333,34 @@ output.
     bundle still contains the dead `hf_template_render` symbol until a multi-toolchain
     rebuild — harmless, nothing references it.
 
+- **2026-08-16 — B1/B2 in progress.** Findings from bringing up the patched build:
+  - The cactus patch series (six patches at cactus `cfea89c`) applies cleanly onto tag
+    `b10076` and builds statically with `LLAMA_BUILD_COMMON/APP/MTMD/TOOLS/...=OFF`.
+    The minimal library set is `libllama.a` + `libggml{,-base,-cpu,-metal}.a`
+    (`llama-common-base` and `cpp-httplib` are not needed); a merged `libllama.a` links
+    and runs against Metal/MetalKit/Accelerate/c++ with the embedded Metal shader
+    library (`GGML_METAL_EMBED_LIBRARY=ON`).
+  - The probe API (`llama_model_has_probe`, `llama_probe_confidence(ctx, seq_id)`,
+    `llama_probe_reset(ctx, seq_id)`) is declared in `src/llama-ext.h` — an internal
+    staging header outside any `extern "C"` block — so the symbols were C++-mangled and
+    unreachable from Swift. Fixed with our own patch
+    (`patches/Llama/0001-llama-export-the-handoff-probe-API-with-C-linkage.patch`)
+    applied after the cactus series by the artifact build. Probe confidence is
+    **per sequence id**, which meshes exactly with the fork-family design.
+  - `b10076` confirms the KV design inputs: `llama_context_params.kv_unified` documents
+    the exact tradeoff (unified helps "when the sequences share a large prefix" — our
+    case), and `llama_model_chat_template(model, name)` reads named GGUF templates
+    (default/tool-use) directly.
+  - `scripts/llama/build-artifact.sh` mirrors the needle2/tokenizers conventions
+    (target matrix with `LLAMA_TARGETS` subsetting, merged static lib per slice via
+    libtool/ar-MRI, generated `info.json`, deterministic zip). Initial bundle carries
+    the Apple slices (macos-arm64/x86_64, ios-arm64, ios-sim-arm64; Metal off on
+    x86_64); linux (docker), android (NDK), and windows slices are release chores on
+    their host toolchains.
+  - Package: `LlamaCore` trait (enables `ChatTemplates`) and `Llama` trait (enables
+    `LlamaCore`, links the `CLlama` binary target + Metal/MetalKit/Accelerate/c++).
+    `CLlama` dependency currently conditioned to macOS/iOS until the other slices ship.
+
 ## Open Questions
 
 - `n_seq_max` fork-overflow behavior: error in v1, or blob-copy migration fallback.
