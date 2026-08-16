@@ -206,7 +206,7 @@ independently against the existing MLX/tokenizer test suites.
   snapshots pass byte-identical. Then drop minijinja/chrono from `rust/tokenizers` and
   rebuild a slimmer `CTokenizers` artifact. Fallback if the gate fails unpatchably: Rust
   workspace split (see Chat Templating section).
-- **A2 — generic fork context.** Extract `MLXContext`'s engine-agnostic bookkeeping
+- **A2 — generic fork context. [DONE]** Extract `MLXContext`'s engine-agnostic bookkeeping
   (transcript/revision/`isResponding`, `begin`/`finish`, `fork`) into a public generic
   context parameterized over a forkable model-state requirement
   (`forkedContextState(copyingCache:)`). `MLXContext` becomes a thin wrapper; evaluate
@@ -298,6 +298,22 @@ output.
   `SystemRandomNumberGenerator` may be unavailable); key-path literals avoided for
   embedded compatibility. `validateBitmaskCoverage` promoted from `private` to internal
   for reuse.
+
+- **2026-08-16 — A2 complete.** `Engines/EdgeToolsTranscriptContext.swift`:
+  `EdgeToolsTranscriptContext<ModelState>` extracted from `MLXContext` (state lock,
+  transcript/revision/`isResponding` observation, `begin`/`finish`, lazy-copy `fork`),
+  parameterized over a new `EdgeToolsForkableModelState` protocol
+  (`forkedContextState(copyingCache:)`), plus public `EdgeToolsEngineIdentity` for the
+  context–engine ownership check. `MLXContext` and `MLXContextParameters` are now
+  typealiases; `MLXModelState` conforms to the protocol. Because the generic context
+  lives in the traitless core, it uses the session's embedded-safe observation pattern
+  (fileprivate `ObservedProperty` enum, `#if !$Embedded` around registrar/keypath use and
+  the `Observable` conformance) instead of `MLXContext`'s direct keypath calls. Gate held:
+  full MLX suite green (46 tests, context/fork tests unchanged); generation snapshots
+  re-recorded with expected phrasing variance only (tool calls unchanged, validated).
+  The `generationTask`/`finalize` wiring was left in `MLXEngine` for now — it depends on
+  profile/parameter types the llama engine won't share; revisit during C3 if a shared
+  shape emerges.
 
 ## Open Questions
 
