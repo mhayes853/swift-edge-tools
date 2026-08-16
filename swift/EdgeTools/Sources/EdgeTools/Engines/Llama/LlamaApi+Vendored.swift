@@ -56,6 +56,10 @@
           let tokenId = llama_vocab_eos(llama_model_get_vocab(model.rawValue))
           return tokenId == LLAMA_TOKEN_NULL ? nil : EdgeToolsToken.ID(tokenId)
         },
+        bosToken: { model in
+          let tokenId = llama_vocab_bos(llama_model_get_vocab(model.rawValue))
+          return tokenId == LLAMA_TOKEN_NULL ? nil : EdgeToolsToken.ID(tokenId)
+        },
         addsBOSToken: { model in
           llama_vocab_get_add_bos(llama_model_get_vocab(model.rawValue))
         },

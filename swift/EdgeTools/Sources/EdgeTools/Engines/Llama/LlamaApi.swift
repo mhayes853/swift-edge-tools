@@ -189,6 +189,7 @@
       public var vocabKind: @Sendable (LlamaModelRef) -> LlamaVocabKind
       public var tokenText: @Sendable (LlamaModelRef, EdgeToolsToken.ID) -> String?
       public var eosToken: @Sendable (LlamaModelRef) -> EdgeToolsToken.ID?
+      public var bosToken: @Sendable (LlamaModelRef) -> EdgeToolsToken.ID?
       public var addsBOSToken: @Sendable (LlamaModelRef) -> Bool
       public var isEndOfGeneration: @Sendable (LlamaModelRef, EdgeToolsToken.ID) -> Bool
       public var tokenize: @Sendable (
@@ -209,6 +210,7 @@
         vocabKind: @escaping @Sendable (LlamaModelRef) -> LlamaVocabKind,
         tokenText: @escaping @Sendable (LlamaModelRef, EdgeToolsToken.ID) -> String?,
         eosToken: @escaping @Sendable (LlamaModelRef) -> EdgeToolsToken.ID?,
+        bosToken: @escaping @Sendable (LlamaModelRef) -> EdgeToolsToken.ID?,
         addsBOSToken: @escaping @Sendable (LlamaModelRef) -> Bool,
         isEndOfGeneration: @escaping @Sendable (LlamaModelRef, EdgeToolsToken.ID) -> Bool,
         tokenize: @escaping @Sendable (LlamaModelRef, String, Bool, Bool) throws ->
@@ -225,6 +227,7 @@
         self.vocabKind = vocabKind
         self.tokenText = tokenText
         self.eosToken = eosToken
+        self.bosToken = bosToken
         self.addsBOSToken = addsBOSToken
         self.isEndOfGeneration = isEndOfGeneration
         self.tokenize = tokenize

@@ -227,11 +227,12 @@ independently against the existing MLX/tokenizer test suites.
 
 ### Track B: llama vendoring (parallel with A)
 
-- **B1 — patched artifact.** `scripts/llama/build-artifact.sh` mirroring
+- **B1 — patched artifact. [DONE — Apple slices; linux/android/windows are release
+  chores]** `scripts/llama/build-artifact.sh` mirroring
   `scripts/needle2` conventions: clone `b10076`, `git am` cactus patches 1–4, CMake static
   builds per triple (Apple: Metal + Accelerate; Linux/Windows/Android: CPU), assemble
   headers + modulemap + checksums into `bin/llama-<version>.artifactbundle.zip`.
-- **B2 — traits + `LlamaApi`.** `LlamaCore` trait: headers-only `CLlama` target (vendored
+- **B2 — traits + `LlamaApi`. [DONE]** `LlamaCore` trait: headers-only `CLlama` target (vendored
   `b10076` headers) plus the `LlamaApi` struct of closures over the C surface the engine
   uses (lifecycle, vocab/tokenize, batch/decode/logits, `llama_memory_seq_*`,
   `llama_state_seq_*`, GGUF metadata, optional probe entries). `Llama` trait: enables
@@ -245,7 +246,7 @@ every model gets it. Probe ("hybrid") confidence applies only to Gemma 4 hybrid 
 (Needle 2 handles its own confidence), so it lives with the Gemma 4 profile work in the
 C5 fan-out rather than on the critical path.
 
-- **C1 — `LlamaTokenizer`.** Core (needs B2 only): `EdgeToolsTokenizer` over
+- **C1 — `LlamaTokenizer`. [DONE — real-GGUF validation lands with C5a]** Core (needs B2 only): `EdgeToolsTokenizer` over
   `llama_vocab` through `LlamaApi`; `XGRTokenizer` via vocab-type mapping
   (SPM → `byteFallback` + prefix space, BPE → `byteLevel`); stop tokens from GGUF
   metadata. Chat conformance (adds A1): `EdgeToolsChatTokenizer` rendering the
@@ -333,7 +334,18 @@ output.
     bundle still contains the dead `hf_template_render` symbol until a multi-toolchain
     rebuild — harmless, nothing references it.
 
-- **2026-08-16 — B1/B2 in progress.** Findings from bringing up the patched build:
+- **2026-08-16 — B1/B2 complete; C1 complete.** The committed bundle links and runs from
+  Swift (backend smoke test passes; probe closures present). `LlamaApi` is a closure
+  struct over semantic operations (handles as `@unchecked Sendable` pointer wrappers,
+  probe entries optional so stock builds work); `LlamaApi.vendored` binds the patched
+  symbols under the `Llama` trait. A key testability payoff: tests construct mock
+  `LlamaApi` values (`MockLlamaApi.swift`), so `LlamaTokenizer` — `EdgeToolsTokenizer` +
+  `XGRTokenizer` (SPM → `byteFallback` + prefix space, BPE → `byteLevel`) +
+  `EdgeToolsChatTokenizer` (GGUF `tool_use`/default template through minja) — is fully
+  unit-tested without model files. SwiftPM gotchas hit: the artifact dict in `info.json`
+  requires a `version` field (opaque "does not contain a binary artifact" otherwise),
+  and a deleted `.build/artifacts` needs `workspace-state.json` cleared too or extraction
+  silently never re-runs. Findings from bringing up the patched build:
   - The cactus patch series (six patches at cactus `cfea89c`) applies cleanly onto tag
     `b10076` and builds statically with `LLAMA_BUILD_COMMON/APP/MTMD/TOOLS/...=OFF`.
     The minimal library set is `libllama.a` + `libggml{,-base,-cpu,-metal}.a`
