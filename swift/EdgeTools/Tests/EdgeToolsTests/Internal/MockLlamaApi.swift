@@ -18,9 +18,12 @@
           ids.append(2)
           remaining = remaining.dropFirst("<eos>".count)
         } else {
-          let word = remaining.prefix { !"< ".contains($0) }
+          let word = remaining.prefix { $0.isLetter }
           if word.isEmpty {
-            remaining = remaining.dropFirst()
+            let character = remaining.removeFirst()
+            if character != " " {
+              ids.append(Self.pieces.firstIndex(of: String(character)) ?? 0)
+            }
             continue
           }
           ids.append(Self.pieces.firstIndex(of: "▁\(word)") ?? 0)
@@ -35,7 +38,7 @@
 
   func mockLlamaApi(
     chatTemplate: String? = "{% for message in messages %}{{ message['content'] }}{% endfor %}"
-      + "{% if add_generation_prompt %}{{ eos_token }}{% endif %}",
+      + "{% if add_generation_prompt %}!{% endif %}",
     toolChatTemplate: String? = nil,
     decode: @escaping @Sendable (LlamaContextRef, LlamaDecodeBatch) throws -> Void = { _, _ in },
     lastLogits: @escaping @Sendable (LlamaContextRef) -> UnsafeMutablePointer<Float>? = { _ in

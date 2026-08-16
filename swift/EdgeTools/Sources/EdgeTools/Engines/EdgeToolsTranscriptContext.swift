@@ -13,7 +13,19 @@ public final class EdgeToolsEngineIdentity: Sendable {
 // MARK: - EdgeToolsForkableModelState
 
 public protocol EdgeToolsForkableModelState {
+  /// The state for a forked context, which may later run generations concurrently with
+  /// this state's context.
   func forkedContextState(copyingCache: Bool) -> sending Self
+
+  /// The state a generation on this state's own context runs against. The context's
+  /// `isResponding` gate guarantees exclusivity until the state is returned via `finish`.
+  func generationState() -> sending Self
+}
+
+extension EdgeToolsForkableModelState {
+  public func generationState() -> sending Self {
+    self.forkedContextState(copyingCache: false)
+  }
 }
 
 // MARK: - EdgeToolsTranscriptContextParameters
@@ -157,7 +169,7 @@ public final class EdgeToolsTranscriptContext<ModelState: EdgeToolsForkableModel
       guard !state.isResponding else {
         throw EdgeToolsError.contextInUse
       }
-      let model = state.model.forkedContextState(copyingCache: false)
+      let model = state.model.generationState()
       var transcript = state.transcript
       transcript.messages.append(.user(message))
       var snapshot: Snapshot!
@@ -183,7 +195,7 @@ public final class EdgeToolsTranscriptContext<ModelState: EdgeToolsForkableModel
       guard !state.isResponding else {
         throw EdgeToolsError.contextInUse
       }
-      let model = state.model.forkedContextState(copyingCache: false)
+      let model = state.model.generationState()
       var snapshot: Snapshot!
       self.withMutation(of: .isResponding) {
         state.isResponding = true

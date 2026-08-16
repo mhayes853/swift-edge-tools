@@ -57,7 +57,7 @@
           addGenerationPrompt: true,
           additionalContext: nil
         ),
-        "hello<eos>"
+        "hello!"
       )
       expectNoDifference(
         try self.tokenizer.applyChatTemplate(
@@ -68,7 +68,7 @@
         ),
         [
           EdgeToolsToken(id: 3, stringValue: "▁hello"),
-          EdgeToolsToken(id: 2, stringValue: "<eos>"),
+          EdgeToolsToken(id: 5, stringValue: "!"),
         ]
       )
     }
