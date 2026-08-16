@@ -198,7 +198,7 @@ independently against the existing MLX/tokenizer test suites.
 
 ### Track A: generic library improvements (parallel with B)
 
-- **A1 — minja chat templating.** Vendor minja + nlohmann::json as a C++ source target
+- **A1 — minja chat templating. [DONE — artifact rebuild pending]** Vendor minja + nlohmann::json as a C++ source target
   (`CMinja`, the `CXGrammar` pattern, PatchPlugin available) with a small C shim, behind a
   `ChatTemplates` trait/target. Move the `{% generation %}` pre-rewrite to Swift; keep
   `strftime_now` pinning (`edge_tools_now`-equivalent context key). Swap
@@ -314,6 +314,24 @@ output.
   The `generationTask`/`finalize` wiring was left in `MLXEngine` for now — it depends on
   profile/parameter types the llama engine won't share; revisit during C3 if a shared
   shape emerges.
+
+- **2026-08-16 — A1 complete (CTokenizers rebuild pending).** `CMinja` target vendors
+  minja `021c229` + nlohmann v3.12.0 (PIN files record versions) with an
+  `edge_template_render` C shim; `EdgeToolsChatTemplates` wraps it behind the new
+  `ChatTemplates` trait, which `HuggingFaceTokenizers` enables. Findings:
+  - As predicted, minja's builtin `tojson` rejects `ensure_ascii` kwargs (Qwen-family
+    templates pass `tojson(ensure_ascii=False)`) and its output diverges from
+    json.dumps. Solved without patching minja: the shim shadows `tojson` (and injects
+    pinned-UTC `strftime_now`) via context values, which resolve before the builtin
+    parent scope — the same mechanism minja's own `chat-template.hpp` uses.
+  - The `{% generation %}` neutralization and `edge_tools_now` pinning ported into the
+    shim 1:1 from the Rust renderer.
+  - **Gate held**: the 9-profile model chat-template snapshot passed byte-identical with
+    no re-record; full suites green on macOS and Linux (docker).
+  - Rust crate slimmed to pure tokenization (minijinja/minijinja-contrib/chrono/serde_json
+    dropped); artifact version bumped to 0.2.0 in the build script. The shipped 0.1.0
+    bundle still contains the dead `hf_template_render` symbol until a multi-toolchain
+    rebuild — harmless, nothing references it.
 
 ## Open Questions
 
