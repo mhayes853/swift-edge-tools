@@ -57,7 +57,6 @@ let package = Package(
     .package(url: "https://github.com/pointfreeco/swift-macro-testing", from: "0.6.5"),
     .package(url: "https://github.com/swiftlang/swift-syntax", "600.0.0"..<"603.0.0"),
     .package(url: "https://github.com/huggingface/swift-transformers", from: "1.3.0"),
-    .package(url: "https://github.com/huggingface/swift-jinja.git", from: "2.4.2"),
     .package(
       url: "https://github.com/ibireme/yyjson.git",
       revision: "de3700ab1778e236a8a571058463b6a5888cf262",
@@ -140,11 +139,6 @@ let package = Package(
             ],
             traits: ["HuggingFaceTokenizers"]
           )
-        ),
-        .product(
-          name: "Jinja",
-          package: "swift-jinja",
-          condition: .when(traits: ["HuggingFaceTokenizers"])
         )
       ],
       path: "swift/EdgeTools/Sources/EdgeTools",

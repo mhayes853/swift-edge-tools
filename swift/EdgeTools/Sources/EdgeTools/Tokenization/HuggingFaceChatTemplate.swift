@@ -1,39 +1,6 @@
-#if HuggingFaceTokenizers && FoundationEssentials
+#if HuggingFaceTokenizers && FoundationEssentials && canImport(CTokenizers)
+  import OrderedCollections
   import _EdgeToolsFoundation
-  import Jinja
-
-  // MARK: - HuggingFaceChatTemplate
-
-  struct HuggingFaceChatTemplate: Sendable {
-    private let template: Template
-
-    init(source: String) throws {
-      self.template = try Template(
-        source,
-        with: Template.Options(lstripBlocks: true, trimBlocks: true)
-      )
-    }
-
-    func render(
-      messages: [EdgeToolsValue],
-      tools: [EdgeToolsValue]?,
-      addGenerationPrompt: Bool,
-      additionalContext: [String: EdgeToolsValue]?,
-      configuration: HuggingFaceTokenizerConfiguration
-    ) throws -> String {
-      var context: [String: Value] = [:]
-      configuration.addSpecialTokens(to: &context)
-      context["messages"] = .array(messages.map(\.jinjaValue))
-      context["add_generation_prompt"] = .boolean(addGenerationPrompt)
-      if let tools {
-        context["tools"] = .array(tools.map(\.jinjaValue))
-      }
-      for (key, value) in additionalContext ?? [:] {
-        context[key] = value.jinjaValue
-      }
-      return try self.template.render(context)
-    }
-  }
 
   // MARK: - Hugging Face Tokenizer Configuration
 
@@ -58,12 +25,30 @@
       self.clsToken = source.clsToken?.content
       self.maskToken = source.maskToken?.content
       self.additionalSpecialTokens = source.additionalSpecialTokens.compactMap(\.content)
-      self.chatTemplates = try (chatTemplateOverride.map { [Source.ChatTemplate.literal($0)] }
+      self.chatTemplates = (chatTemplateOverride.map { [Source.ChatTemplate.literal($0)] }
         ?? source.chatTemplate)
-        .map { try NamedChatTemplate(source: $0) }
+        .map { NamedChatTemplate(source: $0) }
     }
 
-    func selectedChatTemplate(tools: [EdgeToolsValue]?) throws -> HuggingFaceChatTemplate {
+    func renderChatTemplate(
+      messages: [EdgeToolsValue],
+      tools: [EdgeToolsValue]?,
+      addGenerationPrompt: Bool,
+      additionalContext: [String: EdgeToolsValue]?
+    ) throws -> String {
+      let source = try self.selectedChatTemplate(tools: tools)
+      var context = OrderedDictionary<String, EdgeToolsValue>()
+      self.addSpecialTokens(to: &context)
+      context["messages"] = .array(messages)
+      context["add_generation_prompt"] = .boolean(addGenerationPrompt)
+      if let tools {
+        context["tools"] = .array(tools)
+      }
+      context.merge(additionalContext ?? [:]) { _, override in override }
+      return try nativeRenderTemplate(source, context: .object(context))
+    }
+
+    private func selectedChatTemplate(tools: [EdgeToolsValue]?) throws -> String {
       let toolTemplate =
         tools?.isEmpty == false
         ? self.chatTemplates.first { $0.name == toolUseChatTemplateName }
@@ -78,10 +63,10 @@
             : "The Hugging Face tokenizer has no default chat template."
         )
       }
-      return template.template
+      return template.source
     }
 
-    func addSpecialTokens(to context: inout [String: Value]) {
+    private func addSpecialTokens(to context: inout OrderedDictionary<String, EdgeToolsValue>) {
       if let bosToken { context["bos_token"] = .string(bosToken) }
       if let eosToken { context["eos_token"] = .string(eosToken) }
       if let unknownToken { context["unk_token"] = .string(unknownToken) }
@@ -90,28 +75,30 @@
       if let clsToken { context["cls_token"] = .string(clsToken) }
       if let maskToken { context["mask_token"] = .string(maskToken) }
       if !additionalSpecialTokens.isEmpty {
-        context["additional_special_tokens"] = .array(additionalSpecialTokens.map(Value.string))
+        context["additional_special_tokens"] = .array(
+          additionalSpecialTokens.map(EdgeToolsValue.string)
+        )
       }
     }
   }
 
-  // MARK: - Parsed Templates
+  // MARK: - Chat Templates
 
   private let defaultChatTemplateName = "default"
   private let toolUseChatTemplateName = "tool_use"
 
   private struct NamedChatTemplate: Sendable {
     let name: String
-    let template: HuggingFaceChatTemplate
+    let source: String
 
-    init(source: Source.ChatTemplate) throws {
+    init(source: Source.ChatTemplate) {
       switch source {
       case .literal(let template):
         self.name = defaultChatTemplateName
-        self.template = try HuggingFaceChatTemplate(source: template)
+        self.source = template
       case .named(let name, let template):
         self.name = name
-        self.template = try HuggingFaceChatTemplate(source: template)
+        self.source = template
       }
     }
   }
@@ -212,26 +199,4 @@
     }
   }
 
-  // MARK: - Jinja Conversion
-
-  extension EdgeToolsValue {
-    fileprivate var jinjaValue: Jinja.Value {
-      switch self {
-      case .string(let value): .string(value)
-      case .boolean(let value): .boolean(value)
-      case .integer(let value): .int(value)
-      case .number(let value): .double(value)
-      case .null: .null
-      case .array(let values): .array(values.map(\.jinjaValue))
-      case .object(let object):
-        .object(
-          OrderedDictionary(
-            uniqueKeysWithValues: object.map {
-              (Jinja.ObjectKey.string($0.key), $0.value.jinjaValue)
-            }
-          )
-        )
-      }
-    }
-  }
 #endif

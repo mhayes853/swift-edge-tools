@@ -12,6 +12,8 @@
       assertSnapshot(of: outputs.joined(separator: "\n\n"), as: .lines)
     }
 
+    private static let pinnedNow: [String: EdgeToolsValue] = ["edge_tools_now": 1_577_923_200]
+
     private static let profileNames = [
       "FunctionGemma",
       "Gemma4",
@@ -49,12 +51,14 @@
       let promptWithoutGeneration = try tokenizer.renderChatTemplate(
         messages: messages,
         tools: tools,
-        addGenerationPrompt: false
+        addGenerationPrompt: false,
+        additionalContext: pinnedNow
       )
       let promptWithGeneration = try tokenizer.renderChatTemplate(
         messages: messages,
         tools: tools,
-        addGenerationPrompt: true
+        addGenerationPrompt: true,
+        additionalContext: pinnedNow
       )
       expectNoDifference(promptWithoutGeneration.isEmpty, false)
       expectNoDifference(promptWithGeneration.isEmpty, false)
@@ -69,7 +73,6 @@
         return nil
       }
       return try String(contentsOf: url, encoding: .utf8)
-        .replacing(/strftime_now\([^)]*\)/, with: "'2020-01-02'")
     }
 
     private static func resourceData(name: String, file: String) throws -> Data {

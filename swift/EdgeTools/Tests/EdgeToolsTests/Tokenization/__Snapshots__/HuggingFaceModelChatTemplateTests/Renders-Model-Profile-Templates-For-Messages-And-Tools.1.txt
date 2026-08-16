@@ -2,7 +2,7 @@
 
 ## No Generation
 <bos><start_of_turn>developer
-You are concise.<start_function_declaration>declaration:weather{description:<escape>Gets the weather.<escape>,parameters:{ properties:{ location:{description:<escape><escape>,type:<escape>STRING<escape>}},type:<escape>OBJECT<escape>}}<end_function_declaration><end_of_turn>
+You are concise.<start_function_declaration>declaration:weather{description:<escape>Gets the weather.<escape>,parameters:{properties:{location:{description:<escape><escape>,type:<escape>STRING<escape>}},type:<escape>OBJECT<escape>}}<end_function_declaration><end_of_turn>
 <start_of_turn>user
 What is the weather?<end_of_turn>
 <start_of_turn>model
@@ -11,7 +11,7 @@ I will check.<end_of_turn>
 
 ## Generation
 <bos><start_of_turn>developer
-You are concise.<start_function_declaration>declaration:weather{description:<escape>Gets the weather.<escape>,parameters:{ properties:{ location:{description:<escape><escape>,type:<escape>STRING<escape>}},type:<escape>OBJECT<escape>}}<end_function_declaration><end_of_turn>
+You are concise.<start_function_declaration>declaration:weather{description:<escape>Gets the weather.<escape>,parameters:{properties:{location:{description:<escape><escape>,type:<escape>STRING<escape>}},type:<escape>OBJECT<escape>}}<end_function_declaration><end_of_turn>
 <start_of_turn>user
 What is the weather?<end_of_turn>
 <start_of_turn>model
@@ -23,8 +23,7 @@ I will check.<end_of_turn>
 
 ## No Generation
 <bos><|turn>system
-You are concise.<|tool>declaration:weather{description:<|"|>Gets the weather.<|"|>,parameters:{ properties:{ location:{ type:<|"|>STRING<|"|>}},type:<|"|>OBJECT<|"|>}}<tool|><turn|>
-
+You are concise.<|tool>declaration:weather{description:<|"|>Gets the weather.<|"|>,parameters:{properties:{location:{type:<|"|>STRING<|"|>}},type:<|"|>OBJECT<|"|>}}<tool|><turn|>
 <|turn>user
 What is the weather?<turn|>
 <|turn>model
@@ -33,8 +32,7 @@ I will check.<turn|>
 
 ## Generation
 <bos><|turn>system
-You are concise.<|tool>declaration:weather{description:<|"|>Gets the weather.<|"|>,parameters:{ properties:{ location:{ type:<|"|>STRING<|"|>}},type:<|"|>OBJECT<|"|>}}<tool|><turn|>
-
+You are concise.<|tool>declaration:weather{description:<|"|>Gets the weather.<|"|>,parameters:{properties:{location:{type:<|"|>STRING<|"|>}},type:<|"|>OBJECT<|"|>}}<tool|><turn|>
 <|turn>user
 What is the weather?<turn|>
 <|turn>model
@@ -51,7 +49,7 @@ You are a helpful assistant with access to the following tools. You may call one
 
 You are provided with function signatures within <tools></tools> XML tags:
 <tools>
-{"function":{"description":"Gets the weather.","name":"weather","parameters":{"properties":{"location":{"type":"string"}},"type":"object"}},"type":"function"}
+{"type": "function", "function": {"name": "weather", "description": "Gets the weather.", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}}}}
 </tools>
 
 For each tool call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:
@@ -69,7 +67,7 @@ You are a helpful assistant with access to the following tools. You may call one
 
 You are provided with function signatures within <tools></tools> XML tags:
 <tools>
-{"function":{"description":"Gets the weather.","name":"weather","parameters":{"properties":{"location":{"type":"string"}},"type":"object"}},"type":"function"}
+{"type": "function", "function": {"name": "weather", "description": "Gets the weather.", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}}}}
 </tools>
 
 For each tool call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:
@@ -85,7 +83,7 @@ For each tool call, return a json object with function name and arguments within
 ## No Generation
 <|startoftext|><|im_start|>system
 You are concise.
-List of tools: [{"function":{"description":"Gets the weather.","name":"weather","parameters":{"properties":{"location":{"type":"string"}},"type":"object"}},"type":"function"}]<|im_end|>
+List of tools: [{"type": "function", "function": {"name": "weather", "description": "Gets the weather.", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}}}}]<|im_end|>
 <|im_start|>user
 What is the weather?<|im_end|>
 <|im_start|>assistant
@@ -95,7 +93,7 @@ I will check.<|im_end|>
 ## Generation
 <|startoftext|><|im_start|>system
 You are concise.
-List of tools: [{"function":{"description":"Gets the weather.","name":"weather","parameters":{"properties":{"location":{"type":"string"}},"type":"object"}},"type":"function"}]<|im_end|>
+List of tools: [{"type": "function", "function": {"name": "weather", "description": "Gets the weather.", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}}}}]<|im_end|>
 <|im_start|>user
 What is the weather?<|im_end|>
 <|im_start|>assistant
@@ -108,7 +106,7 @@ I will check.<|im_end|>
 ## No Generation
 <|startoftext|><|im_start|>system
 You are concise.
-List of tools: [{"function":{"description":"Gets the weather.","name":"weather","parameters":{"properties":{"location":{"type":"string"}},"type":"object"}},"type":"function"}]<|im_end|>
+List of tools: [{"type": "function", "function": {"name": "weather", "description": "Gets the weather.", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}}}}]<|im_end|>
 <|im_start|>user
 What is the weather?<|im_end|>
 <|im_start|>assistant
@@ -118,7 +116,7 @@ I will check.<|im_end|>
 ## Generation
 <|startoftext|><|im_start|>system
 You are concise.
-List of tools: [{"function":{"description":"Gets the weather.","name":"weather","parameters":{"properties":{"location":{"type":"string"}},"type":"object"}},"type":"function"}]<|im_end|>
+List of tools: [{"type": "function", "function": {"name": "weather", "description": "Gets the weather.", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}}}}]<|im_end|>
 <|im_start|>user
 What is the weather?<|im_end|>
 <|im_start|>assistant
@@ -130,12 +128,12 @@ I will check.<|im_end|>
 
 ## No Generation
 
-{- bos_token }}<|im_start|>system
+{- bos_token -}}<|im_start|>system
 You are concise.
 
 Today's date: 2020-01-02
 
-List of tools: [{"function":{"description":"Gets the weather.","name":"weather","parameters":{"properties":{"location":{"type":"string"}},"type":"object"}},"type":"function"}]<|im_end|>
+List of tools: [{"type": "function", "function": {"name": "weather", "description": "Gets the weather.", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}}}}]<|im_end|>
 <|im_start|>user
 What is the weather?<|im_end|>
 <|im_start|>assistant
@@ -144,12 +142,12 @@ I will check.<|im_end|>
 
 ## Generation
 
-{- bos_token }}<|im_start|>system
+{- bos_token -}}<|im_start|>system
 You are concise.
 
 Today's date: 2020-01-02
 
-List of tools: [{"function":{"description":"Gets the weather.","name":"weather","parameters":{"properties":{"location":{"type":"string"}},"type":"object"}},"type":"function"}]<|im_end|>
+List of tools: [{"type": "function", "function": {"name": "weather", "description": "Gets the weather.", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}}}}]<|im_end|>
 <|im_start|>user
 What is the weather?<|im_end|>
 <|im_start|>assistant
@@ -167,7 +165,7 @@ You are concise.
 
 You are provided with function signatures within <tools></tools> XML tags:
 <tools>
-{"function":{"description":"Gets the weather.","name":"weather","parameters":{"properties":{"location":{"type":"string"}},"type":"object"}},"type":"function"}
+{"type": "function", "function": {"name": "weather", "description": "Gets the weather.", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}}}}
 </tools>
 
 Tool usage guidelines:
@@ -189,7 +187,7 @@ You are concise.
 
 You are provided with function signatures within <tools></tools> XML tags:
 <tools>
-{"function":{"description":"Gets the weather.","name":"weather","parameters":{"properties":{"location":{"type":"string"}},"type":"object"}},"type":"function"}
+{"type": "function", "function": {"name": "weather", "description": "Gets the weather.", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}}}}
 </tools>
 
 Tool usage guidelines:
@@ -216,7 +214,7 @@ You may call one or more functions to assist with the user query.
 
 You are provided with function signatures within <tools></tools> XML tags:
 <tools>
-{"function":{"description":"Gets the weather.","name":"weather","parameters":{"properties":{"location":{"type":"string"}},"type":"object"}},"type":"function"}
+{"type": "function", "function": {"name": "weather", "description": "Gets the weather.", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}}}}
 </tools>
 
 For each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:
@@ -243,7 +241,7 @@ You may call one or more functions to assist with the user query.
 
 You are provided with function signatures within <tools></tools> XML tags:
 <tools>
-{"function":{"description":"Gets the weather.","name":"weather","parameters":{"properties":{"location":{"type":"string"}},"type":"object"}},"type":"function"}
+{"type": "function", "function": {"name": "weather", "description": "Gets the weather.", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}}}}
 </tools>
 
 For each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:
@@ -270,7 +268,7 @@ I will check.<|im_end|>
 You have access to the following functions:
 
 <tools>
-{"function":{"description":"Gets the weather.","name":"weather","parameters":{"properties":{"location":{"type":"string"}},"type":"object"}},"type":"function"}
+{"type": "function", "function": {"name": "weather", "description": "Gets the weather.", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}}}}
 </tools>
 
 If you choose to call a function ONLY reply in the following format with NO suffix:
@@ -314,7 +312,7 @@ I will check.<|im_end|>
 You have access to the following functions:
 
 <tools>
-{"function":{"description":"Gets the weather.","name":"weather","parameters":{"properties":{"location":{"type":"string"}},"type":"object"}},"type":"function"}
+{"type": "function", "function": {"name": "weather", "description": "Gets the weather.", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}}}}
 </tools>
 
 If you choose to call a function ONLY reply in the following format with NO suffix:

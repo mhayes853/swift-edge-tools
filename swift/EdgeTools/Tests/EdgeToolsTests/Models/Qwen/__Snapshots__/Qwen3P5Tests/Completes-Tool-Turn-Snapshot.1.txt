@@ -11,7 +11,7 @@
         - videos: 0 elements
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 48 elements
+        ▿ parts: 60 elements
           ▿ EdgeToolsGenerationPart
             - reasoning: "<think"
           ▿ EdgeToolsGenerationPart
@@ -31,8 +31,6 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " current"
-          ▿ EdgeToolsGenerationPart
             - reasoning: " weather"
           ▿ EdgeToolsGenerationPart
             - reasoning: " in"
@@ -41,9 +39,7 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: "."
           ▿ EdgeToolsGenerationPart
-            - reasoning: "\n"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "I"
+            - reasoning: " I"
           ▿ EdgeToolsGenerationPart
             - reasoning: " will"
           ▿ EdgeToolsGenerationPart
@@ -57,23 +53,23 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " function"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " with"
+            - reasoning: " to"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " retrieve"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " location"
+            - reasoning: " current"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " parameter"
+            - reasoning: " weather"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " set"
+            - reasoning: " information"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " to"
+            - reasoning: " for"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " \""
+            - reasoning: " Paris"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "Paris"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "\"."
+            - reasoning: "."
           ▿ EdgeToolsGenerationPart
             - reasoning: "\n"
           ▿ EdgeToolsGenerationPart
@@ -90,16 +86,9 @@
           ▿ EdgeToolsGenerationPart
             - text: "\n"
           ▿ EdgeToolsGenerationPart
-            ▿ toolCall: EdgeRawToolCall
-              ▿ arguments: EdgeToolsValue
-                ▿ object: 1 key/value pair
-                  ▿ (2 elements)
-                    - key: "location"
-                    ▿ value: EdgeToolsValue
-                      - string: "Paris"
-              - name: "getWeather"
+            - text: "</think>"
           ▿ EdgeToolsGenerationPart
-            - text: "\n"
+            - text: "\n\n"
           ▿ EdgeToolsGenerationPart
             ▿ toolCall: EdgeRawToolCall
               ▿ arguments: EdgeToolsValue
@@ -112,16 +101,9 @@
           ▿ EdgeToolsGenerationPart
             - text: "\n"
           ▿ EdgeToolsGenerationPart
-            ▿ toolCall: EdgeRawToolCall
-              ▿ arguments: EdgeToolsValue
-                ▿ object: 1 key/value pair
-                  ▿ (2 elements)
-                    - key: "location"
-                    ▿ value: EdgeToolsValue
-                      - string: "Paris"
-              - name: "getWeather"
+            - text: "</think>"
           ▿ EdgeToolsGenerationPart
-            - text: "\n"
+            - text: "\n\n"
           ▿ EdgeToolsGenerationPart
             ▿ toolCall: EdgeRawToolCall
               ▿ arguments: EdgeToolsValue
@@ -134,16 +116,9 @@
           ▿ EdgeToolsGenerationPart
             - text: "\n"
           ▿ EdgeToolsGenerationPart
-            ▿ toolCall: EdgeRawToolCall
-              ▿ arguments: EdgeToolsValue
-                ▿ object: 1 key/value pair
-                  ▿ (2 elements)
-                    - key: "location"
-                    ▿ value: EdgeToolsValue
-                      - string: "Paris"
-              - name: "getWeather"
+            - text: "</think>"
           ▿ EdgeToolsGenerationPart
-            - text: "\n"
+            - text: "\n\n"
           ▿ EdgeToolsGenerationPart
             ▿ toolCall: EdgeRawToolCall
               ▿ arguments: EdgeToolsValue
@@ -156,7 +131,63 @@
           ▿ EdgeToolsGenerationPart
             - text: "\n"
           ▿ EdgeToolsGenerationPart
-            - text: "<tool_call>\n<function=getWeather>\n<parameter=location>"
+            - text: "</think>"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n\n"
+          ▿ EdgeToolsGenerationPart
+            ▿ toolCall: EdgeRawToolCall
+              ▿ arguments: EdgeToolsValue
+                ▿ object: 1 key/value pair
+                  ▿ (2 elements)
+                    - key: "location"
+                    ▿ value: EdgeToolsValue
+                      - string: "Paris"
+              - name: "getWeather"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n"
+          ▿ EdgeToolsGenerationPart
+            - text: "</think>"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n\n"
+          ▿ EdgeToolsGenerationPart
+            ▿ toolCall: EdgeRawToolCall
+              ▿ arguments: EdgeToolsValue
+                ▿ object: 1 key/value pair
+                  ▿ (2 elements)
+                    - key: "location"
+                    ▿ value: EdgeToolsValue
+                      - string: "Paris"
+              - name: "getWeather"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n"
+          ▿ EdgeToolsGenerationPart
+            - text: "</think>"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n\n"
+          ▿ EdgeToolsGenerationPart
+            ▿ toolCall: EdgeRawToolCall
+              ▿ arguments: EdgeToolsValue
+                ▿ object: 1 key/value pair
+                  ▿ (2 elements)
+                    - key: "location"
+                    ▿ value: EdgeToolsValue
+                      - string: "Paris"
+              - name: "getWeather"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n"
+          ▿ EdgeToolsGenerationPart
+            - text: "</think>"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n\n"
+          ▿ EdgeToolsGenerationPart
+            ▿ toolCall: EdgeRawToolCall
+              ▿ arguments: EdgeToolsValue
+                ▿ object: 1 key/value pair
+                  ▿ (2 elements)
+                    - key: "location"
+                    ▿ value: EdgeToolsValue
+                      - string: "Paris"
+              - name: "getWeather"
     ▿ Message
       ▿ tool: ToolMessage
         - name: "getWeather"
@@ -176,53 +207,27 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 42 elements
+        ▿ parts: 63 elements
           ▿ EdgeToolsGenerationPart
-            - reasoning: "**"
+            - reasoning: "##"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "Weather"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " in"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " Paris"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "**"
+            - reasoning: " Summary"
           ▿ EdgeToolsGenerationPart
             - reasoning: "\n\n"
           ▿ EdgeToolsGenerationPart
             - reasoning: "The"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " current"
-          ▿ EdgeToolsGenerationPart
             - reasoning: " weather"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " forecast"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " indicates"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " that"
+            - reasoning: " in"
           ▿ EdgeToolsGenerationPart
             - reasoning: " Paris"
           ▿ EdgeToolsGenerationPart
             - reasoning: " is"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " experiencing"
+            - reasoning: " currently"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " a"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " sunny"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " day"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " with"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " a"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " temperature"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " of"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " "
+            - reasoning: " **"
           ▿ EdgeToolsGenerationPart
             - reasoning: "2"
           ▿ EdgeToolsGenerationPart
@@ -232,33 +237,101 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " ("
           ▿ EdgeToolsGenerationPart
-            - reasoning: "ex"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "actly"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " "
-          ▿ EdgeToolsGenerationPart
             - reasoning: "7"
           ▿ EdgeToolsGenerationPart
             - reasoning: "2"
           ▿ EdgeToolsGenerationPart
             - reasoning: "°F"
           ▿ EdgeToolsGenerationPart
-            - reasoning: ")."
+            - reasoning: ")**,"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " The"
+            - reasoning: " with"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " a"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " **"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "s"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "unny"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "**"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " condition"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "."
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " This"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " means"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " current"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " day"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " is"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " pleasant"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " and"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " not"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " quite"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " hot"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "."
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "\n\n"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "If"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " you"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " need"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " more"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " specific"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " information"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " about"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " weather"
           ▿ EdgeToolsGenerationPart
             - reasoning: " conditions"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " are"
+            - reasoning: " outside"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " favorable"
+            - reasoning: " of"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " daily"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " averages"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: ","
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " we"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " can"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " continue"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " searching"
           ▿ EdgeToolsGenerationPart
             - reasoning: " for"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " outdoor"
+            - reasoning: " this"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " activities"
+            - reasoning: " type"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " of"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " data"
           ▿ EdgeToolsGenerationPart
             - reasoning: "."
   ▿ reasoningEffort: EdgeToolsReasoningEffort
