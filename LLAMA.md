@@ -251,11 +251,11 @@ C5 fan-out rather than on the critical path.
   (SPM → `byteFallback` + prefix space, BPE → `byteLevel`); stop tokens from GGUF
   metadata. Chat conformance (adds A1): `EdgeToolsChatTokenizer` rendering the
   GGUF-embedded template through `ChatTemplates`.
-- **C2 — single-sequence model state** (needs A3, B2; parallel with C1).
+- **C2 — single-sequence model state. [DONE]** (needs A3, B2; parallel with C1).
   `LlamaModelState` over one `llama_context`/sequence: prefill, decode step
   (bitmask → CPU sampler → per-token confidence), commit/reset mirroring
   `MLXModelState`. Enough to bring the engine up before forking exists.
-- **C3 — `LlamaEngine`** (needs A2, C1, C2). `LlamaContext` from the generic context,
+- **C3 — `LlamaEngine`. [DONE]** (needs A2, C1, C2). `LlamaContext` from the generic context,
   `LlamaContextParameters` (`n_ctx`, `n_seq_max`, KV type, threads, flash attention),
   `LlamaGenerateParameters`, engine conformances (`EdgeToolsEngine`,
   `EdgeToolsPrefillableEngine`, `EdgeToolsTokenizingEngine`) wired through
@@ -373,6 +373,28 @@ output.
     `LlamaCore`, links the `CLlama` binary target + Metal/MetalKit/Accelerate/c++).
     `CLlama` dependency currently conditioned to macOS/iOS until the other slices ship.
 
+- **2026-08-16 — C2/C3 complete.** `LlamaEngine<Profile>` generates end-to-end through
+  the shared loop against mock scripted logits (session integration, grammar-constrained
+  sampling, per-token confidence metadata). Design notes from implementation:
+  - `LlamaSequence` owns one lazily created `llama_context` (lazy so `context()` and
+    `fork()` stay non-throwing; creation errors surface at generation). Cross-turn KV
+    reuse = trim to longest common token prefix (`memoryRemove`) + decode the suffix in
+    512-token chunks, with a re-decode-last-token fallback when the prompt fully matches
+    the cache (logits would otherwise be stale).
+  - `EdgeToolsForkableModelState` gained a `generationState()` requirement (defaulted to
+    the fork path for MLX): `begin` reusing `forkedContextState(copyingCache: false)`
+    would have handed generations a fresh llama context and severed KV continuity.
+    Generations share the context's sequence; exclusivity comes from `isResponding`, and
+    the sequence serializes all llama calls internally.
+  - User forks currently allocate a fresh llama context (correct, cache-cold); C4
+    replaces this with `seq_cp` copy-on-write inside a shared family.
+  - Chat-template message/tool conversions moved from `MLXEngine.swift` to a shared
+    `EdgeToolsChatTemplateValues.swift`, so both engines produce identical prompt values.
+  - The CPU sampler samples llama's logits buffer in place (no scratch copy).
+  - Testing: the closure-struct `LlamaApi` lets tests script logits per decode step, so
+    prefill→generate KV reuse is asserted at the decode-batch level (positions and token
+    payloads) without any model file.
+
 ## Open Questions
 
 - `n_seq_max` fork-overflow behavior: error in v1, or blob-copy migration fallback.
@@ -385,3 +407,7 @@ output.
 
 - Vulkan (Windows/Linux/Android GPU) backend in the vendored artifact.
 - Blob-copy family migration if `n_seq_max` proves limiting.
+- `llama_decode` blocks a cooperative-pool thread during decode (MLX has the same
+  behavior); a dedicated executor is a possible future refinement.
+- CTokenizers 0.2.0 artifact rebuild (drops the dead renderer symbol) and the
+  linux/android/windows CLlama slices — release chores on their host toolchains.
