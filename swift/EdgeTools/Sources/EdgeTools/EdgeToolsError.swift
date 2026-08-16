@@ -1,96 +1,22 @@
+import EdgeToolsCore
+
 // MARK: - EdgeToolsError
 
-public struct EdgeToolsError: Error, Hashable, Sendable {
-  public struct Code: RawRepresentable, Hashable, Sendable {
-    public let rawValue: String
-
-    public init(rawValue: String) {
-      self.rawValue = rawValue
-    }
-
-    public static let noCompatibleTokenizer = Self(rawValue: "no-compatible-tokenizer")
-    public static let invalidHuggingFaceBackendJSON = Self(
-      rawValue: "invalid-hugging-face-backend-json"
-    )
-    public static let emptyJSONInput = Self(rawValue: "empty-json-input")
-    public static let invalidJSON = Self(rawValue: "invalid-json")
-    public static let jsonIntegerOutOfRange = Self(rawValue: "json-integer-out-of-range")
-    public static let nonFiniteJSONNumber = Self(rawValue: "non-finite-json-number")
-    public static let invalidJSONValue = Self(rawValue: "invalid-json-value")
-    public static let contextLengthExceeded = Self(rawValue: "context-length-exceeded")
-    public static let failedToLoadConfiguration = Self(rawValue: "failed-to-load-configuration")
-    public static let missingModelWeights = Self(rawValue: "missing-model-weights")
-    public static let unsupportedTokenizer = Self(rawValue: "unsupported-tokenizer")
-    public static let grammarRejectedToken = Self(rawValue: "grammar-rejected-token")
-    public static let missingModelOutputs = Self(rawValue: "missing-model-outputs")
-    public static let modelNotPrepared = Self(rawValue: "model-not-prepared")
-    public static let invalidMedia = Self(rawValue: "invalid-media")
-    public static let unsupportedMedia = Self(rawValue: "unsupported-media")
-    public static let contextInUse = Self(rawValue: "context-in-use")
-    public static let incompatibleContext = Self(rawValue: "incompatible-context")
-  }
-
-  public let code: Code
-  public let message: String
-
-  public init(code: Code, message: String) {
-    self.code = code
-    self.message = message
-  }
+extension EdgeToolsError.Code {
+  public static let contextLengthExceeded = Self(rawValue: "context-length-exceeded")
+  public static let failedToLoadConfiguration = Self(rawValue: "failed-to-load-configuration")
+  public static let missingModelWeights = Self(rawValue: "missing-model-weights")
+  public static let unsupportedTokenizer = Self(rawValue: "unsupported-tokenizer")
+  public static let grammarRejectedToken = Self(rawValue: "grammar-rejected-token")
+  public static let missingModelOutputs = Self(rawValue: "missing-model-outputs")
+  public static let modelNotPrepared = Self(rawValue: "model-not-prepared")
+  public static let invalidMedia = Self(rawValue: "invalid-media")
+  public static let unsupportedMedia = Self(rawValue: "unsupported-media")
+  public static let contextInUse = Self(rawValue: "context-in-use")
+  public static let incompatibleContext = Self(rawValue: "incompatible-context")
 }
 
 extension EdgeToolsError {
-  static func noCompatibleTokenizer(
-    in directory: String,
-    hasHuggingFaceTokenizer: Bool,
-    failures: [String] = []
-  ) -> Self {
-    var details = [String]()
-
-    #if HuggingFaceTokenizers && canImport(CTokenizers)
-      if hasHuggingFaceTokenizer {
-        details.append("tokenizer.json is not a supported Hugging Face tokenizer.")
-      } else {
-        details.append("tokenizer.json was not found.")
-      }
-    #else
-      if hasHuggingFaceTokenizer {
-        details.append(
-          "tokenizer.json exists, but the HuggingFaceTokenizers trait is not enabled."
-        )
-      } else {
-        details.append(
-          "The HuggingFaceTokenizers trait is not enabled; enable it to search for tokenizer.json."
-        )
-      }
-    #endif
-
-    details.append(contentsOf: failures)
-    return Self(
-      code: .noCompatibleTokenizer,
-      message:
-        "No compatible tokenizer was found in \(directory). \(details.joined(separator: " "))"
-    )
-  }
-
-  static let invalidHuggingFaceBackendJSON = Self(
-    code: .invalidHuggingFaceBackendJSON,
-    message: "Invalid Hugging Face tokenizer JSON."
-  )
-
-  static let emptyJSONInput = Self(code: .emptyJSONInput, message: "Expected JSON input.")
-  static let invalidJSONValue = Self(code: .invalidJSONValue, message: "Invalid JSON value.")
-
-  static let jsonIntegerOutOfRange = Self(
-    code: .jsonIntegerOutOfRange,
-    message: "A JSON integer was out of the representable range."
-  )
-
-  static let nonFiniteJSONNumber = Self(
-    code: .nonFiniteJSONNumber,
-    message: "A JSON number was not finite."
-  )
-
   static func contextLengthExceeded(tokens: Int, maximum: Int) -> Self {
     Self(
       code: .contextLengthExceeded,

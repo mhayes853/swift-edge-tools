@@ -1,3 +1,5 @@
+import EdgeToolsCore
+
 public struct EdgeToolsGenerationChannel {
   public var onToken: ((EdgeToolsToken) -> Void)?
   public var onPart: ((EdgeToolsGenerationPart) -> Void)?

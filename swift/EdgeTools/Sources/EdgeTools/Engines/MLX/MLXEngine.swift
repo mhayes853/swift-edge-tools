@@ -3,6 +3,8 @@
 #endif
 
 #if MLX && canImport(MLX)
+  import EdgeToolsCore
+  import EdgeToolsTokenizers
   import OrderedCollections
   import _EdgeToolsFoundation
   import MLX

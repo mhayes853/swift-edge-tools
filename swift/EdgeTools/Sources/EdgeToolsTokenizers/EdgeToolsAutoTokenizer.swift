@@ -1,3 +1,5 @@
+import EdgeToolsCore
+
 #if FoundationEssentials
   import _EdgeToolsFoundation
 #endif
@@ -39,6 +41,43 @@ public enum EdgeToolsAutoTokenizer {
       #endif
     }
   #endif
+}
+
+// MARK: - No Compatible Tokenizer
+
+extension EdgeToolsError {
+  static func noCompatibleTokenizer(
+    in directory: String,
+    hasHuggingFaceTokenizer: Bool,
+    failures: [String] = []
+  ) -> Self {
+    var details = [String]()
+
+    #if HuggingFaceTokenizers && canImport(CTokenizers)
+      if hasHuggingFaceTokenizer {
+        details.append("tokenizer.json is not a supported Hugging Face tokenizer.")
+      } else {
+        details.append("tokenizer.json was not found.")
+      }
+    #else
+      if hasHuggingFaceTokenizer {
+        details.append(
+          "tokenizer.json exists, but the HuggingFaceTokenizers trait is not enabled."
+        )
+      } else {
+        details.append(
+          "The HuggingFaceTokenizers trait is not enabled; enable it to search for tokenizer.json."
+        )
+      }
+    #endif
+
+    details.append(contentsOf: failures)
+    return Self(
+      code: .noCompatibleTokenizer,
+      message:
+        "No compatible tokenizer was found in \(directory). \(details.joined(separator: " "))"
+    )
+  }
 }
 
 // MARK: - Helpers

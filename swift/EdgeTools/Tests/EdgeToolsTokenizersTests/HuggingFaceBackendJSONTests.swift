@@ -1,7 +1,11 @@
 import CustomDump
-import EdgeTools
+import EdgeToolsTokenizers
 import Foundation
 import Testing
+
+#if XGrammar
+  import EdgeToolsXGrammar
+#endif
 
 @Suite
 struct `HuggingFaceBackendJSON tests` {

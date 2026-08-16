@@ -3,6 +3,8 @@
 #endif
 
 #if MLX && XGrammar && canImport(MLX)
+  import EdgeToolsCore
+
   public struct FunctionGemmaMLXProfile: MLXLLMModelProfile {
     public typealias Prompt = EdgeToolsTranscript
     public typealias GenerationParser = FunctionGemmaGenerationParser

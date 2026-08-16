@@ -1,4 +1,6 @@
 #if MLX && XGrammar && canImport(CoreImage) && canImport(MLX) && canImport(MLXVLM)
+  import EdgeToolsCore
+  import EdgeToolsTokenizers
   import Foundation
   import MLXLMCommon
   import MLXVLM

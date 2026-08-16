@@ -1,6 +1,6 @@
 #if HuggingFaceTokenizers
   import CustomDump
-  import EdgeTools
+  import EdgeToolsTokenizers
   import Foundation
   import Testing
 
@@ -110,7 +110,7 @@
     @Test
     func `Missing Chat Template Throws`() throws {
       let tokenizer = try HuggingFaceTokenizer(tokenizerJSON: try self.tokenizerJSON())
-      #expect(throws: EdgeToolsError.self) {
+      #expect(throws: EdgeToolsTokenizerError.self) {
         try tokenizer.renderChatTemplate(messages: [], tools: nil, addGenerationPrompt: false)
       }
     }

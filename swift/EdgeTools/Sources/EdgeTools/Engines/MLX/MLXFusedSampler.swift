@@ -1,4 +1,5 @@
 #if MLX && canImport(MLX)
+  import EdgeToolsCore
   import MLX
   import MLXLMCommon
   import MLXNN

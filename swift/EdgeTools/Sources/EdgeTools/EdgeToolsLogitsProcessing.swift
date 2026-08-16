@@ -1,3 +1,5 @@
+import EdgeToolsCore
+
 public protocol EdgeToolsLogitsProcessor<Prompt, Logits>: Sendable {
   associatedtype Prompt: Sendable
   associatedtype Logits: ~Copyable & ~Escapable

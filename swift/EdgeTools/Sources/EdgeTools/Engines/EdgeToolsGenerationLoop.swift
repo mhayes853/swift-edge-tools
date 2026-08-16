@@ -1,3 +1,5 @@
+import EdgeToolsCore
+import EdgeToolsTokenizers
 import _Concurrency
 
 // MARK: - EdgeToolsGenerationLoop

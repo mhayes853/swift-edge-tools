@@ -1,3 +1,5 @@
+import EdgeToolsCore
+
 #if XGrammar
   import EdgeToolsXGrammar
 #endif
@@ -8,6 +10,10 @@
 
 #if HuggingFaceTokenizers && canImport(CTokenizers)
   import CTokenizers
+#endif
+
+#if HuggingFaceTokenizers && FoundationEssentials && canImport(CTokenizers)
+  import OrderedCollections
 #endif
 
 // MARK: - HuggingFaceTokenizer
@@ -129,7 +135,250 @@
         )
       }
     }
+
+    extension XGRTokenizerInfo {
+      public static func huggingFace(
+        encodedVocabulary: [String],
+        backendJSON: String,
+        modelVocabularySize: Int? = nil,
+        stopTokenIDs: [Int] = []
+      ) throws -> XGRTokenizerInfo {
+        let metadata = try Self.metadata(huggingFaceBackendJSON: backendJSON)
+        guard
+          case .object(let decodedMetadata) = try EdgeToolsValue(json: Array(metadata.utf8)),
+          case .integer(let vocabularyTypeValue) = decodedMetadata["vocab_type"],
+          case .boolean(let addPrefixSpace) = decodedMetadata["add_prefix_space"]
+        else {
+          throw EdgeToolsTokenizerError.invalidBackendJSON
+        }
+        let vocabularyType: XGRVocabularyType
+        switch vocabularyTypeValue {
+        case 0: vocabularyType = .raw
+        case 1: vocabularyType = .byteFallback
+        case 2: vocabularyType = .byteLevel
+        default: throw EdgeToolsTokenizerError.invalidBackendJSON
+        }
+        return try XGRTokenizerInfo(
+          encodedVocabulary: encodedVocabulary,
+          vocabularyType: vocabularyType,
+          vocabularySize: modelVocabularySize ?? encodedVocabulary.count,
+          stopTokenIDs: stopTokenIDs,
+          addPrefixSpace: addPrefixSpace
+        )
+      }
+    }
   #endif
+
+  // MARK: - Hugging Face Tokenizer Configuration
+
+  private struct HuggingFaceTokenizerConfiguration: Sendable {
+    let bosToken: String?
+    let eosToken: String?
+    let unknownToken: String?
+    let sepToken: String?
+    let padToken: String?
+    let clsToken: String?
+    let maskToken: String?
+    let additionalSpecialTokens: [String]
+    private let chatTemplates: [NamedChatTemplate]
+
+    init(data: Data?, chatTemplateOverride: String? = nil) throws {
+      let source = try data.map { try JSONDecoder().decode(Source.self, from: $0) } ?? Source()
+      self.bosToken = source.bosToken?.content
+      self.eosToken = source.eosToken?.content
+      self.unknownToken = source.unknownToken?.content
+      self.sepToken = source.sepToken?.content
+      self.padToken = source.padToken?.content
+      self.clsToken = source.clsToken?.content
+      self.maskToken = source.maskToken?.content
+      self.additionalSpecialTokens = source.additionalSpecialTokens.compactMap(\.content)
+      self.chatTemplates = (chatTemplateOverride.map { [Source.ChatTemplate.literal($0)] }
+        ?? source.chatTemplate)
+        .map { NamedChatTemplate(source: $0) }
+    }
+
+    func renderChatTemplate(
+      messages: [EdgeToolsValue],
+      tools: [EdgeToolsValue]?,
+      addGenerationPrompt: Bool,
+      additionalContext: [String: EdgeToolsValue]?
+    ) throws -> String {
+      let source = try self.selectedChatTemplate(tools: tools)
+      var context = OrderedDictionary<String, EdgeToolsValue>()
+      self.addSpecialTokens(to: &context)
+      context["messages"] = .array(messages)
+      context["add_generation_prompt"] = .boolean(addGenerationPrompt)
+      if let tools {
+        context["tools"] = .array(tools)
+      }
+      context.merge(additionalContext ?? [:]) { _, override in override }
+      return try nativeRenderTemplate(source, context: .object(context))
+    }
+
+    private func selectedChatTemplate(tools: [EdgeToolsValue]?) throws -> String {
+      let toolTemplate =
+        tools?.isEmpty == false
+        ? self.chatTemplates.first { $0.name == toolUseChatTemplateName }
+        : nil
+      guard let template = toolTemplate
+        ?? self.chatTemplates.first(where: { $0.name == defaultChatTemplateName })
+      else {
+        throw EdgeToolsTokenizerError(
+          code: .missingChatTemplate,
+          message: self.chatTemplates.isEmpty
+            ? "The Hugging Face tokenizer does not define a chat template."
+            : "The Hugging Face tokenizer has no default chat template."
+        )
+      }
+      return template.source
+    }
+
+    private func addSpecialTokens(to context: inout OrderedDictionary<String, EdgeToolsValue>) {
+      if let bosToken {
+        context["bos_token"] = .string(bosToken)
+      }
+      if let eosToken {
+        context["eos_token"] = .string(eosToken)
+      }
+      if let unknownToken {
+        context["unk_token"] = .string(unknownToken)
+      }
+      if let sepToken {
+        context["sep_token"] = .string(sepToken)
+      }
+      if let padToken {
+        context["pad_token"] = .string(padToken)
+      }
+      if let clsToken {
+        context["cls_token"] = .string(clsToken)
+      }
+      if let maskToken {
+        context["mask_token"] = .string(maskToken)
+      }
+      if !additionalSpecialTokens.isEmpty {
+        context["additional_special_tokens"] = .array(
+          additionalSpecialTokens.map(EdgeToolsValue.string)
+        )
+      }
+    }
+  }
+
+  // MARK: - Chat Templates
+
+  private let defaultChatTemplateName = "default"
+  private let toolUseChatTemplateName = "tool_use"
+
+  private struct NamedChatTemplate: Sendable {
+    let name: String
+    let source: String
+
+    init(source: Source.ChatTemplate) {
+      switch source {
+      case .literal(let template):
+        self.name = defaultChatTemplateName
+        self.source = template
+      case .named(let name, let template):
+        self.name = name
+        self.source = template
+      }
+    }
+  }
+
+  // MARK: - Configuration Source
+
+  private struct Source: Decodable {
+    struct Token: Decodable {
+      let content: String
+
+      init(from decoder: any Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let value = try? container.decode(String.self) {
+          self.content = value
+        } else {
+          self.content = try container.decode(Content.self).content
+        }
+      }
+    }
+
+    struct Content: Decodable {
+      let content: String
+    }
+
+    enum ChatTemplate: Decodable {
+      case literal(String)
+      case named(name: String, template: String)
+
+      private enum CodingKeys: String, CodingKey {
+        case name
+        case template
+      }
+
+      init(from decoder: any Decoder) throws {
+        if let value = try? decoder.singleValueContainer().decode(String.self) {
+          self = .literal(value)
+          return
+        }
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self = .named(
+          name: try container.decode(String.self, forKey: .name),
+          template: try container.decode(String.self, forKey: .template)
+        )
+      }
+    }
+
+    let bosToken: Token?
+    let eosToken: Token?
+    let unknownToken: Token?
+    let sepToken: Token?
+    let padToken: Token?
+    let clsToken: Token?
+    let maskToken: Token?
+    let additionalSpecialTokens: [Token]
+    let chatTemplate: [ChatTemplate]
+
+    private enum CodingKeys: String, CodingKey {
+      case bosToken = "bos_token"
+      case eosToken = "eos_token"
+      case unknownToken = "unk_token"
+      case sepToken = "sep_token"
+      case padToken = "pad_token"
+      case clsToken = "cls_token"
+      case maskToken = "mask_token"
+      case additionalSpecialTokens = "additional_special_tokens"
+      case chatTemplate = "chat_template"
+    }
+
+    init() {
+      self.bosToken = nil
+      self.eosToken = nil
+      self.unknownToken = nil
+      self.sepToken = nil
+      self.padToken = nil
+      self.clsToken = nil
+      self.maskToken = nil
+      self.additionalSpecialTokens = []
+      self.chatTemplate = []
+    }
+
+    init(from decoder: any Decoder) throws {
+      let container = try decoder.container(keyedBy: CodingKeys.self)
+      self.bosToken = try container.decodeIfPresent(Token.self, forKey: .bosToken)
+      self.eosToken = try container.decodeIfPresent(Token.self, forKey: .eosToken)
+      self.unknownToken = try container.decodeIfPresent(Token.self, forKey: .unknownToken)
+      self.sepToken = try container.decodeIfPresent(Token.self, forKey: .sepToken)
+      self.padToken = try container.decodeIfPresent(Token.self, forKey: .padToken)
+      self.clsToken = try container.decodeIfPresent(Token.self, forKey: .clsToken)
+      self.maskToken = try container.decodeIfPresent(Token.self, forKey: .maskToken)
+      self.additionalSpecialTokens =
+        try container.decodeIfPresent([Token].self, forKey: .additionalSpecialTokens) ?? []
+      if let templates = try? container.decodeIfPresent([ChatTemplate].self, forKey: .chatTemplate) {
+        self.chatTemplate = templates
+      } else {
+        self.chatTemplate =
+          try container.decodeIfPresent(ChatTemplate.self, forKey: .chatTemplate).map { [$0] } ?? []
+      }
+    }
+  }
 
   // MARK: - Native Tokenizer Calls
 
@@ -139,8 +388,8 @@
       hf_tokenizer_create(json.baseAddress, json.count, &tokenizer)
     }
     guard let tokenizer else {
-      throw EdgeToolsError(
-        code: .unsupportedTokenizer,
+      throw EdgeToolsTokenizerError(
+        code: .nativeFailure,
         message: "The native tokenizer did not create a tokenizer handle."
       )
     }
@@ -242,8 +491,8 @@
           )
         }
         guard status == HF_TOKENIZER_SUCCESS else {
-          throw EdgeToolsError(
-            code: .unsupportedTokenizer,
+          throw EdgeToolsTokenizerError(
+            code: .nativeFailure,
             message: "The native tokenizer vocabulary did not fit the size it reported."
           )
         }
@@ -280,8 +529,8 @@
 
   private func nativeTokenID(_ tokenID: EdgeToolsToken.ID) throws -> Int32 {
     guard let tokenID = Int32(exactly: tokenID) else {
-      throw EdgeToolsError(
-        code: .unsupportedTokenizer,
+      throw EdgeToolsTokenizerError(
+        code: .nativeFailure,
         message: "A token ID does not fit in the native tokenizer representation."
       )
     }
@@ -306,8 +555,8 @@
         return value
       }
       guard required > capacity else {
-        throw EdgeToolsError(
-          code: .unsupportedTokenizer,
+        throw EdgeToolsTokenizerError(
+          code: .nativeFailure,
           message: "The native tokenizer reported an inconsistent output size."
         )
       }
@@ -321,8 +570,8 @@
     guard status != HF_TOKENIZER_SUCCESS, status != HF_TOKENIZER_BUFFER_TOO_SMALL else {
       return status
     }
-    throw EdgeToolsError(
-      code: .unsupportedTokenizer,
+    throw EdgeToolsTokenizerError(
+      code: .nativeFailure,
       message: String(cString: hf_tokenizer_last_error_message())
     )
   }
@@ -371,10 +620,14 @@ private struct HuggingFaceBackendJSONScanner {
       }) {
         values[metadataIndex] = value
       }
-      if values.allSatisfy({ $0 != nil }) { break }
+      if values.allSatisfy({ $0 != nil }) {
+        break
+      }
 
       self.skipWhitespace()
-      if self.consumeIfPresent(.jsonCloseObject) { break }
+      if self.consumeIfPresent(.jsonCloseObject) {
+        break
+      }
       try self.consume(.jsonComma)
       self.skipWhitespace()
     }
@@ -385,7 +638,7 @@ private struct HuggingFaceBackendJSONScanner {
         let bytes = self.buffer[value]
         let jsonValue = String(decoding: bytes, as: UTF8.self)
         guard jsonValue.utf8.elementsEqual(bytes) else {
-          throw EdgeToolsError.invalidHuggingFaceBackendJSON
+          throw EdgeToolsTokenizerError.invalidBackendJSON
         }
         return "\"\(key)\":\(jsonValue)"
       }
@@ -403,12 +656,12 @@ private struct HuggingFaceBackendJSONScanner {
       }
       escaped = byte == .jsonEscape && !escaped
     }
-    throw EdgeToolsError.invalidHuggingFaceBackendJSON
+    throw EdgeToolsTokenizerError.invalidBackendJSON
   }
 
   private mutating func valueRange() throws -> Range<Int> {
     let start = self.index
-    guard self.index < self.buffer.count else { throw EdgeToolsError.invalidHuggingFaceBackendJSON }
+    guard self.index < self.buffer.count else { throw EdgeToolsTokenizerError.invalidBackendJSON }
 
     switch self.buffer[self.index] {
     case .jsonQuote: _ = try self.stringRange()
@@ -423,7 +676,7 @@ private struct HuggingFaceBackendJSONScanner {
 
     let end = self.buffer[start..<self.index].lastIndex(where: { !$0.isASCIIWhitespace })
       .map { $0 + 1 }
-    guard let end, end > start else { throw EdgeToolsError.invalidHuggingFaceBackendJSON }
+    guard let end, end > start else { throw EdgeToolsTokenizerError.invalidBackendJSON }
     return start..<end
   }
 
@@ -441,14 +694,14 @@ private struct HuggingFaceBackendJSONScanner {
       case .jsonOpenObject: endings.append(.jsonCloseObject)
       case .jsonOpenArray: endings.append(.jsonCloseArray)
       case .jsonCloseObject, .jsonCloseArray:
-        guard endings.popLast() == byte else { throw EdgeToolsError.invalidHuggingFaceBackendJSON }
+        guard endings.popLast() == byte else { throw EdgeToolsTokenizerError.invalidBackendJSON }
         if endings.isEmpty {
           return
         }
       default: break
       }
     }
-    throw EdgeToolsError.invalidHuggingFaceBackendJSON
+    throw EdgeToolsTokenizerError.invalidBackendJSON
   }
 
   private mutating func skipWhitespace() {
@@ -458,7 +711,7 @@ private struct HuggingFaceBackendJSONScanner {
   }
 
   private mutating func consume(_ byte: UInt8) throws {
-    guard self.consumeIfPresent(byte) else { throw EdgeToolsError.invalidHuggingFaceBackendJSON }
+    guard self.consumeIfPresent(byte) else { throw EdgeToolsTokenizerError.invalidBackendJSON }
   }
 
   private mutating func consumeIfPresent(_ byte: UInt8) -> Bool {

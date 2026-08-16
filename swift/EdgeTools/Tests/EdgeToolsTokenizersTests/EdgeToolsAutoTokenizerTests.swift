@@ -1,6 +1,6 @@
 #if FoundationEssentials
   import CustomDump
-  import EdgeTools
+  import EdgeToolsTokenizers
   import Foundation
   import Testing
 

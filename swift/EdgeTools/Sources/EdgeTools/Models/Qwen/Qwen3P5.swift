@@ -1,3 +1,4 @@
+import EdgeToolsCore
 import OrderedCollections
 
 #if XGrammar
@@ -5,6 +6,8 @@ import OrderedCollections
 #endif
 
 #if MLX && XGrammar && canImport(MLX)
+  import EdgeToolsTokenizers
+
   // MARK: - Qwen3P5 Model
 
   public struct Qwen3P5MLXProfile: MLXLLMModelProfile {

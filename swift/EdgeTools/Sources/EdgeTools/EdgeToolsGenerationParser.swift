@@ -1,3 +1,5 @@
+import EdgeToolsCore
+
 public protocol EdgeToolsGenerationParser {
   init()
 

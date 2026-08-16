@@ -20,6 +20,7 @@ let package = Package(
   platforms: [.macOS(.v14), .iOS(.v17), .tvOS(.v17), .watchOS(.v10), .visionOS(.v1)],
   products: [
     .library(name: "EdgeTools", targets: ["EdgeTools"]),
+    .library(name: "EdgeToolsTokenizers", targets: ["EdgeToolsTokenizers"]),
     .library(name: "EdgeToolsXGrammar", targets: ["EdgeToolsXGrammar"])
   ],
   traits: [
@@ -123,21 +124,14 @@ let package = Package(
           package: "mlx-swift-lm",
           condition: .when(platforms: [.macOS], traits: ["MLX"])
         ),
+        .target(name: "EdgeToolsCore"),
+        .target(name: "EdgeToolsTokenizers"),
         .target(name: "EdgeToolsXGrammar", condition: .when(traits: ["XGrammar"])),
         .target(
           name: "CNeedle2",
           condition: .when(
             platforms: [.macOS, .iOS, .tvOS, .watchOS, .linux, .windows, .android],
             traits: ["Needle2"]
-          )
-        ),
-        .target(
-          name: "CTokenizers",
-          condition: .when(
-            platforms: [
-              .macOS, .iOS, .tvOS, .watchOS, .visionOS, .linux, .android, .windows
-            ],
-            traits: ["HuggingFaceTokenizers"]
           )
         )
       ],
@@ -158,6 +152,42 @@ let package = Package(
     .target(
       name: "_EdgeToolsFoundation",
       path: "swift/EdgeTools/Sources/_EdgeToolsFoundation"
+    ),
+    .target(
+      name: "EdgeToolsCore",
+      dependencies: [
+        .target(
+          name: "_EdgeToolsFoundation",
+          condition: .when(traits: ["FoundationEssentials"])
+        ),
+        .product(name: "yyjson", package: "yyjson"),
+        .product(name: "OrderedCollections", package: "swift-collections")
+      ],
+      path: "swift/EdgeTools/Sources/EdgeToolsCore",
+      swiftSettings: edgeToolsSwiftSettings
+    ),
+    .target(
+      name: "EdgeToolsTokenizers",
+      dependencies: [
+        "EdgeToolsCore",
+        .target(
+          name: "_EdgeToolsFoundation",
+          condition: .when(traits: ["FoundationEssentials"])
+        ),
+        .product(name: "OrderedCollections", package: "swift-collections"),
+        .target(name: "EdgeToolsXGrammar", condition: .when(traits: ["XGrammar"])),
+        .target(
+          name: "CTokenizers",
+          condition: .when(
+            platforms: [
+              .macOS, .iOS, .tvOS, .watchOS, .visionOS, .linux, .android, .windows
+            ],
+            traits: ["HuggingFaceTokenizers"]
+          )
+        )
+      ],
+      path: "swift/EdgeTools/Sources/EdgeToolsTokenizers",
+      swiftSettings: edgeToolsSwiftSettings
     ),
     .target(
       name: "_EdgeToolsJavaScript",
@@ -224,6 +254,16 @@ let package = Package(
         "EdgeToolsMacros", .product(name: "MacroTesting", package: "swift-macro-testing")
       ],
       path: "swift/EdgeTools/Tests/EdgeToolsMacrosTests"
+    ),
+    .testTarget(
+      name: "EdgeToolsTokenizersTests",
+      dependencies: [
+        "EdgeToolsTokenizers",
+        .product(name: "CustomDump", package: "swift-custom-dump"),
+        .target(name: "EdgeToolsXGrammar", condition: .when(traits: ["XGrammar"]))
+      ],
+      path: "swift/EdgeTools/Tests/EdgeToolsTokenizersTests",
+      resources: [.process("Resources")]
     ),
     .testTarget(
       name: "EdgeToolsTests",

@@ -321,7 +321,7 @@ struct `SchemaComposition tests` {
     ])
 
     expectNoDifference(
-      OrderedKeyJSONWriter.encode(value),
+      value.orderedJSONString(),
       #"{"escaped":"null\u0000byte","nonfinite":null}"#
     )
   }

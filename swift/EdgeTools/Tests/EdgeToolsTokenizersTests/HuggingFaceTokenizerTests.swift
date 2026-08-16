@@ -1,6 +1,6 @@
 #if HuggingFaceTokenizers
   import CustomDump
-  import EdgeTools
+  import EdgeToolsTokenizers
   import Foundation
   import Testing
 

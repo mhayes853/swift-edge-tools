@@ -1,3 +1,4 @@
+import EdgeToolsCore
 import OrderedCollections
 
 // MARK: - EdgeToolsGenerationSchema
@@ -523,6 +524,21 @@ extension EdgeToolsGenerationSchema {
 }
 
 // MARK: - ValueType
+
+extension EdgeToolsValue {
+  /// The ``EdgeToolsGenerationSchema/ValueType`` of this value.
+  public var type: EdgeToolsGenerationSchema.ValueType {
+    switch self {
+    case .string: .string
+    case .boolean: .boolean
+    case .array: .array
+    case .object: .object
+    case .number: .number
+    case .integer: .integer
+    case .null: .null
+    }
+  }
+}
 
 extension EdgeToolsGenerationSchema {
   /// A type-identifier for a ``EdgeToolsGenerationSchema`` value.

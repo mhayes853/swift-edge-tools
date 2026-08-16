@@ -1,4 +1,5 @@
 #if FoundationEssentials
+  import EdgeToolsCore
   import _EdgeToolsFoundation
 
   // MARK: - EdgeToolsLLMPrefillContext

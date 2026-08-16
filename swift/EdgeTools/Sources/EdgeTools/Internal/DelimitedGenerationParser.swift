@@ -1,3 +1,5 @@
+import EdgeToolsCore
+
 // MARK: - DelimitedGenerationParser
 
 struct DelimitedGenerationParser: Sendable {

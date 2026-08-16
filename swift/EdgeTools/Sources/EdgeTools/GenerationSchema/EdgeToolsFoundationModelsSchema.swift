@@ -1,4 +1,5 @@
 #if FoundationModels && canImport(FoundationModels)
+  import EdgeToolsCore
   import _EdgeToolsFoundation
   import FoundationModels
   import OrderedCollections

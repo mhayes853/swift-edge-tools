@@ -1,4 +1,6 @@
 #if MLX && HuggingFaceTokenizers && canImport(CTokenizers) && canImport(MLX)
+  import EdgeToolsCore
+  import EdgeToolsTokenizers
   import MLXLMCommon
   import OrderedCollections
   import _EdgeToolsFoundation

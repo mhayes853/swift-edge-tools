@@ -1,3 +1,6 @@
+import EdgeToolsCore
+import EdgeToolsTokenizers
+
 struct StreamingDetokenizer {
   private static let replacementCharacter = "\u{fffd}"
 
