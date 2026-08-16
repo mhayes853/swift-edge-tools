@@ -67,6 +67,73 @@
     }
 
     @Test
+    func `Forked Context Shares KV Cells Copy On Write`() async throws {
+      let logits = ScriptedLogits(script: [3, 2], vocabularySize: 6)
+      let batches = LockBox([LlamaDecodeBatch]())
+      let copies = LockBox([[Int]]())
+      let engine = try LlamaEngine<ScriptLlamaProfile>(
+        api: mockLlamaApi(
+          decode: { _, batch in batches.withLock { $0.append(batch) } },
+          lastLogits: { _ in logits.next() },
+          onMemoryCopy: { source, destination in
+            copies.withLock { $0.append([source, destination]) }
+          }
+        ),
+        modelPath: "mock"
+      )
+      let session = EdgeToolsSession(engine: engine)
+      let context = session.context(
+        transcript: EdgeToolsTranscript(messages: [.user("hello world")])
+      )
+      _ = try await engine.prefill(context: context)
+
+      let fork = context.fork()
+      _ = try await session.generate(
+        prompt: .user(""),
+        context: fork,
+        parameters: DefaultLlamaGenerateParameters(sampling: .greedy)
+      )
+
+      expectNoDifference(copies.withLock { $0 }, [[0, 1]])
+      let forkBatches = batches.withLock { Array($0.dropFirst()) }
+      expectNoDifference(forkBatches.allSatisfy { $0.sequenceId == 1 }, true)
+      expectNoDifference(forkBatches.first.map { [$0.startPosition] + $0.tokens }, [2, 5])
+    }
+
+    @Test
+    func `Fork Beyond Sequence Capacity Falls Back To A Fresh Family`() async throws {
+      let logits = ScriptedLogits(script: [3, 2], vocabularySize: 6)
+      let batches = LockBox([LlamaDecodeBatch]())
+      let contextCount = LockBox(0)
+      let engine = try LlamaEngine<ScriptLlamaProfile>(
+        api: mockLlamaApi(
+          decode: { _, batch in batches.withLock { $0.append(batch) } },
+          lastLogits: { _ in logits.next() },
+          onCreateContext: { contextCount.withLock { $0 += 1 } }
+        ),
+        modelPath: "mock",
+        contextParameters: LlamaContextParameters(maximumSequenceCount: 1)
+      )
+      let session = EdgeToolsSession(engine: engine)
+      let context = session.context(
+        transcript: EdgeToolsTranscript(messages: [.user("hello world")])
+      )
+      _ = try await engine.prefill(context: context)
+
+      let fork = context.fork()
+      _ = try await session.generate(
+        prompt: .user(""),
+        context: fork,
+        parameters: DefaultLlamaGenerateParameters(sampling: .greedy)
+      )
+
+      expectNoDifference(contextCount.withLock { $0 }, 2)
+      let forkBatches = batches.withLock { Array($0.dropFirst()) }
+      expectNoDifference(forkBatches.allSatisfy { $0.sequenceId == 0 }, true)
+      expectNoDifference(forkBatches.first.map { $0.startPosition }, 0)
+    }
+
+    @Test
     func `Grammar Bitmask Excludes Tokens From Sampling`() async throws {
       let logits = ScriptedLogits(script: [3, 2], vocabularySize: 6)
       let engine = try LlamaEngine<ScriptLlamaProfile>(

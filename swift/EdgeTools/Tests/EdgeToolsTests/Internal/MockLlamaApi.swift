@@ -44,7 +44,9 @@
     lastLogits: @escaping @Sendable (LlamaContextRef) -> UnsafeMutablePointer<Float>? = { _ in
       nil
     },
-    probeConfidence: (@Sendable (LlamaContextRef, Int) -> Float)? = nil
+    probeConfidence: (@Sendable (LlamaContextRef, Int) -> Float)? = nil,
+    onMemoryCopy: (@Sendable (Int, Int) -> Void)? = nil,
+    onCreateContext: (@Sendable () -> Void)? = nil
   ) -> LlamaApi {
     let hasProbe = probeConfidence != nil
     let tokenize: @Sendable (LlamaModelRef, String, Bool, Bool) throws -> [EdgeToolsToken.ID] = {
@@ -90,12 +92,15 @@
     }
     let create: @Sendable (LlamaModelRef, LlamaContextParameters) throws -> LlamaContextRef = {
       model, parameters in
-      LlamaContextRef(rawValue: OpaquePointer(bitPattern: 0x2)!)
+      onCreateContext?()
+      return LlamaContextRef(rawValue: OpaquePointer(bitPattern: 0x2)!)
     }
     let memoryRemove: @Sendable (LlamaContextRef, Int, Int, Int) -> Bool = { _, _, _, _ in
       true
     }
-    let memoryCopy: @Sendable (LlamaContextRef, Int, Int, Int, Int) -> Void = { _, _, _, _, _ in
+    let memoryCopy: @Sendable (LlamaContextRef, Int, Int, Int, Int) -> Void = {
+      context, source, destination, from, to in
+      onMemoryCopy?(source, destination)
     }
     let context = LlamaApi.Context(
       create: create,

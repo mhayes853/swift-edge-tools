@@ -263,10 +263,10 @@ C5 fan-out rather than on the critical path.
 
 After C3, the remaining phases run in parallel:
 
-- **C4 — fork family + prefix reuse.** The shared lock-protected holder (seq-id
+- **C4 — fork family + prefix reuse. [DONE — `kv_unified` COW behavior still needs
+  real-model verification in C5a]** The shared lock-protected holder (seq-id
   allocation/recycling), `fork()` via `llama_memory_seq_cp`, prefix reuse via
-  `llama_memory_seq_rm` + suffix decode. Verify `kv_unified` `seq_cp` COW behavior at
-  `b10076` here.
+  `llama_memory_seq_rm` + suffix decode.
 - **C5a — test harness + first profile.** `scripts/test-llama.sh` with GGUF fixtures,
   engine generation snapshot tests (`withKnownIssue` recording), and a first profile
   (Qwen3) reusing the engine-agnostic tool-calling parsers/grammars in `Models/`.
@@ -394,6 +394,18 @@ output.
   - Testing: the closure-struct `LlamaApi` lets tests script logits per decode step, so
     prefill→generate KV reuse is asserted at the decode-batch level (positions and token
     payloads) without any model file.
+
+- **2026-08-16 — C4 complete (mock-level).** `LlamaSequenceFamily` owns one llama
+  context shared copy-on-write between leased sequence ids. `fork()` leases a fresh id
+  and `seq_cp`s the parent's cells (cheap under `kv_unified`); releasing a lease
+  (context deallocation) `seq_rm`s its cells and recycles the id; capacity exhaustion
+  falls back to a fresh cold-cache family rather than erroring. Because the context has
+  a single logits output, logits access is atomic with the decode that produced it and
+  a sequence re-decodes its final token when another sequence decoded in between
+  (`logitsSequenceId` tracking) — this is what makes interleaved generations on forked
+  contexts safe. Verified against the mock at the decode-batch level (seq ids,
+  positions, `seq_cp` calls, fallback context creation); real-model verification of
+  `kv_unified` semantics happens in C5a.
 
 ## Open Questions
 
