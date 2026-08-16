@@ -212,7 +212,7 @@ independently against the existing MLX/tokenizer test suites.
   (`forkedContextState(copyingCache:)`). `MLXContext` becomes a thin wrapper; evaluate
   also lifting the `generationTask`/`finalize` wiring shared by transcript engines.
   Gate: MLX engine tests and snapshots unchanged.
-- **A3 — CPU sampling + masking (SIMD).** A CPU fused sampler honoring
+- **A3 — CPU sampling + masking (SIMD). [DONE]** A CPU fused sampler honoring
   `EdgeToolsFusedSamplingParameters` over a logits buffer (counterpart to
   `MLXFusedSampler`), CPU grammar-bitmask application, and top-2 per-token confidence
   extraction in the same pass. Vectorized following the removed ONNX-era pattern
@@ -280,6 +280,24 @@ After C3, the remaining phases run in parallel:
 Fold cactus conversion patches 1–2 into the python export tooling and produce a hybrid
 probe GGUF. No engine dependency; only C5b's Gemma 4 probe validation consumes its
 output.
+
+## Progress Log
+
+- **2026-08-16 — A3 complete.** `EdgeToolsCPUSampling.swift`: `EdgeToolsCPUFusedSampler`
+  (+ `EdgeToolsCPUTokenHistory`, `EdgeToolsCPUSample`), `applyBitmaskCPU`, and
+  internal SIMD reductions (`maxContiguous`, `argmaxContiguous`, `topTwoContiguous`,
+  `sumExpContiguous`). Semantics mirror `MLXFusedSampler` exactly (selection at
+  temperature 1 over full-vocab log-probabilities, temperature applied in the categorical
+  draw, default temperature 0.6, history ring of `repetitionContextSize ?? 20`,
+  confidence post-mask/pre-penalty); the test suite is a 1:1 port of
+  `MLXFusedSamplerTests` plus bitmask/confidence/large-vocab cases. Implementation notes:
+  vDSP paths under `canImport(Accelerate) && !$Embedded`, portable `SIMD16<Float>`
+  otherwise; top-k via `HeapModule.Heap`; top-p without top-k uses progressive top-M
+  (256, ×4) until the nucleus mass is covered; full-vocab log-sum-exp skips SIMD blocks
+  below `max - 20`; RNG is SplitMix64 (embedded gets a fixed default seed since
+  `SystemRandomNumberGenerator` may be unavailable); key-path literals avoided for
+  embedded compatibility. `validateBitmaskCoverage` promoted from `private` to internal
+  for reuse.
 
 ## Open Questions
 

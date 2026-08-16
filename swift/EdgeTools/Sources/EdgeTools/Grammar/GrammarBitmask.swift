@@ -115,7 +115,7 @@ let bitmaskTable = (0..<256)
 // MARK: - Validation
 
 @_transparent
-private func validateBitmaskCoverage(mask: GrammarBitmask, vocabularySize: Int) {
+func validateBitmaskCoverage(mask: GrammarBitmask, vocabularySize: Int) {
   precondition(
     mask.count >= vocabularySize,
     "Grammar bitmask (\(mask.count) tokens) does not cover the model vocabulary (\(vocabularySize) tokens)."
