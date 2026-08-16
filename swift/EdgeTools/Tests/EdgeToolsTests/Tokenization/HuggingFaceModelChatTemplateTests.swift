@@ -7,30 +7,34 @@
   @Suite
   struct `HuggingFaceModelChatTemplate tests` {
     @Test
-    func `Renders Model Profile Templates For Messages And Tools`() throws {
-      let outputs = try Self.profileNames.map(Self.renderProfile)
+    func `Renders Model Profile Templates For Messages And Tools`() async throws {
+      var outputs: [String] = []
+      for profile in Self.models {
+        outputs.append(try await Self.renderProfile(profile))
+      }
       assertSnapshot(of: outputs.joined(separator: "\n\n"), as: .lines)
     }
 
     private static let pinnedNow: [String: EdgeToolsValue] = ["edge_tools_now": 1_577_923_200]
 
-    private static let profileNames = [
-      "FunctionGemma",
-      "Gemma4",
-      "Granite",
-      "LFM2P5",
-      "LFM2P5Thinking",
-      "LFM2P5VL",
-      "MiniCPM5",
-      "Qwen3",
-      "Qwen3P5",
+    private static let models: [(name: String, id: ModelID)] = [
+      ("FunctionGemma", .functionGemma),
+      ("Gemma4", .gemma4E2B),
+      ("Granite", .graniteMoeHybrid),
+      ("LFM2P5", .lfm2P5),
+      ("LFM2P5Thinking", .lfm2P5Thinking),
+      ("LFM2P5VL", .lfm2P5VL),
+      ("MiniCPM5", .miniCPM5),
+      ("Qwen3", .qwen3),
+      ("Qwen3P5", .qwen3P5),
     ]
 
-    private static func renderProfile(_ name: String) throws -> String {
+    private static func renderProfile(_ profile: (name: String, id: ModelID)) async throws -> String {
+      let directory = try await downloadModel(id: profile.id)
       let tokenizer = try HuggingFaceTokenizer(
-        tokenizerJSON: try tokenizerJSON(),
-        configuration: try resourceData(name: name, file: "tokenizer_config.json"),
-        chatTemplate: try chatTemplate(name: name)
+        tokenizerJSON: try Data(contentsOf: directory.appending(path: "tokenizer.json")),
+        configuration: try Data(contentsOf: directory.appending(path: "tokenizer_config.json")),
+        chatTemplate: try Self.chatTemplate(in: directory)
       )
       let messages: [EdgeToolsValue] = [
         ["role": "system", "content": "You are concise."],
@@ -62,30 +66,15 @@
       )
       expectNoDifference(promptWithoutGeneration.isEmpty, false)
       expectNoDifference(promptWithGeneration.isEmpty, false)
-      return "# \(name)\n\n## No Generation\n\(promptWithoutGeneration)\n\n## Generation\n\(promptWithGeneration)"
+      return "# \(profile.name)\n\n## No Generation\n\(promptWithoutGeneration)\n\n## Generation\n\(promptWithGeneration)"
     }
 
-    private static func chatTemplate(name: String) throws -> String? {
-      guard let url = Bundle.module.url(
-        forResource: "\(name)-chat_template",
-        withExtension: "jinja"
-      ) else {
+    private static func chatTemplate(in directory: URL) throws -> String? {
+      let url = directory.appending(path: "chat_template.jinja")
+      guard FileManager.default.fileExists(atPath: url.path()) else {
         return nil
       }
       return try String(contentsOf: url, encoding: .utf8)
-    }
-
-    private static func resourceData(name: String, file: String) throws -> Data {
-      try Data(
-        contentsOf: Bundle.module.url(
-          forResource: "\(name)-\(file.dropLast(5))",
-          withExtension: "json"
-        )!
-      )
-    }
-
-    private static func tokenizerJSON() throws -> Data {
-      try Data(contentsOf: Bundle.module.url(forResource: "test_tokenizer", withExtension: "json")!)
     }
   }
 #endif

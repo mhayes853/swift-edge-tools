@@ -231,7 +231,11 @@ let package = Package(
         "EdgeTools",
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
         .product(name: "CustomDump", package: "swift-custom-dump"),
-        .product(name: "Hub", package: "swift-transformers", condition: .when(traits: ["MLX"]))
+        .product(
+          name: "Hub",
+          package: "swift-transformers",
+          condition: .when(traits: ["HuggingFaceTokenizers"])
+        )
       ],
       path: "swift/EdgeTools/Tests/EdgeToolsTests",
       exclude: [
