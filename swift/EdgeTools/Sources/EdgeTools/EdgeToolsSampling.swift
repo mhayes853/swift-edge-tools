@@ -1,3 +1,5 @@
+import EdgeToolsCore
+
 // MARK: - EdgeToolsSampler
 
 public protocol EdgeToolsSampler<Logits>: Sendable {

@@ -3,6 +3,8 @@
 #endif
 
 #if MLX && XGrammar && canImport(MLX)
+  import EdgeToolsCore
+
   // MARK: - Granite Model
 
   public struct GraniteMLXProfile: MLXLLMModelProfile {

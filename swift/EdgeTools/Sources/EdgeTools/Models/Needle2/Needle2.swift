@@ -1,4 +1,5 @@
 #if Needle2
+  import EdgeToolsCore
   import OrderedCollections
 
   // MARK: - Needle2Response

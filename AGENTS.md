@@ -59,7 +59,7 @@ Grammar constraints and tool argument parsing are generally represented through 
 
 Generally speaking, follow the patterns you see already for the most part. The following are generally mistakes that previous agents have made.
 
-One-line `if` statements with a `return` on the same line are not allowed. Non-empty function signatures and bodies must be on separate lines. Deinits and empty functions may remain on one line.
+One-line `if` statements are not allowed; the body must be on its own line even when it's a single statement. Non-empty function signatures and bodies must be on separate lines. Deinits and empty functions may remain on one line.
 
 When a protocol requirement has an unused parameter, preserve its existing parameter name rather than expressing it with an underscore binding such as `prompt _:`. Use `prompt:` instead.
 

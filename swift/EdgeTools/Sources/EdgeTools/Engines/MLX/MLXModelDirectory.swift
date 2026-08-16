@@ -1,4 +1,6 @@
 #if MLX && canImport(MLX)
+  import EdgeToolsCore
+  import EdgeToolsTokenizers
   import _EdgeToolsFoundation
   import MLX
   import MLXLMCommon

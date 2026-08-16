@@ -1,3 +1,5 @@
+import EdgeToolsCore
+
 // MARK: - EdgeToolsGrammarMatcher
 
 public protocol EdgeToolsGrammarMatcher: ~Copyable {

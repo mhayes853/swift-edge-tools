@@ -20,11 +20,9 @@ struct `StreamingDetokenizer tests` {
 }
 
 private struct ExtendingGraphemeTokenizer: EdgeToolsTokenizer {
-  let unknownTokenId: EdgeToolsToken.ID? = nil
-  let bosTokenId: EdgeToolsToken.ID? = nil
-  let eosTokenId: EdgeToolsToken.ID? = nil
+  let eos: EdgeToolsToken? = nil
 
-  func encode(text: String) -> [EdgeToolsToken.ID] {
+  func encode(text: String) -> [EdgeToolsToken] {
     []
   }
 
@@ -36,11 +34,11 @@ private struct ExtendingGraphemeTokenizer: EdgeToolsTokenizer {
     }
   }
 
-  func convertTokensToIds(_ tokens: [String]) -> [EdgeToolsToken.ID?] {
-    tokens.map { _ in nil }
+  func tokens(forIds ids: [EdgeToolsToken.ID]) -> [EdgeToolsToken?] {
+    ids.map { _ in nil }
   }
 
-  func convertIdsToTokens(_ ids: [EdgeToolsToken.ID]) -> [String?] {
-    ids.map { _ in nil }
+  func tokens(forTexts texts: [String]) -> [EdgeToolsToken?] {
+    texts.map { _ in nil }
   }
 }

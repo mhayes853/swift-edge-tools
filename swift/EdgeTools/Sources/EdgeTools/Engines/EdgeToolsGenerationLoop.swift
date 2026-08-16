@@ -1,3 +1,5 @@
+import EdgeToolsCore
+import EdgeToolsTokenizers
 import _Concurrency
 
 // MARK: - EdgeToolsGenerationLoop
@@ -24,7 +26,7 @@ public struct EdgeToolsGenerationLoop: Sendable {
     extraStopTokenIds: Set<EdgeToolsToken.ID> = []
   ) {
     var stopTokenIds = extraStopTokenIds
-    if let eosTokenId = tokenizer.eosTokenId {
+    if let eosTokenId = tokenizer.eos?.id {
       stopTokenIds.insert(eosTokenId)
     }
     self.tokenizer = tokenizer

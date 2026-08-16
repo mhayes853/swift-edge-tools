@@ -3,6 +3,8 @@
 #endif
 
 #if MLX && XGrammar && canImport(CoreImage) && canImport(MLX) && canImport(MLXVLM)
+  import EdgeToolsCore
+  import EdgeToolsTokenizers
   import Foundation
   import MLXLMCommon
   import MLXNN
@@ -124,7 +126,7 @@
     ) throws -> UserInput {
       try self.gemma4PreparedForReasoning.mlxUserInput(
         tools: tools,
-        additionalContext: ["add_generation_prompt": addGenerationPrompt]
+        additionalContext: ["add_generation_prompt": .boolean(addGenerationPrompt)]
       ) { message in
         switch message {
         case .system:

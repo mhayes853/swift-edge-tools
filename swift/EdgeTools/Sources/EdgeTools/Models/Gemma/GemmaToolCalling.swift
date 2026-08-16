@@ -1,3 +1,5 @@
+import EdgeToolsCore
+
 #if XGrammar
   import EdgeToolsXGrammar
 #endif

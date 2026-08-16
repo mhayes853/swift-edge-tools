@@ -1,3 +1,5 @@
+import EdgeToolsCore
+
 // MARK: - EdgeToolsEngine
 
 public protocol EdgeToolsEngine: Sendable {

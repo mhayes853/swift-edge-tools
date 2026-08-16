@@ -1,0 +1,16 @@
+[package]
+name = "edgetools_tokenizers"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+chrono = { version = "0.4", default-features = false, features = ["alloc", "now", "std"] }
+minijinja = { version = "2.24", features = ["json", "loop_controls", "preserve_order"] }
+minijinja-contrib = { version = "2.24", default-features = false, features = ["pycompat"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+tokenizers = { version = "0.22", default-features = false, features = ["fancy-regex"] }

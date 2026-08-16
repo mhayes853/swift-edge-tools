@@ -1,4 +1,5 @@
 #if Needle2 && JS && canImport(JavaScriptKit)
+  import EdgeToolsCore
   import _Concurrency
   import JavaScriptEventLoop
   import JavaScriptKit

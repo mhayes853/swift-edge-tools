@@ -33,15 +33,9 @@ let package = Package(
         .product(name: "EdgeTools", package: "swift-edge-tools"),
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
         .product(name: "Hub", package: "swift-transformers"),
-        .product(name: "Tokenizers", package: "swift-transformers"),
         .product(name: "MLX", package: "mlx-swift", condition: .when(platforms: [.macOS])),
         .product(name: "MLXNN", package: "mlx-swift", condition: .when(platforms: [.macOS])),
         .product(name: "MLXLLM", package: "mlx-swift-lm", condition: .when(platforms: [.macOS])),
-        .product(
-          name: "MLXHuggingFace",
-          package: "mlx-swift-lm",
-          condition: .when(platforms: [.macOS])
-        ),
         .product(
           name: "MLXLMCommon",
           package: "mlx-swift-lm",

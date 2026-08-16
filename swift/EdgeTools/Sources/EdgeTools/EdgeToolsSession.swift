@@ -1,3 +1,4 @@
+import EdgeToolsCore
 import _Concurrency
 
 #if !$Embedded

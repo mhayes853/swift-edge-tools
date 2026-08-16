@@ -1,4 +1,5 @@
 #if JS && canImport(JavaScriptKit)
+  import EdgeToolsCore
   import JavaScriptEventLoop
   import JavaScriptKit
   import OrderedCollections

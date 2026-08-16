@@ -1,3 +1,5 @@
+import EdgeToolsCore
+
 // MARK: - EdgeToolsTranscript
 
 public struct EdgeToolsTranscript: Hashable, Sendable {

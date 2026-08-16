@@ -1,3 +1,4 @@
+import EdgeToolsCore
 import OrderedCollections
 
 #if XGrammar
@@ -30,9 +31,9 @@ import OrderedCollections
       }
     }
 
-    public static func templateContext(prompt: EdgeToolsTranscript) -> [String: any Sendable]? {
+    public static func templateContext(prompt: EdgeToolsTranscript) -> [String: EdgeToolsValue]? {
       guard prompt.reasoningEffort != .default else { return nil }
-      return ["enable_thinking": prompt.reasoningEffort.isEnabled]
+      return ["enable_thinking": .boolean(prompt.reasoningEffort.isEnabled)]
     }
 
     public static func prepare(

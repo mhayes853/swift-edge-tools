@@ -20,6 +20,7 @@ let package = Package(
   platforms: [.macOS(.v14), .iOS(.v17), .tvOS(.v17), .watchOS(.v10), .visionOS(.v1)],
   products: [
     .library(name: "EdgeTools", targets: ["EdgeTools"]),
+    .library(name: "EdgeToolsTokenizers", targets: ["EdgeToolsTokenizers"]),
     .library(name: "EdgeToolsXGrammar", targets: ["EdgeToolsXGrammar"])
   ],
   traits: [
@@ -33,8 +34,8 @@ let package = Package(
     .trait(name: "XGrammar", description: "XGrammar-powered structured generation."),
     .trait(name: "Needle2", description: "Needle 2 engine support."),
     .trait(
-      name: "Transformers",
-      description: "swift-transformers tokenizer support.",
+      name: "HuggingFaceTokenizers",
+      description: "Hugging Face tokenizer and chat-template support.",
       enabledTraits: ["FoundationEssentials"]
     ),
     .trait(
@@ -45,7 +46,7 @@ let package = Package(
     .trait(
       name: "MLX",
       description: "MLX model support.",
-      enabledTraits: ["Transformers", "FoundationEssentials"]
+      enabledTraits: ["HuggingFaceTokenizers", "FoundationEssentials"]
     ),
     .default(enabledTraits: ["Foundation"])
   ],
@@ -119,30 +120,18 @@ let package = Package(
           condition: .when(platforms: [.macOS], traits: ["MLX"])
         ),
         .product(
-          name: "MLXHuggingFace",
-          package: "mlx-swift-lm",
-          condition: .when(platforms: [.macOS], traits: ["MLX"])
-        ),
-        .product(
           name: "MLXVLM",
           package: "mlx-swift-lm",
           condition: .when(platforms: [.macOS], traits: ["MLX"])
         ),
+        .target(name: "EdgeToolsCore"),
+        .target(name: "EdgeToolsTokenizers"),
         .target(name: "EdgeToolsXGrammar", condition: .when(traits: ["XGrammar"])),
         .target(
           name: "CNeedle2",
           condition: .when(
             platforms: [.macOS, .iOS, .tvOS, .watchOS, .linux, .windows, .android],
             traits: ["Needle2"]
-          )
-        ),
-        .product(
-          name: "Tokenizers",
-          package: "swift-transformers",
-          condition: .when(
-            // TODO: - watchOS has compilation issues in Hub https://github.com/huggingface/swift-huggingface/pull/58
-            platforms: [.macOS, .iOS, .tvOS, .visionOS, .linux],
-            traits: ["Transformers"]
           )
         )
       ],
@@ -165,6 +154,42 @@ let package = Package(
       path: "swift/EdgeTools/Sources/_EdgeToolsFoundation"
     ),
     .target(
+      name: "EdgeToolsCore",
+      dependencies: [
+        .target(
+          name: "_EdgeToolsFoundation",
+          condition: .when(traits: ["FoundationEssentials"])
+        ),
+        .product(name: "yyjson", package: "yyjson"),
+        .product(name: "OrderedCollections", package: "swift-collections")
+      ],
+      path: "swift/EdgeTools/Sources/EdgeToolsCore",
+      swiftSettings: edgeToolsSwiftSettings
+    ),
+    .target(
+      name: "EdgeToolsTokenizers",
+      dependencies: [
+        "EdgeToolsCore",
+        .target(
+          name: "_EdgeToolsFoundation",
+          condition: .when(traits: ["FoundationEssentials"])
+        ),
+        .product(name: "OrderedCollections", package: "swift-collections"),
+        .target(name: "EdgeToolsXGrammar", condition: .when(traits: ["XGrammar"])),
+        .target(
+          name: "CTokenizers",
+          condition: .when(
+            platforms: [
+              .macOS, .iOS, .tvOS, .watchOS, .visionOS, .linux, .android, .windows
+            ],
+            traits: ["HuggingFaceTokenizers"]
+          )
+        )
+      ],
+      path: "swift/EdgeTools/Sources/EdgeToolsTokenizers",
+      swiftSettings: edgeToolsSwiftSettings
+    ),
+    .target(
       name: "_EdgeToolsJavaScript",
       dependencies: [
         .product(name: "JavaScriptKit", package: "JavaScriptKit")
@@ -181,6 +206,10 @@ let package = Package(
     .binaryTarget(
       name: "CNeedle2",
       path: "bin/needle2-2.0.1.artifactbundle.zip"
+    ),
+    .binaryTarget(
+      name: "CTokenizers",
+      path: "bin/tokenizers-0.1.0.artifactbundle.zip"
     ),
     .target(
       name: "CXGrammar",
@@ -227,12 +256,26 @@ let package = Package(
       path: "swift/EdgeTools/Tests/EdgeToolsMacrosTests"
     ),
     .testTarget(
+      name: "EdgeToolsTokenizersTests",
+      dependencies: [
+        "EdgeToolsTokenizers",
+        .product(name: "CustomDump", package: "swift-custom-dump"),
+        .target(name: "EdgeToolsXGrammar", condition: .when(traits: ["XGrammar"]))
+      ],
+      path: "swift/EdgeTools/Tests/EdgeToolsTokenizersTests",
+      resources: [.process("Resources")]
+    ),
+    .testTarget(
       name: "EdgeToolsTests",
       dependencies: [
         "EdgeTools",
         .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
         .product(name: "CustomDump", package: "swift-custom-dump"),
-        .product(name: "Hub", package: "swift-transformers", condition: .when(traits: ["MLX"]))
+        .product(
+          name: "Hub",
+          package: "swift-transformers",
+          condition: .when(traits: ["HuggingFaceTokenizers"])
+        )
       ],
       path: "swift/EdgeTools/Tests/EdgeToolsTests",
       exclude: [
@@ -241,7 +284,8 @@ let package = Package(
         "Models/__Snapshots__",
         "Models/Gemma/__Snapshots__",
         "Models/LFM/__Snapshots__",
-        "Models/Qwen/__Snapshots__"
+        "Models/Qwen/__Snapshots__",
+        "Tokenization/__Snapshots__"
       ],
       resources: [.process("Resources")]
     )

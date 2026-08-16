@@ -54,13 +54,13 @@
           ▿ EdgeToolsGenerationPart
             - text: " sunny"
           ▿ EdgeToolsGenerationPart
-            - text: " with"
+            - text: " and"
           ▿ EdgeToolsGenerationPart
-            - text: " a"
+            - text: " the"
           ▿ EdgeToolsGenerationPart
             - text: " temperature"
           ▿ EdgeToolsGenerationPart
-            - text: " of"
+            - text: " is"
           ▿ EdgeToolsGenerationPart
             - text: " "
           ▿ EdgeToolsGenerationPart

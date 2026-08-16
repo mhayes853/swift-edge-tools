@@ -3,6 +3,8 @@
 #endif
 
 #if MLX && XGrammar && canImport(MLX)
+  import EdgeToolsCore
+
   // MARK: - Qwen3 Model
 
   public struct Qwen3MLXProfile: MLXLLMModelProfile {
@@ -28,9 +30,9 @@
       }
     }
 
-    public static func templateContext(prompt: EdgeToolsTranscript) -> [String: any Sendable]? {
+    public static func templateContext(prompt: EdgeToolsTranscript) -> [String: EdgeToolsValue]? {
       guard prompt.reasoningEffort != .default else { return nil }
-      return ["enable_thinking": prompt.reasoningEffort.isEnabled]
+      return ["enable_thinking": .boolean(prompt.reasoningEffort.isEnabled)]
     }
 
     public static func defaultSampling(
@@ -109,7 +111,7 @@ private func qwenJSONToolCalls(in source: String) -> [EdgeRawToolCall] {
 
     private static func qwenJSONCall(_ tool: EdgeToolDefinition) throws -> XGRGrammar {
       let arguments = Self.strictJSONArguments(for: tool)
-      let encodedName = OrderedKeyJSONWriter.encode(.string(tool.name))
+      let encodedName = EdgeToolsValue.string(tool.name).orderedJSONString()
       let prefix = try XGRGrammar.literal("<tool_call>{\"name\":\(encodedName),\"arguments\":")
       let withArguments = try prefix.concatenate(arguments)
       return try withArguments.concatenate(XGRGrammar.literal("}</tool_call>"))

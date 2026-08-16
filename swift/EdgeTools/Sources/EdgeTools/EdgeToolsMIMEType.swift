@@ -1,3 +1,5 @@
+import EdgeToolsCore
+
 // MARK: - EdgeToolsMIMEType
 
 public struct EdgeToolsMIMEType:

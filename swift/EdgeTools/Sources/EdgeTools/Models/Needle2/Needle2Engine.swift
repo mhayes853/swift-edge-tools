@@ -1,4 +1,6 @@
 #if Needle2
+  import EdgeToolsCore
+
   #if canImport(CNeedle2)
     import CNeedle2
   #endif

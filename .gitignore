@@ -17,6 +17,7 @@ __pycache__/
 .pytest_cache/
 .venv
 python/build
+rust/tokenizers/target/
 .mypy_cache
 .ruff_cache
 

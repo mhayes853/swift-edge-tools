@@ -1,4 +1,5 @@
 #if XGrammar
+  import EdgeToolsCore
   import EdgeToolsXGrammar
   import OrderedCollections
 
@@ -22,10 +23,6 @@
   }
 
   extension XGRError {
-    static let invalidHuggingFaceMetadata = Self(
-      code: .invalidHuggingFaceMetadata,
-      message: "Invalid Hugging Face tokenizer metadata."
-    )
     static let invalidToolInvocationRange = Self(
       code: XGRError.Code.invalidToolInvocationRange,
       message: "Tool invocation ranges cannot have a negative lower bound."
@@ -34,38 +31,6 @@
       code: XGRError.Code.unsupportedToolSchema,
       message: "The tool definition has an unsupported schema."
     )
-  }
-
-  // MARK: - Tokenizer Info
-
-  extension XGRTokenizerInfo {
-    public static func huggingFace(
-      encodedVocabulary: [String],
-      backendJSON: String,
-      modelVocabularySize: Int? = nil,
-      stopTokenIDs: [Int] = []
-    ) throws -> XGRTokenizerInfo {
-      let metadata = try Self.metadata(huggingFaceBackendJSON: backendJSON)
-      guard
-        case .object(let decodedMetadata) = try EdgeToolsValue(json: Array(metadata.utf8)),
-        case .integer(let vocabularyTypeValue) = decodedMetadata["vocab_type"],
-        case .boolean(let addPrefixSpace) = decodedMetadata["add_prefix_space"]
-      else { throw XGRError.invalidHuggingFaceMetadata }
-      let vocabularyType: XGRVocabularyType
-      switch vocabularyTypeValue {
-      case 0: vocabularyType = .raw
-      case 1: vocabularyType = .byteFallback
-      case 2: vocabularyType = .byteLevel
-      default: throw XGRError.invalidHuggingFaceMetadata
-      }
-      return try XGRTokenizerInfo(
-        encodedVocabulary: encodedVocabulary,
-        vocabularyType: vocabularyType,
-        vocabularySize: modelVocabularySize ?? encodedVocabulary.count,
-        stopTokenIDs: stopTokenIDs,
-        addPrefixSpace: addPrefixSpace
-      )
-    }
   }
 
   // MARK: - Matcher

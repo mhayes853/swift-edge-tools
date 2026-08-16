@@ -40,7 +40,7 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 14 elements
+        ▿ parts: 27 elements
           ▿ EdgeToolsGenerationPart
             - text: "The"
           ▿ EdgeToolsGenerationPart
@@ -52,15 +52,19 @@
           ▿ EdgeToolsGenerationPart
             - text: " is"
           ▿ EdgeToolsGenerationPart
-            - text: " sunny"
+            - text: " as"
           ▿ EdgeToolsGenerationPart
-            - text: " with"
+            - text: " follows"
           ▿ EdgeToolsGenerationPart
-            - text: " a"
+            - text: ":"
           ▿ EdgeToolsGenerationPart
-            - text: " temperature"
+            - text: "\n"
           ▿ EdgeToolsGenerationPart
-            - text: " of"
+            - text: "**"
+          ▿ EdgeToolsGenerationPart
+            - text: "Temperature"
+          ▿ EdgeToolsGenerationPart
+            - text: ":**"
           ▿ EdgeToolsGenerationPart
             - text: " "
           ▿ EdgeToolsGenerationPart
@@ -68,6 +72,28 @@
           ▿ EdgeToolsGenerationPart
             - text: "1"
           ▿ EdgeToolsGenerationPart
-            - text: "."
+            - text: "°"
+          ▿ EdgeToolsGenerationPart
+            - text: "C"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n"
+          ▿ EdgeToolsGenerationPart
+            - text: "**"
+          ▿ EdgeToolsGenerationPart
+            - text: "Condition"
+          ▿ EdgeToolsGenerationPart
+            - text: ":**"
+          ▿ EdgeToolsGenerationPart
+            - text: " Sunny"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n"
+          ▿ EdgeToolsGenerationPart
+            - text: "**"
+          ▿ EdgeToolsGenerationPart
+            - text: "Location"
+          ▿ EdgeToolsGenerationPart
+            - text: ":**"
+          ▿ EdgeToolsGenerationPart
+            - text: " Paris"
   ▿ reasoningEffort: EdgeToolsReasoningEffort
     - rawValue: "default"

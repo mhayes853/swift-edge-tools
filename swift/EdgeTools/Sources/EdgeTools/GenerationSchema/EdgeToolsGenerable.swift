@@ -1,3 +1,4 @@
+import EdgeToolsCore
 import OrderedCollections
 
 #if FoundationEssentials
@@ -44,6 +45,12 @@ public protocol ConvertibleToEdgeToolsValue {
 
 extension EdgeToolsValue: ConvertibleToEdgeToolsValue {
   public var edgeToolsValue: EdgeToolsValue { self }
+}
+
+extension ConvertibleToEdgeToolsValue {
+  public func orderedJSONString() -> String {
+    self.edgeToolsValue.orderedJSONString()
+  }
 }
 
 // MARK: - EdgeToolsValue

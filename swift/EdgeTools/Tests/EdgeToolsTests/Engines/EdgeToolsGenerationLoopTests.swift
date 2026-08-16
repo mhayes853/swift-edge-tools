@@ -32,8 +32,8 @@
     func `Stops At Any Extra Model Stop Token`() async throws {
       let tokenizer = try testTokenizer()
       let responseTokenIds = encodedGrammarText("hello", tokenizer: tokenizer)
-      let stopTokenId = try #require(tokenizer.unknownTokenId)
-      let alternateStopTokenId = try #require(tokenizer.bosTokenId)
+      let stopTokenId: EdgeToolsToken.ID = 0
+      let alternateStopTokenId: EdgeToolsToken.ID = 257
       let eosTokenId = try requiredTestEOSToken(tokenizer: tokenizer)
       let engine = try TestEngine(
         tokenizer: tokenizer,
@@ -274,12 +274,7 @@
       tools: [EdgeToolDefinition],
       context: TestContext
     ) async throws -> [EdgeToolsToken] {
-      let tokenIds = self.tokenizer.encode(text: prompt.user)
-      return zip(tokenIds, self.tokenizer.convertIdsToTokens(tokenIds))
-        .compactMap {
-          tokenId,
-          token in token.map { EdgeToolsToken(id: tokenId, stringValue: $0) }
-        }
+      self.tokenizer.encode(text: prompt.user)
     }
 
     func generationState(
@@ -348,13 +343,13 @@
       parser: inout TestGenerationParser,
       state: inout TestGenerationState
     ) async throws -> EdgeToolsGenerationLoop.Preparation {
-      let tokenIds = self.tokenizer.encode(text: prompt.user)
+      let tokens = self.tokenizer.encode(text: prompt.user)
       self.assets?.begin()
       defer { self.assets?.end() }
       try await Task.sleep(for: parameters.preparationDelay)
       state.index = 0
       return EdgeToolsGenerationLoop.Preparation(
-        metrics: EdgeToolsPrefillMetrics(tokens: tokenIds.count, duration: .zero)
+        metrics: EdgeToolsPrefillMetrics(tokens: tokens.count, duration: .zero)
       )
     }
 
