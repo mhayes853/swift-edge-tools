@@ -39,7 +39,10 @@
       let batches = LockBox([LlamaDecodeBatch]())
       let engine = try LlamaEngine<ScriptLlamaProfile>(
         api: mockLlamaApi(
-          decode: { _, batch in batches.withLock { $0.append(batch) } },
+          decode: { _, batch in
+            batches.withLock { $0.append(batch) }
+            return 0
+          },
           lastLogits: { _ in logits.next() }
         ),
         modelPath: "mock"
@@ -73,10 +76,13 @@
       let copies = LockBox([[Int]]())
       let engine = try LlamaEngine<ScriptLlamaProfile>(
         api: mockLlamaApi(
-          decode: { _, batch in batches.withLock { $0.append(batch) } },
+          decode: { _, batch in
+            batches.withLock { $0.append(batch) }
+            return 0
+          },
           lastLogits: { _ in logits.next() },
           onMemoryCopy: { source, destination in
-            copies.withLock { $0.append([source, destination]) }
+            copies.withLock { $0.append([Int(source), Int(destination)]) }
           }
         ),
         modelPath: "mock"
@@ -107,7 +113,10 @@
       let contextCount = LockBox(0)
       let engine = try LlamaEngine<ScriptLlamaProfile>(
         api: mockLlamaApi(
-          decode: { _, batch in batches.withLock { $0.append(batch) } },
+          decode: { _, batch in
+            batches.withLock { $0.append(batch) }
+            return 0
+          },
           lastLogits: { _ in logits.next() },
           onCreateContext: { contextCount.withLock { $0 += 1 } }
         ),

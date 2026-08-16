@@ -11,8 +11,8 @@
       defer { LlamaBackend.shutdown() }
 
       expectNoDifference(LlamaBackend.systemInfo.isEmpty, false)
-      expectNoDifference(LlamaApi.vendored.model.hasProbe != nil, true)
-      expectNoDifference(LlamaApi.vendored.context.probeConfidence != nil, true)
+      expectNoDifference(LlamaAPI.vendored.modelHasProbe != nil, true)
+      expectNoDifference(LlamaAPI.vendored.probeConfidence != nil, true)
     }
   }
 #endif

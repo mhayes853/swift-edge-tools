@@ -18,23 +18,27 @@
   /// The tokenizer shares the model handle with the engine that loaded it; the engine
   /// remains responsible for freeing the model.
   public final class LlamaTokenizer: EdgeToolsTokenizer, @unchecked Sendable {
-    private let api: LlamaApi
-    private let model: LlamaModelRef
+    private let api: LlamaAPI
+    private let model: OpaquePointer
 
     public let eos: EdgeToolsToken?
     public let bos: EdgeToolsToken?
 
-    public init(api: LlamaApi, model: LlamaModelRef) {
+    public init(api: LlamaAPI, model: OpaquePointer) {
       self.api = api
       self.model = model
-      self.eos = api.model.eosToken(model)
-        .flatMap { id in api.model.tokenText(model, id).map { EdgeToolsToken(id: id, stringValue: $0) } }
-      self.bos = api.model.bosToken(model)
-        .flatMap { id in api.model.tokenText(model, id).map { EdgeToolsToken(id: id, stringValue: $0) } }
+      self.eos = api.eosToken(model: model)
+        .flatMap { id in
+          api.tokenText(model: model, tokenId: id).map { EdgeToolsToken(id: id, stringValue: $0) }
+        }
+      self.bos = api.bosToken(model: model)
+        .flatMap { id in
+          api.tokenText(model: model, tokenId: id).map { EdgeToolsToken(id: id, stringValue: $0) }
+        }
     }
 
     public var vocabularySize: Int {
-      self.api.model.vocabularySize(self.model)
+      self.api.vocabularySize(model: self.model)
     }
 
     public func encode(text: String) -> [EdgeToolsToken] {
@@ -43,19 +47,24 @@
 
     public func encode(text: String, addSpecialTokens: Bool) -> [EdgeToolsToken] {
       let ids =
-        (try? self.api.model.tokenize(self.model, text, addSpecialTokens, true)) ?? []
+        (try? self.api.tokenIds(
+          model: self.model,
+          text: text,
+          addSpecialTokens: addSpecialTokens,
+          parseSpecialTokens: true
+        )) ?? []
       return self.tokens(forIds: ids).compactMap { $0 }
     }
 
     public func decode(tokens: [EdgeToolsToken.ID]) -> String {
-      (try? self.api.model.detokenize(self.model, tokens, true)) ?? ""
+      (try? self.api.text(model: self.model, tokenIds: tokens, renderSpecialTokens: true)) ?? ""
     }
 
     public func tokens(forIds ids: [EdgeToolsToken.ID]) -> [EdgeToolsToken?] {
       let vocabularySize = self.vocabularySize
       return ids.map { id in
         guard id >= 0 && id < vocabularySize else { return nil }
-        return self.api.model.tokenText(self.model, id)
+        return self.api.tokenText(model: self.model, tokenId: id)
           .map { EdgeToolsToken(id: id, stringValue: $0) }
       }
     }
@@ -63,10 +72,15 @@
     public func tokens(forTexts texts: [String]) -> [EdgeToolsToken?] {
       texts.map { text in
         guard
-          let ids = try? self.api.model.tokenize(self.model, text, false, true),
+          let ids = try? self.api.tokenIds(
+            model: self.model,
+            text: text,
+            addSpecialTokens: false,
+            parseSpecialTokens: true
+          ),
           ids.count == 1,
           let id = ids.first,
-          self.api.model.tokenText(self.model, id) == text
+          self.api.tokenText(model: self.model, tokenId: id) == text
         else {
           return nil
         }
@@ -77,7 +91,8 @@
     /// The token IDs the vocabulary marks as ending a generation, beyond the EOS token.
     public func endOfGenerationTokenIds() -> Set<EdgeToolsToken.ID> {
       var tokenIds = Set<EdgeToolsToken.ID>()
-      for id in 0..<self.vocabularySize where self.api.model.isEndOfGeneration(self.model, id) {
+      for id in 0..<self.vocabularySize
+      where self.api.isEndOfGeneration(model: self.model, tokenId: id) {
         tokenIds.insert(id)
       }
       return tokenIds
@@ -95,8 +110,11 @@
         additionalContext: [String: EdgeToolsValue]?
       ) throws -> String {
         let toolTemplate =
-          tools?.isEmpty == false ? self.api.model.chatTemplate(self.model, "tool_use") : nil
-        guard let source = toolTemplate ?? self.api.model.chatTemplate(self.model, nil) else {
+          tools?.isEmpty == false
+          ? self.api.chatTemplate(model: self.model, name: "tool_use")
+          : nil
+        guard let source = toolTemplate ?? self.api.chatTemplate(model: self.model, name: nil)
+        else {
           throw EdgeToolsTokenizerError(
             code: .missingChatTemplate,
             message: "The GGUF model does not embed a chat template."
@@ -128,16 +146,16 @@
         addGenerationPrompt: Bool,
         additionalContext: [String: EdgeToolsValue]?
       ) throws -> [EdgeToolsToken] {
-        let ids = try self.api.model.tokenize(
-          self.model,
-          self.renderChatTemplate(
+        let ids = try self.api.tokenIds(
+          model: self.model,
+          text: self.renderChatTemplate(
             messages: messages,
             tools: tools,
             addGenerationPrompt: addGenerationPrompt,
             additionalContext: additionalContext
           ),
-          false,
-          true
+          addSpecialTokens: false,
+          parseSpecialTokens: true
         )
         return self.tokens(forIds: ids).compactMap { $0 }
       }
@@ -154,13 +172,16 @@
       ) throws -> XGRTokenizerInfo {
         let vocabularySize = self.vocabularySize
         let vocabulary = (0..<vocabularySize)
-          .map { self.api.model.tokenText(self.model, $0) ?? "<|edge_tokenizer_unused_\($0)|>" }
+          .map {
+            self.api.tokenText(model: self.model, tokenId: $0)
+              ?? "<|edge_tokenizer_unused_\($0)|>"
+          }
         var stopTokenIds = extraStopTokenIds
         if let eosTokenId = self.eos?.id {
           stopTokenIds.insert(eosTokenId)
         }
         let vocabularyType: XGRVocabularyType =
-          switch self.api.model.vocabKind(self.model) {
+          switch self.api.vocabKind(model: self.model) {
           case .sentencePiece: .byteFallback
           case .bytePairEncoding: .byteLevel
           default: .raw
@@ -170,7 +191,7 @@
           vocabularyType: vocabularyType,
           vocabularySize: max(modelVocabularySize ?? 0, vocabularySize),
           stopTokenIDs: stopTokenIds.sorted(),
-          addPrefixSpace: self.api.model.vocabKind(self.model) == .sentencePiece
+          addPrefixSpace: self.api.vocabKind(model: self.model) == .sentencePiece
         )
       }
     }

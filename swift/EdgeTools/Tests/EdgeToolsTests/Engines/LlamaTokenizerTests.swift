@@ -11,7 +11,7 @@
   struct `LlamaTokenizer tests` {
     private let tokenizer = LlamaTokenizer(
       api: mockLlamaApi(),
-      model: LlamaModelRef(rawValue: OpaquePointer(bitPattern: 0x1)!)
+      model: MockLlamaVocabulary.modelPointer
     )
 
     @Test
@@ -77,7 +77,7 @@
     func `Missing Chat Template Throws`() {
       let tokenizer = LlamaTokenizer(
         api: mockLlamaApi(chatTemplate: nil),
-        model: LlamaModelRef(rawValue: OpaquePointer(bitPattern: 0x1)!)
+        model: MockLlamaVocabulary.modelPointer
       )
       #expect(throws: EdgeToolsTokenizerError.self) {
         try tokenizer.renderChatTemplate(
