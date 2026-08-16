@@ -838,14 +838,12 @@ extension String {
   fileprivate func tokenize(using tokenizer: some EdgeToolsTokenizer)
     -> [EdgeToolsToken]
   {
-    let strings = tokenizer.tokenize(text: self)
-    return strings.enumerated()
-      .compactMap { index, tokenString in
-        guard let id = tokenizer.convertTokenToId(tokenString) else { return nil }
-        if index == 0, tokenString.hasPrefix("▁") {
+    tokenizer.encode(text: self).enumerated()
+      .compactMap { index, token in
+        if index == 0, token.stringValue.hasPrefix("▁") {
           return nil
         }
-        return EdgeToolsToken(id: id, stringValue: tokenString)
+        return token
       }
   }
 }

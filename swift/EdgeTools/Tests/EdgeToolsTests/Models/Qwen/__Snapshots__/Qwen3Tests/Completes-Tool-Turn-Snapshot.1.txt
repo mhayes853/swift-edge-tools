@@ -422,15 +422,7 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: ","
           ▿ EdgeToolsGenerationPart
-            - reasoning: " let"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "\'s"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " see"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "."
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " The"
+            - reasoning: " the"
           ▿ EdgeToolsGenerationPart
             - reasoning: " user"
           ▿ EdgeToolsGenerationPart
@@ -450,11 +442,7 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " I"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " need"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " to"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " use"
+            - reasoning: " used"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
@@ -462,35 +450,13 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: "Weather"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " function"
+            - reasoning: " tool"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " here"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "."
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " The"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " parameters"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " require"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " a"
+            - reasoning: " with"
           ▿ EdgeToolsGenerationPart
             - reasoning: " location"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: ","
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " so"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " I"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "\'ll"
           ▿ EdgeToolsGenerationPart
             - reasoning: " set"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " the"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " location"
           ▿ EdgeToolsGenerationPart
             - reasoning: " to"
           ▿ EdgeToolsGenerationPart
@@ -498,48 +464,82 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: "."
           ▿ EdgeToolsGenerationPart
-            - reasoning: " Since"
+            - reasoning: " The"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " the"
+            - reasoning: " response"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " user"
+            - reasoning: " came"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " is"
+            - reasoning: " back"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " asking"
+            - reasoning: " with"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " for"
+            - reasoning: " sunny"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " the"
+            - reasoning: " conditions"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " current"
+            - reasoning: " and"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " weather"
+            - reasoning: " a"
           ▿ EdgeToolsGenerationPart
-            - reasoning: ","
+            - reasoning: " temperature"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " of"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " "
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "2"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "1"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "°C"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "."
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " Now"
           ▿ EdgeToolsGenerationPart
             - reasoning: " I"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " don"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "\'t"
           ▿ EdgeToolsGenerationPart
             - reasoning: " need"
           ▿ EdgeToolsGenerationPart
             - reasoning: " to"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " wait"
+            - reasoning: " summarize"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " for"
+            - reasoning: " this"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " a"
+            - reasoning: " information"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " response"
+            - reasoning: " clearly"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: ".\n\n"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "First"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: ","
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " I"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " should"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " state"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " main"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " condition"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: ":"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " sunny"
           ▿ EdgeToolsGenerationPart
             - reasoning: "."
           ▿ EdgeToolsGenerationPart
-            - reasoning: " Just"
+            - reasoning: " Then"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " call"
+            - reasoning: " mention"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
   ▿ reasoningEffort: EdgeToolsReasoningEffort
     - rawValue: "default"

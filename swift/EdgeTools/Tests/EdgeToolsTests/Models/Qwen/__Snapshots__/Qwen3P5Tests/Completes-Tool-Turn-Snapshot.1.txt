@@ -207,19 +207,21 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 63 elements
+        ▿ parts: 54 elements
           ▿ EdgeToolsGenerationPart
-            - reasoning: "##"
+            - reasoning: "Based"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " Summary"
+            - reasoning: " on"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "\n\n"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "The"
+            - reasoning: " the"
           ▿ EdgeToolsGenerationPart
             - reasoning: " weather"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " in"
+            - reasoning: " data"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " retrieved"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: ","
           ▿ EdgeToolsGenerationPart
             - reasoning: " Paris"
           ▿ EdgeToolsGenerationPart
@@ -227,27 +229,7 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " currently"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " **"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "2"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "1"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "°C"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " ("
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "7"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "2"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "°F"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: ")**,"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " with"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " a"
+            - reasoning: " experiencing"
           ▿ EdgeToolsGenerationPart
             - reasoning: " **"
           ▿ EdgeToolsGenerationPart
@@ -257,81 +239,81 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: "**"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " condition"
+            - reasoning: " conditions"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "."
+            - reasoning: " with"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " This"
+            - reasoning: " a"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " means"
+            - reasoning: " temperature"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " of"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " **"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "2"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "1"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " degrees"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " Celsius"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "**."
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "\n\n"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "I"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " used"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " `"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "get"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "Weather"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "`"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " to"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " fetch"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
             - reasoning: " current"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " day"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " is"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " pleasant"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " and"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " not"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " quite"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " hot"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "."
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "\n\n"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "If"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " you"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " need"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " more"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " specific"
+            - reasoning: " weather"
           ▿ EdgeToolsGenerationPart
             - reasoning: " information"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " about"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " weather"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " conditions"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " outside"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " of"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " daily"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " averages"
-          ▿ EdgeToolsGenerationPart
             - reasoning: ","
           ▿ EdgeToolsGenerationPart
-            - reasoning: " we"
+            - reasoning: " and"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " can"
+            - reasoning: " now"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " continue"
+            - reasoning: " I"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " searching"
+            - reasoning: " will"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " summarize"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " what"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " is"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " happening"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " in"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " Paris"
           ▿ EdgeToolsGenerationPart
             - reasoning: " for"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " this"
+            - reasoning: " you"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " type"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " of"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " data"
+            - reasoning: " today"
           ▿ EdgeToolsGenerationPart
             - reasoning: "."
   ▿ reasoningEffort: EdgeToolsReasoningEffort

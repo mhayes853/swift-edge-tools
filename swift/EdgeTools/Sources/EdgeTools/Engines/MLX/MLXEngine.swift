@@ -480,13 +480,13 @@
         guard let tokenizer = tokenizer as? any EdgeToolsChatTokenizer else {
           throw EdgeToolsError.unsupportedTokenizer
         }
-        let tokenIds = try tokenizer.applyChatTemplate(
+        let tokens = try tokenizer.applyChatTemplate(
           messages: try prompt.chatTemplateMessages(),
           tools: tools.chatTemplateToolValues,
           addGenerationPrompt: addGenerationPrompt,
           additionalContext: Self.templateContext(prompt: prompt)
         )
-        return LMInput(tokens: MLXArray(tokenIds))
+        return LMInput(tokens: MLXArray(tokens.map(\.id)))
       }
     }
 
@@ -1101,7 +1101,7 @@
       tokenizer: any EdgeToolsTokenizer
     ) throws -> Profile.GrammarEngine {
       var stopTokenIds = self.extraStopTokenIds
-      if let eosTokenId = tokenizer.eosTokenId { stopTokenIds.insert(eosTokenId) }
+      if let eosTokenId = tokenizer.eos?.id { stopTokenIds.insert(eosTokenId) }
       return try Profile.grammarEngine(
         tokenizer: tokenizer,
         vocabularySize: self.vocabularySize,
@@ -1464,11 +1464,7 @@
         tools: tools,
         tokenizer: self.tokenizer
       )
-      let tokens = self.tokenizer.convertIdsToTokens(tokenIds)
-      return zip(tokenIds, tokens)
-        .compactMap { tokenId, token in
-          token.map { EdgeToolsToken(id: tokenId, stringValue: $0) }
-        }
+      return self.tokenizer.tokens(forIds: tokenIds).compactMap { $0 }
     }
 
     public func generationState(
@@ -1787,8 +1783,8 @@
     tokenizer: any EdgeToolsTokenizer
   ) throws -> Set<EdgeToolsToken.ID> {
     var tokenIds = try directory.loadStopTokenIds()
-    tokenIds.formUnion(Profile.extraStopTokens.compactMap { tokenizer.convertTokenToId($0) })
-    if let eosTokenId = tokenizer.eosTokenId { tokenIds.remove(eosTokenId) }
+    tokenIds.formUnion(Profile.extraStopTokens.compactMap { tokenizer.token(forText: $0)?.id })
+    if let eosTokenId = tokenizer.eos?.id { tokenIds.remove(eosTokenId) }
     return tokenIds
   }
 
@@ -1813,7 +1809,7 @@
       return try await VLMProcessorTypeRegistry.shared.createModel(
         configuration: data,
         processorType: processorType,
-        tokenizer: tokenizer
+        tokenizer: tokenizer.mlxTokenizer
       )
     }
   #endif

@@ -1,5 +1,5 @@
 ▿ VLMToolTurnSnapshot
-  - response: "Based on the image provided, the dominant color is red.\n\nSummary: The dominant video color is red."
+  - response: "red"
   ▿ toolCalls: 2 elements
     ▿ EdgeRawToolCall
       ▿ arguments: EdgeToolsValue

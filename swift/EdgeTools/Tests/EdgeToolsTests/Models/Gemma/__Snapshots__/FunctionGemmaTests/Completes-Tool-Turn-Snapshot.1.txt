@@ -40,7 +40,7 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 20 elements
+        ▿ parts: 27 elements
           ▿ EdgeToolsGenerationPart
             - text: "The"
           ▿ EdgeToolsGenerationPart
@@ -52,23 +52,19 @@
           ▿ EdgeToolsGenerationPart
             - text: " is"
           ▿ EdgeToolsGenerationPart
+            - text: " as"
+          ▿ EdgeToolsGenerationPart
+            - text: " follows"
+          ▿ EdgeToolsGenerationPart
             - text: ":"
           ▿ EdgeToolsGenerationPart
             - text: "\n"
           ▿ EdgeToolsGenerationPart
             - text: "**"
           ▿ EdgeToolsGenerationPart
-            - text: "Sunny"
+            - text: "Temperature"
           ▿ EdgeToolsGenerationPart
-            - text: "**"
-          ▿ EdgeToolsGenerationPart
-            - text: " with"
-          ▿ EdgeToolsGenerationPart
-            - text: " a"
-          ▿ EdgeToolsGenerationPart
-            - text: " temperature"
-          ▿ EdgeToolsGenerationPart
-            - text: " of"
+            - text: ":**"
           ▿ EdgeToolsGenerationPart
             - text: " "
           ▿ EdgeToolsGenerationPart
@@ -76,10 +72,28 @@
           ▿ EdgeToolsGenerationPart
             - text: "1"
           ▿ EdgeToolsGenerationPart
-            - text: " degrees"
+            - text: "°"
           ▿ EdgeToolsGenerationPart
-            - text: " Celsius"
+            - text: "C"
           ▿ EdgeToolsGenerationPart
-            - text: "."
+            - text: "\n"
+          ▿ EdgeToolsGenerationPart
+            - text: "**"
+          ▿ EdgeToolsGenerationPart
+            - text: "Condition"
+          ▿ EdgeToolsGenerationPart
+            - text: ":**"
+          ▿ EdgeToolsGenerationPart
+            - text: " Sunny"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n"
+          ▿ EdgeToolsGenerationPart
+            - text: "**"
+          ▿ EdgeToolsGenerationPart
+            - text: "Location"
+          ▿ EdgeToolsGenerationPart
+            - text: ":**"
+          ▿ EdgeToolsGenerationPart
+            - text: " Paris"
   ▿ reasoningEffort: EdgeToolsReasoningEffort
     - rawValue: "default"

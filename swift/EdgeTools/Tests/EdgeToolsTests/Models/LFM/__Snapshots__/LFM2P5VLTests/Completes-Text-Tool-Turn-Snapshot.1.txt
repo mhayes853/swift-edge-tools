@@ -54,21 +54,21 @@
           ▿ EdgeToolsGenerationPart
             - text: " sunny"
           ▿ EdgeToolsGenerationPart
-            - text: ","
-          ▿ EdgeToolsGenerationPart
-            - text: " with"
+            - text: " and"
           ▿ EdgeToolsGenerationPart
             - text: " the"
           ▿ EdgeToolsGenerationPart
             - text: " temperature"
           ▿ EdgeToolsGenerationPart
-            - text: " at"
+            - text: " is"
           ▿ EdgeToolsGenerationPart
             - text: " "
           ▿ EdgeToolsGenerationPart
             - text: "21"
           ▿ EdgeToolsGenerationPart
-            - text: "°C"
+            - text: " degrees"
+          ▿ EdgeToolsGenerationPart
+            - text: " Celsius"
           ▿ EdgeToolsGenerationPart
             - text: "."
   ▿ reasoningEffort: EdgeToolsReasoningEffort

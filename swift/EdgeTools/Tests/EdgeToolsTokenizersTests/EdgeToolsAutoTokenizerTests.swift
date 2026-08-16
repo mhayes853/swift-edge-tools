@@ -42,14 +42,9 @@
 
         let tokenizer = try await EdgeToolsAutoTokenizer.from(modelDirectory: directory)
         let preTrainedTokenizer = try #require(tokenizer as? HuggingFaceTokenizer)
-        let tokenIDs = (
-          preTrainedTokenizer.bosTokenId,
-          preTrainedTokenizer.eosTokenId,
-          preTrainedTokenizer.unknownTokenId
-        )
-        expectNoDifference(tokenIDs.0, 0)
-        expectNoDifference(tokenIDs.1, 2)
-        expectNoDifference(tokenIDs.2, 3)
+        expectNoDifference(preTrainedTokenizer.bos, EdgeToolsToken(id: 0, stringValue: "<bos>"))
+        expectNoDifference(preTrainedTokenizer.eos, EdgeToolsToken(id: 2, stringValue: "<eos>"))
+        expectNoDifference(preTrainedTokenizer.unk, EdgeToolsToken(id: 3, stringValue: "<unk>"))
         expectNoDifference(preTrainedTokenizer.backendJSON.contains("\"model\""), false)
       }
 

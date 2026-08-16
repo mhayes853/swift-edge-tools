@@ -11,46 +11,21 @@ import EdgeToolsCore
 // MARK: - EdgeToolsTokenizer
 
 public protocol EdgeToolsTokenizer: Sendable {
-  var unknownTokenId: EdgeToolsToken.ID? { borrowing get }
-  var bosTokenId: EdgeToolsToken.ID? { borrowing get }
-  var eosTokenId: EdgeToolsToken.ID? { borrowing get }
+  var eos: EdgeToolsToken? { borrowing get }
 
-  var unknownToken: String? { borrowing get }
-  var bosToken: String? { borrowing get }
-  var eosToken: String? { borrowing get }
-
-  func encode(text: String) -> [EdgeToolsToken.ID]
+  func encode(text: String) -> [EdgeToolsToken]
   func decode(tokens: [EdgeToolsToken.ID]) -> String
-  func convertTokensToIds(_ tokens: [String]) -> [EdgeToolsToken.ID?]
-  func convertIdsToTokens(_ ids: [EdgeToolsToken.ID]) -> [String?]
+  func tokens(forIds ids: [EdgeToolsToken.ID]) -> [EdgeToolsToken?]
+  func tokens(forTexts texts: [String]) -> [EdgeToolsToken?]
 }
 
 extension EdgeToolsTokenizer {
-  public func tokenize(text: String) -> [String] {
-    self.encode(text: text).compactMap { self.convertIdToToken($0) }
+  public func token(forId id: EdgeToolsToken.ID) -> EdgeToolsToken? {
+    self.tokens(forIds: [id])[0]
   }
 
-  public func convertTokenToId(_ token: String) -> EdgeToolsToken.ID? {
-    self.convertTokensToIds([token])[0]
-  }
-
-  public func convertIdToToken(_ id: EdgeToolsToken.ID) -> String? {
-    self.convertIdsToTokens([id])[0]
-  }
-
-  public var unknownToken: String? {
-    guard let tokenID = self.unknownTokenId else { return nil }
-    return self.convertIdToToken(tokenID)
-  }
-
-  public var bosToken: String? {
-    guard let tokenID = self.bosTokenId else { return nil }
-    return self.convertIdToToken(tokenID)
-  }
-
-  public var eosToken: String? {
-    guard let tokenID = self.eosTokenId else { return nil }
-    return self.convertIdToToken(tokenID)
+  public func token(forText text: String) -> EdgeToolsToken? {
+    self.tokens(forTexts: [text])[0]
   }
 }
 
@@ -69,7 +44,7 @@ public protocol EdgeToolsChatTokenizer: EdgeToolsTokenizer {
     tools: [EdgeToolsValue]?,
     addGenerationPrompt: Bool,
     additionalContext: [String: EdgeToolsValue]?
-  ) throws -> [EdgeToolsToken.ID]
+  ) throws -> [EdgeToolsToken]
 }
 
 // MARK: - XGRTokenizer

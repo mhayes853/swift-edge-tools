@@ -51,7 +51,7 @@
           tools: nil,
           addGenerationPrompt: false
         ),
-        [4]
+        [EdgeToolsToken(id: 4, stringValue: "offline")]
       )
       expectNoDifference(
         try tokenizer.applyChatTemplate(
@@ -59,7 +59,7 @@
           tools: nil,
           addGenerationPrompt: true
         ),
-        [4, 2]
+        [EdgeToolsToken(id: 4, stringValue: "offline"), EdgeToolsToken(id: 2, stringValue: "<eos>")]
       )
     }
 

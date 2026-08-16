@@ -18,12 +18,10 @@ struct TestPrompt: Hashable, Sendable {
 struct TestTokenizer: EdgeToolsTokenizer {
   static let vocabularySize = 258
 
-  let unknownTokenId: EdgeToolsToken.ID? = 0
-  let bosTokenId: EdgeToolsToken.ID? = 257
-  let eosTokenId: EdgeToolsToken.ID? = 1
+  let eos: EdgeToolsToken? = EdgeToolsToken(id: 1, stringValue: "<eos>")
 
-  func encode(text: String) -> [EdgeToolsToken.ID] {
-    Array(text.utf8).map { Int($0) + 2 }
+  func encode(text: String) -> [EdgeToolsToken] {
+    self.tokens(forIds: Array(text.utf8).map { Int($0) + 2 }).compactMap { $0 }
   }
 
   func decode(tokens: [EdgeToolsToken.ID]) -> String {
@@ -33,21 +31,23 @@ struct TestTokenizer: EdgeToolsTokenizer {
     }, as: UTF8.self)
   }
 
-  func convertTokensToIds(_ tokens: [String]) -> [EdgeToolsToken.ID?] {
-    tokens.map { token in
-      guard token.utf8.count == 1, let byte = token.utf8.first else { return nil }
-      return Int(byte) + 2
+  func tokens(forIds ids: [EdgeToolsToken.ID]) -> [EdgeToolsToken?] {
+    ids.map { id in
+      let stringValue: String?
+      switch id {
+      case 0: stringValue = "<unk>"
+      case 1: stringValue = "<eos>"
+      case 2..<Self.vocabularySize: stringValue = Self.tokenString(for: id - 2)
+      default: stringValue = nil
+      }
+      return stringValue.map { EdgeToolsToken(id: id, stringValue: $0) }
     }
   }
 
-  func convertIdsToTokens(_ ids: [EdgeToolsToken.ID]) -> [String?] {
-    ids.map { token in
-      switch token {
-      case 0: "<unk>"
-      case 1: "<eos>"
-      case 2..<Self.vocabularySize: Self.tokenString(for: token - 2)
-      default: nil
-      }
+  func tokens(forTexts texts: [String]) -> [EdgeToolsToken?] {
+    texts.map { text in
+      guard text.utf8.count == 1, let byte = text.utf8.first else { return nil }
+      return EdgeToolsToken(id: Int(byte) + 2, stringValue: text)
     }
   }
 
@@ -159,9 +159,9 @@ func testTokenizer() throws -> TestTokenizer {
       modelVocabularySize: Int?,
       extraStopTokenIds: Set<EdgeToolsToken.ID>
     ) throws -> XGRTokenizerInfo {
-      let stopTokenIDs = [self.eosTokenId].compactMap { $0 } + extraStopTokenIds
+      let stopTokenIDs = [self.eos?.id].compactMap { $0 } + extraStopTokenIds
       return try XGRTokenizerInfo(
-        encodedVocabulary: self.convertIdsToTokens(Array(0..<Self.vocabularySize)).compactMap { $0 },
+        encodedVocabulary: self.tokens(forIds: Array(0..<Self.vocabularySize)).compactMap { $0?.stringValue },
         vocabularyType: .raw,
         vocabularySize: modelVocabularySize ?? Self.vocabularySize,
         stopTokenIDs: stopTokenIDs,
@@ -173,10 +173,10 @@ func testTokenizer() throws -> TestTokenizer {
   func requiredTestEOSToken(
     tokenizer: some XGRTokenizer
   ) throws -> EdgeToolsToken.ID {
-    guard let eosToken = tokenizer.eosTokenId else {
+    guard let eosTokenId = tokenizer.eos?.id else {
       throw XGRError(code: .invalidTokenizerInfo, message: "The test tokenizer must provide an EOS token.")
     }
-    return eosToken
+    return eosTokenId
   }
 
   extension XGRCompiler {
@@ -198,7 +198,7 @@ func testTokenizer() throws -> TestTokenizer {
     _ text: String,
     tokenizer: some XGRTokenizer
   ) -> [EdgeToolsToken.ID] {
-    tokenizer.encode(text: text)
+    tokenizer.encode(text: text).map(\.id)
   }
 
   func assertGrammarAccepts(
@@ -241,7 +241,7 @@ func testTokenizer() throws -> TestTokenizer {
     let tokenIds = encodedGrammarText(text, tokenizer: tokenizer)
     for (index, tokenId) in tokenIds.enumerated() {
       guard !matcher.accept(tokenId: tokenId) else { continue }
-      let token = tokenizer.convertIdToToken(tokenId) ?? ""
+      let token = tokenizer.token(forId: tokenId)?.stringValue ?? ""
       let prefix = tokenizer.decode(tokens: Array(tokenIds.prefix(index + 1)))
       return RejectedGrammarToken(index: index, tokenId: tokenId, token: token, prefix: prefix)
     }

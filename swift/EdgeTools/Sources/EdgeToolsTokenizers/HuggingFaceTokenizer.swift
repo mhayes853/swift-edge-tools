@@ -23,12 +23,9 @@ import EdgeToolsCore
     private let handle: OpaquePointer
     private let configuration: HuggingFaceTokenizerConfiguration
 
-    public let unknownToken: String?
-    public let bosToken: String?
-    public let eosToken: String?
-    public let unknownTokenId: EdgeToolsToken.ID?
-    public let bosTokenId: EdgeToolsToken.ID?
-    public let eosTokenId: EdgeToolsToken.ID?
+    public let unk: EdgeToolsToken?
+    public let bos: EdgeToolsToken?
+    public let eos: EdgeToolsToken?
     public let backendJSON: String
 
     public init(
@@ -47,17 +44,14 @@ import EdgeToolsCore
       self.configuration = parsed
       self.handle = handle
       self.backendJSON = try loadHuggingFaceBackendJSON(from: tokenizerJSON)
-      self.unknownToken = parsed.unknownToken
-      self.bosToken = parsed.bosToken
-      self.eosToken = parsed.eosToken
-      self.unknownTokenId = parsed.unknownToken.flatMap { try? nativeTokenToID(handle, $0) }
-      self.bosTokenId = parsed.bosToken.flatMap { try? nativeTokenToID(handle, $0) }
-      self.eosTokenId = parsed.eosToken.flatMap { try? nativeTokenToID(handle, $0) }
+      self.unk = nativeSpecialToken(parsed.unknownToken, handle: handle)
+      self.bos = nativeSpecialToken(parsed.bosToken, handle: handle)
+      self.eos = nativeSpecialToken(parsed.eosToken, handle: handle)
     }
 
     deinit { hf_tokenizer_destroy(self.handle) }
 
-    public func encode(text: String) -> [EdgeToolsToken.ID] {
+    public func encode(text: String) -> [EdgeToolsToken] {
       self.encode(text: text, addSpecialTokens: true)
     }
 
@@ -65,20 +59,26 @@ import EdgeToolsCore
       self.decode(tokens: tokens, skipSpecialTokens: false)
     }
 
-    public func encode(text: String, addSpecialTokens: Bool) -> [EdgeToolsToken.ID] {
-      (try? nativeEncode(self.handle, text, addSpecialTokens: addSpecialTokens)) ?? []
+    public func encode(text: String, addSpecialTokens: Bool) -> [EdgeToolsToken] {
+      let ids = (try? nativeEncode(self.handle, text, addSpecialTokens: addSpecialTokens)) ?? []
+      return self.tokens(forIds: ids).compactMap { $0 }
     }
 
     public func decode(tokens: [EdgeToolsToken.ID], skipSpecialTokens: Bool) -> String {
       (try? nativeDecode(self.handle, tokens, skipSpecialTokens: skipSpecialTokens)) ?? ""
     }
 
-    public func convertTokensToIds(_ tokens: [String]) -> [EdgeToolsToken.ID?] {
-      tokens.map { try? nativeTokenToID(self.handle, $0) }
+    public func tokens(forIds ids: [EdgeToolsToken.ID]) -> [EdgeToolsToken?] {
+      ids.map { id in
+        ((try? nativeIDToToken(self.handle, id)) ?? nil).map { EdgeToolsToken(id: id, stringValue: $0) }
+      }
     }
 
-    public func convertIdsToTokens(_ ids: [EdgeToolsToken.ID]) -> [String?] {
-      ids.map { try? nativeIDToToken(self.handle, $0) }
+    public func tokens(forTexts texts: [String]) -> [EdgeToolsToken?] {
+      texts.map { text in
+        ((try? nativeTokenToID(self.handle, text)) ?? nil)
+          .map { EdgeToolsToken(id: $0, stringValue: text) }
+      }
     }
 
     public func renderChatTemplate(
@@ -100,8 +100,8 @@ import EdgeToolsCore
       tools: [EdgeToolsValue]?,
       addGenerationPrompt: Bool,
       additionalContext: [String: EdgeToolsValue]? = nil
-    ) throws -> [EdgeToolsToken.ID] {
-      try nativeEncode(
+    ) throws -> [EdgeToolsToken] {
+      let ids = try nativeEncode(
         self.handle,
         self.renderChatTemplate(
           messages: messages,
@@ -111,6 +111,7 @@ import EdgeToolsCore
         ),
         addSpecialTokens: false
       )
+      return self.tokens(forIds: ids).compactMap { $0 }
     }
   }
 
@@ -124,7 +125,7 @@ import EdgeToolsCore
       ) throws -> XGRTokenizerInfo {
         let vocabulary = try nativeVocabulary(self.handle)
         var stopTokenIds = extraStopTokenIds
-        if let eosTokenId = self.eosTokenId {
+        if let eosTokenId = self.eos?.id {
           stopTokenIds.insert(eosTokenId)
         }
         return try XGRTokenizerInfo.huggingFace(
@@ -394,6 +395,12 @@ import EdgeToolsCore
       )
     }
     return tokenizer
+  }
+
+  private func nativeSpecialToken(_ text: String?, handle: OpaquePointer) -> EdgeToolsToken? {
+    text.flatMap { text in
+      ((try? nativeTokenToID(handle, text)) ?? nil).map { EdgeToolsToken(id: $0, stringValue: text) }
+    }
   }
 
   private func nativeEncode(

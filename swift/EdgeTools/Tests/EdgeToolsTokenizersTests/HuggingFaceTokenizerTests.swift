@@ -18,25 +18,33 @@
       let tokenizer = try self.makeTokenizer()
       let tokens = tokenizer.encode(text: String(repeating: "offline ", count: 4096))
       expectNoDifference(tokens.count, 4096)
-      expectNoDifference(Set(tokens), [4])
+      expectNoDifference(Set(tokens.map(\.id)), [4])
     }
 
     @Test
-    func `Reports Configured Special Tokens Through The Tokenizer Protocol`() throws {
+    func `Reports Configured EOS Token Through The Tokenizer Protocol`() throws {
       let tokenizer: any EdgeToolsTokenizer = try self.makeTokenizer()
-      expectNoDifference(tokenizer.bosToken, "<bos>")
-      expectNoDifference(tokenizer.eosToken, "<eos>")
-      expectNoDifference(tokenizer.unknownToken, "<unk>")
-      expectNoDifference(tokenizer.bosTokenId, 0)
-      expectNoDifference(tokenizer.eosTokenId, 2)
-      expectNoDifference(tokenizer.unknownTokenId, 3)
+      expectNoDifference(tokenizer.eos, EdgeToolsToken(id: 2, stringValue: "<eos>"))
+    }
+
+    @Test
+    func `Reports Bos And Unknown Tokens On The Hugging Face Tokenizer`() throws {
+      let tokenizer = try self.makeTokenizer()
+      expectNoDifference(tokenizer.bos, EdgeToolsToken(id: 0, stringValue: "<bos>"))
+      expectNoDifference(tokenizer.unk, EdgeToolsToken(id: 3, stringValue: "<unk>"))
     }
 
     @Test
     func `Converts Unknown Tokens And Out Of Range Ids To Nil`() throws {
       let tokenizer = try self.makeTokenizer()
-      expectNoDifference(tokenizer.convertTokensToIds(["offline", "absent"]), [4, nil])
-      expectNoDifference(tokenizer.convertIdsToTokens([4, 9_999]), ["offline", nil])
+      expectNoDifference(
+        tokenizer.tokens(forTexts: ["offline", "absent"]),
+        [EdgeToolsToken(id: 4, stringValue: "offline"), nil]
+      )
+      expectNoDifference(
+        tokenizer.tokens(forIds: [4, 9_999]),
+        [EdgeToolsToken(id: 4, stringValue: "offline"), nil]
+      )
     }
 
     #if XGrammar
