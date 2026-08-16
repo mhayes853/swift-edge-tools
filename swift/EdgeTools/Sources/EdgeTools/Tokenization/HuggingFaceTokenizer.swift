@@ -13,10 +13,6 @@
 // MARK: - HuggingFaceTokenizer
 
 #if HuggingFaceTokenizers && FoundationEssentials && canImport(CTokenizers)
-  /// A native Hugging Face tokenizer backed by the Rust `tokenizers` crate.
-  ///
-  /// The C API only performs immutable tokenizer operations. Rust's `Tokenizer` is thread safe for
-  /// those operations, so sharing this handle across Swift concurrency domains is safe.
   public final class HuggingFaceTokenizer: @unchecked Sendable, EdgeToolsTokenizer {
     private let handle: OpaquePointer
     private let configuration: HuggingFaceTokenizerConfiguration
@@ -53,9 +49,7 @@
       self.eosTokenId = parsed.eosToken.flatMap { try? nativeTokenToID(handle, $0) }
     }
 
-    deinit {
-      edge_tokenizer_destroy(self.handle)
-    }
+    deinit { hf_tokenizer_destroy(self.handle) }
 
     public func encode(text: String) -> [EdgeToolsToken.ID] {
       self.encode(text: text, addSpecialTokens: true)
@@ -142,7 +136,7 @@
   private func nativeCreateTokenizer(_ json: UnsafeBufferPointer<UInt8>) throws -> OpaquePointer {
     var tokenizer: OpaquePointer?
     try nativeCall {
-      edge_tokenizer_create(json.baseAddress, json.count, &tokenizer)
+      hf_tokenizer_create(json.baseAddress, json.count, &tokenizer)
     }
     guard let tokenizer else {
       throw EdgeToolsError(
@@ -160,7 +154,7 @@
   ) throws -> [EdgeToolsToken.ID] {
     try Array(text.utf8).withUnsafeBufferPointer { text in
       try withNativeBuffer(capacity: text.count + 8) { ids, capacity, count in
-        edge_tokenizer_encode(
+        hf_tokenizer_encode(
           tokenizer,
           text.baseAddress,
           text.count,
@@ -182,7 +176,7 @@
   ) throws -> String {
     try tokenIDs.map(nativeTokenID).withUnsafeBufferPointer { tokenIDs in
       try withNativeBuffer(capacity: tokenIDs.count * 8 + 16) { text, capacity, count in
-        edge_tokenizer_decode(
+        hf_tokenizer_decode(
           tokenizer,
           tokenIDs.baseAddress,
           tokenIDs.count,
@@ -205,7 +199,7 @@
     var found = false
     try Array(token.utf8).withUnsafeBufferPointer { token -> Void in
       try nativeCall {
-        edge_tokenizer_token_to_id(tokenizer, token.baseAddress, token.count, &tokenID, &found)
+        hf_tokenizer_token_to_id(tokenizer, token.baseAddress, token.count, &tokenID, &found)
       }
     }
     return found ? EdgeToolsToken.ID(tokenID) : nil
@@ -218,7 +212,7 @@
     let tokenID = try nativeTokenID(tokenID)
     var found = false
     let token = try withNativeBuffer(capacity: 64) { token, capacity, count in
-      edge_tokenizer_id_to_token(tokenizer, tokenID, token, capacity, count, &found)
+      hf_tokenizer_id_to_token(tokenizer, tokenID, token, capacity, count, &found)
     } transform: { token in
       String(decoding: token, as: UTF8.self)
     }
@@ -229,7 +223,7 @@
     var byteCount = 0
     var entryCount = 0
     try nativeCall {
-      edge_tokenizer_vocabulary(tokenizer, nil, 0, &byteCount, nil, 0, &entryCount)
+      hf_tokenizer_vocabulary(tokenizer, nil, 0, &byteCount, nil, 0, &entryCount)
     }
 
     var storage = [UInt8](repeating: 0, count: byteCount)
@@ -237,7 +231,7 @@
     try storage.withUnsafeMutableBufferPointer { storage in
       try sizes.withUnsafeMutableBufferPointer { sizes -> Void in
         let status = try nativeCall {
-          edge_tokenizer_vocabulary(
+          hf_tokenizer_vocabulary(
             tokenizer,
             storage.baseAddress,
             storage.count,
@@ -247,7 +241,7 @@
             &entryCount
           )
         }
-        guard status == EDGE_TOKENIZER_SUCCESS else {
+        guard status == HF_TOKENIZER_SUCCESS else {
           throw EdgeToolsError(
             code: .unsupportedTokenizer,
             message: "The native tokenizer vocabulary did not fit the size it reported."
@@ -268,7 +262,7 @@
       try Array(context.orderedJSONString().utf8).withUnsafeBufferPointer { context in
         let estimate = source.count + context.count + 4096
         return try withNativeBuffer(capacity: estimate) { text, capacity, count in
-          edge_template_render(
+          hf_template_render(
             source.baseAddress,
             source.count,
             context.baseAddress,
@@ -305,7 +299,7 @@
       var required = 0
       let value = try storage.withUnsafeMutableBufferPointer { storage -> Value? in
         let status = try nativeCall { body(storage.baseAddress, storage.count, &required) }
-        guard status == EDGE_TOKENIZER_SUCCESS else { return nil }
+        guard status == HF_TOKENIZER_SUCCESS else { return nil }
         return transform(UnsafeBufferPointer(start: storage.baseAddress, count: required))
       }
       if let value {
@@ -324,12 +318,12 @@
   @discardableResult
   private func nativeCall(_ body: () -> Int32) throws -> Int32 {
     let status = body()
-    guard status != EDGE_TOKENIZER_SUCCESS, status != EDGE_TOKENIZER_BUFFER_TOO_SMALL else {
+    guard status != HF_TOKENIZER_SUCCESS, status != HF_TOKENIZER_BUFFER_TOO_SMALL else {
       return status
     }
     throw EdgeToolsError(
       code: .unsupportedTokenizer,
-      message: String(cString: edge_tokenizer_last_error_message())
+      message: String(cString: hf_tokenizer_last_error_message())
     )
   }
 #endif

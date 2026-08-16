@@ -7,12 +7,12 @@ use std::{
 };
 
 use chrono::{
-    DateTime, TimeZone, Utc,
     format::{Item, StrftimeItems},
+    DateTime, TimeZone, Utc,
 };
 use minijinja::{
-    Environment, ErrorKind,
     value::{Kwargs, Value},
+    Environment, ErrorKind,
 };
 use minijinja_contrib::pycompat;
 use tokenizers::Tokenizer;
@@ -21,13 +21,13 @@ const MAXIMUM_VOCABULARY_SIZE: usize = 4_194_304;
 
 const NOW_CONTEXT_KEY: &str = "edge_tools_now";
 
-pub const EDGE_TOKENIZER_SUCCESS: i32 = 0;
-pub const EDGE_TOKENIZER_FAILURE: i32 = 1;
-pub const EDGE_TOKENIZER_INVALID_ARGUMENT: i32 = 2;
-pub const EDGE_TOKENIZER_BUFFER_TOO_SMALL: i32 = 3;
+pub const HF_TOKENIZER_SUCCESS: i32 = 0;
+pub const HF_TOKENIZER_FAILURE: i32 = 1;
+pub const HF_TOKENIZER_INVALID_ARGUMENT: i32 = 2;
+pub const HF_TOKENIZER_BUFFER_TOO_SMALL: i32 = 3;
 
 #[repr(C)]
-pub struct edge_tokenizer_t {
+pub struct hf_tokenizer_t {
     tokenizer: Tokenizer,
 }
 
@@ -36,29 +36,33 @@ thread_local! {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn edge_tokenizer_last_error_message() -> *const c_char {
+pub extern "C" fn hf_tokenizer_last_error_message() -> *const c_char {
     LAST_ERROR.with_borrow(|message| message.as_ptr().cast())
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn edge_tokenizer_create(
+pub unsafe extern "C" fn hf_tokenizer_create(
     tokenizer_json: *const u8,
     tokenizer_json_count: usize,
-    tokenizer: *mut *mut edge_tokenizer_t,
+    tokenizer: *mut *mut hf_tokenizer_t,
 ) -> i32 {
     unsafe {
         with_boundary(|| {
-            let json = input(tokenizer_json, tokenizer_json_count, "Tokenizer JSON is required.")?;
+            let json = input(
+                tokenizer_json,
+                tokenizer_json_count,
+                "Tokenizer JSON is required.",
+            )?;
             let handle = output(tokenizer)?;
             let native = Tokenizer::from_bytes(json).map_err(|error| error.to_string())?;
-            *handle = Box::into_raw(Box::new(edge_tokenizer_t { tokenizer: native }));
+            *handle = Box::into_raw(Box::new(hf_tokenizer_t { tokenizer: native }));
             Ok(())
         })
     }
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn edge_tokenizer_destroy(tokenizer: *mut edge_tokenizer_t) {
+pub unsafe extern "C" fn hf_tokenizer_destroy(tokenizer: *mut hf_tokenizer_t) {
     unsafe {
         if !tokenizer.is_null() {
             drop(Box::from_raw(tokenizer));
@@ -67,8 +71,8 @@ pub unsafe extern "C" fn edge_tokenizer_destroy(tokenizer: *mut edge_tokenizer_t
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn edge_tokenizer_encode(
-    tokenizer: *const edge_tokenizer_t,
+pub unsafe extern "C" fn hf_tokenizer_encode(
+    tokenizer: *const hf_tokenizer_t,
     text: *const u8,
     text_count: usize,
     add_special_tokens: bool,
@@ -93,8 +97,8 @@ pub unsafe extern "C" fn edge_tokenizer_encode(
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn edge_tokenizer_decode(
-    tokenizer: *const edge_tokenizer_t,
+pub unsafe extern "C" fn hf_tokenizer_decode(
+    tokenizer: *const hf_tokenizer_t,
     token_ids: *const i32,
     token_ids_count: usize,
     skip_special_tokens: bool,
@@ -117,8 +121,8 @@ pub unsafe extern "C" fn edge_tokenizer_decode(
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn edge_tokenizer_token_to_id(
-    tokenizer: *const edge_tokenizer_t,
+pub unsafe extern "C" fn hf_tokenizer_token_to_id(
+    tokenizer: *const hf_tokenizer_t,
     token: *const u8,
     token_count: usize,
     token_id: *mut i32,
@@ -138,8 +142,8 @@ pub unsafe extern "C" fn edge_tokenizer_token_to_id(
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn edge_tokenizer_id_to_token(
-    tokenizer: *const edge_tokenizer_t,
+pub unsafe extern "C" fn hf_tokenizer_id_to_token(
+    tokenizer: *const hf_tokenizer_t,
     token_id: i32,
     token: *mut u8,
     token_capacity: usize,
@@ -164,8 +168,8 @@ pub unsafe extern "C" fn edge_tokenizer_id_to_token(
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn edge_tokenizer_vocabulary(
-    tokenizer: *const edge_tokenizer_t,
+pub unsafe extern "C" fn hf_tokenizer_vocabulary(
+    tokenizer: *const hf_tokenizer_t,
     tokens: *mut u8,
     tokens_capacity: usize,
     tokens_count: *mut usize,
@@ -195,7 +199,7 @@ pub unsafe extern "C" fn edge_tokenizer_vocabulary(
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn edge_template_render(
+pub unsafe extern "C" fn hf_template_render(
     source: *const u8,
     source_count: usize,
     context_json: *const u8,
@@ -239,19 +243,19 @@ fn with_boundary(body: impl FnOnce() -> Result<(), CallError>) -> i32 {
     match outcome {
         Ok(()) => {
             set_last_error("");
-            EDGE_TOKENIZER_SUCCESS
+            HF_TOKENIZER_SUCCESS
         }
         Err(CallError::BufferTooSmall) => {
             set_last_error("An output buffer was too small for the result.");
-            EDGE_TOKENIZER_BUFFER_TOO_SMALL
+            HF_TOKENIZER_BUFFER_TOO_SMALL
         }
         Err(CallError::InvalidArgument(message)) => {
             set_last_error(message);
-            EDGE_TOKENIZER_INVALID_ARGUMENT
+            HF_TOKENIZER_INVALID_ARGUMENT
         }
         Err(CallError::Failure(message)) => {
             set_last_error(&message);
-            EDGE_TOKENIZER_FAILURE
+            HF_TOKENIZER_FAILURE
         }
     }
 }
@@ -265,7 +269,7 @@ fn set_last_error(message: &str) {
     });
 }
 
-unsafe fn handle<'a>(tokenizer: *const edge_tokenizer_t) -> Result<&'a Tokenizer, CallError> {
+unsafe fn handle<'a>(tokenizer: *const hf_tokenizer_t) -> Result<&'a Tokenizer, CallError> {
     unsafe {
         tokenizer
             .as_ref()

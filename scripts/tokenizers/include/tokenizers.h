@@ -1,30 +1,30 @@
-#ifndef EDGE_TOOLS_TOKENIZERS_H
-#define EDGE_TOOLS_TOKENIZERS_H
+#ifndef HF_TOKENIZERS_H
+#define HF_TOKENIZERS_H
 
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
-typedef struct edge_tokenizer_t edge_tokenizer_t;
+typedef struct hf_tokenizer_t hf_tokenizer_t;
 
 enum {
-  EDGE_TOKENIZER_SUCCESS = 0,
-  EDGE_TOKENIZER_FAILURE = 1,
-  EDGE_TOKENIZER_INVALID_ARGUMENT = 2,
-  EDGE_TOKENIZER_BUFFER_TOO_SMALL = 3,
+  HF_TOKENIZER_SUCCESS = 0,
+  HF_TOKENIZER_FAILURE = 1,
+  HF_TOKENIZER_INVALID_ARGUMENT = 2,
+  HF_TOKENIZER_BUFFER_TOO_SMALL = 3,
 };
 
-const char *edge_tokenizer_last_error_message(void);
+const char *hf_tokenizer_last_error_message(void);
 
-int32_t edge_tokenizer_create(
+int32_t hf_tokenizer_create(
   const uint8_t *tokenizer_json,
   size_t tokenizer_json_count,
-  edge_tokenizer_t **tokenizer
+  hf_tokenizer_t **tokenizer
 );
-void edge_tokenizer_destroy(edge_tokenizer_t *tokenizer);
+void hf_tokenizer_destroy(hf_tokenizer_t *tokenizer);
 
-int32_t edge_tokenizer_encode(
-  const edge_tokenizer_t *tokenizer,
+int32_t hf_tokenizer_encode(
+  const hf_tokenizer_t *tokenizer,
   const uint8_t *text,
   size_t text_count,
   bool add_special_tokens,
@@ -33,8 +33,8 @@ int32_t edge_tokenizer_encode(
   size_t *token_ids_count
 );
 
-int32_t edge_tokenizer_decode(
-  const edge_tokenizer_t *tokenizer,
+int32_t hf_tokenizer_decode(
+  const hf_tokenizer_t *tokenizer,
   const int32_t *token_ids,
   size_t token_ids_count,
   bool skip_special_tokens,
@@ -43,16 +43,16 @@ int32_t edge_tokenizer_decode(
   size_t *text_count
 );
 
-int32_t edge_tokenizer_token_to_id(
-  const edge_tokenizer_t *tokenizer,
+int32_t hf_tokenizer_token_to_id(
+  const hf_tokenizer_t *tokenizer,
   const uint8_t *token,
   size_t token_count,
   int32_t *token_id,
   bool *found
 );
 
-int32_t edge_tokenizer_id_to_token(
-  const edge_tokenizer_t *tokenizer,
+int32_t hf_tokenizer_id_to_token(
+  const hf_tokenizer_t *tokenizer,
   int32_t token_id,
   uint8_t *token,
   size_t token_capacity,
@@ -60,8 +60,8 @@ int32_t edge_tokenizer_id_to_token(
   bool *found
 );
 
-int32_t edge_tokenizer_vocabulary(
-  const edge_tokenizer_t *tokenizer,
+int32_t hf_tokenizer_vocabulary(
+  const hf_tokenizer_t *tokenizer,
   uint8_t *tokens,
   size_t tokens_capacity,
   size_t *tokens_count,
@@ -70,7 +70,7 @@ int32_t edge_tokenizer_vocabulary(
   size_t *lengths_count
 );
 
-int32_t edge_template_render(
+int32_t hf_template_render(
   const uint8_t *source,
   size_t source_count,
   const uint8_t *context_json,
