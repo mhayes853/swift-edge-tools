@@ -530,124 +530,124 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: "The"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " user"
+            - reasoning: " weather"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " asked"
+            - reasoning: " data"
           ▿ EdgeToolsGenerationPart
             - reasoning: " for"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " the"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " weather"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " in"
-          ▿ EdgeToolsGenerationPart
             - reasoning: " Paris"
           ▿ EdgeToolsGenerationPart
-            - reasoning: ","
+            - reasoning: " is"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " and"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " I"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " received"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " a"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " response"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " with"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " temperature"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: ","
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " condition"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: ","
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " and"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " location"
+            - reasoning: " available"
           ▿ EdgeToolsGenerationPart
             - reasoning: "."
           ▿ EdgeToolsGenerationPart
-            - reasoning: " I"
+            - reasoning: " It"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " indicates"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: ":\n"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "-"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " Condition"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: ":"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " sunny"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "\n"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "-"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " Temperature"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: ":"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " "
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "21"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "°C"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "\n\n"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "I"
           ▿ EdgeToolsGenerationPart
             - reasoning: " should"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " summarize"
+            - reasoning: " share"
           ▿ EdgeToolsGenerationPart
             - reasoning: " this"
           ▿ EdgeToolsGenerationPart
             - reasoning: " information"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " for"
+            - reasoning: " with"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
             - reasoning: " user"
           ▿ EdgeToolsGenerationPart
+            - reasoning: ","
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " since"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " I"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " can"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " access"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " data"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " and"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " summarize"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " it"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " properly"
+          ▿ EdgeToolsGenerationPart
             - reasoning: ".\n"
           ▿ EdgeToolsGenerationPart
             - text: "\n\n"
           ▿ EdgeToolsGenerationPart
+            - text: "The"
+          ▿ EdgeToolsGenerationPart
+            - text: " weather"
+          ▿ EdgeToolsGenerationPart
+            - text: " in"
+          ▿ EdgeToolsGenerationPart
+            - text: " Paris"
+          ▿ EdgeToolsGenerationPart
+            - text: " is"
+          ▿ EdgeToolsGenerationPart
+            - text: " sunny"
+          ▿ EdgeToolsGenerationPart
+            - text: "."
+          ▿ EdgeToolsGenerationPart
+            - text: " The"
+          ▿ EdgeToolsGenerationPart
+            - text: " temperature"
+          ▿ EdgeToolsGenerationPart
+            - text: " is"
+          ▿ EdgeToolsGenerationPart
+            - text: " "
+          ▿ EdgeToolsGenerationPart
+            - text: "21"
+          ▿ EdgeToolsGenerationPart
+            - text: "°C"
+          ▿ EdgeToolsGenerationPart
+            - text: ".\n"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n"
+          ▿ EdgeToolsGenerationPart
             - text: "I"
           ▿ EdgeToolsGenerationPart
-            - text: " don"
-          ▿ EdgeToolsGenerationPart
-            - text: "\'t"
-          ▿ EdgeToolsGenerationPart
             - text: " have"
-          ▿ EdgeToolsGenerationPart
-            - text: " access"
-          ▿ EdgeToolsGenerationPart
-            - text: " to"
-          ▿ EdgeToolsGenerationPart
-            - text: " the"
-          ▿ EdgeToolsGenerationPart
-            - text: " current"
-          ▿ EdgeToolsGenerationPart
-            - text: " weather"
-          ▿ EdgeToolsGenerationPart
-            - text: " data"
-          ▿ EdgeToolsGenerationPart
-            - text: "."
-          ▿ EdgeToolsGenerationPart
-            - text: " I"
-          ▿ EdgeToolsGenerationPart
-            - text: " can"
-          ▿ EdgeToolsGenerationPart
-            - text: " only"
-          ▿ EdgeToolsGenerationPart
-            - text: " provide"
-          ▿ EdgeToolsGenerationPart
-            - text: " information"
-          ▿ EdgeToolsGenerationPart
-            - text: " based"
-          ▿ EdgeToolsGenerationPart
-            - text: " on"
-          ▿ EdgeToolsGenerationPart
-            - text: " the"
-          ▿ EdgeToolsGenerationPart
-            - text: " tools"
-          ▿ EdgeToolsGenerationPart
-            - text: " available"
-          ▿ EdgeToolsGenerationPart
-            - text: " to"
-          ▿ EdgeToolsGenerationPart
-            - text: " me"
-          ▿ EdgeToolsGenerationPart
-            - text: "."
-          ▿ EdgeToolsGenerationPart
-            - text: " Please"
-          ▿ EdgeToolsGenerationPart
-            - text: " check"
-          ▿ EdgeToolsGenerationPart
-            - text: " the"
-          ▿ EdgeToolsGenerationPart
-            - text: " weather"
-          ▿ EdgeToolsGenerationPart
-            - text: " for"
   ▿ reasoningEffort: EdgeToolsReasoningEffort
     - rawValue: "default"

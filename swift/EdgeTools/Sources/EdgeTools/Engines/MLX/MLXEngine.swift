@@ -22,35 +22,7 @@
 
   // MARK: - MLXModelProfile
 
-  public protocol MLXModelProfile: SendableMetatype {
-    associatedtype Prompt: Sendable
-    associatedtype GenerateParameters: MLXGenerateParameters
-    associatedtype GenerationParser: EdgeToolsGenerationParser
-    associatedtype GrammarEngine: EdgeToolsGrammarEngine
-
-    static var extraStopTokens: Set<String> { get }
-
-    static func grammarEngine(
-      tokenizer: any EdgeToolsTokenizer,
-      vocabularySize: Int,
-      stopTokenIds: Set<EdgeToolsToken.ID>
-    ) throws -> GrammarEngine
-
-    static func grammar(
-      prompt: Prompt,
-      tools: [EdgeToolDefinition],
-      parameters: GenerateParameters,
-      grammarEngine: borrowing GrammarEngine
-    ) throws -> GrammarEngine.Grammar
-
-    static func prepare(
-      prompt: inout Prompt,
-      tools: [EdgeToolDefinition],
-      parser: inout GenerationParser
-    )
-
-    static func templateContext(prompt: Prompt) -> [String: EdgeToolsValue]?
-
+  public protocol MLXModelProfile: EdgeToolsModelProfile where GenerateParameters: MLXGenerateParameters {
     static nonisolated(nonsending) func input(
       prompt: Prompt,
       tools: [EdgeToolDefinition],
@@ -64,11 +36,6 @@
       tokenizer: any EdgeToolsTokenizer,
       processor: (any UserInputProcessor)?
     ) async throws -> LMInput
-
-    static func defaultSampling(
-      prompt: Prompt,
-      parameters: GenerateParameters
-    ) -> EdgeToolsFusedSamplingParameters?
   }
 
   public protocol MLXLLMModelProfile: MLXModelProfile {}
@@ -77,44 +44,7 @@
     public protocol MLXVLMModelProfile: MLXModelProfile {}
   #endif
 
-  extension MLXModelProfile
-  where
-    GenerateParameters: EdgeToolsConstrainedGenerateParameters,
-    GenerateParameters.Constraint.Grammar == GrammarEngine.Grammar,
-    GenerateParameters.Constraint.Context == GrammarEngine
-  {
-    public static func constrainedGrammar(
-      tools: [EdgeToolDefinition],
-      parameters: GenerateParameters,
-      grammarEngine: borrowing GrammarEngine,
-      toolCallGrammar: (GrammarToolCallRange) throws -> GrammarEngine.Grammar
-    ) throws -> GrammarEngine.Grammar {
-      let constraint = parameters.constraint
-      let grammar = try constraint.toolCallRange.map(toolCallGrammar)
-      return try constraint.grammar(toolCallGrammar: grammar, context: grammarEngine)
-    }
-  }
-
   extension MLXModelProfile {
-    public static var extraStopTokens: Set<String> { [] }
-
-    public static func defaultSampling(
-      prompt: Prompt,
-      parameters: GenerateParameters
-    ) -> EdgeToolsFusedSamplingParameters? {
-      nil
-    }
-
-    public static func prepare(
-      prompt: inout Prompt,
-      tools: [EdgeToolDefinition],
-      parser: inout GenerationParser
-    ) {}
-
-    public static func templateContext(prompt: Prompt) -> [String: EdgeToolsValue]? {
-      nil
-    }
-
     public static nonisolated(nonsending) func prefillInput(
       prompt: Prompt,
       tools: [EdgeToolDefinition],
@@ -210,25 +140,6 @@
       }
     }
 
-    // MARK: - MLXModelProfile + XGrammar
-
-    extension MLXModelProfile where GrammarEngine == XGrammarEngine {
-      public static func grammarEngine(
-        tokenizer: any EdgeToolsTokenizer,
-        vocabularySize: Int,
-        stopTokenIds: Set<EdgeToolsToken.ID>
-      ) throws -> XGrammarEngine {
-        guard let tokenizer = tokenizer as? any XGRTokenizer else {
-          throw EdgeToolsError.unsupportedTokenizer
-        }
-        return try XGrammarEngine(
-          tokenizerInfo: tokenizer.tokenizerInfo(
-            modelVocabularySize: vocabularySize,
-            extraStopTokenIds: stopTokenIds
-          )
-        )
-      }
-    }
   #endif
 
   // MARK: - MLXContextParameters
