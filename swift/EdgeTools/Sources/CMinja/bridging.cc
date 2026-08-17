@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <minja/minja.hpp>
@@ -18,68 +19,9 @@ thread_local std::string last_error;
 
 void set_last_error(const std::string &message) { last_error = message; }
 
-std::string generation_blocks_neutralized(const std::string &source) {
-  std::string rewritten;
-  rewritten.reserve(source.size());
-  size_t cursor = 0;
-  while (true) {
-    size_t start = source.find("{%", cursor);
-    if (start == std::string::npos) {
-      break;
-    }
-    size_t inner_end = source.find("%}", start + 2);
-    if (inner_end == std::string::npos) {
-      break;
-    }
-    size_t end = inner_end + 2;
-    std::string inner = source.substr(start + 2, inner_end - (start + 2));
-
-    auto is_marker = [](char character) { return character == '-' || character == '+'; };
-    std::string opening;
-    std::string closing;
-    if (!inner.empty() && is_marker(inner.front())) {
-      opening = inner.front();
-    }
-    if (!inner.empty() && is_marker(inner.back())) {
-      closing = inner.back();
-    }
-    size_t body_begin = 0;
-    size_t body_end = inner.size();
-    while (body_begin < body_end &&
-           (std::isspace(static_cast<unsigned char>(inner[body_begin])) ||
-            is_marker(inner[body_begin]))) {
-      ++body_begin;
-    }
-    while (body_end > body_begin &&
-           (std::isspace(static_cast<unsigned char>(inner[body_end - 1])) ||
-            is_marker(inner[body_end - 1]))) {
-      --body_end;
-    }
-    std::string body = inner.substr(body_begin, body_end - body_begin);
-
-    const char *replacement = nullptr;
-    if (body == "generation") {
-      replacement = "if true";
-    } else if (body == "endgeneration") {
-      replacement = "endif";
-    }
-
-    rewritten.append(source, cursor, start - cursor);
-    if (replacement != nullptr) {
-      rewritten += "{%";
-      rewritten += opening;
-      rewritten += ' ';
-      rewritten += replacement;
-      rewritten += ' ';
-      rewritten += closing;
-      rewritten += "%}";
-    } else {
-      rewritten.append(source, start, end - start);
-    }
-    cursor = end;
-  }
-  rewritten.append(source, cursor, source.size() - cursor);
-  return rewritten;
+size_t fail(const std::string &message) {
+  set_last_error(message);
+  return 0;
 }
 
 std::time_t rendering_instant(nlohmann::ordered_json &context) {
@@ -102,79 +44,72 @@ void write_python_json(
     int64_t indent,
     bool sort_keys,
     size_t level) {
+  if (!value.is_structured()) {
+    out += value.dump(-1, ' ', ensure_ascii);
+    return;
+  }
+  const char *brackets = value.is_object() ? "{}" : "[]";
+  if (value.empty()) {
+    out.append(brackets, 2);
+    return;
+  }
+
   auto write_break = [&](size_t break_level) {
     if (indent >= 0) {
       out += '\n';
       out.append(break_level * static_cast<size_t>(indent), ' ');
     }
   };
-  auto write_item_separator = [&](size_t item_level) {
+  bool first = true;
+  auto write_separator = [&] {
+    if (std::exchange(first, false)) {
+      return;
+    }
     out += ',';
-    if (indent >= 0) {
-      write_break(item_level);
-    } else {
+    if (indent < 0) {
       out += ' ';
+    } else {
+      write_break(level + 1);
     }
   };
 
-  if (value.is_object()) {
-    if (value.empty()) {
-      out += "{}";
-      return;
+  out += brackets[0];
+  write_break(level + 1);
+  if (value.is_array()) {
+    for (const auto &element : value) {
+      write_separator();
+      write_python_json(element, out, ensure_ascii, indent, sort_keys, level + 1);
     }
+  } else {
     std::vector<std::string> keys;
     keys.reserve(value.size());
-    for (auto it = value.begin(); it != value.end(); ++it) {
-      keys.push_back(it.key());
+    for (auto member = value.begin(); member != value.end(); ++member) {
+      keys.push_back(member.key());
     }
     if (sort_keys) {
       std::sort(keys.begin(), keys.end());
     }
-    out += '{';
-    write_break(level + 1);
-    for (size_t index = 0; index < keys.size(); ++index) {
-      if (index > 0) {
-        write_item_separator(level + 1);
-      }
-      out += nlohmann::ordered_json(keys[index]).dump(-1, ' ', ensure_ascii);
+    for (const auto &key : keys) {
+      write_separator();
+      out += nlohmann::ordered_json(key).dump(-1, ' ', ensure_ascii);
       out += ": ";
-      write_python_json(value.at(keys[index]), out, ensure_ascii, indent, sort_keys, level + 1);
+      write_python_json(value.at(key), out, ensure_ascii, indent, sort_keys, level + 1);
     }
-    write_break(level);
-    out += '}';
-  } else if (value.is_array()) {
-    if (value.empty()) {
-      out += "[]";
-      return;
-    }
-    out += '[';
-    write_break(level + 1);
-    for (size_t index = 0; index < value.size(); ++index) {
-      if (index > 0) {
-        write_item_separator(level + 1);
-      }
-      write_python_json(value.at(index), out, ensure_ascii, indent, sort_keys, level + 1);
-    }
-    write_break(level);
-    out += ']';
-  } else {
-    out += value.dump(-1, ' ', ensure_ascii);
   }
+  write_break(level);
+  out += brackets[1];
 }
 
 minja::Value tojson_value(const std::shared_ptr<minja::Context> &, minja::ArgumentsValue &args) {
   if (args.args.empty()) {
     throw std::runtime_error("tojson expects a value to serialize");
   }
-  int64_t indent = -1;
-  bool ensure_ascii = false;
-  bool sort_keys = false;
-  if (args.args.size() > 1) {
-    indent = args.args[1].get<int64_t>();
-  }
   if (args.args.size() > 2) {
     throw std::runtime_error("tojson expects at most two positional arguments");
   }
+  int64_t indent = args.args.size() > 1 ? args.args[1].get<int64_t>() : -1;
+  bool ensure_ascii = false;
+  bool sort_keys = false;
   for (auto &kwarg : args.kwargs) {
     if (kwarg.first == "indent") {
       indent = kwarg.second.is_null() ? -1 : kwarg.second.get<int64_t>();
@@ -186,9 +121,9 @@ minja::Value tojson_value(const std::shared_ptr<minja::Context> &, minja::Argume
       throw std::runtime_error("Unknown argument " + kwarg.first + " for function tojson");
     }
   }
-  auto serialized = nlohmann::ordered_json::parse(args.args[0].dump(-1, /* to_json= */ true));
   std::string out;
-  write_python_json(serialized, out, ensure_ascii, indent, sort_keys, 0);
+  write_python_json(
+      args.args[0].get<nlohmann::ordered_json>(), out, ensure_ascii, indent, sort_keys, 0);
   return minja::Value(out);
 }
 
@@ -232,8 +167,7 @@ std::string formatted_utc(std::time_t instant, const std::string &format) {
   return out.str();
 }
 
-std::string render(const std::string &raw_source, const std::string &context_json) {
-  auto source = generation_blocks_neutralized(raw_source);
+std::string render(const std::string &source, const std::string &context_json) {
   auto context_values = nlohmann::ordered_json::parse(context_json);
   if (!context_values.is_object()) {
     throw std::runtime_error("The template context must be a JSON object.");
@@ -265,18 +199,12 @@ std::string render(const std::string &raw_source, const std::string &context_jso
   return root->render(context);
 }
 
-int32_t fill(
-    uint8_t *text, size_t text_capacity, size_t *text_count, const std::string &value) {
-  *text_count = value.size();
-  if (value.size() > text_capacity) {
-    set_last_error("An output buffer was too small for the result.");
-    return EDGE_TEMPLATE_BUFFER_TOO_SMALL;
+size_t write_string(const std::string &value, char *text, size_t text_capacity) {
+  const size_t required_capacity = value.size() + 1;
+  if (text != nullptr && text_capacity >= required_capacity) {
+    std::memcpy(text, value.c_str(), required_capacity);
   }
-  if (!value.empty()) {
-    std::memcpy(text, value.data(), value.size());
-  }
-  set_last_error("");
-  return EDGE_TEMPLATE_SUCCESS;
+  return required_capacity;
 }
 
 }  // namespace
@@ -285,37 +213,22 @@ extern "C" {
 
 const char *edge_template_last_error_message(void) { return last_error.c_str(); }
 
-int32_t edge_template_render(
-    const uint8_t *source,
-    size_t source_count,
-    const uint8_t *context_json,
-    size_t context_json_count,
-    uint8_t *text,
-    size_t text_capacity,
-    size_t *text_count) {
+size_t edge_template_render(
+    const char *source, const char *context_json, char *text, size_t text_capacity) {
   if (source == nullptr) {
-    set_last_error("A template source is required.");
-    return EDGE_TEMPLATE_INVALID_ARGUMENT;
+    return fail("A template source is required.");
   }
   if (context_json == nullptr) {
-    set_last_error("A template context is required.");
-    return EDGE_TEMPLATE_INVALID_ARGUMENT;
-  }
-  if (text_count == nullptr || (text == nullptr && text_capacity > 0)) {
-    set_last_error("An output buffer is required.");
-    return EDGE_TEMPLATE_INVALID_ARGUMENT;
+    return fail("A template context is required.");
   }
   try {
-    auto rendered = render(
-        std::string(reinterpret_cast<const char *>(source), source_count),
-        std::string(reinterpret_cast<const char *>(context_json), context_json_count));
-    return fill(text, text_capacity, text_count, rendered);
+    auto rendered = render(source, context_json);
+    set_last_error("");
+    return write_string(rendered, text, text_capacity);
   } catch (const std::exception &error) {
-    set_last_error(error.what());
-    return EDGE_TEMPLATE_FAILURE;
+    return fail(error.what());
   } catch (...) {
-    set_last_error("The template renderer encountered an unexpected failure.");
-    return EDGE_TEMPLATE_FAILURE;
+    return fail("The template renderer encountered an unexpected failure.");
   }
 }
 

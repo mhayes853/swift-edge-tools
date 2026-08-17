@@ -1806,25 +1806,7 @@ private:
       if (it == end) return nullptr;
       if (*it == '"' || *it == '\'') {
         auto str = parseString();
-        if (str) {
-          // EdgeTools: jinja2 concatenates adjacent string literals the way Python does
-          // (`"a" "b"` is `"ab"`), which chat templates use to wrap long messages.
-          while (true) {
-            auto mark = it;
-            consumeSpaces();
-            if (it == end || (*it != '"' && *it != '\'')) {
-              it = mark;
-              break;
-            }
-            auto adjacent = parseString();
-            if (!adjacent) {
-              it = mark;
-              break;
-            }
-            *str += *adjacent;
-          }
-          return std::make_shared<Value>(*str);
-        }
+        if (str) return std::make_shared<Value>(*str);
       }
       static std::regex prim_tok(R"(true\b|True\b|false\b|False\b|None\b)");
       auto token = consumeToken(prim_tok);
