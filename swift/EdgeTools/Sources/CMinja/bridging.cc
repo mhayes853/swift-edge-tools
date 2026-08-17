@@ -18,9 +18,6 @@ thread_local std::string last_error;
 
 void set_last_error(const std::string &message) { last_error = message; }
 
-// Rewrites `{% generation %}` / `{% endgeneration %}` into always-true conditionals while
-// preserving whitespace-control markers. Assistant-token masking has no meaning when
-// rendering a prompt.
 std::string generation_blocks_neutralized(const std::string &source) {
   std::string rewritten;
   rewritten.reserve(source.size());
@@ -98,10 +95,6 @@ std::time_t rendering_instant(nlohmann::ordered_json &context) {
   return static_cast<std::time_t>(pinned.get<int64_t>());
 }
 
-// Serializes a value the way Python's json.dumps does: ", " and ": " separators in
-// compact mode, insertion-ordered keys, and non-ASCII passed through unless
-// `ensure_ascii` asks for escapes. Scalars reuse nlohmann's writer, which matches
-// json.dumps escaping for strings and shortest round-trip formatting for numbers.
 void write_python_json(
     const nlohmann::ordered_json &value,
     std::string &out,
@@ -247,11 +240,7 @@ std::string render(const std::string &raw_source, const std::string &context_jso
   }
   auto instant = rendering_instant(context_values);
 
-  auto root = minja::Parser::parse(
-      source,
-      {/* .trim_blocks = */ true,
-       /* .lstrip_blocks = */ true,
-       /* .keep_trailing_newline = */ false});
+  auto root = minja::Parser::parse(source, { true, true, false});
   auto context = minja::Context::make(minja::Value(context_values));
   context->set(
       "strftime_now",

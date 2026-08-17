@@ -52,15 +52,6 @@
 
   // MARK: - LlamaModel
 
-  /// A loaded `llama_model`.
-  ///
-  /// A class rather than a non-copyable handle because one loaded model is shared by the
-  /// tokenizer, the engine, and every fork family at once; the pointer is immutable for the
-  /// lifetime of the handle and llama.cpp's model-level reads are thread-safe, so reference
-  /// sharing is safe and ARC frees the model exactly once.
-  ///
-  /// The pointers are reachable only for the duration of a `withUnsafe…Pointer` call, so
-  /// they cannot outlive the model that owns them.
   public final class LlamaModel: @unchecked Sendable {
     private let raw: OpaquePointer
     private let vocab: OpaquePointer
@@ -92,17 +83,12 @@
       llama_model_free(self.raw)
     }
 
-    /// Calls `body` with the `llama_model *`, which is valid only for that call.
     public func withUnsafeModelPointer<R, E: Error>(
       _ body: (OpaquePointer) throws(E) -> R
     ) throws(E) -> R {
       try body(self.raw)
     }
 
-    /// Calls `body` with the model's `llama_vocab *`, which is valid only for that call.
-    ///
-    /// The vocabulary is owned by the model — llama.cpp exposes no way to free it
-    /// separately, and it dies with the model.
     public func withUnsafeVocabPointer<R, E: Error>(
       _ body: (OpaquePointer) throws(E) -> R
     ) throws(E) -> R {
@@ -112,10 +98,6 @@
 
   // MARK: - Helpers
 
-  /// Registers llama.cpp's backends once per process on the first model load.
-  ///
-  /// `llama_backend_free` is deliberately never called: it tears down state shared by every
-  /// live model, so there is no point at which one engine can safely invoke it.
   private let llamaBackendInitialized: Bool = {
     llama_backend_init()
     return true
