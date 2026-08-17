@@ -130,6 +130,17 @@
         Int32(to)
       )
     }
+
+    /// The probe's confidence in the rows accumulated for the sequence, or nil when the
+    /// model carries no probe head or the sequence has decoded no scored tokens.
+    borrowing func probeConfidence(sequenceId: Int) -> Float? {
+      let confidence = llama_probe_confidence(self.raw, Int32(sequenceId))
+      return confidence < 0 ? nil : confidence
+    }
+
+    borrowing func probeReset(sequenceId: Int) {
+      llama_probe_reset(self.raw, Int32(sequenceId))
+    }
   }
 
   // MARK: - LlamaModel + Contexts

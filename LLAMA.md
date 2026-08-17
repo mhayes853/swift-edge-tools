@@ -12,7 +12,7 @@ model integration, true prefill via `EdgeToolsPrefillableEngine`, and XGrammar c
 
 ## Cactus Hybrid Findings
 
-https://github.com/cactus-compute/cactus-hybrid
+<https://github.com/cactus-compute/cactus-hybrid>
 
 - "Hybrid inference" means confidence-based routing between an on-device model and a cloud
   model, not hardware splitting. Models carry a trained probe head (extra GGUF tensors)
@@ -270,10 +270,10 @@ After C3, the remaining phases run in parallel:
   find on its own), the vendored artifact embeds its shaders, so
   `swift test --disable-default-traits --traits Llama,XGrammar,HuggingFaceTokenizers`
   runs them as-is.
-- **C5b — profile fan-out. [DONE except Gemma 4 probe confidence]** (after C5a; parallel
+- **C5b — profile fan-out. [DONE]** (after C5a; parallel
   per model). Remaining llama profiles
   (Gemma 4, LFM2.5, Granite, …). The Gemma 4 profile additionally wires probe
-  confidence: a probe metadata key emitted when the model carries probe tensors (needs the track D hybrid GGUF for validation).
+  confidence: a probe metadata key emitted when the model carries probe tensors.
 - **C5c — CLI.** `.gguf` model detection in `EdgeToolsCLI`.
 
 ### Track D: python export (independent, anytime)
@@ -283,6 +283,28 @@ probe GGUF. No engine dependency; only C5b's Gemma 4 probe validation consumes i
 output.
 
 ## Progress Log
+
+- **2026-08-17 — probe confidence complete.** `metadata.probeConfidence` carries
+  `llama_probe_confidence` (1 - p_wrong) for any GGUF with a probe head; models without
+  one return -1.0, which the handle parses to nil so the key is simply absent. No profile
+  hook and no `llama_model_has_probe` call: the probe is a model-file property, and the
+  sentinel already answers the question. Findings:
+  - **The per-generation `llama_probe_reset` is load-bearing.** llama.cpp only drops a
+    sequence's accumulated rows when it decodes a token at position zero, which prefix
+    reuse skips on every turn after the first. Measured on a shared context: turn 1
+    ("capital of France", 0.996) followed by an unanswerable turn 2 scores 0.176 with the
+    reset and 0.456 without it — the same refusal text, contaminated by turn 1's rows.
+  - Rows only accumulate for logits-flagged tokens, so a score covers the final prompt
+    token plus every sampled token; `commitGeneration`'s append decodes without logits
+    and adds nothing. Discrimination verified end to end: 0.993 for "what is 2 + 2"
+    against 0.533 for a digit of Graham's number.
+  - `llama_memory_seq_cp` does not copy probe state, so a fork starts with an empty
+    accumulator — correct, since it has generated no answer yet.
+  - Coverage is the existing `Llama Generates Reasoning Snapshot`, whose dump already
+    carries generation metadata (recorded at 0.882).
+  - Unrelated regression fixed in passing: `ec660c9` re-vendored minja unmodified, which
+    dropped the adjacent-string-literal patch and made *every* Gemma 4 llama test fail in
+    the chat template (`raise_exception("…" "…")`). Restored, with the PIN note.
 
 - **2026-08-16 — `LlamaApi` removed; module layout cleanup.** Six refactors landed
   together:

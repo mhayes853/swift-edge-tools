@@ -508,7 +508,7 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " asked"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " about"
+            - reasoning: " for"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
@@ -532,7 +532,7 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: "Weather"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " tool"
+            - reasoning: " function"
           ▿ EdgeToolsGenerationPart
             - reasoning: " to"
           ▿ EdgeToolsGenerationPart
@@ -554,11 +554,11 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " with"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " a"
+            - reasoning: " the"
           ▿ EdgeToolsGenerationPart
             - reasoning: " condition"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " of"
+            - reasoning: " as"
           ▿ EdgeToolsGenerationPart
             - reasoning: " sunny"
           ▿ EdgeToolsGenerationPart
@@ -572,11 +572,7 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " and"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " a"
-          ▿ EdgeToolsGenerationPart
             - reasoning: " temperature"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " of"
           ▿ EdgeToolsGenerationPart
             - reasoning: " "
           ▿ EdgeToolsGenerationPart
@@ -602,6 +598,8 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " information"
           ▿ EdgeToolsGenerationPart
+            - reasoning: " clearly"
+          ▿ EdgeToolsGenerationPart
             - reasoning: " for"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
@@ -621,5 +619,7 @@
             - reasoning: " mention"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " location"
   ▿ reasoningEffort: EdgeToolsReasoningEffort
     - rawValue: "default"

@@ -254,132 +254,65 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 63 elements
+        ▿ parts: 26 elements
           ▿ EdgeToolsGenerationPart
             - reasoning: "<think>"
           ▿ EdgeToolsGenerationPart
             - reasoning: "\n"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "The"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " user"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " asked"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " about"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " the"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " weather"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " in"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " Paris"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "."
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " I"
+            - reasoning: "I"
           ▿ EdgeToolsGenerationPart
             - reasoning: " need"
           ▿ EdgeToolsGenerationPart
             - reasoning: " to"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " provide"
+            - reasoning: " call"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " information"
+            - reasoning: " weather"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " I"
+            - reasoning: " function"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " have"
+            - reasoning: " again"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " received"
+            - reasoning: " with"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " so"
+            - reasoning: " the"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " far"
+            - reasoning: " same"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "."
+            - reasoning: " location"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " I"
+            - reasoning: " \""
           ▿ EdgeToolsGenerationPart
-            - reasoning: " have"
+            - reasoning: "Paris"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " one"
+            - reasoning: "\""
           ▿ EdgeToolsGenerationPart
-            - reasoning: " result"
+            - reasoning: " to"
           ▿ EdgeToolsGenerationPart
-            - reasoning: ":"
+            - reasoning: " get"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " sunny"
+            - reasoning: " the"
           ▿ EdgeToolsGenerationPart
-            - reasoning: ","
+            - reasoning: " latest"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " temperature"
+            - reasoning: " weather"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " "
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "21"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "°C"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "."
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " I"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " should"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " summarize"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " this"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " information"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " and"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " ask"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " if"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " they"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " want"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " more"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " details"
+            - reasoning: " update"
           ▿ EdgeToolsGenerationPart
             - reasoning: ".\n"
           ▿ EdgeToolsGenerationPart
-            - text: "\n\n"
+            - text: "\n\n\n"
           ▿ EdgeToolsGenerationPart
-            - text: "The"
-          ▿ EdgeToolsGenerationPart
-            - text: " weather"
-          ▿ EdgeToolsGenerationPart
-            - text: " in"
-          ▿ EdgeToolsGenerationPart
-            - text: " Paris"
-          ▿ EdgeToolsGenerationPart
-            - text: " is"
-          ▿ EdgeToolsGenerationPart
-            - text: " currently"
-          ▿ EdgeToolsGenerationPart
-            - text: " sunny"
-          ▿ EdgeToolsGenerationPart
-            - text: ","
-          ▿ EdgeToolsGenerationPart
-            - text: " with"
-          ▿ EdgeToolsGenerationPart
-            - text: " a"
-          ▿ EdgeToolsGenerationPart
-            - text: " temperature"
-          ▿ EdgeToolsGenerationPart
-            - text: " of"
-          ▿ EdgeToolsGenerationPart
-            - text: " "
-          ▿ EdgeToolsGenerationPart
-            - text: "21"
+            ▿ toolCall: EdgeRawToolCall
+              ▿ arguments: EdgeToolsValue
+                ▿ object: 1 key/value pair
+                  ▿ (2 elements)
+                    - key: "location"
+                    ▿ value: EdgeToolsValue
+                      - string: "Paris"
+              - name: "getWeather"
   ▿ reasoningEffort: EdgeToolsReasoningEffort
     - rawValue: "default"

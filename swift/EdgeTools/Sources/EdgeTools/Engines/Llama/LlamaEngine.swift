@@ -223,6 +223,14 @@
       }
     }
 
+    func probeConfidence(sequenceId: Int) -> Float? {
+      self.state.withLock { $0.context?.probeConfidence(sequenceId: sequenceId) ?? nil }
+    }
+
+    func resetProbe(sequenceId: Int) {
+      self.state.withLock { $0.context?.probeReset(sequenceId: sequenceId) }
+    }
+
     private func release(sequenceId: Int) {
       self.state.withLock { state in
         _ = state.context?.memoryRemove(sequenceId: sequenceId, from: 0, to: -1)
@@ -368,6 +376,7 @@
       )
       let clock = ContinuousClock()
       let start = clock.now
+      self.family.resetProbe(sequenceId: self.lease.sequenceId)
       let decodedCount = try self.family.prefill(
         sequenceId: self.lease.sequenceId,
         tokenIds: tokenIds,
@@ -468,6 +477,7 @@
       var metadata = EdgeToolsMetadata()
       metadata.generationConfidence = generation.confidence.mean
       metadata.perTokenConfidences = generation.confidence.perTokenConfidences
+      metadata.probeConfidence = self.family.probeConfidence(sequenceId: self.lease.sequenceId)
       return metadata
     }
   }
