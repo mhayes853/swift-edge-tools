@@ -55,7 +55,7 @@ where
     toolCallGrammar: (GrammarToolCallRange) throws -> GrammarEngine.Grammar
   ) throws -> GrammarEngine.Grammar {
     let constraint = parameters.constraint
-    let grammar = try constraint.toolCallRange.map(toolCallGrammar)
+    let grammar = try (!tools.isEmpty ? constraint.toolCallRange : nil).map(toolCallGrammar)
     return try constraint.grammar(toolCallGrammar: grammar, context: grammarEngine)
   }
 }

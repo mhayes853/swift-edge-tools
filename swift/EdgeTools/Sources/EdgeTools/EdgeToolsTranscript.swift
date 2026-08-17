@@ -36,6 +36,36 @@ public struct EdgeToolsTranscript: Hashable, Sendable {
   }
 }
 
+// MARK: - Prompt
+
+extension EdgeToolsTranscript {
+  /// A batch of messages to append to a transcript before generating a response.
+  public struct Prompt: Hashable, Sendable {
+    public var messages: [Message]
+
+    public init(messages: [Message]) {
+      self.messages = messages
+    }
+
+    public static func user(_ message: UserMessage) -> Self {
+      Self(messages: [.user(message)])
+    }
+
+    public static func user(
+      _ content: String,
+      images: [Asset] = [],
+      videos: [Asset] = [],
+      audio: [Asset] = []
+    ) -> Self {
+      self.user(UserMessage(content: content, images: images, videos: videos, audio: audio))
+    }
+
+    public static func tools(_ responses: [ToolMessage]) -> Self {
+      Self(messages: responses.map(Message.tool))
+    }
+  }
+}
+
 // MARK: - Message
 
 extension EdgeToolsTranscript {

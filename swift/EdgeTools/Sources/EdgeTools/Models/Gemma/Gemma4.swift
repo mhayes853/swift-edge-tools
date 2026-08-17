@@ -24,17 +24,17 @@
       parameters: DefaultMLXGenerateParameters,
       grammarEngine: borrowing XGrammarEngine
     ) throws -> XGRGrammar {
-      try Self.constrainedGrammar(
+      let grammar = try Self.constrainedGrammar(
         tools: tools,
         parameters: parameters,
         grammarEngine: grammarEngine
-      ) { range in
-        let toolCalls = try XGRGrammar.gemma4(tools: tools, range: range)
-        guard prompt.reasoningEffort != .default, prompt.reasoningEffort.isEnabled else {
-          return toolCalls
-        }
-        return try XGRGrammar.gemma4Reasoning().concatenate(toolCalls)
+      ) {
+        try XGRGrammar.gemma4(tools: tools, range: $0)
       }
+      guard prompt.reasoningEffort != .default, prompt.reasoningEffort.isEnabled else {
+        return grammar
+      }
+      return try XGRGrammar.gemma4Reasoning().concatenate(grammar)
     }
 
     public static func prepare(

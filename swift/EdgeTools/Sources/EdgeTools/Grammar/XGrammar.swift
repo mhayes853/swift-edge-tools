@@ -148,6 +148,10 @@
         range: GrammarToolCallRange = .unbounded(minimum: 0),
         grammar: (@Sendable (borrowing XGRGrammar, XGRTokenizerInfo) throws -> XGRGrammar)? = nil
       )
+      case turn(
+        range: GrammarToolCallRange,
+        response: XGRGrammarBox
+      )
     }
 
     private let kind: Kind
@@ -192,8 +196,11 @@
     public typealias Context = XGrammarEngine
 
     public var toolCallRange: GrammarToolCallRange? {
-      guard case .toolsWithGrammar(let range, _) = self.kind else { return nil }
-      return range
+      switch self.kind {
+      case .toolsWithGrammar(let range, _): return range
+      case .turn(let range, _): return range
+      case .unconstrained, .grammar: return nil
+      }
     }
 
     public func grammar(
@@ -209,7 +216,26 @@
         let grammar = toolCallGrammar ?? XGRGrammar.universal
         guard let transform else { return grammar }
         return try transform(grammar, context.tokenizerInfo)
+      case .turn(_, let response):
+        guard let toolCallGrammar else {
+          return try response.grammar.copy()
+        }
+        return try toolCallGrammar.union(response.grammar)
       }
+    }
+  }
+
+  extension XGRGenerationConstraint: EdgeToolsTurnGenerationConstraint {
+    public static func toolCallsOrResponse<Response: EdgeToolsGenerable>(
+      _ response: Response.Type,
+      toolCallRange: GrammarToolCallRange
+    ) -> Self {
+      return Self(
+        kind: .turn(
+          range: toolCallRange,
+          response: XGRGrammarBox(grammar: .schema(response))
+        )
+      )
     }
   }
 

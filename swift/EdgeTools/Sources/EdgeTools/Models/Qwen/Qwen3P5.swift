@@ -22,15 +22,15 @@ import OrderedCollections
       parameters: DefaultMLXGenerateParameters,
       grammarEngine: borrowing XGrammarEngine
     ) throws -> XGRGrammar {
-      try Self.constrainedGrammar(
+      let grammar = try Self.constrainedGrammar(
         tools: tools,
         parameters: parameters,
         grammarEngine: grammarEngine
-      ) { range in
-        let toolCalls = try XGRGrammar.qwen3P5(tools: tools, range: range)
-        guard prompt.reasoningEffort.isEnabled else { return toolCalls }
-        return try XGRGrammar.qwenReasoning().concatenate(toolCalls)
+      ) {
+        try XGRGrammar.qwen3P5(tools: tools, range: $0)
       }
+      guard prompt.reasoningEffort.isEnabled else { return grammar }
+      return try XGRGrammar.qwenReasoning().concatenate(grammar)
     }
 
     public static func templateContext(prompt: EdgeToolsTranscript) -> [String: EdgeToolsValue]? {
@@ -84,15 +84,15 @@ import OrderedCollections
       parameters: DefaultMLXGenerateParameters,
       grammarEngine: borrowing XGrammarEngine
     ) throws -> XGRGrammar {
-      try Self.constrainedGrammar(
+      let grammar = try Self.constrainedGrammar(
         tools: tools,
         parameters: parameters,
         grammarEngine: grammarEngine
-      ) { range in
-        let toolCalls = try XGRGrammar.qwen3P5(tools: tools, range: range)
-        guard prompt.reasoningEffort.isEnabled else { return toolCalls }
-        return try XGRGrammar.qwenReasoning().concatenate(toolCalls)
+      ) {
+        try XGRGrammar.qwen3P5(tools: tools, range: $0)
       }
+      guard prompt.reasoningEffort.isEnabled else { return grammar }
+      return try XGRGrammar.qwenReasoning().concatenate(grammar)
     }
 
     public static func templateContext(prompt: EdgeToolsTranscript) -> [String: EdgeToolsValue]? {
