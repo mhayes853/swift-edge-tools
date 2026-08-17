@@ -190,4 +190,29 @@ struct `MiniCPM5 tests` {
       }
     }
   #endif
+
+  #if Llama && XGrammar && canImport(CLlama) && !os(WASI)
+    @Suite(.serialized)
+    struct `MiniCPM5LlamaModelEngine tests` {
+      @Test
+      func `Llama Completes Tool Turn Snapshot`() async throws {
+        let engine = try MiniCPM5LlamaModelEngine(
+          modelPath: (try await downloadGGUFModel(id: .miniCPM5)).path()
+        )
+        let transcript = try await completeWeatherTurn(using: engine)
+
+        withKnownIssue { assertSnapshot(of: transcript, as: .dump, record: .all) }
+      }
+
+      @Test
+      func `Llama Generates Reasoning Snapshot`() async throws {
+        let engine = try MiniCPM5LlamaModelEngine(
+          modelPath: (try await downloadGGUFModel(id: .miniCPM5)).path()
+        )
+        let generation = try await generateReasoning(using: engine)
+
+        withKnownIssue { assertSnapshot(of: generation, as: .dump, record: .all) }
+      }
+    }
+  #endif
 }

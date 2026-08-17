@@ -43,4 +43,29 @@ struct `Gemma4 tests` {
       }
     }
   #endif
+
+  #if Llama && XGrammar && canImport(CLlama) && !os(WASI)
+    @Suite(.serialized)
+    struct `Gemma4LlamaModelEngine tests` {
+      @Test
+      func `Llama Completes Tool Turn Snapshot`() async throws {
+        let engine = try Gemma4LlamaModelEngine(
+          modelPath: (try await downloadGGUFModel(id: .gemma4E2BHybrid)).path()
+        )
+        let transcript = try await completeWeatherTurn(using: engine)
+
+        withKnownIssue { assertSnapshot(of: transcript, as: .dump, record: .all) }
+      }
+
+      @Test
+      func `Llama Generates Reasoning Snapshot`() async throws {
+        let engine = try Gemma4LlamaModelEngine(
+          modelPath: (try await downloadGGUFModel(id: .gemma4E2BHybrid)).path()
+        )
+        let generation = try await generateReasoning(using: engine)
+
+        withKnownIssue { assertSnapshot(of: generation, as: .dump, record: .all) }
+      }
+    }
+  #endif
 }

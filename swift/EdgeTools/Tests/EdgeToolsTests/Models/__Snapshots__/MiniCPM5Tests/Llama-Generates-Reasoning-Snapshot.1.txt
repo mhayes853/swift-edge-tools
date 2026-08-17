@@ -1,0 +1,431 @@
+▿ EdgeToolsEngineGeneration
+  ▿ decodeMetrics: EdgeToolsDecodeMetrics
+    ▿ duration: 1.718779125 seconds
+      - _low: 1718779125000000000
+      - _high: 0
+    ▿ durationToFirstToken: 4.541649625 seconds
+      - _low: 4541649625000000000
+      - _high: 0
+    - tokens: 68
+  ▿ metadata: 2 key/value pairs
+    ▿ (2 elements)
+      ▿ key: EdgeToolsMetadataKey
+        - rawValue: "GenerationConfidence"
+      - value: 0.9004952
+    ▿ (2 elements)
+      ▿ key: EdgeToolsMetadataKey
+        - rawValue: "PerTokenConfidences"
+      ▿ value: 68 elements
+        - 0.8646293
+        - 0.9994068
+        - 0.6032208
+        - 0.99953294
+        - 0.9999964
+        - 0.8065799
+        - 0.99998355
+        - 0.99999726
+        - 0.99999946
+        - 0.9999898
+        - 0.9999307
+        - 0.99998504
+        - 0.9999873
+        - 0.9999759
+        - 0.783356
+        - 0.69821817
+        - 0.6634931
+        - 0.7217122
+        - 0.9713817
+        - 0.679037
+        - 0.7458936
+        - 0.9880744
+        - 0.99985725
+        - 0.9971116
+        - 0.99999166
+        - 0.99994445
+        - 0.6774548
+        - 0.9869472
+        - 0.98375326
+        - 0.51291275
+        - 0.633051
+        - 0.9268676
+        - 0.7086381
+        - 0.99919313
+        - 0.99927235
+        - 0.9999901
+        - 0.8633097
+        - 0.999741
+        - 0.96321344
+        - 0.8969045
+        - 0.99916524
+        - 0.95184577
+        - 0.9980183
+        - 0.99998236
+        - 0.9952879
+        - 0.9999999
+        - 0.9997915
+        - 0.8022543
+        - 0.8238389
+        - 0.9990969
+        - 0.885382
+        - 0.9948839
+        - 0.70551723
+        - 0.9840746
+        - 0.9814505
+        - 0.6480245
+        - 0.9619629
+        - 0.8984172
+        - 0.83258176
+        - 0.5372434
+        - 0.99693274
+        - 0.99250185
+        - 0.9999699
+        - 0.6524759
+        - 0.9999297
+        - 0.9991772
+        - 0.92137086
+        - 0.9999581
+  ▿ parts: 66 elements
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "First"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: ","
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " I"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " need"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " to"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " find"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " the"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " sum"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " of"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "19"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " and"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "23"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "."
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " Let"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " me"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " add"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " them"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " together"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: ":"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "19"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " +"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "23"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " ="
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "42"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "."
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " So"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " the"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " sum"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " is"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "42"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: ".\n"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "\n"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "The"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " instruction"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " says"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " to"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " keep"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " the"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " final"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " answer"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " brief"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "."
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " So"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " I"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " should"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " just"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " state"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " the"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " answer"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: ".\n"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "\n"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "I"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "\'ll"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " answer"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: ":"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "42"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "\n"
+    ▿ EdgeToolsGenerationPart
+      - text: "\n\n"
+    ▿ EdgeToolsGenerationPart
+      - text: "42"
+  ▿ prefillMetrics: EdgeToolsPrefillMetrics
+    ▿ duration: 0.034656958 seconds
+      - _low: 34656958000000000
+      - _high: 0
+    - tokens: 33
+  - response: "First, I need to find the sum of 19 and 23. Let me add them together: 19 + 23 = 42. So the sum is 42.\n\nThe instruction says to keep the final answer brief. So I should just state the answer.\n\nI\'ll answer: 42\n</think>\n\n42"
+  ▿ tokens: 68 elements
+    ▿ EdgeToolsToken
+      - id: 10920
+      - stringValue: "First"
+    ▿ EdgeToolsToken
+      - id: 33
+      - stringValue: ","
+    ▿ EdgeToolsToken
+      - id: 354
+      - stringValue: " I"
+    ▿ EdgeToolsToken
+      - id: 1178
+      - stringValue: " need"
+    ▿ EdgeToolsToken
+      - id: 317
+      - stringValue: " to"
+    ▿ EdgeToolsToken
+      - id: 1562
+      - stringValue: " find"
+    ▿ EdgeToolsToken
+      - id: 285
+      - stringValue: " the"
+    ▿ EdgeToolsToken
+      - id: 2601
+      - stringValue: " sum"
+    ▿ EdgeToolsToken
+      - id: 304
+      - stringValue: " of"
+    ▿ EdgeToolsToken
+      - id: 242
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 456
+      - stringValue: "19"
+    ▿ EdgeToolsToken
+      - id: 316
+      - stringValue: " and"
+    ▿ EdgeToolsToken
+      - id: 242
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 1024
+      - stringValue: "23"
+    ▿ EdgeToolsToken
+      - id: 35
+      - stringValue: "."
+    ▿ EdgeToolsToken
+      - id: 2789
+      - stringValue: " Let"
+    ▿ EdgeToolsToken
+      - id: 559
+      - stringValue: " me"
+    ▿ EdgeToolsToken
+      - id: 1804
+      - stringValue: " add"
+    ▿ EdgeToolsToken
+      - id: 902
+      - stringValue: " them"
+    ▿ EdgeToolsToken
+      - id: 2945
+      - stringValue: " together"
+    ▿ EdgeToolsToken
+      - id: 47
+      - stringValue: ":"
+    ▿ EdgeToolsToken
+      - id: 242
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 456
+      - stringValue: "19"
+    ▿ EdgeToolsToken
+      - id: 663
+      - stringValue: " +"
+    ▿ EdgeToolsToken
+      - id: 242
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 1024
+      - stringValue: "23"
+    ▿ EdgeToolsToken
+      - id: 483
+      - stringValue: " ="
+    ▿ EdgeToolsToken
+      - id: 242
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 2189
+      - stringValue: "42"
+    ▿ EdgeToolsToken
+      - id: 35
+      - stringValue: "."
+    ▿ EdgeToolsToken
+      - id: 2996
+      - stringValue: " So"
+    ▿ EdgeToolsToken
+      - id: 285
+      - stringValue: " the"
+    ▿ EdgeToolsToken
+      - id: 2601
+      - stringValue: " sum"
+    ▿ EdgeToolsToken
+      - id: 357
+      - stringValue: " is"
+    ▿ EdgeToolsToken
+      - id: 242
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 2189
+      - stringValue: "42"
+    ▿ EdgeToolsToken
+      - id: 350
+      - stringValue: ".\n"
+    ▿ EdgeToolsToken
+      - id: 220
+      - stringValue: "\n"
+    ▿ EdgeToolsToken
+      - id: 608
+      - stringValue: "The"
+    ▿ EdgeToolsToken
+      - id: 11396
+      - stringValue: " instruction"
+    ▿ EdgeToolsToken
+      - id: 3586
+      - stringValue: " says"
+    ▿ EdgeToolsToken
+      - id: 317
+      - stringValue: " to"
+    ▿ EdgeToolsToken
+      - id: 2934
+      - stringValue: " keep"
+    ▿ EdgeToolsToken
+      - id: 285
+      - stringValue: " the"
+    ▿ EdgeToolsToken
+      - id: 4202
+      - stringValue: " final"
+    ▿ EdgeToolsToken
+      - id: 4219
+      - stringValue: " answer"
+    ▿ EdgeToolsToken
+      - id: 6659
+      - stringValue: " brief"
+    ▿ EdgeToolsToken
+      - id: 35
+      - stringValue: "."
+    ▿ EdgeToolsToken
+      - id: 2996
+      - stringValue: " So"
+    ▿ EdgeToolsToken
+      - id: 354
+      - stringValue: " I"
+    ▿ EdgeToolsToken
+      - id: 1153
+      - stringValue: " should"
+    ▿ EdgeToolsToken
+      - id: 1230
+      - stringValue: " just"
+    ▿ EdgeToolsToken
+      - id: 1896
+      - stringValue: " state"
+    ▿ EdgeToolsToken
+      - id: 285
+      - stringValue: " the"
+    ▿ EdgeToolsToken
+      - id: 4219
+      - stringValue: " answer"
+    ▿ EdgeToolsToken
+      - id: 350
+      - stringValue: ".\n"
+    ▿ EdgeToolsToken
+      - id: 220
+      - stringValue: "\n"
+    ▿ EdgeToolsToken
+      - id: 62
+      - stringValue: "I"
+    ▿ EdgeToolsToken
+      - id: 2305
+      - stringValue: "\'ll"
+    ▿ EdgeToolsToken
+      - id: 4219
+      - stringValue: " answer"
+    ▿ EdgeToolsToken
+      - id: 47
+      - stringValue: ":"
+    ▿ EdgeToolsToken
+      - id: 242
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 2189
+      - stringValue: "42"
+    ▿ EdgeToolsToken
+      - id: 220
+      - stringValue: "\n"
+    ▿ EdgeToolsToken
+      - id: 9
+      - stringValue: "</think>"
+    ▿ EdgeToolsToken
+      - id: 130063
+      - stringValue: "\n\n"
+    ▿ EdgeToolsToken
+      - id: 2189
+      - stringValue: "42"
+    ▿ EdgeToolsToken
+      - id: 130073
+      - stringValue: "<|im_end|>"
+  - wasStopped: false

@@ -103,4 +103,29 @@ struct `Qwen3P5 tests` {
       }
     #endif
   #endif
+
+  #if Llama && XGrammar && canImport(CLlama) && !os(WASI)
+    @Suite(.serialized)
+    struct `Qwen3P5LlamaModelEngine tests` {
+      @Test
+      func `Llama Completes Tool Turn Snapshot`() async throws {
+        let engine = try Qwen3P5LlamaModelEngine(
+          modelPath: (try await downloadGGUFModel(id: .qwen3P5)).path()
+        )
+        let transcript = try await completeWeatherTurn(using: engine)
+
+        withKnownIssue { assertSnapshot(of: transcript, as: .dump, record: .all) }
+      }
+
+      @Test
+      func `Llama Generates Reasoning Snapshot`() async throws {
+        let engine = try Qwen3P5LlamaModelEngine(
+          modelPath: (try await downloadGGUFModel(id: .qwen3P5)).path()
+        )
+        let generation = try await generateReasoning(using: engine)
+
+        withKnownIssue { assertSnapshot(of: generation, as: .dump, record: .all) }
+      }
+    }
+  #endif
 }

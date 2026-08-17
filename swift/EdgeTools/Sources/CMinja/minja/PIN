@@ -1,1 +1,4 @@
 021c2293c187789ef13d56c6cfd89c9b134fd80f
+
+Local modifications (search `EdgeTools:` in minja.hpp when re-vendoring):
+- parseConstant concatenates adjacent string literals like jinja2/Python does.

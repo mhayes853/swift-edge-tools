@@ -246,7 +246,7 @@ every model gets it. Probe ("hybrid") confidence applies only to Gemma 4 hybrid 
 (Needle 2 handles its own confidence), so it lives with the Gemma 4 profile work in the
 C5 fan-out rather than on the critical path.
 
-- **C1 — `LlamaTokenizer`. [DONE — real-GGUF validation lands with C5a]** Core (needs B2 only): `EdgeToolsTokenizer` over
+- **C1 — `LlamaTokenizer`. [DONE]** Core (needs B2 only): `EdgeToolsTokenizer` over
   `llama_vocab` through `LlamaApi`; `XGRTokenizer` via vocab-type mapping
   (SPM → `byteFallback` + prefix space, BPE → `byteLevel`); stop tokens from GGUF
   metadata. Chat conformance (adds A1): `EdgeToolsChatTokenizer` rendering the
@@ -263,14 +263,18 @@ C5 fan-out rather than on the critical path.
 
 After C3, the remaining phases run in parallel:
 
-- **C4 — fork family + prefix reuse. [DONE — `kv_unified` COW behavior still needs
-  real-model verification in C5a]** The shared lock-protected holder (seq-id
+- **C4 — fork family + prefix reuse. [DONE]** The shared lock-protected holder (seq-id
   allocation/recycling), `fork()` via `llama_memory_seq_cp`, prefix reuse via
   `llama_memory_seq_rm` + suffix decode.
-- **C5a — test harness + first profile.** `scripts/test-llama.sh` with GGUF fixtures,
+- **C5a — test harness + first profile. [DONE]** GGUF fixtures downloaded from the Hub,
   engine generation snapshot tests (`withKnownIssue` recording), and a first profile
-  (Qwen3) reusing the engine-agnostic tool-calling parsers/grammars in `Models/`.
-- **C5b — profile fan-out** (after C5a; parallel per model). Remaining llama profiles
+  (Qwen3) reusing the engine-agnostic tool-calling parsers/grammars in `Models/`. No
+  runner script is needed: unlike MLX (whose Metal library the SwiftPM runner cannot
+  find on its own), the vendored artifact embeds its shaders, so
+  `swift test --disable-default-traits --traits Llama,XGrammar,HuggingFaceTokenizers`
+  runs them as-is.
+- **C5b — profile fan-out. [DONE except Gemma 4 probe confidence]** (after C5a; parallel
+  per model). Remaining llama profiles
   (Gemma 4, LFM2.5, Granite, …). The Gemma 4 profile additionally wires probe
   confidence: a probe metadata key emitted when the `LlamaApi` probe closures are present
   and the model carries probe tensors (needs the track D hybrid GGUF for validation).
@@ -407,11 +411,60 @@ output.
   positions, `seq_cp` calls, fallback context creation); real-model verification of
   `kv_unified` semantics happens in C5a.
 
+- **2026-08-16 — C5a/C5b complete (probe confidence excluded).** Eight llama profiles
+  (Qwen3, Qwen3.5, Gemma 4, FunctionGemma, LFM2.5, MiniCPM5, Granite) mirror their MLX
+  counterparts 1:1 and generate end-to-end against real GGUFs under the
+  `Llama,XGrammar,HuggingFaceTokenizers` traits (the trait selection is the whole opt-in
+  — the tests carry no condition trait, since llama needs nothing from Xcode or a runner
+  script). 13 tests, all snapshots recorded and validated
+  (correct tool calls; the Qwen3-0.6B tool turn rambles exactly like its committed MLX
+  snapshot does — a model artifact, not an engine one). Three bugs the real models
+  exposed, all fixed:
+  - **Recurrent memory cannot drop a suffix.** LFM2.5, Granite 4.0-h, and Qwen3.5 died
+    with `llama_decode ... ret = -1` ("inconsistent sequence positions") on the second
+    turn: prefix reuse called `llama_memory_seq_rm(seq, prefix, -1)`, which
+    `llama_memory_recurrent` *rejects* while the attention KV cache accepts it, and the
+    return value was discarded. `LlamaSequenceFamily.trim` now honors the result and
+    falls back to clearing the sequence and decoding the prompt whole. Attention models
+    keep the cheap path; the chunked decode and the last-token re-decode share one
+    `decode` helper.
+  - **minja has no `min`/`max` filter.** MiniCPM5's template (`[a, b]|min`) failed with
+    "Value is not callable: null". Added to the shim as context callables, the same
+    resolve-before-builtins trick as `tojson` — no minja patch.
+  - **minja does not concatenate adjacent string literals.** Gemma 4's template wraps a
+    long `raise_exception("…" "…" "…")` the way jinja2/Python allow; minja's
+    `parseConstant` stopped at the first literal. Patched in the vendored header
+    (marked `EdgeTools:`); the 9-profile chat-template byte-identity gate still passes.
+  - `Profile.extraStopTokens` was never consumed by `LlamaEngine` (MLX applies it) —
+    now folded into the stop-token sets, which matters for Gemma 4's
+    `<|tool_response>`.
+  Test-side notes: snapshot names are derived from the test function only, so the llama
+  tests are prefixed `Llama …` — reusing the MLX names silently overwrote the MLX
+  snapshots on the first run. Fork + prefix reuse now has real-model coverage
+  (`Llama Forked System Prefill Only Processes User Suffix`, Qwen3), confirming
+  `kv_unified` copy-on-write end to end.
+
+  The turn logic is shared between the engines in `GenerationTestSupport.swift` as plain
+  functions, since both engines' contexts are `EdgeToolsTranscriptContext` and both
+  `generate` calls return `AnyGenerationTask`. `completeToolTurn(in:tool:toolResponse:…)`
+  owns the sequencing and assertions (generate the constrained call, append the tool
+  result, continue the turn) and takes the two generations as closures; the fixtures,
+  `splitUserMessage`, and the reasoning assertion sit alongside it. Each engine's support
+  file keeps only what is engine-typed — its generate parameters (MLX spells greedy as
+  `ArgMaxSampler()`, llama as `sampling: .greedy`) — plus, for MLX, the genuinely
+  MLX-only helpers (the session/fused-sampler turn and the image/video VLM turns, which
+  reuse the same shared core). An engine-generic protocol was tried and dropped: binding
+  `Prompt`/`ContextParameters`/`Context`/parameter type through associated types cost more
+  than the duplication it removed, especially since the promptless continuation `generate`
+  is not an `EdgeToolsEngine` requirement.
+
 ## Open Questions
 
 - `n_seq_max` fork-overflow behavior: error in v1, or blob-copy migration fallback.
-- Exact `kv_unified` / sequence-stream semantics at `b10076` — confirm `seq_cp` is COW
-  under the chosen context params.
+- `seq_cp` on recurrent/hybrid memory: `llama_memory_seq_cp` returns void, so a module
+  that refuses the copy (as `llama_memory_recurrent` refuses partial `seq_rm`) would
+  leave a fork claiming cached tokens it does not hold. Forks are only covered by a
+  real-model test on attention-only Qwen3.
 - Whether `LlamaApi` closures take C types by value (pins users to `b10076`-era ABI for
   `llama_batch` etc.) or we shrink the by-value surface. Document the pin either way.
 

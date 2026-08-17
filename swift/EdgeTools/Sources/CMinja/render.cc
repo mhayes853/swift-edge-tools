@@ -199,6 +199,34 @@ minja::Value tojson_value(const std::shared_ptr<minja::Context> &, minja::Argume
   return minja::Value(out);
 }
 
+// jinja2's `min` / `max` filters over a sequence, which minja does not provide. Both
+// compare numerically when every element is a number and lexicographically otherwise,
+// matching Python's ordering for the scalar sequences chat templates use.
+minja::Value extremum_value(const char *name, bool wantsMinimum, minja::ArgumentsValue &args) {
+  args.expectArgs(name, {1, 1}, {0, 0});
+  auto &sequence = args.args[0];
+  if (!sequence.is_array()) {
+    throw std::runtime_error(std::string(name) + " expects a sequence");
+  }
+  if (sequence.size() == 0) {
+    return minja::Value();
+  }
+  auto isLess = [](const minja::Value &lhs, const minja::Value &rhs) {
+    if (lhs.is_number() && rhs.is_number()) {
+      return lhs.get<double>() < rhs.get<double>();
+    }
+    return lhs.to_str() < rhs.to_str();
+  };
+  auto extremum = sequence.at(size_t{0});
+  for (size_t index = 1; index < sequence.size(); ++index) {
+    auto element = sequence.at(index);
+    if (isLess(element, extremum) == wantsMinimum) {
+      extremum = element;
+    }
+  }
+  return extremum;
+}
+
 std::string formatted_utc(std::time_t instant, const std::string &format) {
   std::tm components{};
 #ifdef _WIN32
@@ -233,6 +261,18 @@ std::string render(const std::string &raw_source, const std::string &context_jso
         return minja::Value(formatted_utc(instant, args.args[0].get<std::string>()));
       }));
   context->set("tojson", minja::Value::callable(tojson_value));
+  context->set(
+      "min",
+      minja::Value::callable([](const std::shared_ptr<minja::Context> &,
+                                minja::ArgumentsValue &args) {
+        return extremum_value("min", /* wantsMinimum= */ true, args);
+      }));
+  context->set(
+      "max",
+      minja::Value::callable([](const std::shared_ptr<minja::Context> &,
+                                minja::ArgumentsValue &args) {
+        return extremum_value("max", /* wantsMinimum= */ false, args);
+      }));
   return root->render(context);
 }
 

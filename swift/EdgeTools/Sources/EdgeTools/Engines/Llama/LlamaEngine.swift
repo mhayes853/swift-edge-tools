@@ -197,35 +197,19 @@
         if wantsLogits && prefixCount == tokenIds.count && !tokenIds.isEmpty {
           prefixCount = tokenIds.count - 1
         }
-        if prefixCount < cached.count {
-          _ = self.api.memoryRemove(
-            context: context.raw,
-            sequenceId: sequenceId,
-            from: prefixCount,
-            to: -1
-          )
-        }
-        state.cachedTokenIds[sequenceId] = Array(tokenIds.prefix(prefixCount))
-        var position = prefixCount
-        while position < tokenIds.count {
-          let end = min(position + Self.decodeChunkSize, tokenIds.count)
-          let chunk = Array(tokenIds[position..<end])
-          let isLast = end == tokenIds.count
-          try self.api.decode(
-            context: context.raw,
-            batch: LlamaDecodeBatch(
-              tokens: chunk,
-              startPosition: position,
-              sequenceId: sequenceId,
-              wantsLogits: wantsLogits && isLast
-            )
-          )
-          state.cachedTokenIds[sequenceId, default: []].append(contentsOf: chunk)
-          position += chunk.count
-        }
-        if wantsLogits {
-          state.logitsSequenceId = sequenceId
-        }
+        prefixCount = self.trim(
+          sequenceId: sequenceId,
+          to: prefixCount,
+          context: context,
+          state: &state
+        )
+        try self.decode(
+          tokenIds: Array(tokenIds[prefixCount...]),
+          sequenceId: sequenceId,
+          wantsLogits: wantsLogits,
+          context: context,
+          state: &state
+        )
         return tokenIds.count - prefixCount
       }
     }
@@ -241,30 +225,29 @@
       try self.state.withLock { state in
         let context = try self.context(&state)
         if let pendingTokenId {
-          try self.decodeAppending(
-            tokenId: pendingTokenId,
+          try self.decode(
+            tokenIds: [pendingTokenId],
             sequenceId: sequenceId,
             wantsLogits: true,
             context: context,
             state: &state
           )
         } else if state.logitsSequenceId != sequenceId {
-          guard let lastTokenId = state.cachedTokenIds[sequenceId]?.last else {
+          let cached = state.cachedTokenIds[sequenceId] ?? []
+          guard !cached.isEmpty else {
             throw LlamaRuntimeError(
               code: .decodeFailed,
               message: "The sequence has no decoded tokens to produce logits from."
             )
           }
-          let position = (state.cachedTokenIds[sequenceId]?.count ?? 1) - 1
-          _ = self.api.memoryRemove(
-            context: context.raw,
+          let prefixCount = self.trim(
             sequenceId: sequenceId,
-            from: position,
-            to: -1
+            to: cached.count - 1,
+            context: context,
+            state: &state
           )
-          state.cachedTokenIds[sequenceId]?.removeLast()
-          try self.decodeAppending(
-            tokenId: lastTokenId,
+          try self.decode(
+            tokenIds: Array(cached[prefixCount...]),
             sequenceId: sequenceId,
             wantsLogits: true,
             context: context,
@@ -285,8 +268,8 @@
     func append(tokenId: EdgeToolsToken.ID, sequenceId: Int) throws {
       try self.state.withLock { state in
         let context = try self.context(&state)
-        try self.decodeAppending(
-          tokenId: tokenId,
+        try self.decode(
+          tokenIds: [tokenId],
           sequenceId: sequenceId,
           wantsLogits: false,
           context: context,
@@ -313,23 +296,54 @@
       }
     }
 
-    private func decodeAppending(
-      tokenId: EdgeToolsToken.ID,
+    /// Drops the cells the sequence holds past `prefixCount`, returning the token count it
+    /// actually retains. Recurrent memory modules only support clearing a sequence whole, so
+    /// a rejected removal wipes the sequence and the caller decodes from scratch.
+    private func trim(
+      sequenceId: Int,
+      to prefixCount: Int,
+      context: LlamaContextHandle,
+      state: inout State
+    ) -> Int {
+      let cached = state.cachedTokenIds[sequenceId] ?? []
+      guard prefixCount < cached.count else { return prefixCount }
+      var prefixCount = prefixCount
+      if !self.api.memoryRemove(
+        context: context.raw,
+        sequenceId: sequenceId,
+        from: prefixCount,
+        to: -1
+      ) {
+        _ = self.api.memoryRemove(context: context.raw, sequenceId: sequenceId, from: 0, to: -1)
+        prefixCount = 0
+      }
+      state.cachedTokenIds[sequenceId] = Array(cached.prefix(prefixCount))
+      return prefixCount
+    }
+
+    /// Decodes tokens at the end of the sequence in chunks, leaving logits for the final
+    /// token when requested.
+    private func decode(
+      tokenIds: [EdgeToolsToken.ID],
       sequenceId: Int,
       wantsLogits: Bool,
       context: LlamaContextHandle,
       state: inout State
     ) throws {
-      try self.api.decode(
-        context: context.raw,
-        batch: LlamaDecodeBatch(
-          tokens: [tokenId],
-          startPosition: state.cachedTokenIds[sequenceId]?.count ?? 0,
-          sequenceId: sequenceId,
-          wantsLogits: wantsLogits
+      for start in stride(from: 0, to: tokenIds.count, by: Self.decodeChunkSize) {
+        let end = min(start + Self.decodeChunkSize, tokenIds.count)
+        let chunk = Array(tokenIds[start..<end])
+        try self.api.decode(
+          context: context.raw,
+          batch: LlamaDecodeBatch(
+            tokens: chunk,
+            startPosition: state.cachedTokenIds[sequenceId]?.count ?? 0,
+            sequenceId: sequenceId,
+            wantsLogits: wantsLogits && end == tokenIds.count
+          )
         )
-      )
-      state.cachedTokenIds[sequenceId, default: []].append(tokenId)
+        state.cachedTokenIds[sequenceId, default: []].append(contentsOf: chunk)
+      }
       if wantsLogits {
         state.logitsSequenceId = sequenceId
       }
@@ -595,6 +609,9 @@
       self.tokenizer = tokenizer
       self.vocabularySizeValue = api.vocabularySize(model: model)
       var extraStopTokenIds = tokenizer.endOfGenerationTokenIds()
+      extraStopTokenIds.formUnion(
+        Profile.extraStopTokens.compactMap { tokenizer.token(forText: $0)?.id }
+      )
       var grammarStopTokenIds = extraStopTokenIds
       if let eosTokenId = tokenizer.eos?.id {
         extraStopTokenIds.remove(eosTokenId)

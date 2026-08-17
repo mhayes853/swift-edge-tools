@@ -65,6 +65,62 @@ import OrderedCollections
   public typealias Qwen3P5MLXModelEngine = MLXEngine<Qwen3P5MLXProfile>
 #endif
 
+#if LlamaCore && XGrammar
+  public struct Qwen3P5LlamaProfile: LlamaModelProfile {
+    public typealias Prompt = EdgeToolsTranscript
+    public typealias GenerationParser = Qwen3P5GenerationParser
+    public typealias GenerateParameters = DefaultLlamaGenerateParameters
+    public typealias GrammarEngine = XGrammarEngine
+
+    public static func grammar(
+      prompt: EdgeToolsTranscript,
+      tools: [EdgeToolDefinition],
+      parameters: DefaultLlamaGenerateParameters,
+      grammarEngine: borrowing XGrammarEngine
+    ) throws -> XGRGrammar {
+      try Self.constrainedGrammar(
+        tools: tools,
+        parameters: parameters,
+        grammarEngine: grammarEngine
+      ) { range in
+        let toolCalls = try XGRGrammar.qwen3P5(tools: tools, range: range)
+        guard prompt.reasoningEffort.isEnabled else { return toolCalls }
+        return try XGRGrammar.qwenReasoning().concatenate(toolCalls)
+      }
+    }
+
+    public static func templateContext(prompt: EdgeToolsTranscript) -> [String: EdgeToolsValue]? {
+      guard prompt.reasoningEffort != .default else { return nil }
+      return ["enable_thinking": .boolean(prompt.reasoningEffort.isEnabled)]
+    }
+
+    public static func prepare(
+      prompt: inout EdgeToolsTranscript,
+      tools: [EdgeToolDefinition],
+      parser: inout Qwen3P5GenerationParser
+    ) {
+      let prefix = prompt.reasoningEffort.isEnabled ? "<think>\n" : "<think>\n\n</think>\n\n"
+      _ = parser.accept(token: EdgeToolsToken(id: -1, stringValue: prefix))
+    }
+
+    public static func defaultSampling(
+      prompt: EdgeToolsTranscript,
+      parameters: DefaultLlamaGenerateParameters
+    ) -> EdgeToolsFusedSamplingParameters? {
+      prompt.reasoningEffort.isEnabled
+        ? EdgeToolsFusedSamplingParameters(
+          temperature: 1,
+          topK: 20,
+          topP: 0.95,
+          presencePenalty: 1.5
+        )
+        : EdgeToolsFusedSamplingParameters(temperature: 1, topK: 20, presencePenalty: 2)
+    }
+  }
+
+  public typealias Qwen3P5LlamaModelEngine = LlamaEngine<Qwen3P5LlamaProfile>
+#endif
+
 #if MLX && XGrammar && canImport(CoreImage) && canImport(MLX) && canImport(MLXVLM)
   import Foundation
   import MLXLMCommon

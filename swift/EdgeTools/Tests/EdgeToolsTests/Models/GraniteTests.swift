@@ -19,4 +19,19 @@ struct `Granite tests` {
       }
     }
   #endif
+
+  #if Llama && XGrammar && canImport(CLlama) && !os(WASI)
+    @Suite(.serialized)
+    struct `GraniteLlamaModelEngine tests` {
+      @Test
+      func `Llama Completes Tool Turn Snapshot`() async throws {
+        let engine = try GraniteLlamaModelEngine(
+          modelPath: (try await downloadGGUFModel(id: .graniteMoeHybrid)).path()
+        )
+        let transcript = try await completeWeatherTurn(using: engine)
+
+        withKnownIssue { assertSnapshot(of: transcript, as: .dump, record: .all) }
+      }
+    }
+  #endif
 }
