@@ -49,7 +49,7 @@ import OrderedCollections
   public typealias MiniCPM5MLXModelEngine = MLXEngine<MiniCPM5MLXProfile>
 #endif
 
-#if LlamaCore && XGrammar
+#if Llama && XGrammar && canImport(CLlama)
   public struct MiniCPM5LlamaProfile: LlamaModelProfile {
     public typealias Prompt = EdgeToolsTranscript
     public typealias GenerationParser = MiniCPM5GenerationParser

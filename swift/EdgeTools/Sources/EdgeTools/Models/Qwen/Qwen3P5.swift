@@ -65,7 +65,7 @@ import OrderedCollections
   public typealias Qwen3P5MLXModelEngine = MLXEngine<Qwen3P5MLXProfile>
 #endif
 
-#if LlamaCore && XGrammar
+#if Llama && XGrammar && canImport(CLlama)
   public struct Qwen3P5LlamaProfile: LlamaModelProfile {
     public typealias Prompt = EdgeToolsTranscript
     public typealias GenerationParser = Qwen3P5GenerationParser

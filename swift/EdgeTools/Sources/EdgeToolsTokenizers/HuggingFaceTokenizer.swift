@@ -12,10 +12,6 @@ import EdgeToolsCore
   import CTokenizers
 #endif
 
-#if ChatTemplates && canImport(EdgeToolsChatTemplates)
-  import EdgeToolsChatTemplates
-#endif
-
 #if HuggingFaceTokenizers && FoundationEssentials && canImport(CTokenizers)
   import OrderedCollections
 #endif

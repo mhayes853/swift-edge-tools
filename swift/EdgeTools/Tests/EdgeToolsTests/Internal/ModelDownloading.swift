@@ -77,7 +77,7 @@ import Foundation
 
 #endif
 
-#if HuggingFaceTokenizers && LlamaCore
+#if HuggingFaceTokenizers && Llama && canImport(CLlama)
 
   enum GGUFModelID: String {
     case qwen3 = "Qwen/Qwen3-0.6B-GGUF"

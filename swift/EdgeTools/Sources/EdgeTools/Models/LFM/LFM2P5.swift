@@ -22,7 +22,7 @@
   public typealias LFM2P5MLXModelEngine = MLXEngine<LFM2P5MLXProfile>
 #endif
 
-#if LlamaCore && XGrammar
+#if Llama && XGrammar && canImport(CLlama)
   import EdgeToolsXGrammar
 
   public struct LFM2P5LlamaProfile: LlamaModelProfile {

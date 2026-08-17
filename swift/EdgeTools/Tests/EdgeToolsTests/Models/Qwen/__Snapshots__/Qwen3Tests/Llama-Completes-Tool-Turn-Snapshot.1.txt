@@ -532,15 +532,15 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: "Weather"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " function"
+            - reasoning: " tool"
           ▿ EdgeToolsGenerationPart
             - reasoning: " to"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " get"
+            - reasoning: " retrieve"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " result"
+            - reasoning: " data"
           ▿ EdgeToolsGenerationPart
             - reasoning: "."
           ▿ EdgeToolsGenerationPart
@@ -572,7 +572,11 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " and"
           ▿ EdgeToolsGenerationPart
+            - reasoning: " a"
+          ▿ EdgeToolsGenerationPart
             - reasoning: " temperature"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " of"
           ▿ EdgeToolsGenerationPart
             - reasoning: " "
           ▿ EdgeToolsGenerationPart
@@ -598,8 +602,6 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " information"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " clearly"
-          ▿ EdgeToolsGenerationPart
             - reasoning: " for"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
@@ -619,7 +621,5 @@
             - reasoning: " mention"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " location"
   ▿ reasoningEffort: EdgeToolsReasoningEffort
     - rawValue: "default"

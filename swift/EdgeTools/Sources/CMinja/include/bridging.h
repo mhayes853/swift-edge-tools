@@ -1,5 +1,5 @@
-#ifndef EDGE_TEMPLATE_H
-#define EDGE_TEMPLATE_H
+#ifndef MINJA_BRIDGING_H
+#define MINJA_BRIDGING_H
 
 #include <stddef.h>
 #include <stdint.h>

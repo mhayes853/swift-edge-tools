@@ -48,7 +48,7 @@
   public typealias Qwen3MLXModelEngine = MLXEngine<Qwen3MLXProfile>
 #endif
 
-#if LlamaCore && XGrammar
+#if Llama && XGrammar && canImport(CLlama)
   import EdgeToolsCore
 
   public struct Qwen3LlamaProfile: LlamaModelProfile {

@@ -410,19 +410,13 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 24 elements
+        ▿ parts: 52 elements
           ▿ EdgeToolsGenerationPart
-            - reasoning: "Based"
+            - reasoning: "I"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " on"
+            - reasoning: " found"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " the"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " retrieved"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " information"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: ","
+            - reasoning: " that"
           ▿ EdgeToolsGenerationPart
             - reasoning: " Paris"
           ▿ EdgeToolsGenerationPart
@@ -436,13 +430,9 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: "unny"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "**."
+            - reasoning: "**"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " The"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " forecast"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " shows"
+            - reasoning: " with"
           ▿ EdgeToolsGenerationPart
             - reasoning: " a"
           ▿ EdgeToolsGenerationPart
@@ -457,6 +447,72 @@
             - reasoning: "1"
           ▿ EdgeToolsGenerationPart
             - reasoning: "°C"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "."
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " This"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " information"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " was"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " retrieved"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " by"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " using"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " `"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "get"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "Weather"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "`"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " tool"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " with"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " location"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " parameter"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " set"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " to"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " \""
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "Paris"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "\"."
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "\n\n"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "The"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " summary"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " provided"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " above"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " reflects"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " these"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " weather"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " details"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " for"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " you"
           ▿ EdgeToolsGenerationPart
             - reasoning: "."
   ▿ reasoningEffort: EdgeToolsReasoningEffort

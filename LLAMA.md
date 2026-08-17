@@ -37,23 +37,21 @@ https://github.com/cactus-compute/cactus-hybrid
 
 ## Decisions
 
-### Packaging: prebuilt artifactbundle + bring-your-own-build traits
+### Packaging: prebuilt artifactbundle only
 
-Two traits, following the removed ONNX engine's precedent (`ONNXCore` / `ONNX`, see
-`02f0257^`):
+A single `Llama` trait enabling the vendored, cactus-patched binary artifactbundle. The
+engine calls `llama_*` symbols directly through `CLlama`.
 
-- `LlamaCore`: engine, protocols, and a headers-only `CLlama` target (vendored `llama.h`
-  et al., pinned to the `b10076` ABI). No binaries. Users link their own llama.cpp build.
-- `Llama`: enables `LlamaCore` and adds our vendored, cactus-patched binary artifactbundle.
-
-Unlike ONNX Runtime, llama.cpp has no `OrtApi`-style function-pointer table; `llama_*`
-symbols bind at link time. So the engine never references `llama_*` symbols directly.
-Instead a `LlamaApi` struct of closures covers the exact C surface the engine uses
-(model/context lifecycle, vocab/tokenize/detokenize, batch/decode/logits,
-`llama_memory_seq_*`, `llama_state_seq_*`, chat-template metadata lookup, probe). Under
-the `Llama` trait we provide a default instance wired to the linked patched symbols. The
-`llama_probe_*` entries are optional closures — `nil` on stock builds — so
-bring-your-own users without the cactus patches lose only probe confidence.
+A bring-your-own-build path was originally shipped (a `LlamaCore` trait plus a `LlamaApi`
+struct of closures over the C surface, with a `.vendored` instance under `Llama`) and was
+removed on 2026-08-16 — see the progress log. It cost 26 `nonisolated(unsafe)` closure
+fields, four hand-written adapter closures that a custom build could silently get wrong
+(`modelLoad`, `contextInit`, `decode`, `vocabType`, whose C signatures name non-opaque
+structs that cannot cross module boundaries), and a permanent ABI-pinning documentation
+burden — in exchange for a capability with no known consumer. Reviving it would mean
+splitting `CLlama` into a headers-only source target plus a library-only artifact, and
+adding a `static inline` C shim so every entry is a plain `@convention(c)` pointer rather
+than a closure; that is the shape to build if the need reappears.
 
 Artifact build: `scripts/llama/build-artifact.sh` mirroring `scripts/needle2` and
 `scripts/tokenizers` — clone `b10076`, `git am` the cactus series, CMake per target
@@ -114,7 +112,7 @@ Logits arrive as a CPU `float *`, so:
 - A CPU fused sampler honors `EdgeToolsFusedSamplingParameters` (counterpart to
   `MLXFusedSampler`).
 - Top-2 heuristic confidence falls out of the same pass for every model; probe confidence
-  (Gemma 4 hybrid GGUFs only) queried through the optional `LlamaApi` probe closures.
+  (Gemma 4 hybrid GGUFs only) queried through the `llama_probe_*` symbols directly.
 
 Model profiles follow the existing per-engine pattern (`Qwen3LlamaProfile` alongside
 `Qwen3MLXProfile`), reusing the engine-agnostic tool-calling parsers and grammars in
@@ -123,7 +121,8 @@ Model profiles follow the existing per-engine pattern (`Qwen3LlamaProfile` along
 ### Tokenizer: llama.cpp native
 
 The GGUF-embedded vocab is ground truth for what the model was quantized against. A
-`LlamaTokenizer` over `llama_vocab` (through `LlamaApi`) conforms to:
+`LlamaTokenizer` (in `EdgeToolsTokenizers`) over `llama_vocab`, reached through
+`LlamaModel.withUnsafeVocabPointer` (`LlamaModel` lives in `EdgeToolsCore`), conforms to:
 
 - `EdgeToolsTokenizer`: `llama_tokenize` / `llama_detokenize` / vocab getters.
 - `XGRTokenizer`: `XGRTokenizerInfo` needs the encoded vocabulary, vocabulary type, and
@@ -186,8 +185,8 @@ renderer as-is; `rust/tokenizers` drops it), with the same `ChatTemplates` trait
 
 ### Naming
 
-`Llama` / `LlamaCore` traits; `LlamaEngine`, `LlamaModelProfile`, `LlamaContext`,
-`LlamaTokenizer`, `LlamaApi` types. "Llama" is understood as llama.cpp, not the model
+`Llama` trait; `LlamaEngine`, `LlamaModelProfile`, `LlamaContext`, `LlamaTokenizer`,
+`LlamaModel` types. "Llama" is understood as llama.cpp, not the model
 family.
 
 ## Implementation Plan
@@ -221,8 +220,7 @@ independently against the existing MLX/tokenizer test suites.
   tracking, masked replace, scalar tail) — resurrect and extend the deleted
   `argmaxContiguous`/`argmaxSIMD` helpers into softmax/top-k/top-p/min-p/penalties.
   ggml was considered and rejected: it would tie the generic layer to llama linkage
-  (breaking track independence and requiring `LlamaApi` closures for non-public ggml
-  symbols) and its vector kernels aren't exported as stable public API. Engine-agnostic,
+  (breaking track independence, and its non-public symbols are unreachable anyway) and its vector kernels aren't exported as stable public API. Engine-agnostic,
   unit-tested directly.
 
 ### Track B: llama vendoring (parallel with A)
@@ -232,12 +230,11 @@ independently against the existing MLX/tokenizer test suites.
   `scripts/needle2` conventions: clone `b10076`, `git am` cactus patches 1–4, CMake static
   builds per triple (Apple: Metal + Accelerate; Linux/Windows/Android: CPU), assemble
   headers + modulemap + checksums into `bin/llama-<version>.artifactbundle.zip`.
-- **B2 — traits + `LlamaApi`. [DONE]** `LlamaCore` trait: headers-only `CLlama` target (vendored
-  `b10076` headers) plus the `LlamaApi` struct of closures over the C surface the engine
-  uses (lifecycle, vocab/tokenize, batch/decode/logits, `llama_memory_seq_*`,
-  `llama_state_seq_*`, GGUF metadata, optional probe entries). `Llama` trait: enables
-  `LlamaCore` + `ChatTemplates`, links the B1 binary, provides the vendored `LlamaApi`
-  default.
+- **B2 — trait + runtime. [DONE; simplified 2026-08-16]** `Llama` trait enables
+  `ChatTemplates` and links the B1 binary. `LlamaModel` (vocab/tokenize/detokenize/chat
+  template) and `LlamaContextHandle` (decode/logits/`llama_memory_seq_*`) call `llama_*`
+  directly. Originally a `LlamaCore` trait plus a `LlamaApi` closure struct; see the
+  packaging section.
 
 ### Track C: the engine (after A + B)
 
@@ -247,7 +244,7 @@ every model gets it. Probe ("hybrid") confidence applies only to Gemma 4 hybrid 
 C5 fan-out rather than on the critical path.
 
 - **C1 — `LlamaTokenizer`. [DONE]** Core (needs B2 only): `EdgeToolsTokenizer` over
-  `llama_vocab` through `LlamaApi`; `XGRTokenizer` via vocab-type mapping
+  `llama_vocab` through `LlamaModel`; `XGRTokenizer` via vocab-type mapping
   (SPM → `byteFallback` + prefix space, BPE → `byteLevel`); stop tokens from GGUF
   metadata. Chat conformance (adds A1): `EdgeToolsChatTokenizer` rendering the
   GGUF-embedded template through `ChatTemplates`.
@@ -276,8 +273,7 @@ After C3, the remaining phases run in parallel:
 - **C5b — profile fan-out. [DONE except Gemma 4 probe confidence]** (after C5a; parallel
   per model). Remaining llama profiles
   (Gemma 4, LFM2.5, Granite, …). The Gemma 4 profile additionally wires probe
-  confidence: a probe metadata key emitted when the `LlamaApi` probe closures are present
-  and the model carries probe tensors (needs the track D hybrid GGUF for validation).
+  confidence: a probe metadata key emitted when the model carries probe tensors (needs the track D hybrid GGUF for validation).
 - **C5c — CLI.** `.gguf` model detection in `EdgeToolsCLI`.
 
 ### Track D: python export (independent, anytime)
@@ -287,6 +283,53 @@ probe GGUF. No engine dependency; only C5b's Gemma 4 probe validation consumes i
 output.
 
 ## Progress Log
+
+- **2026-08-16 — `LlamaApi` removed; module layout cleanup.** Six refactors landed
+  together:
+  - **`LlamaAPI` deleted.** `LlamaCore` collapsed into `Llama`; `LlamaModel` and
+    `LlamaContextHandle` call `llama_*` directly. This removed 26 `nonisolated(unsafe)`
+    fields, `LlamaAPI+Vendored.swift`, and the dead probe/metadata plumbing
+    (`modelHasProbe`, `probeConfidence`, `probeReset`, `metadataValue`, `addsBOSToken`
+    were never called). `LlamaContextHandle` is `~Copyable` with a `deinit`, so the context
+    has exactly one owner and `LlamaSequenceFamily` needs no `deinit` of its own —
+    `Lock.deinit` destroys the state, which frees the context. `LlamaSequenceFamily`, its
+    `Lease`, and `LlamaTokenizer` are plain `Sendable`. Consequence: the engine is Apple-only until the
+    linux/android/windows artifact slices ship, since it can no longer compile against a
+    user-supplied build.
+  - **`LlamaBackend` deleted.** `llama_backend_init` now runs once per process from a
+    lazy global on first model load; `llama_backend_free` is never called (it tears down
+    state shared by every live model). `LlamaBackend.systemInfo` became the global
+    `llamaSystemInfo()`.
+  - **Tests moved off mocks onto real GGUFs.** `MockLlamaApi.swift` is gone. KV reuse,
+    fork COW, and capacity fallback are now asserted through `prefillMetrics.tokens` on
+    Qwen3-0.6B (`LlamaEngineTests`), and `LlamaTokenizerTests` runs against the real
+    vocabulary. Two assertions improved in the process: the capacity test now checks the
+    user-visible contract (the fork still works, cache-cold) rather than "two contexts were
+    created", and a new test checks that a diverged fork leaves the parent's cache intact —
+    something the mock suite never covered. Lost: `Missing Chat Template Throws`, which
+    needs a GGUF with no embedded template.
+  - **`EdgeToolsChatTemplates` folded into `EdgeToolsTokenizers`** (target and product
+    dropped; it had no consumers outside the package) and `LlamaTokenizer` moved there.
+    `LlamaModel` sits lower still, in `EdgeToolsCore`, since both the tokenizer and the
+    engine need it. It exposes no pointer properties — only `withUnsafeModelPointer` and
+    `withUnsafeVocabPointer`, so a `llama_model *` cannot outlive the model that owns it —
+    and it carries no vocabulary wrapper methods: `LlamaTokenizer` and `createContext` call
+    `llama_*` directly inside those closures. That deleted `LlamaVocabKind` too, since the
+    XGrammar mapping now switches on `LLAMA_VOCAB_TYPE_*` at the one place it is needed.
+  - **`CMinja` restructured to the `CXGrammar` layout** — `.clangd`, `bridging.cc`,
+    `include/bridging.h`, `include/module.modulemap` — which is what fixes the LSP errors
+    (clangd could not resolve `minja/minja.hpp` without the include paths).
+  - **CPU sampling takes `MutableSpan<Float>`.** `EdgeToolsCPUFusedSampler.sample` and
+    `applyBitmaskCPU` take spans; the pointer overloads remain public for callers that
+    already hold a buffer, and the SIMD/vDSP internals still work on `UnsafeBufferPointer`.
+    `applyBitmaskCPU` and its SIMD table moved to `Grammar/GrammarBitmask.swift`, next to
+    the MLX bitmask path. Note for callers:
+    `Array.mutableSpan` is macOS 26+, but the `MutableSpan` type and
+    `MutableSpan(_unsafeElements:)` work at the package's macOS 14 floor, so pre-26
+    callers bridge through `withUnsafeMutableBufferPointer`.
+  - Also fixed: `EdgeToolsTests` declared `resources: [.process("Resources")]` for a
+    directory emptied back in `214cfa8` (the fixtures moved to `EdgeToolsTokenizersTests`),
+    which broke `swift build --build-tests` on any clean checkout.
 
 - **2026-08-16 — A3 complete.** `EdgeToolsCPUSampling.swift`: `EdgeToolsCPUFusedSampler`
   (+ `EdgeToolsCPUTokenHistory`, `EdgeToolsCPUSample`), `applyBitmaskCPU`, and
@@ -465,8 +508,8 @@ output.
   that refuses the copy (as `llama_memory_recurrent` refuses partial `seq_rm`) would
   leave a fork claiming cached tokens it does not hold. Forks are only covered by a
   real-model test on attention-only Qwen3.
-- Whether `LlamaApi` closures take C types by value (pins users to `b10076`-era ABI for
-  `llama_batch` etc.) or we shrink the by-value surface. Document the pin either way.
+- The `b10076` ABI pin now lives in the vendored artifact rather than in a closure
+  surface; revisit if a bring-your-own-build path returns.
 
 ## Deferred
 

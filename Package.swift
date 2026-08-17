@@ -21,7 +21,6 @@ let package = Package(
   products: [
     .library(name: "EdgeTools", targets: ["EdgeTools"]),
     .library(name: "EdgeToolsTokenizers", targets: ["EdgeToolsTokenizers"]),
-    .library(name: "EdgeToolsChatTemplates", targets: ["EdgeToolsChatTemplates"]),
     .library(name: "EdgeToolsXGrammar", targets: ["EdgeToolsXGrammar"])
   ],
   traits: [
@@ -54,18 +53,9 @@ let package = Package(
       enabledTraits: ["HuggingFaceTokenizers", "FoundationEssentials"]
     ),
     .trait(
-      name: "LlamaCore",
-      description: """
-        llama.cpp engine and runtime protocols. \
-        (Only enable this trait if you want to use your own llama.cpp build. \
-        Otherwise, enable `Llama` directly.)
-        """,
-      enabledTraits: ["ChatTemplates"]
-    ),
-    .trait(
       name: "Llama",
-      description: "Vendored cactus-patched llama.cpp support.",
-      enabledTraits: ["LlamaCore"]
+      description: "Vendored cactus-patched llama.cpp engine support.",
+      enabledTraits: ["ChatTemplates"]
     ),
     .default(enabledTraits: ["Foundation"])
   ],
@@ -147,15 +137,6 @@ let package = Package(
         .target(name: "EdgeToolsTokenizers"),
         .target(name: "EdgeToolsXGrammar", condition: .when(traits: ["XGrammar"])),
         .target(
-          name: "EdgeToolsChatTemplates",
-          condition: .when(
-            platforms: [
-              .macOS, .iOS, .tvOS, .watchOS, .visionOS, .linux, .android, .windows
-            ],
-            traits: ["LlamaCore"]
-          )
-        ),
-        .target(
           name: "CLlama",
           condition: .when(platforms: [.macOS, .iOS], traits: ["Llama"])
         ),
@@ -197,10 +178,20 @@ let package = Package(
           condition: .when(traits: ["FoundationEssentials"])
         ),
         .product(name: "yyjson", package: "yyjson"),
-        .product(name: "OrderedCollections", package: "swift-collections")
+        .product(name: "OrderedCollections", package: "swift-collections"),
+        .target(
+          name: "CLlama",
+          condition: .when(platforms: [.macOS, .iOS], traits: ["Llama"])
+        )
       ],
       path: "swift/EdgeTools/Sources/EdgeToolsCore",
-      swiftSettings: edgeToolsSwiftSettings
+      swiftSettings: edgeToolsSwiftSettings,
+      linkerSettings: [
+        .linkedFramework("Metal", .when(platforms: [.macOS, .iOS], traits: ["Llama"])),
+        .linkedFramework("MetalKit", .when(platforms: [.macOS, .iOS], traits: ["Llama"])),
+        .linkedFramework("Accelerate", .when(platforms: [.macOS, .iOS], traits: ["Llama"])),
+        .linkedLibrary("c++", .when(platforms: [.macOS, .iOS], traits: ["Llama"]))
+      ]
     ),
     .target(
       name: "EdgeToolsTokenizers",
@@ -222,39 +213,33 @@ let package = Package(
           )
         ),
         .target(
-          name: "EdgeToolsChatTemplates",
+          name: "CMinja",
           condition: .when(
             platforms: [
               .macOS, .iOS, .tvOS, .watchOS, .visionOS, .linux, .android, .windows
             ],
             traits: ["ChatTemplates"]
           )
+        ),
+        .target(
+          name: "CLlama",
+          condition: .when(platforms: [.macOS, .iOS], traits: ["Llama"])
         )
       ],
       path: "swift/EdgeTools/Sources/EdgeToolsTokenizers",
-      swiftSettings: edgeToolsSwiftSettings
-    ),
-    .target(
-      name: "EdgeToolsChatTemplates",
-      dependencies: [
-        "EdgeToolsCore",
-        .target(
-          name: "CMinja",
-          condition: .when(
-            platforms: [
-              .macOS, .iOS, .tvOS, .watchOS, .visionOS, .linux, .android, .windows
-            ]
-          )
-        )
-      ],
-      path: "swift/EdgeTools/Sources/EdgeToolsChatTemplates",
-      swiftSettings: edgeToolsSwiftSettings
+      swiftSettings: edgeToolsSwiftSettings,
+      linkerSettings: [
+        .linkedFramework("Metal", .when(platforms: [.macOS, .iOS], traits: ["Llama"])),
+        .linkedFramework("MetalKit", .when(platforms: [.macOS, .iOS], traits: ["Llama"])),
+        .linkedFramework("Accelerate", .when(platforms: [.macOS, .iOS], traits: ["Llama"])),
+        .linkedLibrary("c++", .when(platforms: [.macOS, .iOS], traits: ["Llama"]))
+      ]
     ),
     .target(
       name: "CMinja",
       path: "swift/EdgeTools/Sources/CMinja",
       exclude: ["minja/LICENSE", "minja/PIN", "nlohmann/PIN"],
-      sources: ["render.cc"],
+      sources: ["bridging.cc"],
       publicHeadersPath: "include",
       cxxSettings: [
         .headerSearchPath(".")
@@ -361,8 +346,7 @@ let package = Package(
         "Models/LFM/__Snapshots__",
         "Models/Qwen/__Snapshots__",
         "Tokenization/__Snapshots__"
-      ],
-      resources: [.process("Resources")]
+      ]
     )
   ],
   swiftLanguageModes: [.v6],

@@ -50,7 +50,7 @@
   public typealias GraniteMoeHybridMLXModelEngine = MLXEngine<GraniteMoeHybridMLXProfile>
 #endif
 
-#if LlamaCore && XGrammar
+#if Llama && XGrammar && canImport(CLlama)
   import EdgeToolsCore
 
   public struct GraniteLlamaProfile: LlamaModelProfile {

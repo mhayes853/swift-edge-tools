@@ -141,7 +141,7 @@
   }
 #endif
 
-#if LlamaCore && XGrammar
+#if Llama && XGrammar && canImport(CLlama)
   public struct Gemma4LlamaProfile: LlamaModelProfile {
     public typealias Prompt = EdgeToolsTranscript
     public typealias GenerationParser = Gemma4GenerationParser

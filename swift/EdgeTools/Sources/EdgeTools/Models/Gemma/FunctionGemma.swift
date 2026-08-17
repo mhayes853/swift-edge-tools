@@ -30,7 +30,7 @@
   public typealias FunctionGemmaMLXModelEngine = MLXEngine<FunctionGemmaMLXProfile>
 #endif
 
-#if LlamaCore && XGrammar
+#if Llama && XGrammar && canImport(CLlama)
   import EdgeToolsCore
 
   public struct FunctionGemmaLlamaProfile: LlamaModelProfile {

@@ -1,4 +1,4 @@
-#if canImport(CMinja)
+#if ChatTemplates && canImport(CMinja)
   import CMinja
   import EdgeToolsCore
 

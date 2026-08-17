@@ -1,4 +1,4 @@
-#if LlamaCore
+#if Llama && canImport(CLlama)
   import EdgeToolsCore
   import EdgeToolsTokenizers
 
@@ -74,31 +74,6 @@
   public typealias LlamaContext<Profile> = EdgeToolsTranscriptContext<LlamaModelState<Profile>>
   where Profile: LlamaModelProfile
 
-  // MARK: - LlamaModelHandle
-
-  final class LlamaModelHandle: @unchecked Sendable {
-    let api: LlamaAPI
-    let model: OpaquePointer
-
-    init(api: LlamaAPI, model: OpaquePointer) {
-      self.api = api
-      self.model = model
-    }
-
-    deinit {
-      self.api.modelFree(self.model)
-    }
-  }
-
-  // MARK: - LlamaContextHandle
-
-  /// A Sendable wrapper for a `llama_context` pointer. The family lock serializes access;
-  /// keeping the handle Sendable keeps region isolation from tying the pointer to the
-  /// lock state when it flows into the raw C closures of ``LlamaAPI``.
-  private struct LlamaContextHandle: @unchecked Sendable {
-    let raw: OpaquePointer
-  }
-
   // MARK: - LlamaSequenceFamily
 
   /// One llama context whose KV cells are shared copy-on-write between the sequences of a
@@ -110,9 +85,9 @@
   /// `isResponding` gate. Because the context has a single logits output, logits access
   /// is atomic with the decode that produced it, and a sequence re-decodes its final
   /// token when another sequence decoded in between.
-  final class LlamaSequenceFamily: @unchecked Sendable {
+  final class LlamaSequenceFamily: Sendable {
     /// Ownership of one sequence id; releasing it clears the sequence's KV cells.
-    final class Lease: @unchecked Sendable {
+    final class Lease: Sendable {
       let family: LlamaSequenceFamily
       let sequenceId: Int
 
@@ -124,7 +99,7 @@
       deinit { self.family.release(sequenceId: self.sequenceId) }
     }
 
-    private struct State {
+    private struct State: ~Copyable {
       var context: LlamaContextHandle?
       var cachedTokenIds = [Int: [EdgeToolsToken.ID]]()
       var allocatedSequenceIds = Set<Int>()
@@ -133,29 +108,16 @@
 
     private static let decodeChunkSize = 512
 
-    let handle: LlamaModelHandle
+    let model: LlamaModel
     let parameters: LlamaContextParameters
     private let state = Lock(State())
 
-    private var api: LlamaAPI {
-      self.handle.api
-    }
-
-    init(handle: LlamaModelHandle, parameters: LlamaContextParameters) {
-      self.handle = handle
+    init(model: LlamaModel, parameters: LlamaContextParameters) {
+      self.model = model
       self.parameters = parameters
     }
 
-    deinit {
-      self.state.withBorrowedLock { state in
-        if let context = state.context {
-          self.handle.api.contextFree(context.raw)
-        }
-      }
-    }
-
-    /// Leases a fresh sequence id, sharing the parent's KV cells copy-on-write. Returns
-    /// nil when the family has no sequence capacity left.
+    /// Returns nil when the family has no sequence capacity left.
     func lease(copyingFrom parentSequenceId: Int?) -> Lease? {
       self.state.withLock { state in
         guard
@@ -166,15 +128,12 @@
         }
         state.allocatedSequenceIds.insert(sequenceId)
         if let parentSequenceId {
-          if let context = state.context {
-            self.api.memoryCopy(
-              context: context.raw,
-              source: parentSequenceId,
-              destination: sequenceId,
-              from: 0,
-              to: -1
-            )
-          }
+          state.context?.memoryCopy(
+            source: parentSequenceId,
+            destination: sequenceId,
+            from: 0,
+            to: -1
+          )
           state.cachedTokenIds[sequenceId] = state.cachedTokenIds[parentSequenceId] ?? []
         } else {
           state.cachedTokenIds[sequenceId] = []
@@ -183,53 +142,44 @@
       }
     }
 
-    /// Trims the sequence to the common prefix and decodes the remaining suffix, leaving
-    /// logits for the final token when requested. Returns the number of decoded tokens.
+    /// Returns the number of tokens actually decoded after prefix reuse.
     func prefill(
       sequenceId: Int,
       tokenIds: [EdgeToolsToken.ID],
       wantsLogits: Bool
     ) throws -> Int {
       try self.state.withLock { state in
-        let context = try self.context(&state)
+        try self.ensureContext(&state)
         let cached = state.cachedTokenIds[sequenceId] ?? []
         var prefixCount = zip(cached, tokenIds).prefix { $0 == $1 }.count
         if wantsLogits && prefixCount == tokenIds.count && !tokenIds.isEmpty {
           prefixCount = tokenIds.count - 1
         }
-        prefixCount = self.trim(
-          sequenceId: sequenceId,
-          to: prefixCount,
-          context: context,
-          state: &state
-        )
+        prefixCount = self.trim(sequenceId: sequenceId, to: prefixCount, state: &state)
         try self.decode(
           tokenIds: Array(tokenIds[prefixCount...]),
           sequenceId: sequenceId,
           wantsLogits: wantsLogits,
-          context: context,
           state: &state
         )
         return tokenIds.count - prefixCount
       }
     }
 
-    /// Decodes a pending token when present, then passes the sequence's current logits to
-    /// `body`, regenerating them when another sequence decoded since they were produced.
+    /// Regenerates the logits first when another sequence decoded since they were produced.
     func withCurrentLogits<R>(
       sequenceId: Int,
       appending pendingTokenId: EdgeToolsToken.ID?,
       vocabularySize: Int,
-      _ body: (UnsafeMutableBufferPointer<Float>) throws -> R
+      _ body: (inout MutableSpan<Float>) throws -> R
     ) throws -> R {
       try self.state.withLock { state in
-        let context = try self.context(&state)
+        try self.ensureContext(&state)
         if let pendingTokenId {
           try self.decode(
             tokenIds: [pendingTokenId],
             sequenceId: sequenceId,
             wantsLogits: true,
-            context: context,
             state: &state
           )
         } else if state.logitsSequenceId != sequenceId {
@@ -240,39 +190,34 @@
               message: "The sequence has no decoded tokens to produce logits from."
             )
           }
-          let prefixCount = self.trim(
-            sequenceId: sequenceId,
-            to: cached.count - 1,
-            context: context,
-            state: &state
-          )
+          let prefixCount = self.trim(sequenceId: sequenceId, to: cached.count - 1, state: &state)
           try self.decode(
             tokenIds: Array(cached[prefixCount...]),
             sequenceId: sequenceId,
             wantsLogits: true,
-            context: context,
             state: &state
           )
         }
-        guard let logits = self.api.lastLogits(context: context.raw) else {
+        guard let logits = state.context?.lastLogits() ?? nil else {
           throw LlamaRuntimeError(
             code: .decodeFailed,
             message: "The llama context has no logits for the last decoded token."
           )
         }
-        return try body(UnsafeMutableBufferPointer(start: logits, count: vocabularySize))
+        var span = MutableSpan<Float>(
+          _unsafeElements: UnsafeMutableBufferPointer(start: logits, count: vocabularySize)
+        )
+        return try body(&span)
       }
     }
 
-    /// Decodes a single committed token at the end of the sequence.
     func append(tokenId: EdgeToolsToken.ID, sequenceId: Int) throws {
       try self.state.withLock { state in
-        let context = try self.context(&state)
+        try self.ensureContext(&state)
         try self.decode(
           tokenIds: [tokenId],
           sequenceId: sequenceId,
           wantsLogits: false,
-          context: context,
           state: &state
         )
       }
@@ -280,14 +225,7 @@
 
     private func release(sequenceId: Int) {
       self.state.withLock { state in
-        if let context = state.context {
-          _ = self.api.memoryRemove(
-            context: context.raw,
-            sequenceId: sequenceId,
-            from: 0,
-            to: -1
-          )
-        }
+        _ = state.context?.memoryRemove(sequenceId: sequenceId, from: 0, to: -1)
         state.cachedTokenIds[sequenceId] = nil
         state.allocatedSequenceIds.remove(sequenceId)
         if state.logitsSequenceId == sequenceId {
@@ -299,48 +237,38 @@
     /// Drops the cells the sequence holds past `prefixCount`, returning the token count it
     /// actually retains. Recurrent memory modules only support clearing a sequence whole, so
     /// a rejected removal wipes the sequence and the caller decodes from scratch.
-    private func trim(
-      sequenceId: Int,
-      to prefixCount: Int,
-      context: LlamaContextHandle,
-      state: inout State
-    ) -> Int {
+    private func trim(sequenceId: Int, to prefixCount: Int, state: inout State) -> Int {
       let cached = state.cachedTokenIds[sequenceId] ?? []
       guard prefixCount < cached.count else { return prefixCount }
       var prefixCount = prefixCount
-      if !self.api.memoryRemove(
-        context: context.raw,
-        sequenceId: sequenceId,
-        from: prefixCount,
-        to: -1
-      ) {
-        _ = self.api.memoryRemove(context: context.raw, sequenceId: sequenceId, from: 0, to: -1)
+      if state.context?.memoryRemove(sequenceId: sequenceId, from: prefixCount, to: -1) != true {
+        _ = state.context?.memoryRemove(sequenceId: sequenceId, from: 0, to: -1)
         prefixCount = 0
       }
       state.cachedTokenIds[sequenceId] = Array(cached.prefix(prefixCount))
       return prefixCount
     }
 
-    /// Decodes tokens at the end of the sequence in chunks, leaving logits for the final
-    /// token when requested.
     private func decode(
       tokenIds: [EdgeToolsToken.ID],
       sequenceId: Int,
       wantsLogits: Bool,
-      context: LlamaContextHandle,
       state: inout State
     ) throws {
+      guard state.context != nil else {
+        throw LlamaRuntimeError(
+          code: .contextCreationFailed,
+          message: "The llama context is unavailable."
+        )
+      }
       for start in stride(from: 0, to: tokenIds.count, by: Self.decodeChunkSize) {
         let end = min(start + Self.decodeChunkSize, tokenIds.count)
         let chunk = Array(tokenIds[start..<end])
-        try self.api.decode(
-          context: context.raw,
-          batch: LlamaDecodeBatch(
-            tokens: chunk,
-            startPosition: state.cachedTokenIds[sequenceId]?.count ?? 0,
-            sequenceId: sequenceId,
-            wantsLogits: wantsLogits && end == tokenIds.count
-          )
+        try state.context?.decode(
+          tokenIds: chunk,
+          startPosition: state.cachedTokenIds[sequenceId]?.count ?? 0,
+          sequenceId: sequenceId,
+          wantsLogits: wantsLogits && end == tokenIds.count
         )
         state.cachedTokenIds[sequenceId, default: []].append(contentsOf: chunk)
       }
@@ -349,15 +277,9 @@
       }
     }
 
-    private func context(_ state: inout State) throws -> LlamaContextHandle {
-      if let context = state.context {
-        return context
-      }
-      let context = LlamaContextHandle(
-        raw: try self.api.createContext(model: self.handle.model, parameters: self.parameters)
-      )
-      state.context = context
-      return context
+    private func ensureContext(_ state: inout State) throws {
+      guard state.context == nil else { return }
+      state.context = try self.model.createContext(parameters: self.parameters)
     }
   }
 
@@ -393,9 +315,7 @@
     }
 
     public func forkedContextState(copyingCache: Bool) -> sending Self {
-      // Forks lease a fresh sequence id sharing the parent's KV cells copy-on-write.
-      // When the family's sequence capacity is exhausted the fork falls back to a fresh
-      // family with a cold cache. All llama access is serialized inside the family.
+      // Exhausting the family's sequence capacity falls back to a fresh, cache-cold family.
       let state: Self
       if let lease = self.family.lease(copyingFrom: self.lease.sequenceId) {
         state = Self(
@@ -406,7 +326,7 @@
         )
       } else {
         let family = LlamaSequenceFamily(
-          handle: self.family.handle,
+          model: self.family.model,
           parameters: self.family.parameters
         )
         state = Self(
@@ -421,9 +341,8 @@
     }
 
     public func generationState() -> sending Self {
-      // A generation continues on the same sequence; exclusivity is enforced by the
-      // transcript context's `isResponding` gate, and the family serializes all llama
-      // calls internally.
+      // Generations continue on the context's own sequence: forking one here would hand it
+      // a cold cache and sever KV continuity. Exclusivity comes from `isResponding`.
       nonisolated(unsafe) let state = Self(
         family: self.family,
         lease: self.lease,
@@ -522,7 +441,7 @@
         appending: generation.pendingTokenId,
         vocabularySize: self.vocabularySizeValue
       ) {
-        generation.sampler.sample(logits: $0, bitmask: bitmask)
+        generation.sampler.sample(logits: &$0, bitmask: bitmask)
       }
       generation.confidence.add(confidence: sample.confidence)
       generation.pendingTokenId = sample.tokenId
@@ -584,7 +503,7 @@
     public typealias GenerateParameters = Profile.GenerateParameters
     public typealias ModelGenerationState = LlamaGenerationState<Profile>
 
-    private let handle: LlamaModelHandle
+    private let model: LlamaModel
     private let contextParameters: LlamaContextParameters
     private let defaultSampling: EdgeToolsFusedSamplingParameters?
     private let vocabularySizeValue: Int
@@ -594,20 +513,18 @@
     public let grammarEngine: Profile.GrammarEngine
 
     public init(
-      api: LlamaAPI,
       modelPath: String,
       modelParameters: LlamaModelParameters = LlamaModelParameters(),
       contextParameters: LlamaContextParameters = LlamaContextParameters(),
       defaultSampling: EdgeToolsFusedSamplingParameters? = nil
     ) throws {
-      api.backendInit()
-      let model = try api.loadModel(path: modelPath, parameters: modelParameters)
-      self.handle = LlamaModelHandle(api: api, model: model)
+      let model = try LlamaModel(path: modelPath, parameters: modelParameters)
+      self.model = model
       self.contextParameters = contextParameters
       self.defaultSampling = defaultSampling
-      let tokenizer = LlamaTokenizer(api: api, model: model)
+      let tokenizer = LlamaTokenizer(model: model)
       self.tokenizer = tokenizer
-      self.vocabularySizeValue = api.vocabularySize(model: model)
+      self.vocabularySizeValue = tokenizer.vocabularySize
       var extraStopTokenIds = tokenizer.endOfGenerationTokenIds()
       extraStopTokenIds.formUnion(
         Profile.extraStopTokens.compactMap { tokenizer.token(forText: $0)?.id }
@@ -828,7 +745,7 @@
 
     private func makeModelState() -> sending LlamaModelState<Profile> {
       let family = LlamaSequenceFamily(
-        handle: self.handle,
+        model: self.model,
         parameters: self.contextParameters
       )
       nonisolated(unsafe) let state = LlamaModelState<Profile>(
@@ -856,25 +773,6 @@
       )
     }
   }
-
-  #if Llama && canImport(CLlama)
-    extension LlamaEngine {
-      public convenience init(
-        modelPath: String,
-        modelParameters: LlamaModelParameters = LlamaModelParameters(),
-        contextParameters: LlamaContextParameters = LlamaContextParameters(),
-        defaultSampling: EdgeToolsFusedSamplingParameters? = nil
-      ) throws {
-        try self.init(
-          api: .vendored,
-          modelPath: modelPath,
-          modelParameters: modelParameters,
-          contextParameters: contextParameters,
-          defaultSampling: defaultSampling
-        )
-      }
-    }
-  #endif
 
   // MARK: - EdgeToolsSession + Llama
 

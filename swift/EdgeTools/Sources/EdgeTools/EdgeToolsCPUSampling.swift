@@ -94,7 +94,7 @@ public final class EdgeToolsCPUFusedSampler {
   }
 
   public func sample(
-    logits: inout [Float],
+    logits: inout MutableSpan<Float>,
     bitmask: GrammarBitmask? = nil
   ) -> EdgeToolsCPUSample {
     logits.withUnsafeMutableBufferPointer { self.sample(logits: $0, bitmask: bitmask) }
@@ -230,33 +230,6 @@ public final class EdgeToolsCPUFusedSampler {
   }
 }
 
-// MARK: - Bitmask
-
-public func applyBitmaskCPU(logits: UnsafeMutableBufferPointer<Float>, mask: GrammarBitmask) {
-  validateBitmaskCoverage(mask: mask, vocabularySize: logits.count)
-  guard let base = logits.baseAddress else { return }
-  var index = 0
-  for byte in mask.storage {
-    guard index < logits.count else { break }
-    if byte == .max {
-      index += 8
-      continue
-    }
-    if index + 8 <= logits.count {
-      let pointer = UnsafeMutableRawPointer(base.advanced(by: index))
-      let block = pointer.loadUnaligned(as: SIMD8<Float>.self)
-      pointer.storeBytes(of: block + bitmaskSIMDTable[Int(byte)], as: SIMD8<Float>.self)
-    } else {
-      for bit in 0..<8 where index + bit < logits.count {
-        if byte & (1 &<< UInt8(bit)) == 0 {
-          logits[index + bit] = -.infinity
-        }
-      }
-    }
-    index += 8
-  }
-}
-
 // MARK: - Candidate Selection
 
 private struct LogitCandidate: Comparable {
@@ -308,11 +281,6 @@ private func nucleusCandidates(
 // MARK: - SIMD Reductions
 
 private let negligibleLogitOffset = Float(20)
-
-private let bitmaskSIMDTable = (0..<256)
-  .map { byte in
-    SIMD8<Float>((0..<8).map { bit in ((byte >> bit) & 1) != 0 ? 0 : -Float.infinity })
-  }
 
 @inline(always)
 func maxContiguous(_ values: UnsafeBufferPointer<Float>) -> Float {

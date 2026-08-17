@@ -165,6 +165,16 @@ extension [Float] {
 }
 
 extension EdgeToolsCPUFusedSampler {
+  fileprivate func sample(
+    logits: inout [Float],
+    bitmask: GrammarBitmask? = nil
+  ) -> EdgeToolsCPUSample {
+    logits.withUnsafeMutableBufferPointer { logits in
+      var span = MutableSpan<Float>(_unsafeElements: logits)
+      return self.sample(logits: &span, bitmask: bitmask)
+    }
+  }
+
   fileprivate func pick(from logits: [Float]) -> Int {
     var logits = logits
     return self.sample(logits: &logits).tokenId
