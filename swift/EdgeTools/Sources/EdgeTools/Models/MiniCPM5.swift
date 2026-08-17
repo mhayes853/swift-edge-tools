@@ -20,15 +20,15 @@ import OrderedCollections
       parameters: DefaultMLXGenerateParameters,
       grammarEngine: borrowing XGrammarEngine
     ) throws -> XGRGrammar {
-      try Self.constrainedGrammar(
+      let grammar = try Self.constrainedGrammar(
         tools: tools,
         parameters: parameters,
         grammarEngine: grammarEngine
-      ) { range in
-        let toolCalls = try XGRGrammar.miniCPM5(tools: tools, range: range)
-        guard prompt.reasoningEffort.isEnabled else { return toolCalls }
-        return try .qwenReasoning().concatenate(toolCalls)
+      ) {
+        try XGRGrammar.miniCPM5(tools: tools, range: $0)
       }
+      guard prompt.reasoningEffort.isEnabled else { return grammar }
+      return try .qwenReasoning().concatenate(grammar)
     }
 
     public static func templateContext(prompt: EdgeToolsTranscript) -> [String: EdgeToolsValue]? {

@@ -67,7 +67,7 @@
     let turn = try splitUserMessage(from: .weatherTest)
     let context = session.context(transcript: turn.transcript, reasoningEffort: .none)
     let toolGeneration = try await session.generate(
-      prompt: turn.userMessage,
+      prompt: .user(turn.userMessage),
       context: context,
       parameters: DefaultMLXGenerateParameters(
         sampler: MLXFusedSampler(parameters: parameters),
@@ -203,7 +203,7 @@
       toolResponse: toolResponse,
       generatingToolCall: {
         try engine.generate(
-          prompt: turn.userMessage,
+          prompt: .user(turn.userMessage),
           tools: [tool],
           parameters: DefaultMLXGenerateParameters(
             sampler: ArgMaxSampler(),
@@ -239,7 +239,7 @@
       videos: [video.asset]
     )
     let task = try engine.generate(
-      prompt: prompt,
+      prompt: .user(prompt),
       tools: [],
       parameters: DefaultMLXGenerateParameters(maxTokens: 64),
       context: engine.context(),
@@ -263,7 +263,7 @@
       videos: [video.asset]
     )
     let task = try engine.generate(
-      prompt: prompt,
+      prompt: .user(prompt),
       tools: [],
       parameters: DefaultMLXGenerateParameters(maxTokens: 64),
       context: engine.context(),

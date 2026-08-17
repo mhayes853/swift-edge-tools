@@ -565,7 +565,7 @@
       context: LlamaContext<Profile>
     ) async throws -> [EdgeToolsToken] {
       try self.validate(context)
-      let transcript = context.transcript(appending: prompt)
+      let transcript = context.transcript(appending: .user(prompt))
       let model = self.makeModelState()
       let tokenIds = try model.tokenIds(
         prompt: transcript,
@@ -590,7 +590,7 @@
         context: context,
         channel: channel,
         makeState: {
-          self.generationState(from: try context.begin(appending: prompt))
+          self.generationState(from: try context.begin(appending: .user(prompt)))
         }
       )
     }
@@ -621,7 +621,7 @@
     ) async throws -> EdgeToolsEnginePrefill {
       try self.validate(context)
       return try self.prefill(
-        snapshot: context.begin(appending: promptPrefix),
+        snapshot: context.begin(appending: .user(promptPrefix)),
         tools: tools,
         context: context
       )

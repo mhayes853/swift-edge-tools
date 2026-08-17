@@ -154,24 +154,24 @@ public final class EdgeToolsTranscriptContext<ModelState: EdgeToolsForkableModel
   }
 
   public func transcript(
-    appending message: EdgeToolsTranscript.UserMessage
+    appending prompt: EdgeToolsTranscript.Prompt
   ) -> EdgeToolsTranscript {
     self.state.withBorrowedLock { state in
       var transcript = state.transcript
-      transcript.messages.append(.user(message))
+      transcript.messages.append(contentsOf: prompt.messages)
       transcript.reasoningEffort = state.reasoningEffort
       return transcript
     }
   }
 
-  public func begin(appending message: EdgeToolsTranscript.UserMessage) throws -> Snapshot {
+  public func begin(appending prompt: EdgeToolsTranscript.Prompt) throws -> Snapshot {
     try self.state.withLock { state in
       guard !state.isResponding else {
         throw EdgeToolsError.contextInUse
       }
       let model = state.model.generationState()
       var transcript = state.transcript
-      transcript.messages.append(.user(message))
+      transcript.messages.append(contentsOf: prompt.messages)
       var snapshot: Snapshot!
       self.withMutation(of: .transcript) {
         self.withMutation(of: .isResponding) {

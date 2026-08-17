@@ -281,14 +281,38 @@ public final class AnyEdgeToolCall: Sendable, Identifiable {
     get async throws { try await self.base.erasedOutput }
   }
 
-  private let base: any _AnyEdgeToolCall
+  public func outputValue() async throws -> EdgeToolsValue? {
+    guard let encodeOutput = self.encodeOutput else {
+      return nil
+    }
+    return try await encodeOutput()
+  }
 
-  private init(base: any _AnyEdgeToolCall) {
+  private let base: any _AnyEdgeToolCall
+  private let encodeOutput: (@Sendable () async throws -> EdgeToolsValue)?
+
+  private init(
+    base: any _AnyEdgeToolCall,
+    encodeOutput: (@Sendable () async throws -> EdgeToolsValue)? = nil
+  ) {
     self.base = base
+    self.encodeOutput = encodeOutput
   }
 
   public static func erasing<Tool: EdgeTool>(_ toolCall: EdgeToolCall<Tool>) -> AnyEdgeToolCall {
     AnyEdgeToolCall(base: toolCall)
+  }
+
+  static func erasing<Tool: EdgeTool>(
+    _ toolCall: EdgeToolCall<Tool>,
+    encodeOutput: @escaping @Sendable (Tool.Output) throws -> EdgeToolsValue
+  ) -> AnyEdgeToolCall {
+    AnyEdgeToolCall(
+      base: toolCall,
+      encodeOutput: {
+        try encodeOutput(await toolCall.output)
+      }
+    )
   }
 
   public func `as`<Tool: EdgeTool>(_: Tool.Type) -> EdgeToolCall<Tool>? {

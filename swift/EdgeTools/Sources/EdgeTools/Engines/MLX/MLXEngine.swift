@@ -1038,7 +1038,7 @@
   where Profile.Prompt == EdgeToolsTranscript {
     public typealias Context = MLXContext<Profile>
     public typealias ContextParameters = MLXContextParameters
-    public typealias Prompt = EdgeToolsTranscript.UserMessage
+    public typealias Prompt = EdgeToolsTranscript.Prompt
     public typealias GenerateParameters = Profile.GenerateParameters
     public typealias ModelGenerationState = MLXGenerationState<Profile>
     public typealias GenerationParser = Profile.GenerationParser
@@ -1087,7 +1087,7 @@
     }
 
     public func tokenize(
-      prompt: EdgeToolsTranscript.UserMessage,
+      prompt: EdgeToolsTranscript.Prompt,
       tools: [EdgeToolDefinition],
       context: MLXContext<Profile>
     ) async throws -> [EdgeToolsToken] {
@@ -1103,7 +1103,7 @@
     }
 
     public func generationState(
-      prompt: EdgeToolsTranscript.UserMessage,
+      prompt: EdgeToolsTranscript.Prompt,
       context: MLXContext<Profile>
     ) async throws -> ModelGenerationState {
       try self.validate(context)
@@ -1111,7 +1111,7 @@
     }
 
     public func generate(
-      prompt: EdgeToolsTranscript.UserMessage,
+      prompt: EdgeToolsTranscript.Prompt,
       tools: [EdgeToolDefinition] = [],
       parameters: sending Profile.GenerateParameters,
       context: MLXContext<Profile>,
@@ -1130,7 +1130,7 @@
     }
 
     public func prepare(
-      prompt: inout EdgeToolsTranscript.UserMessage,
+      prompt: inout EdgeToolsTranscript.Prompt,
       tools: [EdgeToolDefinition],
       parameters: Profile.GenerateParameters,
       parser: inout Profile.GenerationParser,
@@ -1146,7 +1146,7 @@
     }
 
     public func grammar(
-      prompt: EdgeToolsTranscript.UserMessage,
+      prompt: EdgeToolsTranscript.Prompt,
       tools: [EdgeToolDefinition],
       parameters: Profile.GenerateParameters,
       state: ModelGenerationState
@@ -1200,7 +1200,7 @@
     }
 
     public func prefill(
-      promptPrefix: EdgeToolsTranscript.UserMessage,
+      promptPrefix: EdgeToolsTranscript.Prompt,
       tools: [EdgeToolDefinition],
       context: MLXContext<Profile>
     ) async throws -> EdgeToolsEnginePrefill {
@@ -1232,7 +1232,7 @@
     ) throws -> AnyGenerationTask {
       try self.validate(context)
       return self.generationTask(
-        prompt: .user(""),
+        prompt: EdgeToolsTranscript.Prompt(messages: []),
         tools: tools,
         parameters: parameters,
         context: context,
@@ -1244,7 +1244,7 @@
     }
 
     private func generationTask(
-      prompt: EdgeToolsTranscript.UserMessage,
+      prompt: EdgeToolsTranscript.Prompt,
       tools: [EdgeToolDefinition],
       parameters: sending Profile.GenerateParameters,
       context: MLXContext<Profile>,

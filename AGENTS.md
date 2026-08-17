@@ -77,6 +77,8 @@ Prefer `withUnsafeContinuation` over checked continuations.
 
 Parse, don't validate: turn external input into a usable internal representation instead of running a separate validation pass and continuing to use the unparsed value.
 
+Do not use scoped extension modifiers (so no `private extension`, `public extension`, etc.).
+
 DO NOT ASSUME WASI IS A SINGLE THREADED ENVIRONMENT. It is not ok to conform types to `@unchecked Sendable` just because they have a member variable that uses a type from `JavaScriptKit`, and because "JS is single-threaded". `JavaScriptKit` does not conform most of its types to Sendable because Swift WASM supports sdks that enable multithreading through web workers or other means.
 
 If a lot of public APIs are using shared package or internal scoped APIs, it's likely that the API should also be public since it has inherent useful reusability. That is, users should get the same tools as us to make their own abstractions.
@@ -100,5 +102,13 @@ traits and configures MLX's Metal library for the SwiftPM test runner. Use
 Make sure to prefer using `expectNoDifference` over `#expect` for assertions. The only times where `#expect` are preferred are for `#expect(throws:)` and for `WASITests` (`expectNoDifference` doesn't work properly on WASI). For assertions on boolean expressions, you can do `expectNoDifference(myConditionExpression, true)` or `expectNoDifference(myConditionExpression, false)`.
 
 When snapshots update from new generation tests, don't delete or revert them. Leave them as is.
+
+Do not use `@Test("Test Name")`, do: 
+```
+@Test 
+func `Test Name`() {
+  // ...
+}
+```
 
 `test_wasm.sh` and `test_linux.sh` can be used to run WASM and Linux tests on macOS.

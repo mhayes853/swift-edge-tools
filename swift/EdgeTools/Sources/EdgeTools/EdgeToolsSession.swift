@@ -144,6 +144,102 @@ extension EdgeToolsSession where Engine: EdgeToolsPrefillableEngine {
   }
 }
 
+// MARK: - Agent Generation
+
+public struct EdgeToolsAgentTurn<Context: Sendable>: Sendable {
+  public let index: Int
+  public let context: Context
+  public let prompt: EdgeToolsTranscript.Prompt
+
+  public init(
+    index: Int,
+    context: sending Context,
+    prompt: EdgeToolsTranscript.Prompt
+  ) {
+    self.index = index
+    self.context = context
+    self.prompt = prompt
+  }
+}
+
+public struct EdgeToolsAgentResult<Result: Sendable>: Sendable {
+  public let output: Result
+  public let generations: [EdgeToolsSessionGeneration]
+  public let toolCalls: EdgeToolCallCollection
+
+  public init(
+    output: sending Result,
+    generations: [EdgeToolsSessionGeneration],
+    toolCalls: EdgeToolCallCollection
+  ) {
+    self.output = output
+    self.generations = generations
+    self.toolCalls = toolCalls
+  }
+}
+
+public enum EdgeToolsAgentError: Error, Sendable {
+  case maximumTurnsExceeded(Int)
+  case invalidToolOutput(String)
+}
+
+extension EdgeToolsSession
+where
+  Engine.Prompt == EdgeToolsTranscript.Prompt,
+  Engine.GenerateParameters: EdgeToolsConstrainedGenerateParameters,
+  Engine.GenerateParameters.Constraint: EdgeToolsTurnGenerationConstraint
+{
+  @concurrent
+  public func respond<Result: EdgeToolsGenerable>(
+    to initialPrompt: Engine.Prompt,
+    as type: Result.Type,
+    context: Engine.Context? = nil,
+    maximumTurns: Int? = nil,
+    parameters: @escaping @Sendable (EdgeToolsAgentTurn<Engine.Context>) -> Engine.GenerateParameters = {
+      _ in .default
+    },
+    constraint: @escaping @Sendable (
+      Result.Type,
+      EdgeToolsAgentTurn<Engine.Context>
+    ) -> Engine.GenerateParameters.Constraint = {
+      type, _ in .toolCallsOrResponse(type, toolCallRange: .unbounded(minimum: 1))
+    }
+  ) async throws -> EdgeToolsAgentResult<Result> {
+    var prompt = initialPrompt
+    let context = self.resolveContext(context)
+    var generations = [EdgeToolsSessionGeneration]()
+    var toolCalls = EdgeToolCallCollection()
+
+    var index = 0
+    while maximumTurns.map({ index < $0 }) ?? true {
+      let turn = EdgeToolsAgentTurn(index: index, context: context, prompt: prompt)
+      var generationParameters = parameters(turn)
+      generationParameters.constraint = constraint(Result.self, turn)
+      let generation = try await self.generate(
+        prompt: prompt,
+        context: context,
+        parameters: generationParameters,
+        shouldInvokeTools: { _ in false }
+      )
+      generations.append(generation)
+      toolCalls.append(contentsOf: generation.toolCalls)
+
+      guard !generation.toolCalls.isEmpty else {
+        return EdgeToolsAgentResult(
+          output: try generation.decoded(as: Result.self),
+          generations: generations,
+          toolCalls: toolCalls
+        )
+      }
+
+      prompt = .tools(try await agentToolResponses(for: generation.toolCalls))
+      index += 1
+    }
+
+    throw EdgeToolsAgentError.maximumTurnsExceeded(maximumTurns!)
+  }
+}
+
 // MARK: - EdgeToolsSessionTool
 
 private protocol _SessionTool: AnyObject, Sendable {
@@ -155,20 +251,28 @@ private protocol _SessionTool: AnyObject, Sendable {
 
 private final class SessionToolBox<Tool: EdgeTool>: _SessionTool {
   let tool: Tool
+  let encodeOutput: (@Sendable (Tool.Output) throws -> EdgeToolsValue)?
 
   var erasedTool: any EdgeTool { self.tool }
   var erasedName: String { self.tool.name }
   var erasedDefinition: EdgeToolDefinition { self.tool.definition }
 
-  init(_ tool: Tool) {
+  init(
+    _ tool: Tool,
+    encodeOutput: (@Sendable (Tool.Output) throws -> EdgeToolsValue)? = nil
+  ) {
     self.tool = tool
+    self.encodeOutput = encodeOutput
   }
 
   func call(id: EdgeToolCallID, rawInput: EdgeToolsValue) -> AnyEdgeToolCall? {
     guard let call = try? EdgeToolCall(id: id, tool: self.tool, rawInput: rawInput) else {
       return nil
     }
-    return AnyEdgeToolCall.erasing(call)
+    guard let encodeOutput else {
+      return AnyEdgeToolCall.erasing(call)
+    }
+    return AnyEdgeToolCall.erasing(call, encodeOutput: encodeOutput)
   }
 }
 
@@ -178,6 +282,17 @@ public struct EdgeToolsSessionTool: Sendable {
   public var tool: any EdgeTool { self.base.erasedTool }
   public var name: String { self.base.erasedName }
   public var definition: EdgeToolDefinition { self.base.erasedDefinition }
+
+  public init<Tool>(_ tool: Tool) where Tool: EdgeTool, Tool.Output: ConvertibleToEdgeToolsValue {
+    self.base = SessionToolBox(tool, encodeOutput: { $0.edgeToolsValue })
+  }
+
+  public init<Tool>(
+    _ tool: Tool,
+    encodeOutput: @escaping @Sendable (Tool.Output) throws -> EdgeToolsValue
+  ) where Tool: EdgeTool {
+    self.base = SessionToolBox(tool, encodeOutput: encodeOutput)
+  }
 
   public init(_ tool: some EdgeTool) {
     self.base = SessionToolBox(tool)
@@ -192,7 +307,8 @@ public struct EdgeToolsSessionTool: Sendable {
 
 @resultBuilder
 public enum EdgeToolsToolBuilder {
-  public static func buildExpression(_ tool: some EdgeTool) -> EdgeToolsSessionTool {
+  public static func buildExpression<Tool>(_ tool: Tool) -> EdgeToolsSessionTool
+  where Tool: EdgeTool, Tool.Output: ConvertibleToEdgeToolsValue {
     EdgeToolsSessionTool(tool)
   }
 
@@ -847,4 +963,28 @@ package func duplicateToolNameError(_ names: some Sequence<String>) -> String? {
       "The names \(originals.sorted().map { "'\($0)'" }.joined(separator: " and ")) all normalize to '\(normalized)'."
     }
     .joined(separator: "\n")
+}
+
+private func agentToolResponses(
+  for toolCalls: EdgeToolCallCollection
+) async throws -> [EdgeToolsTranscript.ToolMessage] {
+  try await withThrowingTaskGroup(of: (Int, EdgeToolsTranscript.ToolMessage).self) { group in
+    for (index, toolCall) in toolCalls.enumerated() {
+      group.addTask {
+        guard let value = try await toolCall.outputValue() else {
+          throw EdgeToolsAgentError.invalidToolOutput(toolCall.tool.name)
+        }
+        return (index, EdgeToolsTranscript.ToolMessage(name: toolCall.tool.name, response: value))
+      }
+    }
+
+    var responses = Array<EdgeToolsTranscript.ToolMessage?>(
+      repeating: nil,
+      count: toolCalls.count
+    )
+    for try await (index, response) in group {
+      responses[index] = response
+    }
+    return responses.compactMap { $0 }
+  }
 }
