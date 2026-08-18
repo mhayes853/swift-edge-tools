@@ -36,6 +36,29 @@ func simdExpShifted(
 }
 
 @inline(always)
+func simdSumExpShifted(
+  _ values: UnsafeBufferPointer<Float>,
+  shiftedBy maximum: Float
+) -> Float {
+  guard let source = values.baseAddress else { return 0 }
+  let width = SIMD16<Float>.scalarCount
+  let shift = SIMD16<Float>(repeating: maximum)
+  var totals = SIMD16<Float>(repeating: 0)
+  var index = 0
+  while index + width <= values.count {
+    let block = UnsafeRawPointer(source.advanced(by: index)).loadUnaligned(as: SIMD16<Float>.self)
+    totals += simdExp(block - shift)
+    index += width
+  }
+  var total = totals.sum()
+  while index < values.count {
+    total += expf(values[index] - maximum)
+    index += 1
+  }
+  return total
+}
+
+@inline(always)
 func simdExp(_ values: SIMD16<Float>) -> SIMD16<Float> {
   let magic = SIMD16<Float>(repeating: expRoundingMagic)
   let scaled = simdMax(values, SIMD16(repeating: smallestExpInput)) * log2Inverse

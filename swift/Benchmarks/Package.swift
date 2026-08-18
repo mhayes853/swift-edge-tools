@@ -9,7 +9,7 @@ let package = Package(
     .package(
       name: "swift-edge-tools",
       path: "../..",
-      traits: ["Foundation", "XGrammar"]
+      traits: ["Foundation", "XGrammar", "Llama"]
     ),
     .package(
       name: "benchmark",

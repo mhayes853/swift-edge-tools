@@ -284,6 +284,97 @@ output.
 
 ## Progress Log
 
+- **2026-08-17 — llama sampler chain benchmarked; the CPU sampler stays.** `swift/Benchmarks`
+  gained the `Llama` trait and a `llama sample …` mirror of every `sample …` case, so both
+  paths run against the same synthetic logits fixture. The chain is measured charitably:
+  the `llama_token_data_array` buffer is preallocated and reused across iterations (what
+  `common/sampling.cpp` does, rather than the `std::vector` that `llama_sampler_sample`
+  builds per call), `no_perf` is on, and the penalty history is seeded with the same tokens
+  as ours. Both paths report zero mallocs per iteration. p50 wall clock at the 128k
+  reference vocabulary, peaked distribution:
+
+  ```text
+  config               unconstrained ours/llama    restrictive (512 permitted) ours/llama
+  greedy                 23 /   68 µs    3.0x         4.9 /   92 µs   18.9x
+  temperature            93 /  572 µs    6.2x         5.3 /  562 µs  107.0x
+  top-k                  38 /   74 µs    1.9x         7.3 /   94 µs   12.8x
+  top-p                 118 / 1163 µs    9.9x        15.0 / 1136 µs   75.7x
+  top-k+top-p+min-p     101 /   74 µs    0.7x         8.3 /   94 µs   11.4x
+  penalties              40 /  319 µs    8.0x         8.5 /  346 µs   40.9x
+  ```
+
+  - Ratios hold flat from 8k to 256k and instruction counts track wall clock, so the
+    ordering is structural rather than measurement noise. The restrictive column is the
+    sparse-gather path (`gatherPermitted`, ≤`sparseGatherLimit` tokens): llama has no
+    bitmask equivalent, so every stage of its chain pays full-vocabulary cost even when the
+    grammar permits a few hundred tokens — which is the regime tool-call generation lives
+    in. Adopting the chain would be a large regression there.
+  - **One consistent loss: `top-k+top-p+min-p`, 1.4x slower than llama at every vocabulary
+    size.** `sampledTokenId` always materialized the full-vocabulary weights buffer through
+    `fillWeights` when `topP` is set, but that buffer is only read by `nucleusCutoff`, which
+    only runs on the top-p-without-top-k branch — with `topK` set the ~512KB of stores was
+    pure waste. Fixed with `simdSumExpShifted`, a sum-only sibling of `simdExpShifted` that
+    accumulates in the same order so the two agree bit for bit (multiplying by a `scale` of
+    1 is exact), selected whenever the weights array is not consumed. Measured: 101 → 93 µs
+    at 128k, 203 → 183 µs at 256k, roughly -8% to -12% on the affected configurations,
+    -0% to -5% elsewhere, and every unaffected path's instruction count is unchanged, which
+    is the evidence that nothing drifted semantically.
+  - **The fix is real but does not close the gap — llama is still 1.3x faster there
+    (93 vs 70 µs).** The original estimate attributed ~60 µs to `fillWeights`; the stores
+    were only ~8 µs of that. The rest is the `simdExp` polynomial evaluated over the whole
+    vocabulary, which the sum-only path still performs. This is inherent to normalizing
+    top-p against the full vocabulary to match `MLXFusedSampler`; llama renormalizes over
+    the top-k survivors and so never evaluates an exp per vocabulary entry.
+  - **The exp reduction is at its practical floor; two candidate optimizations were measured
+    and both rejected.** A standalone `swiftc -O` harness (interleaved min-of-N over the
+    same fixture shape, not committed) reproduced the in-package cost exactly — 57.9 µs at
+    131k — and then found nothing to take:
+    - *Loop unrolling with independent accumulators (2, 4, 8 blocks per iteration): 1.00x to
+      1.01x, i.e. no effect.* The hypothesis was that the loop stalls on `simdExp`'s five
+      serially dependent FMAs, but the measurement says otherwise: the kernel is
+      issue-throughput-bound at roughly 56 NEON ops per `SIMD16` block (~2.5 ops/cycle
+      against a 4/cycle ceiling), and an out-of-order core already overlaps consecutive
+      iterations without help. Unrolling also reorders the summation, shifting the total by
+      up to 1.3e-5 relative — strictly worse: no gain, plus snapshot exposure.
+    - *The below-`max - 20` block skip that A3 documented and `be8b7df` dropped: 0.89x to
+      0.91x, i.e. actively slower.* An earlier note in this entry predicted it would "elide
+      most of the polynomial work"; that was wrong. The skip fires only when all 16 lanes of
+      a block are under the threshold, and on these distributions the bulk sits ~22 below
+      the max with sigma 2.5, so ~21% of individual lanes clear the floor and only **2.2–2.4%
+      of blocks** are skippable. The per-block branch costs more than the work it avoids.
+      It could still pay off on a model whose real logits leave a wider gap between the max
+      and the bulk, but that has to be measured per distribution rather than assumed.
+    Reducing op count per element is the only lever left, which means a cheaper exp
+    approximation and a precision tradeoff — not worth it for ~19 µs on one configuration.
+  - **In context, the entire sampler question is noise.** Handing llama's logits to our
+    sampler costs no copy: `withCurrentLogits` wraps the `llama_get_logits_ith` pointer in a
+    `MutableSpan` and the sampler works in place, and the device→host logits readback
+    happens inside `llama_decode` either way. Measured on Qwen3-0.6B Q8_0 (vocab 151936,
+    512-token KV, Metal), a single-token decode is **~8.2 ms p50**, against ~27 µs for a
+    full-vocabulary greedy sample and ~108 µs for `top-k+top-p+min-p` — **0.3% and 1.3% of a
+    token**. The in-situ deltas were in fact unresolvable: `decode + greedy` measured
+    *higher* than `decode + top-k+top-p+min-p`, i.e. decode's own variance (±300–1000 µs)
+    swamps sampling entirely. This is structural, not an artifact of a small model: decode
+    streams the whole weight tensor per token (~600 MB at Q8), which is a thousand times the
+    ~600 KB of logits, so it is memory-bandwidth-bound and sampling cannot matter. The
+    corollary is that llama's `[EXPERIMENTAL]` backend-sampling path (`llama_set_sampler`,
+    `llama_get_sampled_token_ith`, sampling fused into the ggml graph so logits never leave
+    the device) has a ceiling of ~1–2% of a token, and would cost the XGrammar mask, the
+    sparse-gather path, and MLX/llama behavioral parity to claim it. Not worth pursuing.
+    The throwaway harness that produced this is not committed: it loaded the GGUF during
+    benchmark registration, which package-benchmark also runs in its discovery pass.
+  - Top-p over a *flat* distribution is pathological for both engines (846 µs ours, 6459 µs
+    llama at 128k): the progressive top-M nucleus probe degenerates once the nucleus covers
+    a large fraction of the vocabulary. A synthetic worst case — real models at temperature
+    0.6–0.7 are peaked — but it is the one place the curve is ugly.
+  - The grammar half of the question was argued structurally, not measured: llama's GBNF
+    sampler needs a `llama_vocab`, so benchmarking it requires a GGUF fixture. XGrammar's
+    adaptive precomputed masks beat a per-token full-vocabulary UTF-8 stack walk by
+    construction, `LLAMA_BUILD_COMMON=OFF` means the schema→GBNF converter is not even
+    linked, and GBNF has no analogue of the structural tags and `union`/`concatenate`/
+    `repeated` combinators that `XGRGrammar.toolCalls` and `GrammarToolCallRange` are built
+    on. Switching would also fork grammar behavior between the MLX and llama engines.
+
 - **2026-08-17 — probe confidence complete.** `metadata.probeConfidence` carries
   `llama_probe_confidence` (1 - p_wrong) for any GGUF with a probe head; models without
   one return -1.0, which the handle parses to nil so the key is simply absent. No profile

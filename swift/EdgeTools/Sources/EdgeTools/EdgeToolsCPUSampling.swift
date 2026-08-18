@@ -224,7 +224,14 @@ public final class EdgeToolsCPUFusedSampler {
       )
     }
 
-    let total = topP.map { _ in self.fillWeights(from: logits, shiftedBy: maxLogit) }
+    let total: Float? =
+      if topP == nil {
+        nil
+      } else if topK == nil {
+        self.fillWeights(from: logits, shiftedBy: maxLogit)
+      } else {
+        simdSumExpShifted(logits, shiftedBy: maxLogit)
+      }
     let logSumExp = total.map { maxLogit + logf($0) }
     var candidates: [LogitCandidate]
     if let topK {
