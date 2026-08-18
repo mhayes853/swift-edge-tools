@@ -127,6 +127,51 @@
     return LlamaVLMToolTurnSnapshot(toolCalls: result.toolCalls, response: result.response)
   }
 
+  func completeAudioToneTurn<Profile: LlamaModelProfile>(
+    using engine: LlamaEngine<Profile>
+  ) async throws -> LlamaVLMToolTurnSnapshot
+  where Profile.GenerateParameters == DefaultLlamaGenerateParameters {
+    let turn = try splitUserMessage(
+      from: EdgeToolsTranscript(messages: [
+        .system(
+          "Listen to the audio and call reportAudio with whether it contains silence or a steady tone. After the tool result, summarize it."
+        ),
+        .user("Classify the audio.", audio: [llamaToneAudioAsset()])
+      ])
+    )
+    let context = engine.context(
+      EdgeToolsTranscriptContextParameters(transcript: turn.transcript)
+    )
+    let result = try await completeToolTurn(
+      in: context,
+      tool: .llamaAudioTest,
+      toolResponse: ["kind": "tone"],
+      generatingToolCall: {
+        try engine.generate(
+          prompt: .user(turn.userMessage),
+          tools: [.llamaAudioTest],
+          parameters: DefaultLlamaGenerateParameters(
+            sampling: .greedy,
+            constraint: .toolsWithGrammar(range: .exact(1)),
+            maxTokens: 128
+          ),
+          context: context,
+          channel: EdgeToolsGenerationChannel()
+        )
+      },
+      generatingResponse: { toolMessage in
+        try engine.generate(
+          prompt: .tools([toolMessage]),
+          tools: [],
+          parameters: DefaultLlamaGenerateParameters(sampling: .greedy, maxTokens: 64),
+          context: context,
+          channel: EdgeToolsGenerationChannel()
+        )
+      }
+    )
+    return LlamaVLMToolTurnSnapshot(toolCalls: result.toolCalls, response: result.response)
+  }
+
   // MARK: - VLM Fixtures
 
   extension EdgeToolDefinition {
@@ -142,6 +187,19 @@
           )
         ]),
         .required(["color"]),
+        .additionalProperties(false)
+      )
+    )
+
+    fileprivate static let llamaAudioTest = Self(
+      name: "reportAudio",
+      description: "Reports whether audio contains silence or a steady tone.",
+      arguments: EdgeToolsGenerationSchema(
+        .type(.object),
+        .properties([
+          "kind": EdgeToolsGenerationSchema(.string, .enum(["silence", "tone"]))
+        ]),
+        .required(["kind"]),
         .additionalProperties(false)
       )
     )
@@ -189,5 +247,40 @@
       throw LlamaGenerationTestError.failedToCreateImage
     }
     return EdgeToolsTranscript.Asset(bytes: Array(data as Data), mimeTypeOverride: .png)
+  }
+
+  func llamaToneAudioAsset() -> EdgeToolsTranscript.Asset {
+    let sampleRate = 16_000
+    let samples = (0..<(sampleRate * 2))
+      .map { index in
+        let phase = 2 * Double.pi * 440 * Double(index) / Double(sampleRate)
+        return Int16((sin(phase) * 12_000).rounded())
+      }
+    let dataSize = samples.count * MemoryLayout<Int16>.size
+    var bytes = [UInt8]()
+    bytes.reserveCapacity(44 + dataSize)
+    bytes.append(contentsOf: "RIFF".utf8)
+    appendLittleEndian(UInt32(36 + dataSize), to: &bytes)
+    bytes.append(contentsOf: "WAVEfmt ".utf8)
+    appendLittleEndian(UInt32(16), to: &bytes)
+    appendLittleEndian(UInt16(1), to: &bytes)
+    appendLittleEndian(UInt16(1), to: &bytes)
+    appendLittleEndian(UInt32(sampleRate), to: &bytes)
+    appendLittleEndian(UInt32(sampleRate * MemoryLayout<Int16>.size), to: &bytes)
+    appendLittleEndian(UInt16(MemoryLayout<Int16>.size), to: &bytes)
+    appendLittleEndian(UInt16(16), to: &bytes)
+    bytes.append(contentsOf: "data".utf8)
+    appendLittleEndian(UInt32(dataSize), to: &bytes)
+    for sample in samples {
+      appendLittleEndian(sample, to: &bytes)
+    }
+    return EdgeToolsTranscript.Asset(bytes: bytes, mimeTypeOverride: .wav)
+  }
+
+  private func appendLittleEndian<Value: FixedWidthInteger>(
+    _ value: Value,
+    to bytes: inout [UInt8]
+  ) {
+    withUnsafeBytes(of: value.littleEndian) { bytes.append(contentsOf: $0) }
   }
 #endif

@@ -34,8 +34,19 @@
 
   // MARK: - LlamaPreparedInput
 
+  enum LlamaMediaKind: Equatable {
+    case image
+    case audio
+  }
+
+  struct LlamaMultimodalAsset {
+    let kind: LlamaMediaKind
+    let asset: EdgeToolsTranscript.Asset
+  }
+
   struct LlamaPreparedInputUnit: Equatable {
     struct Media: Equatable {
+      let kind: LlamaMediaKind
       let id: String
       let tokenCount: Int
       let positionCount: Int
@@ -92,7 +103,9 @@
           let tokenIds = (0..<tokenCount).map { EdgeToolsToken.ID(tokens![$0]) }
           units.append(contentsOf: tokenIds.map { LlamaPreparedInputUnit(value: .token($0)) })
           chunks.append(.text(tokenIds: tokenIds, units: unitStart..<units.count))
-        case MTMD_INPUT_CHUNK_TYPE_IMAGE:
+        case MTMD_INPUT_CHUNK_TYPE_IMAGE, MTMD_INPUT_CHUNK_TYPE_AUDIO:
+          let kind: LlamaMediaKind =
+            mtmd_input_chunk_get_type(chunk) == MTMD_INPUT_CHUNK_TYPE_AUDIO ? .audio : .image
           let tokenCount = Int(mtmd_input_chunk_get_n_tokens(chunk))
           let positionCount = Int(mtmd_input_chunk_get_n_pos(chunk))
           let id = mtmd_input_chunk_get_id(chunk).map { String(cString: $0) } ?? ""
@@ -100,6 +113,7 @@
             LlamaPreparedInputUnit(
               value: .media(
                 LlamaPreparedInputUnit.Media(
+                  kind: kind,
                   id: id,
                   tokenCount: tokenCount,
                   positionCount: positionCount
@@ -109,9 +123,7 @@
           )
           chunks.append(.media(chunkIndex: chunkIndex, unit: unitStart))
         default:
-          throw EdgeToolsError.unsupportedMedia(
-            "This LlamaEngine integration supports image input only."
-          )
+          throw EdgeToolsError.unsupportedMedia("Unsupported llama multimodal input chunk.")
         }
       }
       self.handle = consume handle
@@ -170,10 +182,10 @@
           message: "The multimodal projector at \(path) could not be loaded."
         )
       }
-      guard mtmd_support_vision(handle) else {
+      guard mtmd_support_vision(handle) || mtmd_support_audio(handle) else {
         mtmd_free(handle)
         throw EdgeToolsError.unsupportedMedia(
-          "The multimodal projector does not support image input."
+          "The multimodal projector does not support image or audio input."
         )
       }
       self.model = model
@@ -186,13 +198,27 @@
       }
     }
 
-    func prepare(text: String, images: [EdgeToolsTranscript.Asset]) throws -> LlamaPreparedInput {
+    func prepare(text: String, media: [LlamaMultimodalAsset]) throws -> LlamaPreparedInput {
       try self.state.withBorrowedLock { state in
         var bitmapHandles = [OpaquePointer]()
         defer { bitmapHandles.forEach(mtmd_bitmap_free) }
-        for image in images {
+        for item in media {
+          switch item.kind {
+          case .image:
+            guard mtmd_support_vision(state.handle) else {
+              throw EdgeToolsError.unsupportedMedia(
+                "The multimodal projector does not support image input."
+              )
+            }
+          case .audio:
+            guard mtmd_support_audio(state.handle) else {
+              throw EdgeToolsError.unsupportedMedia(
+                "The multimodal projector does not support audio input."
+              )
+            }
+          }
           let wrapper =
-            switch image.content {
+            switch item.asset.content {
             case .path(let path):
               path.withCString { mtmd_helper_bitmap_init_from_file(state.handle, $0, false) }
             case .bytes(let bytes):
@@ -205,17 +231,21 @@
                 )
               }
             }
-          guard let bitmapHandle = wrapper.bitmap else {
-            throw EdgeToolsError.invalidMedia("The image could not be decoded.")
-          }
           if let videoHandle = wrapper.video_ctx {
             mtmd_helper_video_free(videoHandle)
-            mtmd_bitmap_free(bitmapHandle)
+            wrapper.bitmap.map(mtmd_bitmap_free)
             throw EdgeToolsError.unsupportedMedia("Video input is not supported by LlamaEngine.")
           }
-          guard !mtmd_bitmap_is_audio(bitmapHandle) else {
+          guard let bitmapHandle = wrapper.bitmap else {
+            let name = item.kind == .audio ? "audio" : "image"
+            throw EdgeToolsError.invalidMedia("The \(name) could not be decoded.")
+          }
+          let decodedKind: LlamaMediaKind = mtmd_bitmap_is_audio(bitmapHandle) ? .audio : .image
+          guard decodedKind == item.kind else {
             mtmd_bitmap_free(bitmapHandle)
-            throw EdgeToolsError.unsupportedMedia("Audio input is not supported by LlamaEngine.")
+            throw EdgeToolsError.invalidMedia(
+              "The decoded media does not match its declared modality."
+            )
           }
           bitmapHandles.append(bitmapHandle)
         }

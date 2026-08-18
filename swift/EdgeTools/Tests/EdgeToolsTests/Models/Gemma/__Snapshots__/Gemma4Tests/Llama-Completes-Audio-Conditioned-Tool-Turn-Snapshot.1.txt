@@ -1,0 +1,11 @@
+▿ LlamaVLMToolTurnSnapshot
+  - response: "The audio contains a steady tone."
+  ▿ toolCalls: 1 element
+    ▿ EdgeRawToolCall
+      ▿ arguments: EdgeToolsValue
+        ▿ object: 1 key/value pair
+          ▿ (2 elements)
+            - key: "kind"
+            ▿ value: EdgeToolsValue
+              - string: "tone"
+      - name: "reportAudio"

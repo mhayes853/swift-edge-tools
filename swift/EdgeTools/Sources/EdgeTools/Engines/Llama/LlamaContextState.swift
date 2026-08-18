@@ -84,43 +84,43 @@
           )
         )
       }
-      #if FoundationEssentials
-        guard prompt.videos.isEmpty, prompt.audio.isEmpty else {
-          throw EdgeToolsError.unsupportedMedia(
-            "This LlamaEngine integration supports image input only."
-          )
-        }
-        guard
-          let profile = Profile.self as? any EdgeToolsMultimodalModelProfile.Type,
-          let tokenizer = self.tokenizer as? any EdgeToolsChatTokenizer
-        else {
-          throw EdgeToolsError.unsupportedTokenizer
-        }
-        var images = [EdgeToolsTranscript.Asset]()
-        let messages = try prompt.chatTemplateMessages { userMessage in
-          let content = profile.multimodalContent(for: userMessage).reduce(into: "") {
-            content, part in
+      guard prompt.videos.isEmpty else {
+        throw EdgeToolsError.unsupportedMedia("Video input is not supported by LlamaEngine.")
+      }
+      guard
+        let profile = Profile.self as? any EdgeToolsMultimodalModelProfile.Type,
+        let tokenizer = self.tokenizer as? any EdgeToolsChatTokenizer
+      else {
+        throw EdgeToolsError.unsupportedTokenizer
+      }
+      var media = [LlamaMultimodalAsset]()
+      let messages = try prompt.chatTemplateMessages { userMessage in
+        let content = try profile.multimodalContent(for: userMessage)
+          .reduce(into: "") { content, part in
             switch part {
-            case .text(let text): content.append(text)
+            case .text(let text):
+              content.append(text)
             case .image(let image):
               content.append(multimodalRuntime.mediaMarker)
-              images.append(image)
-            case .video, .audio:
-              break
+              media.append(LlamaMultimodalAsset(kind: .image, asset: image))
+            case .audio(let audio):
+              content.append(multimodalRuntime.mediaMarker)
+              media.append(LlamaMultimodalAsset(kind: .audio, asset: audio))
+            case .video:
+              throw EdgeToolsError.unsupportedMedia(
+                "Video input is not supported by LlamaEngine."
+              )
             }
           }
-          return ["role": "user", "content": .string(content)]
-        }
-        let text = try tokenizer.renderChatTemplate(
-          messages: messages,
-          tools: tools.chatTemplateToolValues,
-          addGenerationPrompt: addGenerationPrompt,
-          additionalContext: Profile.templateContext(prompt: prompt)
-        )
-        return try multimodalRuntime.prepare(text: text, images: images)
-      #else
-        throw EdgeToolsError.unsupportedTokenizer
-      #endif
+        return ["role": "user", "content": .string(content)]
+      }
+      let text = try tokenizer.renderChatTemplate(
+        messages: messages,
+        tools: tools.chatTemplateToolValues,
+        addGenerationPrompt: addGenerationPrompt,
+        additionalContext: Profile.templateContext(prompt: prompt)
+      )
+      return try multimodalRuntime.prepare(text: text, media: media)
     }
   }
 

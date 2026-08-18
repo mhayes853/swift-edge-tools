@@ -18,27 +18,25 @@
     ) throws -> [EdgeToolsToken.ID]
   }
 
-  #if FoundationEssentials
-    extension LlamaModelProfile {
-      public static func tokenIds(
-        prompt: EdgeToolsTranscript,
-        tools: [EdgeToolDefinition],
-        tokenizer: any EdgeToolsTokenizer,
-        addGenerationPrompt: Bool
-      ) throws -> [EdgeToolsToken.ID] {
-        guard let tokenizer = tokenizer as? any EdgeToolsChatTokenizer else {
-          throw EdgeToolsError.unsupportedTokenizer
-        }
-        return try tokenizer.applyChatTemplate(
-          messages: prompt.chatTemplateMessages(),
-          tools: tools.chatTemplateToolValues,
-          addGenerationPrompt: addGenerationPrompt,
-          additionalContext: Self.templateContext(prompt: prompt)
-        )
-        .map(\.id)
+  extension LlamaModelProfile {
+    public static func tokenIds(
+      prompt: EdgeToolsTranscript,
+      tools: [EdgeToolDefinition],
+      tokenizer: any EdgeToolsTokenizer,
+      addGenerationPrompt: Bool
+    ) throws -> [EdgeToolsToken.ID] {
+      guard let tokenizer = tokenizer as? any EdgeToolsChatTokenizer else {
+        throw EdgeToolsError.unsupportedTokenizer
       }
+      let tokens = try tokenizer.applyChatTemplate(
+        messages: prompt.chatTemplateMessages(),
+        tools: tools.chatTemplateToolValues,
+        addGenerationPrompt: addGenerationPrompt,
+        additionalContext: Self.templateContext(prompt: prompt)
+      )
+      return tokens.map(\.id)
     }
-  #endif
+  }
 
   // MARK: - LlamaGenerateParameters
 
@@ -71,5 +69,7 @@
 
   // MARK: - LlamaContext
 
-  public typealias LlamaContext<Profile: LlamaModelProfile> = EdgeToolsTranscriptContext<LlamaContextState<Profile>>
+  public typealias LlamaContext<Profile: LlamaModelProfile> = EdgeToolsTranscriptContext<
+    LlamaContextState<Profile>
+  >
 #endif

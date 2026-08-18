@@ -69,7 +69,7 @@ struct `Gemma4 tests` {
 
       @Test
       func `Llama Describes Image Snapshot`() async throws {
-        let engine = try await self.vlmEngine()
+        let engine = try await self.multimodalEngine()
         let response = try await describeRedImage(using: engine)
 
         withKnownIssue { assertSnapshot(of: response, as: .lines, record: .all) }
@@ -77,15 +77,23 @@ struct `Gemma4 tests` {
 
       @Test
       func `Llama Completes Image Conditioned Tool Turn Snapshot`() async throws {
-        let engine = try await self.vlmEngine()
+        let engine = try await self.multimodalEngine()
         let result = try await completeImageColorTurn(using: engine)
 
         withKnownIssue { assertSnapshot(of: result, as: .dump, record: .all) }
       }
 
       @Test
+      func `Llama Completes Audio Conditioned Tool Turn Snapshot`() async throws {
+        let engine = try await self.multimodalEngine()
+        let result = try await completeAudioToneTurn(using: engine)
+
+        withKnownIssue { assertSnapshot(of: result, as: .dump, record: .all) }
+      }
+
+      @Test
       func `Llama Reuses Image Conditioned Prefix`() async throws {
-        let engine = try await self.vlmEngine()
+        let engine = try await self.multimodalEngine()
         let context = engine.context(
           EdgeToolsTranscriptContextParameters(
             transcript: EdgeToolsTranscript(messages: [
@@ -98,16 +106,36 @@ struct `Gemma4 tests` {
         context.transcript.messages.append(.user("Confirm that briefly."))
 
         let cached = try await engine.prefill(context: context)
-        let fresh = try await engine.prefill(
-          context: engine.context(
-            EdgeToolsTranscriptContextParameters(transcript: context.transcript)
-          )
-        )
+
+        let params = EdgeToolsTranscriptContextParameters(transcript: context.transcript)
+        let fresh = try await engine.prefill(context: engine.context(params))
 
         expectNoDifference(cached.metrics.tokens < fresh.metrics.tokens, true)
       }
 
-      private func vlmEngine() async throws -> Gemma4LlamaModelEngine {
+      @Test
+      func `Llama Reuses Audio Conditioned Prefix`() async throws {
+        let engine = try await self.multimodalEngine()
+        let context = engine.context(
+          EdgeToolsTranscriptContextParameters(
+            transcript: EdgeToolsTranscript(messages: [
+              .user("Does this contain a tone?", audio: [llamaToneAudioAsset()])
+            ])
+          )
+        )
+        _ = try await engine.prefill(context: context)
+        context.transcript.messages.append(.assistant([.text("The audio contains a tone.")]))
+        context.transcript.messages.append(.user("Confirm that briefly."))
+
+        let cached = try await engine.prefill(context: context)
+
+        let params = EdgeToolsTranscriptContextParameters(transcript: context.transcript)
+        let fresh = try await engine.prefill(context: engine.context(params))
+
+        expectNoDifference(cached.metrics.tokens < fresh.metrics.tokens, true)
+      }
+
+      private func multimodalEngine() async throws -> Gemma4LlamaModelEngine {
         let model = try await downloadGGUFMultimodalModel(id: .gemma4E2BHybrid)
         return try Gemma4LlamaModelEngine(
           modelPath: model.model.path(),
