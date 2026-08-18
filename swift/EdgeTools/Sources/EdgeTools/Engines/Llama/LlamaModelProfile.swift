@@ -71,7 +71,5 @@
 
   // MARK: - LlamaContext
 
-  public typealias LlamaContext<Profile> = EdgeToolsTranscriptContext<LlamaModelState<Profile>>
-  where Profile: LlamaModelProfile
-
+  public typealias LlamaContext<Profile: LlamaModelProfile> = EdgeToolsTranscriptContext<LlamaContextState<Profile>>
 #endif

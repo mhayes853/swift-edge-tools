@@ -21,16 +21,15 @@
     tool: EdgeToolDefinition,
     toolResponse: EdgeToolsValue,
     generatingToolCall: () throws -> AnyGenerationTask,
-    generatingResponse: () throws -> AnyGenerationTask
+    generatingResponse: (EdgeToolsTranscript.ToolMessage) throws -> AnyGenerationTask
   ) async throws -> ToolTurnSnapshot {
     let toolGeneration = try await generatingToolCall().value
     guard !toolGeneration.toolCalls.isEmpty else {
       throw GenerationTestError.missingToolCall
     }
 
-    context.transcript.messages.append(.tool(name: tool.name, response: toolResponse))
-
-    let responseGeneration = try await generatingResponse().value
+    let toolMessage = EdgeToolsTranscript.ToolMessage(name: tool.name, response: toolResponse)
+    let responseGeneration = try await generatingResponse(toolMessage).value
     guard !responseGeneration.response.isEmpty else {
       throw GenerationTestError.missingFinalResponse
     }

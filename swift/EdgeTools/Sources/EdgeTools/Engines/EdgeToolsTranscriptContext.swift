@@ -46,8 +46,7 @@ public struct EdgeToolsTranscriptContextParameters: Hashable, Sendable {
 // MARK: - EdgeToolsTranscriptContext
 
 public final class EdgeToolsTranscriptContext<ModelState: EdgeToolsForkableModelState>:
-  Identifiable, Sendable
-{
+  Identifiable, Sendable {
   private struct State {
     var transcript: EdgeToolsTranscript
     var reasoningEffort: EdgeToolsReasoningEffort
@@ -75,6 +74,12 @@ public final class EdgeToolsTranscriptContext<ModelState: EdgeToolsForkableModel
     public let transcript: EdgeToolsTranscript
     public let revision: Int
     public let model: ModelState
+
+    public init(transcript: EdgeToolsTranscript, revision: Int, model: ModelState) {
+      self.transcript = transcript
+      self.revision = revision
+      self.model = model
+    }
   }
 
   private struct ForkSnapshot {

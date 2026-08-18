@@ -16,17 +16,18 @@
     EdgeToolsEngine, EdgeToolsPrefillableEngine, EdgeToolsTokenizingEngine {
     public typealias Context = LlamaContext<Profile>
     public typealias ContextParameters = EdgeToolsTranscriptContextParameters
-    public typealias Prompt = EdgeToolsTranscript.UserMessage
+    public typealias Prompt = EdgeToolsTranscript.Prompt
     public typealias GenerateParameters = Profile.GenerateParameters
-    public typealias ModelGenerationState = LlamaGenerationState<Profile>
+    typealias ModelGenerationState = LlamaGenerationTransaction<Profile>
 
     private let model: LlamaModelBox
-    private let multimodalProjector: LlamaMultimodalProjector?
+    private let multimodalRuntime: LlamaMultimodalRuntime?
     private let contextParameters: LlamaContextParameters
     private let defaultSampling: EdgeToolsFusedSamplingParameters?
     private let vocabularySizeValue: Int
     private let identity = EdgeToolsEngineIdentity()
     private let generationLoop: EdgeToolsGenerationLoop
+    private let inputProcessor: LlamaInputProcessor<Profile>
     public let tokenizer: any EdgeToolsTokenizer
     public let grammarEngine: Profile.GrammarEngine
 
@@ -59,7 +60,6 @@
       )
     }
 
-    /// Loads a text model and its matching multimodal projector.
     public convenience init(
       modelPath: String,
       multimodalProjectorPath: String,
@@ -102,16 +102,21 @@
     ) throws {
       let model = LlamaModelBox(model: consume model)
       self.model = model
-      self.multimodalProjector = try projectorPath.map {
-        try LlamaMultimodalProjector(path: $0, model: model, parameters: multimodalParameters)
+      let multimodalRuntime = try projectorPath.map {
+        try LlamaMultimodalRuntime(path: $0, model: model, parameters: multimodalParameters)
       }
+      self.multimodalRuntime = multimodalRuntime
       self.contextParameters = contextParameters
       self.defaultSampling = defaultSampling
+
       let tokenizer = LlamaTokenizer(model: model)
       self.tokenizer = tokenizer
+      self.inputProcessor = LlamaInputProcessor(
+        tokenizer: tokenizer,
+        multimodalRuntime: multimodalRuntime
+      )
       self.vocabularySizeValue = tokenizer.vocabularySize
-      // `endOfGenerationTokenIds` already reports the eos token, and `EdgeToolsGenerationLoop`
-      // inserts it regardless, so the grammar and the loop stop on exactly the same set.
+
       var stopTokenIds = tokenizer.endOfGenerationTokenIds()
       stopTokenIds.formUnion(
         Profile.extraStopTokens.compactMap { tokenizer.token(forText: $0)?.id }
@@ -136,29 +141,28 @@
     ) -> LlamaContext<Profile> {
       EdgeToolsTranscriptContext(
         parameters: parameters,
-        model: self.makeModelState(),
+        model: self.contextState(),
         engineIdentity: self.identity
       )
     }
 
     public func tokenize(
-      prompt: EdgeToolsTranscript.UserMessage,
+      prompt: EdgeToolsTranscript.Prompt,
       tools: [EdgeToolDefinition],
       context: LlamaContext<Profile>
     ) async throws -> [EdgeToolsToken] {
       try self.validate(context)
-      let transcript = context.transcript(appending: .user(prompt))
-      let model = self.makeModelState()
-      let tokenIds = try model.tokenIds(
+      let transcript = context.transcript(appending: prompt)
+      let input = try self.inputProcessor.input(
         prompt: transcript,
         tools: tools,
-        tokenizer: self.tokenizer
+        addGenerationPrompt: true
       )
-      return self.tokenizer.tokens(forIds: tokenIds).compactMap { $0 }
+      return self.tokenizer.tokens(forIds: input.units.tokenIds).compactMap { $0 }
     }
 
     public func generate(
-      prompt: EdgeToolsTranscript.UserMessage,
+      prompt: EdgeToolsTranscript.Prompt,
       tools: [EdgeToolDefinition] = [],
       parameters: sending Profile.GenerateParameters,
       context: LlamaContext<Profile>,
@@ -170,57 +174,29 @@
         parameters: parameters,
         context: context,
         channel: channel,
-        makeState: {
-          self.generationState(from: try context.begin(appending: .user(prompt)))
-        }
-      )
-    }
-
-    public func generate(
-      tools: [EdgeToolDefinition] = [],
-      parameters: sending Profile.GenerateParameters,
-      context: LlamaContext<Profile>,
-      channel: sending EdgeToolsGenerationChannel
-    ) throws -> AnyGenerationTask {
-      try self.validate(context)
-      return self.generationTask(
-        tools: tools,
-        parameters: parameters,
-        context: context,
-        channel: channel,
-        makeState: {
-          self.generationState(from: try context.begin())
-        }
+        makeState: { self.generationState(from: try context.begin(appending: prompt)) }
       )
     }
 
     public func prefill(
-      promptPrefix: EdgeToolsTranscript.UserMessage,
+      promptPrefix: EdgeToolsTranscript.Prompt,
       tools: [EdgeToolDefinition],
       context: LlamaContext<Profile>
     ) async throws -> EdgeToolsEnginePrefill {
       try self.validate(context)
-      return try self.prefill(
-        snapshot: context.begin(appending: .user(promptPrefix)),
-        tools: tools,
-        context: context
-      )
+      let snapshot = try context.begin(appending: promptPrefix)
+      return try self.prefill(snapshot: snapshot, tools: tools, context: context)
     }
 
-    /// Pays the setup a first generation would otherwise absorb into its time to first token:
-    /// allocating the llama context, and parsing the chat template for the given tools.
     public func warmUp(tools: [EdgeToolDefinition] = [], context: LlamaContext<Profile>) throws {
       try self.validate(context)
       let snapshot = try context.begin()
-      nonisolated(unsafe) let model = snapshot.model
-      defer {
-        context.finish(generation: nil, revision: snapshot.revision, model: model)
-      }
-      try model.warmUp()
-      _ = try model.tokenIds(
+      defer { context.finish(generation: nil, revision: snapshot.revision, model: snapshot.model) }
+      try snapshot.model.sequenceStore.warmUp()
+      _ = try self.inputProcessor.input(
         prompt: snapshot.transcript,
         tools: tools,
-        tokenizer: self.tokenizer
+        addGenerationPrompt: true
       )
     }
 
@@ -254,26 +230,18 @@
               channel: channel,
               grammarEngine: self.grammarEngine,
               maximumTokenCount: parameters.maxTokens,
-              grammar: { state in
+              grammar: {
                 try Profile.grammar(
-                  prompt: state.transcript,
+                  prompt: $0.transcript,
                   tools: tools,
                   parameters: parameters,
                   grammarEngine: self.grammarEngine
                 )
               },
-              prepare: { parser, state in
-                try state.model.prepare(
-                  prompt: &state.transcript,
-                  tools: tools,
-                  tokenizer: self.tokenizer,
-                  parameters: parameters,
-                  parser: &parser
-                )
+              prepare: {
+                try self.prepare(parser: &$0, tools: tools, parameters: parameters, state: &$1)
               },
-              decode: { bitmask, state in
-                try state.model.decode(bitmask: bitmask, parameters: parameters)
-              }
+              decode: { try self.decode(bitmask: $0, state: &$1) }
             )
           )
         } catch {
@@ -283,33 +251,80 @@
       }
     }
 
+    private func prepare(
+      parser: inout Profile.GenerationParser,
+      tools: [EdgeToolDefinition],
+      parameters: Profile.GenerateParameters,
+      state: inout ModelGenerationState
+    ) throws -> EdgeToolsGenerationLoop.Preparation {
+      Profile.prepare(prompt: &state.transcript, tools: tools, parser: &parser)
+      let input = try self.inputProcessor.input(
+        prompt: state.transcript,
+        tools: tools,
+        addGenerationPrompt: true
+      )
+      let contextState = state.contextState
+      contextState.sequenceStore.resetProbe(sequenceId: contextState.sequence.sequenceId)
+      let metrics = try self.synchronize(
+        input: input,
+        contextState: contextState,
+        output: .lastTokenLogits
+      )
+      let defaultSampling =
+        Profile.defaultSampling(prompt: state.transcript, parameters: parameters)
+        ?? contextState.configuredSampling
+        ?? EdgeToolsFusedSamplingParameters()
+      state.decoder = ModelGenerationState.Decoder(
+        sampler: EdgeToolsCPUFusedSampler(
+          parameters: parameters.sampling.applying(to: defaultSampling)
+        )
+      )
+      return EdgeToolsGenerationLoop.Preparation(metrics: metrics)
+    }
+
+    private func decode(
+      bitmask: GrammarBitmask,
+      state: inout ModelGenerationState
+    ) throws -> EdgeToolsToken.ID {
+      guard var decoder = state.decoder else {
+        throw EdgeToolsError.modelNotPrepared
+      }
+      let contextState = state.contextState
+      let sample = try contextState.sequenceStore.withLogits(
+        sequenceId: contextState.sequence.sequenceId,
+        appending: decoder.pendingTokenId,
+        vocabularySize: contextState.vocabularySizeValue
+      ) {
+        decoder.sampler.sample(logits: &$0, bitmask: bitmask)
+      }
+      decoder.confidence.add(confidence: sample.confidence)
+      decoder.pendingTokenId = sample.tokenId
+      state.decoder = decoder
+      return sample.tokenId
+    }
+
     private func finalize(
       state: consuming ModelGenerationState,
       result: consuming Result<EdgeToolsEngineGeneration, any Error>,
       context: LlamaContext<Profile>
     ) -> Result<EdgeToolsEngineGeneration, any Error> {
       var state = state
-      let metadata = state.model.finish()
+      let metadata = self.metadata(for: state)
 
       let finalResult: Result<EdgeToolsEngineGeneration, any Error>
       switch result {
       case .success(var value):
-        state.model.commitGeneration(stopTokenIds: self.generationLoop.stopTokenIds)
+        self.commitGeneration(state: &state)
         value.metadata.merge(metadata) { _, finalValue in finalValue }
         finalResult = .success(value)
       case .failure(let error):
-        state.model.resetGeneration()
+        state.decoder = nil
         finalResult = .failure(error)
       }
-      let generation = try? finalResult.get()
-      // The state is returned exactly once and is not accessed after this point. Region
-      // isolation does not currently infer that exclusivity through the synchronous
-      // context method.
-      nonisolated(unsafe) let restoredModel = state.model
       context.finish(
-        generation: generation,
+        generation: try? finalResult.get(),
         revision: state.revision,
-        model: restoredModel
+        model: state.contextState
       )
       return finalResult
     }
@@ -319,33 +334,77 @@
       tools: [EdgeToolDefinition],
       context: LlamaContext<Profile>
     ) throws -> EdgeToolsEnginePrefill {
-      var model = snapshot.model
       defer {
-        // The model is no longer used after it is returned to the context. Region isolation does
-        // not currently infer that exclusivity through the synchronous context method.
-        nonisolated(unsafe) let restoredModel = model
-        context.finish(generation: nil, revision: snapshot.revision, model: restoredModel)
+        context.finish(generation: nil, revision: snapshot.revision, model: snapshot.model)
       }
-      return try model.prefill(
+      let input = try self.inputProcessor.input(
         prompt: snapshot.transcript,
         tools: tools,
-        tokenizer: self.tokenizer
+        addGenerationPrompt: false
+      )
+      return EdgeToolsEnginePrefill(
+        metrics: try self.synchronize(
+          input: input,
+          contextState: snapshot.model,
+          output: .none
+        )
       )
     }
 
-    private func makeModelState() -> sending LlamaModelState<Profile> {
-      let family = LlamaSequenceFamily(
-        model: self.model,
-        parameters: self.contextParameters,
-        multimodalProjector: self.multimodalProjector
+    private func synchronize(
+      input: borrowing LlamaPreparedInput,
+      contextState: LlamaContextState<Profile>,
+      output: LlamaEvaluationOutput
+    ) throws -> EdgeToolsPrefillMetrics {
+      let clock = ContinuousClock()
+      let start = clock.now
+      let evaluatedCount = try contextState.sequenceStore.synchronize(
+        sequenceId: contextState.sequence.sequenceId,
+        input: input,
+        multimodalRuntime: self.multimodalRuntime,
+        output: output
       )
-      nonisolated(unsafe) let state = LlamaModelState<Profile>(
-        family: family,
-        lease: family.lease(copyingFrom: nil)!,
+      return EdgeToolsPrefillMetrics(
+        tokens: evaluatedCount,
+        duration: start.duration(to: clock.now)
+      )
+    }
+
+    private func metadata(for state: ModelGenerationState) -> EdgeToolsMetadata {
+      guard let decoder = state.decoder else { return EdgeToolsMetadata() }
+      var metadata = EdgeToolsMetadata()
+      metadata.generationConfidence = decoder.confidence.mean
+      metadata.perTokenConfidences = decoder.confidence.perTokenConfidences
+      metadata.probeConfidence = state.contextState.sequenceStore.probeConfidence(
+        sequenceId: state.contextState.sequence.sequenceId
+      )
+      return metadata
+    }
+
+    private func commitGeneration(state: inout ModelGenerationState) {
+      guard let decoder = state.decoder else { return }
+      if let pendingTokenId = decoder.pendingTokenId,
+        !self.generationLoop.stopTokenIds.contains(pendingTokenId)
+      {
+        try? state.contextState.sequenceStore.commit(
+          tokenId: pendingTokenId,
+          sequenceId: state.contextState.sequence.sequenceId
+        )
+      }
+      state.decoder = nil
+    }
+
+    private func contextState() -> sending LlamaContextState<Profile> {
+      let sequenceStore = LlamaKVSequenceStore(
+        model: self.model,
+        parameters: self.contextParameters
+      )
+      return LlamaContextState(
+        sequenceStore: sequenceStore,
+        sequence: sequenceStore.lease(copyingFrom: nil)!,
         vocabularySize: self.vocabularySizeValue,
         defaultSampling: self.defaultSampling
       )
-      return state
     }
 
     private func validate(_ context: LlamaContext<Profile>) throws {
@@ -358,7 +417,7 @@
       from snapshot: LlamaContext<Profile>.Snapshot
     ) -> ModelGenerationState {
       ModelGenerationState(
-        model: snapshot.model,
+        contextState: snapshot.model,
         transcript: snapshot.transcript,
         revision: snapshot.revision
       )

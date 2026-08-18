@@ -9,13 +9,9 @@
 
   // MARK: - LlamaTokenizer
 
-  /// A tokenizer over the GGUF-embedded vocabulary of a loaded llama.cpp model.
   public final class LlamaTokenizer: EdgeToolsTokenizer, Sendable {
     package let model: LlamaModelBox
 
-    /// The model's vocabulary, which llama.cpp keeps immutable and alive for as long as the
-    /// model handle the box owns, so sharing it across isolation domains is safe for the same
-    /// reason the model handle itself is.
     private nonisolated(unsafe) let vocabulary: OpaquePointer
 
     public let vocabularySize: Int
@@ -96,7 +92,6 @@
       }
     }
 
-    /// The token IDs the vocabulary marks as ending a generation, beyond the EOS token.
     public func endOfGenerationTokenIds() -> Set<EdgeToolsToken.ID> {
       Set(
         (0..<self.vocabularySize).lazy
@@ -251,17 +246,11 @@
 
   // MARK: - Helpers
 
-  private func tokenText(
-    vocabulary: OpaquePointer,
-    tokenId: EdgeToolsToken.ID
-  ) -> String? {
+  private func tokenText(vocabulary: OpaquePointer, tokenId: EdgeToolsToken.ID) -> String? {
     llama_vocab_get_text(vocabulary, Int32(tokenId)).map { String(cString: $0) }
   }
 
-  private func specialToken(
-    vocabulary: OpaquePointer,
-    tokenId: Int32
-  ) -> EdgeToolsToken? {
+  private func specialToken(vocabulary: OpaquePointer, tokenId: Int32) -> EdgeToolsToken? {
     guard tokenId != -1 else { return nil }
     let id = EdgeToolsToken.ID(tokenId)
     return tokenText(vocabulary: vocabulary, tokenId: id)

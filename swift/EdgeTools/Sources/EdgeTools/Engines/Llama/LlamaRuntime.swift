@@ -5,7 +5,6 @@
 
   // MARK: - LlamaKVCacheType
 
-  /// The raw values of the `ggml_type` cases usable for the KV cache.
   public struct LlamaKVCacheType: RawRepresentable, Hashable, Sendable {
     public let rawValue: Int32
 
@@ -23,7 +22,6 @@
 
   // MARK: - LlamaFlashAttention
 
-  /// The raw values of llama.cpp's `llama_flash_attn_type` enum.
   public struct LlamaFlashAttention: RawRepresentable, Hashable, Sendable {
     public let rawValue: Int32
 
@@ -39,13 +37,9 @@
   // MARK: - LlamaContextParameters
 
   public struct LlamaContextParameters: Hashable, Sendable {
-    /// The token capacity of the context (`n_ctx`). Zero uses the model's training length.
     public var contextLength: Int
-    /// The maximum number of forked sequences the context supports (`n_seq_max`).
     public var maximumSequenceCount: Int
-    /// Shares KV cells between sequences (`kv_unified`), making forks copy-on-write.
     public var unifiedKVCache: Bool
-    /// The number of threads used for decoding. Zero picks a hardware-based default.
     public var threadCount: Int
     public var flashAttention: LlamaFlashAttention
     public var keyCacheType: LlamaKVCacheType
@@ -70,9 +64,9 @@
     }
   }
 
-  // MARK: - LlamaContextHandle
+  // MARK: - LlamaRuntimeContext
 
-  struct LlamaContextHandle: ~Copyable, @unchecked Sendable {
+  struct LlamaRuntimeContext: ~Copyable {
     let handle: OpaquePointer
 
     deinit {
@@ -140,7 +134,7 @@
   // MARK: - LlamaModel + Contexts
 
   extension LlamaModel {
-    borrowing func createContext(parameters: LlamaContextParameters) throws -> LlamaContextHandle {
+    borrowing func createContext(parameters: LlamaContextParameters) throws -> LlamaRuntimeContext {
       var contextParameters = llama_context_default_params()
       contextParameters.n_ctx = UInt32(parameters.contextLength)
       contextParameters.n_seq_max = UInt32(parameters.maximumSequenceCount)
@@ -159,7 +153,7 @@
           message: "A llama context could not be created."
         )
       }
-      return LlamaContextHandle(handle: handle)
+      return LlamaRuntimeContext(handle: handle)
     }
   }
 #endif

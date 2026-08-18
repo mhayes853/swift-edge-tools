@@ -410,65 +410,31 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 63 elements
+        ▿ parts: 30 elements
           ▿ EdgeToolsGenerationPart
-            - reasoning: "It"
+            - reasoning: "Based"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " seems"
+            - reasoning: " on"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " system"
+            - reasoning: " `"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " automatically"
+            - reasoning: "get"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " processed"
+            - reasoning: "Weather"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " your"
+            - reasoning: "`"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " request"
+            - reasoning: " tool"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " without"
+            - reasoning: "\'s"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " direct"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " user"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " input"
+            - reasoning: " result"
           ▿ EdgeToolsGenerationPart
             - reasoning: ","
           ▿ EdgeToolsGenerationPart
-            - reasoning: " but"
-          ▿ EdgeToolsGenerationPart
             - reasoning: " the"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " weather"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " information"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " for"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " Paris"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " was"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " retrieved"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " successfully"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "."
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "\n\n"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "**"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "Summary"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: ":**"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "\n"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "The"
           ▿ EdgeToolsGenerationPart
             - reasoning: " weather"
           ▿ EdgeToolsGenerationPart
@@ -486,9 +452,9 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: "unny"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "**,"
+            - reasoning: "**"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " with"
+            - reasoning: " at"
           ▿ EdgeToolsGenerationPart
             - reasoning: " a"
           ▿ EdgeToolsGenerationPart
@@ -503,38 +469,6 @@
             - reasoning: "1"
           ▿ EdgeToolsGenerationPart
             - reasoning: "°C"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "."
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " Conditions"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " are"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " clear"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " with"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " a"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " pleasant"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " weather"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " profile"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " suitable"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " for"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " outdoor"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " activities"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " and"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " outdoor"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " events"
           ▿ EdgeToolsGenerationPart
             - reasoning: "."
   ▿ reasoningEffort: EdgeToolsReasoningEffort

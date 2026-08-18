@@ -75,9 +75,7 @@
 
     init(tokenIds: [EdgeToolsToken.ID]) {
       self.handle = nil
-      self.units = tokenIds.map {
-        LlamaPreparedInputUnit(value: .token($0))
-      }
+      self.units = tokenIds.map { LlamaPreparedInputUnit(value: .token($0)) }
       self.chunks = []
     }
 
@@ -92,9 +90,7 @@
           var tokenCount = 0
           let tokens = mtmd_input_chunk_get_tokens_text(chunk, &tokenCount)
           let tokenIds = (0..<tokenCount).map { EdgeToolsToken.ID(tokens![$0]) }
-          units.append(contentsOf: tokenIds.map {
-            LlamaPreparedInputUnit(value: .token($0))
-          })
+          units.append(contentsOf: tokenIds.map { LlamaPreparedInputUnit(value: .token($0)) })
           chunks.append(.text(tokenIds: tokenIds, units: unitStart..<units.count))
         case MTMD_INPUT_CHUNK_TYPE_IMAGE:
           let tokenCount = Int(mtmd_input_chunk_get_n_tokens(chunk))
@@ -130,9 +126,9 @@
     }
   }
 
-  // MARK: - LlamaMultimodalProjector
+  // MARK: - LlamaMultimodalRuntime
 
-  final class LlamaMultimodalProjector: Sendable {
+  final class LlamaMultimodalRuntime: Sendable {
     private struct State: ~Copyable {
       let handle: OpaquePointer
 
@@ -264,12 +260,11 @@
 
     func evaluate(
       input: borrowing LlamaPreparedInput,
-      context: borrowing LlamaContextHandle,
+      context: borrowing LlamaRuntimeContext,
       chunkIndex: Int,
       position: Int,
       sequenceId: Int,
-      batchSize: Int,
-      wantsLogits: Bool
+      batchSize: Int
     ) throws -> Int {
       try self.state.withBorrowedLock { state in
         guard
@@ -289,7 +284,7 @@
           llama_pos(position),
           llama_seq_id(sequenceId),
           Int32(clamping: batchSize),
-          wantsLogits,
+          false,
           &newPosition
         )
         guard status == 0 else {

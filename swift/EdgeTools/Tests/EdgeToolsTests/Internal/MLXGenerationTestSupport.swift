@@ -214,8 +214,9 @@
           channel: EdgeToolsGenerationChannel()
         )
       },
-      generatingResponse: {
+      generatingResponse: { toolMessage in
         try engine.generate(
+          prompt: .tools([toolMessage]),
           tools: [],
           parameters: DefaultMLXGenerateParameters(maxTokens: 64),
           context: context,

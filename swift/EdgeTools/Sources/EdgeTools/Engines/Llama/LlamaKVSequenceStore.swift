@@ -1,21 +1,34 @@
 #if Llama && canImport(CLlama)
   import EdgeToolsCore
 
-  // MARK: - LlamaSequenceFamily
+  // MARK: - LlamaEvaluationOutput
 
-  final class LlamaSequenceFamily: Sendable {
-    final class Lease: Sendable {
-      let family: LlamaSequenceFamily
-      let sequenceId: Int
+  enum LlamaEvaluationOutput {
+    case none
+    case lastTokenLogits
 
-      init(family: LlamaSequenceFamily, sequenceId: Int) {
-        self.family = family
-        self.sequenceId = sequenceId
-      }
+    var wantsLogits: Bool {
+      self == .lastTokenLogits
+    }
+  }
 
-      deinit { self.family.release(sequenceId: self.sequenceId) }
+  // MARK: - LlamaSequenceLease
+
+  final class LlamaSequenceLease: Sendable {
+    let store: LlamaKVSequenceStore
+    let sequenceId: Int
+
+    fileprivate init(store: LlamaKVSequenceStore, sequenceId: Int) {
+      self.store = store
+      self.sequenceId = sequenceId
     }
 
+    deinit { self.store.release(sequenceId: self.sequenceId) }
+  }
+
+  // MARK: - LlamaKVSequenceStore
+
+  final class LlamaKVSequenceStore: Sendable {
     private struct CachedInput {
       var units = [LlamaPreparedInputUnit]()
       var positionCount = 0
@@ -32,13 +45,13 @@
     }
 
     private struct State: ~Copyable {
-      var context: LlamaContextHandle?
+      var context: LlamaRuntimeContext?
       var cachedInputs = [Int: CachedInput]()
       var allocatedSequenceIds = Set<Int>()
       var logitsSequenceId: Int?
 
       borrowing func withContext<R: ~Copyable>(
-        _ body: (borrowing LlamaContextHandle) throws -> R
+        _ body: (borrowing LlamaRuntimeContext) throws -> R
       ) throws -> R {
         switch self.context {
         case .some(let context):
@@ -52,24 +65,18 @@
       }
     }
 
-    private static let decodeChunkSize = 512
+    private static let evaluationChunkSize = 512
 
     let model: LlamaModelBox
     let parameters: LlamaContextParameters
-    let multimodalProjector: LlamaMultimodalProjector?
     private let state = Lock(State())
 
-    init(
-      model: LlamaModelBox,
-      parameters: LlamaContextParameters,
-      multimodalProjector: LlamaMultimodalProjector?
-    ) {
+    init(model: LlamaModelBox, parameters: LlamaContextParameters) {
       self.model = model
       self.parameters = parameters
-      self.multimodalProjector = multimodalProjector
     }
 
-    func lease(copyingFrom parentSequenceId: Int?) -> Lease? {
+    func lease(copyingFrom parentSequenceId: Int?) -> LlamaSequenceLease? {
       self.state.withLock { state in
         guard
           let sequenceId = (0..<self.parameters.maximumSequenceCount)
@@ -89,20 +96,21 @@
         } else {
           state.cachedInputs[sequenceId] = CachedInput()
         }
-        return Lease(family: self, sequenceId: sequenceId)
+        return LlamaSequenceLease(store: self, sequenceId: sequenceId)
       }
     }
 
-    func prefill(
+    func synchronize(
       sequenceId: Int,
       input: borrowing LlamaPreparedInput,
-      wantsLogits: Bool
+      multimodalRuntime: LlamaMultimodalRuntime?,
+      output: LlamaEvaluationOutput
     ) throws -> Int {
       try self.state.withLock { state in
         try self.ensureContext(&state)
         let cached = state.cachedInputs[sequenceId]?.units ?? []
         var prefixCount = zip(cached, input.units).prefix { $0 == $1 }.count
-        if wantsLogits && prefixCount == input.units.count && !input.units.isEmpty {
+        if output.wantsLogits && prefixCount == input.units.count && !input.units.isEmpty {
           prefixCount = input.units.count - 1
         }
         prefixCount = self.trim(sequenceId: sequenceId, to: prefixCount, state: &state)
@@ -111,14 +119,15 @@
             input,
             from: prefixCount,
             sequenceId: sequenceId,
-            wantsLogits: wantsLogits,
+            multimodalRuntime: multimodalRuntime,
+            output: output,
             state: &state
           )
         } else {
-          try self.decode(
+          try self.evaluate(
             tokenIds: input.units[prefixCount...].tokenIds,
             sequenceId: sequenceId,
-            wantsLogits: wantsLogits,
+            output: output,
             state: &state
           )
         }
@@ -126,7 +135,7 @@
       }
     }
 
-    func withCurrentLogits<R>(
+    func withLogits<R>(
       sequenceId: Int,
       appending pendingTokenId: EdgeToolsToken.ID?,
       vocabularySize: Int,
@@ -135,10 +144,10 @@
       try self.state.withLock { state in
         try self.ensureContext(&state)
         if let pendingTokenId {
-          try self.decode(
+          try self.evaluate(
             tokenIds: [pendingTokenId],
             sequenceId: sequenceId,
-            wantsLogits: true,
+            output: .lastTokenLogits,
             state: &state
           )
         } else if state.logitsSequenceId != sequenceId {
@@ -146,39 +155,33 @@
           guard case .token(let tokenId) = cached.last?.value else {
             throw LlamaRuntimeError(
               code: .decodeFailed,
-              message: "The sequence has no decoded tokens to produce logits from."
+              message: "The sequence has no evaluated tokens to produce logits from."
             )
           }
           _ = self.trim(sequenceId: sequenceId, to: cached.count - 1, state: &state)
-          try self.decode(
+          try self.evaluate(
             tokenIds: [tokenId],
             sequenceId: sequenceId,
-            wantsLogits: true,
+            output: .lastTokenLogits,
             state: &state
           )
         }
         guard let logits = try state.withContext({ $0.lastLogits() }) else {
           throw LlamaRuntimeError(
             code: .decodeFailed,
-            message: "The llama context has no logits for the last decoded token."
+            message: "The llama context has no logits for the last evaluated token."
           )
         }
-        var span = MutableSpan<Float>(
-          _unsafeElements: UnsafeMutableBufferPointer(start: logits, count: vocabularySize)
-        )
+        let buffer = UnsafeMutableBufferPointer(start: logits, count: vocabularySize)
+        var span = MutableSpan<Float>(_unsafeElements: buffer)
         return try body(&span)
       }
     }
 
-    func append(tokenId: EdgeToolsToken.ID, sequenceId: Int) throws {
+    func commit(tokenId: EdgeToolsToken.ID, sequenceId: Int) throws {
       try self.state.withLock { state in
         try self.ensureContext(&state)
-        try self.decode(
-          tokenIds: [tokenId],
-          sequenceId: sequenceId,
-          wantsLogits: false,
-          state: &state
-        )
+        try self.evaluate(tokenIds: [tokenId], sequenceId: sequenceId, output: .none, state: &state)
       }
     }
 
@@ -190,7 +193,11 @@
       self.state.withLock { $0.context?.probeReset(sequenceId: sequenceId) }
     }
 
-    private func release(sequenceId: Int) {
+    func warmUp() throws {
+      try self.state.withLock { try self.ensureContext(&$0) }
+    }
+
+    fileprivate func release(sequenceId: Int) {
       self.state.withLock { state in
         _ = state.context?.memoryRemove(sequenceId: sequenceId, from: 0, to: -1)
         state.cachedInputs[sequenceId] = nil
@@ -207,11 +214,7 @@
       var prefixCount = prefixCount
       var retainedUnits = Array(cached.units.prefix(prefixCount))
       var retainedPositions = retainedUnits.reduce(0) { $0 + $1.positionCount }
-      if state.context?.memoryRemove(
-        sequenceId: sequenceId,
-        from: retainedPositions,
-        to: -1
-      ) != true {
+      if state.context?.memoryRemove(sequenceId: sequenceId, from: retainedPositions, to: -1) != true {
         _ = state.context?.memoryRemove(sequenceId: sequenceId, from: 0, to: -1)
         prefixCount = 0
         retainedUnits = []
@@ -224,14 +227,14 @@
       return prefixCount
     }
 
-    private func decode(
+    private func evaluate(
       tokenIds: [EdgeToolsToken.ID],
       sequenceId: Int,
-      wantsLogits: Bool,
+      output: LlamaEvaluationOutput,
       state: inout State
     ) throws {
-      for start in stride(from: 0, to: tokenIds.count, by: Self.decodeChunkSize) {
-        let end = min(start + Self.decodeChunkSize, tokenIds.count)
+      for start in stride(from: 0, to: tokenIds.count, by: Self.evaluationChunkSize) {
+        let end = min(start + Self.evaluationChunkSize, tokenIds.count)
         let chunk = Array(tokenIds[start..<end])
         let startPosition = state.cachedInputs[sequenceId]?.positionCount ?? 0
         try state.withContext {
@@ -239,12 +242,12 @@
             tokenIds: chunk,
             startPosition: startPosition,
             sequenceId: sequenceId,
-            wantsLogits: wantsLogits && end == tokenIds.count
+            wantsLogits: output.wantsLogits && end == tokenIds.count
           )
         }
         state.cachedInputs[sequenceId, default: CachedInput()].append(tokenIds: chunk)
       }
-      if wantsLogits {
+      if output.wantsLogits {
         state.logitsSequenceId = sequenceId
       }
     }
@@ -253,13 +256,14 @@
       _ input: borrowing LlamaPreparedInput,
       from prefixCount: Int,
       sequenceId: Int,
-      wantsLogits: Bool,
+      multimodalRuntime: LlamaMultimodalRuntime?,
+      output: LlamaEvaluationOutput,
       state: inout State
     ) throws {
-      guard let projector = self.multimodalProjector else {
+      guard let multimodalRuntime else {
         throw LlamaRuntimeError(
           code: .multimodalProcessingFailed,
-          message: "The multimodal projector is unavailable."
+          message: "The multimodal runtime is unavailable."
         )
       }
       for chunk in input.chunks {
@@ -267,10 +271,12 @@
         case .text(let tokenIds, let units):
           guard prefixCount < units.upperBound else { continue }
           let offset = max(prefixCount - units.lowerBound, 0)
-          try self.decode(
+          try self.evaluate(
             tokenIds: Array(tokenIds.dropFirst(offset)),
             sequenceId: sequenceId,
-            wantsLogits: wantsLogits && units.upperBound == input.units.count,
+            output: output.wantsLogits && units.upperBound == input.units.count
+              ? .lastTokenLogits
+              : .none,
             state: &state
           )
         case .media(let chunkIndex, let unitIndex):
@@ -278,25 +284,18 @@
           let unit = input.units[unitIndex]
           let currentPosition = state.cachedInputs[sequenceId]?.positionCount ?? 0
           let newPosition = try state.withContext {
-            try projector.evaluate(
+            try multimodalRuntime.evaluate(
               input: input,
               context: $0,
               chunkIndex: chunkIndex,
               position: currentPosition,
               sequenceId: sequenceId,
-              batchSize: Self.decodeChunkSize,
-              wantsLogits: false
+              batchSize: Self.evaluationChunkSize
             )
           }
           state.cachedInputs[sequenceId, default: CachedInput()]
             .append(media: unit, endingAt: newPosition)
         }
-      }
-    }
-
-    func warmUp() throws {
-      try self.state.withLock { state in
-        try self.ensureContext(&state)
       }
     }
 

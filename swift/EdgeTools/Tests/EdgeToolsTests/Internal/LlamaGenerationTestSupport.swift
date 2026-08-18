@@ -19,7 +19,7 @@
       toolResponse: .weatherTestResponse,
       generatingToolCall: {
         try engine.generate(
-          prompt: turn.userMessage,
+          prompt: .user(turn.userMessage),
           tools: [.weatherTest],
           parameters: DefaultLlamaGenerateParameters(
             sampling: .greedy,
@@ -30,8 +30,9 @@
           channel: EdgeToolsGenerationChannel()
         )
       },
-      generatingResponse: {
+      generatingResponse: { toolMessage in
         try engine.generate(
+          prompt: .tools([toolMessage]),
           tools: [],
           parameters: DefaultLlamaGenerateParameters(maxTokens: 64),
           context: context,
@@ -102,7 +103,7 @@
       toolResponse: ["color": "red"],
       generatingToolCall: {
         try engine.generate(
-          prompt: turn.userMessage,
+          prompt: .user(turn.userMessage),
           tools: [.llamaColorTest],
           parameters: DefaultLlamaGenerateParameters(
             sampling: .greedy,
@@ -113,8 +114,9 @@
           channel: EdgeToolsGenerationChannel()
         )
       },
-      generatingResponse: {
+      generatingResponse: { toolMessage in
         try engine.generate(
+          prompt: .tools([toolMessage]),
           tools: [],
           parameters: DefaultLlamaGenerateParameters(sampling: .greedy, maxTokens: 64),
           context: context,

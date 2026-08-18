@@ -37,11 +37,8 @@
   // MARK: - LlamaModelParameters
 
   public struct LlamaModelParameters: Hashable, Sendable {
-    /// The number of layers to offload to the GPU. Defaults to all layers.
     public var gpuLayerCount: Int
     public var useMemoryMapping: Bool
-
-    /// Loads the vocabulary and metadata without the weights.
     public var vocabularyOnly: Bool
 
     public init(
@@ -57,51 +54,34 @@
 
   // MARK: - System Info
 
-  /// A description of the backend features the linked llama.cpp build was compiled with.
   public func llamaSystemInfo() -> String {
     String(cString: llama_print_system_info())
   }
 
   // MARK: - LlamaModel
 
-  /// An owned llama.cpp model.
-  ///
-  /// The model is immutable after loading, and llama.cpp permits the model operations used by
-  /// EdgeTools to run concurrently. Non-copyability ensures the handle is destroyed exactly once.
   public struct LlamaModel: ~Copyable, @unchecked Sendable {
     public let handle: OpaquePointer
 
     public init(path: String, parameters: LlamaModelParameters = LlamaModelParameters()) throws {
-      _ = llamaBackendInitialized
+      llama_backend_init()
       var modelParameters = llama_model_default_params()
       modelParameters.n_gpu_layers =
         parameters.gpuLayerCount == .max ? -1 : Int32(clamping: parameters.gpuLayerCount)
       modelParameters.use_mmap = parameters.useMemoryMapping
       modelParameters.vocab_only = parameters.vocabularyOnly
       guard let handle = llama_model_load_from_file(path, modelParameters) else {
-        throw LlamaRuntimeError(
-          code: .modelLoadFailed,
-          message: "The model at \(path) could not be loaded."
-        )
-      }
-      guard llama_model_get_vocab(handle) != nil else {
-        llama_model_free(handle)
-        throw LlamaRuntimeError(
-          code: .vocabularyUnavailable,
-          message: "The model at \(path) does not carry a vocabulary."
-        )
+        let message = "The model at \(path) could not be loaded."
+        throw LlamaRuntimeError(code: .modelLoadFailed, message: message)
       }
       self.handle = handle
     }
 
-    /// Takes ownership of a llama.cpp model handle.
     public init(handle: consuming OpaquePointer) {
       self.handle = consume handle
     }
 
-    deinit {
-      llama_model_free(self.handle)
-    }
+    deinit { llama_model_free(self.handle) }
 
     public borrowing func chatTemplate(named name: String? = nil) -> String? {
       let template =
@@ -123,10 +103,7 @@
 
   #if FoundationEssentials
     extension LlamaModel {
-      public init(
-        url: URL,
-        parameters: LlamaModelParameters = LlamaModelParameters()
-      ) throws {
+      public init(url: URL, parameters: LlamaModelParameters = LlamaModelParameters()) throws {
         try self.init(path: url.path(), parameters: parameters)
       }
     }
@@ -148,9 +125,8 @@
     private let model: LlamaModel
 
     public init(contentsOfGGUF path: String) throws {
-      self.init(
-        model: try LlamaModel(path: path, parameters: LlamaModelParameters(vocabularyOnly: true))
-      )
+      let model = try LlamaModel(path: path, parameters: LlamaModelParameters(vocabularyOnly: true))
+      self.init(model: model)
     }
 
     public init(model: consuming LlamaModel) {
@@ -197,9 +173,4 @@
       String(decoding: buffer.prefix(Int(written)).map { UInt8(bitPattern: $0) }, as: UTF8.self)
     }
   }
-
-  private let llamaBackendInitialized: Bool = {
-    llama_backend_init()
-    return true
-  }()
 #endif
