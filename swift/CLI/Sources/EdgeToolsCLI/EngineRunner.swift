@@ -15,8 +15,21 @@ private struct EngineFactoryContext: Sendable {
 
 private typealias ModelEngineFactory = @Sendable (EngineFactoryContext) async throws -> EngineRunner
 
+private struct ModelEngineRegistration: Sendable {
+  let factory: ModelEngineFactory
+  let supportsImages: Bool
+
+  init(
+    factory: @escaping ModelEngineFactory,
+    supportsImages: Bool = false
+  ) {
+    self.factory = factory
+    self.supportsImages = supportsImages
+  }
+}
+
 private struct ModelRegistration: Sendable {
-  let engines: [EngineKind: ModelEngineFactory]
+  let engines: [EngineKind: ModelEngineRegistration]
 }
 
 public struct EngineRunner: Sendable {
@@ -132,24 +145,25 @@ extension EngineRunner {
   }
 
   public static func capabilities(of engine: EngineKind, for model: DetectedModel) -> Capabilities {
+    let supportsImages = Self.modelRegistrations[model]?.engines[engine]?.supportsImages ?? false
     switch engine {
     case .mlx:
-      Capabilities(
+      return Capabilities(
         supportsCustomGrammar: true,
         supportsSampling: true,
-        supportsImages: model.modality == .vision
+        supportsImages: supportsImages
       )
     case .needle2:
-      Capabilities(
+      return Capabilities(
         supportsCustomGrammar: false,
         supportsSampling: false,
         supportsImages: false
       )
     case .llama:
-      Capabilities(
+      return Capabilities(
         supportsCustomGrammar: true,
         supportsSampling: true,
-        supportsImages: false
+        supportsImages: supportsImages
       )
     }
   }
@@ -175,6 +189,9 @@ extension EngineRunner {
       throw EdgeCLIError(
         "\(detection.model.displayName) on \(engine.rawValue) takes text only; --image does not apply."
       )
+    }
+    if !request.images.isEmpty, engine == .llama, detection.model.modality == .vision {
+      _ = try multimodalProjector(in: detection)
     }
     guard request.grammar == .auto || capabilities.supportsCustomGrammar else {
       throw EdgeCLIError(
@@ -206,12 +223,12 @@ extension EngineRunner {
   ) async throws {
     let engine = try resolvedEngine(requested: engine, detection: detection)
     let context = EngineFactoryContext(detection: detection, hardwareUnit: hardwareUnit)
-    guard let factory = Self.modelRegistrations[detection.model]?.engines[engine] else {
+    guard let registration = Self.modelRegistrations[detection.model]?.engines[engine] else {
       throw EdgeCLIError(
         "\(detection.model.displayName) does not support the \(engine.rawValue) engine."
       )
     }
-    self = try await factory(context)
+    self = try await registration.factory(context)
   }
 
   public init(
@@ -250,73 +267,134 @@ extension EngineRunner {
     var registrations: [DetectedModel: ModelRegistration] = [:]
     if #available(macOS 26, *) {
       registrations[.needle2] = ModelRegistration(engines: [
-        .needle2: { _ in Self.needle2() }
+        .needle2: ModelEngineRegistration(factory: { _ in Self.needle2() })
       ])
     }
-    let llamaFactories: [DetectedModel: ModelEngineFactory] = [
-      .qwen3: Self.llamaFactory { try Qwen3LlamaModelEngine(modelPath: $0) },
-      .qwen3P5: Self.llamaFactory { try Qwen3P5LlamaModelEngine(modelPath: $0) },
-      .functionGemma: Self.llamaFactory { try FunctionGemmaLlamaModelEngine(modelPath: $0) },
-      .gemma4: Self.llamaFactory { try Gemma4LlamaModelEngine(modelPath: $0) },
-      .lfm2: Self.llamaFactory { try LFM2P5LlamaModelEngine(modelPath: $0) },
-      .granite: Self.llamaFactory { try GraniteLlamaModelEngine(modelPath: $0) },
-      .graniteMoeHybrid: Self.llamaFactory { try GraniteLlamaModelEngine(modelPath: $0) },
-      .miniCPM5: Self.llamaFactory { try MiniCPM5LlamaModelEngine(modelPath: $0) },
-      .genericLLM: Self.llamaFactory { try Qwen3LlamaModelEngine(modelPath: $0) }
+    let llamaRegistrations: [DetectedModel: ModelEngineRegistration] = [
+      .qwen3: ModelEngineRegistration(
+        factory: Self.llamaFactory { try Qwen3LlamaModelEngine(modelPath: $0) }
+      ),
+      .qwen3P5: ModelEngineRegistration(
+        factory: Self.llamaFactory { try Qwen3P5LlamaModelEngine(modelPath: $0) }
+      ),
+      .functionGemma: ModelEngineRegistration(
+        factory: Self.llamaFactory { try FunctionGemmaLlamaModelEngine(modelPath: $0) }
+      ),
+      .gemma4: ModelEngineRegistration(
+        factory: Self.llamaMultimodalFactory(
+          withProjector: {
+            try Gemma4LlamaModelEngine(modelPath: $0, multimodalProjectorPath: $1)
+          },
+          withoutProjector: { try Gemma4LlamaModelEngine(modelPath: $0) }
+        ),
+        supportsImages: true
+      ),
+      .lfm2: ModelEngineRegistration(
+        factory: Self.llamaFactory { try LFM2P5LlamaModelEngine(modelPath: $0) }
+      ),
+      .granite: ModelEngineRegistration(
+        factory: Self.llamaFactory { try GraniteLlamaModelEngine(modelPath: $0) }
+      ),
+      .graniteMoeHybrid: ModelEngineRegistration(
+        factory: Self.llamaFactory { try GraniteLlamaModelEngine(modelPath: $0) }
+      ),
+      .miniCPM5: ModelEngineRegistration(
+        factory: Self.llamaFactory { try MiniCPM5LlamaModelEngine(modelPath: $0) }
+      ),
+      .genericLLM: ModelEngineRegistration(
+        factory: Self.llamaFactory { try Qwen3LlamaModelEngine(modelPath: $0) }
+      ),
+      .genericVLM: ModelEngineRegistration(
+        factory: Self.llamaMultimodalFactory(
+          withProjector: {
+            try GenericVLMLlamaModelEngine(modelPath: $0, multimodalProjectorPath: $1)
+          },
+          withoutProjector: { try GenericVLMLlamaModelEngine(modelPath: $0) }
+        ),
+        supportsImages: true
+      )
     ]
     #if canImport(MLX)
       registrations[.qwen3] = ModelRegistration(engines: [
-        .mlx: Self.mlxFactory { try await Qwen3MLXModelEngine(from: $0) }
+        .mlx: ModelEngineRegistration(
+          factory: Self.mlxFactory { try await Qwen3MLXModelEngine(from: $0) }
+        )
       ])
       registrations[.qwen3P5] = ModelRegistration(engines: [
-        .mlx: Self.mlxFactory { try await Qwen3P5MLXModelEngine(from: $0) }
+        .mlx: ModelEngineRegistration(
+          factory: Self.mlxFactory { try await Qwen3P5MLXModelEngine(from: $0) }
+        )
       ])
       registrations[.qwen3P5VL] = ModelRegistration(engines: [
-        .mlx: Self.mlxFactory(
-          { try await Qwen3P5VLMLXModelEngine(from: $0) },
+        .mlx: ModelEngineRegistration(
+          factory: Self.mlxFactory(
+            { try await Qwen3P5VLMLXModelEngine(from: $0) },
+            supportsImages: true
+          ),
           supportsImages: true
         )
       ])
       registrations[.lfm2] = ModelRegistration(engines: [
-        .mlx: Self.mlxFactory { try await LFM2P5MLXModelEngine(from: $0) }
+        .mlx: ModelEngineRegistration(
+          factory: Self.mlxFactory { try await LFM2P5MLXModelEngine(from: $0) }
+        )
       ])
       registrations[.functionGemma] = ModelRegistration(engines: [
-        .mlx: Self.mlxFactory { try await FunctionGemmaMLXModelEngine(from: $0) }
+        .mlx: ModelEngineRegistration(
+          factory: Self.mlxFactory { try await FunctionGemmaMLXModelEngine(from: $0) }
+        )
       ])
       registrations[.gemma4] = ModelRegistration(engines: [
-        .mlx: Self.mlxFactory(
-          { try await Gemma4MLXModelEngine(from: $0) },
+        .mlx: ModelEngineRegistration(
+          factory: Self.mlxFactory(
+            { try await Gemma4MLXModelEngine(from: $0) },
+            supportsImages: true
+          ),
           supportsImages: true
         )
       ])
       registrations[.granite] = ModelRegistration(engines: [
-        .mlx: Self.mlxFactory { try await GraniteMLXModelEngine(from: $0) }
+        .mlx: ModelEngineRegistration(
+          factory: Self.mlxFactory { try await GraniteMLXModelEngine(from: $0) }
+        )
       ])
       registrations[.graniteMoeHybrid] = ModelRegistration(engines: [
-        .mlx: Self.mlxFactory { try await GraniteMoeHybridMLXModelEngine(from: $0) }
+        .mlx: ModelEngineRegistration(
+          factory: Self.mlxFactory { try await GraniteMoeHybridMLXModelEngine(from: $0) }
+        )
       ])
       registrations[.miniCPM5] = ModelRegistration(engines: [
-        .mlx: Self.mlxFactory { try await MiniCPM5MLXModelEngine(from: $0) }
+        .mlx: ModelEngineRegistration(
+          factory: Self.mlxFactory { try await MiniCPM5MLXModelEngine(from: $0) }
+        )
       ])
       registrations[.lfm2P5VL] = ModelRegistration(engines: [
-        .mlx: Self.mlxFactory(
-          { try await LFM2P5VLMLXModelEngine(from: $0) },
+        .mlx: ModelEngineRegistration(
+          factory: Self.mlxFactory(
+            { try await LFM2P5VLMLXModelEngine(from: $0) },
+            supportsImages: true
+          ),
           supportsImages: true
         )
       ])
       registrations[.genericLLM] = ModelRegistration(engines: [
-        .mlx: Self.mlxFactory { try await Qwen3MLXModelEngine(from: $0) }
+        .mlx: ModelEngineRegistration(
+          factory: Self.mlxFactory { try await Qwen3MLXModelEngine(from: $0) }
+        )
       ])
       registrations[.genericVLM] = ModelRegistration(engines: [
-        .mlx: Self.mlxFactory(
-          { try await GenericVLMMLXModelEngine(from: $0) },
+        .mlx: ModelEngineRegistration(
+          factory: Self.mlxFactory(
+            { try await GenericVLMMLXModelEngine(from: $0) },
+            supportsImages: true
+          ),
           supportsImages: true
         )
       ])
     #endif
-    for (model, factory) in llamaFactories {
+    for (model, registration) in llamaRegistrations {
       var engines = registrations[model]?.engines ?? [:]
-      engines[.llama] = factory
+      engines[.llama] = registration
       registrations[model] = ModelRegistration(engines: engines)
     }
     return registrations
@@ -367,8 +445,35 @@ extension EngineRunner {
     }
   }
 
+  private static func llamaMultimodalFactory<Profile: LlamaModelProfile & EdgeToolsMultimodalModelProfile>(
+    withProjector: @escaping @Sendable (String, String) throws -> LlamaEngine<Profile>,
+    withoutProjector: @escaping @Sendable (String) throws -> LlamaEngine<Profile>
+  ) -> ModelEngineFactory
+  where
+    Profile.Prompt == EdgeToolsTranscript,
+    Profile.GenerateParameters == DefaultLlamaGenerateParameters,
+    Profile.GrammarEngine == XGrammarEngine
+  {
+    { context in
+      guard let modelFile = context.detection.ggufFile else {
+        throw EdgeCLIError(
+          "No GGUF file in \(context.detection.directory.path()) for the llama engine."
+        )
+      }
+      guard !context.detection.multimodalProjectorFiles.isEmpty else {
+        return Self.llama(engine: try withoutProjector(modelFile.path()))
+      }
+      let projector = try multimodalProjector(in: context.detection)
+      return Self.llama(
+        engine: try withProjector(modelFile.path(), projector.path()),
+        supportsImages: true
+      )
+    }
+  }
+
   private static func llama<Profile: LlamaModelProfile>(
-    engine: LlamaEngine<Profile>
+    engine: LlamaEngine<Profile>,
+    supportsImages: Bool = false
   ) -> Self
   where
     Profile.Prompt == EdgeToolsTranscript,
@@ -381,10 +486,11 @@ extension EngineRunner {
       engine: .llama,
       supportsCustomGrammar: true,
       supportsSampling: true,
+      supportsImages: supportsImages,
       generation: { request, channel in
         let context = llamaContext(engine: engine, cache: cachedContext, request: request)
         let task = try engine.generate(
-          prompt: .user(request.user),
+          prompt: .user(request.user, images: request.images),
           tools: request.tools,
           parameters: DefaultLlamaGenerateParameters(
             sampling: request.sampling,
@@ -548,4 +654,17 @@ private func resolvedEngine(
     Supported engines: \(detection.model.supportedEngines.map(\.rawValue).joined(separator: ", ")).
     """
   )
+}
+
+private func multimodalProjector(in detection: ModelDetection) throws -> URL {
+  let projectors = detection.multimodalProjectorFiles
+  guard projectors.count == 1, let projector = projectors.first else {
+    let files = projectors.map(\.lastPathComponent).joined(separator: " · ")
+    throw EdgeCLIError(
+      projectors.isEmpty
+        ? "No multimodal projector GGUF in \(detection.directory.path()). Expected an mmproj*.gguf file."
+        : "Several multimodal projector GGUF files in \(detection.directory.path()): \(files)."
+      )
+  }
+  return projector
 }

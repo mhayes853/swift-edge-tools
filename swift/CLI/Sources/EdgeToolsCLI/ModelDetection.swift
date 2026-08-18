@@ -95,7 +95,7 @@ public enum EngineKind: String, CaseIterable, Sendable {
     switch self {
     case .mlx: files.contains { $0.hasSuffix(".safetensors") }
     case .needle2: true
-    case .llama: files.contains { $0.hasSuffix(".gguf") }
+    case .llama: files.contains(where: isModelGGUFFile)
     }
   }
 }
@@ -130,6 +130,12 @@ public struct ModelDetection: Hashable, Sendable {
 
   public var unavailableEngines: [EngineKind] {
     self.model.supportedEngines.filter { !self.engines.contains($0) }
+  }
+
+  public var multimodalProjectorFiles: [URL] {
+    self.files
+      .filter(isMultimodalProjectorFile)
+      .map { self.directory.appending(path: $0) }
   }
 }
 
@@ -210,7 +216,7 @@ private let preferredEngineOrder: [EngineKind] = {
 }()
 
 private func resolvedGGUFFile(in directory: URL, files: [String], quant: String?) throws -> URL? {
-  let ggufs = files.filter { $0.hasSuffix(".gguf") }
+  let ggufs = files.filter(isModelGGUFFile)
   guard !ggufs.isEmpty else { return nil }
   guard let quant else {
     guard ggufs.count == 1 else {
@@ -239,6 +245,14 @@ private func resolvedGGUFFile(in directory: URL, files: [String], quant: String?
       "--quant \(quant) matches several GGUF files: \(matches.joined(separator: " · "))."
     )
   }
+}
+
+private func isModelGGUFFile(_ file: String) -> Bool {
+  file.lowercased().hasSuffix(".gguf") && !isMultimodalProjectorFile(file)
+}
+
+private func isMultimodalProjectorFile(_ file: String) -> Bool {
+  file.lowercased().hasSuffix(".gguf") && file.lowercased().contains("mmproj")
 }
 
 private func detectedGGUFModel(at file: URL) throws -> DetectedModel {

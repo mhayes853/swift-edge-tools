@@ -1,4 +1,5 @@
 import CustomDump
+import EdgeTools
 import EdgeToolsCLI
 import Foundation
 import Testing
@@ -185,6 +186,105 @@ struct `ModelDetection tests` {
     let detection = try ModelDetection.detect(in: directory, quant: "q4_k_m")
 
     expectNoDifference(detection.ggufFile?.lastPathComponent, "Qwen3-0.6B-Q4_K_M.gguf")
+  }
+
+  @Test
+  func `Ignores Multimodal Projectors When Selecting The Model GGUF`() throws {
+    let directory = try temporaryModel(
+      configuration: "{\"model_type\": \"gemma4\"}",
+      files: ["gemma-4-Q4_K_M.gguf", "mmproj-F16.gguf"]
+    )
+
+    let detection = try ModelDetection.detect(in: directory)
+
+    expectNoDifference(detection.ggufFile?.lastPathComponent, "gemma-4-Q4_K_M.gguf")
+    expectNoDifference(
+      detection.multimodalProjectorFiles.map(\.lastPathComponent),
+      ["mmproj-F16.gguf"]
+    )
+  }
+
+  @Test
+  func `Registers Llama For Vision Models That Have A Multimodal Profile`() throws {
+    let directory = try temporaryModel(
+      configuration: "{\"model_type\": \"gemma4\"}",
+      files: ["gemma-4-Q4_K_M.gguf", "mmproj-F16.gguf"]
+    )
+    let detection = try ModelDetection.detect(in: directory)
+
+    expectNoDifference(detection.engines, [.llama])
+    expectNoDifference(
+      EngineRunner.capabilities(of: .llama, for: detection.model).supportsImages,
+      true
+    )
+  }
+
+  @Test
+  func `Registers The Generic VLM For Llama`() throws {
+    let directory = try temporaryModel(
+      configuration: "{\"model_type\": \"some-new-vlm\"}",
+      files: ["model-Q4_K_M.gguf", "mmproj-F16.gguf", "processor_config.json"]
+    )
+    let detection = try ModelDetection.detect(in: directory)
+
+    expectNoDifference(detection.model, .genericVLM)
+    expectNoDifference(detection.engines, [.llama])
+    expectNoDifference(
+      EngineRunner.capabilities(of: .llama, for: detection.model).supportsImages,
+      true
+    )
+  }
+
+  @Test
+  func `Rejects Image Input For A Llama Vision Model Without A Projector`() async throws {
+    let directory = URL.temporaryDirectory.appending(path: "edge-tests-\(UUID().uuidString)")
+    let error = await #expect(throws: EdgeCLIError.self) {
+      try await runModel(
+        context: .stub(
+          directory: directory,
+          model: .gemma4,
+          engines: [.llama],
+          files: ["gemma-4-Q4_K_M.gguf"],
+          runner: .stub(supportsImages: true)
+        ),
+        source: .test(),
+        request: GenerationRequest(
+          user: "hello",
+          images: [EdgeToolsTranscript.Asset(path: "/tmp/cat.png")]
+        )
+      )
+    }
+
+    expectNoDifference(
+      try #require(error).description.contains("No multimodal projector GGUF"),
+      true
+    )
+  }
+
+  @Test
+  func `Rejects Image Input For A Llama Vision Model With Several Projectors`() async throws {
+    let directory = URL.temporaryDirectory.appending(path: "edge-tests-\(UUID().uuidString)")
+    let error = await #expect(throws: EdgeCLIError.self) {
+      try await runModel(
+        context: .stub(
+          directory: directory,
+          model: .gemma4,
+          engines: [.llama],
+          files: ["gemma-4-Q4_K_M.gguf", "mmproj-F16.gguf", "mmproj-Q8_0.gguf"],
+          runner: .stub(supportsImages: true)
+        ),
+        source: .test(),
+        request: GenerationRequest(
+          user: "hello",
+          images: [EdgeToolsTranscript.Asset(path: "/tmp/cat.png")]
+        )
+      )
+    }
+
+    expectNoDifference(
+      try #require(error).description.contains("Several multimodal projector GGUF files"),
+      true
+    )
   }
 
   @Test
