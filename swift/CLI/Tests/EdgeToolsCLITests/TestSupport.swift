@@ -75,6 +75,20 @@ extension EdgeContext {
     )
   }
 
+  static func multimodalStub(
+    onGenerate: @escaping @Sendable (GenerationRequest) -> Void
+  ) -> Self {
+    .stub(
+      model: .genericVLM,
+      engines: [.llama],
+      files: ["model.gguf", "mmproj.gguf"],
+      runner: .stub(
+        capabilities: [.customGrammar, .sampling, .imageInput, .audioInput],
+        onGenerate: onGenerate
+      )
+    )
+  }
+
   private func withCommandIO(
     standardInput: String,
     capture: CommandCapture,
@@ -98,9 +112,7 @@ extension EngineRunner {
     response: String = "done",
     toolCalls: [EdgeRawToolCall] = [],
     tokens: [String] = ["do", "ne"],
-    supportsCustomGrammar: Bool = true,
-    supportsSampling: Bool = true,
-    supportsImages: Bool = false,
+    capabilities: EngineCapabilities = [.sampling, .customGrammar],
     decodeDuration: Duration = .milliseconds(20),
     metadata: EdgeToolsMetadata = [:],
     metricsExtractor: any GenerationMetricsExtractor = StandardGenerationMetricsExtractor(),
@@ -109,9 +121,7 @@ extension EngineRunner {
   ) -> Self {
     Self(
       engine: .mlx,
-      supportsCustomGrammar: supportsCustomGrammar,
-      supportsSampling: supportsSampling,
-      supportsImages: supportsImages,
+      capabilities: capabilities,
       metricsExtractor: metricsExtractor,
       generation: { request, channel in
         onGenerate(request)
@@ -144,8 +154,7 @@ extension EngineRunner {
   static func failing(_ error: any Error) -> Self {
     Self(
       engine: .mlx,
-      supportsCustomGrammar: true,
-      supportsSampling: true,
+      capabilities: [.customGrammar, .sampling],
       generation: { _, _ in throw error }
     )
   }

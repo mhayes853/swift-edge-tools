@@ -6,6 +6,21 @@ import Synchronization
   import MLX
 #endif
 
+// MARK: - EngineCapabilities
+
+public struct EngineCapabilities: OptionSet, Hashable, Sendable {
+  public let rawValue: UInt64
+
+  public init(rawValue: UInt64) {
+    self.rawValue = rawValue
+  }
+
+  public static let customGrammar = Self(rawValue: 1 << 0)
+  public static let sampling = Self(rawValue: 1 << 1)
+  public static let imageInput = Self(rawValue: 1 << 2)
+  public static let audioInput = Self(rawValue: 1 << 3)
+}
+
 // MARK: - EngineRunner
 
 private struct EngineFactoryContext: Sendable {
@@ -17,14 +32,14 @@ private typealias ModelEngineFactory = @Sendable (EngineFactoryContext) async th
 
 private struct ModelEngineRegistration: Sendable {
   let factory: ModelEngineFactory
-  let supportsImages: Bool
+  let capabilities: EngineCapabilities
 
   init(
     factory: @escaping ModelEngineFactory,
-    supportsImages: Bool = false
+    capabilities: EngineCapabilities = []
   ) {
     self.factory = factory
-    self.supportsImages = supportsImages
+    self.capabilities = capabilities
   }
 }
 
@@ -34,9 +49,7 @@ private struct ModelRegistration: Sendable {
 
 public struct EngineRunner: Sendable {
   public let engine: EngineKind
-  public let supportsCustomGrammar: Bool
-  public let supportsSampling: Bool
-  public let supportsImages: Bool
+  public let capabilities: EngineCapabilities
 
   private let metricsExtractor: any GenerationMetricsExtractor
   private let generation:
@@ -47,9 +60,7 @@ public struct EngineRunner: Sendable {
 
   public init(
     engine: EngineKind = .mlx,
-    supportsCustomGrammar: Bool,
-    supportsSampling: Bool,
-    supportsImages: Bool = false,
+    capabilities: EngineCapabilities = [],
     metricsExtractor: any GenerationMetricsExtractor = StandardGenerationMetricsExtractor(),
     generation:
       @escaping @Sendable (
@@ -59,9 +70,7 @@ public struct EngineRunner: Sendable {
     modelWarmingUp: @escaping @Sendable (GenerationRequest) async throws -> Void = { _ in }
   ) {
     self.engine = engine
-    self.supportsCustomGrammar = supportsCustomGrammar
-    self.supportsSampling = supportsSampling
-    self.supportsImages = supportsImages
+    self.capabilities = capabilities
     self.metricsExtractor = metricsExtractor
     self.generation = generation
     self.modelResetting = modelResetting
@@ -96,9 +105,7 @@ extension EngineRunner {
   private init<Engine: EdgeToolsEngine>(
     engineKind: EngineKind,
     engine: Engine,
-    supportsCustomGrammar: Bool = false,
-    supportsSampling: Bool = false,
-    supportsImages: Bool = false,
+    capabilities: EngineCapabilities = [],
     metricsExtractor: any GenerationMetricsExtractor = StandardGenerationMetricsExtractor(),
     prompt: @escaping @Sendable (GenerationRequest) -> Engine.Prompt,
     parameters: @escaping @Sendable (GenerationRequest) throws -> sending Engine.GenerateParameters,
@@ -106,9 +113,7 @@ extension EngineRunner {
   ) {
     self.init(
       engine: engineKind,
-      supportsCustomGrammar: supportsCustomGrammar,
-      supportsSampling: supportsSampling,
-      supportsImages: supportsImages,
+      capabilities: capabilities,
       metricsExtractor: metricsExtractor,
       generation: { request, channel in
         let task = try engine.generate(
@@ -138,34 +143,17 @@ extension EngineRunner {
     let hardwareUnit: MLXHardwareUnit
   }
 
-  public struct Capabilities: Hashable, Sendable {
-    public var supportsCustomGrammar: Bool
-    public var supportsSampling: Bool
-    public var supportsImages: Bool
-  }
-
-  public static func capabilities(of engine: EngineKind, for model: DetectedModel) -> Capabilities {
-    let supportsImages = Self.modelRegistrations[model]?.engines[engine]?.supportsImages ?? false
-    switch engine {
-    case .mlx:
-      return Capabilities(
-        supportsCustomGrammar: true,
-        supportsSampling: true,
-        supportsImages: supportsImages
-      )
-    case .needle2:
-      return Capabilities(
-        supportsCustomGrammar: false,
-        supportsSampling: false,
-        supportsImages: false
-      )
-    case .llama:
-      return Capabilities(
-        supportsCustomGrammar: true,
-        supportsSampling: true,
-        supportsImages: supportsImages
-      )
-    }
+  public static func capabilities(
+    of engine: EngineKind,
+    for model: DetectedModel
+  ) -> EngineCapabilities {
+    let engineCapabilities: EngineCapabilities =
+      switch engine {
+      case .mlx, .llama: [.customGrammar, .sampling]
+      case .needle2: []
+      }
+    let modelCapabilities = Self.modelRegistrations[model]?.engines[engine]?.capabilities ?? []
+    return engineCapabilities.union(modelCapabilities)
   }
 
   static func parse(
@@ -180,20 +168,25 @@ extension EngineRunner {
     }
 
     let capabilities = Self.capabilities(of: engine, for: detection.model)
-    guard request.sampling.isEmpty || capabilities.supportsSampling else {
+    guard request.sampling.isEmpty || capabilities.contains(.sampling) else {
       throw EdgeCLIError(
         "\(detection.model.displayName) on \(engine.rawValue) always samples greedily; sampler options do not apply."
       )
     }
-    guard request.images.isEmpty || capabilities.supportsImages else {
+    guard request.images.isEmpty || capabilities.contains(.imageInput) else {
       throw EdgeCLIError(
-        "\(detection.model.displayName) on \(engine.rawValue) takes text only; --image does not apply."
+        "\(detection.model.displayName) on \(engine.rawValue) does not support --image."
       )
     }
-    if !request.images.isEmpty, engine == .llama, detection.model.modality == .vision {
+    guard request.audio.isEmpty || capabilities.contains(.audioInput) else {
+      throw EdgeCLIError(
+        "\(detection.model.displayName) on \(engine.rawValue) does not support --audio."
+      )
+    }
+    if engine == .llama, !request.images.isEmpty || !request.audio.isEmpty {
       _ = try multimodalProjector(in: detection)
     }
-    guard request.grammar == .auto || capabilities.supportsCustomGrammar else {
+    guard request.grammar == .auto || capabilities.contains(.customGrammar) else {
       throw EdgeCLIError(
         """
         \(detection.model.displayName) on \(engine.rawValue) only supports `--grammar auto`; its \
@@ -228,7 +221,8 @@ extension EngineRunner {
         "\(detection.model.displayName) does not support the \(engine.rawValue) engine."
       )
     }
-    self = try await registration.factory(context)
+    let implementation = try await registration.factory(context)
+    self = implementation.withCapabilities(Self.capabilities(of: engine, for: detection.model))
   }
 
   public init(
@@ -254,9 +248,7 @@ extension EngineRunner {
     let implementation = try await loader(detection, engine, hardwareUnit)
     self.init(
       engine: engine,
-      supportsCustomGrammar: implementation.supportsCustomGrammar,
-      supportsSampling: implementation.supportsSampling,
-      supportsImages: implementation.supportsImages,
+      capabilities: implementation.capabilities,
       generation: implementation.generation,
       modelResetting: implementation.modelResetting,
       modelWarmingUp: implementation.modelWarmingUp
@@ -287,7 +279,7 @@ extension EngineRunner {
           },
           withoutProjector: { try Gemma4LlamaModelEngine(modelPath: $0) }
         ),
-        supportsImages: true
+        capabilities: [.imageInput, .audioInput]
       ),
       .lfm2: ModelEngineRegistration(
         factory: Self.llamaFactory { try LFM2P5LlamaModelEngine(modelPath: $0) }
@@ -311,7 +303,7 @@ extension EngineRunner {
           },
           withoutProjector: { try GenericVLMLlamaModelEngine(modelPath: $0) }
         ),
-        supportsImages: true
+        capabilities: [.imageInput, .audioInput]
       )
     ]
     #if canImport(MLX)
@@ -327,11 +319,8 @@ extension EngineRunner {
       ])
       registrations[.qwen3P5VL] = ModelRegistration(engines: [
         .mlx: ModelEngineRegistration(
-          factory: Self.mlxFactory(
-            { try await Qwen3P5VLMLXModelEngine(from: $0) },
-            supportsImages: true
-          ),
-          supportsImages: true
+          factory: Self.mlxFactory { try await Qwen3P5VLMLXModelEngine(from: $0) },
+          capabilities: [.imageInput]
         )
       ])
       registrations[.lfm2] = ModelRegistration(engines: [
@@ -346,11 +335,8 @@ extension EngineRunner {
       ])
       registrations[.gemma4] = ModelRegistration(engines: [
         .mlx: ModelEngineRegistration(
-          factory: Self.mlxFactory(
-            { try await Gemma4MLXModelEngine(from: $0) },
-            supportsImages: true
-          ),
-          supportsImages: true
+          factory: Self.mlxFactory { try await Gemma4MLXModelEngine(from: $0) },
+          capabilities: [.imageInput]
         )
       ])
       registrations[.granite] = ModelRegistration(engines: [
@@ -370,11 +356,8 @@ extension EngineRunner {
       ])
       registrations[.lfm2P5VL] = ModelRegistration(engines: [
         .mlx: ModelEngineRegistration(
-          factory: Self.mlxFactory(
-            { try await LFM2P5VLMLXModelEngine(from: $0) },
-            supportsImages: true
-          ),
-          supportsImages: true
+          factory: Self.mlxFactory { try await LFM2P5VLMLXModelEngine(from: $0) },
+          capabilities: [.imageInput]
         )
       ])
       registrations[.genericLLM] = ModelRegistration(engines: [
@@ -384,11 +367,8 @@ extension EngineRunner {
       ])
       registrations[.genericVLM] = ModelRegistration(engines: [
         .mlx: ModelEngineRegistration(
-          factory: Self.mlxFactory(
-            { try await GenericVLMMLXModelEngine(from: $0) },
-            supportsImages: true
-          ),
-          supportsImages: true
+          factory: Self.mlxFactory { try await GenericVLMMLXModelEngine(from: $0) },
+          capabilities: [.imageInput]
         )
       ])
     #endif
@@ -405,8 +385,6 @@ extension EngineRunner {
     let engine = Needle2Engine()
     return Self(
       engine: .needle2,
-      supportsCustomGrammar: false,
-      supportsSampling: false,
       metricsExtractor: Needle2GenerationMetricsExtractor(),
       generation: { request, channel in
         let context = engine.context(
@@ -445,7 +423,9 @@ extension EngineRunner {
     }
   }
 
-  private static func llamaMultimodalFactory<Profile: LlamaModelProfile & EdgeToolsMultimodalModelProfile>(
+  private static func llamaMultimodalFactory<
+    Profile: LlamaModelProfile & EdgeToolsMultimodalModelProfile
+  >(
     withProjector: @escaping @Sendable (String, String) throws -> LlamaEngine<Profile>,
     withoutProjector: @escaping @Sendable (String) throws -> LlamaEngine<Profile>
   ) -> ModelEngineFactory
@@ -464,16 +444,12 @@ extension EngineRunner {
         return Self.llama(engine: try withoutProjector(modelFile.path()))
       }
       let projector = try multimodalProjector(in: context.detection)
-      return Self.llama(
-        engine: try withProjector(modelFile.path(), projector.path()),
-        supportsImages: true
-      )
+      return Self.llama(engine: try withProjector(modelFile.path(), projector.path()))
     }
   }
 
   private static func llama<Profile: LlamaModelProfile>(
-    engine: LlamaEngine<Profile>,
-    supportsImages: Bool = false
+    engine: LlamaEngine<Profile>
   ) -> Self
   where
     Profile.Prompt == EdgeToolsTranscript,
@@ -484,13 +460,11 @@ extension EngineRunner {
     let cachedContext = Mutex<LlamaContext<Profile>?>(nil)
     return Self(
       engine: .llama,
-      supportsCustomGrammar: true,
-      supportsSampling: true,
-      supportsImages: supportsImages,
+      capabilities: [.customGrammar, .sampling],
       generation: { request, channel in
         let context = llamaContext(engine: engine, cache: cachedContext, request: request)
         let task = try engine.generate(
-          prompt: .user(request.user, images: request.images),
+          prompt: .user(request.user, images: request.images, audio: request.audio),
           tools: request.tools,
           parameters: DefaultLlamaGenerateParameters(
             sampling: request.sampling,
@@ -514,8 +488,7 @@ extension EngineRunner {
 
   #if canImport(MLX)
     private static func mlxFactory<Profile: MLXModelProfile>(
-      _ make: @escaping @Sendable (URL) async throws -> MLXEngine<Profile>,
-      supportsImages: Bool = false
+      _ make: @escaping @Sendable (URL) async throws -> MLXEngine<Profile>
     ) -> ModelEngineFactory
     where
       Profile.Prompt == EdgeToolsTranscript,
@@ -523,10 +496,7 @@ extension EngineRunner {
       Profile.GrammarEngine == XGrammarEngine
     {
       { context in
-        try await Self.mlx(
-          hardwareUnit: context.hardwareUnit,
-          supportsImages: supportsImages
-        ) {
+        try await Self.mlx(hardwareUnit: context.hardwareUnit) {
           try await make(context.detection.directory)
         }
       }
@@ -534,7 +504,6 @@ extension EngineRunner {
 
     private static func mlx<Profile: MLXModelProfile>(
       hardwareUnit: MLXHardwareUnit,
-      supportsImages: Bool = false,
       make: () async throws -> MLXEngine<Profile>
     ) async throws -> Self
     where
@@ -547,9 +516,7 @@ extension EngineRunner {
       }
       return Self(
         engine: .mlx,
-        supportsCustomGrammar: true,
-        supportsSampling: true,
-        supportsImages: supportsImages,
+        capabilities: [.customGrammar, .sampling],
         generation: { request, channel in
           let context = engine.context(
             MLXContextParameters(
@@ -562,7 +529,8 @@ extension EngineRunner {
           let task = try engine.generate(
             prompt: .user(
               request.user,
-              images: request.images
+              images: request.images,
+              audio: request.audio
             ),
             tools: request.tools,
             parameters: DefaultMLXGenerateParameters(
@@ -664,7 +632,22 @@ private func multimodalProjector(in detection: ModelDetection) throws -> URL {
       projectors.isEmpty
         ? "No multimodal projector GGUF in \(detection.directory.path()). Expected an mmproj*.gguf file."
         : "Several multimodal projector GGUF files in \(detection.directory.path()): \(files)."
-      )
+    )
   }
   return projector
+}
+
+// MARK: - Capability Adaptation
+
+extension EngineRunner {
+  private func withCapabilities(_ capabilities: EngineCapabilities) -> Self {
+    Self(
+      engine: self.engine,
+      capabilities: capabilities,
+      metricsExtractor: self.metricsExtractor,
+      generation: self.generation,
+      modelResetting: self.modelResetting,
+      modelWarmingUp: self.modelWarmingUp
+    )
+  }
 }

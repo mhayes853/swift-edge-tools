@@ -164,35 +164,51 @@ struct `RunAction tests` {
     expectNoDifference(output.value, "<think>answer\n")
   }
 
-  @Test
-  func `Throws When Images Are Unsupported By The Engine`() async throws {
+  @Test(arguments: [
+    (GenerationRequest(user: "hello", images: [Asset(path: "/tmp/cat.png")]), "--image"),
+    (GenerationRequest(user: "hello", audio: [Asset(path: "/tmp/tone.wav")]), "--audio")
+  ])
+  func `Throws When Media Is Unsupported By The Engine`(
+    request: GenerationRequest,
+    option: String
+  ) async throws {
     let error = await #expect(throws: EdgeCLIError.self) {
-      try await runModel(
-        context: .stub(),
-        source: .test(),
-        request: GenerationRequest(user: "hello", images: [Asset(path: "/tmp/cat.png")])
-      )
+      try await runModel(context: .stub(), source: .test(), request: request)
     }
 
-    expectNoDifference(try #require(error).description.contains("--image"), true)
+    expectNoDifference(try #require(error).description.contains(option), true)
   }
 
   @Test
-  func `Forwards Images To A Vision Engine`() async throws {
+  func `Forwards Multimodal Input`() async throws {
     let requests = LockedBox([GenerationRequest]())
+    let request = GenerationRequest(
+      user: "hello",
+      images: [Asset(path: "/tmp/cat.png")],
+      audio: [Asset(path: "/tmp/tone.wav")]
+    )
     _ = try await runModel(
-      context: .stub(
-        model: .genericVLM,
-        runner: .stub(
-          supportsImages: true,
-          onGenerate: { request in requests.withValue { $0.append(request) } }
-        )
-      ),
+      context: .multimodalStub { request in requests.withValue { $0.append(request) } },
       source: .test(),
-      request: GenerationRequest(user: "hello", images: [Asset(path: "/tmp/cat.png")])
+      request: request
     )
 
-    expectNoDifference(requests.value.first?.images, [Asset(path: "/tmp/cat.png")])
+    expectNoDifference(requests.value.first?.images, request.images)
+    expectNoDifference(requests.value.first?.audio, request.audio)
+  }
+
+  @Test
+  func `Rejects Audio For Gemma4 On MLX`() async throws {
+    let error = await #expect(throws: EdgeCLIError.self) {
+      try await runModel(
+        context: .stub(model: .gemma4),
+        source: .test(),
+        requestedEngine: .mlx,
+        request: GenerationRequest(user: "hello", audio: [Asset(path: "/tmp/tone.wav")])
+      )
+    }
+
+    expectNoDifference(try #require(error).description.contains("--audio"), true)
   }
 
   @Test

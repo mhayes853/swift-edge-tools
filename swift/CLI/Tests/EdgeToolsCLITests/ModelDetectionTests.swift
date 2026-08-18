@@ -213,10 +213,7 @@ struct `ModelDetection tests` {
     let detection = try ModelDetection.detect(in: directory)
 
     expectNoDifference(detection.engines, [.llama])
-    expectNoDifference(
-      EngineRunner.capabilities(of: .llama, for: detection.model).supportsImages,
-      true
-    )
+    expectLlamaMultimodalCapabilities(for: detection)
   }
 
   @Test
@@ -229,14 +226,14 @@ struct `ModelDetection tests` {
 
     expectNoDifference(detection.model, .genericVLM)
     expectNoDifference(detection.engines, [.llama])
-    expectNoDifference(
-      EngineRunner.capabilities(of: .llama, for: detection.model).supportsImages,
-      true
-    )
+    expectLlamaMultimodalCapabilities(for: detection)
   }
 
-  @Test
-  func `Rejects Image Input For A Llama Vision Model Without A Projector`() async throws {
+  @Test(arguments: MultimodalInputKind.allCases, projectorFailures)
+  func `Rejects Multimodal Input When The Projector Is Ambiguous`(
+    input: MultimodalInputKind,
+    failure: ProjectorFailure
+  ) async throws {
     let directory = URL.temporaryDirectory.appending(path: "edge-tests-\(UUID().uuidString)")
     let error = await #expect(throws: EdgeCLIError.self) {
       try await runModel(
@@ -244,47 +241,15 @@ struct `ModelDetection tests` {
           directory: directory,
           model: .gemma4,
           engines: [.llama],
-          files: ["gemma-4-Q4_K_M.gguf"],
-          runner: .stub(supportsImages: true)
+          files: failure.files,
+          runner: .stub(capabilities: [.customGrammar, .sampling, .imageInput, .audioInput])
         ),
         source: .test(),
-        request: GenerationRequest(
-          user: "hello",
-          images: [EdgeToolsTranscript.Asset(path: "/tmp/cat.png")]
-        )
+        request: input.request
       )
     }
 
-    expectNoDifference(
-      try #require(error).description.contains("No multimodal projector GGUF"),
-      true
-    )
-  }
-
-  @Test
-  func `Rejects Image Input For A Llama Vision Model With Several Projectors`() async throws {
-    let directory = URL.temporaryDirectory.appending(path: "edge-tests-\(UUID().uuidString)")
-    let error = await #expect(throws: EdgeCLIError.self) {
-      try await runModel(
-        context: .stub(
-          directory: directory,
-          model: .gemma4,
-          engines: [.llama],
-          files: ["gemma-4-Q4_K_M.gguf", "mmproj-F16.gguf", "mmproj-Q8_0.gguf"],
-          runner: .stub(supportsImages: true)
-        ),
-        source: .test(),
-        request: GenerationRequest(
-          user: "hello",
-          images: [EdgeToolsTranscript.Asset(path: "/tmp/cat.png")]
-        )
-      )
-    }
-
-    expectNoDifference(
-      try #require(error).description.contains("Several multimodal projector GGUF files"),
-      true
-    )
+    expectNoDifference(try #require(error).description.contains(failure.message), true)
   }
 
   @Test
@@ -325,6 +290,48 @@ struct `ModelDetection tests` {
       expectNoDifference(detection.defaultEngine, .llama)
     #endif
   }
+}
+
+enum MultimodalInputKind: CaseIterable, Sendable {
+  case image
+  case audio
+
+  var request: GenerationRequest {
+    switch self {
+    case .image:
+      GenerationRequest(
+        user: "hello",
+        images: [EdgeToolsTranscript.Asset(path: "/tmp/cat.png")]
+      )
+    case .audio:
+      GenerationRequest(
+        user: "hello",
+        audio: [EdgeToolsTranscript.Asset(path: "/tmp/tone.wav")]
+      )
+    }
+  }
+}
+
+struct ProjectorFailure: Sendable {
+  let files: [String]
+  let message: String
+}
+
+let projectorFailures = [
+  ProjectorFailure(
+    files: ["gemma-4-Q4_K_M.gguf"],
+    message: "No multimodal projector GGUF"
+  ),
+  ProjectorFailure(
+    files: ["gemma-4-Q4_K_M.gguf", "mmproj-F16.gguf", "mmproj-Q8_0.gguf"],
+    message: "Several multimodal projector GGUF files"
+  )
+]
+
+private func expectLlamaMultimodalCapabilities(for detection: ModelDetection) {
+  let capabilities = EngineRunner.capabilities(of: .llama, for: detection.model)
+  expectNoDifference(capabilities.contains(.imageInput), true)
+  expectNoDifference(capabilities.contains(.audioInput), true)
 }
 
 private func temporaryModel(
