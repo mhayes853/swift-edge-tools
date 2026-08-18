@@ -532,7 +532,6 @@ private func insert(
 struct LogitExtremes {
   let top1Index: EdgeToolsToken.ID
   let top1: Float
-
   let top2: Float
 }
 
