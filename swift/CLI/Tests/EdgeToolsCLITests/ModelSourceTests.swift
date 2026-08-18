@@ -15,7 +15,7 @@ struct `ModelSource tests` {
       cacheDirectory: cache
     )
 
-    let result = try await source.resolve { repo, revision, cacheDirectory in
+    let result = try await source.resolve { repo, revision, cacheDirectory, _ in
       calls.withValue { $0.append((repo, revision, cacheDirectory)) }
       return expected
     }
@@ -24,5 +24,32 @@ struct `ModelSource tests` {
     expectNoDifference(calls.value.map(\.0), ["org/model"])
     expectNoDifference(calls.value.map(\.1), ["main"])
     expectNoDifference(calls.value.map(\.2), [cache])
+  }
+
+  @Test
+  func `Downloads Every File Without A Quant`() async throws {
+    let globs = LockedBox<[String]?>(["unset"])
+    _ = try await ModelSource(location: .huggingFace(repo: "org/model", revision: "main"))
+      .resolve { _, _, _, requested in
+        globs.value = requested
+        return URL(fileURLWithPath: "/cache")
+      }
+
+    expectNoDifference(globs.value, nil)
+  }
+
+  @Test
+  func `Narrows The Download To The Requested Quant`() async throws {
+    let globs = LockedBox<[String]?>(nil)
+    _ = try await ModelSource(
+      location: .huggingFace(repo: "org/model", revision: "main"),
+      quant: "Q4_K_M"
+    )
+    .resolve { _, _, _, requested in
+      globs.value = requested
+      return URL(fileURLWithPath: "/cache")
+    }
+
+    expectNoDifference(globs.value, ["*Q4_K_M*.gguf", "*.json", "*.jinja"])
   }
 }

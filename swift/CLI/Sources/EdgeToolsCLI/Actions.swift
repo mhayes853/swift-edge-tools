@@ -112,7 +112,7 @@ public func inspectModel(
   let directory = try await context.resolveDirectory(source) { repo in
     onWarning("downloading \(repo)...")
   }
-  return InfoReport(detection: try context.detectModel(directory))
+  return InfoReport(detection: try context.detectModel(directory, source.quant))
 }
 
 // MARK: - BenchSample

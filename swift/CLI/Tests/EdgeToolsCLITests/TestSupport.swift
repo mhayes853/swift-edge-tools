@@ -59,8 +59,8 @@ extension EdgeContext {
         onResolve(source)
         return directory
       },
-      detectModel: {
-        ModelDetection(directory: $0, model: model, engines: engines, files: files)
+      detectModel: { directory, _ in
+        ModelDetection(directory: directory, model: model, engines: engines, files: files)
       },
       makeRunner: { _, _, _ in
         onMakeRunner()

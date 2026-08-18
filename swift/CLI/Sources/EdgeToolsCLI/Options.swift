@@ -17,6 +17,11 @@ struct ModelSourceOptions: ParsableArguments {
   @Option(name: .customLong("cache-dir"), help: "Where downloaded models are cached.")
   var cacheDirectory: String?
 
+  @Option(
+    help: "The GGUF quantization to download and load, such as Q4_K_M. Llama engine only."
+  )
+  var quant: String?
+
   init() {}
 
   func validate() throws {
@@ -35,12 +40,13 @@ struct ModelSourceOptions: ParsableArguments {
 
   var source: ModelSource {
     if let path {
-      return ModelSource(location: .filesystem(URL(fileURLWithPath: path)))
+      return ModelSource(location: .filesystem(URL(fileURLWithPath: path)), quant: self.quant)
     }
     return ModelSource(
       location: .huggingFace(repo: self.repo ?? "", revision: self.revision),
       cacheDirectory: self.cacheDirectory.map { URL(fileURLWithPath: $0) }
-        ?? ModelSource.defaultCacheDirectory
+        ?? ModelSource.defaultCacheDirectory,
+      quant: self.quant
     )
   }
 }

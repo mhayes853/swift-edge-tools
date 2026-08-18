@@ -34,12 +34,17 @@
     public var gpuLayerCount: Int
     public var useMemoryMapping: Bool
 
+    /// Loads the vocabulary and metadata without the weights.
+    public var vocabularyOnly: Bool
+
     public init(
       gpuLayerCount: Int = .max,
-      useMemoryMapping: Bool = true
+      useMemoryMapping: Bool = true,
+      vocabularyOnly: Bool = false
     ) {
       self.gpuLayerCount = gpuLayerCount
       self.useMemoryMapping = useMemoryMapping
+      self.vocabularyOnly = vocabularyOnly
     }
   }
 
@@ -62,6 +67,7 @@
       modelParameters.n_gpu_layers =
         parameters.gpuLayerCount == .max ? -1 : Int32(clamping: parameters.gpuLayerCount)
       modelParameters.use_mmap = parameters.useMemoryMapping
+      modelParameters.vocab_only = parameters.vocabularyOnly
       guard let raw = llama_model_load_from_file(path, modelParameters) else {
         throw LlamaRuntimeError(
           code: .modelLoadFailed,
@@ -93,6 +99,48 @@
       _ body: (OpaquePointer) throws(E) -> R
     ) throws(E) -> R {
       try body(self.vocab)
+    }
+  }
+
+  // MARK: - LlamaModelMetadata
+
+  public struct LlamaModelMetadata: Sendable {
+    private let model: LlamaModel
+
+    public init(contentsOfGGUF path: String) throws {
+      self.init(
+        model: try LlamaModel(path: path, parameters: LlamaModelParameters(vocabularyOnly: true))
+      )
+    }
+
+    public init(model: LlamaModel) {
+      self.model = model
+    }
+
+    public var architecture: String? {
+      self["general.architecture"]
+    }
+
+    public var name: String? {
+      self["general.name"]
+    }
+
+    public var chatTemplate: String? {
+      self.model.withUnsafeModelPointer { model in
+        llama_model_chat_template(model, nil).map { String(cString: $0) }
+      }
+    }
+
+    public subscript(key: String) -> String? {
+      self.model.withUnsafeModelPointer { model in
+        let length = llama_model_meta_val_str(model, key, nil, 0)
+        guard length > 0 else { return nil }
+        return String(unsafeUninitializedCapacity: Int(length) + 1) { buffer in
+          buffer.withMemoryRebound(to: CChar.self) { characters in
+            Int(llama_model_meta_val_str(model, key, characters.baseAddress, characters.count))
+          }
+        }
+      }
     }
   }
 
