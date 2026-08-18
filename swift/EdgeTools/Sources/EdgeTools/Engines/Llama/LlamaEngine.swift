@@ -285,6 +285,12 @@
       }
     }
 
+    func warmUp() throws {
+      try self.state.withLock { state in
+        try self.ensureContext(&state)
+      }
+    }
+
     private func ensureContext(_ state: inout State) throws {
       guard state.context == nil else { return }
       state.context = try self.model.createContext(parameters: self.parameters)
@@ -358,6 +364,10 @@
         defaultSampling: self.configuredSampling
       )
       return state
+    }
+
+    public func warmUp() throws {
+      try self.family.warmUp()
     }
 
     public mutating func prepare(
@@ -634,6 +644,24 @@
         snapshot: context.begin(appending: .user(promptPrefix)),
         tools: tools,
         context: context
+      )
+    }
+
+    /// Pays the setup a first generation would otherwise absorb into its time to first token:
+    /// allocating the llama context, and parsing the chat template for the given tools.
+    public func warmUp(tools: [EdgeToolDefinition] = [], context: LlamaContext<Profile>) throws {
+      try self.validate(context)
+      let snapshot = try context.begin()
+      nonisolated(unsafe) let model = snapshot.model
+      defer {
+        context.finish(generation: nil, revision: snapshot.revision, model: model)
+      }
+      try model.warmUp()
+      _ = try Profile.tokenIds(
+        prompt: snapshot.transcript,
+        tools: tools,
+        tokenizer: self.tokenizer,
+        addGenerationPrompt: true
       )
     }
 

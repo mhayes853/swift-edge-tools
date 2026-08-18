@@ -30,6 +30,7 @@ public struct EngineRunner: Sendable {
     @Sendable (GenerationRequest, sending EdgeToolsGenerationChannel) async throws ->
       EdgeToolsEngineGeneration
   private let modelResetting: @Sendable () async -> Void
+  private let modelWarmingUp: @Sendable (GenerationRequest) async throws -> Void
 
   public init(
     engine: EngineKind = .mlx,
@@ -41,7 +42,8 @@ public struct EngineRunner: Sendable {
       @escaping @Sendable (
         GenerationRequest, sending EdgeToolsGenerationChannel
       ) async throws -> EdgeToolsEngineGeneration,
-    modelResetting: @escaping @Sendable () async -> Void = {}
+    modelResetting: @escaping @Sendable () async -> Void = {},
+    modelWarmingUp: @escaping @Sendable (GenerationRequest) async throws -> Void = { _ in }
   ) {
     self.engine = engine
     self.supportsCustomGrammar = supportsCustomGrammar
@@ -50,6 +52,7 @@ public struct EngineRunner: Sendable {
     self.metricsExtractor = metricsExtractor
     self.generation = generation
     self.modelResetting = modelResetting
+    self.modelWarmingUp = modelWarmingUp
   }
 
   public func generate(
@@ -61,6 +64,12 @@ public struct EngineRunner: Sendable {
 
   public func reset() async {
     await self.modelResetting()
+  }
+
+  /// Pays whatever fixed setup an engine defers to its first generation, such as allocating a
+  /// llama context, so it lands outside the measured generation.
+  public func warmUp(_ request: GenerationRequest) async throws {
+    try await self.modelWarmingUp(request)
   }
 
   public func metrics(from generation: EdgeToolsEngineGeneration) -> CLIGenerationMetrics {
@@ -232,7 +241,8 @@ extension EngineRunner {
       supportsSampling: implementation.supportsSampling,
       supportsImages: implementation.supportsImages,
       generation: implementation.generation,
-      modelResetting: implementation.modelResetting
+      modelResetting: implementation.modelResetting,
+      modelWarmingUp: implementation.modelWarmingUp
     )
   }
 
@@ -372,21 +382,7 @@ extension EngineRunner {
       supportsCustomGrammar: true,
       supportsSampling: true,
       generation: { request, channel in
-        let context = cachedContext.withLock { context in
-          if let context {
-            return context
-          }
-          let created = engine.context(
-            EdgeToolsTranscriptContextParameters(
-              transcript: EdgeToolsTranscript(
-                messages: request.system.isEmpty ? [] : [.system(request.system)]
-              ),
-              reasoningEffort: request.reasoning
-            )
-          )
-          context = created
-          return created
-        }
+        let context = llamaContext(engine: engine, cache: cachedContext, request: request)
         let task = try engine.generate(
           prompt: .user(request.user),
           tools: request.tools,
@@ -400,7 +396,13 @@ extension EngineRunner {
         )
         return try await task.value
       },
-      modelResetting: { cachedContext.withLock { $0 = nil } }
+      modelResetting: { cachedContext.withLock { $0 = nil } },
+      modelWarmingUp: { request in
+        try engine.warmUp(
+          tools: request.tools,
+          context: llamaContext(engine: engine, cache: cachedContext, request: request)
+        )
+      }
     )
   }
 
@@ -496,6 +498,28 @@ private func needle2System(from string: String) throws -> Needle2System {
         return Needle2System.raw(.init(rawValue: key), value)
       }
   )
+}
+
+private func llamaContext<Profile: LlamaModelProfile>(
+  engine: LlamaEngine<Profile>,
+  cache: borrowing Mutex<LlamaContext<Profile>?>,
+  request: GenerationRequest
+) -> LlamaContext<Profile> {
+  cache.withLock { context in
+    if let context {
+      return context
+    }
+    let created = engine.context(
+      EdgeToolsTranscriptContextParameters(
+        transcript: EdgeToolsTranscript(
+          messages: request.system.isEmpty ? [] : [.system(request.system)]
+        ),
+        reasoningEffort: request.reasoning
+      )
+    )
+    context = created
+    return created
+  }
 }
 
 private func resolvedEngine(

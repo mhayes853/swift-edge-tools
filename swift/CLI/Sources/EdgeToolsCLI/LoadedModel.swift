@@ -38,6 +38,7 @@ extension LoadedModel {
       configuration.engine,
       configuration.hardwareUnit
     )
+    try await runner.warmUp(request)
     return Self(
       detection: detection,
       runner: runner,

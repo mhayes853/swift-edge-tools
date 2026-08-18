@@ -79,6 +79,7 @@ public func benchmarkModel(
   for index in 0..<runs {
     onProgress(index + 1, runs)
     await loaded.runner.reset()
+    try await loaded.runner.warmUp(request)
     let start = context.now()
     let generation = try await loaded.generate(request)
     samples.append(
