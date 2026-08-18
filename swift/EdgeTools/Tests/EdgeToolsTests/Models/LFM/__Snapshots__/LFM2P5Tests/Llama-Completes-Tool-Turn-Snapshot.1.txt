@@ -44,13 +44,13 @@
           ▿ EdgeToolsGenerationPart
             - text: "The"
           ▿ EdgeToolsGenerationPart
+            - text: " current"
+          ▿ EdgeToolsGenerationPart
             - text: " weather"
           ▿ EdgeToolsGenerationPart
             - text: " in"
           ▿ EdgeToolsGenerationPart
             - text: " Paris"
-          ▿ EdgeToolsGenerationPart
-            - text: " today"
           ▿ EdgeToolsGenerationPart
             - text: " is"
           ▿ EdgeToolsGenerationPart

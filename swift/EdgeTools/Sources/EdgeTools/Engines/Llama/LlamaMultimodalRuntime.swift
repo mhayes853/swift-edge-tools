@@ -63,8 +63,6 @@
     }
   }
 
-  /// A uniquely owned prepared input. Moving it across an isolation boundary is safe because
-  /// non-copyability prevents concurrent aliases to its mutable llama.cpp resource.
   struct LlamaPreparedInput: ~Copyable, @unchecked Sendable {
     enum Chunk {
       case text(tokenIds: [EdgeToolsToken.ID], units: Range<Int>)
@@ -129,30 +127,6 @@
       if let handle = self.handle {
         mtmd_input_chunks_free(handle)
       }
-    }
-  }
-
-  // MARK: - LlamaContextHandle
-
-  extension LlamaContextHandle {
-    borrowing func evaluate(
-      input: borrowing LlamaPreparedInput,
-      using projector: LlamaMultimodalProjector,
-      chunkIndex: Int,
-      position: Int,
-      sequenceId: Int,
-      batchSize: Int,
-      wantsLogits: Bool
-    ) throws -> Int {
-      try projector.evaluate(
-        input: input,
-        context: self,
-        chunkIndex: chunkIndex,
-        position: position,
-        sequenceId: sequenceId,
-        batchSize: batchSize,
-        wantsLogits: wantsLogits
-      )
     }
   }
 
@@ -325,6 +299,17 @@
           )
         }
         return Int(newPosition)
+      }
+    }
+  }
+
+  // MARK: - Helpers
+
+  extension Sequence<LlamaPreparedInputUnit> {
+    var tokenIds: [EdgeToolsToken.ID] {
+      self.compactMap { unit in
+        guard case .token(let tokenId) = unit.value else { return nil }
+        return tokenId
       }
     }
   }

@@ -38,7 +38,6 @@
     }
 
     public func forkedContextState(copyingCache: Bool) -> sending Self {
-      // Exhausting the family's sequence capacity falls back to a fresh, cache-cold family.
       let state: Self
       if let lease = self.family.lease(copyingFrom: self.lease.sequenceId) {
         state = Self(
@@ -65,8 +64,6 @@
     }
 
     public func generationState() -> sending Self {
-      // Generations continue on the context's own sequence: forking one here would hand it
-      // a cold cache and sever KV continuity. Exclusivity comes from `isResponding`.
       nonisolated(unsafe) let state = Self(
         family: self.family,
         lease: self.lease,
@@ -94,14 +91,8 @@
         tokenizer: tokenizer,
         addGenerationPrompt: true
       )
-      let clock = ContinuousClock()
-      let start = clock.now
       self.family.resetProbe(sequenceId: self.lease.sequenceId)
-      let decodedCount = try self.family.prefill(
-        sequenceId: self.lease.sequenceId,
-        input: input,
-        wantsLogits: true
-      )
+      let metrics = try self.prefill(input: input, wantsLogits: true)
       let defaultSampling =
         Profile.defaultSampling(prompt: prompt, parameters: parameters)
         ?? self.configuredSampling
@@ -111,12 +102,7 @@
           parameters: parameters.sampling.applying(to: defaultSampling)
         )
       )
-      return EdgeToolsGenerationLoop.Preparation(
-        metrics: EdgeToolsPrefillMetrics(
-          tokens: decodedCount,
-          duration: start.duration(to: clock.now)
-        )
-      )
+      return EdgeToolsGenerationLoop.Preparation(metrics: metrics)
     }
 
     public mutating func prefill(
@@ -130,19 +116,7 @@
         tokenizer: tokenizer,
         addGenerationPrompt: false
       )
-      let clock = ContinuousClock()
-      let start = clock.now
-      let decodedCount = try self.family.prefill(
-        sequenceId: self.lease.sequenceId,
-        input: input,
-        wantsLogits: false
-      )
-      return EdgeToolsEnginePrefill(
-        metrics: EdgeToolsPrefillMetrics(
-          tokens: decodedCount,
-          duration: start.duration(to: clock.now)
-        )
-      )
+      return EdgeToolsEnginePrefill(metrics: try self.prefill(input: input, wantsLogits: false))
     }
 
     public func tokenIds(
@@ -156,17 +130,14 @@
         tokenizer: tokenizer,
         addGenerationPrompt: true
       )
-      return input.units.compactMap { unit in
-        guard case .token(let tokenId) = unit.value else { return nil }
-        return tokenId
-      }
+      return input.units.tokenIds
     }
 
     public mutating func decode(
       bitmask: GrammarBitmask,
       parameters: Profile.GenerateParameters
     ) throws -> EdgeToolsToken.ID {
-      guard var generation = self.generation else {
+      guard let generation = self.generation else {
         throw EdgeToolsError.modelNotPrepared
       }
       let sample = try self.family.withCurrentLogits(
@@ -176,9 +147,8 @@
       ) {
         generation.sampler.sample(logits: &$0, bitmask: bitmask)
       }
-      generation.confidence.add(confidence: sample.confidence)
-      generation.pendingTokenId = sample.tokenId
-      self.generation = generation
+      self.generation?.confidence.add(confidence: sample.confidence)
+      self.generation?.pendingTokenId = sample.tokenId
       return sample.tokenId
     }
 
@@ -203,6 +173,20 @@
       metadata.perTokenConfidences = generation.confidence.perTokenConfidences
       metadata.probeConfidence = self.family.probeConfidence(sequenceId: self.lease.sequenceId)
       return metadata
+    }
+
+    private func prefill(
+      input: borrowing LlamaPreparedInput,
+      wantsLogits: Bool
+    ) throws -> EdgeToolsPrefillMetrics {
+      let clock = ContinuousClock()
+      let start = clock.now
+      let decodedCount = try self.family.prefill(
+        sequenceId: self.lease.sequenceId,
+        input: input,
+        wantsLogits: wantsLogits
+      )
+      return EdgeToolsPrefillMetrics(tokens: decodedCount, duration: start.duration(to: clock.now))
     }
 
     private func preparedInput(
@@ -239,11 +223,8 @@
           throw EdgeToolsError.unsupportedTokenizer
         }
         var images = [EdgeToolsTranscript.Asset]()
-        let messages = try prompt.messages.map { message -> EdgeToolsValue in
-          guard case .user(let message) = message else {
-            return try message.chatTemplateValue()
-          }
-          let content = profile.multimodalContent(for: message).reduce(into: "") {
+        let messages = try prompt.chatTemplateMessages { userMessage in
+          let content = profile.multimodalContent(for: userMessage).reduce(into: "") {
             content, part in
             switch part {
             case .text(let text): content.append(text)
@@ -288,5 +269,4 @@
       self.revision = revision
     }
   }
-
 #endif

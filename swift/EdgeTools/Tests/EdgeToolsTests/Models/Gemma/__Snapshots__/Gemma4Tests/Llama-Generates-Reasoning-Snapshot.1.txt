@@ -1,21 +1,21 @@
 ▿ EdgeToolsEngineGeneration
   ▿ decodeMetrics: EdgeToolsDecodeMetrics
-    ▿ duration: 4.162865667 seconds
-      - _low: 4162865667000000000
+    ▿ duration: 4.235847542 seconds
+      - _low: 4235847542000000000
       - _high: 0
-    ▿ durationToFirstToken: 1.005435458 seconds
-      - _low: 1005435458000000000
+    ▿ durationToFirstToken: 14.445551291000001 seconds
+      - _low: 14445551291000000000
       - _high: 0
-    - tokens: 44
+    - tokens: 45
   ▿ metadata: 3 key/value pairs
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "GenerationConfidence"
-      - value: 0.97325784
+      - value: 0.97402346
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "PerTokenConfidences"
-      ▿ value: 44 elements
+      ▿ value: 45 elements
         - 0.9216146
         - 1.0
         - 1.0
@@ -54,17 +54,18 @@
         - 0.9912609
         - 0.99241346
         - 0.59631926
-        - 0.9996343
-        - 0.9996686
-        - 0.95463
+        - 0.9998677
+        - 0.99994206
+        - 0.99971706
+        - 0.9621162
         - 1.0
         - 1.0
         - 1.0
     ▿ (2 elements)
       ▿ key: EdgeToolsMetadataKey
         - rawValue: "ProbeConfidence"
-      - value: 0.9549881
-  ▿ parts: 39 elements
+      - value: 0.9556649
+  ▿ parts: 40 elements
     ▿ EdgeToolsGenerationPart
       - reasoning: "The"
     ▿ EdgeToolsGenerationPart
@@ -134,6 +135,8 @@
     ▿ EdgeToolsGenerationPart
       - reasoning: " the"
     ▿ EdgeToolsGenerationPart
+      - reasoning: " final"
+    ▿ EdgeToolsGenerationPart
       - reasoning: " answer"
     ▿ EdgeToolsGenerationPart
       - reasoning: " briefly"
@@ -144,12 +147,12 @@
     ▿ EdgeToolsGenerationPart
       - text: "2"
   ▿ prefillMetrics: EdgeToolsPrefillMetrics
-    ▿ duration: 0.152909958 seconds
-      - _low: 152909958000000000
+    ▿ duration: 0.158609917 seconds
+      - _low: 158609917000000000
       - _high: 0
     - tokens: 39
-  - response: "<|channel>thought\nThe user is asking for the sum of 19 and 23.\n19 + 23 = 42.\nI need to provide the answer briefly.<channel|>42"
-  ▿ tokens: 44 elements
+  - response: "<|channel>thought\nThe user is asking for the sum of 19 and 23.\n19 + 23 = 42.\nI need to provide the final answer briefly.<channel|>42"
+  ▿ tokens: 45 elements
     ▿ EdgeToolsToken
       - id: 100
       - stringValue: "<|channel>"
@@ -261,6 +264,9 @@
     ▿ EdgeToolsToken
       - id: 506
       - stringValue: " the"
+    ▿ EdgeToolsToken
+      - id: 1626
+      - stringValue: " final"
     ▿ EdgeToolsToken
       - id: 3890
       - stringValue: " answer"

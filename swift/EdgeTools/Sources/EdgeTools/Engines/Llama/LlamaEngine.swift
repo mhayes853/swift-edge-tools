@@ -110,23 +110,20 @@
       let tokenizer = LlamaTokenizer(model: model)
       self.tokenizer = tokenizer
       self.vocabularySizeValue = tokenizer.vocabularySize
-      var extraStopTokenIds = tokenizer.endOfGenerationTokenIds()
-      extraStopTokenIds.formUnion(
+      // `endOfGenerationTokenIds` already reports the eos token, and `EdgeToolsGenerationLoop`
+      // inserts it regardless, so the grammar and the loop stop on exactly the same set.
+      var stopTokenIds = tokenizer.endOfGenerationTokenIds()
+      stopTokenIds.formUnion(
         Profile.extraStopTokens.compactMap { tokenizer.token(forText: $0)?.id }
       )
-      var grammarStopTokenIds = extraStopTokenIds
-      if let eosTokenId = tokenizer.eos?.id {
-        extraStopTokenIds.remove(eosTokenId)
-        grammarStopTokenIds.insert(eosTokenId)
-      }
       self.grammarEngine = try Profile.grammarEngine(
         tokenizer: tokenizer,
         vocabularySize: self.vocabularySizeValue,
-        stopTokenIds: grammarStopTokenIds
+        stopTokenIds: stopTokenIds
       )
       self.generationLoop = EdgeToolsGenerationLoop(
         tokenizer: tokenizer,
-        extraStopTokenIds: extraStopTokenIds
+        extraStopTokenIds: stopTokenIds
       )
     }
 
@@ -169,7 +166,6 @@
     ) throws -> AnyGenerationTask {
       try self.validate(context)
       return self.generationTask(
-        prompt: prompt,
         tools: tools,
         parameters: parameters,
         context: context,
@@ -188,7 +184,6 @@
     ) throws -> AnyGenerationTask {
       try self.validate(context)
       return self.generationTask(
-        prompt: .user(""),
         tools: tools,
         parameters: parameters,
         context: context,
@@ -242,7 +237,6 @@
     }
 
     private func generationTask(
-      prompt: EdgeToolsTranscript.UserMessage,
       tools: [EdgeToolDefinition],
       parameters: sending Profile.GenerateParameters,
       context: LlamaContext<Profile>,
@@ -297,19 +291,17 @@
       var state = state
       let metadata = state.model.finish()
 
-      let generation: EdgeToolsEngineGeneration?
       let finalResult: Result<EdgeToolsEngineGeneration, any Error>
       switch result {
       case .success(var value):
         state.model.commitGeneration(stopTokenIds: self.generationLoop.stopTokenIds)
         value.metadata.merge(metadata) { _, finalValue in finalValue }
-        generation = value
         finalResult = .success(value)
       case .failure(let error):
         state.model.resetGeneration()
-        generation = nil
         finalResult = .failure(error)
       }
+      let generation = try? finalResult.get()
       // The state is returned exactly once and is not accessed after this point. Region
       // isolation does not currently infer that exclusivity through the synchronous
       // context method.
@@ -328,21 +320,17 @@
       context: LlamaContext<Profile>
     ) throws -> EdgeToolsEnginePrefill {
       var model = snapshot.model
-      do {
-        let prefill = try model.prefill(
-          prompt: snapshot.transcript,
-          tools: tools,
-          tokenizer: self.tokenizer
-        )
+      defer {
+        // The model is no longer used after it is returned to the context. Region isolation does
+        // not currently infer that exclusivity through the synchronous context method.
         nonisolated(unsafe) let restoredModel = model
         context.finish(generation: nil, revision: snapshot.revision, model: restoredModel)
-        return prefill
-      } catch {
-        model.resetGeneration()
-        nonisolated(unsafe) let restoredModel = model
-        context.finish(generation: nil, revision: snapshot.revision, model: restoredModel)
-        throw error
       }
+      return try model.prefill(
+        prompt: snapshot.transcript,
+        tools: tools,
+        tokenizer: self.tokenizer
+      )
     }
 
     private func makeModelState() -> sending LlamaModelState<Profile> {

@@ -72,12 +72,6 @@
 
   // MARK: - LlamaContextHandle
 
-  /// A `llama_context` and the decode/KV operations that mutate it.
-  ///
-  /// Non-copyable so the context has exactly one owner and is freed on destruction. The
-  /// handle carries no synchronization of its own; ``LlamaSequenceFamily`` owns one and
-  /// serializes every call through its lock. Keeping it `Sendable` stops region isolation
-  /// from tying the pointer to the lock state.
   struct LlamaContextHandle: ~Copyable, @unchecked Sendable {
     let handle: OpaquePointer
 
@@ -133,8 +127,6 @@
       )
     }
 
-    /// The probe's confidence in the rows accumulated for the sequence, or nil when the
-    /// model carries no probe head or the sequence has decoded no scored tokens.
     borrowing func probeConfidence(sequenceId: Int) -> Float? {
       let confidence = llama_probe_confidence(self.handle, Int32(sequenceId))
       return confidence < 0 ? nil : confidence

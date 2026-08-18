@@ -6,8 +6,17 @@
   // MARK: - Transcript Conversion
 
   extension EdgeToolsTranscript {
-    func chatTemplateMessages() throws -> [EdgeToolsValue] {
-      try self.messages.map { try $0.chatTemplateValue() }
+    func chatTemplateMessages(
+      userMessage: (UserMessage) throws -> EdgeToolsValue = {
+        ["role": "user", "content": .string($0.content)]
+      }
+    ) throws -> [EdgeToolsValue] {
+      try self.messages.map { message in
+        guard case .user(let message) = message else {
+          return try message.chatTemplateValue()
+        }
+        return try userMessage(message)
+      }
     }
   }
 

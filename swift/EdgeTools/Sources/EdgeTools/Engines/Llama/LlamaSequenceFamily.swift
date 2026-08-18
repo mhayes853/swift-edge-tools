@@ -3,17 +3,7 @@
 
   // MARK: - LlamaSequenceFamily
 
-  /// One llama context whose KV cells are shared copy-on-write between the sequences of a
-  /// fork family.
-  ///
-  /// All llama.cpp calls on the context go through the internal lock, so generations on
-  /// different sequences of the family may interleave safely; exclusive use of one
-  /// sequence during a generation is guaranteed by the transcript context's
-  /// `isResponding` gate. Because the context has a single logits output, logits access
-  /// is atomic with the decode that produced it, and a sequence re-decodes its final
-  /// token when another sequence decoded in between.
   final class LlamaSequenceFamily: Sendable {
-    /// Ownership of one sequence id; releasing it clears the sequence's KV cells.
     final class Lease: Sendable {
       let family: LlamaSequenceFamily
       let sequenceId: Int
@@ -29,6 +19,16 @@
     private struct CachedInput {
       var units = [LlamaPreparedInputUnit]()
       var positionCount = 0
+
+      mutating func append(tokenIds: [EdgeToolsToken.ID]) {
+        self.units.append(contentsOf: tokenIds.map { LlamaPreparedInputUnit(value: .token($0)) })
+        self.positionCount += tokenIds.count
+      }
+
+      mutating func append(media: LlamaPreparedInputUnit, endingAt positionCount: Int) {
+        self.units.append(media)
+        self.positionCount = positionCount
+      }
     }
 
     private struct State: ~Copyable {
@@ -36,6 +36,20 @@
       var cachedInputs = [Int: CachedInput]()
       var allocatedSequenceIds = Set<Int>()
       var logitsSequenceId: Int?
+
+      borrowing func withContext<R: ~Copyable>(
+        _ body: (borrowing LlamaContextHandle) throws -> R
+      ) throws -> R {
+        switch self.context {
+        case .some(let context):
+          return try body(context)
+        case .none:
+          throw LlamaRuntimeError(
+            code: .contextCreationFailed,
+            message: "The llama context is unavailable."
+          )
+        }
+      }
     }
 
     private static let decodeChunkSize = 512
@@ -55,7 +69,6 @@
       self.multimodalProjector = multimodalProjector
     }
 
-    /// Returns nil when the family has no sequence capacity left.
     func lease(copyingFrom parentSequenceId: Int?) -> Lease? {
       self.state.withLock { state in
         guard
@@ -80,7 +93,6 @@
       }
     }
 
-    /// Returns the number of token rows actually evaluated after prefix reuse.
     func prefill(
       sequenceId: Int,
       input: borrowing LlamaPreparedInput,
@@ -103,12 +115,8 @@
             state: &state
           )
         } else {
-          let tokenIds: [EdgeToolsToken.ID] = input.units[prefixCount...].compactMap { unit in
-            guard case .token(let tokenId) = unit.value else { return nil }
-            return tokenId
-          }
           try self.decode(
-            tokenIds: tokenIds,
+            tokenIds: input.units[prefixCount...].tokenIds,
             sequenceId: sequenceId,
             wantsLogits: wantsLogits,
             state: &state
@@ -118,7 +126,6 @@
       }
     }
 
-    /// Regenerates the logits first when another sequence decoded since they were produced.
     func withCurrentLogits<R>(
       sequenceId: Int,
       appending pendingTokenId: EdgeToolsToken.ID?,
@@ -150,7 +157,7 @@
             state: &state
           )
         }
-        guard let logits = state.context?.lastLogits() ?? nil else {
+        guard let logits = try state.withContext({ $0.lastLogits() }) else {
           throw LlamaRuntimeError(
             code: .decodeFailed,
             message: "The llama context has no logits for the last decoded token."
@@ -194,9 +201,6 @@
       }
     }
 
-    /// Drops the cells the sequence holds past `prefixCount`, returning the input-unit count it
-    /// actually retains. Recurrent memory modules only support clearing a sequence whole, so
-    /// a rejected removal wipes the sequence and the caller decodes from scratch.
     private func trim(sequenceId: Int, to prefixCount: Int, state: inout State) -> Int {
       let cached = state.cachedInputs[sequenceId] ?? CachedInput()
       guard prefixCount < cached.units.count else { return prefixCount }
@@ -226,25 +230,19 @@
       wantsLogits: Bool,
       state: inout State
     ) throws {
-      guard state.context != nil else {
-        throw LlamaRuntimeError(
-          code: .contextCreationFailed,
-          message: "The llama context is unavailable."
-        )
-      }
       for start in stride(from: 0, to: tokenIds.count, by: Self.decodeChunkSize) {
         let end = min(start + Self.decodeChunkSize, tokenIds.count)
         let chunk = Array(tokenIds[start..<end])
-        try state.context?.decode(
-          tokenIds: chunk,
-          startPosition: state.cachedInputs[sequenceId]?.positionCount ?? 0,
-          sequenceId: sequenceId,
-          wantsLogits: wantsLogits && end == tokenIds.count
-        )
-        state.cachedInputs[sequenceId, default: CachedInput()].units.append(
-          contentsOf: chunk.map { LlamaPreparedInputUnit(value: .token($0)) }
-        )
-        state.cachedInputs[sequenceId, default: CachedInput()].positionCount += chunk.count
+        let startPosition = state.cachedInputs[sequenceId]?.positionCount ?? 0
+        try state.withContext {
+          try $0.decode(
+            tokenIds: chunk,
+            startPosition: startPosition,
+            sequenceId: sequenceId,
+            wantsLogits: wantsLogits && end == tokenIds.count
+          )
+        }
+        state.cachedInputs[sequenceId, default: CachedInput()].append(tokenIds: chunk)
       }
       if wantsLogits {
         state.logitsSequenceId = sequenceId
@@ -279,23 +277,19 @@
           guard prefixCount <= unitIndex else { continue }
           let unit = input.units[unitIndex]
           let currentPosition = state.cachedInputs[sequenceId]?.positionCount ?? 0
-          let newPosition = try state.context?.evaluate(
-            input: input,
-            using: projector,
-            chunkIndex: chunkIndex,
-            position: currentPosition,
-            sequenceId: sequenceId,
-            batchSize: Self.decodeChunkSize,
-            wantsLogits: false
-          )
-          guard let newPosition else {
-            throw LlamaRuntimeError(
-              code: .contextCreationFailed,
-              message: "The llama context is unavailable."
+          let newPosition = try state.withContext {
+            try projector.evaluate(
+              input: input,
+              context: $0,
+              chunkIndex: chunkIndex,
+              position: currentPosition,
+              sequenceId: sequenceId,
+              batchSize: Self.decodeChunkSize,
+              wantsLogits: false
             )
           }
-          state.cachedInputs[sequenceId, default: CachedInput()].units.append(unit)
-          state.cachedInputs[sequenceId, default: CachedInput()].positionCount = newPosition
+          state.cachedInputs[sequenceId, default: CachedInput()]
+            .append(media: unit, endingAt: newPosition)
         }
       }
     }
@@ -311,5 +305,4 @@
       state.context = try self.model.model.createContext(parameters: self.parameters)
     }
   }
-
 #endif

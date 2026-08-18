@@ -30,7 +30,7 @@
           throw EdgeToolsError.unsupportedTokenizer
         }
         return try tokenizer.applyChatTemplate(
-          messages: try prompt.chatTemplateMessages(),
+          messages: prompt.chatTemplateMessages(),
           tools: tools.chatTemplateToolValues,
           addGenerationPrompt: addGenerationPrompt,
           additionalContext: Self.templateContext(prompt: prompt)
