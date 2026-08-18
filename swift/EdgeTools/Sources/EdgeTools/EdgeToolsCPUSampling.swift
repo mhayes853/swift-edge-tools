@@ -1,5 +1,5 @@
-#if canImport(Accelerate) && !$Embedded
-  import Accelerate
+#if canImport(simd) && !$Embedded
+  import simd
 #endif
 
 import EdgeToolsCore
@@ -42,6 +42,7 @@ public final class EdgeToolsCPUTokenHistory {
   public init(capacity: Int) {
     precondition(capacity > 0, "Token history capacity must be greater than zero.")
     self.capacity = capacity
+    self.buffer.reserveCapacity(capacity)
   }
 
   public var tokenIds: [EdgeToolsToken.ID] {
@@ -54,7 +55,8 @@ public final class EdgeToolsCPUTokenHistory {
   }
 
   public func seed(_ tokens: some Sequence<EdgeToolsToken.ID>) {
-    self.buffer = Array(tokens.suffix(self.capacity))
+    self.buffer.removeAll(keepingCapacity: true)
+    self.buffer.append(contentsOf: tokens.suffix(self.capacity))
     self.writeIndex = self.buffer.count % self.capacity
   }
 
@@ -75,6 +77,10 @@ public final class EdgeToolsCPUFusedSampler {
   public let history: EdgeToolsCPUTokenHistory
 
   private var rngState: UInt64
+  private var weights = [Float]()
+  private var nucleusBuckets = [Float](repeating: 0, count: nucleusBucketCount)
+  private var gatheredLogits = [Float]()
+  private var gatheredIds = [EdgeToolsToken.ID]()
 
   public convenience init(parameters: EdgeToolsFusedSamplingParameters) {
     self.init(
@@ -105,37 +111,121 @@ public final class EdgeToolsCPUFusedSampler {
     bitmask: GrammarBitmask? = nil
   ) -> EdgeToolsCPUSample {
     precondition(!logits.isEmpty, "Cannot sample from empty logits.")
-    if let bitmask {
-      applyBitmaskCPU(logits: logits, mask: bitmask)
-    }
-    let (top1, top2) = topTwoContiguous(UnsafeBufferPointer(logits))
-    let confidence = tokenConfidence(top1: top1, top2: top2)
-    if self.parameters.penalizesHistory {
+    let penalizesHistory = self.parameters.penalizesHistory
+    if penalizesHistory {
       self.applyHistoryPenalties(logits: logits)
     }
-    let tokenId = self.sampledTokenId(logits: UnsafeBufferPointer(logits))
-    if self.parameters.penalizesHistory {
-      self.history.append(tokenId)
+    let sample = self.constrainedSample(logits: logits, bitmask: bitmask)
+    if penalizesHistory {
+      self.history.append(sample.tokenId)
     }
-    return EdgeToolsCPUSample(tokenId: tokenId, confidence: confidence)
+    return sample
+  }
+
+  private func constrainedSample(
+    logits: UnsafeMutableBufferPointer<Float>,
+    bitmask: GrammarBitmask?
+  ) -> EdgeToolsCPUSample {
+    guard let bitmask else {
+      return self.sample(logits: UnsafeBufferPointer(logits), ids: nil)
+    }
+    guard let count = self.gatherPermitted(logits: UnsafeBufferPointer(logits), mask: bitmask)
+    else {
+      applyBitmaskCPU(logits: logits, mask: bitmask)
+      return self.sample(logits: UnsafeBufferPointer(logits), ids: nil)
+    }
+    return self.gatheredLogits.withUnsafeBufferPointer { values in
+      self.gatheredIds.withUnsafeBufferPointer { ids in
+        self.sample(
+          logits: UnsafeBufferPointer(rebasing: values[..<count]),
+          ids: UnsafeBufferPointer(rebasing: ids[..<count])
+        )
+      }
+    }
+  }
+
+  private func sample(
+    logits: UnsafeBufferPointer<Float>,
+    ids: UnsafeBufferPointer<EdgeToolsToken.ID>?
+  ) -> EdgeToolsCPUSample {
+    let extremes = logitExtremes(logits)
+    let index = self.sampledTokenId(logits: logits, extremes: extremes)
+    return EdgeToolsCPUSample(
+      tokenId: ids.map { $0[index] } ?? index,
+      confidence: tokenConfidence(top1: extremes.top1, top2: extremes.top2)
+    )
+  }
+
+  private func gatherPermitted(
+    logits: UnsafeBufferPointer<Float>,
+    mask: GrammarBitmask
+  ) -> Int? {
+    validateBitmaskCoverage(mask: mask, vocabularySize: logits.count)
+    guard permittedCount(mask: mask, limit: sparseGatherLimit) != nil else { return nil }
+    if self.gatheredLogits.count < sparseGatherLimit {
+      self.gatheredLogits = [Float](repeating: 0, count: sparseGatherLimit)
+      self.gatheredIds = [EdgeToolsToken.ID](repeating: 0, count: sparseGatherLimit)
+    }
+    var written = 0
+    self.gatheredLogits.withUnsafeMutableBufferPointer { values in
+      self.gatheredIds.withUnsafeMutableBufferPointer { ids in
+        mask.storage.withUnsafeBytes { raw in
+          var byteOffset = 0
+          while byteOffset + maskBlockSize <= raw.count {
+            let block = raw.loadUnaligned(fromByteOffset: byteOffset, as: MaskBlock.self)
+            if any(block .!= MaskBlock()) {
+              for lane in 0..<MaskBlock.scalarCount {
+                var word = UInt64(littleEndian: block[lane])
+                let base = (byteOffset + lane * 8) * 8
+                while word != 0 {
+                  let tokenId = base + word.trailingZeroBitCount
+                  guard tokenId < logits.count else { return }
+                  values[written] = logits[tokenId]
+                  ids[written] = tokenId
+                  written += 1
+                  word &= word &- 1
+                }
+              }
+            }
+            byteOffset += maskBlockSize
+          }
+          while byteOffset < raw.count {
+            var word = maskWord(raw, from: byteOffset)
+            while word != 0 {
+              let tokenId = byteOffset * 8 + word.trailingZeroBitCount
+              guard tokenId < logits.count else { return }
+              values[written] = logits[tokenId]
+              ids[written] = tokenId
+              written += 1
+              word &= word &- 1
+            }
+            byteOffset += 8
+          }
+        }
+      }
+    }
+    return written > 0 ? written : nil
   }
 
   private func applyHistoryPenalties(logits: UnsafeMutableBufferPointer<Float>) {
     let repetitionPenalty = self.parameters.repetitionPenalty ?? 1
     let presencePenalty = self.parameters.presencePenalty ?? 0
-    var penalized = Set<EdgeToolsToken.ID>()
-    for tokenId in self.history.tokenIds where penalized.insert(tokenId).inserted {
-      guard logits.indices.contains(tokenId) else { continue }
+    let tokenIds = self.history.tokenIds
+    for (offset, tokenId) in tokenIds.enumerated()
+    where logits.indices.contains(tokenId) && !tokenIds[..<offset].contains(tokenId) {
       let logit = logits[tokenId]
       let scaled = logit < 0 ? logit * repetitionPenalty : logit / repetitionPenalty
       logits[tokenId] = scaled - presencePenalty
     }
   }
 
-  private func sampledTokenId(logits: UnsafeBufferPointer<Float>) -> EdgeToolsToken.ID {
-    guard !self.parameters.isGreedy else { return argmaxContiguous(logits) }
+  private func sampledTokenId(
+    logits: UnsafeBufferPointer<Float>,
+    extremes: LogitExtremes
+  ) -> EdgeToolsToken.ID {
+    guard !self.parameters.isGreedy else { return extremes.top1Index }
     let invTemperature = 1 / (self.parameters.temperature ?? 0.6)
-    let maxLogit = maxContiguous(logits)
+    let maxLogit = extremes.top1
     let topK = self.parameters.topK.flatMap { $0 > 0 && $0 < logits.count ? $0 : nil }
     let topP = self.parameters.topP.flatMap { $0 < 1 ? $0 : nil }
     let minP = self.parameters.minP.flatMap { $0 > 0 ? $0 : nil }
@@ -148,17 +238,21 @@ public final class EdgeToolsCPUFusedSampler {
       )
     }
 
-    let logSumExp = topP.map { _ in maxLogit + logf(sumExpContiguous(logits, shiftedBy: maxLogit)) }
+    let total = topP.map { _ in self.fillWeights(from: logits, shiftedBy: maxLogit) }
+    let logSumExp = total.map { maxLogit + logf($0) }
     var candidates: [LogitCandidate]
     if let topK {
       candidates = topCandidates(logits, count: topK)
-    } else if let topP, let logSumExp {
-      candidates = nucleusCandidates(logits, mass: topP, logSumExp: logSumExp)
+    } else if let topP, let total, let logSumExp {
+      candidates = self.nucleusCandidates(
+        logits: logits,
+        maxLogit: maxLogit,
+        mass: topP,
+        total: total,
+        logSumExp: logSumExp
+      )
     } else {
-      let threshold = maxLogit + logf(minP!)
-      candidates = logits.enumerated()
-        .filter { $0.element >= threshold }
-        .map { LogitCandidate(logit: $0.element, id: $0.offset) }
+      candidates = candidatesAtOrAbove(maxLogit + logf(minP!), in: logits)
     }
 
     if let topP, let logSumExp {
@@ -202,22 +296,93 @@ public final class EdgeToolsCPUFusedSampler {
     maxLogit: Float,
     invTemperature: Float
   ) -> EdgeToolsToken.ID {
-    let cutoff = maxLogit - (negligibleLogitOffset / Swift.max(invTemperature, 1e-6))
-    var total = Float.zero
-    for logit in logits where logit >= cutoff {
-      total += expf((logit - maxLogit) * invTemperature)
-    }
+    let total = self.fillWeights(from: logits, shiftedBy: maxLogit, scaledBy: invTemperature)
     let uniform = self.nextUniform() * total
-    var accumulated = Float.zero
-    var lastCandidate = 0
-    for (index, logit) in logits.enumerated() where logit >= cutoff {
-      accumulated += expf((logit - maxLogit) * invTemperature)
-      lastCandidate = index
-      if uniform < accumulated {
-        return index
+    return self.weights.withUnsafeBufferPointer {
+      firstIndexCrossing(UnsafeBufferPointer(rebasing: $0[..<logits.count]), threshold: uniform)
+    }
+  }
+
+  private func fillWeights(
+    from logits: UnsafeBufferPointer<Float>,
+    shiftedBy maximum: Float,
+    scaledBy scale: Float = 1
+  ) -> Float {
+    if self.weights.count < logits.count {
+      self.weights = [Float](repeating: 0, count: logits.count)
+    }
+    return self.weights.withUnsafeMutableBufferPointer {
+      expShifted(
+        logits,
+        shiftedBy: maximum,
+        scaledBy: scale,
+        into: UnsafeMutableBufferPointer(rebasing: $0[..<logits.count])
+      )
+    }
+  }
+
+  private func nucleusCandidates(
+    logits: UnsafeBufferPointer<Float>,
+    maxLogit: Float,
+    mass: Float,
+    total: Float,
+    logSumExp: Float
+  ) -> [LogitCandidate] {
+    let probe = topCandidates(logits, count: Swift.min(nucleusProbeCount, logits.count))
+    if probe.reduce(Float.zero, { $0 + expf($1.logit - logSumExp) }) >= mass {
+      return probe
+    }
+    let cutoff = self.nucleusCutoff(logits: logits, maxLogit: maxLogit, mass: mass, total: total)
+    var candidates = candidatesAtOrAbove(cutoff, in: logits)
+    let boundary = candidates.partition {
+      $0.logit < cutoff + nucleusLogitRange / Float(nucleusBucketCount)
+    }
+    candidates[boundary...].sort(by: >)
+    return candidates
+  }
+
+  private func nucleusCutoff(
+    logits: UnsafeBufferPointer<Float>,
+    maxLogit: Float,
+    mass: Float,
+    total: Float
+  ) -> Float {
+    let scale = Float(nucleusBucketCount) / nucleusLogitRange
+    for index in self.nucleusBuckets.indices {
+      self.nucleusBuckets[index] = 0
+    }
+    let floor = maxLogit - nucleusLogitRange
+    let floorBlock = SIMD16<Float>(repeating: floor)
+    let width = SIMD16<Float>.scalarCount
+    self.weights.withUnsafeBufferPointer { weights in
+      var index = 0
+      while index + width <= logits.count {
+        let block = UnsafeRawPointer(logits.baseAddress!.advanced(by: index))
+          .loadUnaligned(as: SIMD16<Float>.self)
+        if any(block .>= floorBlock) {
+          for lane in 0..<width where block[lane] >= floor {
+            let bucket = bucketIndex(maxLogit - block[lane], scale: scale)
+            self.nucleusBuckets[bucket] += weights[index + lane]
+          }
+        }
+        index += width
+      }
+      while index < logits.count {
+        if logits[index] >= floor {
+          self.nucleusBuckets[bucketIndex(maxLogit - logits[index], scale: scale)] += weights[index]
+        }
+        index += 1
       }
     }
-    return lastCandidate
+    let target = mass * total
+    var cumulative = Float.zero
+    for (bucket, bucketMass) in self.nucleusBuckets.enumerated() {
+      cumulative += bucketMass
+      if cumulative >= target {
+        return maxLogit - Float(bucket + 1) / scale
+      }
+    }
+    return maxLogit - nucleusLogitRange
   }
 
   private func nextUniform() -> Float {
@@ -241,18 +406,39 @@ private struct LogitCandidate: Comparable {
   }
 }
 
+private let sparseGatherLimit = 4096
+
+private let nucleusProbeCount = 64
+
+private let nucleusBucketCount = 512
+
+private let nucleusLogitRange = Float(88)
+
 private func topCandidates(
   _ logits: UnsafeBufferPointer<Float>,
   count: Int
 ) -> [LogitCandidate] {
+  guard let base = logits.baseAddress else { return [] }
   var heap = Heap<LogitCandidate>()
-  for (index, logit) in logits.enumerated() {
-    let candidate = LogitCandidate(logit: logit, id: index)
-    if heap.count < count {
-      heap.insert(candidate)
-    } else if let minimum = heap.min, candidate > minimum {
-      heap.replaceMin(with: candidate)
+  heap.reserveCapacity(count)
+  let width = SIMD16<Float>.scalarCount
+  var threshold = SIMD16<Float>(repeating: -.infinity)
+  var index = 0
+  while index + width <= logits.count {
+    let block = UnsafeRawPointer(base.advanced(by: index)).loadUnaligned(as: SIMD16<Float>.self)
+    if heap.count < count || any(block .>= threshold) {
+      for lane in 0..<width {
+        insert(LogitCandidate(logit: block[lane], id: index + lane), into: &heap, limit: count)
+      }
+      if heap.count == count, let minimum = heap.min {
+        threshold = SIMD16<Float>(repeating: minimum.logit)
+      }
     }
+    index += width
+  }
+  while index < logits.count {
+    insert(LogitCandidate(logit: logits[index], id: index), into: &heap, limit: count)
+    index += 1
   }
   var descending = [LogitCandidate]()
   descending.reserveCapacity(heap.count)
@@ -262,156 +448,254 @@ private func topCandidates(
   return descending
 }
 
-private func nucleusCandidates(
-  _ logits: UnsafeBufferPointer<Float>,
-  mass: Float,
-  logSumExp: Float
+private func candidatesAtOrAbove(
+  _ threshold: Float,
+  in logits: UnsafeBufferPointer<Float>
 ) -> [LogitCandidate] {
-  var count = Swift.min(256, logits.count)
-  while true {
-    let candidates = topCandidates(logits, count: count)
-    let cumulative = candidates.reduce(Float.zero) { $0 + expf($1.logit - logSumExp) }
-    if cumulative >= mass || count == logits.count {
-      return candidates
-    }
-    count = Swift.min(count * 4, logits.count)
-  }
-}
-
-// MARK: - SIMD Reductions
-
-private let negligibleLogitOffset = Float(20)
-
-@inline(always)
-func maxContiguous(_ values: UnsafeBufferPointer<Float>) -> Float {
-  #if canImport(Accelerate) && !$Embedded
-    guard !values.isEmpty else { return -.infinity }
-    var maximum = Float.zero
-    vDSP_maxv(values.baseAddress!, 1, &maximum, vDSP_Length(values.count))
-    return maximum
-  #else
-    guard !values.isEmpty else { return -.infinity }
-    let width = SIMD16<Float>.scalarCount
-    var best = SIMD16<Float>(repeating: -.infinity)
-    var index = 0
-    while index + width <= values.count {
-      let block = UnsafeRawPointer(values.baseAddress!.advanced(by: index))
-        .loadUnaligned(as: SIMD16<Float>.self)
-      best = best.replacing(with: block, where: block .> best)
-      index += width
-    }
-    var maximum = best.max()
-    while index < values.count {
-      maximum = Swift.max(maximum, values[index])
-      index += 1
-    }
-    return maximum
-  #endif
-}
-
-@inline(always)
-func argmaxContiguous(_ values: UnsafeBufferPointer<Float>) -> Int {
-  #if canImport(Accelerate) && !$Embedded
-    guard !values.isEmpty else { return 0 }
-    var maximum = Float.zero
-    var index = vDSP_Length.zero
-    vDSP_maxvi(values.baseAddress!, 1, &maximum, &index, vDSP_Length(values.count))
-    return Int(index)
-  #else
-    let (top1Index, _, _) = topTwoIndexed(values)
-    return top1Index
-  #endif
-}
-
-@inline(always)
-func topTwoContiguous(_ values: UnsafeBufferPointer<Float>) -> (top1: Float, top2: Float) {
-  let (_, top1, top2) = topTwoIndexed(values)
-  return (top1, top2)
-}
-
-@inline(always)
-func sumExpContiguous(
-  _ values: UnsafeBufferPointer<Float>,
-  shiftedBy maximum: Float
-) -> Float {
-  guard !values.isEmpty else { return 0 }
+  guard let base = logits.baseAddress else { return [] }
   let width = SIMD16<Float>.scalarCount
-  let cutoff = maximum - negligibleLogitOffset
-  let cutoffBlock = SIMD16<Float>(repeating: cutoff)
-  var sum = Float.zero
+  let thresholdBlock = SIMD16<Float>(repeating: threshold)
+  var candidates = [LogitCandidate]()
   var index = 0
-  while index + width <= values.count {
-    let block = UnsafeRawPointer(values.baseAddress!.advanced(by: index))
-      .loadUnaligned(as: SIMD16<Float>.self)
-    if any(block .>= cutoffBlock) {
-      for lane in 0..<width where block[lane] >= cutoff {
-        sum += expf(block[lane] - maximum)
+  while index + width <= logits.count {
+    let block = UnsafeRawPointer(base.advanced(by: index)).loadUnaligned(as: SIMD16<Float>.self)
+    if any(block .>= thresholdBlock) {
+      for lane in 0..<width where block[lane] >= threshold {
+        candidates.append(LogitCandidate(logit: block[lane], id: index + lane))
       }
     }
     index += width
   }
-  while index < values.count {
-    if values[index] >= cutoff {
-      sum += expf(values[index] - maximum)
+  while index < logits.count {
+    if logits[index] >= threshold {
+      candidates.append(LogitCandidate(logit: logits[index], id: index))
     }
     index += 1
   }
-  return sum
+  return candidates
 }
 
-private let topTwoLaneOffsets = SIMD16<Int32>(
-  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
-)
+@inline(always)
+private func bucketIndex(_ distanceBelowMaximum: Float, scale: Float) -> Int {
+  Swift.min(Int(distanceBelowMaximum * scale), nucleusBucketCount - 1)
+}
 
 @inline(always)
-private func topTwoIndexed(
-  _ values: UnsafeBufferPointer<Float>
-) -> (top1Index: Int, top1: Float, top2: Float) {
-  guard !values.isEmpty else { return (0, -.infinity, -.infinity) }
+private func maskWord(_ raw: UnsafeRawBufferPointer, from byteOffset: Int) -> UInt64 {
+  guard raw.count - byteOffset < 8 else {
+    return UInt64(littleEndian: raw.loadUnaligned(fromByteOffset: byteOffset, as: UInt64.self))
+  }
+  var word = UInt64.zero
+  for offset in byteOffset..<raw.count {
+    word |= UInt64(raw[offset]) &<< UInt64((offset - byteOffset) * 8)
+  }
+  return word
+}
+
+private typealias MaskBlock = SIMD8<UInt64>
+
+private let maskBlockSize = MemoryLayout<MaskBlock>.size
+
+private func permittedCount(mask: GrammarBitmask, limit: Int) -> Int? {
+  mask.storage.withUnsafeBytes { raw in
+    var count = 0
+    var byteOffset = 0
+    while byteOffset + maskBlockSize <= raw.count {
+      let block = raw.loadUnaligned(fromByteOffset: byteOffset, as: MaskBlock.self)
+      if any(block .!= MaskBlock()) {
+        for lane in 0..<MaskBlock.scalarCount {
+          count += block[lane].nonzeroBitCount
+        }
+        if count > limit {
+          return nil
+        }
+      }
+      byteOffset += maskBlockSize
+    }
+    while byteOffset < raw.count {
+      count += maskWord(raw, from: byteOffset).nonzeroBitCount
+      if count > limit {
+        return nil
+      }
+      byteOffset += 8
+    }
+    return count
+  }
+}
+
+private func insert(
+  _ candidate: LogitCandidate,
+  into heap: inout Heap<LogitCandidate>,
+  limit: Int
+) {
+  if heap.count < limit {
+    heap.insert(candidate)
+  } else if let minimum = heap.min, candidate > minimum {
+    heap.replaceMin(with: candidate)
+  }
+}
+// MARK: - LogitExtremes
+
+struct LogitExtremes {
+  let top1Index: EdgeToolsToken.ID
+  let top1: Float
+
+  let top2: Float
+}
+
+// MARK: - SIMD Reductions
+
+private let laneOffsets = SIMD16<Int32>(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
+
+@inline(always)
+func logitExtremes(_ values: UnsafeBufferPointer<Float>) -> LogitExtremes {
+  guard let base = values.baseAddress, !values.isEmpty else {
+    return LogitExtremes(top1Index: 0, top1: -.infinity, top2: -.infinity)
+  }
   let width = SIMD16<Float>.scalarCount
-  var bestValues = SIMD16<Float>(repeating: -.infinity)
-  var bestIndices = SIMD16<Int32>(repeating: 0)
-  var secondValues = SIMD16<Float>(repeating: -.infinity)
+  var laneTop1 = SIMD16<Float>(repeating: -.infinity)
+  var laneTop2 = SIMD16<Float>(repeating: -.infinity)
+  var laneIndices = SIMD16<Int32>(repeating: 0)
   var index = 0
   while index + width <= values.count {
-    let block = UnsafeRawPointer(values.baseAddress!.advanced(by: index))
-      .loadUnaligned(as: SIMD16<Float>.self)
-    let isBest = block .> bestValues
-    secondValues.replace(with: bestValues, where: isBest)
-    bestValues.replace(with: block, where: isBest)
-    bestIndices.replace(with: topTwoLaneOffsets &+ Int32(index), where: isBest)
-    let isSecond = (block .> secondValues) .& (.!isBest)
-    secondValues.replace(with: block, where: isSecond)
+    let block = UnsafeRawPointer(base.advanced(by: index)).loadUnaligned(as: SIMD16<Float>.self)
+    let winners = simdMax(laneTop1, block)
+    let losers = simdMin(laneTop1, block)
+    laneIndices.replace(with: laneOffsets &+ Int32(index), where: block .> laneTop1)
+    laneTop2 = simdMax(laneTop2, losers.replacing(with: -.infinity, where: losers .== winners))
+    laneTop1 = winners
     index += width
   }
 
   var top1 = -Float.infinity
   var top1Index = 0
-  var top2 = -Float.infinity
   for lane in 0..<width {
-    let value = bestValues[lane]
-    let valueIndex = Int(bestIndices[lane])
+    let value = laneTop1[lane]
+    let valueIndex = Int(laneIndices[lane])
     if value > top1 || (value == top1 && valueIndex < top1Index) {
-      top2 = Swift.max(top2, top1)
       top1 = value
       top1Index = valueIndex
-    } else if value > top2 {
-      top2 = value
-    }
-    if secondValues[lane] > top2 {
-      top2 = secondValues[lane]
     }
   }
+
+  var top2 = -Float.infinity
+  for lane in 0..<width {
+    top2 = Swift.max(top2, laneTop2[lane])
+    if laneTop1[lane] < top1 {
+      top2 = Swift.max(top2, laneTop1[lane])
+    }
+  }
+
   while index < values.count {
     let value = values[index]
     if value > top1 {
-      top2 = top1
+      top2 = Swift.max(top2, top1)
       top1 = value
       top1Index = index
-    } else if value > top2 {
+    } else if value > top2 && value < top1 {
       top2 = value
     }
     index += 1
   }
-  return (top1Index, top1, top2)
+  return LogitExtremes(top1Index: top1Index, top1: top1, top2: top2)
+}
+
+@inline(always)
+func expShifted(
+  _ values: UnsafeBufferPointer<Float>,
+  shiftedBy maximum: Float,
+  scaledBy scale: Float,
+  into destination: UnsafeMutableBufferPointer<Float>
+) -> Float {
+  guard let source = values.baseAddress, let target = destination.baseAddress else { return 0 }
+  let width = SIMD16<Float>.scalarCount
+  let shift = SIMD16<Float>(repeating: maximum)
+  let factor = SIMD16<Float>(repeating: scale)
+  var totals = SIMD16<Float>(repeating: 0)
+  var index = 0
+  while index + width <= values.count {
+    let block = UnsafeRawPointer(source.advanced(by: index)).loadUnaligned(as: SIMD16<Float>.self)
+    let weights = simdExp((block - shift) * factor)
+    UnsafeMutableRawPointer(target.advanced(by: index))
+      .storeBytes(of: weights, as: SIMD16<Float>.self)
+    totals += weights
+    index += width
+  }
+  var total = totals.sum()
+  while index < values.count {
+    let weight = expf((values[index] - maximum) * scale)
+    destination[index] = weight
+    total += weight
+    index += 1
+  }
+  return total
+}
+
+@inline(always)
+func firstIndexCrossing(
+  _ weights: UnsafeBufferPointer<Float>,
+  threshold: Float
+) -> Int {
+  guard let base = weights.baseAddress, !weights.isEmpty else { return 0 }
+  let width = SIMD16<Float>.scalarCount
+  var accumulated = Float.zero
+  var index = 0
+  while index + width <= weights.count {
+    let block = UnsafeRawPointer(base.advanced(by: index)).loadUnaligned(as: SIMD16<Float>.self)
+    let blockTotal = block.sum()
+    if accumulated + blockTotal > threshold {
+      break
+    }
+    accumulated += blockTotal
+    index += width
+  }
+  while index < weights.count {
+    accumulated += weights[index]
+    if threshold < accumulated {
+      return index
+    }
+    index += 1
+  }
+  return weights.count - 1
+}
+
+private let smallestExpInput = Float(-87.3)
+
+private let log2Inverse = Float(1.442_695_04)
+
+private let expRoundingMagic = Float(1 << 23) + Float(1 << 22)
+
+@inline(always)
+private func simdExp(_ values: SIMD16<Float>) -> SIMD16<Float> {
+  let magic = SIMD16<Float>(repeating: expRoundingMagic)
+  let scaled = simdMax(values, SIMD16(repeating: smallestExpInput)) * log2Inverse
+  let rounded = scaled + magic
+  let fraction = scaled - (rounded - magic)
+  var polynomial = SIMD16<Float>(repeating: 0.001_333_355_8)
+  polynomial = polynomial * fraction + SIMD16(repeating: 0.009_618_129)
+  polynomial = polynomial * fraction + SIMD16(repeating: 0.055_504_108_7)
+  polynomial = polynomial * fraction + SIMD16(repeating: 0.240_226_506_9)
+  polynomial = polynomial * fraction + SIMD16(repeating: 0.693_147_180_5)
+  polynomial = polynomial * fraction + SIMD16(repeating: 1)
+  let exponent = unsafeBitCast(rounded, to: SIMD16<UInt32>.self) &<< 23
+  let bits = unsafeBitCast(polynomial, to: SIMD16<UInt32>.self) &+ exponent
+  return unsafeBitCast(bits, to: SIMD16<Float>.self)
+}
+
+@inline(always)
+private func simdMax(_ lhs: SIMD16<Float>, _ rhs: SIMD16<Float>) -> SIMD16<Float> {
+  #if canImport(simd) && !$Embedded
+    simd_max(lhs, rhs)
+  #else
+    lhs.replacing(with: rhs, where: rhs .> lhs)
+  #endif
+}
+
+@inline(always)
+private func simdMin(_ lhs: SIMD16<Float>, _ rhs: SIMD16<Float>) -> SIMD16<Float> {
+  #if canImport(simd) && !$Embedded
+    simd_min(lhs, rhs)
+  #else
+    lhs.replacing(with: rhs, where: rhs .< lhs)
+  #endif
 }

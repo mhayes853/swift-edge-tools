@@ -410,101 +410,53 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 64 elements
+        ▿ parts: 46 elements
           ▿ EdgeToolsGenerationPart
-            - reasoning: "I"
+            - reasoning: "Based"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " see"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "."
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " The"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " user"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " is"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " asking"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " for"
+            - reasoning: " on"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " weather"
+            - reasoning: " retrieved"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " data"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: ","
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " today"
           ▿ EdgeToolsGenerationPart
             - reasoning: " in"
           ▿ EdgeToolsGenerationPart
             - reasoning: " Paris"
           ▿ EdgeToolsGenerationPart
-            - reasoning: ","
+            - reasoning: " is"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " and"
+            - reasoning: " **"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " I"
+            - reasoning: "s"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " just"
+            - reasoning: "unny"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " retrieved"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " the"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " current"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " conditions"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " using"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " the"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " `"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "get"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "Weather"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "`"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " tool"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "."
+            - reasoning: "**."
           ▿ EdgeToolsGenerationPart
             - reasoning: " The"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " result"
+            - reasoning: " average"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " shows"
+            - reasoning: " temperature"
           ▿ EdgeToolsGenerationPart
-            - reasoning: ":"
+            - reasoning: " for"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "\n"
+            - reasoning: " that"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "*"
+            - reasoning: " day"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "  "
+            - reasoning: " is"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " **"
+            - reasoning: " a"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "Current"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " weather"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " condition"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: ":**"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " Sunny"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "\n"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "*"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "  "
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " **"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "Temperature"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: ":**"
+            - reasoning: " pleasant"
           ▿ EdgeToolsGenerationPart
             - reasoning: " "
           ▿ EdgeToolsGenerationPart
@@ -514,30 +466,42 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: "°C"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "\n\n"
+            - reasoning: "."
           ▿ EdgeToolsGenerationPart
-            - reasoning: "This"
+            - reasoning: " The"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " information"
+            - reasoning: " weather"
           ▿ EdgeToolsGenerationPart
             - reasoning: " has"
           ▿ EdgeToolsGenerationPart
             - reasoning: " been"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " summarized"
+            - reasoning: " steady"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " for"
+            - reasoning: " this"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " you"
+            - reasoning: " morning"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " to"
+            - reasoning: ","
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " with"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " no"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " significant"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " changes"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " in"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " user"
+            - reasoning: " forecast"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "\'s"
+            - reasoning: " for"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " request"
+            - reasoning: " today"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "."
   ▿ reasoningEffort: EdgeToolsReasoningEffort
     - rawValue: "default"

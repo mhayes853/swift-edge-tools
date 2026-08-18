@@ -518,9 +518,7 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " Paris"
           ▿ EdgeToolsGenerationPart
-            - reasoning: ","
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " and"
+            - reasoning: "."
           ▿ EdgeToolsGenerationPart
             - reasoning: " I"
           ▿ EdgeToolsGenerationPart
@@ -532,27 +530,13 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: "Weather"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " function"
+            - reasoning: " tool"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " to"
+            - reasoning: ","
           ▿ EdgeToolsGenerationPart
-            - reasoning: " retrieve"
+            - reasoning: " which"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " the"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " data"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "."
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " The"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " response"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " came"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " back"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " with"
+            - reasoning: " returned"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
@@ -566,6 +550,8 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " location"
           ▿ EdgeToolsGenerationPart
+            - reasoning: " as"
+          ▿ EdgeToolsGenerationPart
             - reasoning: " Paris"
           ▿ EdgeToolsGenerationPart
             - reasoning: ","
@@ -574,13 +560,15 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " temperature"
           ▿ EdgeToolsGenerationPart
+            - reasoning: " Celsius"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " as"
+          ▿ EdgeToolsGenerationPart
             - reasoning: " "
           ▿ EdgeToolsGenerationPart
             - reasoning: "2"
           ▿ EdgeToolsGenerationPart
             - reasoning: "1"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "°C"
           ▿ EdgeToolsGenerationPart
             - reasoning: "."
           ▿ EdgeToolsGenerationPart
@@ -600,26 +588,38 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " clearly"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " for"
+            - reasoning: "."
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " Let"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " me"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " check"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " user"
+            - reasoning: " response"
           ▿ EdgeToolsGenerationPart
-            - reasoning: ".\n\n"
+            - reasoning: " again"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "First"
+            - reasoning: " to"
           ▿ EdgeToolsGenerationPart
-            - reasoning: ","
+            - reasoning: " ensure"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " I"
+            - reasoning: " accuracy"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " should"
+            - reasoning: "."
           ▿ EdgeToolsGenerationPart
-            - reasoning: " mention"
+            - reasoning: " The"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " the"
+            - reasoning: " temperature"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " location"
+            - reasoning: " is"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " "
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "2"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "1"
   ▿ reasoningEffort: EdgeToolsReasoningEffort
     - rawValue: "default"

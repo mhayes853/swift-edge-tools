@@ -134,6 +134,54 @@ struct `EdgeToolsCPUFusedSampler tests` {
   }
 
   @Test
+  func `Sparse Bitmask Samples A Permitted Token Over A Large Vocabulary`() {
+    let sampler = EdgeToolsCPUFusedSampler(
+      parameters: EdgeToolsFusedSamplingParameters(temperature: 0)
+    )
+    var bitmask = GrammarBitmask(bitCount: GrammarBitmask.bitCount(forVocabularySize: 100_003))
+    bitmask[51_337] = true
+    bitmask[90_001] = true
+    var logits = [Float](repeating: -10, count: 100_003)
+    logits[70_000] = 12
+    logits[90_001] = 4
+    logits[51_337] = 2
+
+    expectNoDifference(sampler.sample(logits: &logits, bitmask: bitmask).tokenId, 90_001)
+  }
+
+  @Test
+  func `Bitmask Permitting More Tokens Than The Gather Limit Still Excludes Masked Ones`() {
+    let sampler = EdgeToolsCPUFusedSampler(
+      parameters: EdgeToolsFusedSamplingParameters(temperature: 0)
+    )
+    var bitmask = GrammarBitmask(bitCount: GrammarBitmask.bitCount(forVocabularySize: 100_003))
+    for tokenId in 0..<5_000 {
+      bitmask[tokenId] = true
+    }
+    var logits = [Float](repeating: -10, count: 100_003)
+    logits[70_000] = 12
+    logits[4_999] = 3
+
+    expectNoDifference(sampler.sample(logits: &logits, bitmask: bitmask).tokenId, 4_999)
+  }
+
+  @Test
+  func `Repetition Penalty Demotes A Token Reached Through A Sparse Bitmask`() {
+    let sampler = EdgeToolsCPUFusedSampler(
+      parameters: EdgeToolsFusedSamplingParameters(temperature: 0, repetitionPenalty: 2)
+    )
+    var bitmask = GrammarBitmask(bitCount: GrammarBitmask.bitCount(forVocabularySize: 100_003))
+    bitmask[51_337] = true
+    bitmask[90_001] = true
+    var logits = [Float](repeating: -10, count: 100_003)
+    logits[90_001] = 4
+    logits[51_337] = 2
+
+    expectNoDifference(sampler.sample(logits: &logits, bitmask: bitmask).tokenId, 90_001)
+    expectNoDifference(sampler.sample(logits: &logits, bitmask: bitmask).tokenId, 51_337)
+  }
+
+  @Test
   func `Confidence Reflects The Margin Between The Top Two Logits`() {
     let sampler = EdgeToolsCPUFusedSampler(
       parameters: EdgeToolsFusedSamplingParameters(temperature: 0)
@@ -142,6 +190,32 @@ struct `EdgeToolsCPUFusedSampler tests` {
 
     let sample = sampler.sample(logits: &logits)
     expectNoDifference(sample.confidence, Float(1 / (1 + exp(-2.0))))
+  }
+
+  @Test
+  func `Confidence Reflects The Penalized Distribution The Sample Came From`() {
+    let sampler = EdgeToolsCPUFusedSampler(
+      parameters: EdgeToolsFusedSamplingParameters(temperature: 0, repetitionPenalty: 2)
+    )
+    var first = [Float].test
+    expectNoDifference(sampler.sample(logits: &first).tokenId, 1)
+
+    var second = [Float].test
+    let sample = sampler.sample(logits: &second)
+    expectNoDifference(sample.tokenId, 2)
+    expectNoDifference(sample.confidence, Float(1 / (1 + exp(-0.5))))
+  }
+
+  @Test
+  func `Confidence Measures The Margin To The Next Distinct Logit When The Top Logits Tie`() {
+    let sampler = EdgeToolsCPUFusedSampler(
+      parameters: EdgeToolsFusedSamplingParameters(temperature: 0)
+    )
+    var logits: [Float] = [1, 5, 5, 2]
+
+    let sample = sampler.sample(logits: &logits)
+    expectNoDifference(sample.tokenId, 1)
+    expectNoDifference(sample.confidence, Float(1 / (1 + exp(-3.0))))
   }
 
   @Test
