@@ -4,6 +4,8 @@
 #include <cstring>
 #include <ctime>
 #include <iomanip>
+#include <memory>
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -167,6 +169,27 @@ std::string formatted_utc(std::time_t instant, const std::string &format) {
   return out.str();
 }
 
+std::shared_ptr<minja::TemplateNode> parsed_template(const std::string &source) {
+  constexpr size_t max_cached_templates = 4;
+  static std::mutex mutex;
+  static std::vector<std::pair<std::string, std::shared_ptr<minja::TemplateNode>>> cache;
+
+  std::lock_guard<std::mutex> guard(mutex);
+  auto cached = std::find_if(cache.begin(), cache.end(), [&source](const auto &entry) {
+    return entry.first == source;
+  });
+  if (cached != cache.end()) {
+    std::rotate(cache.begin(), cached, cached + 1);
+    return cache.front().second;
+  }
+  auto root = minja::Parser::parse(source, { true, true, false});
+  cache.insert(cache.begin(), { source, root });
+  if (cache.size() > max_cached_templates) {
+    cache.pop_back();
+  }
+  return root;
+}
+
 std::string render(const std::string &source, const std::string &context_json) {
   auto context_values = nlohmann::ordered_json::parse(context_json);
   if (!context_values.is_object()) {
@@ -174,7 +197,7 @@ std::string render(const std::string &source, const std::string &context_json) {
   }
   auto instant = rendering_instant(context_values);
 
-  auto root = minja::Parser::parse(source, { true, true, false});
+  auto root = parsed_template(source);
   auto context = minja::Context::make(minja::Value(context_values));
   context->set(
       "strftime_now",

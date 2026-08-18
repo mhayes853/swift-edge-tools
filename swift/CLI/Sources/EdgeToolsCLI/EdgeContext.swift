@@ -7,7 +7,7 @@ import Foundation
 public struct EdgeContext: Sendable {
   public var resolveDirectory:
     @Sendable (ModelSource, @Sendable (String) -> Void) async throws -> URL
-  public var detectModel: @Sendable (URL) throws -> ModelDetection
+  public var detectModel: @Sendable (URL, String?) throws -> ModelDetection
   public var makeRunner:
     @Sendable (ModelDetection, EngineKind, MLXHardwareUnit) async throws -> EngineRunner
   public var peakMemory: @Sendable () -> PeakMemory
@@ -21,7 +21,7 @@ public struct EdgeContext: Sendable {
     resolveDirectory:
       @escaping @Sendable (ModelSource, @Sendable (String) -> Void) async throws ->
       URL,
-    detectModel: @escaping @Sendable (URL) throws -> ModelDetection,
+    detectModel: @escaping @Sendable (URL, String?) throws -> ModelDetection,
     makeRunner:
       @escaping @Sendable (ModelDetection, EngineKind, MLXHardwareUnit) async throws ->
       EngineRunner,
@@ -51,7 +51,7 @@ extension EdgeContext {
     resolveDirectory: { source, onDownloadStart in
       try await source.resolve(onDownloadStart: onDownloadStart)
     },
-    detectModel: { try ModelDetection.detect(in: $0) },
+    detectModel: { try ModelDetection.detect(in: $0, quant: $1) },
     makeRunner: {
       try await EngineRunner(detection: $0, engine: $1, hardwareUnit: $2)
     },

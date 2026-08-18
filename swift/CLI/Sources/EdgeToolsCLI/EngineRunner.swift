@@ -1,5 +1,6 @@
 import EdgeTools
 import Foundation
+import Synchronization
 
 #if canImport(MLX)
   import MLX
@@ -29,6 +30,7 @@ public struct EngineRunner: Sendable {
     @Sendable (GenerationRequest, sending EdgeToolsGenerationChannel) async throws ->
       EdgeToolsEngineGeneration
   private let modelResetting: @Sendable () async -> Void
+  private let modelWarmingUp: @Sendable (GenerationRequest) async throws -> Void
 
   public init(
     engine: EngineKind = .mlx,
@@ -40,7 +42,8 @@ public struct EngineRunner: Sendable {
       @escaping @Sendable (
         GenerationRequest, sending EdgeToolsGenerationChannel
       ) async throws -> EdgeToolsEngineGeneration,
-    modelResetting: @escaping @Sendable () async -> Void = {}
+    modelResetting: @escaping @Sendable () async -> Void = {},
+    modelWarmingUp: @escaping @Sendable (GenerationRequest) async throws -> Void = { _ in }
   ) {
     self.engine = engine
     self.supportsCustomGrammar = supportsCustomGrammar
@@ -49,6 +52,7 @@ public struct EngineRunner: Sendable {
     self.metricsExtractor = metricsExtractor
     self.generation = generation
     self.modelResetting = modelResetting
+    self.modelWarmingUp = modelWarmingUp
   }
 
   public func generate(
@@ -60,6 +64,12 @@ public struct EngineRunner: Sendable {
 
   public func reset() async {
     await self.modelResetting()
+  }
+
+  /// Pays whatever fixed setup an engine defers to its first generation, such as allocating a
+  /// llama context, so it lands outside the measured generation.
+  public func warmUp(_ request: GenerationRequest) async throws {
+    try await self.modelWarmingUp(request)
   }
 
   public func metrics(from generation: EdgeToolsEngineGeneration) -> CLIGenerationMetrics {
@@ -115,6 +125,35 @@ extension EngineRunner {
     let hardwareUnit: MLXHardwareUnit
   }
 
+  public struct Capabilities: Hashable, Sendable {
+    public var supportsCustomGrammar: Bool
+    public var supportsSampling: Bool
+    public var supportsImages: Bool
+  }
+
+  public static func capabilities(of engine: EngineKind, for model: DetectedModel) -> Capabilities {
+    switch engine {
+    case .mlx:
+      Capabilities(
+        supportsCustomGrammar: true,
+        supportsSampling: true,
+        supportsImages: model.modality == .vision
+      )
+    case .needle2:
+      Capabilities(
+        supportsCustomGrammar: false,
+        supportsSampling: false,
+        supportsImages: false
+      )
+    case .llama:
+      Capabilities(
+        supportsCustomGrammar: true,
+        supportsSampling: true,
+        supportsImages: false
+      )
+    }
+  }
+
   static func parse(
     _ request: GenerationRequest,
     detection: ModelDetection,
@@ -126,19 +165,18 @@ extension EngineRunner {
       throw EdgeCLIError("--hardware-unit only applies to the mlx engine.")
     }
 
-    let supportsMLXFeatures = engine == .mlx
-    guard request.sampling.isEmpty || supportsMLXFeatures else {
+    let capabilities = Self.capabilities(of: engine, for: detection.model)
+    guard request.sampling.isEmpty || capabilities.supportsSampling else {
       throw EdgeCLIError(
         "\(detection.model.displayName) on \(engine.rawValue) always samples greedily; sampler options do not apply."
       )
     }
-    let supportsImages = supportsMLXFeatures && detection.model.modality == .vision
-    guard request.images.isEmpty || supportsImages else {
+    guard request.images.isEmpty || capabilities.supportsImages else {
       throw EdgeCLIError(
         "\(detection.model.displayName) on \(engine.rawValue) takes text only; --image does not apply."
       )
     }
-    guard request.grammar == .auto || supportsMLXFeatures else {
+    guard request.grammar == .auto || capabilities.supportsCustomGrammar else {
       throw EdgeCLIError(
         """
         \(detection.model.displayName) on \(engine.rawValue) only supports `--grammar auto`; its \
@@ -203,7 +241,8 @@ extension EngineRunner {
       supportsSampling: implementation.supportsSampling,
       supportsImages: implementation.supportsImages,
       generation: implementation.generation,
-      modelResetting: implementation.modelResetting
+      modelResetting: implementation.modelResetting,
+      modelWarmingUp: implementation.modelWarmingUp
     )
   }
 
@@ -214,6 +253,17 @@ extension EngineRunner {
         .needle2: { _ in Self.needle2() }
       ])
     }
+    let llamaFactories: [DetectedModel: ModelEngineFactory] = [
+      .qwen3: Self.llamaFactory { try Qwen3LlamaModelEngine(modelPath: $0) },
+      .qwen3P5: Self.llamaFactory { try Qwen3P5LlamaModelEngine(modelPath: $0) },
+      .functionGemma: Self.llamaFactory { try FunctionGemmaLlamaModelEngine(modelPath: $0) },
+      .gemma4: Self.llamaFactory { try Gemma4LlamaModelEngine(modelPath: $0) },
+      .lfm2: Self.llamaFactory { try LFM2P5LlamaModelEngine(modelPath: $0) },
+      .granite: Self.llamaFactory { try GraniteLlamaModelEngine(modelPath: $0) },
+      .graniteMoeHybrid: Self.llamaFactory { try GraniteLlamaModelEngine(modelPath: $0) },
+      .miniCPM5: Self.llamaFactory { try MiniCPM5LlamaModelEngine(modelPath: $0) },
+      .genericLLM: Self.llamaFactory { try Qwen3LlamaModelEngine(modelPath: $0) }
+    ]
     #if canImport(MLX)
       registrations[.qwen3] = ModelRegistration(engines: [
         .mlx: Self.mlxFactory { try await Qwen3MLXModelEngine(from: $0) }
@@ -264,6 +314,11 @@ extension EngineRunner {
         )
       ])
     #endif
+    for (model, factory) in llamaFactories {
+      var engines = registrations[model]?.engines ?? [:]
+      engines[.llama] = factory
+      registrations[model] = ModelRegistration(engines: engines)
+    }
     return registrations
   }()
 
@@ -287,6 +342,66 @@ extension EngineRunner {
           channel: channel
         )
         return try await task.value
+      }
+    )
+  }
+
+  private static func llamaFactory<Profile: LlamaModelProfile>(
+    _ make: @escaping @Sendable (String) throws -> LlamaEngine<Profile>
+  ) -> ModelEngineFactory
+  where
+    Profile.Prompt == EdgeToolsTranscript,
+    Profile.GenerateParameters == DefaultLlamaGenerateParameters,
+    Profile.GrammarEngine == XGrammarEngine
+  {
+    { context in
+      guard let file = context.detection.ggufFile else {
+        throw EdgeCLIError(
+          """
+          No GGUF file in \(context.detection.directory.path()) for the llama engine. Download a \
+          GGUF build of \(context.detection.model.displayName), or pick one with --quant.
+          """
+        )
+      }
+      return Self.llama(engine: try make(file.path()))
+    }
+  }
+
+  private static func llama<Profile: LlamaModelProfile>(
+    engine: LlamaEngine<Profile>
+  ) -> Self
+  where
+    Profile.Prompt == EdgeToolsTranscript,
+    Profile.GenerateParameters == DefaultLlamaGenerateParameters,
+    Profile.GrammarEngine == XGrammarEngine
+  {
+    // Held across generations so multi-turn runs reuse the KV cache; `bench` drops it per run.
+    let cachedContext = Mutex<LlamaContext<Profile>?>(nil)
+    return Self(
+      engine: .llama,
+      supportsCustomGrammar: true,
+      supportsSampling: true,
+      generation: { request, channel in
+        let context = llamaContext(engine: engine, cache: cachedContext, request: request)
+        let task = try engine.generate(
+          prompt: .user(request.user),
+          tools: request.tools,
+          parameters: DefaultLlamaGenerateParameters(
+            sampling: request.sampling,
+            constraint: try request.grammar.constraint(toolCallRange: request.toolCallRange),
+            maxTokens: request.maxTokens
+          ),
+          context: context,
+          channel: channel
+        )
+        return try await task.value
+      },
+      modelResetting: { cachedContext.withLock { $0 = nil } },
+      modelWarmingUp: { request in
+        try engine.warmUp(
+          tools: request.tools,
+          context: llamaContext(engine: engine, cache: cachedContext, request: request)
+        )
       }
     )
   }
@@ -383,6 +498,28 @@ private func needle2System(from string: String) throws -> Needle2System {
         return Needle2System.raw(.init(rawValue: key), value)
       }
   )
+}
+
+private func llamaContext<Profile: LlamaModelProfile>(
+  engine: LlamaEngine<Profile>,
+  cache: borrowing Mutex<LlamaContext<Profile>?>,
+  request: GenerationRequest
+) -> LlamaContext<Profile> {
+  cache.withLock { context in
+    if let context {
+      return context
+    }
+    let created = engine.context(
+      EdgeToolsTranscriptContextParameters(
+        transcript: EdgeToolsTranscript(
+          messages: request.system.isEmpty ? [] : [.system(request.system)]
+        ),
+        reasoningEffort: request.reasoning
+      )
+    )
+    context = created
+    return created
+  }
 }
 
 private func resolvedEngine(

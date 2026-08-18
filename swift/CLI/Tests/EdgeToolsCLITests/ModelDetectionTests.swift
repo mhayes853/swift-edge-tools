@@ -163,6 +163,68 @@ struct `ModelDetection tests` {
       try ModelDetection.detect(in: directory)
     }
   }
+
+  @Test
+  func `Offers The Llama Engine When GGUF Weights Are Present`() throws {
+    let directory = try temporaryModel(
+      configuration: "{\"model_type\": \"qwen3\"}",
+      files: ["Qwen3-0.6B-Q8_0.gguf"]
+    )
+    let detection = try ModelDetection.detect(in: directory)
+
+    expectNoDifference(detection.engines, [.llama])
+    expectNoDifference(detection.ggufFile?.lastPathComponent, "Qwen3-0.6B-Q8_0.gguf")
+  }
+
+  @Test
+  func `Selects The GGUF Matching The Requested Quant`() throws {
+    let directory = try temporaryModel(
+      configuration: "{\"model_type\": \"qwen3\"}",
+      files: ["Qwen3-0.6B-Q8_0.gguf", "Qwen3-0.6B-Q4_K_M.gguf"]
+    )
+    let detection = try ModelDetection.detect(in: directory, quant: "q4_k_m")
+
+    expectNoDifference(detection.ggufFile?.lastPathComponent, "Qwen3-0.6B-Q4_K_M.gguf")
+  }
+
+  @Test
+  func `Throws When Several GGUF Files Are Present Without A Quant`() throws {
+    let directory = try temporaryModel(
+      configuration: "{\"model_type\": \"qwen3\"}",
+      files: ["Qwen3-0.6B-Q8_0.gguf", "Qwen3-0.6B-Q4_K_M.gguf"]
+    )
+
+    #expect(throws: EdgeCLIError.self) {
+      try ModelDetection.detect(in: directory)
+    }
+  }
+
+  @Test
+  func `Throws When No GGUF File Matches The Quant`() throws {
+    let directory = try temporaryModel(
+      configuration: "{\"model_type\": \"qwen3\"}",
+      files: ["Qwen3-0.6B-Q8_0.gguf"]
+    )
+
+    #expect(throws: EdgeCLIError.self) {
+      try ModelDetection.detect(in: directory, quant: "Q2_K")
+    }
+  }
+
+  @Test
+  func `Prefers MLX Over Llama When Both Sets Of Weights Are Present`() throws {
+    let directory = try temporaryModel(
+      configuration: "{\"model_type\": \"qwen3\"}",
+      files: ["model.safetensors", "Qwen3-0.6B-Q8_0.gguf"]
+    )
+    let detection = try ModelDetection.detect(in: directory)
+
+    #if arch(arm64)
+      expectNoDifference(detection.defaultEngine, .mlx)
+    #else
+      expectNoDifference(detection.defaultEngine, .llama)
+    #endif
+  }
 }
 
 private func temporaryModel(

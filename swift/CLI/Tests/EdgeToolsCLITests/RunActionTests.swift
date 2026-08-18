@@ -50,6 +50,50 @@ struct `RunAction tests` {
   }
 
   @Test
+  func `Reports Generation And Probe Confidence As Percentages`() async throws {
+    var metadata = EdgeToolsMetadata()
+    metadata.generationConfidence = 0.8125
+    metadata.probeConfidence = 0.5
+    let report = try await runModel(
+      context: .stub(runner: .stub(metadata: metadata)),
+      source: .test(),
+      request: GenerationRequest(user: "hello")
+    )
+
+    expectNoDifference(report.metrics.generation["generationConfidence"], 81.25)
+    expectNoDifference(report.metrics.generation["probeConfidence"], 50)
+    expectNoDifference(
+      report.displayText(includingResponse: false).contains("Confidence 81.2%  probe 50.0%"),
+      true
+    )
+  }
+
+  @Test
+  func `Omits The Confidence Group When The Engine Scores Nothing`() async throws {
+    let report = try await runModel(
+      context: .stub(runner: .stub()),
+      source: .test(),
+      request: GenerationRequest(user: "hello")
+    )
+
+    expectNoDifference(report.metrics.generation.groups.map(\.label), ["Prefill", "Decode"])
+  }
+
+  @Test
+  func `Omits Probe Confidence When The Model Carries No Probe`() async throws {
+    var metadata = EdgeToolsMetadata()
+    metadata.generationConfidence = 0.5
+    let report = try await runModel(
+      context: .stub(runner: .stub(metadata: metadata)),
+      source: .test(),
+      request: GenerationRequest(user: "hello")
+    )
+
+    expectNoDifference(report.metrics.generation["probeConfidence"], nil)
+    expectNoDifference(report.metrics.generation.groups.map(\.label).contains("Confidence"), true)
+  }
+
+  @Test
   func `Passes The Prompt And Tools Through To The Engine`() async throws {
     let requests = LockedBox<GenerationRequest?>(nil)
     let tools = [

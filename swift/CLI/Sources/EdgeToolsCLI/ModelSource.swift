@@ -11,10 +11,16 @@ public struct ModelSource: Hashable, Sendable {
 
   public var location: Location
   public var cacheDirectory: URL
+  public var quant: String?
 
-  public init(location: Location, cacheDirectory: URL = ModelSource.defaultCacheDirectory) {
+  public init(
+    location: Location,
+    cacheDirectory: URL = ModelSource.defaultCacheDirectory,
+    quant: String? = nil
+  ) {
     self.location = location
     self.cacheDirectory = cacheDirectory
+    self.quant = quant
   }
 
   public static var defaultCacheDirectory: URL {
@@ -32,18 +38,22 @@ extension ModelSource {
   public func resolve(
     onDownloadStart: @Sendable (String) -> Void = { _ in }
   ) async throws -> URL {
-    try await self.resolve(onDownloadStart: onDownloadStart) { repo, revision, cacheDirectory in
+    try await self.resolve(onDownloadStart: onDownloadStart) { repo, revision, cacheDirectory, globs in
       let hub = HubApi(downloadBase: cacheDirectory)
+      guard let globs else {
+        return try await hub.snapshot(from: Hub.Repo(id: repo, type: .models), revision: revision)
+      }
       return try await hub.snapshot(
         from: Hub.Repo(id: repo, type: .models),
-        revision: revision
+        revision: revision,
+        matching: globs
       )
     }
   }
 
   public func resolve(
     onDownloadStart: @Sendable (String) -> Void = { _ in },
-    snapshot: @Sendable (String, String, URL) async throws -> URL
+    snapshot: @Sendable (String, String, URL, [String]?) async throws -> URL
   ) async throws -> URL {
     switch self.location {
     case .filesystem(let url):
@@ -60,7 +70,13 @@ extension ModelSource {
 
     case .huggingFace(let repo, let revision):
       onDownloadStart(repo)
-      return try await snapshot(repo, revision, self.cacheDirectory)
+      return try await snapshot(repo, revision, self.cacheDirectory, self.quantGlobs)
     }
+  }
+
+  /// The download globs narrowing a GGUF repo to one quantization, or nil to fetch everything.
+  public var quantGlobs: [String]? {
+    guard let quant = self.quant else { return nil }
+    return ["*\(quant)*.gguf", "*.json", "*.jinja"]
   }
 }

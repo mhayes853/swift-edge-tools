@@ -26,7 +26,7 @@ extension LoadedModel {
     let directory = try await context.resolveDirectory(source) { repo in
       onWarning("downloading \(repo)...")
     }
-    let detection = try context.detectModel(directory)
+    let detection = try context.detectModel(directory, source.quant)
     let configuration = try EngineRunner.parse(
       request,
       detection: detection,
@@ -38,6 +38,7 @@ extension LoadedModel {
       configuration.engine,
       configuration.hardwareUnit
     )
+    try await runner.warmUp(request)
     return Self(
       detection: detection,
       runner: runner,

@@ -3,4 +3,5 @@
   modality    text
   engines     mlx
               defaults to mlx
+              llama — no weights here
   files       config.json · model.safetensors
