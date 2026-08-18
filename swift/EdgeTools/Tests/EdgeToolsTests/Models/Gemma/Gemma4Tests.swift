@@ -66,6 +66,56 @@ struct `Gemma4 tests` {
 
         withKnownIssue { assertSnapshot(of: generation, as: .dump, record: .all) }
       }
+
+      @Test
+      func `Llama Describes Image Snapshot`() async throws {
+        let engine = try await self.vlmEngine()
+        let response = try await describeRedImage(using: engine)
+
+        withKnownIssue { assertSnapshot(of: response, as: .lines, record: .all) }
+      }
+
+      @Test
+      func `Llama Completes Image Conditioned Tool Turn Snapshot`() async throws {
+        let engine = try await self.vlmEngine()
+        let result = try await completeImageColorTurn(using: engine)
+
+        withKnownIssue { assertSnapshot(of: result, as: .dump, record: .all) }
+      }
+
+      @Test
+      func `Llama Reuses Image Conditioned Prefix`() async throws {
+        let engine = try await self.vlmEngine()
+        let context = engine.context(
+          EdgeToolsTranscriptContextParameters(
+            transcript: EdgeToolsTranscript(messages: [
+              .user("What is the dominant color?", images: [try llamaRedImageAsset()])
+            ])
+          )
+        )
+        _ = try await engine.prefill(context: context)
+        context.transcript.messages.append(.assistant([.text("The dominant color is red.")]))
+        context.transcript.messages.append(.user("Confirm that briefly."))
+
+        let cached = try await engine.prefill(context: context)
+        let fresh = try await engine.prefill(
+          context: engine.context(
+            EdgeToolsTranscriptContextParameters(transcript: context.transcript)
+          )
+        )
+
+        expectNoDifference(cached.metrics.tokens < fresh.metrics.tokens, true)
+      }
+
+      private func vlmEngine() async throws -> Gemma4LlamaModelEngine {
+        let model = try await downloadGGUFMultimodalModel(id: .gemma4E2BHybrid)
+        return try Gemma4LlamaModelEngine(
+          modelPath: model.model.path(),
+          multimodalProjectorPath: model.projector.path(),
+          contextParameters: LlamaContextParameters(maximumSequenceCount: 1),
+          multimodalParameters: LlamaMultimodalParameters(warmUp: false)
+        )
+      }
     }
   #endif
 }

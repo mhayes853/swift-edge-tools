@@ -90,7 +90,8 @@ common_flags=(
   -DLLAMA_BUILD_TOOLS=OFF
   -DLLAMA_BUILD_COMMON=OFF
   -DLLAMA_BUILD_APP=OFF
-  -DLLAMA_BUILD_MTMD=OFF
+  -DLLAMA_BUILD_MTMD=ON
+  -DMTMD_VIDEO=OFF
   -DLLAMA_CURL=OFF
   -DGGML_NATIVE=OFF
   -DGGML_OPENMP=OFF
@@ -106,10 +107,10 @@ apple_flags=(
 configure_flags() {
   case "$1" in
   macos-arm64)
-    echo "${apple_flags[*]} -DCMAKE_OSX_ARCHITECTURES=arm64"
+    echo "${apple_flags[*]} -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0"
     ;;
   macos-x86_64)
-    echo "${apple_flags[*]} -DCMAKE_OSX_ARCHITECTURES=x86_64 -DGGML_METAL=OFF"
+    echo "${apple_flags[*]} -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 -DGGML_METAL=OFF"
     ;;
   ios-arm64)
     echo "${apple_flags[*]} -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=17.0"
@@ -229,6 +230,8 @@ for header in "${headers[@]}"; do
     cp "$checkout/ggml/include/$header" "$bundle/include/$header"
   fi
 done
+cp "$checkout/tools/mtmd/mtmd.h" "$bundle/include/mtmd.h"
+cp "$checkout/tools/mtmd/mtmd-helper.h" "$bundle/include/mtmd-helper.h"
 cp "$script_directory/module.modulemap" "$bundle/include/module.modulemap"
 cp "$checkout/LICENSE" "$bundle/LICENSE"
 

@@ -1,6 +1,10 @@
 #if Llama && canImport(CLlama)
   import CLlama
 
+  #if FoundationEssentials
+    import _EdgeToolsFoundation
+  #endif
+
   // MARK: - LlamaRuntimeError
 
   public struct LlamaRuntimeError: Hashable, Sendable, Error {
@@ -15,6 +19,9 @@
       public static let contextCreationFailed = Self(rawValue: "context-creation-failed")
       public static let tokenizationFailed = Self(rawValue: "tokenization-failed")
       public static let decodeFailed = Self(rawValue: "decode-failed")
+      public static let multimodalProjectorLoadFailed =
+        Self(rawValue: "multimodal-projector-load-failed")
+      public static let multimodalProcessingFailed = Self(rawValue: "multimodal-processing-failed")
       public static let vocabularyUnavailable = Self(rawValue: "vocabulary-unavailable")
     }
 
@@ -57,9 +64,12 @@
 
   // MARK: - LlamaModel
 
-  public final class LlamaModel: @unchecked Sendable {
-    private let raw: OpaquePointer
-    private let vocab: OpaquePointer
+  /// An owned llama.cpp model.
+  ///
+  /// The model is immutable after loading, and llama.cpp permits the model operations used by
+  /// EdgeTools to run concurrently. Non-copyability ensures the handle is destroyed exactly once.
+  public struct LlamaModel: ~Copyable, @unchecked Sendable {
+    public let handle: OpaquePointer
 
     public init(path: String, parameters: LlamaModelParameters = LlamaModelParameters()) throws {
       _ = llamaBackendInitialized
@@ -68,43 +78,83 @@
         parameters.gpuLayerCount == .max ? -1 : Int32(clamping: parameters.gpuLayerCount)
       modelParameters.use_mmap = parameters.useMemoryMapping
       modelParameters.vocab_only = parameters.vocabularyOnly
-      guard let raw = llama_model_load_from_file(path, modelParameters) else {
+      guard let handle = llama_model_load_from_file(path, modelParameters) else {
         throw LlamaRuntimeError(
           code: .modelLoadFailed,
           message: "The model at \(path) could not be loaded."
         )
       }
-      guard let vocab = llama_model_get_vocab(raw) else {
-        llama_model_free(raw)
+      guard llama_model_get_vocab(handle) != nil else {
+        llama_model_free(handle)
         throw LlamaRuntimeError(
           code: .vocabularyUnavailable,
           message: "The model at \(path) does not carry a vocabulary."
         )
       }
-      self.raw = raw
-      self.vocab = vocab
+      self.handle = handle
+    }
+
+    /// Takes ownership of a llama.cpp model handle.
+    public init(handle: consuming OpaquePointer) {
+      self.handle = consume handle
     }
 
     deinit {
-      llama_model_free(self.raw)
+      llama_model_free(self.handle)
     }
 
-    public func withUnsafeModelPointer<R, E: Error>(
-      _ body: (OpaquePointer) throws(E) -> R
-    ) throws(E) -> R {
-      try body(self.raw)
+    public borrowing func chatTemplate(named name: String? = nil) -> String? {
+      let template =
+        if let name {
+          name.withCString { llama_model_chat_template(self.handle, $0) }
+        } else {
+          llama_model_chat_template(self.handle, nil)
+        }
+      return template.map { String(cString: $0) }
     }
 
-    public func withUnsafeVocabPointer<R, E: Error>(
-      _ body: (OpaquePointer) throws(E) -> R
-    ) throws(E) -> R {
-      try body(self.vocab)
+    public borrowing func metadataValue(forKey key: String) -> String? {
+      let length = llama_model_meta_val_str(self.handle, key, nil, 0)
+      guard length > 0 else { return nil }
+      return String(unsafeUninitializedCapacity: Int(length) + 1) { buffer in
+        buffer.withMemoryRebound(to: CChar.self) { characters in
+          Int(
+            llama_model_meta_val_str(
+              self.handle,
+              key,
+              characters.baseAddress,
+              characters.count
+            )
+          )
+        }
+      }
+    }
+  }
+
+  #if FoundationEssentials
+    extension LlamaModel {
+      public init(
+        url: URL,
+        parameters: LlamaModelParameters = LlamaModelParameters()
+      ) throws {
+        try self.init(path: url.path(), parameters: parameters)
+      }
+    }
+  #endif
+
+  // MARK: - LlamaModelBox
+
+  package final class LlamaModelBox: Sendable {
+    package let model: LlamaModel
+
+    package init(model: consuming LlamaModel) {
+      self.model = consume model
     }
   }
 
   // MARK: - LlamaModelMetadata
 
-  public struct LlamaModelMetadata: Sendable {
+  public struct LlamaModelMetadata: ~Copyable, Sendable {
     private let model: LlamaModel
 
     public init(contentsOfGGUF path: String) throws {
@@ -113,8 +163,8 @@
       )
     }
 
-    public init(model: LlamaModel) {
-      self.model = model
+    public init(model: consuming LlamaModel) {
+      self.model = consume model
     }
 
     public var architecture: String? {
@@ -126,23 +176,21 @@
     }
 
     public var chatTemplate: String? {
-      self.model.withUnsafeModelPointer { model in
-        llama_model_chat_template(model, nil).map { String(cString: $0) }
-      }
+      self.model.chatTemplate()
     }
 
     public subscript(key: String) -> String? {
-      self.model.withUnsafeModelPointer { model in
-        let length = llama_model_meta_val_str(model, key, nil, 0)
-        guard length > 0 else { return nil }
-        return String(unsafeUninitializedCapacity: Int(length) + 1) { buffer in
-          buffer.withMemoryRebound(to: CChar.self) { characters in
-            Int(llama_model_meta_val_str(model, key, characters.baseAddress, characters.count))
-          }
-        }
-      }
+      self.model.metadataValue(forKey: key)
     }
   }
+
+  #if FoundationEssentials
+    extension LlamaModelMetadata {
+      public init(contentsOfGGUF url: URL) throws {
+        try self.init(contentsOfGGUF: url.path())
+      }
+    }
+  #endif
 
   // MARK: - Helpers
 

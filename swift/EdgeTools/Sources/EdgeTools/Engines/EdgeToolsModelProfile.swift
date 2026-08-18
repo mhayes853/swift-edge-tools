@@ -42,6 +42,34 @@ public protocol EdgeToolsModelProfile: SendableMetatype {
   ) -> EdgeToolsFusedSamplingParameters?
 }
 
+// MARK: - EdgeToolsMultimodalModelProfile
+
+@nonexhaustive
+public enum EdgeToolsMultimodalContent: Hashable, Sendable {
+  case text(String)
+  case image(EdgeToolsTranscript.Asset)
+  case video(EdgeToolsTranscript.Asset)
+  case audio(EdgeToolsTranscript.Asset)
+}
+
+public protocol EdgeToolsMultimodalModelProfile: EdgeToolsModelProfile
+where Prompt == EdgeToolsTranscript {
+  static func multimodalContent(
+    for message: EdgeToolsTranscript.UserMessage
+  ) -> [EdgeToolsMultimodalContent]
+}
+
+extension EdgeToolsMultimodalModelProfile {
+  public static func multimodalContent(
+    for message: EdgeToolsTranscript.UserMessage
+  ) -> [EdgeToolsMultimodalContent] {
+    message.images.map(EdgeToolsMultimodalContent.image)
+      + message.videos.map(EdgeToolsMultimodalContent.video)
+      + message.audio.map(EdgeToolsMultimodalContent.audio)
+      + [.text(message.content)]
+  }
+}
+
 extension EdgeToolsModelProfile
 where
   GenerateParameters: EdgeToolsConstrainedGenerateParameters,

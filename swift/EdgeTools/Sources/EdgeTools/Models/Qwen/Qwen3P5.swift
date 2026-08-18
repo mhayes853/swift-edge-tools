@@ -128,7 +128,9 @@ import OrderedCollections
 
   // MARK: - Qwen3P5 VLM Model
 
-  public struct Qwen3P5VLMLXProfile: MLXVLMModelProfile {
+  public struct Qwen3P5VLMLXProfile:
+    MLXVLMModelProfile,
+    EdgeToolsMultimodalModelProfile {
     public typealias Prompt = EdgeToolsTranscript
     public typealias GenerationParser = Qwen3P5GenerationParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
@@ -223,10 +225,10 @@ import OrderedCollections
       ) { message in
         switch message {
         case .user(let message):
-          var content: [MLXLMCommon.Message] = message.images.map { _ in ["type": "image"] }
-          content.append(contentsOf: message.videos.map { _ in ["type": "video"] })
-          content.append(["type": "text", "text": message.content])
-          return ["role": "user", "content": content]
+          return [
+            "role": "user",
+            "content": Self.multimodalContent(for: message).map(\.mlxMessage)
+          ]
         case .system, .assistant, .tool:
           return try message.mlxMessage()
         }
@@ -248,6 +250,7 @@ private func qwenXMLToolCalls(in source: String) -> [EdgeRawToolCall] {
     closedBy: QwenXMLToolCalls.parameterCloser,
     orAbortedBy: QwenXMLToolCalls.functionCloser
   ) {
+    // pi-lens-ignore: optional_data_string_conversion
     let payload = String(decoding: payloadData, as: UTF8.self)
     if let call = QwenXMLToolCalls.parse(payload) { calls.append(call) }
   }

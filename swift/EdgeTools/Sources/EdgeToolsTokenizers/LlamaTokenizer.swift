@@ -11,23 +11,30 @@
 
   /// A tokenizer over the GGUF-embedded vocabulary of a loaded llama.cpp model.
   public final class LlamaTokenizer: EdgeToolsTokenizer, Sendable {
-    private let model: LlamaModel
+    package let model: LlamaModelBox
 
     public let eos: EdgeToolsToken?
     public let bos: EdgeToolsToken?
 
-    public init(model: LlamaModel) {
+    public convenience init(model: consuming LlamaModel) {
+      self.init(model: LlamaModelBox(model: consume model))
+    }
+
+    package init(model: LlamaModelBox) {
       self.model = model
-      self.eos = model.withUnsafeVocabPointer { vocab in
-        specialToken(vocab: vocab, tokenId: llama_vocab_eos(vocab))
-      }
-      self.bos = model.withUnsafeVocabPointer { vocab in
-        specialToken(vocab: vocab, tokenId: llama_vocab_bos(vocab))
-      }
+      let vocabularyHandle = llama_model_get_vocab(model.model.handle)!
+      self.eos = specialToken(
+        model: model.model,
+        tokenId: llama_vocab_eos(vocabularyHandle)
+      )
+      self.bos = specialToken(
+        model: model.model,
+        tokenId: llama_vocab_bos(vocabularyHandle)
+      )
     }
 
     public var vocabularySize: Int {
-      self.model.withUnsafeVocabPointer { Int(llama_vocab_n_tokens($0)) }
+      Int(llama_vocab_n_tokens(llama_model_get_vocab(self.model.model.handle)))
     }
 
     public func encode(text: String) -> [EdgeToolsToken] {
@@ -41,57 +48,68 @@
 
     public func decode(tokens: [EdgeToolsToken.ID]) -> String {
       let ids = tokens.map { Int32($0) }
-      return self.model.withUnsafeVocabPointer { vocab in
-        ids.withUnsafeBufferPointer { ids in
-          measuredCString(
-            measure: {
-              llama_detokenize(vocab, ids.baseAddress, Int32(ids.count), nil, 0, false, true)
-            },
-            fill: {
-              llama_detokenize(vocab, ids.baseAddress, Int32(ids.count), $0, Int32($1), false, true)
-            }
-          )
-        }
+      let vocabularyHandle = llama_model_get_vocab(self.model.model.handle)!
+      return ids.withUnsafeBufferPointer { ids in
+        measuredCString(
+          measure: {
+            llama_detokenize(
+              vocabularyHandle,
+              ids.baseAddress,
+              Int32(ids.count),
+              nil,
+              0,
+              false,
+              true
+            )
+          },
+          fill: {
+            llama_detokenize(
+              vocabularyHandle,
+              ids.baseAddress,
+              Int32(ids.count),
+              $0,
+              Int32($1),
+              false,
+              true
+            )
+          }
+        )
       } ?? ""
     }
 
     public func tokens(forIds ids: [EdgeToolsToken.ID]) -> [EdgeToolsToken?] {
-      self.model.withUnsafeVocabPointer { vocab in
-        let vocabularySize = Int(llama_vocab_n_tokens(vocab))
-        return ids.map { id in
-          guard id >= 0 && id < vocabularySize else { return nil }
-          return tokenText(vocab: vocab, tokenId: id)
-            .map { EdgeToolsToken(id: id, stringValue: $0) }
-        }
+      let vocabularyHandle = llama_model_get_vocab(self.model.model.handle)!
+      let vocabularySize = Int(llama_vocab_n_tokens(vocabularyHandle))
+      return ids.map { id in
+        guard id >= 0 && id < vocabularySize else { return nil }
+        return tokenText(model: self.model.model, tokenId: id)
+          .map { EdgeToolsToken(id: id, stringValue: $0) }
       }
     }
 
     public func tokens(forTexts texts: [String]) -> [EdgeToolsToken?] {
-      self.model.withUnsafeVocabPointer { vocab in
-        texts.map { text in
-          guard
-            let ids = try? self.tokenIds(text: text, addSpecialTokens: false),
-            ids.count == 1,
-            let id = ids.first,
-            tokenText(vocab: vocab, tokenId: id) == text
-          else {
-            return nil
-          }
-          return EdgeToolsToken(id: id, stringValue: text)
+      texts.map { text in
+        guard
+          let ids = try? self.tokenIds(text: text, addSpecialTokens: false),
+          ids.count == 1,
+          let id = ids.first,
+          tokenText(model: self.model.model, tokenId: id) == text
+        else {
+          return nil
         }
+        return EdgeToolsToken(id: id, stringValue: text)
       }
     }
 
     /// The token IDs the vocabulary marks as ending a generation, beyond the EOS token.
     public func endOfGenerationTokenIds() -> Set<EdgeToolsToken.ID> {
-      self.model.withUnsafeVocabPointer { vocab in
-        var tokenIds = Set<EdgeToolsToken.ID>()
-        for id in 0..<Int(llama_vocab_n_tokens(vocab))
-        where llama_vocab_is_eog(vocab, Int32(id)) {
-          tokenIds.insert(id)
-        }
-        return tokenIds
+      let vocabularyHandle = llama_model_get_vocab(self.model.model.handle)!
+      var tokenIds = Set<EdgeToolsToken.ID>()
+      for id in 0..<Int(llama_vocab_n_tokens(vocabularyHandle))
+      where llama_vocab_is_eog(vocabularyHandle, Int32(id)) {
+        tokenIds.insert(id)
       }
+      return tokenIds
     }
 
     fileprivate func tokenIds(
@@ -99,35 +117,42 @@
       addSpecialTokens: Bool
     ) throws -> [EdgeToolsToken.ID] {
       let utf8Count = Int32(text.utf8.count)
-      return try self.model.withUnsafeVocabPointer { vocab in
-        try text.withCString { text in
-          let count = -llama_tokenize(vocab, text, utf8Count, nil, 0, addSpecialTokens, true)
-          guard count >= 0 else {
-            throw LlamaRuntimeError(
-              code: .tokenizationFailed,
-              message: "The text could not be tokenized."
-            )
-          }
-          var tokens = [Int32](repeating: 0, count: Int(count))
-          let written = tokens.withUnsafeMutableBufferPointer { tokens in
-            llama_tokenize(
-              vocab,
-              text,
-              utf8Count,
-              tokens.baseAddress,
-              Int32(tokens.count),
-              addSpecialTokens,
-              true
-            )
-          }
-          guard written >= 0 else {
-            throw LlamaRuntimeError(
-              code: .tokenizationFailed,
-              message: "The text could not be tokenized."
-            )
-          }
-          return tokens.prefix(Int(written)).map { EdgeToolsToken.ID($0) }
+      let vocabularyHandle = llama_model_get_vocab(self.model.model.handle)!
+      return try text.withCString { text in
+        let count = -llama_tokenize(
+          vocabularyHandle,
+          text,
+          utf8Count,
+          nil,
+          0,
+          addSpecialTokens,
+          true
+        )
+        guard count >= 0 else {
+          throw LlamaRuntimeError(
+            code: .tokenizationFailed,
+            message: "The text could not be tokenized."
+          )
         }
+        var tokens = [Int32](repeating: 0, count: Int(count))
+        let written = tokens.withUnsafeMutableBufferPointer { tokens in
+          llama_tokenize(
+            vocabularyHandle,
+            text,
+            utf8Count,
+            tokens.baseAddress,
+            Int32(tokens.count),
+            addSpecialTokens,
+            true
+          )
+        }
+        guard written >= 0 else {
+          throw LlamaRuntimeError(
+            code: .tokenizationFailed,
+            message: "The text could not be tokenized."
+          )
+        }
+        return tokens.prefix(Int(written)).map { EdgeToolsToken.ID($0) }
       }
     }
   }
@@ -189,15 +214,7 @@
       }
 
       private func chatTemplate(name: String?) -> String? {
-        self.model.withUnsafeModelPointer { model in
-          let template =
-            if let name {
-              name.withCString { llama_model_chat_template(model, $0) }
-            } else {
-              llama_model_chat_template(model, nil)
-            }
-          return template.map { String(cString: $0) }
-        }
+        self.model.model.chatTemplate(named: name)
       }
     }
   #endif
@@ -214,25 +231,23 @@
         if let eosTokenId = self.eos?.id {
           stopTokenIds.insert(eosTokenId)
         }
-        let (vocabulary, vocabularyType) = try self.model.withUnsafeVocabPointer { vocab in
-          let vocabulary = try (0..<Int(llama_vocab_n_tokens(vocab)))
-            .map { tokenId in
-              guard let text = tokenText(vocab: vocab, tokenId: tokenId) else {
-                throw LlamaRuntimeError(
-                  code: .vocabularyUnavailable,
-                  message: "The vocabulary has no text for token \(tokenId)."
-                )
-              }
-              return text
+        let vocabularyHandle = llama_model_get_vocab(self.model.model.handle)!
+        let vocabulary = try (0..<Int(llama_vocab_n_tokens(vocabularyHandle)))
+          .map { tokenId in
+            guard let text = tokenText(model: self.model.model, tokenId: tokenId) else {
+              throw LlamaRuntimeError(
+                code: .vocabularyUnavailable,
+                message: "The vocabulary has no text for token \(tokenId)."
+              )
             }
-          let vocabularyType: XGRVocabularyType =
-            switch llama_vocab_type(vocab) {
-            case LLAMA_VOCAB_TYPE_SPM: .byteFallback
-            case LLAMA_VOCAB_TYPE_BPE: .byteLevel
-            default: .raw
-            }
-          return (vocabulary, vocabularyType)
-        }
+            return text
+          }
+        let vocabularyType: XGRVocabularyType =
+          switch llama_vocab_type(vocabularyHandle) {
+          case LLAMA_VOCAB_TYPE_SPM: .byteFallback
+          case LLAMA_VOCAB_TYPE_BPE: .byteLevel
+          default: .raw
+          }
         return try XGRTokenizerInfo(
           encodedVocabulary: vocabulary,
           vocabularyType: vocabularyType,
@@ -246,14 +261,22 @@
 
   // MARK: - Helpers
 
-  private func tokenText(vocab: OpaquePointer, tokenId: EdgeToolsToken.ID) -> String? {
-    llama_vocab_get_text(vocab, Int32(tokenId)).map { String(cString: $0) }
+  private func tokenText(
+    model: borrowing LlamaModel,
+    tokenId: EdgeToolsToken.ID
+  ) -> String? {
+    let vocabularyHandle = llama_model_get_vocab(model.handle)!
+    return llama_vocab_get_text(vocabularyHandle, Int32(tokenId)).map { String(cString: $0) }
   }
 
-  private func specialToken(vocab: OpaquePointer, tokenId: Int32) -> EdgeToolsToken? {
+  private func specialToken(
+    model: borrowing LlamaModel,
+    tokenId: Int32
+  ) -> EdgeToolsToken? {
     guard tokenId != -1 else { return nil }
     let id = EdgeToolsToken.ID(tokenId)
-    return tokenText(vocab: vocab, tokenId: id).map { EdgeToolsToken(id: id, stringValue: $0) }
+    return tokenText(model: model, tokenId: id)
+      .map { EdgeToolsToken(id: id, stringValue: $0) }
   }
 
   private func measuredCString(

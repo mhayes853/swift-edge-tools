@@ -242,7 +242,7 @@ private func resolvedGGUFFile(in directory: URL, files: [String], quant: String?
 }
 
 private func detectedGGUFModel(at file: URL) throws -> DetectedModel {
-  let metadata = try LlamaModelMetadata(contentsOfGGUF: file.path())
+  let metadata = try LlamaModelMetadata(contentsOfGGUF: file)
   let architecture = metadata.architecture?.lowercased() ?? ""
   switch architecture {
   case "qwen3": return .qwen3

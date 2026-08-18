@@ -10,7 +10,7 @@
   import MLXNN
   import MLXVLM
 
-  public struct Gemma4MLXProfile: MLXVLMModelProfile {
+  public struct Gemma4MLXProfile: MLXVLMModelProfile, EdgeToolsMultimodalModelProfile {
     public typealias Prompt = EdgeToolsTranscript
     public typealias GenerationParser = Gemma4GenerationParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
@@ -115,9 +115,10 @@
         case .system:
           return try message.mlxMessage()
         case .user(let message):
-          var content: [MLXLMCommon.Message] = message.images.map { _ in ["type": "image"] }
-          content.append(["type": "text", "text": message.content])
-          return ["role": "user", "content": content]
+          return [
+            "role": "user",
+            "content": Gemma4MLXProfile.multimodalContent(for: message).map(\.mlxMessage)
+          ]
         case .assistant, .tool:
           var result = try message.mlxMessage()
           if let text = result["content"] as? String {
@@ -142,7 +143,9 @@
 #endif
 
 #if Llama && XGrammar && canImport(CLlama)
-  public struct Gemma4LlamaProfile: LlamaModelProfile {
+  public struct Gemma4LlamaProfile:
+    LlamaModelProfile,
+    EdgeToolsMultimodalModelProfile {
     public typealias Prompt = EdgeToolsTranscript
     public typealias GenerationParser = Gemma4GenerationParser
     public typealias GenerateParameters = DefaultLlamaGenerateParameters

@@ -1,0 +1,11 @@
+▿ LlamaVLMToolTurnSnapshot
+  - response: "The dominant color of the image is red."
+  ▿ toolCalls: 1 element
+    ▿ EdgeRawToolCall
+      ▿ arguments: EdgeToolsValue
+        ▿ object: 1 key/value pair
+          ▿ (2 elements)
+            - key: "color"
+            ▿ value: EdgeToolsValue
+              - string: "red"
+      - name: "reportColor"

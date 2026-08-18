@@ -79,6 +79,10 @@ import Foundation
 
 #if HuggingFaceTokenizers && Llama && canImport(CLlama)
 
+  private enum GGUFModelDownloadError: Error {
+    case missingMultimodalProjector
+  }
+
   enum GGUFModelID: String {
     case qwen3 = "Qwen/Qwen3-0.6B-GGUF"
     case qwen3P5 = "unsloth/Qwen3.5-0.8B-GGUF"
@@ -101,6 +105,15 @@ import Foundation
       case .graniteMoeHybrid: "granite-4.0-h-350m-Q4_K_M.gguf"
       }
     }
+
+    var multimodalProjectorFile: String? {
+      switch self {
+      case .gemma4E2BHybrid: "mmproj-F16.gguf"
+      case .qwen3, .qwen3P5, .functionGemma, .lfm2P5, .lfm2P5Thinking, .miniCPM5,
+        .graniteMoeHybrid:
+        nil
+      }
+    }
   }
 
   func downloadGGUFModel(id: GGUFModelID) async throws -> URL {
@@ -117,6 +130,30 @@ import Foundation
     let url = try await hub.snapshot(from: repo, matching: [id.file])
     print("=== Finished Downloading GGUF To \(url.path) ===")
     return url.appending(path: id.file)
+  }
+
+  func downloadGGUFMultimodalModel(
+    id: GGUFModelID
+  ) async throws -> (model: URL, projector: URL) {
+    guard let projectorFile = id.multimodalProjectorFile else {
+      throw GGUFModelDownloadError.missingMultimodalProjector
+    }
+    let hub = HubApi(downloadBase: URL.swiftEdgeToolsTestsDirectory)
+    let repo = Hub.Repo(id: id.rawValue, type: .models)
+    let directory = hub.localRepoLocation(repo)
+    let model = directory.appending(path: id.file)
+    let projector = directory.appending(path: projectorFile)
+    if FileManager.default.fileExists(atPath: model.path()),
+      FileManager.default.fileExists(atPath: projector.path())
+    {
+      print("=== GGUF VLM Already Downloaded At \(directory.path) ===")
+      return (model, projector)
+    }
+
+    print("=== Downloading GGUF VLM From \(repo.id) ===")
+    let url = try await hub.snapshot(from: repo, matching: [id.file, projectorFile])
+    print("=== Finished Downloading GGUF VLM To \(url.path) ===")
+    return (url.appending(path: id.file), url.appending(path: projectorFile))
   }
 #endif
 

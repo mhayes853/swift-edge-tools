@@ -1,10 +1,10 @@
 ▿ EdgeToolsEngineGeneration
   ▿ decodeMetrics: EdgeToolsDecodeMetrics
-    ▿ duration: 4.252115417 seconds
-      - _low: 4252115417000000000
+    ▿ duration: 4.162865667 seconds
+      - _low: 4162865667000000000
       - _high: 0
-    ▿ durationToFirstToken: 12.134929625 seconds
-      - _low: 12134929625000000000
+    ▿ durationToFirstToken: 1.005435458 seconds
+      - _low: 1005435458000000000
       - _high: 0
     - tokens: 44
   ▿ metadata: 3 key/value pairs
@@ -144,8 +144,8 @@
     ▿ EdgeToolsGenerationPart
       - text: "2"
   ▿ prefillMetrics: EdgeToolsPrefillMetrics
-    ▿ duration: 0.163079791 seconds
-      - _low: 163079791000000000
+    ▿ duration: 0.152909958 seconds
+      - _low: 152909958000000000
       - _high: 0
     - tokens: 39
   - response: "<|channel>thought\nThe user is asking for the sum of 19 and 23.\n19 + 23 = 42.\nI need to provide the answer briefly.<channel|>42"

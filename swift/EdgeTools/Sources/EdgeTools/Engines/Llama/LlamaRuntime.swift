@@ -15,7 +15,9 @@
 
     public static let f32 = Self(rawValue: 0)
     public static let f16 = Self(rawValue: 1)
+    // pi-lens-ignore: identifier_name
     public static let q4_0 = Self(rawValue: 2)
+    // pi-lens-ignore: identifier_name
     public static let q8_0 = Self(rawValue: 8)
   }
 
@@ -77,10 +79,10 @@
   /// serializes every call through its lock. Keeping it `Sendable` stops region isolation
   /// from tying the pointer to the lock state.
   struct LlamaContextHandle: ~Copyable, @unchecked Sendable {
-    let raw: OpaquePointer
+    let handle: OpaquePointer
 
     deinit {
-      llama_free(self.raw)
+      llama_free(self.handle)
     }
 
     borrowing func decode(
@@ -102,7 +104,7 @@
       if wantsLogits && !tokenIds.isEmpty {
         batch.logits[tokenIds.count - 1] = 1
       }
-      let status = llama_decode(self.raw, batch)
+      let status = llama_decode(self.handle, batch)
       guard status == 0 else {
         throw LlamaRuntimeError(
           code: .decodeFailed,
@@ -112,18 +114,18 @@
     }
 
     borrowing func lastLogits() -> UnsafeMutablePointer<Float>? {
-      llama_get_logits_ith(self.raw, -1)
+      llama_get_logits_ith(self.handle, -1)
     }
 
     borrowing func memoryRemove(sequenceId: Int, from: Int, to: Int) -> Bool {
       llama_memory_seq_rm(
-        llama_get_memory(self.raw), Int32(sequenceId), Int32(from), Int32(to)
+        llama_get_memory(self.handle), Int32(sequenceId), Int32(from), Int32(to)
       )
     }
 
     borrowing func memoryCopy(source: Int, destination: Int, from: Int, to: Int) {
       llama_memory_seq_cp(
-        llama_get_memory(self.raw),
+        llama_get_memory(self.handle),
         Int32(source),
         Int32(destination),
         Int32(from),
@@ -134,19 +136,19 @@
     /// The probe's confidence in the rows accumulated for the sequence, or nil when the
     /// model carries no probe head or the sequence has decoded no scored tokens.
     borrowing func probeConfidence(sequenceId: Int) -> Float? {
-      let confidence = llama_probe_confidence(self.raw, Int32(sequenceId))
+      let confidence = llama_probe_confidence(self.handle, Int32(sequenceId))
       return confidence < 0 ? nil : confidence
     }
 
     borrowing func probeReset(sequenceId: Int) {
-      llama_probe_reset(self.raw, Int32(sequenceId))
+      llama_probe_reset(self.handle, Int32(sequenceId))
     }
   }
 
   // MARK: - LlamaModel + Contexts
 
   extension LlamaModel {
-    func createContext(parameters: LlamaContextParameters) throws -> LlamaContextHandle {
+    borrowing func createContext(parameters: LlamaContextParameters) throws -> LlamaContextHandle {
       var contextParameters = llama_context_default_params()
       contextParameters.n_ctx = UInt32(parameters.contextLength)
       contextParameters.n_seq_max = UInt32(parameters.maximumSequenceCount)
@@ -159,14 +161,13 @@
         llama_flash_attn_type(rawValue: parameters.flashAttention.rawValue)
       contextParameters.type_k = ggml_type(rawValue: UInt32(parameters.keyCacheType.rawValue))
       contextParameters.type_v = ggml_type(rawValue: UInt32(parameters.valueCacheType.rawValue))
-      let context = self.withUnsafeModelPointer { llama_init_from_model($0, contextParameters) }
-      guard let context else {
+      guard let handle = llama_init_from_model(self.handle, contextParameters) else {
         throw LlamaRuntimeError(
           code: .contextCreationFailed,
           message: "A llama context could not be created."
         )
       }
-      return LlamaContextHandle(raw: context)
+      return LlamaContextHandle(handle: handle)
     }
   }
 #endif

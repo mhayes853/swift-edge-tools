@@ -8,11 +8,19 @@
 
   // MARK: - LFM2P5VL Model
 
-  public struct LFM2P5VLMLXProfile: MLXVLMModelProfile {
+  public struct LFM2P5VLMLXProfile:
+    MLXVLMModelProfile,
+    EdgeToolsMultimodalModelProfile {
     public typealias Prompt = EdgeToolsTranscript
     public typealias GenerationParser = LFM2P5GenerationParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarEngine = XGrammarEngine
+
+    public static func multimodalContent(
+      for message: EdgeToolsTranscript.UserMessage
+    ) -> [EdgeToolsMultimodalContent] {
+      [.text(message.content)] + message.images.map(EdgeToolsMultimodalContent.image)
+    }
 
     public static func grammar(
       prompt: EdgeToolsTranscript,
@@ -86,10 +94,10 @@
           return try message.mlxMessage()
         }
         guard !message.images.isEmpty else { return ["role": "user", "content": message.content] }
-
-        var content: [MLXLMCommon.Message] = [["type": "text", "text": message.content]]
-        content.append(contentsOf: message.images.map { _ in ["type": "image"] })
-        return ["role": "user", "content": content]
+        return [
+          "role": "user",
+          "content": LFM2P5VLMLXProfile.multimodalContent(for: message).map(\.mlxMessage)
+        ]
       }
     }
   }
