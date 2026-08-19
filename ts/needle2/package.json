@@ -34,7 +34,7 @@
     "build:types": "tsc --outDir dist/types && rollup --config rollup.types.config.mjs",
     "prepack": "npm run build",
     "test": "npm run build && npm run test:types && vitest run && npm run test:deno && npm run test:bun",
-    "test:types": "tsc --noEmit --skipLibCheck false --module NodeNext --moduleResolution NodeNext --target ES2022 dist/index.d.ts dist/standalone.d.ts && tsc --noEmit --skipLibCheck false --module ESNext --moduleResolution Bundler --target ES2022 --lib ES2022 dist/index.d.ts dist/standalone.d.ts",
+    "test:types": "tsc --noEmit --skipLibCheck false --module NodeNext --moduleResolution NodeNext --target ES2022 dist/index.d.ts dist/standalone.d.ts && tsc --noEmit --skipLibCheck false --module ESNext --moduleResolution Bundler --target ES2022 --lib ES2022 dist/index.d.ts dist/standalone.d.ts && tsc -p tsconfig.test.json",
     "test:bun": "bun test ./tests/runtime-compatibility.ts",
     "test:deno": "deno test --allow-read tests/runtime-compatibility.ts",
     "test:native": "npm run native:build && node --experimental-strip-types --test tests/native-compatibility.ts",

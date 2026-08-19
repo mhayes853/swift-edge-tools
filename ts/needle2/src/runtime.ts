@@ -168,6 +168,54 @@ export type Needle2GenerationResult<
 	Tools extends readonly Needle2AnyTool[] = readonly Needle2ToolDefinition[],
 > = Needle2GenerationSuccess<Tools> | Needle2GenerationFailure<Tools>;
 
+/**
+ * A generation with no tool outputs attached, as returned by `generateRaw` and held
+ * by each loop step. Loop outputs live in the step's `toolResponses`, because a
+ * failed handler contributes an error response rather than an output.
+ */
+export type Needle2RawGeneration<
+	Tools extends readonly Needle2AnyTool[] = readonly Needle2ToolDefinition[],
+> =
+	| (Omit<Needle2GenerationSuccess<Tools>, "functionCalls"> & {
+			functionCalls: Needle2UninvokedToolCall<Tools[number]>[];
+		})
+	| Needle2GenerationFailure<Tools>;
+
+export type Needle2LoopStep<
+	Tools extends readonly Needle2AnyTool[] = readonly Needle2ToolDefinition[],
+> = {
+	generation: Needle2RawGeneration<Tools>;
+	toolResponses: Needle2JSONValue[];
+};
+
+export type Needle2LoopTerminationCause =
+	| "responded"
+	| "refused"
+	| "no-tool-calls"
+	| "maximum-turns-reached"
+	| "failed";
+
+export type Needle2LoopResponse<
+	Tools extends readonly Needle2AnyTool[] = readonly Needle2ToolDefinition[],
+> = {
+	steps: Needle2LoopStep<Tools>[];
+	terminationCause: Needle2LoopTerminationCause;
+};
+
+export type Needle2LoopTurnParameters = {
+	maxTokens?: number;
+	outputCapacity?: number;
+};
+
+export type Needle2LoopOptions<
+	Tools extends readonly Needle2AnyTool[] = readonly Needle2ToolDefinition[],
+> = {
+	prompt: string;
+	initialization: Needle2Initialization<Tools>;
+	maximumTurns?: number;
+	parameters?: (turn: number) => Needle2LoopTurnParameters;
+};
+
 export type Needle2ToolCallFailure = {
 	name: string;
 	index: number;
@@ -225,17 +273,85 @@ export class Needle2Runtime {
 	async generate<const Tools extends readonly Needle2AnyTool[]>(
 		options: Needle2GenerateOptions<Tools>,
 	): Promise<Needle2GenerationResult<Tools>> {
-		const generation = await this.backend.generate(
-			resolveGenerateOptions(options),
-		);
-		const result = parseGenerationResult(
-			generation.json,
-			generation.tokenCount,
-		);
-		return (await invokeTools(
+		const result = await this.generateRaw<readonly Needle2AnyTool[]>(options);
+		return (await attachToolOutputs(
 			result,
 			options.initialization.tools,
 		)) as Needle2GenerationResult<Tools>;
+	}
+
+	/**
+	 * Generates one turn without invoking any tool handlers, leaving the calls for the
+	 * caller to execute and feed back as the next prompt.
+	 */
+	async generateRaw<const Tools extends readonly Needle2AnyTool[]>(
+		options: Needle2GenerateOptions<Tools>,
+	): Promise<Needle2RawGeneration<Tools>> {
+		const generation = await this.backend.generate(
+			resolveGenerateOptions(options),
+		);
+		return parseGenerationResult(
+			generation.json,
+			generation.tokenCount,
+		) as Needle2RawGeneration<Tools>;
+	}
+
+	/**
+	 * Drives the tool loop: each turn's tool responses become the next turn's prompt.
+	 *
+	 * Unlike `generate`, a handler that throws does not end the loop. Its error is fed
+	 * back to the model as that call's response, so the model can recover on the next
+	 * turn, and it stays visible to the caller in the step's `toolResponses`.
+	 */
+	async runLoop<const Tools extends readonly Needle2AnyTool[]>(
+		options: Needle2LoopOptions<Tools>,
+	): Promise<Needle2LoopResponse<Tools>> {
+		const maximumTurns = options.maximumTurns ?? 8;
+		if (
+			!Number.isInteger(maximumTurns) ||
+			maximumTurns < 1 ||
+			maximumTurns > 8
+		) {
+			throw new Needle2Error(
+				"invalid-turns",
+				`Needle 2 supports between 1 and 8 loop turns, but received ${maximumTurns}.`,
+			);
+		}
+
+		const tools = options.initialization.tools;
+		const steps: Needle2LoopStep[] = [];
+		let prompt = options.prompt;
+
+		for (let turn = 0; turn < maximumTurns; turn += 1) {
+			const generation = await this.generateRaw<readonly Needle2AnyTool[]>({
+				prompt,
+				initialization: options.initialization,
+				...options.parameters?.(turn),
+			});
+			if (
+				!generation.success ||
+				generation.type !== "call" ||
+				generation.functionCalls.length === 0
+			) {
+				steps.push({ generation, toolResponses: [] });
+				return {
+					steps,
+					terminationCause: loopTerminationCause(generation),
+				} as Needle2LoopResponse<Tools>;
+			}
+
+			const outcomes = await toolOutcomes(generation.functionCalls, tools);
+			const toolResponses = outcomes.map((outcome, index) =>
+				toolResponse(outcome, generation.functionCalls[index]?.name ?? ""),
+			);
+			steps.push({ generation, toolResponses });
+			prompt = JSON.stringify(toolResponses);
+		}
+
+		return {
+			steps,
+			terminationCause: "maximum-turns-reached",
+		} as Needle2LoopResponse<Tools>;
 	}
 
 	load(weights: Needle2BinarySource): Promise<void> {
@@ -284,17 +400,39 @@ function toolDefinition(tool: Needle2AnyTool): Needle2ToolDefinition {
 	};
 }
 
-async function invokeTools(
-	result: Needle2GenerationResult,
+type ToolOutcome =
+	| { status: "fulfilled"; value: unknown }
+	| { status: "rejected"; reason: unknown }
+	| { status: "unhandled" };
+
+async function toolOutcomes(
+	calls: readonly Needle2FunctionCall[],
 	tools: readonly Needle2AnyTool[],
-): Promise<Needle2GenerationResult> {
+): Promise<ToolOutcome[]> {
 	const handlers = new Map(
 		tools.flatMap((tool) => (tool.call ? [[tool.name, tool.call] as const] : [])),
 	);
+	const settled = await Promise.allSettled(
+		calls.map(async (call) => handlers.get(call.name)?.(call.arguments)),
+	);
+	return settled.map((outcome, index) => {
+		if (outcome.status === "rejected") {
+			return { status: "rejected", reason: outcome.reason };
+		}
+		return handlers.has(calls[index]?.name ?? "")
+			? { status: "fulfilled", value: outcome.value }
+			: { status: "unhandled" };
+	});
+}
+
+async function attachToolOutputs(
+	result: Needle2GenerationResult,
+	tools: readonly Needle2AnyTool[],
+): Promise<Needle2GenerationResult> {
 	if (
 		!result.success ||
-		handlers.size === 0 ||
-		result.functionCalls.length === 0
+		result.functionCalls.length === 0 ||
+		tools.every((tool) => !tool.call)
 	) {
 		return result;
 	}
@@ -308,13 +446,7 @@ async function invokeTools(
 		);
 	}
 
-	// The callback is `async` so that a handler throwing synchronously rejects
-	// alongside the others instead of escaping `map` and orphaning them.
-	const outcomes = await Promise.allSettled(
-		result.functionCalls.map(async (call) =>
-			handlers.get(call.name)?.(call.arguments),
-		),
-	);
+	const outcomes = await toolOutcomes(result.functionCalls, tools);
 	const failures = outcomes.flatMap((outcome, index) =>
 		outcome.status === "rejected"
 			? [
@@ -332,11 +464,41 @@ async function invokeTools(
 
 	const functionCalls = result.functionCalls.map((call, index) => {
 		const outcome = outcomes[index];
-		return handlers.has(call.name) && outcome?.status === "fulfilled"
+		return outcome?.status === "fulfilled"
 			? { ...call, output: outcome.value }
 			: call;
 	}) as Needle2GenerationSuccess["functionCalls"];
 	return { ...result, functionCalls };
+}
+
+function toolResponse(outcome: ToolOutcome, name: string): Needle2JSONValue {
+	if (outcome.status === "fulfilled") {
+		return (outcome.value ?? null) as Needle2JSONValue;
+	}
+	if (outcome.status === "rejected") {
+		return {
+			error:
+				outcome.reason instanceof Error
+					? outcome.reason.message
+					: String(outcome.reason),
+		};
+	}
+	return { error: `unknown tool: ${name}` };
+}
+
+function loopTerminationCause(
+	generation: Needle2GenerationResult,
+): Needle2LoopTerminationCause {
+	if (!generation.success) {
+		return "failed";
+	}
+	if (generation.type === "respond") {
+		return "responded";
+	}
+	if (generation.type === "refuse") {
+		return "refused";
+	}
+	return "no-tool-calls";
 }
 
 function parseGenerationResult(

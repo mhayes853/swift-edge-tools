@@ -232,6 +232,137 @@ test("skips tool invocation entirely for a failed generation", async () => {
 	expect(invocations).toBe(0);
 });
 
+test("leaves tool handlers uninvoked when generating a raw turn", async () => {
+	let invocations = 0;
+	const runtime = await needle2({ provider: "direct" });
+	runtimes.push(runtime);
+
+	const generation = await runtime.generateRaw({
+		prompt: weatherAndEmailPrompt,
+		initialization: {
+			tools: [
+				{
+					...weatherTool,
+					call: () => {
+						invocations += 1;
+						return "sunny";
+					},
+				},
+				{ ...emailTool, call: () => "sent" },
+			],
+		},
+	});
+
+	expect(generation.success).toBe(true);
+	expect(generation.functionCalls.map((call) => call.name)).toEqual([
+		"get_weather",
+		"send_email",
+	]);
+	expect(generation.functionCalls[0]).not.toHaveProperty("output");
+	expect(invocations).toBe(0);
+});
+
+test("drives the tool loop until the model responds", async () => {
+	const runtime = await needle2({ provider: "direct" });
+	runtimes.push(runtime);
+
+	const response = await runtime.runLoop({
+		prompt: weatherAndEmailPrompt,
+		initialization: {
+			tools: [
+				{ ...weatherTool, call: () => ({ celsius: 21, condition: "sunny" }) },
+				{ ...emailTool, call: () => ({ status: "sent" }) },
+			],
+		},
+	});
+
+	expect(response.terminationCause).toBe("responded");
+	expect(response.steps).toHaveLength(2);
+	expect(response.steps[0]?.toolResponses).toEqual([
+		{ celsius: 21, condition: "sunny" },
+		{ status: "sent" },
+	]);
+	expect(response.steps[1]?.generation.functionCalls).toEqual([]);
+	expect(response.steps[1]?.toolResponses).toEqual([]);
+});
+
+test("feeds a failed tool handler back to the model instead of throwing", async () => {
+	const runtime = await needle2({ provider: "direct" });
+	runtimes.push(runtime);
+
+	const response = await runtime.runLoop({
+		prompt: weatherAndEmailPrompt,
+		initialization: {
+			tools: [
+				{
+					...weatherTool,
+					call: () => {
+						throw new Error("the weather station is down");
+					},
+				},
+				{ ...emailTool, call: () => ({ status: "sent" }) },
+			],
+		},
+	});
+
+	expect(response.steps[0]?.toolResponses).toEqual([
+		{ error: "the weather station is down" },
+		{ status: "sent" },
+	]);
+	expect(response.steps.length).toBeGreaterThan(1);
+});
+
+test("feeds an unknown tool error back for a tool declared without a handler", async () => {
+	const runtime = await needle2({ provider: "direct" });
+	runtimes.push(runtime);
+
+	const response = await runtime.runLoop({
+		prompt: weatherAndEmailPrompt,
+		initialization: {
+			tools: [{ ...weatherTool, call: () => ({ celsius: 21 }) }, emailTool],
+		},
+	});
+
+	expect(response.steps[0]?.toolResponses).toEqual([
+		{ celsius: 21 },
+		{ error: "unknown tool: send_email" },
+	]);
+});
+
+test("stops the loop once it runs out of turns", async () => {
+	const runtime = await needle2({ provider: "direct" });
+	runtimes.push(runtime);
+
+	const response = await runtime.runLoop({
+		prompt: weatherAndEmailPrompt,
+		maximumTurns: 1,
+		initialization: {
+			tools: [
+				{ ...weatherTool, call: () => ({ celsius: 21 }) },
+				{ ...emailTool, call: () => ({ status: "sent" }) },
+			],
+		},
+	});
+
+	expect(response.terminationCause).toBe("maximum-turns-reached");
+	expect(response.steps).toHaveLength(1);
+});
+
+test("rejects a turn count Needle 2 cannot support", async () => {
+	const runtime = await needle2({ provider: "direct" });
+	runtimes.push(runtime);
+
+	await expect(
+		runtime.runLoop({
+			prompt: weatherAndEmailPrompt,
+			maximumTurns: 9,
+			initialization: {
+				tools: [{ ...weatherTool, call: () => ({ celsius: 21 }) }],
+			},
+		}),
+	).rejects.toMatchObject({ code: "invalid-turns" });
+});
+
 test("shares one direct model and requires reset between active runtimes", async () => {
 	const thermostat = await needle2({ provider: "direct" });
 	const weather = await needle2({ provider: "direct" });
