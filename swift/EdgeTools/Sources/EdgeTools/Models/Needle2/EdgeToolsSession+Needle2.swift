@@ -41,6 +41,12 @@
     case maximumTurnsReached
   }
 
+  // MARK: - Needle2LoopError
+
+  public enum Needle2LoopError: Error, Hashable, Sendable {
+    case unsupportedTurnCount(Int)
+  }
+
   // MARK: - Loop
 
   extension EdgeToolsSession where Engine: Needle2SessionEngine {
@@ -52,10 +58,9 @@
       parameters: @escaping @Sendable (Int) -> Engine.GenerateParameters = { _ in .default },
       shouldInvokeTools: @escaping @Sendable (AnyEdgeToolCall) -> Bool = { _ in true }
     ) async throws -> Needle2LoopResponse {
-      precondition(
-        (1...8).contains(maximumTurns),
-        "Needle 2 supports between 1 and 8 loop turns."
-      )
+      guard (1...8).contains(maximumTurns) else {
+        throw Needle2LoopError.unsupportedTurnCount(maximumTurns)
+      }
 
       let context = self.resolveContext(context)
       var prompt = Needle2Prompt.user(prompt)
@@ -69,7 +74,7 @@
           shouldInvokeTools: shouldInvokeTools
         )
         guard generation.engineGeneration.metadata.needle2ResponseType == "call",
-          !generation.toolCalls.isEmpty
+          !generation.toolCallOutcomes.isEmpty
         else {
           steps.append(Needle2LoopStep(generation: generation, toolResponses: []))
           return Needle2LoopResponse(
@@ -78,7 +83,8 @@
           )
         }
 
-        let toolResponses = try await agentToolResponses(for: generation.toolCalls).map(\.response)
+        let toolResponses = await agentToolResponses(for: generation.toolCallOutcomes)
+          .map(\.response)
         steps.append(Needle2LoopStep(generation: generation, toolResponses: toolResponses))
         guard turn < maximumTurns - 1 else {
           return Needle2LoopResponse(
