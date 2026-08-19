@@ -1,5 +1,6 @@
 #if Llama && canImport(CLlama)
   import EdgeToolsCore
+  import EdgeToolsLlama
 
   // MARK: - LlamaEvaluationOutput
 

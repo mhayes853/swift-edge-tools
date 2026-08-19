@@ -20,6 +20,7 @@ let package = Package(
   platforms: [.macOS(.v14), .iOS(.v17), .tvOS(.v17), .watchOS(.v10), .visionOS(.v1)],
   products: [
     .library(name: "EdgeTools", targets: ["EdgeTools"]),
+    .library(name: "EdgeToolsLlama", targets: ["EdgeToolsLlama"]),
     .library(name: "EdgeToolsTokenizers", targets: ["EdgeToolsTokenizers"]),
     .library(name: "EdgeToolsXGrammar", targets: ["EdgeToolsXGrammar"])
   ],
@@ -134,6 +135,10 @@ let package = Package(
           condition: .when(platforms: [.macOS], traits: ["MLX"])
         ),
         .target(name: "EdgeToolsCore"),
+        .target(
+          name: "EdgeToolsLlama",
+          condition: .when(platforms: [.macOS, .iOS], traits: ["Llama"])
+        ),
         .target(name: "EdgeToolsTokenizers"),
         .target(name: "EdgeToolsXGrammar", condition: .when(traits: ["XGrammar"])),
         .target(
@@ -171,6 +176,24 @@ let package = Package(
       path: "swift/EdgeTools/Sources/_EdgeToolsFoundation"
     ),
     .target(
+      name: "EdgeToolsLlama",
+      dependencies: [
+        .target(
+          name: "_EdgeToolsFoundation",
+          condition: .when(traits: ["FoundationEssentials"])
+        ),
+        .target(name: "CLlama", condition: .when(platforms: [.macOS, .iOS]))
+      ],
+      path: "swift/EdgeTools/Sources/EdgeToolsLlama",
+      swiftSettings: edgeToolsSwiftSettings,
+      linkerSettings: [
+        .linkedFramework("Metal", .when(platforms: [.macOS, .iOS])),
+        .linkedFramework("MetalKit", .when(platforms: [.macOS, .iOS])),
+        .linkedFramework("Accelerate", .when(platforms: [.macOS, .iOS])),
+        .linkedLibrary("c++", .when(platforms: [.macOS, .iOS]))
+      ]
+    ),
+    .target(
       name: "EdgeToolsCore",
       dependencies: [
         .target(
@@ -178,20 +201,10 @@ let package = Package(
           condition: .when(traits: ["FoundationEssentials"])
         ),
         .product(name: "yyjson", package: "yyjson"),
-        .product(name: "OrderedCollections", package: "swift-collections"),
-        .target(
-          name: "CLlama",
-          condition: .when(platforms: [.macOS, .iOS], traits: ["Llama"])
-        )
+        .product(name: "OrderedCollections", package: "swift-collections")
       ],
       path: "swift/EdgeTools/Sources/EdgeToolsCore",
-      swiftSettings: edgeToolsSwiftSettings,
-      linkerSettings: [
-        .linkedFramework("Metal", .when(platforms: [.macOS, .iOS], traits: ["Llama"])),
-        .linkedFramework("MetalKit", .when(platforms: [.macOS, .iOS], traits: ["Llama"])),
-        .linkedFramework("Accelerate", .when(platforms: [.macOS, .iOS], traits: ["Llama"])),
-        .linkedLibrary("c++", .when(platforms: [.macOS, .iOS], traits: ["Llama"]))
-      ]
+      swiftSettings: edgeToolsSwiftSettings
     ),
     .target(
       name: "EdgeToolsTokenizers",
@@ -202,6 +215,10 @@ let package = Package(
           condition: .when(traits: ["FoundationEssentials"])
         ),
         .product(name: "OrderedCollections", package: "swift-collections"),
+        .target(
+          name: "EdgeToolsLlama",
+          condition: .when(platforms: [.macOS, .iOS], traits: ["Llama"])
+        ),
         .target(name: "EdgeToolsXGrammar", condition: .when(traits: ["XGrammar"])),
         .target(
           name: "CTokenizers",
@@ -314,6 +331,14 @@ let package = Package(
         "EdgeToolsMacros", .product(name: "MacroTesting", package: "swift-macro-testing")
       ],
       path: "swift/EdgeTools/Tests/EdgeToolsMacrosTests"
+    ),
+    .testTarget(
+      name: "EdgeToolsLlamaTests",
+      dependencies: [
+        "EdgeToolsLlama",
+        .product(name: "CustomDump", package: "swift-custom-dump")
+      ],
+      path: "swift/EdgeTools/Tests/EdgeToolsLlamaTests"
     ),
     .testTarget(
       name: "EdgeToolsTokenizersTests",
