@@ -75,6 +75,163 @@ test("returns the native error response for truncated generation", async () => {
 	expect(result.errorCode).toBe("truncated");
 });
 
+// `as const` keeps the literal tool names when these are spread into a tool with a
+// handler, which is what drives the per-tool typing of `output`.
+const weatherTool = {
+	name: "get_weather",
+	description: "Get the current weather for a city.",
+	parameters: {
+		type: "object",
+		properties: { city: { type: "string" } },
+		required: ["city"],
+	},
+} as const;
+
+const emailTool = {
+	name: "send_email",
+	description: "Sends an email to a recipient with an email address.",
+	parameters: {
+		type: "object",
+		properties: {
+			address: { type: "string" },
+			subject: { type: "string" },
+			body: { type: "string" },
+		},
+		required: ["address", "subject", "body"],
+	},
+} as const;
+
+const weatherAndEmailPrompt =
+	"What's the weather in Paris, and email blob@gmail.com about it?";
+
+test("invokes tool handlers in parallel and attaches their outputs", async () => {
+	const runtime = await needle2({ provider: "direct" });
+	runtimes.push(runtime);
+
+	// The first handler only settles once the second has started, so a sequential
+	// implementation deadlocks rather than quietly passing.
+	let startSecond!: () => void;
+	const second = new Promise<void>((resolve) => {
+		startSecond = resolve;
+	});
+
+	const result = await runtime.generate({
+		prompt: weatherAndEmailPrompt,
+		initialization: {
+			tools: [
+				{
+					...weatherTool,
+					call: async (args: { city: string }) => {
+						await second;
+						return { celsius: 21, city: args.city };
+					},
+				},
+				{
+					...emailTool,
+					call: (args: { address: string }) => {
+						startSecond();
+						return `sent to ${args.address}`;
+					},
+				},
+			],
+		},
+	});
+
+	expect(result.success).toBe(true);
+	if (!result.success) {
+		throw new Error("Expected Needle 2 to call both tools.");
+	}
+	expect(result.functionCalls.map((call) => call.name)).toEqual([
+		"get_weather",
+		"send_email",
+	]);
+	expect(result.functionCalls[0]?.output).toEqual({
+		celsius: 21,
+		city: "Paris",
+	});
+	expect(result.functionCalls[1]?.output).toBe("sent to blob@gmail.com");
+});
+
+test("leaves tools declared without a handler uninvoked", async () => {
+	const runtime = await needle2({ provider: "direct" });
+	runtimes.push(runtime);
+
+	const result = await runtime.generate({
+		prompt: weatherAndEmailPrompt,
+		initialization: {
+			tools: [
+				{ ...weatherTool, call: () => "sunny" },
+				emailTool,
+			],
+		},
+	});
+
+	expect(result.success).toBe(true);
+	if (!result.success) {
+		throw new Error("Expected Needle 2 to call both tools.");
+	}
+	expect(result.functionCalls[0]).toMatchObject({
+		name: "get_weather",
+		output: "sunny",
+	});
+	expect(result.functionCalls[1]).not.toHaveProperty("output");
+});
+
+test("reports every failed tool handler without losing the generation", async () => {
+	const runtime = await needle2({ provider: "direct" });
+	runtimes.push(runtime);
+
+	const failure = await runtime
+		.generate({
+			prompt: weatherAndEmailPrompt,
+			initialization: {
+				tools: [
+					{
+						...weatherTool,
+						call: () => {
+							throw new Error("the weather station is down");
+						},
+					},
+					{ ...emailTool, call: () => "sent" },
+				],
+			},
+		})
+		.catch((error: unknown) => error);
+
+	expect(failure).toMatchObject({
+		code: "tool-call-failed",
+		failures: [{ name: "get_weather", index: 0 }],
+		generation: { success: true, type: "call" },
+	});
+});
+
+test("skips tool invocation entirely for a failed generation", async () => {
+	let invocations = 0;
+	const runtime = await needle2({ provider: "direct" });
+	runtimes.push(runtime);
+
+	const result = await runtime.generate({
+		prompt: weatherAndEmailPrompt,
+		maxTokens: 4,
+		initialization: {
+			tools: [
+				{
+					...weatherTool,
+					call: () => {
+						invocations += 1;
+						return "sunny";
+					},
+				},
+				emailTool,
+			],
+		},
+	});
+
+	expect(result.success).toBe(false);
+	expect(result.functionCalls).toEqual([]);
+	expect(invocations).toBe(0);
+});
+
 test("shares one direct model and requires reset between active runtimes", async () => {
 	const thermostat = await needle2({ provider: "direct" });
 	const weather = await needle2({ provider: "direct" });
@@ -130,6 +287,41 @@ describe.each([
 				prefillTokensPerSecond: expect.any(Number),
 				decodeTokensPerSecond: expect.any(Number),
 			},
+		});
+	});
+
+	test("invokes tool handlers across the provider boundary", async () => {
+		const runtime = await needle2({ provider });
+		runtimes.push(runtime);
+
+		const result = await runtime.generate({
+			prompt: "set the thermostat to 21 degrees",
+			initialization: {
+				tools: [
+					{
+						name: "set_thermostat",
+						description: "Set the thermostat temperature.",
+						parameters: {
+							type: "object",
+							properties: { temperature: { type: "integer" } },
+							required: ["temperature"],
+						},
+						call: async (args: { temperature: number }) => ({
+							status: "ok" as const,
+							temperature: args.temperature,
+						}),
+					},
+				],
+			},
+		});
+
+		expect(result.success).toBe(true);
+		if (!result.success) {
+			throw new Error("Expected Needle 2 to call the thermostat tool.");
+		}
+		expect(result.functionCalls[0]?.output).toEqual({
+			status: "ok",
+			temperature: 21,
 		});
 	});
 

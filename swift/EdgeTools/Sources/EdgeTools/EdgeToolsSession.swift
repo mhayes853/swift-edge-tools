@@ -71,7 +71,7 @@ public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable {
     }
   }
 
-  fileprivate func resolveContext(_ context: Engine.Context?) -> Engine.Context {
+  package func resolveContext(_ context: Engine.Context?) -> Engine.Context {
     context ?? self.context()
   }
 }
@@ -239,93 +239,6 @@ where
     throw EdgeToolsAgentError.maximumTurnsExceeded(maximumTurns!)
   }
 }
-
-#if Needle2
-  // MARK: - Needle 2 Loops
-
-  public struct Needle2LoopResponse: Sendable {
-    public let steps: [Needle2LoopStep]
-    public let terminationCause: Needle2LoopTerminationCause
-
-    public init(
-      steps: [Needle2LoopStep],
-      terminationCause: Needle2LoopTerminationCause
-    ) {
-      self.steps = steps
-      self.terminationCause = terminationCause
-    }
-  }
-
-  public struct Needle2LoopStep: Sendable {
-    public let generation: EdgeToolsSessionGeneration
-    public let toolResponses: [EdgeToolsValue]
-
-    public init(
-      generation: EdgeToolsSessionGeneration,
-      toolResponses: [EdgeToolsValue]
-    ) {
-      self.generation = generation
-      self.toolResponses = toolResponses
-    }
-  }
-
-  public enum Needle2LoopTerminationCause: Hashable, Sendable {
-    case responded
-    case refused
-    case noToolCalls
-    case maximumTurnsReached
-  }
-
-  extension EdgeToolsSession where Engine: Needle2SessionEngine {
-    @concurrent
-    public func runLoop(
-      prompt: String,
-      context: Engine.Context? = nil,
-      maximumTurns: Int = 8,
-      parameters: @escaping @Sendable (Int) -> Engine.GenerateParameters = { _ in .default },
-      shouldInvokeTools: @escaping @Sendable (AnyEdgeToolCall) -> Bool = { _ in true }
-    ) async throws -> Needle2LoopResponse {
-      precondition(
-        (1...8).contains(maximumTurns),
-        "Needle 2 supports between 1 and 8 loop turns."
-      )
-
-      let context = self.resolveContext(context)
-      var prompt = Needle2Prompt.user(prompt)
-      var steps = [Needle2LoopStep]()
-
-      for turn in 0..<maximumTurns {
-        let generation = try await self.generate(
-          prompt: prompt,
-          context: context,
-          parameters: parameters(turn),
-          shouldInvokeTools: shouldInvokeTools
-        )
-        guard generation.engineGeneration.metadata.needle2ResponseType == "call",
-          !generation.toolCalls.isEmpty
-        else {
-          steps.append(Needle2LoopStep(generation: generation, toolResponses: []))
-          return Needle2LoopResponse(
-            steps: steps,
-            terminationCause: needle2LoopTerminationCause(for: generation)
-          )
-        }
-
-        let toolResponses = try await agentToolResponses(for: generation.toolCalls).map(\.response)
-        steps.append(Needle2LoopStep(generation: generation, toolResponses: toolResponses))
-        guard turn < maximumTurns - 1 else {
-          return Needle2LoopResponse(
-            steps: steps,
-            terminationCause: .maximumTurnsReached
-          )
-        }
-        prompt = .toolResponses(toolResponses)
-      }
-
-      fatalError("Needle 2 loop ended without a termination cause.")
-    }
-  }
-#endif
 
 // MARK: - EdgeToolsSessionTool
 
@@ -1052,7 +965,7 @@ package func duplicateToolNameError(_ names: some Sequence<String>) -> String? {
     .joined(separator: "\n")
 }
 
-private func agentToolResponses(
+package func agentToolResponses(
   for toolCalls: EdgeToolCallCollection
 ) async throws -> [EdgeToolsTranscript.ToolMessage] {
   try await withThrowingTaskGroup(of: (Int, EdgeToolsTranscript.ToolMessage).self) { group in
@@ -1075,15 +988,3 @@ private func agentToolResponses(
     return responses.compactMap { $0 }
   }
 }
-
-#if Needle2
-  private func needle2LoopTerminationCause(
-    for generation: EdgeToolsSessionGeneration
-  ) -> Needle2LoopTerminationCause {
-    switch generation.engineGeneration.metadata.needle2ResponseType {
-    case "respond": .responded
-    case "refuse": .refused
-    default: .noToolCalls
-    }
-  }
-#endif
