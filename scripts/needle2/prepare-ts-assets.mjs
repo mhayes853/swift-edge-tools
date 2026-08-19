@@ -3,7 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const revision = "17a803d95928ba33d3e9a0160e024d9565b5c3f2";
+const revision = "b7ce80e07a8c76fb30a3a78db1e4aea7d72198da";
 const repository = `https://huggingface.co/Cactus-Compute/needle2/resolve/${revision}`;
 const checksums = {
   "wasm/needle.js":

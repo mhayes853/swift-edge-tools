@@ -278,7 +278,7 @@ let package = Package(
     ),
     .binaryTarget(
       name: "CNeedle2",
-      path: "bin/needle2-2.0.1.artifactbundle.zip"
+      path: "bin/needle2-2.0.2.artifactbundle.zip"
     ),
     .binaryTarget(
       name: "CLlama",

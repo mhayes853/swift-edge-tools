@@ -28,12 +28,12 @@ test("an ordinary HTML page runs with one standalone JavaScript file", async () 
 });
 
 function createStandaloneServer(): Server {
-  const files = new Map([
+  const files = new Map<string, readonly [string, string]>([
     ["/", ["tests/standalone/index.html", "text/html; charset=utf-8"]],
     ["/needle2.min.js", ["dist/needle2.min.js", "text/javascript; charset=utf-8"]],
     ["/needle.wasm", ["dist/needle.wasm", "application/wasm"]],
     ["/needle2.cact", ["dist/needle2.cact", "application/octet-stream"]]
-  ] as const);
+  ]);
   return createServer(async (request, response) => {
     const file = files.get(request.url ?? "");
     if (!file) {

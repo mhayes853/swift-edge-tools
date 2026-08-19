@@ -39,7 +39,16 @@ public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable {
   #if !$Embedded
     public init(engine: sending Engine, tools: [any EdgeTool]) {
       self.engine = engine
-      self._tools = Lock(tools.map { EdgeToolsSessionTool($0) })
+      self._tools = Lock(
+        tools.map { tool in
+          EdgeToolsSessionTool(tool) { output in
+            guard let value = output as? any ConvertibleToEdgeToolsValue else {
+              throw EdgeToolsAgentError.invalidToolOutput(tool.name)
+            }
+            return value.edgeToolsValue
+          }
+        }
+      )
     }
   #endif
 
@@ -71,7 +80,7 @@ public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable {
     }
   }
 
-  fileprivate func resolveContext(_ context: Engine.Context?) -> Engine.Context {
+  package func resolveContext(_ context: Engine.Context?) -> Engine.Context {
     context ?? self.context()
   }
 }
@@ -232,7 +241,7 @@ where
         )
       }
 
-      prompt = .tools(try await agentToolResponses(for: generation.toolCalls))
+      prompt = .tools(await agentToolResponses(for: generation.toolCallOutcomes))
       index += 1
     }
 
@@ -337,11 +346,39 @@ public enum EdgeToolsToolBuilder {
   }
 }
 
+// MARK: - EdgeToolCallOutcome
+
+public enum EdgeToolCallOutcome: Sendable {
+  case resolved(AnyEdgeToolCall)
+  case unknownTool(EdgeRawToolCall)
+  case invalidArguments(EdgeRawToolCall)
+
+  public var call: AnyEdgeToolCall? {
+    switch self {
+    case .resolved(let call): call
+    case .unknownTool, .invalidArguments: nil
+    }
+  }
+
+  public var rawValue: EdgeRawToolCall {
+    switch self {
+    case .resolved(let call): call.rawValue
+    case .unknownTool(let rawCall), .invalidArguments(let rawCall): rawCall
+    }
+  }
+
+  public var name: String {
+    self.rawValue.name
+  }
+}
+
 // MARK: - Generation
 
 public struct EdgeToolsSessionGeneration: Sendable {
   public let engineGeneration: EdgeToolsEngineGeneration
   public let toolCalls: EdgeToolCallCollection
+
+  public let toolCallOutcomes: [EdgeToolCallOutcome]
 
   public var response: String {
     self.engineGeneration.response
@@ -384,7 +421,7 @@ public final class EdgeToolsSessionStream: Sendable, Identifiable {
     var result: Result<EdgeToolsSessionGeneration, any Error>?
     var wasStoppedBeforeGeneration = false
     var stop: (@Sendable () -> Void)?
-    var toolCalls = EdgeToolCallCollection()
+    var toolCallOutcomes = [EdgeToolCallOutcome]()
     var events = [Event]()
     var eventSubscribers = [Int: @Sendable (Event) -> Void]()
     var onFinish: (@Sendable () -> Void)?
@@ -406,7 +443,12 @@ public final class EdgeToolsSessionStream: Sendable, Identifiable {
 
   public var toolCalls: EdgeToolCallCollection {
     self.access(.toolCalls)
-    return self.state.withLock { $0.toolCalls }
+    return self.state.withLock { EdgeToolCallCollection($0.toolCallOutcomes.compactMap(\.call)) }
+  }
+
+  public var toolCallOutcomes: [EdgeToolCallOutcome] {
+    self.access(.toolCalls)
+    return self.state.withLock { $0.toolCallOutcomes }
   }
 
   public var result: Result<EdgeToolsSessionGeneration, any Error>? {
@@ -646,7 +688,8 @@ extension EdgeToolsSessionStream {
     if wasStopped {
       let generation = EdgeToolsSessionGeneration(
         engineGeneration: .empty,
-        toolCalls: EdgeToolCallCollection()
+        toolCalls: EdgeToolCallCollection(),
+        toolCallOutcomes: []
       )
       self.finish(with: .success(generation))
       return generation
@@ -674,7 +717,8 @@ extension EdgeToolsSessionStream {
       try Task.checkCancellation()
       let generation = EdgeToolsSessionGeneration(
         engineGeneration: engineGeneration,
-        toolCalls: self.toolCalls
+        toolCalls: self.toolCalls,
+        toolCallOutcomes: self.toolCallOutcomes
       )
       self.finish(with: .success(generation))
       return generation
@@ -696,15 +740,16 @@ extension EdgeToolsSessionStream {
   }
 
   private func emit(rawCall: EdgeRawToolCall) {
-    guard let call = self.resolve(rawCall) else { return }
+    let outcome = self.resolve(rawCall)
     self.withMutation(of: .toolCalls) {
       self.state.withLock { state in
-        state.toolCalls.append(call)
+        state.toolCallOutcomes.append(outcome)
       }
     }
-    if self.shouldInvokeTools(call) {
-      _ = Task { _ = try await call.output }
+    guard let call = outcome.call, self.shouldInvokeTools(call) else {
+      return
     }
+    _ = Task { _ = try await call.output }
   }
 
   private func emit(part: EdgeToolsGenerationPart) {
@@ -741,9 +786,14 @@ extension EdgeToolsSessionStream {
     }
   }
 
-  private func resolve(_ rawCall: EdgeRawToolCall) -> AnyEdgeToolCall? {
-    self.toolsByName[rawCall.name.snakeCased()]?
-      .call(id: EdgeToolCallID(), rawInput: rawCall.arguments)
+  private func resolve(_ rawCall: EdgeRawToolCall) -> EdgeToolCallOutcome {
+    guard let tool = self.toolsByName[rawCall.name.snakeCased()] else {
+      return .unknownTool(rawCall)
+    }
+    guard let call = tool.call(id: EdgeToolCallID(), rawInput: rawCall.arguments) else {
+      return .invalidArguments(rawCall)
+    }
+    return .resolved(call)
   }
 }
 
@@ -965,26 +1015,48 @@ package func duplicateToolNameError(_ names: some Sequence<String>) -> String? {
     .joined(separator: "\n")
 }
 
-private func agentToolResponses(
-  for toolCalls: EdgeToolCallCollection
-) async throws -> [EdgeToolsTranscript.ToolMessage] {
-  try await withThrowingTaskGroup(of: (Int, EdgeToolsTranscript.ToolMessage).self) { group in
-    for (index, toolCall) in toolCalls.enumerated() {
+package func agentToolResponses(
+  for outcomes: [EdgeToolCallOutcome]
+) async -> [EdgeToolsTranscript.ToolMessage] {
+  await withTaskGroup(of: (Int, EdgeToolsTranscript.ToolMessage).self) { group in
+    for (index, outcome) in outcomes.enumerated() {
       group.addTask {
-        guard let value = try await toolCall.outputValue() else {
-          throw EdgeToolsAgentError.invalidToolOutput(toolCall.tool.name)
-        }
-        return (index, EdgeToolsTranscript.ToolMessage(name: toolCall.tool.name, response: value))
+        let response = await outcome.response()
+        return (index, EdgeToolsTranscript.ToolMessage(name: outcome.name, response: response))
       }
     }
 
     var responses = Array<EdgeToolsTranscript.ToolMessage?>(
       repeating: nil,
-      count: toolCalls.count
+      count: outcomes.count
     )
-    while let result = try await group.next() {
-      responses[result.0] = result.1
+    for await (index, response) in group {
+      responses[index] = response
     }
     return responses.compactMap { $0 }
   }
+}
+
+extension EdgeToolCallOutcome {
+  fileprivate func response() async -> EdgeToolsValue {
+    switch self {
+    case .unknownTool:
+      return edgeToolErrorResponse("unknown tool: \(self.name)")
+    case .invalidArguments:
+      return edgeToolErrorResponse("invalid arguments for tool: \(self.name)")
+    case .resolved(let call):
+      do {
+        guard let value = try await call.outputValue() else {
+          return edgeToolErrorResponse("unencodable output from tool: \(self.name)")
+        }
+        return value
+      } catch {
+        return edgeToolErrorResponse(String(describing: error))
+      }
+    }
+  }
+}
+
+private func edgeToolErrorResponse(_ message: String) -> EdgeToolsValue {
+  .object(["error": .string(message)])
 }

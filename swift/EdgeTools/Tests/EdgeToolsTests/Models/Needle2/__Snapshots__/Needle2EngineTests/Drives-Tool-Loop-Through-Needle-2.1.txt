@@ -1,0 +1,4 @@
+▿ Optional<Array<EdgeToolsGenerationPart>>
+  ▿ some: 1 element
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "Email sent. Confirm."

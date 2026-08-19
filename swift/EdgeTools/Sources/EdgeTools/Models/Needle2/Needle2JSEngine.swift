@@ -45,11 +45,12 @@
   public final class Needle2JSEngine: EdgeToolsEngine {
     public typealias Context = Needle2Context
     public typealias ContextParameters = Needle2ContextParameters
-    public typealias Prompt = String
+    public typealias Prompt = Needle2Prompt
     public typealias GenerateParameters = Needle2GenerateParameters
 
     private let runtime: JSRemote<JSObject>
     private let defaultContext: Context
+    private let activeContextIdentifier = Lock<UInt64?>(nil)
 
     public init(
       createRuntime: sending Needle2JSRuntimeFactory,
@@ -116,8 +117,9 @@
       return AnyGenerationTask { stopper in
         let contextParameters = try context.begin()
         defer { context.finish() }
+        try self.claim(context)
         let request = Needle2JSRequest(
-          prompt: prompt,
+          prompt: prompt.needle2Input,
           systemPrompt: contextParameters.system.formatted(),
           tools: tools.needle2Value,
           toolIndexPath: contextParameters.toolIndexPath,
@@ -155,6 +157,12 @@
     }
 
     public func load(_ source: Needle2JSBinarySource) async throws {
+      guard self.activeContextIdentifier.withBorrowedLock({ $0 == nil }) else {
+        throw Needle2Error(
+          code: .activeContext,
+          message: "Reset the active Needle 2 context before loading new weights."
+        )
+      }
       try await self.runtime.promiseValue(failure: Self.error) { runtime in
         Self.invoke(
           runtime: runtime,
@@ -163,11 +171,49 @@
         )
       }
     }
+
+    public func reset(_ context: Context) async throws {
+      guard !context.isResponding else {
+        throw EdgeToolsError.contextInUse
+      }
+      try self.activeContextIdentifier.withLock { activeContextIdentifier in
+        guard let activeContextIdentifier else {
+          return
+        }
+        guard activeContextIdentifier == context.identifier else {
+          throw Needle2Error(
+            code: .activeContext,
+            message: "Another Needle 2 context has an active conversation."
+          )
+        }
+      }
+      try await self.runtime.promiseValue(failure: Self.error) { runtime in
+        Self.invoke(runtime: runtime, function: "reset", arguments: [])
+      }
+      self.activeContextIdentifier.withLock { $0 = nil }
+    }
   }
+
+  extension Needle2JSEngine: Needle2SessionEngine {}
 
   // MARK: - JavaScript Bridge
 
   extension Needle2JSEngine {
+    private func claim(_ context: Context) throws {
+      try self.activeContextIdentifier.withLock { activeIdentifier in
+        guard let activeIdentifier else {
+          activeIdentifier = context.identifier
+          return
+        }
+        guard activeIdentifier == context.identifier else {
+          throw Needle2Error(
+            code: .activeContext,
+            message: "Another Needle 2 context has an active conversation. Reset it before using this context."
+          )
+        }
+      }
+    }
+
     private static func remoteRuntime(
       _ value: JSValue
     ) throws -> JSRemote<JSObject> {
@@ -268,7 +314,7 @@
     init(_ runtime: JSObject) throws {
       let object = JSObject()
       object["receiver"] = runtime.jsValue
-      for name in ["generate", "load", "dispose"] {
+      for name in ["generate", "load", "reset", "dispose"] {
         guard let function = runtime[name].object else {
           throw Needle2Error(
             code: .invalidJavaScriptRuntime,

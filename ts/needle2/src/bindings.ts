@@ -23,6 +23,7 @@ export interface Needle2Binding {
 		options: Needle2ResolvedGenerateOptions,
 	): Promise<Needle2NativeGeneration>;
 	load(weights: Needle2BinarySource): Promise<void>;
+	reset(): Promise<void>;
 	dispose(): Promise<void>;
 }
 
@@ -237,12 +238,17 @@ class SharedNeedle2Binding {
 	): Promise<void> {
 		return this.operations.enqueue(async () => {
 			requireActive(state);
+			this.requireAvailable(owner);
+			if (this.activeOwner === owner) {
+				throw new Needle2Error(
+					"active-session",
+					"Reset the active Needle 2 runtime before loading new weights.",
+				);
+			}
 			const loadedWeights = await weights;
 			this.loadWeights(loadedWeights, weightsIdentity);
 			state.weights = loadedWeights.slice();
 			state.weightsIdentity = weightsIdentity;
-			this.activeOwner = owner;
-			this.activeInitializationFingerprint = undefined;
 		});
 	}
 
@@ -255,19 +261,30 @@ class SharedNeedle2Binding {
 			requireActive(state);
 			this.loadWeights(state.weights, state.weightsIdentity);
 			const initializationFingerprint = JSON.stringify(options.initialization);
-			if (
-				this.activeOwner !== owner ||
-				this.activeInitializationFingerprint !== initializationFingerprint
-			) {
+			this.requireAvailable(owner);
+			if (this.activeOwner === undefined) {
 				this.rawBinding.initialize(options);
 				this.activeOwner = owner;
 				this.activeInitializationFingerprint = initializationFingerprint;
+			} else if (
+				this.activeInitializationFingerprint !== initializationFingerprint
+			) {
+				throw new Needle2Error(
+					"initialization-changed",
+					"Reset the Needle 2 runtime before changing its tools, system facts, or tool index.",
+				);
 			}
+			return this.rawBinding.complete(options);
+		});
+	}
 
-			try {
-				return this.rawBinding.complete(options);
-			} finally {
+	reset(owner: object, state: Needle2BindingState): Promise<void> {
+		return this.operations.enqueue(() => {
+			requireActive(state);
+			this.requireAvailable(owner);
+			if (this.activeOwner === owner) {
 				this.rawBinding.reset();
+				this.clearActiveConversation();
 			}
 		});
 	}
@@ -275,11 +292,25 @@ class SharedNeedle2Binding {
 	dispose(owner: object, state: Needle2BindingState): Promise<void> {
 		return this.operations.enqueue(() => {
 			if (this.activeOwner === owner) {
-				this.activeOwner = undefined;
-				this.activeInitializationFingerprint = undefined;
+				this.rawBinding.reset();
+				this.clearActiveConversation();
 			}
 			state.disposed = true;
 		});
+	}
+
+	private requireAvailable(owner: object): void {
+		if (this.activeOwner !== undefined && this.activeOwner !== owner) {
+			throw new Needle2Error(
+				"active-session",
+				"Another direct Needle 2 runtime has an active conversation. Reset or dispose it before using this runtime.",
+			);
+		}
+	}
+
+	private clearActiveConversation(): void {
+		this.activeOwner = undefined;
+		this.activeInitializationFingerprint = undefined;
 	}
 
 	private loadWeights(weights: Uint8Array, identity: object | string): void {
@@ -326,6 +357,10 @@ class ManagedNeedle2Binding implements Needle2Binding {
 			binarySourceBytes(weights),
 			{},
 		);
+	}
+
+	reset(): Promise<void> {
+		return this.sharedBinding.reset(this, this.state);
 	}
 
 	dispose(): Promise<void> {

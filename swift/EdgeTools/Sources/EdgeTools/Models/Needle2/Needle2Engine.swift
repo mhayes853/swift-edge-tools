@@ -32,6 +32,7 @@
 
   public final class Needle2Context: Identifiable, Sendable {
     private struct State {
+      var identifier: UInt64
       var parameters: Needle2ContextParameters
       var isResponding = false
     }
@@ -86,8 +87,12 @@
       return self.state.withBorrowedLock { $0.isResponding }
     }
 
+    var identifier: UInt64 {
+      self.state.withBorrowedLock { $0.identifier }
+    }
+
     init(parameters: Needle2ContextParameters) {
-      self.state = Lock(State(parameters: parameters))
+      self.state = Lock(State(identifier: nextNeedle2ContextIdentifier(), parameters: parameters))
     }
 
     func begin() throws -> Needle2ContextParameters {
@@ -126,6 +131,15 @@
     extension Needle2Context: Observable {}
   #endif
 
+  private let needle2ContextIdentifier = Lock(UInt64.zero)
+
+  private func nextNeedle2ContextIdentifier() -> UInt64 {
+    needle2ContextIdentifier.withLock { identifier in
+      identifier &+= 1
+      return identifier
+    }
+  }
+
   // MARK: - Needle2GenerateParameters
 
   public struct Needle2GenerateParameters: EdgeToolsEngineGenerateParameters, Hashable, Sendable {
@@ -160,6 +174,8 @@
       public static let generationFailed = Self(rawValue: "generation-failed")
       public static let invalidResponse = Self(rawValue: "invalid-response")
       public static let outputCapacityExceeded = Self(rawValue: "output-capacity-exceeded")
+      public static let activeContext = Self(rawValue: "active-context")
+      public static let initializationChanged = Self(rawValue: "initialization-changed")
     }
 
     public let code: Code
@@ -170,7 +186,6 @@
       self.message = message
     }
   }
-
 #endif
 
 #if Needle2 && canImport(CNeedle2)
@@ -180,7 +195,7 @@
   public struct Needle2Engine: EdgeToolsEngine {
     public typealias Context = Needle2Context
     public typealias ContextParameters = Needle2ContextParameters
-    public typealias Prompt = String
+    public typealias Prompt = Needle2Prompt
     public typealias GenerateParameters = Needle2GenerateParameters
 
     private let defaultContext: Context
@@ -224,7 +239,7 @@
       return AnyGenerationTask { stopper in
         let contextParameters = try context.begin()
         let request = Needle2Request(
-          prompt: prompt,
+          prompt: prompt.needle2Input,
           initialization: Needle2Initialization(
             systemPrompt: contextParameters.system.formatted(),
             toolsJSON: tools.needle2JSON,
@@ -236,6 +251,7 @@
         defer { context.finish() }
         return try await self.runNeedle2Generation(
           request: request,
+          contextIdentifier: context.identifier,
           channel: channel,
           wasStopped: { stopper.isStopped }
         )
@@ -244,10 +260,14 @@
     @concurrent
     private func runNeedle2Generation(
       request: Needle2Request,
+      contextIdentifier: UInt64,
       channel: EdgeToolsGenerationChannel,
       wasStopped: @Sendable () -> Bool
     ) async throws -> EdgeToolsEngineGeneration {
-      let nativeResult = try Needle2Runtime.shared.complete(request: request)
+      let nativeResult = try Needle2Runtime.shared.complete(
+        request: request,
+        contextIdentifier: contextIdentifier
+      )
       let response = try Needle2Response(json: nativeResult.response)
       if !response.success {
         throw Needle2Error(
@@ -292,10 +312,17 @@
       try Needle2Runtime.shared.load(bytes)
     }
 
+    public func reset(_ context: Context) throws {
+      try Needle2Runtime.shared.reset(contextIdentifier: context.identifier)
+    }
+
     public static func load(_ bytes: [UInt8]) throws {
       try bytes.withUnsafeBufferPointer(Self.load)
     }
   }
+
+  @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
+  extension Needle2Engine: Needle2SessionEngine {}
 
   #if FoundationEssentials
     @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
@@ -316,6 +343,7 @@
 
   private final class Needle2Runtime: Sendable {
     private struct State {
+      var activeContextIdentifier: UInt64?
       var initialization: Needle2Initialization?
     }
 
@@ -323,19 +351,61 @@
 
     private let state = Lock(State())
 
-    func complete(request: Needle2Request) throws -> (response: String, tokenCount: Int) {
+    func complete(
+      request: Needle2Request,
+      contextIdentifier: UInt64
+    ) throws -> (response: String, tokenCount: Int) {
       try self.state.withLock { state in
-        if state.initialization != request.initialization {
+        if let activeContextIdentifier = state.activeContextIdentifier,
+          activeContextIdentifier != contextIdentifier
+        {
+          throw Needle2Error(
+            code: .activeContext,
+            message: "Another Needle 2 context has an active conversation. Reset it before using this context."
+          )
+        }
+        if state.activeContextIdentifier == contextIdentifier,
+          state.initialization != request.initialization
+        {
+          throw Needle2Error(
+            code: .initializationChanged,
+            message: "Reset the Needle 2 context before changing its tools, system facts, or tool index."
+          )
+        }
+        if state.activeContextIdentifier == nil {
           try request.initialization.initialize()
           state.initialization = request.initialization
+          state.activeContextIdentifier = contextIdentifier
         }
-        defer { needle_reset() }
         return try request.complete()
       }
     }
 
+    func reset(contextIdentifier: UInt64) throws {
+      try self.state.withLock { state in
+        guard let activeContextIdentifier = state.activeContextIdentifier else {
+          return
+        }
+        guard activeContextIdentifier == contextIdentifier else {
+          throw Needle2Error(
+            code: .activeContext,
+            message: "Another Needle 2 context has an active conversation."
+          )
+        }
+        needle_reset()
+        state.activeContextIdentifier = nil
+        state.initialization = nil
+      }
+    }
+
     func load(_ bytes: UnsafeBufferPointer<UInt8>) throws {
-      let result = self.state.withLock { state in
+      let result = try self.state.withLock { state in
+        guard state.activeContextIdentifier == nil else {
+          throw Needle2Error(
+            code: .activeContext,
+            message: "Reset the active Needle 2 context before loading new weights."
+          )
+        }
         let result = needle_load(bytes.baseAddress, UInt64(bytes.count))
         state.initialization = nil
         return result
@@ -405,4 +475,5 @@
       return (String(decoding: bytes, as: UTF8.self), Int(result))
     }
   }
+
 #endif
