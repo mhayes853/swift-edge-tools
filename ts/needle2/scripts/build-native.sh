@@ -3,13 +3,13 @@
 set -euo pipefail
 
 package_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-repository="https://huggingface.co/Cactus-Compute/needle2/resolve/17a803d95928ba33d3e9a0160e024d9565b5c3f2"
+repository="https://huggingface.co/Cactus-Compute/needle2/resolve/b7ce80e07a8c76fb30a3a78db1e4aea7d72198da"
 output_directory="${2:-$package_directory/dist/native}"
 artifact="${1:-}"
 workspace="$(mktemp -d)"
 trap 'rm -rf "$workspace"' EXIT
 
-repository_artifact="$package_directory/../../bin/needle2-2.0.1.artifactbundle.zip"
+repository_artifact="$package_directory/../../bin/needle2-2.0.2.artifactbundle.zip"
 if [[ -z "$artifact" && -f "$repository_artifact" ]]; then
   artifact="$repository_artifact"
 fi
