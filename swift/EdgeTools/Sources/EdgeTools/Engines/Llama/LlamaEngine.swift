@@ -158,10 +158,12 @@
     ) async throws -> [EdgeToolsToken] {
       try self.validate(context)
       let transcript = context.transcript(appending: prompt)
-      let input = try self.inputProcessor.input(
+      let input = try await self.inputProcessor.inputConcurrently(
         prompt: transcript,
         tools: tools,
-        addGenerationPrompt: true
+        addGenerationPrompt: true,
+        kind: .generation,
+        cache: EdgeToolsLLMPreparedInputCache()
       )
       return self.tokenizer.tokens(forIds: input.units.tokenIds).compactMap { $0 }
     }
@@ -190,7 +192,7 @@
     ) async throws -> EdgeToolsEnginePrefill {
       try self.validate(context)
       let snapshot = try context.begin(appending: promptPrefix)
-      return try self.prefill(snapshot: snapshot, tools: tools, context: context)
+      return try await self.prefill(snapshot: snapshot, tools: tools, context: context)
     }
 
     public func warmUp(tools: [EdgeToolDefinition] = [], context: LlamaContext<Profile>) throws {
@@ -201,7 +203,9 @@
       _ = try self.inputProcessor.input(
         prompt: snapshot.transcript,
         tools: tools,
-        addGenerationPrompt: true
+        addGenerationPrompt: true,
+        kind: .generation,
+        cache: snapshot.model.preparedInputCache
       )
     }
 
@@ -210,7 +214,7 @@
       context: LlamaContext<Profile>
     ) async throws -> EdgeToolsEnginePrefill {
       try self.validate(context)
-      return try self.prefill(
+      return try await self.prefill(
         snapshot: context.begin(),
         tools: tools,
         context: context
@@ -244,7 +248,12 @@
                 )
               },
               prepare: {
-                try self.prepare(parser: &$0, tools: tools, parameters: parameters, state: &$1)
+                try await self.prepare(
+                  parser: &$0,
+                  tools: tools,
+                  parameters: parameters,
+                  state: &$1
+                )
               },
               decode: { try self.decode(bitmask: $0, state: &$1) }
             )
@@ -261,12 +270,14 @@
       tools: [EdgeToolDefinition],
       parameters: Profile.GenerateParameters,
       state: inout ModelGenerationState
-    ) throws -> EdgeToolsGenerationLoop.Preparation {
+    ) async throws -> EdgeToolsGenerationLoop.Preparation {
       Profile.prepare(prompt: &state.transcript, tools: tools, parser: &parser)
-      let input = try self.inputProcessor.input(
+      let input = try await self.inputProcessor.inputConcurrently(
         prompt: state.transcript,
         tools: tools,
-        addGenerationPrompt: true
+        addGenerationPrompt: true,
+        kind: .generation,
+        cache: state.contextState.preparedInputCache
       )
       let contextState = state.contextState
       contextState.sequenceStore.resetProbe(sequenceId: contextState.sequence.sequenceId)
@@ -319,9 +330,14 @@
       let finalResult: Result<EdgeToolsEngineGeneration, any Error>
       switch result {
       case .success(var value):
-        self.commitGeneration(state: &state)
-        value.metadata.merge(metadata) { _, finalValue in finalValue }
-        finalResult = .success(value)
+        do {
+          try self.commitGeneration(state: &state)
+          value.metadata.merge(metadata) { _, finalValue in finalValue }
+          finalResult = .success(value)
+        } catch {
+          state.decoder = nil
+          finalResult = .failure(error)
+        }
       case .failure(let error):
         state.decoder = nil
         finalResult = .failure(error)
@@ -338,14 +354,16 @@
       snapshot: LlamaContext<Profile>.Snapshot,
       tools: [EdgeToolDefinition],
       context: LlamaContext<Profile>
-    ) throws -> EdgeToolsEnginePrefill {
+    ) async throws -> EdgeToolsEnginePrefill {
       defer {
         context.finish(generation: nil, revision: snapshot.revision, model: snapshot.model)
       }
-      let input = try self.inputProcessor.input(
+      let input = try await self.inputProcessor.inputConcurrently(
         prompt: snapshot.transcript,
         tools: tools,
-        addGenerationPrompt: false
+        addGenerationPrompt: false,
+        kind: .prefill,
+        cache: snapshot.model.preparedInputCache
       )
       return EdgeToolsEnginePrefill(
         metrics: try self.synchronize(
@@ -386,12 +404,12 @@
       return metadata
     }
 
-    private func commitGeneration(state: inout ModelGenerationState) {
+    private func commitGeneration(state: inout ModelGenerationState) throws {
       guard let decoder = state.decoder else { return }
       if let pendingTokenId = decoder.pendingTokenId,
         !self.generationLoop.stopTokenIds.contains(pendingTokenId)
       {
-        try? state.contextState.sequenceStore.commit(
+        try state.contextState.sequenceStore.commit(
           tokenId: pendingTokenId,
           sequenceId: state.contextState.sequence.sequenceId
         )

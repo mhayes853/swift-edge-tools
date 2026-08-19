@@ -2,6 +2,7 @@ import EdgeTools
 import Testing
 
 #if !os(WASI)
+  import Foundation
   import SnapshotTesting
 #endif
 
@@ -44,7 +45,7 @@ struct `Gemma4 tests` {
     }
   #endif
 
-  #if Llama && XGrammar && canImport(CLlama) && !os(WASI)
+  #if HuggingFaceTokenizers && Llama && XGrammar && canImport(CLlama) && !os(WASI)
     @Suite(.serialized)
     struct `Gemma4LlamaModelEngine tests` {
       @Test
@@ -111,6 +112,44 @@ struct `Gemma4 tests` {
         let fresh = try await engine.prefill(context: engine.context(params))
 
         expectNoDifference(cached.metrics.tokens < fresh.metrics.tokens, true)
+      }
+
+      @Test
+      func `Llama Reuses Prepared Media For Text Only Continuations`() async throws {
+        let source = try llamaRedImageAsset()
+        guard case .bytes(let bytes) = source.content else {
+          Issue.record("The image fixture did not contain bytes.")
+          return
+        }
+        let directory = FileManager.default.temporaryDirectory
+          .appending(path: "edge-tools-llama-media-\(UUID().uuidString)")
+        let validImageURL = directory.appending(path: "valid.png")
+        let imageURL = directory.appending(path: "image.png")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try Data(bytes).write(to: validImageURL)
+        try FileManager.default.createSymbolicLink(
+          at: imageURL,
+          withDestinationURL: validImageURL
+        )
+
+        let engine = try await self.multimodalEngine()
+        let context = engine.context(
+          EdgeToolsTranscriptContextParameters(
+            transcript: EdgeToolsTranscript(messages: [
+              .user(
+                "What is the dominant color?",
+                images: [EdgeToolsTranscript.Asset(path: imageURL.path())]
+              )
+            ])
+          )
+        )
+        _ = try await engine.prefill(context: context)
+        try FileManager.default.removeItem(at: validImageURL)
+        context.transcript.messages.append(.assistant([.text("The dominant color is red.")]))
+        context.transcript.messages.append(.user("Confirm that briefly."))
+
+        _ = try await engine.prefill(context: context)
       }
 
       @Test

@@ -7,9 +7,9 @@
   // MARK: - LlamaKVCacheType
 
   public struct LlamaKVCacheType: RawRepresentable, Hashable, Sendable {
-    public let rawValue: Int32
+    public let rawValue: UInt32
 
-    public init(rawValue: Int32) {
+    public init(rawValue: UInt32) {
       self.rawValue = rawValue
     }
 
@@ -38,23 +38,24 @@
   // MARK: - LlamaContextParameters
 
   public struct LlamaContextParameters: Hashable, Sendable {
-    public var contextLength: Int
-    public var maximumSequenceCount: Int
+    public var contextLength: UInt32
+    public var maximumSequenceCount: UInt32
     public var unifiedKVCache: Bool
-    public var threadCount: Int
+    public var threadCount: Int32
     public var flashAttention: LlamaFlashAttention
     public var keyCacheType: LlamaKVCacheType
     public var valueCacheType: LlamaKVCacheType
 
     public init(
-      contextLength: Int = 4096,
-      maximumSequenceCount: Int = 8,
+      contextLength: UInt32 = 4096,
+      maximumSequenceCount: UInt32 = 8,
       unifiedKVCache: Bool = true,
-      threadCount: Int = 0,
+      threadCount: Int32 = 0,
       flashAttention: LlamaFlashAttention = .auto,
       keyCacheType: LlamaKVCacheType = .f16,
       valueCacheType: LlamaKVCacheType = .f16
     ) {
+      precondition(maximumSequenceCount > 0)
       self.contextLength = contextLength
       self.maximumSequenceCount = maximumSequenceCount
       self.unifiedKVCache = unifiedKVCache
@@ -69,19 +70,44 @@
 
   struct LlamaRuntimeContext: ~Copyable {
     let handle: OpaquePointer
+    private let batch: UnsafeMutablePointer<llama_batch>
+
+    var batchCapacity: Int {
+      Int(llama_n_batch(self.handle))
+    }
+
+    var microBatchCapacity: Int {
+      Int(llama_n_ubatch(self.handle))
+    }
+
+    init(handle: OpaquePointer) {
+      self.handle = handle
+      self.batch = UnsafeMutablePointer.allocate(capacity: 1)
+      self.batch.initialize(
+        to: llama_batch_init(Int32(clamping: llama_n_batch(handle)), 0, 1)
+      )
+    }
 
     deinit {
+      llama_batch_free(self.batch.pointee)
+      self.batch.deinitialize(count: 1)
+      self.batch.deallocate()
       llama_free(self.handle)
     }
 
     borrowing func decode(
-      tokenIds: [EdgeToolsToken.ID],
+      tokenIds: some Collection<EdgeToolsToken.ID>,
       startPosition: Int,
       sequenceId: Int,
       wantsLogits: Bool
     ) throws {
-      var batch = llama_batch_init(Int32(tokenIds.count), 0, 1)
-      defer { llama_batch_free(batch) }
+      guard tokenIds.count <= self.batchCapacity else {
+        throw LlamaRuntimeError(
+          code: .decodeFailed,
+          message: "The llama decode batch exceeds the configured batch capacity."
+        )
+      }
+      var batch = self.batch.pointee
       batch.n_tokens = Int32(tokenIds.count)
       for (index, tokenId) in tokenIds.enumerated() {
         batch.token[index] = llama_token(tokenId)
@@ -142,17 +168,17 @@
   extension LlamaModel {
     borrowing func createContext(parameters: LlamaContextParameters) throws -> LlamaRuntimeContext {
       var contextParameters = llama_context_default_params()
-      contextParameters.n_ctx = UInt32(parameters.contextLength)
-      contextParameters.n_seq_max = UInt32(parameters.maximumSequenceCount)
+      contextParameters.n_ctx = parameters.contextLength
+      contextParameters.n_seq_max = parameters.maximumSequenceCount
       contextParameters.kv_unified = parameters.unifiedKVCache
       if parameters.threadCount > 0 {
-        contextParameters.n_threads = Int32(parameters.threadCount)
-        contextParameters.n_threads_batch = Int32(parameters.threadCount)
+        contextParameters.n_threads = parameters.threadCount
+        contextParameters.n_threads_batch = parameters.threadCount
       }
       contextParameters.flash_attn_type =
         llama_flash_attn_type(rawValue: parameters.flashAttention.rawValue)
-      contextParameters.type_k = ggml_type(rawValue: UInt32(parameters.keyCacheType.rawValue))
-      contextParameters.type_v = ggml_type(rawValue: UInt32(parameters.valueCacheType.rawValue))
+      contextParameters.type_k = ggml_type(rawValue: parameters.keyCacheType.rawValue)
+      contextParameters.type_v = ggml_type(rawValue: parameters.valueCacheType.rawValue)
       guard let handle = llama_init_from_model(self.handle, contextParameters) else {
         throw LlamaRuntimeError(
           code: .contextCreationFailed,

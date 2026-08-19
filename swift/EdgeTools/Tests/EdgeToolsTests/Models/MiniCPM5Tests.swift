@@ -191,7 +191,7 @@ struct `MiniCPM5 tests` {
     }
   #endif
 
-  #if Llama && XGrammar && canImport(CLlama) && !os(WASI)
+  #if HuggingFaceTokenizers && Llama && XGrammar && canImport(CLlama) && !os(WASI)
     @Suite(.serialized)
     struct `MiniCPM5LlamaModelEngine tests` {
       @Test

@@ -1,4 +1,4 @@
-#if Llama && XGrammar && canImport(CLlama)
+#if HuggingFaceTokenizers && Llama && XGrammar && canImport(CLlama)
   import CoreGraphics
   import EdgeTools
   import Foundation

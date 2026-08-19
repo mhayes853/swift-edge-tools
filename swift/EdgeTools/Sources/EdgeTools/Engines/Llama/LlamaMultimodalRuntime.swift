@@ -2,26 +2,27 @@
   import CLlama
   import EdgeToolsCore
   import EdgeToolsLlama
+  import EdgeToolsTokenizers
 
   // MARK: - LlamaMultimodalParameters
 
   public struct LlamaMultimodalParameters: Hashable, Sendable {
     public var useGPU: Bool
     public var printTimings: Bool
-    public var threadCount: Int
+    public var threadCount: Int32
     public var flashAttention: LlamaFlashAttention
     public var warmUp: Bool
-    public var minimumImageTokenCount: Int?
-    public var maximumImageTokenCount: Int?
+    public var minimumImageTokenCount: Int32?
+    public var maximumImageTokenCount: Int32?
 
     public init(
       useGPU: Bool = true,
       printTimings: Bool = false,
-      threadCount: Int = 0,
+      threadCount: Int32 = 0,
       flashAttention: LlamaFlashAttention = .auto,
       warmUp: Bool = true,
-      minimumImageTokenCount: Int? = nil,
-      maximumImageTokenCount: Int? = nil
+      minimumImageTokenCount: Int32? = nil,
+      maximumImageTokenCount: Int32? = nil
     ) {
       self.useGPU = useGPU
       self.printTimings = printTimings
@@ -35,25 +36,25 @@
 
   // MARK: - LlamaPreparedInput
 
-  enum LlamaMediaKind: Equatable {
+  enum LlamaMediaKind: Equatable, Sendable {
     case image
     case audio
   }
 
-  struct LlamaMultimodalAsset {
+  struct LlamaMultimodalAsset: Sendable {
     let kind: LlamaMediaKind
     let asset: EdgeToolsTranscript.Asset
   }
 
-  struct LlamaPreparedInputUnit: Equatable {
-    struct Media: Equatable {
+  struct LlamaPreparedInputUnit: Equatable, Sendable {
+    struct Media: Equatable, Sendable {
       let kind: LlamaMediaKind
       let id: String
       let tokenCount: Int
       let positionCount: Int
     }
 
-    enum Value: Equatable {
+    enum Value: Equatable, Sendable {
       case token(EdgeToolsToken.ID)
       case media(Media)
     }
@@ -75,27 +76,58 @@
     }
   }
 
-  struct LlamaPreparedInput: ~Copyable, @unchecked Sendable {
-    enum Chunk {
-      case text(tokenIds: [EdgeToolsToken.ID], units: Range<Int>)
-      case media(chunkIndex: Int, unit: Int)
+  // The handle is transferred once and all shared access is serialized by LlamaPreparedMedia.
+  // Remove the unchecked conformance when imported C handles can express owned sendability.
+  private struct LlamaInputChunks: ~Copyable, @unchecked Sendable {
+    private let handle: OpaquePointer
+
+    init() throws {
+      guard let handle = mtmd_input_chunks_init() else {
+        throw LlamaRuntimeError(
+          code: .multimodalProcessingFailed,
+          message: "The multimodal input chunks could not be allocated."
+        )
+      }
+      self.handle = handle
     }
 
-    let handle: OpaquePointer?
-    let units: [LlamaPreparedInputUnit]
-    let chunks: [Chunk]
-
-    init(tokenIds: [EdgeToolsToken.ID]) {
-      self.handle = nil
-      self.units = tokenIds.map { LlamaPreparedInputUnit(value: .token($0)) }
-      self.chunks = []
+    deinit {
+      mtmd_input_chunks_free(self.handle)
     }
 
-    init(handle: consuming OpaquePointer) throws {
+    borrowing func tokenize(
+      runtime: OpaquePointer,
+      text: String,
+      bitmapHandles: [OpaquePointer]
+    ) -> Int32 {
+      text.withCString { textPointer in
+        var input = mtmd_input_text(
+          text: textPointer,
+          text_len: text.utf8.count,
+          add_special: false,
+          parse_special: true
+        )
+        var pointers = bitmapHandles.map(Optional.some)
+        return pointers.withUnsafeMutableBufferPointer { pointers in
+          mtmd_tokenize(
+            runtime,
+            self.handle,
+            &input,
+            pointers.baseAddress,
+            pointers.count
+          )
+        }
+      }
+    }
+
+    borrowing func contents() throws -> (
+      units: [LlamaPreparedInputUnit],
+      chunks: [LlamaPreparedInput.Chunk]
+    ) {
       var units = [LlamaPreparedInputUnit]()
-      var chunks = [Chunk]()
-      for chunkIndex in 0..<mtmd_input_chunks_size(handle) {
-        guard let chunk = mtmd_input_chunks_get(handle, chunkIndex) else { continue }
+      var chunks = [LlamaPreparedInput.Chunk]()
+      for chunkIndex in 0..<mtmd_input_chunks_size(self.handle) {
+        guard let chunk = mtmd_input_chunks_get(self.handle, chunkIndex) else { continue }
         let unitStart = units.count
         switch mtmd_input_chunk_get_type(chunk) {
         case MTMD_INPUT_CHUNK_TYPE_TEXT:
@@ -127,15 +159,162 @@
           throw EdgeToolsError.unsupportedMedia("Unsupported llama multimodal input chunk.")
         }
       }
-      self.handle = consume handle
+      return (units, chunks)
+    }
+
+    borrowing func evaluate(
+      runtime: OpaquePointer,
+      context: borrowing LlamaRuntimeContext,
+      chunkIndex: Int,
+      position: Int,
+      sequenceId: Int,
+      batchSize: Int
+    ) throws -> Int {
+      guard let chunk = mtmd_input_chunks_get(self.handle, chunkIndex) else {
+        throw LlamaRuntimeError(
+          code: .multimodalProcessingFailed,
+          message: "The multimodal input chunk is unavailable."
+        )
+      }
+      var newPosition = llama_pos(position)
+      let status = mtmd_helper_eval_chunk_single(
+        runtime,
+        context.handle,
+        chunk,
+        llama_pos(position),
+        llama_seq_id(sequenceId),
+        Int32(clamping: batchSize),
+        false,
+        &newPosition
+      )
+      guard status == 0 else {
+        throw LlamaRuntimeError(
+          code: .decodeFailed,
+          message: "The multimodal chunk could not be evaluated (status \(status))."
+        )
+      }
+      return Int(newPosition)
+    }
+  }
+
+  private final class LlamaPreparedMedia: Sendable {
+    private let chunks: Lock<LlamaInputChunks>
+
+    init(chunks: consuming sending LlamaInputChunks) {
+      self.chunks = Lock(chunks)
+    }
+
+    func evaluate(
+      runtime: OpaquePointer,
+      context: borrowing LlamaRuntimeContext,
+      chunkIndex: Int,
+      position: Int,
+      sequenceId: Int,
+      batchSize: Int
+    ) throws -> Int {
+      try self.chunks.withBorrowedLock {
+        try $0.evaluate(
+          runtime: runtime,
+          context: context,
+          chunkIndex: chunkIndex,
+          position: position,
+          sequenceId: sequenceId,
+          batchSize: batchSize
+        )
+      }
+    }
+  }
+
+  struct LlamaPreparedInput: Sendable {
+    enum Chunk {
+      case text(tokenIds: [EdgeToolsToken.ID], units: Range<Int>)
+      case media(chunkIndex: Int, unit: Int)
+    }
+
+    private let media: LlamaPreparedMedia?
+    let units: [LlamaPreparedInputUnit]
+    let chunks: [Chunk]
+
+    var hasMedia: Bool {
+      self.media != nil
+    }
+
+    init(tokenIds: [EdgeToolsToken.ID]) {
+      self.media = nil
+      self.units = tokenIds.map { LlamaPreparedInputUnit(value: .token($0)) }
+      self.chunks = []
+    }
+
+    fileprivate init(chunks: consuming sending LlamaInputChunks) throws {
+      let contents = try chunks.contents()
+      self.media = LlamaPreparedMedia(chunks: consume chunks)
+      self.units = contents.units
+      self.chunks = contents.chunks
+    }
+
+    private init(
+      media: LlamaPreparedMedia,
+      units: [LlamaPreparedInputUnit],
+      chunks: [Chunk]
+    ) {
+      self.media = media
       self.units = units
       self.chunks = chunks
     }
 
-    deinit {
-      if let handle = self.handle {
-        mtmd_input_chunks_free(handle)
+    func replacingText(
+      _ text: String,
+      mediaMarker: String,
+      tokenizer: LlamaTokenizer
+    ) throws -> Self? {
+      guard let preparedMedia = self.media else { return nil }
+      let mediaUnits = self.chunks.compactMap { chunk -> (Int, LlamaPreparedInputUnit)? in
+        guard case .media(let chunkIndex, let unitIndex) = chunk else { return nil }
+        return (chunkIndex, self.units[unitIndex])
       }
+      let segments = llamaTextSegments(text, separatedBy: mediaMarker)
+      guard segments.count == mediaUnits.count + 1 else { return nil }
+
+      var units = [LlamaPreparedInputUnit]()
+      var chunks = [Chunk]()
+      for (index, segment) in segments.enumerated() {
+        let tokenIds = try tokenizer.tokenIds(text: String(segment), addSpecialTokens: false)
+        if !tokenIds.isEmpty {
+          let unitStart = units.count
+          units.append(contentsOf: tokenIds.map { LlamaPreparedInputUnit(value: .token($0)) })
+          chunks.append(.text(tokenIds: tokenIds, units: unitStart..<units.count))
+        }
+        if index < mediaUnits.count {
+          let unitIndex = units.count
+          units.append(mediaUnits[index].1)
+          chunks.append(.media(chunkIndex: mediaUnits[index].0, unit: unitIndex))
+        }
+      }
+      return Self(media: preparedMedia, units: units, chunks: chunks)
+    }
+
+    func evaluateMedia(
+      runtime: OpaquePointer,
+      context: borrowing LlamaRuntimeContext,
+      chunkIndex: Int,
+      position: Int,
+      sequenceId: Int,
+      batchSize: Int
+    ) throws -> Int {
+      guard let media else {
+        throw LlamaRuntimeError(
+          code: .multimodalProcessingFailed,
+          message: "The multimodal input chunk is unavailable."
+        )
+      }
+      return try media.evaluate(
+        runtime: runtime,
+        context: context,
+        chunkIndex: chunkIndex,
+        position: position,
+        sequenceId: sequenceId,
+        batchSize: batchSize
+      )
     }
   }
 
@@ -162,17 +341,17 @@
       contextParameters.use_gpu = parameters.useGPU
       contextParameters.print_timings = parameters.printTimings
       if parameters.threadCount > 0 {
-        contextParameters.n_threads = Int32(clamping: parameters.threadCount)
+        contextParameters.n_threads = parameters.threadCount
       }
       contextParameters.flash_attn_type = llama_flash_attn_type(
         rawValue: parameters.flashAttention.rawValue
       )
       contextParameters.warmup = parameters.warmUp
       if let minimumImageTokenCount = parameters.minimumImageTokenCount {
-        contextParameters.image_min_tokens = Int32(clamping: minimumImageTokenCount)
+        contextParameters.image_min_tokens = minimumImageTokenCount
       }
       if let maximumImageTokenCount = parameters.maximumImageTokenCount {
-        contextParameters.image_max_tokens = Int32(clamping: maximumImageTokenCount)
+        contextParameters.image_max_tokens = maximumImageTokenCount
       }
       let handle = path.withCString { path in
         mtmd_init_from_file(path, model.model.handle, contextParameters)
@@ -250,42 +429,19 @@
           }
           bitmapHandles.append(bitmapHandle)
         }
-        guard let chunks = mtmd_input_chunks_init() else {
+        let chunks = try LlamaInputChunks()
+        let status = chunks.tokenize(
+          runtime: state.handle,
+          text: text,
+          bitmapHandles: bitmapHandles
+        )
+        guard status == 0 else {
           throw LlamaRuntimeError(
             code: .multimodalProcessingFailed,
-            message: "The multimodal input chunks could not be allocated."
+            message: "The multimodal prompt could not be tokenized (status \(status))."
           )
         }
-        do {
-          let status = text.withCString { textPointer in
-            var input = mtmd_input_text(
-              text: textPointer,
-              text_len: text.utf8.count,
-              add_special: false,
-              parse_special: true
-            )
-            var pointers = bitmapHandles.map(Optional.some)
-            return pointers.withUnsafeMutableBufferPointer { pointers in
-              mtmd_tokenize(
-                state.handle,
-                chunks,
-                &input,
-                pointers.baseAddress,
-                pointers.count
-              )
-            }
-          }
-          guard status == 0 else {
-            throw LlamaRuntimeError(
-              code: .multimodalProcessingFailed,
-              message: "The multimodal prompt could not be tokenized (status \(status))."
-            )
-          }
-          return try LlamaPreparedInput(handle: chunks)
-        } catch {
-          mtmd_input_chunks_free(chunks)
-          throw error
-        }
+        return try LlamaPreparedInput(chunks: consume chunks)
       }
     }
 
@@ -298,33 +454,14 @@
       batchSize: Int
     ) throws -> Int {
       try self.state.withBorrowedLock { state in
-        guard
-          let inputHandle = input.handle,
-          let chunk = mtmd_input_chunks_get(inputHandle, chunkIndex)
-        else {
-          throw LlamaRuntimeError(
-            code: .multimodalProcessingFailed,
-            message: "The multimodal input chunk is unavailable."
-          )
-        }
-        var newPosition = llama_pos(position)
-        let status = mtmd_helper_eval_chunk_single(
-          state.handle,
-          context.handle,
-          chunk,
-          llama_pos(position),
-          llama_seq_id(sequenceId),
-          Int32(clamping: batchSize),
-          false,
-          &newPosition
+        try input.evaluateMedia(
+          runtime: state.handle,
+          context: context,
+          chunkIndex: chunkIndex,
+          position: position,
+          sequenceId: sequenceId,
+          batchSize: batchSize
         )
-        guard status == 0 else {
-          throw LlamaRuntimeError(
-            code: .decodeFailed,
-            message: "The multimodal chunk could not be evaluated (status \(status))."
-          )
-        }
-        return Int(newPosition)
       }
     }
   }
@@ -338,5 +475,20 @@
         return tokenId
       }
     }
+  }
+
+  private func llamaTextSegments(
+    _ text: String,
+    separatedBy separator: String
+  ) -> [Substring] {
+    guard !separator.isEmpty else { return [text[...]] }
+    var segments = [Substring]()
+    var remainder = text[...]
+    while let range = remainder.firstRange(of: separator) {
+      segments.append(remainder[..<range.lowerBound])
+      remainder = remainder[range.upperBound...]
+    }
+    segments.append(remainder)
+    return segments
   }
 #endif

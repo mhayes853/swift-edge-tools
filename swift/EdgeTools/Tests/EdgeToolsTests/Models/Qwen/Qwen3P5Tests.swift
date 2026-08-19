@@ -137,7 +137,7 @@ struct `Qwen3P5 tests` {
     #endif
   #endif
 
-  #if Llama && XGrammar && canImport(CLlama) && !os(WASI)
+  #if HuggingFaceTokenizers && Llama && XGrammar && canImport(CLlama) && !os(WASI)
     @Suite(.serialized)
     struct `Qwen3P5LlamaModelEngine tests` {
       @Test
@@ -307,7 +307,7 @@ struct `Qwen3P5 tests` {
   }
 #endif
 
-#if Llama && XGrammar && canImport(CLlama) && !os(WASI)
+#if HuggingFaceTokenizers && Llama && XGrammar && canImport(CLlama) && !os(WASI)
   private func qwenLlamaImagePrefix() throws -> EdgeToolsTranscript {
     EdgeToolsTranscript(
       messages: [

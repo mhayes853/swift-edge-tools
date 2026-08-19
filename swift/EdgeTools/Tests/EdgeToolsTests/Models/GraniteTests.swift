@@ -20,7 +20,7 @@ struct `Granite tests` {
     }
   #endif
 
-  #if Llama && XGrammar && canImport(CLlama) && !os(WASI)
+  #if HuggingFaceTokenizers && Llama && XGrammar && canImport(CLlama) && !os(WASI)
     @Suite(.serialized)
     struct `GraniteLlamaModelEngine tests` {
       @Test

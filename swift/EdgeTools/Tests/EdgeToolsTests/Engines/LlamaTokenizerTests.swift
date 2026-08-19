@@ -1,4 +1,4 @@
-#if Llama && XGrammar && canImport(CLlama) && !os(WASI)
+#if HuggingFaceTokenizers && Llama && XGrammar && canImport(CLlama) && !os(WASI)
   import CustomDump
   import EdgeTools
   import EdgeToolsXGrammar

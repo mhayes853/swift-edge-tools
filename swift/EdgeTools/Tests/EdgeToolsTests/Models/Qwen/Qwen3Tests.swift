@@ -75,7 +75,7 @@ struct `Qwen3 tests` {
     }
   #endif
 
-  #if Llama && XGrammar && canImport(CLlama) && !os(WASI)
+  #if HuggingFaceTokenizers && Llama && XGrammar && canImport(CLlama) && !os(WASI)
     @Suite(.serialized)
     struct `Qwen3LlamaModelEngine tests` {
       @Test

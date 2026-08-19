@@ -36,7 +36,7 @@ struct `LFM2P5VL tests` {
     }
   #endif
 
-  #if Llama && XGrammar && canImport(CLlama) && !os(WASI)
+  #if HuggingFaceTokenizers && Llama && XGrammar && canImport(CLlama) && !os(WASI)
     @Suite(.serialized)
     struct `LFM2P5VLLlamaModelEngine tests` {
       @Test

@@ -13,17 +13,21 @@
     let sequence: LlamaSequenceLease
     let vocabularySizeValue: Int
     let configuredSampling: EdgeToolsFusedSamplingParameters?
+    let preparedInputCache: EdgeToolsLLMPreparedInputCache<LlamaPreparedInput>
 
     init(
       sequenceStore: LlamaKVSequenceStore,
       sequence: LlamaSequenceLease,
       vocabularySize: Int,
-      defaultSampling: EdgeToolsFusedSamplingParameters?
+      defaultSampling: EdgeToolsFusedSamplingParameters?,
+      preparedInputCache: EdgeToolsLLMPreparedInputCache<LlamaPreparedInput> =
+        EdgeToolsLLMPreparedInputCache()
     ) {
       self.sequenceStore = sequenceStore
       self.sequence = sequence
       self.vocabularySizeValue = vocabularySize
       self.configuredSampling = defaultSampling
+      self.preparedInputCache = preparedInputCache
     }
 
     public var vocabularySize: Int {
@@ -36,7 +40,8 @@
           sequenceStore: self.sequenceStore,
           sequence: sequence,
           vocabularySize: self.vocabularySizeValue,
-          defaultSampling: self.configuredSampling
+          defaultSampling: self.configuredSampling,
+          preparedInputCache: self.preparedInputCache.forked()
         )
       }
       let sequenceStore = LlamaKVSequenceStore(
@@ -47,7 +52,8 @@
         sequenceStore: sequenceStore,
         sequence: sequenceStore.lease(copyingFrom: nil)!,
         vocabularySize: self.vocabularySizeValue,
-        defaultSampling: self.configuredSampling
+        defaultSampling: self.configuredSampling,
+        preparedInputCache: self.preparedInputCache.forked()
       )
     }
 
@@ -61,13 +67,32 @@
   // MARK: - LlamaInputProcessor
 
   struct LlamaInputProcessor<Profile: LlamaModelProfile>: Sendable {
-    let tokenizer: any EdgeToolsTokenizer
+    let tokenizer: LlamaTokenizer
     let multimodalRuntime: LlamaMultimodalRuntime?
+
+    @concurrent
+    func inputConcurrently(
+      prompt: EdgeToolsTranscript,
+      tools: [EdgeToolDefinition],
+      addGenerationPrompt: Bool,
+      kind: EdgeToolsLLMInputKind,
+      cache: EdgeToolsLLMPreparedInputCache<LlamaPreparedInput>
+    ) async throws -> LlamaPreparedInput {
+      try self.input(
+        prompt: prompt,
+        tools: tools,
+        addGenerationPrompt: addGenerationPrompt,
+        kind: kind,
+        cache: cache
+      )
+    }
 
     func input(
       prompt: EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
-      addGenerationPrompt: Bool
+      addGenerationPrompt: Bool,
+      kind: EdgeToolsLLMInputKind,
+      cache: EdgeToolsLLMPreparedInputCache<LlamaPreparedInput>
     ) throws -> LlamaPreparedInput {
       guard let multimodalRuntime else {
         guard prompt.images.isEmpty, prompt.videos.isEmpty, prompt.audio.isEmpty else {
@@ -88,11 +113,11 @@
         throw EdgeToolsError.unsupportedMedia("Video input is not supported by LlamaEngine.")
       }
       guard
-        let profile = Profile.self as? any EdgeToolsMultimodalModelProfile.Type,
-        let tokenizer = self.tokenizer as? any EdgeToolsChatTokenizer
+        let profile = Profile.self as? any EdgeToolsMultimodalModelProfile.Type
       else {
         throw EdgeToolsError.unsupportedTokenizer
       }
+      let tokenizer = self.tokenizer
       var media = [LlamaMultimodalAsset]()
       let messages = try prompt.chatTemplateMessages { userMessage in
         let content = try profile.multimodalContent(for: userMessage)
@@ -120,7 +145,25 @@
         addGenerationPrompt: addGenerationPrompt,
         additionalContext: Profile.templateContext(prompt: prompt)
       )
-      return try multimodalRuntime.prepare(text: text, media: media)
+      let cachedInput = cache.input(
+        for: prompt,
+        tools: tools,
+        kind: kind,
+        allowingTextOnlyContinuation: true
+      )
+      if let cached = cachedInput,
+        let input = try cached.replacingText(
+          text,
+          mediaMarker: multimodalRuntime.mediaMarker,
+          tokenizer: tokenizer
+        )
+      {
+        cache.store(input, for: prompt, tools: tools, kind: kind)
+        return input
+      }
+      let input = try multimodalRuntime.prepare(text: text, media: media)
+      cache.store(input, for: prompt, tools: tools, kind: kind)
+      return input
     }
   }
 

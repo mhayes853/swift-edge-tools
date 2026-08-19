@@ -100,7 +100,7 @@
       )
     }
 
-    fileprivate func tokenIds(
+    package func tokenIds(
       text: String,
       addSpecialTokens: Bool
     ) throws -> [EdgeToolsToken.ID] {

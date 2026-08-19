@@ -240,11 +240,6 @@
 
   #endif
 
-  private enum MLXInputKind: Equatable {
-    case generation
-    case prefill
-  }
-
   // MARK: - VLM Prompt Conversion
 
   #if canImport(CoreImage) && canImport(MLXVLM)
@@ -380,6 +375,15 @@
   }
 
   public struct MLXModelState<Profile: MLXModelProfile> {
+    // LMInput is immutable, but MLXLMCommon does not declare it Sendable.
+    private final class PreparedInput: @unchecked Sendable {
+      let value: LMInput
+
+      init(_ value: LMInput) {
+        self.value = value
+      }
+    }
+
     private final class CachedPrefill {
 
       let input: LMInput
@@ -387,7 +391,7 @@
       let cache: [any KVCache]
       let output: LMOutput
       let context: EdgeToolsLLMPrefillContext?
-      let inputKind: MLXInputKind
+      let inputKind: EdgeToolsLLMInputKind
       private let copying = Lock(())
 
       init(
@@ -396,7 +400,7 @@
         cache: [any KVCache],
         output: LMOutput,
         context: EdgeToolsLLMPrefillContext?,
-        inputKind: MLXInputKind
+        inputKind: EdgeToolsLLMInputKind
       ) {
         self.input = input
         self.tokenIds = tokenIds
@@ -404,13 +408,6 @@
         self.output = output
         self.context = context
         self.inputKind = inputKind
-      }
-
-      func input(
-        for context: EdgeToolsLLMPrefillContext,
-        kind: MLXInputKind
-      ) -> LMInput? {
-        self.context == context && self.inputKind == kind ? self.input : nil
       }
 
       func mutableSnapshot(
@@ -467,21 +464,37 @@
     private struct PrefillCacheState {
       var cachedPrefill: CachedPrefill?
       var inputContext: EdgeToolsLLMPrefillContext?
+      var preparedInputs = EdgeToolsLLMPreparedInputCache<PreparedInput>()
 
       mutating func input(
         for context: EdgeToolsLLMPrefillContext,
-        kind: MLXInputKind
+        kind: EdgeToolsLLMInputKind
       ) -> LMInput? {
         self.inputContext = context
-        return self.cachedPrefill?.input(for: context, kind: kind)
+        return self.preparedInputs.input(for: context, kind: kind)?.value
       }
 
       mutating func clearInputContext() {
         self.inputContext = nil
+        self.preparedInputs.removeAll()
       }
 
       mutating func fork(copyingCache: Bool) {
         self.cachedPrefill = self.cachedPrefill?.forked(copyingCache: copyingCache)
+        self.preparedInputs = self.preparedInputs.forked()
+      }
+
+      mutating func update(_ cachedPrefill: CachedPrefill) {
+        self.cachedPrefill = cachedPrefill
+        guard let context = cachedPrefill.context else {
+          self.preparedInputs.removeAll()
+          return
+        }
+        self.preparedInputs.store(
+          PreparedInput(cachedPrefill.input),
+          for: context,
+          kind: cachedPrefill.inputKind
+        )
       }
     }
 
@@ -546,13 +559,15 @@
       }
       eval(generation.logits)
       eval(generation.cache)
-      self.prefillCacheState.cachedPrefill = CachedPrefill(
-        input: generation.input,
-        tokenIds: generation.cachedTokenIds,
-        cache: generation.cache,
-        output: LMOutput(logits: generation.logits, state: generation.outputState),
-        context: generation.inputContext,
-        inputKind: .generation
+      self.prefillCacheState.update(
+        CachedPrefill(
+          input: generation.input,
+          tokenIds: generation.cachedTokenIds,
+          cache: generation.cache,
+          output: LMOutput(logits: generation.logits, state: generation.outputState),
+          context: generation.inputContext,
+          inputKind: .generation
+        )
       )
       self.generation = nil
     }
@@ -617,13 +632,15 @@
       let prepared = try self.preparedOutput(input: input, tokenIds: tokenIds)
       eval(prepared.output.logits)
       eval(prepared.cache)
-      self.prefillCacheState.cachedPrefill = CachedPrefill(
-        input: input,
-        tokenIds: tokenIds,
-        cache: prepared.cache,
-        output: prepared.output,
-        context: self.prefillCacheState.inputContext,
-        inputKind: .prefill
+      self.prefillCacheState.update(
+        CachedPrefill(
+          input: input,
+          tokenIds: tokenIds,
+          cache: prepared.cache,
+          output: prepared.output,
+          context: self.prefillCacheState.inputContext,
+          inputKind: .prefill
+        )
       )
       let snapshot = Self.memorySnapshot(synchronize: true)
       var metadata = EdgeToolsMetadata()
@@ -641,7 +658,7 @@
       prompt: Profile.Prompt,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer,
-      kind: MLXInputKind
+      kind: EdgeToolsLLMInputKind
     ) async throws -> LMInput {
       if let prompt = prompt as? EdgeToolsTranscript {
         let context = EdgeToolsLLMPrefillContext(prompt: prompt, tools: tools)

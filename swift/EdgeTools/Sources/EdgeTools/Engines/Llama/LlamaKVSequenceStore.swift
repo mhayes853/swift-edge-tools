@@ -34,7 +34,7 @@
       var units = [LlamaPreparedInputUnit]()
       var positionCount = 0
 
-      mutating func append(tokenIds: [EdgeToolsToken.ID]) {
+      mutating func append(tokenIds: some Collection<EdgeToolsToken.ID>) {
         self.units.append(contentsOf: tokenIds.map { LlamaPreparedInputUnit(value: .token($0)) })
         self.positionCount += tokenIds.count
       }
@@ -66,8 +66,6 @@
       }
     }
 
-    private static let evaluationChunkSize = 512
-
     let model: LlamaModelBox
     let parameters: LlamaContextParameters
     private let state = Lock(State())
@@ -80,7 +78,7 @@
     func lease(copyingFrom parentSequenceId: Int?) -> LlamaSequenceLease? {
       self.state.withLock { state in
         guard
-          let sequenceId = (0..<self.parameters.maximumSequenceCount)
+          let sequenceId = (0..<Int(self.parameters.maximumSequenceCount))
             .first(where: { !state.allocatedSequenceIds.contains($0) })
         else {
           return nil
@@ -126,7 +124,7 @@
           prefixCount = input.units.count - 1
         }
         prefixCount = self.trim(sequenceId: sequenceId, to: prefixCount, state: &state)
-        if input.handle != nil {
+        if input.hasMedia {
           try self.evaluate(
             input,
             from: prefixCount,
@@ -157,7 +155,7 @@
         try self.ensureContext(&state)
         if let pendingTokenId {
           try self.evaluate(
-            tokenIds: [pendingTokenId],
+            tokenIds: CollectionOfOne(pendingTokenId),
             sequenceId: sequenceId,
             output: .lastTokenLogits,
             state: &state
@@ -172,7 +170,7 @@
           }
           _ = self.trim(sequenceId: sequenceId, to: cached.count - 1, state: &state)
           try self.evaluate(
-            tokenIds: [tokenId],
+            tokenIds: CollectionOfOne(tokenId),
             sequenceId: sequenceId,
             output: .lastTokenLogits,
             state: &state
@@ -193,7 +191,12 @@
     func commit(tokenId: EdgeToolsToken.ID, sequenceId: Int) throws {
       try self.state.withLock { state in
         try self.ensureContext(&state)
-        try self.evaluate(tokenIds: [tokenId], sequenceId: sequenceId, output: .none, state: &state)
+        try self.evaluate(
+          tokenIds: CollectionOfOne(tokenId),
+          sequenceId: sequenceId,
+          output: .none,
+          state: &state
+        )
       }
     }
 
@@ -240,27 +243,34 @@
     }
 
     private func evaluate(
-      tokenIds: [EdgeToolsToken.ID],
+      tokenIds: some Collection<EdgeToolsToken.ID>,
       sequenceId: Int,
       output: LlamaEvaluationOutput,
       state: inout State
     ) throws {
-      for start in stride(from: 0, to: tokenIds.count, by: Self.evaluationChunkSize) {
-        let end = min(start + Self.evaluationChunkSize, tokenIds.count)
-        let chunk = Array(tokenIds[start..<end])
+      let chunkSize = try state.withContext { $0.batchCapacity }
+      var start = tokenIds.startIndex
+      while start != tokenIds.endIndex {
+        let end =
+          tokenIds.index(
+            start,
+            offsetBy: chunkSize,
+            limitedBy: tokenIds.endIndex
+          ) ?? tokenIds.endIndex
+        let chunk = tokenIds[start..<end]
         let startPosition = state.cachedInputs[sequenceId]?.positionCount ?? 0
+        let wantsLogits = output.wantsLogits && end == tokenIds.endIndex
         try state.withContext {
           try $0.decode(
             tokenIds: chunk,
             startPosition: startPosition,
             sequenceId: sequenceId,
-            wantsLogits: output.wantsLogits && end == tokenIds.count
+            wantsLogits: wantsLogits
           )
         }
+        state.logitsSequenceId = wantsLogits ? sequenceId : nil
         state.cachedInputs[sequenceId, default: CachedInput()].append(tokenIds: chunk)
-      }
-      if output.wantsLogits {
-        state.logitsSequenceId = sequenceId
+        start = end
       }
     }
 
@@ -284,7 +294,7 @@
           guard prefixCount < units.upperBound else { continue }
           let offset = max(prefixCount - units.lowerBound, 0)
           try self.evaluate(
-            tokenIds: Array(tokenIds.dropFirst(offset)),
+            tokenIds: tokenIds.dropFirst(offset),
             sequenceId: sequenceId,
             output: output.wantsLogits && units.upperBound == input.units.count
               ? .lastTokenLogits
@@ -295,6 +305,7 @@
           guard prefixCount <= unitIndex else { continue }
           let unit = input.units[unitIndex]
           let currentPosition = state.cachedInputs[sequenceId]?.positionCount ?? 0
+          let batchSize = try state.withContext { $0.microBatchCapacity }
           let newPosition = try state.withContext {
             try multimodalRuntime.evaluate(
               input: input,
@@ -302,7 +313,7 @@
               chunkIndex: chunkIndex,
               position: currentPosition,
               sequenceId: sequenceId,
-              batchSize: Self.evaluationChunkSize
+              batchSize: batchSize
             )
           }
           state.cachedInputs[sequenceId, default: CachedInput()]
