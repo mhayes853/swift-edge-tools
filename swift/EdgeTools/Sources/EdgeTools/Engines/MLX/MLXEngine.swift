@@ -1490,7 +1490,7 @@
       return false
     }
     if let cachedContext, let inputContext {
-      return cachedContext.hasMediaPrefix(in: inputContext)
+      return cachedContext.continuation(in: inputContext) == .textOnly
     }
     return mlxProcessedImagesEqual(cachedInput.image, input.image)
       && mlxProcessedVideosEqual(cachedInput.video, input.video)

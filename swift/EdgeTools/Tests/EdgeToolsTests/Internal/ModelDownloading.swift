@@ -86,6 +86,7 @@ import Foundation
   enum GGUFModelID: String {
     case qwen3 = "Qwen/Qwen3-0.6B-GGUF"
     case qwen3P5 = "unsloth/Qwen3.5-0.8B-GGUF"
+    case qwen3P5VL = "unsloth/Qwen3.5-2B-GGUF"
     case functionGemma = "ggml-org/functiongemma-270m-it-GGUF"
     case lfm2P5 = "LiquidAI/LFM2.5-230M-GGUF"
     case lfm2P5Thinking = "LiquidAI/LFM2.5-1.2B-Thinking-GGUF"
@@ -97,6 +98,7 @@ import Foundation
       switch self {
       case .qwen3: "Qwen3-0.6B-Q8_0.gguf"
       case .qwen3P5: "Qwen3.5-0.8B-Q4_K_M.gguf"
+      case .qwen3P5VL: "Qwen3.5-2B-Q4_K_M.gguf"
       case .functionGemma: "functiongemma-270m-it-q8_0.gguf"
       case .lfm2P5: "LFM2.5-230M-Q8_0.gguf"
       case .lfm2P5Thinking: "LFM2.5-1.2B-Thinking-Q4_K_M.gguf"
@@ -108,7 +110,7 @@ import Foundation
 
     var multimodalProjectorFile: String? {
       switch self {
-      case .gemma4E2BHybrid: "mmproj-F16.gguf"
+      case .gemma4E2BHybrid, .qwen3P5VL: "mmproj-F16.gguf"
       case .qwen3, .qwen3P5, .functionGemma, .lfm2P5, .lfm2P5Thinking, .miniCPM5,
         .graniteMoeHybrid:
         nil

@@ -297,7 +297,7 @@
     return VLMToolTurnSnapshot(toolCalls: turn.toolCalls, response: turn.response)
   }
 
-  private func redImageAsset() throws -> EdgeToolsTranscript.Asset {
+  func redImageAsset() throws -> EdgeToolsTranscript.Asset {
     let width = 128
     let height = 128
     guard
