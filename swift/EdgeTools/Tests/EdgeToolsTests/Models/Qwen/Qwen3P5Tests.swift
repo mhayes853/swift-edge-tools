@@ -127,5 +127,34 @@ struct `Qwen3P5 tests` {
         withKnownIssue { assertSnapshot(of: generation, as: .dump, record: .all) }
       }
     }
+
+    @Suite(.serialized)
+    struct `Qwen3P5VLLlamaModelEngine tests` {
+      @Test
+      func `Llama Describes Image Snapshot`() async throws {
+        let engine = try await self.multimodalEngine()
+        let response = try await describeRedImage(using: engine)
+
+        withKnownIssue { assertSnapshot(of: response, as: .lines, record: .all) }
+      }
+
+      @Test
+      func `Llama Completes Image Conditioned Tool Turn Snapshot`() async throws {
+        let engine = try await self.multimodalEngine()
+        let result = try await completeImageColorTurn(using: engine)
+
+        withKnownIssue { assertSnapshot(of: result, as: .dump, record: .all) }
+      }
+
+      private func multimodalEngine() async throws -> Qwen3P5VLLlamaModelEngine {
+        let model = try await downloadGGUFMultimodalModel(id: .qwen3P5VL)
+        return try Qwen3P5VLLlamaModelEngine(
+          modelPath: model.model.path(),
+          multimodalProjectorPath: model.projector.path(),
+          contextParameters: LlamaContextParameters(maximumSequenceCount: 1),
+          multimodalParameters: LlamaMultimodalParameters(warmUp: false)
+        )
+      }
+    }
   #endif
 }

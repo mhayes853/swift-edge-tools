@@ -35,4 +35,35 @@ struct `LFM2P5VL tests` {
       }
     }
   #endif
+
+  #if Llama && XGrammar && canImport(CLlama) && !os(WASI)
+    @Suite(.serialized)
+    struct `LFM2P5VLLlamaModelEngine tests` {
+      @Test
+      func `Llama Describes Image Snapshot`() async throws {
+        let engine = try await self.multimodalEngine()
+        let response = try await describeRedImage(using: engine)
+
+        withKnownIssue { assertSnapshot(of: response, as: .lines, record: .all) }
+      }
+
+      @Test
+      func `Llama Completes Image Conditioned Tool Turn Snapshot`() async throws {
+        let engine = try await self.multimodalEngine()
+        let result = try await completeImageColorTurn(using: engine)
+
+        withKnownIssue { assertSnapshot(of: result, as: .dump, record: .all) }
+      }
+
+      private func multimodalEngine() async throws -> LFM2P5VLLlamaModelEngine {
+        let model = try await downloadGGUFMultimodalModel(id: .lfm2P5VL)
+        return try LFM2P5VLLlamaModelEngine(
+          modelPath: model.model.path(),
+          multimodalProjectorPath: model.projector.path(),
+          contextParameters: LlamaContextParameters(maximumSequenceCount: 1),
+          multimodalParameters: LlamaMultimodalParameters(warmUp: false)
+        )
+      }
+    }
+  #endif
 }

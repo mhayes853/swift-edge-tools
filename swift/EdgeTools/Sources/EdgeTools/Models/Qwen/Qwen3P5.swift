@@ -66,7 +66,9 @@ import OrderedCollections
 #endif
 
 #if Llama && XGrammar && canImport(CLlama)
-  public struct Qwen3P5LlamaProfile: LlamaModelProfile {
+  public struct Qwen3P5LlamaProfile:
+    LlamaModelProfile,
+    EdgeToolsMultimodalModelProfile {
     public typealias Prompt = EdgeToolsTranscript
     public typealias GenerationParser = Qwen3P5GenerationParser
     public typealias GenerateParameters = DefaultLlamaGenerateParameters
@@ -119,6 +121,13 @@ import OrderedCollections
   }
 
   public typealias Qwen3P5LlamaModelEngine = LlamaEngine<Qwen3P5LlamaProfile>
+
+  // MARK: - Qwen3P5 VLM Llama Model
+
+  // Qwen3.5 is one GGUF architecture whether or not a projector is loaded, so the vision
+  // variant is the same profile under the name that mirrors the MLX side.
+  public typealias Qwen3P5VLLlamaProfile = Qwen3P5LlamaProfile
+  public typealias Qwen3P5VLLlamaModelEngine = LlamaEngine<Qwen3P5VLLlamaProfile>
 #endif
 
 #if MLX && XGrammar && canImport(CoreImage) && canImport(MLX) && canImport(MLXVLM)

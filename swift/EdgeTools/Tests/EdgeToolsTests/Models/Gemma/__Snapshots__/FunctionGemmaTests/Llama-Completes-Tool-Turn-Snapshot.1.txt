@@ -40,7 +40,7 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 15 elements
+        ▿ parts: 30 elements
           ▿ EdgeToolsGenerationPart
             - text: "The"
           ▿ EdgeToolsGenerationPart
@@ -52,15 +52,47 @@
           ▿ EdgeToolsGenerationPart
             - text: " is"
           ▿ EdgeToolsGenerationPart
-            - text: " sunny"
+            - text: ":"
           ▿ EdgeToolsGenerationPart
-            - text: " with"
+            - text: "\n\n"
           ▿ EdgeToolsGenerationPart
-            - text: " a"
+            - text: "*"
           ▿ EdgeToolsGenerationPart
-            - text: " temperature"
+            - text: "   "
           ▿ EdgeToolsGenerationPart
-            - text: " of"
+            - text: "**"
+          ▿ EdgeToolsGenerationPart
+            - text: "Location"
+          ▿ EdgeToolsGenerationPart
+            - text: ":**"
+          ▿ EdgeToolsGenerationPart
+            - text: " Paris"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n"
+          ▿ EdgeToolsGenerationPart
+            - text: "*"
+          ▿ EdgeToolsGenerationPart
+            - text: "   "
+          ▿ EdgeToolsGenerationPart
+            - text: "**"
+          ▿ EdgeToolsGenerationPart
+            - text: "Condition"
+          ▿ EdgeToolsGenerationPart
+            - text: ":**"
+          ▿ EdgeToolsGenerationPart
+            - text: " Sunny"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n"
+          ▿ EdgeToolsGenerationPart
+            - text: "*"
+          ▿ EdgeToolsGenerationPart
+            - text: "   "
+          ▿ EdgeToolsGenerationPart
+            - text: "**"
+          ▿ EdgeToolsGenerationPart
+            - text: "Temperature"
+          ▿ EdgeToolsGenerationPart
+            - text: ":**"
           ▿ EdgeToolsGenerationPart
             - text: " "
           ▿ EdgeToolsGenerationPart
@@ -69,7 +101,5 @@
             - text: "1"
           ▿ EdgeToolsGenerationPart
             - text: " Celsius"
-          ▿ EdgeToolsGenerationPart
-            - text: "."
   ▿ reasoningEffort: EdgeToolsReasoningEffort
     - rawValue: "default"

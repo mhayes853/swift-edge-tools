@@ -410,31 +410,9 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 30 elements
+        ▿ parts: 29 elements
           ▿ EdgeToolsGenerationPart
-            - reasoning: "Based"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " on"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " the"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " `"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "get"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "Weather"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "`"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " tool"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "\'s"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " result"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: ","
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " the"
+            - reasoning: "The"
           ▿ EdgeToolsGenerationPart
             - reasoning: " weather"
           ▿ EdgeToolsGenerationPart
@@ -452,23 +430,43 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: "unny"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "**"
+            - reasoning: "**."
           ▿ EdgeToolsGenerationPart
-            - reasoning: " at"
+            - reasoning: " The"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " forecast"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " indicates"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " clear"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " skies"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " with"
           ▿ EdgeToolsGenerationPart
             - reasoning: " a"
           ▿ EdgeToolsGenerationPart
+            - reasoning: " pleasant"
+          ▿ EdgeToolsGenerationPart
             - reasoning: " temperature"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " of"
+            - reasoning: ","
           ▿ EdgeToolsGenerationPart
-            - reasoning: " "
+            - reasoning: " making"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "2"
+            - reasoning: " it"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "1"
+            - reasoning: " an"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "°C"
+            - reasoning: " ideal"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " day"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " for"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " outdoor"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " activities"
           ▿ EdgeToolsGenerationPart
             - reasoning: "."
   ▿ reasoningEffort: EdgeToolsReasoningEffort

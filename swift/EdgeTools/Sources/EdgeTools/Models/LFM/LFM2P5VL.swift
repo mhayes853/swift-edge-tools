@@ -102,3 +102,37 @@
     }
   }
 #endif
+
+#if Llama && XGrammar && canImport(CLlama)
+  import EdgeToolsXGrammar
+
+  // MARK: - LFM2P5VL Llama Model
+
+  public struct LFM2P5VLLlamaProfile:
+    LlamaModelProfile,
+    EdgeToolsMultimodalModelProfile {
+    public typealias Prompt = EdgeToolsTranscript
+    public typealias GenerationParser = LFM2P5GenerationParser
+    public typealias GenerateParameters = DefaultLlamaGenerateParameters
+    public typealias GrammarEngine = XGrammarEngine
+
+    public static func multimodalContent(
+      for message: EdgeToolsTranscript.UserMessage
+    ) -> [EdgeToolsMultimodalContent] {
+      [.text(message.content)] + message.images.map(EdgeToolsMultimodalContent.image)
+    }
+
+    public static func grammar(
+      prompt: EdgeToolsTranscript,
+      tools: [EdgeToolDefinition],
+      parameters: DefaultLlamaGenerateParameters,
+      grammarEngine: borrowing XGrammarEngine
+    ) throws -> XGRGrammar {
+      try Self.constrainedGrammar(tools: tools, parameters: parameters, grammarEngine: grammarEngine) {
+        try .lfm2P5(tools: tools, range: $0)
+      }
+    }
+  }
+
+  public typealias LFM2P5VLLlamaModelEngine = LlamaEngine<LFM2P5VLLlamaProfile>
+#endif

@@ -189,6 +189,47 @@ renderer as-is; `rust/tokenizers` drops it), with the same `ChatTemplates` trait
 `LlamaModel` types. "Llama" is understood as llama.cpp, not the model
 family.
 
+### Video input: `mtmd_bitmap_init_lazy`, not the ffmpeg helper
+
+Deferred, but the investigation is done — recorded so the next pass does not repeat it.
+
+`b10076` exposes two video paths and only one of them is usable here.
+
+The **helper path** (`mtmd_helper_video_init` / `mtmd_helper_video_read_next`,
+`mtmd-helper.h:111-157`) shells out to `ffmpeg`/`ffprobe` binaries resolved from `PATH`
+(`mtmd-helper.cpp:790 start_ffmpeg`). It sits behind the `MTMD_VIDEO` compile flag, which
+`scripts/llama/build-artifact.sh` sets to `OFF`; the symbols are linked into the vendored
+artifact but are the stubs that log "video is not supported in this build". This flag
+should stay `OFF`: spawning a subprocess is unavailable on iOS and hostile on Android/WASM,
+llama.cpp's own header calls the implementation "model-agnostic … may not be accurate for
+some specific models", and turning it `ON` also changes `mtmd_helper_bitmap_init_from_buf`
+to fall through to video decoding, which would silently repurpose the `wrapper.video_ctx`
+guard in `LlamaMultimodalRuntime.prepare`.
+
+The **core path** is `mtmd_bitmap_init_lazy` (`mtmd.h:200-206`). It lives in core mtmd with
+no `MTMD_VIDEO` guard, and `_mtmd_bitmap_init_lazy` is confirmed present in the shipped
+`libllama.a`. It takes an ID plus a callback that `mtmd_tokenize` drains
+(`mtmd.cpp:873 expand_lazy_bitmaps`), each call emitting either a bitmap or a text chunk
+until EOF. That is frame-plus-timestamp streaming, and it is exactly what llama.cpp's own
+ffmpeg path is built on. It never materializes the whole video, and the whole video carries
+one ID, which is what `LlamaKVSequenceStore` needs for prefix reuse.
+
+Feeding frames as a *sequence* of bitmaps is the correct representation rather than a
+workaround: `mtmd.cpp:919-949` temporally merges consecutive same-size bitmaps into one
+chunk for qwen-vl-style models (`n_temporal_merge`, capped at 2 frames per group).
+
+So the shape is: EdgeTools owns frame extraction, llama.cpp owns encoding. A public
+frame-provider protocol yielding RGB frames and optional timestamp text, bridged to
+`mtmd_bitmap_init_lazy` — AVFoundation on Apple, `<video>`+canvas via JavaScriptKit on
+WASM, an opt-in ffmpeg-CLI conformance on desktop Linux/Windows, and always a
+caller-supplies-frames path. Worth lifting to the framework rather than the engine, since
+MLX currently delegates video to mlx-swift-lm's Apple-only AVFoundation path.
+
+One hazard to design around: the lazy callback fires synchronously inside `mtmd_tokenize`,
+which runs under `state.withBorrowedLock`. Decoding frames inline would hold that lock for
+the length of the decode, so frames likely want pre-draining into a bounded buffer off the
+locked thread.
+
 ## Implementation Plan
 
 Two parallel early tracks — generic library improvements (A) and llama vendoring (B) —
@@ -623,9 +664,23 @@ output.
   real-model test on attention-only Qwen3.
 - The `b10076` ABI pin now lives in the vendored artifact rather than in a closure
   surface; revisit if a bring-your-own-build path returns.
+- M-RoPE positions vs recurrent memory. Qwen3.5 VL images decode correctly (the
+  `Llama Describes Image Snapshot` reads " red"), but every image ubatch logs
+  `find_slot: non-consecutive token position ...` from `llama_memory_recurrent::find_slot`
+  (`llama-memory-recurrent.cpp:641`). Qwen3.5 is hybrid-recurrent, and M-RoPE positions are
+  not linear: an image ubatch carries the temporal index in section 0 for all of its tokens,
+  so `last_pos != cell.pos + n_seq_tokens`, and the following text chunk resumes at
+  `n_past + n_pos` rather than `n_past + n_tokens`. Both positions come from
+  `mtmd_helper_eval_chunk_single`'s own `new_n_past`, so this is llama.cpp's arithmetic, not
+  ours — upstream's comment there says outright that backtracked/skipped positions are
+  unspecified for recurrent state. Not reproduced by LFM2.5 VL or Gemma 4, whose projectors
+  are not M-RoPE and whose media positions stay linear. Untested consequence: image-conditioned
+  prefix reuse (the `Llama Reuses Image Conditioned Prefix` shape) on an M-RoPE model, since
+  `LlamaKVSequenceStore` trims on positions that the recurrent module already disagrees with.
 
 ## Deferred
 
+- Video input for VLMs, via `mtmd_bitmap_init_lazy` (see the video decision above).
 - Vulkan (Windows/Linux/Android GPU) backend in the vendored artifact.
 - Blob-copy family migration if `n_seq_max` proves limiting.
 - `llama_decode` blocks a cooperative-pool thread during decode (MLX has the same
