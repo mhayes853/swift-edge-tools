@@ -111,14 +111,19 @@
       )
     }
 
-    borrowing func memoryCopy(source: Int, destination: Int, from: Int, to: Int) {
+    borrowing func memoryCopy(source: Int, destination: Int, from: Int, to: Int) -> Bool {
+      let memory = llama_get_memory(self.handle)
+      let sourceMinimumPosition = llama_memory_seq_pos_min(memory, Int32(source))
+      let sourceMaximumPosition = llama_memory_seq_pos_max(memory, Int32(source))
       llama_memory_seq_cp(
-        llama_get_memory(self.handle),
+        memory,
         Int32(source),
         Int32(destination),
         Int32(from),
         Int32(to)
       )
+      return llama_memory_seq_pos_min(memory, Int32(destination)) == sourceMinimumPosition
+        && llama_memory_seq_pos_max(memory, Int32(destination)) == sourceMaximumPosition
     }
 
     borrowing func probeConfidence(sequenceId: Int) -> Float? {
