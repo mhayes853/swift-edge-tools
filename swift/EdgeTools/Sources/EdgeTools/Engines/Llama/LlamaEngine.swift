@@ -1,5 +1,6 @@
 #if Llama && canImport(CLlama)
   import EdgeToolsCore
+  import EdgeToolsLlama
   import EdgeToolsTokenizers
 
   #if FoundationEssentials
@@ -12,6 +13,10 @@
 
   // MARK: - LlamaEngine
 
+  /// A llama.cpp engine.
+  ///
+  /// Initialize `LlamaBackend` before creating an engine and keep it initialized while any engine
+  /// resources remain in use.
   public final class LlamaEngine<Profile: LlamaModelProfile>:
     EdgeToolsEngine, EdgeToolsPrefillableEngine, EdgeToolsTokenizingEngine {
     public typealias Context = LlamaContext<Profile>

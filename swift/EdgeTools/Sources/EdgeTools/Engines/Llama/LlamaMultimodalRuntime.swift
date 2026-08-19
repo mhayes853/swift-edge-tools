@@ -1,6 +1,7 @@
 #if Llama && canImport(CLlama)
   import CLlama
   import EdgeToolsCore
+  import EdgeToolsLlama
 
   // MARK: - LlamaMultimodalParameters
 

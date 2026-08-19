@@ -256,6 +256,12 @@ private func isMultimodalProjectorFile(_ file: String) -> Bool {
 }
 
 private func detectedGGUFModel(at file: URL) throws -> DetectedModel {
+  LlamaBackend.initialize()
+  defer { LlamaBackend.free() }
+  return try detectedGGUFModelWithInitializedBackend(at: file)
+}
+
+private func detectedGGUFModelWithInitializedBackend(at file: URL) throws -> DetectedModel {
   let metadata = try LlamaModelMetadata(contentsOfGGUF: file)
   let architecture = metadata.architecture?.lowercased() ?? ""
   switch architecture {

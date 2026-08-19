@@ -1,38 +1,9 @@
-#if Llama && canImport(CLlama)
+#if canImport(CLlama)
   import CLlama
 
   #if FoundationEssentials
     import _EdgeToolsFoundation
   #endif
-
-  // MARK: - LlamaRuntimeError
-
-  public struct LlamaRuntimeError: Hashable, Sendable, Error {
-    public struct Code: RawRepresentable, Hashable, Sendable {
-      public let rawValue: String
-
-      public init(rawValue: String) {
-        self.rawValue = rawValue
-      }
-
-      public static let modelLoadFailed = Self(rawValue: "model-load-failed")
-      public static let contextCreationFailed = Self(rawValue: "context-creation-failed")
-      public static let tokenizationFailed = Self(rawValue: "tokenization-failed")
-      public static let decodeFailed = Self(rawValue: "decode-failed")
-      public static let multimodalProjectorLoadFailed =
-        Self(rawValue: "multimodal-projector-load-failed")
-      public static let multimodalProcessingFailed = Self(rawValue: "multimodal-processing-failed")
-      public static let vocabularyUnavailable = Self(rawValue: "vocabulary-unavailable")
-    }
-
-    public let code: Code
-    public let message: String
-
-    public init(code: Code, message: String) {
-      self.code = code
-      self.message = message
-    }
-  }
 
   // MARK: - LlamaModelParameters
 
@@ -60,11 +31,14 @@
 
   // MARK: - LlamaModel
 
+  /// An owned llama.cpp model.
+  ///
+  /// Initialize `LlamaBackend` before creating a model directly and keep it initialized for the
+  /// model's lifetime. Higher-level engine APIs manage this lifecycle automatically.
   public struct LlamaModel: ~Copyable, @unchecked Sendable {
     public let handle: OpaquePointer
 
     public init(path: String, parameters: LlamaModelParameters = LlamaModelParameters()) throws {
-      llama_backend_init()
       var modelParameters = llama_model_default_params()
       modelParameters.n_gpu_layers =
         parameters.gpuLayerCount == .max ? -1 : Int32(clamping: parameters.gpuLayerCount)
@@ -109,18 +83,11 @@
     }
   #endif
 
-  // MARK: - LlamaModelBox
-
-  package final class LlamaModelBox: Sendable {
-    package let model: LlamaModel
-
-    package init(model: consuming LlamaModel) {
-      self.model = consume model
-    }
-  }
-
   // MARK: - LlamaModelMetadata
 
+  /// Read-only metadata from a llama.cpp model.
+  ///
+  /// Initialize `LlamaBackend` before loading metadata from a GGUF path.
   public struct LlamaModelMetadata: ~Copyable, Sendable {
     private let model: LlamaModel
 
@@ -158,19 +125,4 @@
     }
   #endif
 
-  // MARK: - Helpers
-
-  package func llamaMeasuredCString(
-    measure: () -> Int32,
-    fill: (UnsafeMutablePointer<CChar>?, Int) -> Int32
-  ) -> String? {
-    let measured = measure()
-    let count = measured >= 0 ? measured : -measured
-    var storage = [CChar](repeating: 0, count: Int(count) + 1)
-    let written = storage.withUnsafeMutableBufferPointer { fill($0.baseAddress, $0.count) }
-    guard written >= 0 else { return nil }
-    return storage.withUnsafeBufferPointer { buffer in
-      String(decoding: buffer.prefix(Int(written)).map { UInt8(bitPattern: $0) }, as: UTF8.self)
-    }
-  }
 #endif

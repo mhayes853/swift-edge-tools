@@ -1,6 +1,6 @@
-#if Llama && canImport(CLlama)
+#if canImport(CLlama)
   import CustomDump
-  import EdgeTools
+  import EdgeToolsLlama
   import Testing
 
   @Suite
