@@ -2,6 +2,20 @@
   import simd
 #endif
 
+#if canImport(Darwin)
+  import Darwin
+#elseif canImport(Glibc)
+  import Glibc
+#elseif canImport(Musl)
+  import Musl
+#elseif canImport(WASILibc)
+  import WASILibc
+#elseif canImport(Android)
+  import Android
+#elseif canImport(ucrt)
+  import ucrt
+#endif
+
 // MARK: - Exp
 
 @inline(always)

@@ -40,9 +40,9 @@ extension EdgeToolsTranscript.Message {
     parts: [EdgeToolsGenerationPart]
   ) -> EdgeToolsValue {
     var message: OrderedDictionary<String, EdgeToolsValue> = ["role": "assistant"]
-    let content = parts.compactMap(\.text).joined()
-    let reasoning = parts.compactMap(\.reasoning).joined()
-    let toolCalls = parts.compactMap(\.toolCall)
+    let content = parts.compactMap { $0.text }.joined()
+    let reasoning = parts.compactMap { $0.reasoning }.joined()
+    let toolCalls = parts.compactMap { $0.toolCall }
     if !content.isEmpty {
       message["content"] = .string(content)
     }
@@ -51,7 +51,7 @@ extension EdgeToolsTranscript.Message {
       message["thinking"] = .string(reasoning)
     }
     if !toolCalls.isEmpty {
-      message["tool_calls"] = .array(toolCalls.map(\.chatTemplateValue))
+      message["tool_calls"] = .array(toolCalls.map { $0.chatTemplateValue })
     }
     return .object(message)
   }
@@ -86,7 +86,9 @@ extension EdgeToolDefinition {
 
 extension Sequence where Element == EdgeToolDefinition {
   var chatTemplateToolValues: [EdgeToolsValue]? {
-    let values = self.filter(\.includesSchemaInInstructions).map(\.chatTemplateValue)
+    let values = self
+      .filter { $0.includesSchemaInInstructions }
+      .map { $0.chatTemplateValue }
     return values.isEmpty ? nil : values
   }
 }

@@ -982,8 +982,8 @@ private func agentToolResponses(
       repeating: nil,
       count: toolCalls.count
     )
-    for try await (index, response) in group {
-      responses[index] = response
+    while let result = try await group.next() {
+      responses[result.0] = result.1
     }
     return responses.compactMap { $0 }
   }

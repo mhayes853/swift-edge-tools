@@ -5,6 +5,20 @@
 import EdgeToolsCore
 import HeapModule
 
+#if canImport(Darwin)
+  import Darwin
+#elseif canImport(Glibc)
+  import Glibc
+#elseif canImport(Musl)
+  import Musl
+#elseif canImport(WASILibc)
+  import WASILibc
+#elseif canImport(Android)
+  import Android
+#elseif canImport(ucrt)
+  import ucrt
+#endif
+
 // MARK: - EdgeToolsCPUSample
 
 public struct EdgeToolsCPUSample: Hashable, Sendable {
