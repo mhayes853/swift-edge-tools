@@ -1,4 +1,5 @@
 import EdgeToolsCore
+import OrderedCollections
 import _Concurrency
 
 #if !$Embedded
@@ -443,7 +444,9 @@ public final class EdgeToolsSessionStream: Sendable, Identifiable {
 
   public var toolCalls: EdgeToolCallCollection {
     self.access(.toolCalls)
-    return self.state.withLock { EdgeToolCallCollection($0.toolCallOutcomes.compactMap(\.call)) }
+    return self.state.withLock {
+      EdgeToolCallCollection($0.toolCallOutcomes.compactMap { $0.call })
+    }
   }
 
   public var toolCallOutcomes: [EdgeToolCallOutcome] {
@@ -1051,7 +1054,7 @@ extension EdgeToolCallOutcome {
         }
         return value
       } catch {
-        return edgeToolErrorResponse(String(describing: error))
+        return edgeToolErrorResponse(edgeToolErrorDescription(error))
       }
     }
   }
@@ -1059,4 +1062,8 @@ extension EdgeToolCallOutcome {
 
 private func edgeToolErrorResponse(_ message: String) -> EdgeToolsValue {
   .object(["error": .string(message)])
+}
+
+private func edgeToolErrorDescription(_ error: any Error) -> String {
+  (error as? EdgeToolsError)?.message ?? "unknown error"
 }
