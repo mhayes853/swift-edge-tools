@@ -66,7 +66,9 @@ import OrderedCollections
 #endif
 
 #if Llama && XGrammar && canImport(CLlama)
-  public struct Qwen3P5LlamaProfile: LlamaModelProfile {
+  public struct Qwen3P5LlamaProfile:
+    LlamaModelProfile,
+    EdgeToolsMultimodalModelProfile {
     public typealias Prompt = EdgeToolsTranscript
     public typealias GenerationParser = Qwen3P5GenerationParser
     public typealias GenerateParameters = DefaultLlamaGenerateParameters

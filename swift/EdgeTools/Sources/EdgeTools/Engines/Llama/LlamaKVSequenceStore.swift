@@ -86,12 +86,23 @@
         }
         state.allocatedSequenceIds.insert(sequenceId)
         if let parentSequenceId {
-          state.context?.memoryCopy(
-            source: parentSequenceId,
-            destination: sequenceId,
-            from: 0,
-            to: -1
-          )
+          if state.context != nil {
+            let copied = try? state.withContext {
+              $0.memoryCopy(
+                source: parentSequenceId,
+                destination: sequenceId,
+                from: 0,
+                to: -1
+              )
+            }
+            if copied != true {
+              _ = try? state.withContext {
+                $0.memoryRemove(sequenceId: sequenceId, from: 0, to: -1)
+              }
+              state.allocatedSequenceIds.remove(sequenceId)
+              return nil
+            }
+          }
           state.cachedInputs[sequenceId] = state.cachedInputs[parentSequenceId] ?? CachedInput()
         } else {
           state.cachedInputs[sequenceId] = CachedInput()
