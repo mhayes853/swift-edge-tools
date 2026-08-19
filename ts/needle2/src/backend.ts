@@ -25,6 +25,7 @@ export interface Needle2Backend {
 		options: Needle2ResolvedGenerateOptions,
 	): Promise<Needle2NativeGeneration>;
 	load(weights: Needle2BinarySource): Promise<void>;
+	reset(): Promise<void>;
 	dispose(): Promise<void>;
 }
 
@@ -42,6 +43,7 @@ export type Needle2WorkerRequest =
 			options: Needle2ResolvedGenerateOptions;
 	  }
 	| { id: number; operation: "load"; weights: Needle2SerializedBinarySource }
+	| { id: number; operation: "reset" }
 	| { id: number; operation: "dispose" };
 
 export type Needle2WorkerResult = Needle2NativeGeneration | undefined;
@@ -130,6 +132,10 @@ export class Needle2WorkerBackend implements Needle2Backend {
 			operation: "load",
 			weights: serializeBinarySource(weights),
 		});
+	}
+
+	async reset(): Promise<void> {
+		await this.request({ operation: "reset" });
 	}
 
 	dispose(): Promise<void> {

@@ -51,6 +51,12 @@ bundled resources. The worker provider always uses the bundled worker implementa
 `.cact` file through `weights`, or use `runtime.load(...)` to replace the weights after
 initialization.
 
+Each runtime keeps the underlying Needle 2 conversation alive after `generate`. To drive a tool
+loop, invoke the returned tool calls, then pass the JSON array of their results to the next
+`generate` call using the same initialization. Call `runtime.reset()` when the conversation is
+complete or before changing the initialization. Direct runtimes share one process-wide native
+model, so another direct runtime must wait until the active runtime is reset or disposed.
+
 Run the full package test suite with `npm test`. It builds the package, runs the Node and browser
 Vitest suites, and then runs the direct and worker providers under both Deno and Bun. The Deno
 runtime test needs read permission for the bundled WASM and model assets; its command is

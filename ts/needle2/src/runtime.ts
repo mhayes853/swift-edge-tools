@@ -153,6 +153,10 @@ export class Needle2Runtime {
 		return this.backend.load(weights);
 	}
 
+	reset(): Promise<void> {
+		return this.backend.reset();
+	}
+
 	dispose(): Promise<void> {
 		return this.backend.dispose();
 	}

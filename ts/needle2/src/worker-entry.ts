@@ -58,6 +58,10 @@ async function handle(
 			await requireBackend().load(request.weights);
 			return undefined;
 
+		case "reset":
+			await requireBackend().reset();
+			return undefined;
+
 		case "dispose":
 			await requireBackend().dispose();
 			backend = undefined;

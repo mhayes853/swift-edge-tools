@@ -75,7 +75,7 @@ test("returns the native error response for truncated generation", async () => {
 	expect(result.errorCode).toBe("truncated");
 });
 
-test("isolates multiple direct runtimes sharing one native module", async () => {
+test("shares one direct model and requires reset between active runtimes", async () => {
 	const thermostat = await needle2({ provider: "direct" });
 	const weather = await needle2({ provider: "direct" });
 	runtimes.push(thermostat, weather);
@@ -92,9 +92,12 @@ test("isolates multiple direct runtimes sharing one native module", async () => 
 	expect(
 		(await thermostat.generate(thermostatPrompt)).functionCalls[0]?.name,
 	).toBe("set_thermostat");
-	expect((await weather.generate(weatherPrompt)).functionCalls[0]?.name).toBe(
-		"get_weather",
-	);
+	await expect(weather.generate(weatherPrompt)).rejects.toMatchObject({
+		code: "active-session",
+	});
+	await thermostat.reset();
+	expect((await weather.generate(weatherPrompt)).functionCalls[0]?.name).toBe("get_weather");
+	await weather.reset();
 	expect(
 		(await thermostat.generate(thermostatPrompt)).functionCalls[0]?.name,
 	).toBe("set_thermostat");

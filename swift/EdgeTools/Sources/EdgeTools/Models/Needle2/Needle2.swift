@@ -2,6 +2,32 @@
   import EdgeToolsCore
   import OrderedCollections
 
+  // MARK: - Needle2Prompt
+
+  public enum Needle2Prompt: Hashable, Sendable {
+    case user(String)
+    case toolResponses([EdgeToolsValue])
+
+    public init(_ userMessage: String) {
+      self = .user(userMessage)
+    }
+
+    var needle2Input: String {
+      switch self {
+      case .user(let message): message
+      case .toolResponses(let responses): EdgeToolsValue.array(responses).orderedJSONString()
+      }
+    }
+  }
+
+  extension Needle2Prompt: ExpressibleByStringLiteral {
+    public init(stringLiteral value: String) {
+      self = .user(value)
+    }
+  }
+
+  public protocol Needle2SessionEngine: EdgeToolsEngine where Prompt == Needle2Prompt {}
+
   // MARK: - Needle2Response
 
   struct Needle2Response: Sendable {
