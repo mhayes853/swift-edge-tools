@@ -283,7 +283,6 @@
     Profile.GenerateParameters == DefaultMLXGenerateParameters
   {
     let task = try engine.generate(
-      tools: [],
       parameters: DefaultMLXGenerateParameters(
         sampler: ArgMaxSampler(),
         maxTokens: 1,

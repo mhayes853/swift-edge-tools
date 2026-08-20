@@ -65,12 +65,12 @@
           arguments: [Self.configurationObject(configuration).jsValue]
         )
       }
-      self.defaultContext = Context(parameters: ContextParameters())
+      self.defaultContext = Context(parameters: ContextParameters(), tools: [])
     }
 
     public init(runtime: sending JSObject) throws {
       self.runtime = JSRemote(try Needle2JSRuntimeObject(runtime).object)
-      self.defaultContext = Context(parameters: ContextParameters())
+      self.defaultContext = Context(parameters: ContextParameters(), tools: [])
     }
 
     deinit {
@@ -89,13 +89,19 @@
       self.defaultContext
     }
 
-    public func context(_ parameters: ContextParameters) -> Context {
-      Context(parameters: parameters)
+    public func context(tools: [any EdgeTool]) -> Context {
+      Context(parameters: ContextParameters(), tools: tools)
+    }
+
+    public func context(
+      _ parameters: ContextParameters,
+      tools: [any EdgeTool]
+    ) -> Context {
+      Context(parameters: parameters, tools: tools)
     }
 
     public func generate(
       prompt: Prompt,
-      tools: [EdgeToolDefinition],
       parameters: sending GenerateParameters,
       context: Context,
       channel: sending EdgeToolsGenerationChannel
@@ -116,6 +122,7 @@
 
       return AnyGenerationTask { stopper in
         let contextParameters = try context.begin()
+        let tools = context.tools.map { $0.definition }
         defer { context.finish() }
         try self.claim(context)
         let request = Needle2JSRequest(

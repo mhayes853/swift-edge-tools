@@ -41,7 +41,7 @@ struct `Qwen3P5 tests` {
       @Test
       func `Completes A Session Tool Turn With The Fused Sampler Snapshot`() async throws {
         let engine = try await Qwen3P5MLXModelEngine(from: downloadQwen3P5())
-        let session = EdgeToolsSession(engine: engine) { WeatherTestTool() }
+        let session = EdgeToolsSession(engine: engine)
         let turn = try await completeWeatherTurn(
           using: session,
           sampling: EdgeToolsFusedSamplingParameters(
@@ -294,7 +294,6 @@ struct `Qwen3P5 tests` {
   ) async throws -> EdgeToolsEngineGeneration {
     let task = try engine.generate(
       prompt: .user(prompt),
-      tools: [],
       parameters: DefaultMLXGenerateParameters(
         sampling: .greedy,
         maxTokens: 1,
@@ -325,7 +324,6 @@ struct `Qwen3P5 tests` {
   ) async throws -> EdgeToolsEngineGeneration {
     let task = try engine.generate(
       prompt: .user(prompt),
-      tools: [],
       parameters: DefaultLlamaGenerateParameters(sampling: .greedy, maxTokens: 1),
       context: context,
       channel: EdgeToolsGenerationChannel()

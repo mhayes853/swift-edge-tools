@@ -50,11 +50,12 @@ swift build --disable-default-traits --traits Foundation
 import EdgeTools
 
 let engine = try await Qwen3MLXModelEngine(from: modelURL)
-let session = EdgeToolsSession(engine: engine, tools: [GetWeather()])
+let session = EdgeToolsSession(engine: engine)
+let context = session.context { GetWeather() }
 
 let generation = try await session.generate(
   prompt: EdgeToolsTranscript(messages: [.user(.init(content: "What is the weather in San Francisco?"))]),
-  context: nil,
+  context: context,
   parameters: .default
 )
 

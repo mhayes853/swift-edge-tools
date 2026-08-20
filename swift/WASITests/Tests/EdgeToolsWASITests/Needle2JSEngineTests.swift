@@ -26,10 +26,8 @@ struct `Needle2JSEngine tests` {
   func `Generates Real Tool Call Through Worker Runtime`() async throws {
     let createRuntime = try #require(JSObject.global["edgeToolsNeedle2Runtime"].object)
     let engine = try await Needle2JSEngine(createRuntime: createRuntime)
-    let context = engine.context()
-    let session = EdgeToolsSession(engine: engine) {
-      Needle2SendEmailTool()
-    }
+    let context = engine.context { Needle2SendEmailTool() }
+    let session = EdgeToolsSession(engine: engine)
 
     let generation = try await session.generate(
       prompt: "Send an email to blob@gmail.com asking them to go hiking.",

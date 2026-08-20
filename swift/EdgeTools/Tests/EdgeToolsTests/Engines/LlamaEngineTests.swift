@@ -178,7 +178,6 @@
   ) async throws -> EdgeToolsEngineGeneration {
     let task = try engine.generate(
       prompt: .user(llamaUserPrompt),
-      tools: [],
       parameters: DefaultLlamaGenerateParameters(sampling: .greedy, maxTokens: 1),
       context: context,
       channel: EdgeToolsGenerationChannel()

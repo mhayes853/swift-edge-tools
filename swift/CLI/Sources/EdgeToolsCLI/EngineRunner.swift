@@ -116,10 +116,11 @@ extension EngineRunner {
       capabilities: capabilities,
       metricsExtractor: metricsExtractor,
       generation: { request, channel in
+        let context = engine.context(tools: definitionTools(request.tools))
         let task = try engine.generate(
           prompt: prompt(request),
-          tools: request.tools,
           parameters: try parameters(request),
+          context: context,
           channel: channel
         )
         return try await task.value
@@ -388,11 +389,11 @@ extension EngineRunner {
       metricsExtractor: Needle2GenerationMetricsExtractor(),
       generation: { request, channel in
         let context = engine.context(
-          Needle2ContextParameters(system: try needle2System(from: request.system))
+          Needle2ContextParameters(system: try needle2System(from: request.system)),
+          tools: definitionTools(request.tools)
         )
         let task = try engine.generate(
-          prompt: request.user,
-          tools: request.tools,
+          prompt: .user(request.user),
           parameters: Needle2GenerateParameters(maxTokens: request.maxTokens),
           context: context,
           channel: channel
@@ -465,7 +466,6 @@ extension EngineRunner {
         let context = llamaContext(engine: engine, cache: cachedContext, request: request)
         let task = try engine.generate(
           prompt: .user(request.user, images: request.images, audio: request.audio),
-          tools: request.tools,
           parameters: DefaultLlamaGenerateParameters(
             sampling: request.sampling,
             constraint: try request.grammar.constraint(toolCallRange: request.toolCallRange),
@@ -479,7 +479,6 @@ extension EngineRunner {
       modelResetting: { cachedContext.withLock { $0 = nil } },
       modelWarmingUp: { request in
         try engine.warmUp(
-          tools: request.tools,
           context: llamaContext(engine: engine, cache: cachedContext, request: request)
         )
       }
@@ -524,7 +523,8 @@ extension EngineRunner {
                 messages: request.system.isEmpty ? [] : [.system(request.system)]
               ),
               reasoningEffort: request.reasoning
-            )
+            ),
+            tools: definitionTools(request.tools)
           )
           let task = try engine.generate(
             prompt: .user(
@@ -532,7 +532,6 @@ extension EngineRunner {
               images: request.images,
               audio: request.audio
             ),
-            tools: request.tools,
             parameters: DefaultMLXGenerateParameters(
               sampling: request.sampling,
               constraint: try request.grammar.constraint(
@@ -580,7 +579,9 @@ private func llamaContext<Profile: LlamaModelProfile>(
   request: GenerationRequest
 ) -> LlamaContext<Profile> {
   cache.withLock { context in
-    if let context {
+    if let context,
+      toolDefinitions(context.tools) == request.tools
+    {
       return context
     }
     let created = engine.context(
@@ -589,11 +590,36 @@ private func llamaContext<Profile: LlamaModelProfile>(
           messages: request.system.isEmpty ? [] : [.system(request.system)]
         ),
         reasoningEffort: request.reasoning
-      )
+      ),
+      tools: definitionTools(request.tools)
     )
     context = created
     return created
   }
+}
+
+private struct DefinitionTool: EdgeTool {
+  typealias Input = EdgeToolsValue
+  typealias Output = EdgeToolsValue
+
+  let definition: EdgeToolDefinition
+
+  var name: String { self.definition.name }
+  var description: String { self.definition.description }
+  var arguments: EdgeToolsGenerationSchema { self.definition.arguments }
+  var includesSchemaInInstructions: Bool { self.definition.includesSchemaInInstructions }
+
+  func invoke(input: EdgeToolsValue) async throws -> EdgeToolsValue {
+    input
+  }
+}
+
+private func definitionTools(_ definitions: [EdgeToolDefinition]) -> [any EdgeTool] {
+  definitions.map { DefinitionTool(definition: $0) as any EdgeTool }
+}
+
+private func toolDefinitions(_ tools: [any EdgeTool]) -> [EdgeToolDefinition] {
+  tools.map { $0.definition }
 }
 
 private func resolvedEngine(

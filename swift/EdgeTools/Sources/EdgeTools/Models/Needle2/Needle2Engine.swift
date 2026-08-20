@@ -30,7 +30,7 @@
 
   // MARK: - Needle2Context
 
-  public final class Needle2Context: Identifiable, Sendable {
+  public final class Needle2Context: EdgeToolsEngineContext {
     private struct State {
       var identifier: UInt64
       var parameters: Needle2ContextParameters
@@ -39,6 +39,7 @@
 
     private let state: Lock<State>
     private let observationRegistrar = _ObservationRegistrar()
+    public let tools: [any EdgeTool]
 
     public var system: Needle2System {
       get {
@@ -91,8 +92,9 @@
       self.state.withBorrowedLock { $0.identifier }
     }
 
-    init(parameters: Needle2ContextParameters) {
+    init(parameters: Needle2ContextParameters, tools: [any EdgeTool]) {
       self.state = Lock(State(identifier: nextNeedle2ContextIdentifier(), parameters: parameters))
+      self.tools = tools
     }
 
     func begin() throws -> Needle2ContextParameters {
@@ -201,20 +203,26 @@
     private let defaultContext: Context
 
     public init() {
-      self.defaultContext = Context(parameters: ContextParameters())
+      self.defaultContext = Context(parameters: ContextParameters(), tools: [])
     }
 
     public func context() -> Context {
       self.defaultContext
     }
 
-    public func context(_ parameters: ContextParameters) -> Context {
-      Context(parameters: parameters)
+    public func context(tools: [any EdgeTool]) -> Context {
+      Context(parameters: ContextParameters(), tools: tools)
+    }
+
+    public func context(
+      _ parameters: ContextParameters,
+      tools: [any EdgeTool]
+    ) -> Context {
+      Context(parameters: parameters, tools: tools)
     }
 
     public func generate(
       prompt: Prompt,
-      tools: [EdgeToolDefinition],
       parameters: sending GenerateParameters,
       context: Context,
       channel: sending EdgeToolsGenerationChannel
@@ -238,6 +246,7 @@
 
       return AnyGenerationTask { stopper in
         let contextParameters = try context.begin()
+        let tools = context.tools.map { $0.definition }
         let request = Needle2Request(
           prompt: prompt.needle2Input,
           initialization: Needle2Initialization(

@@ -6,7 +6,8 @@
   // MARK: - EdgeToolsFMTool
 
   @available(iOS 26.0, macOS 26.0, watchOS 27.0, tvOS 26.0, visionOS 26.0, *)
-  public struct EdgeToolsFMTool<Base: Tool>: EdgeTool where Base.Arguments: Sendable {
+  public struct EdgeToolsFMTool<Base: Tool>: EdgeTool
+  where Base.Arguments: Sendable, Base.Output: ConvertibleToEdgeToolsValue {
     public typealias Input = EdgeToolsFMToolInput<Base.Arguments>
     public typealias Output = Base.Output
 
