@@ -55,10 +55,11 @@ than a closure; that is the shape to build if the need reappears.
 
 Artifact build: `scripts/llama/build-artifact.sh` mirroring `scripts/needle2` and
 `scripts/tokenizers` — clone `b10076`, `git am` the cactus series, CMake per target
-triple, zip a static-library artifactbundle. Backends: Metal + Accelerate on Apple,
-CPU-only elsewhere for v1 (Vulkan deferred; llama.cpp's CPU backend is strong for the
-sub-1B models this framework targets). Binary target conditioned on every platform except
-`.wasi`.
+triple, zip a static-library artifactbundle. Backends: Metal + Accelerate on macOS, iOS,
+tvOS, and visionOS; Accelerate + CPU on watchOS; CPU-only elsewhere for v1 (Vulkan
+deferred; llama.cpp's CPU backend is strong for the sub-1B models this framework targets).
+The current artifact ships every listed platform except Windows and `.wasi`; the Windows
+build definitions remain ready for a later artifact refresh.
 
 ### KV cache and forking: fork-family ownership
 
@@ -266,8 +267,8 @@ independently against the existing MLX/tokenizer test suites.
 
 ### Track B: llama vendoring (parallel with A)
 
-- **B1 — patched artifact. [DONE — Apple slices; linux/android/windows are release
-  chores]** `scripts/llama/build-artifact.sh` mirroring
+- **B1 — patched artifact. [DONE — 14-slice artifact; Windows deferred]**
+  `scripts/llama/build-artifact.sh` mirroring
   `scripts/needle2` conventions: clone `b10076`, `git am` cactus patches 1–4, CMake static
   builds per triple (Apple: Metal + Accelerate; Linux/Windows/Android: CPU), assemble
   headers + modulemap + checksums into `bin/llama-<version>.artifactbundle.zip`.
