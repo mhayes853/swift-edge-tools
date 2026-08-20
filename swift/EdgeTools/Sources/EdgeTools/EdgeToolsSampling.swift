@@ -1,17 +1,3 @@
-import EdgeToolsCore
-
-// MARK: - EdgeToolsSampler
-
-public protocol EdgeToolsSampler<Logits>: Sendable {
-  associatedtype Logits: ~Copyable & ~Escapable
-
-  nonisolated(nonsending) func sample(
-    logits: borrowing Logits
-  ) async throws -> EdgeToolsToken.ID
-}
-
-// MARK: - EdgeToolsFusedSamplingParameters
-
 public struct EdgeToolsFusedSamplingParameters: Hashable, Sendable {
   public var temperature: Float?
   public var topK: Int?

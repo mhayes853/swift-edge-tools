@@ -1,9 +1,10 @@
 import CustomDump
 import EdgeTools
-@testable import EdgeToolsCLI
 import Foundation
 import SnapshotTesting
 import Testing
+
+@testable import EdgeToolsCLI
 
 @Suite(.serialized, .snapshots)
 struct `Command tests` {
@@ -156,6 +157,55 @@ struct `Command tests` {
         "--path", "/models/qwen3", "--prompt", "hello", "--image", directory.path()
       ],
       message: "No image file at \(directory.path())."
+    )
+  }
+
+  @Test
+  func `Rejects An Audio Directory`() async throws {
+    let directory = URL.temporaryDirectory.appending(path: "edge-audio-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    await expectCommandError(
+      arguments: [
+        "--path", "/models/qwen3", "--prompt", "hello", "--audio", directory.path()
+      ],
+      message: "No audio file at \(directory.path())."
+    )
+  }
+
+  @Test
+  func `Forwards Repeated Media Options In Order`() async throws {
+    let directory = URL.temporaryDirectory.appending(path: "edge-media-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let imagePaths = ["first.png", "second.png"].map { directory.appending(path: $0).path() }
+    let audioPaths = ["first.wav", "second.wav"].map { directory.appending(path: $0).path() }
+    for path in imagePaths + audioPaths {
+      try Data().write(to: URL(filePath: path))
+    }
+
+    let requests = LockedBox<GenerationRequest?>(nil)
+    let (context, _) = EdgeContext.test(
+      context: .multimodalStub { requests.value = $0 }
+    )
+
+    try await EdgeCommand.run(
+      arguments: [
+        "--path", "/models/generic", "--engine", "llama", "--prompt", "hello",
+        "--stream", "none", "--image", imagePaths[0], "--image", imagePaths[1],
+        "--audio", audioPaths[0], "--audio", audioPaths[1]
+      ],
+      context: context
+    )
+
+    expectNoDifference(
+      try #require(requests.value).images.map(\.content),
+      imagePaths.map { EdgeToolsTranscript.Asset.Content.path($0) }
+    )
+    expectNoDifference(
+      try #require(requests.value).audio.map(\.content),
+      audioPaths.map { EdgeToolsTranscript.Asset.Content.path($0) }
     )
   }
 

@@ -1,0 +1,385 @@
+▿ EdgeToolsTranscript
+  ▿ messages: 5 elements
+    ▿ Message
+      ▿ system: SystemMessage
+        - content: "Use getWeather when needed. After receiving its result, summarize it for the user."
+    ▿ Message
+      ▿ user: UserMessage
+        - audio: 0 elements
+        - content: "What is the weather in Paris?"
+        - images: 0 elements
+        - videos: 0 elements
+    ▿ Message
+      ▿ assistant: AssistantMessage
+        ▿ parts: 59 elements
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "<think>"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "\n"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "The"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " user"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " wants"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " to"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " know"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " weather"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " in"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " Paris"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "."
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " I"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " need"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " to"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " call"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " get"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "Weather"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " function"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " with"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " location"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " parameter"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " set"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " to"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " Paris"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: ".\n"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n\n"
+          ▿ EdgeToolsGenerationPart
+            ▿ toolCall: EdgeRawToolCall
+              ▿ arguments: EdgeToolsValue
+                ▿ object: 1 key/value pair
+                  ▿ (2 elements)
+                    - key: "location"
+                    ▿ value: EdgeToolsValue
+                      - string: "Paris"
+              - name: "getWeather"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n"
+          ▿ EdgeToolsGenerationPart
+            ▿ toolCall: EdgeRawToolCall
+              ▿ arguments: EdgeToolsValue
+                ▿ object: 1 key/value pair
+                  ▿ (2 elements)
+                    - key: "location"
+                    ▿ value: EdgeToolsValue
+                      - string: "Paris"
+              - name: "getWeather"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n"
+          ▿ EdgeToolsGenerationPart
+            ▿ toolCall: EdgeRawToolCall
+              ▿ arguments: EdgeToolsValue
+                ▿ object: 1 key/value pair
+                  ▿ (2 elements)
+                    - key: "location"
+                    ▿ value: EdgeToolsValue
+                      - string: "Paris"
+              - name: "getWeather"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n"
+          ▿ EdgeToolsGenerationPart
+            ▿ toolCall: EdgeRawToolCall
+              ▿ arguments: EdgeToolsValue
+                ▿ object: 1 key/value pair
+                  ▿ (2 elements)
+                    - key: "location"
+                    ▿ value: EdgeToolsValue
+                      - string: "Paris"
+              - name: "getWeather"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n"
+          ▿ EdgeToolsGenerationPart
+            ▿ toolCall: EdgeRawToolCall
+              ▿ arguments: EdgeToolsValue
+                ▿ object: 1 key/value pair
+                  ▿ (2 elements)
+                    - key: "location"
+                    ▿ value: EdgeToolsValue
+                      - string: "Paris"
+              - name: "getWeather"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n"
+          ▿ EdgeToolsGenerationPart
+            ▿ toolCall: EdgeRawToolCall
+              ▿ arguments: EdgeToolsValue
+                ▿ object: 1 key/value pair
+                  ▿ (2 elements)
+                    - key: "location"
+                    ▿ value: EdgeToolsValue
+                      - string: "Paris"
+              - name: "getWeather"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n"
+          ▿ EdgeToolsGenerationPart
+            ▿ toolCall: EdgeRawToolCall
+              ▿ arguments: EdgeToolsValue
+                ▿ object: 1 key/value pair
+                  ▿ (2 elements)
+                    - key: "location"
+                    ▿ value: EdgeToolsValue
+                      - string: "Paris"
+              - name: "getWeather"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n"
+          ▿ EdgeToolsGenerationPart
+            ▿ toolCall: EdgeRawToolCall
+              ▿ arguments: EdgeToolsValue
+                ▿ object: 1 key/value pair
+                  ▿ (2 elements)
+                    - key: "location"
+                    ▿ value: EdgeToolsValue
+                      - string: "Paris"
+              - name: "getWeather"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n"
+          ▿ EdgeToolsGenerationPart
+            ▿ toolCall: EdgeRawToolCall
+              ▿ arguments: EdgeToolsValue
+                ▿ object: 1 key/value pair
+                  ▿ (2 elements)
+                    - key: "location"
+                    ▿ value: EdgeToolsValue
+                      - string: "Paris"
+              - name: "getWeather"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n"
+          ▿ EdgeToolsGenerationPart
+            ▿ toolCall: EdgeRawToolCall
+              ▿ arguments: EdgeToolsValue
+                ▿ object: 1 key/value pair
+                  ▿ (2 elements)
+                    - key: "location"
+                    ▿ value: EdgeToolsValue
+                      - string: "Paris"
+              - name: "getWeather"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n"
+          ▿ EdgeToolsGenerationPart
+            ▿ toolCall: EdgeRawToolCall
+              ▿ arguments: EdgeToolsValue
+                ▿ object: 1 key/value pair
+                  ▿ (2 elements)
+                    - key: "location"
+                    ▿ value: EdgeToolsValue
+                      - string: "Paris"
+              - name: "getWeather"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n"
+          ▿ EdgeToolsGenerationPart
+            ▿ toolCall: EdgeRawToolCall
+              ▿ arguments: EdgeToolsValue
+                ▿ object: 1 key/value pair
+                  ▿ (2 elements)
+                    - key: "location"
+                    ▿ value: EdgeToolsValue
+                      - string: "Paris"
+              - name: "getWeather"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n"
+          ▿ EdgeToolsGenerationPart
+            ▿ toolCall: EdgeRawToolCall
+              ▿ arguments: EdgeToolsValue
+                ▿ object: 1 key/value pair
+                  ▿ (2 elements)
+                    - key: "location"
+                    ▿ value: EdgeToolsValue
+                      - string: "Paris"
+              - name: "getWeather"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n"
+          ▿ EdgeToolsGenerationPart
+            ▿ toolCall: EdgeRawToolCall
+              ▿ arguments: EdgeToolsValue
+                ▿ object: 1 key/value pair
+                  ▿ (2 elements)
+                    - key: "location"
+                    ▿ value: EdgeToolsValue
+                      - string: "Paris"
+              - name: "getWeather"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n"
+          ▿ EdgeToolsGenerationPart
+            ▿ toolCall: EdgeRawToolCall
+              ▿ arguments: EdgeToolsValue
+                ▿ object: 1 key/value pair
+                  ▿ (2 elements)
+                    - key: "location"
+                    ▿ value: EdgeToolsValue
+                      - string: "Paris"
+              - name: "getWeather"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n"
+    ▿ Message
+      ▿ tool: ToolMessage
+        - name: "getWeather"
+        ▿ response: EdgeToolsValue
+          ▿ object: 3 key/value pairs
+            ▿ (2 elements)
+              - key: "condition"
+              ▿ value: EdgeToolsValue
+                - string: "sunny"
+            ▿ (2 elements)
+              - key: "location"
+              ▿ value: EdgeToolsValue
+                - string: "Paris"
+            ▿ (2 elements)
+              - key: "temperatureCelsius"
+              ▿ value: EdgeToolsValue
+                - integer: 21
+    ▿ Message
+      ▿ assistant: AssistantMessage
+        ▿ parts: 63 elements
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "<think>"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "\n"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "The"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " user"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " asked"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " about"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " weather"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " in"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " Paris"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "."
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " I"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " need"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " to"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " provide"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " information"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " I"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " have"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " received"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "."
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " The"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " response"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " from"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " get"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "Weather"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " function"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " shows"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " that"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " Paris"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " has"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " sunny"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " weather"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " with"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " a"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " temperature"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " of"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " "
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "21"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "°C"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "."
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " I"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " should"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " summarize"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " this"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " information"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " for"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " user"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: ".\n"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n\n"
+          ▿ EdgeToolsGenerationPart
+            - text: "The"
+          ▿ EdgeToolsGenerationPart
+            - text: " weather"
+          ▿ EdgeToolsGenerationPart
+            - text: " in"
+          ▿ EdgeToolsGenerationPart
+            - text: " Paris"
+          ▿ EdgeToolsGenerationPart
+            - text: " is"
+          ▿ EdgeToolsGenerationPart
+            - text: " currently"
+          ▿ EdgeToolsGenerationPart
+            - text: " sunny"
+          ▿ EdgeToolsGenerationPart
+            - text: " with"
+          ▿ EdgeToolsGenerationPart
+            - text: " a"
+          ▿ EdgeToolsGenerationPart
+            - text: " temperature"
+          ▿ EdgeToolsGenerationPart
+            - text: " of"
+  ▿ reasoningEffort: EdgeToolsReasoningEffort
+    - rawValue: "default"

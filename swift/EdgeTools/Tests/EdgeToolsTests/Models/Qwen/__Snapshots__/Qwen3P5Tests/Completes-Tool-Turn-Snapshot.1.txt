@@ -207,21 +207,25 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 17 elements
+        ▿ parts: 19 elements
           ▿ EdgeToolsGenerationPart
-            - reasoning: "The"
+            - reasoning: "###"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " current"
+            - reasoning: " Summary"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " weather"
+            - reasoning: "\n\n"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " in"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " Paris"
+            - reasoning: "Paris"
           ▿ EdgeToolsGenerationPart
             - reasoning: " is"
           ▿ EdgeToolsGenerationPart
+            - reasoning: " currently"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " having"
+          ▿ EdgeToolsGenerationPart
             - reasoning: " sunny"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " weather"
           ▿ EdgeToolsGenerationPart
             - reasoning: " with"
           ▿ EdgeToolsGenerationPart
@@ -237,7 +241,7 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: "1"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " degrees"
+            - reasoning: "°"
           ▿ EdgeToolsGenerationPart
             - reasoning: " Celsius"
           ▿ EdgeToolsGenerationPart

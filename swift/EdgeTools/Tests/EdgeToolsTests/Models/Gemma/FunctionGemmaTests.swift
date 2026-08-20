@@ -20,4 +20,19 @@ struct `FunctionGemma tests` {
       }
     }
   #endif
+
+  #if HuggingFaceTokenizers && Llama && XGrammar && canImport(CLlama) && !os(WASI)
+    @Suite(.serialized)
+    struct `FunctionGemmaLlamaModelEngine tests` {
+      @Test
+      func `Llama Completes Tool Turn Snapshot`() async throws {
+        let engine = try FunctionGemmaLlamaModelEngine(
+          modelPath: (try await downloadGGUFModel(id: .functionGemma)).path()
+        )
+        let transcript = try await completeWeatherTurn(using: engine)
+
+        withKnownIssue { assertSnapshot(of: transcript, as: .dump, record: .all) }
+      }
+    }
+  #endif
 }

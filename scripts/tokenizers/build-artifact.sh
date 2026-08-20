@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-version="0.1.0"
+version="0.2.0"
 script_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repository_directory="$(dirname "$(dirname "$script_directory")")"
 crate_directory="$repository_directory/rust/tokenizers"

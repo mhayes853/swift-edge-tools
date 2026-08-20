@@ -70,14 +70,4 @@ int32_t hf_tokenizer_vocabulary(
   size_t *lengths_count
 );
 
-int32_t hf_template_render(
-  const uint8_t *source,
-  size_t source_count,
-  const uint8_t *context_json,
-  size_t context_json_count,
-  uint8_t *text,
-  size_t text_capacity,
-  size_t *text_count
-);
-
 #endif

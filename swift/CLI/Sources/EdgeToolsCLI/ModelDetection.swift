@@ -1,3 +1,4 @@
+import EdgeTools
 import Foundation
 
 // MARK: - DetectedModel
@@ -60,11 +61,13 @@ public enum DetectedModel: String, Hashable, Sendable, CaseIterable {
 public enum EngineKind: String, CaseIterable, Sendable {
   case mlx
   case needle2
+  case llama
 
   public init?(argument: String) {
     switch argument.lowercased().filter({ $0.isLetter || $0.isNumber }) {
     case "mlx": self = .mlx
     case "needle2": self = .needle2
+    case "llama", "llamacpp": self = .llama
     default: return nil
     }
   }
@@ -83,6 +86,8 @@ public enum EngineKind: String, CaseIterable, Sendable {
       } else {
         false
       }
+    case .llama:
+      true
     }
   }
 
@@ -90,6 +95,7 @@ public enum EngineKind: String, CaseIterable, Sendable {
     switch self {
     case .mlx: files.contains { $0.hasSuffix(".safetensors") }
     case .needle2: true
+    case .llama: files.contains(where: isModelGGUFFile)
     }
   }
 }
@@ -101,38 +107,54 @@ public struct ModelDetection: Hashable, Sendable {
   public var model: DetectedModel
   public var engines: [EngineKind]
   public var files: [String]
+  public var ggufFile: URL?
 
-  public init(directory: URL, model: DetectedModel, engines: [EngineKind], files: [String]) {
+  public init(
+    directory: URL,
+    model: DetectedModel,
+    engines: [EngineKind],
+    files: [String],
+    ggufFile: URL? = nil
+  ) {
     self.directory = directory
     self.model = model
     self.engines = engines
     self.files = files
+    self.ggufFile = ggufFile
   }
 
   public var defaultEngine: EngineKind? {
     let available = self.engines.filter(self.model.supportedEngines.contains)
-    return [.needle2, .mlx].first(where: available.contains)
+    return preferredEngineOrder.first(where: available.contains)
   }
 
   public var unavailableEngines: [EngineKind] {
     self.model.supportedEngines.filter { !self.engines.contains($0) }
+  }
+
+  public var multimodalProjectorFiles: [URL] {
+    self.files
+      .filter(isMultimodalProjectorFile)
+      .map { self.directory.appending(path: $0) }
   }
 }
 
 // MARK: - Detecting
 
 extension ModelDetection {
-  public static func detect(in directory: URL) throws -> Self {
+  public static func detect(in directory: URL, quant: String? = nil) throws -> Self {
     let files = (try? FileManager.default.contentsOfDirectory(atPath: directory.path()))?.sorted()
     guard let files, !files.isEmpty else {
       throw EdgeCLIError("Model directory \(directory.path()) is empty.")
     }
-    let model = try detectedModel(in: directory, files: files)
+    let ggufFile = try resolvedGGUFFile(in: directory, files: files, quant: quant)
+    let model = try detectedModel(in: directory, files: files, ggufFile: ggufFile)
     return Self(
       directory: directory,
       model: model,
       engines: model.supportedEngines.filter { $0.hasWeights(in: files) },
-      files: files
+      files: files,
+      ggufFile: ggufFile
     )
   }
 }
@@ -149,9 +171,16 @@ private struct ConfigurationHeader: Decodable {
   }
 }
 
-private func detectedModel(in directory: URL, files: [String]) throws -> DetectedModel {
+private func detectedModel(
+  in directory: URL,
+  files: [String],
+  ggufFile: URL?
+) throws -> DetectedModel {
   let configurationFile = ["configuration.json", "config.json"].first { files.contains($0) }
   guard let configurationFile else {
+    if let ggufFile {
+      return try detectedGGUFModel(at: ggufFile)
+    }
     throw EdgeCLIError(
       "No config.json or configuration.json in \(directory.path()) — cannot identify the model."
     )
@@ -175,6 +204,72 @@ private func detectedModel(in directory: URL, files: [String]) throws -> Detecte
     return .miniCPM5
   default:
     return hasProcessorConfiguration(files) ? .genericVLM : .genericLLM
+  }
+}
+
+private let preferredEngineOrder: [EngineKind] = {
+  #if arch(arm64) && canImport(Darwin)
+    [.needle2, .mlx, .llama]
+  #else
+    [.needle2, .llama, .mlx]
+  #endif
+}()
+
+private func resolvedGGUFFile(in directory: URL, files: [String], quant: String?) throws -> URL? {
+  let ggufs = files.filter(isModelGGUFFile)
+  guard !ggufs.isEmpty else { return nil }
+  guard let quant else {
+    guard ggufs.count == 1 else {
+      throw EdgeCLIError(
+        """
+        \(directory.path()) holds several GGUF files. Pick one with --quant: \
+        \(ggufs.joined(separator: " · ")).
+        """
+      )
+    }
+    return directory.appending(path: ggufs[0])
+  }
+  let matches = ggufs.filter { $0.lowercased().contains(quant.lowercased()) }
+  switch matches.count {
+  case 1:
+    return directory.appending(path: matches[0])
+  case 0:
+    throw EdgeCLIError(
+      """
+      No GGUF file matching --quant \(quant) in \(directory.path()). \
+      Available: \(ggufs.joined(separator: " · ")).
+      """
+    )
+  default:
+    throw EdgeCLIError(
+      "--quant \(quant) matches several GGUF files: \(matches.joined(separator: " · "))."
+    )
+  }
+}
+
+private func isModelGGUFFile(_ file: String) -> Bool {
+  file.lowercased().hasSuffix(".gguf") && !isMultimodalProjectorFile(file)
+}
+
+private func isMultimodalProjectorFile(_ file: String) -> Bool {
+  file.lowercased().hasSuffix(".gguf") && file.lowercased().contains("mmproj")
+}
+
+private func detectedGGUFModel(at file: URL) throws -> DetectedModel {
+  let metadata = try LlamaModelMetadata(contentsOfGGUF: file)
+  let architecture = metadata.architecture?.lowercased() ?? ""
+  switch architecture {
+  case "qwen3": return .qwen3
+  case "qwen35": return .qwen3P5
+  case "gemma3": return .functionGemma
+  case "lfm2": return .lfm2
+  case "granite": return .granite
+  case "granitehybrid": return .graniteMoeHybrid
+  case "llama" where metadata.chatTemplate?.contains("<function") == true: return .miniCPM5
+  default:
+    // Cactus' Gemma 4 exports carry a repo-specific architecture rather than a canonical one.
+    return architecture.contains("gemma-4") || architecture.contains("gemma4")
+      ? .gemma4 : .genericLLM
   }
 }
 

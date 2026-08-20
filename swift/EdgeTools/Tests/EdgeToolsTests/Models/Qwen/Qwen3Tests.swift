@@ -74,4 +74,66 @@ struct `Qwen3 tests` {
       }
     }
   #endif
+
+  #if HuggingFaceTokenizers && Llama && XGrammar && canImport(CLlama) && !os(WASI)
+    @Suite(.serialized)
+    struct `Qwen3LlamaModelEngine tests` {
+      @Test
+      func `Llama Completes Tool Turn Snapshot`() async throws {
+        let engine = try Qwen3LlamaModelEngine(
+          modelPath: (try await downloadGGUFModel(id: .qwen3)).path()
+        )
+        let transcript = try await completeWeatherTurn(using: engine)
+
+        withKnownIssue { assertSnapshot(of: transcript, as: .dump, record: .all) }
+      }
+
+      @Test
+      func `Llama Generates Reasoning Snapshot`() async throws {
+        let engine = try Qwen3LlamaModelEngine(
+          modelPath: (try await downloadGGUFModel(id: .qwen3)).path()
+        )
+        let generation = try await generateReasoning(using: engine)
+
+        withKnownIssue { assertSnapshot(of: generation, as: .dump, record: .all) }
+      }
+
+      @Test
+      func `Llama Forked System Prefill Only Processes User Suffix`() async throws {
+        let engine = try Qwen3LlamaModelEngine(
+          modelPath: (try await downloadGGUFModel(id: .qwen3)).path()
+        )
+        let systemPrompt = "You are a helpful assistant."
+        let parameters = EdgeToolsTranscriptContextParameters(
+          transcript: EdgeToolsTranscript(messages: [.system(systemPrompt)]),
+          reasoningEffort: .none
+        )
+        let context = engine.context(parameters)
+        let prefill = try await engine.prefill(context: context)
+
+        let forkedTask = try engine.generate(
+          prompt: .user("Say hello in one word."),
+          tools: [],
+          parameters: DefaultLlamaGenerateParameters(maxTokens: 1),
+          context: context.fork(),
+          channel: EdgeToolsGenerationChannel()
+        )
+        let forked = try await forkedTask.value
+
+        let freshTask = try engine.generate(
+          prompt: .user("Say hello in one word."),
+          tools: [],
+          parameters: DefaultLlamaGenerateParameters(maxTokens: 1),
+          context: engine.context(parameters),
+          channel: EdgeToolsGenerationChannel()
+        )
+        let fresh = try await freshTask.value
+
+        expectNoDifference(
+          forked.prefillMetrics.tokens + prefill.metrics.tokens,
+          fresh.prefillMetrics.tokens
+        )
+      }
+    }
+  #endif
 }

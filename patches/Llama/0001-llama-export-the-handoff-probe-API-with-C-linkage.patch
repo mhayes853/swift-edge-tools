@@ -1,0 +1,100 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: build <build@edge>
+Date: Sun, 16 Aug 2026 15:14:11 -0700
+Subject: [PATCH] llama : export the handoff probe API with C linkage
+
+The probe entry points live in the llama-ext.h staging header without C
+linkage, which makes them unreachable from C and Swift consumers of the
+static library. Wrap the definitions in extern "C" and surface the
+declarations from llama.h inside its extern "C" block.
+---
+ include/llama.h       | 14 ++++++++++++++
+ src/llama-context.cpp |  4 ++--
+ src/llama-ext.h       |  6 +++---
+ src/llama-model.cpp   |  2 +-
+ 4 files changed, 20 insertions(+), 6 deletions(-)
+
+diff --git a/include/llama.h b/include/llama.h
+index a311ac2..bc49c8a 100644
+--- a/include/llama.h
++++ b/include/llama.h
+@@ -1589,6 +1589,20 @@ extern "C" {
+             ggml_opt_epoch_callback   callback_train,
+             ggml_opt_epoch_callback   callback_eval);
+ 
++    //
++    // handoff probe (gemma-4-e2b-it-hybrid hybrid inference)
++    //
++
++    // returns true if the model has a handoff probe head
++    LLAMA_API bool llama_model_has_probe(const struct llama_model * model);
++
++    // confidence that the answer generated for seq_id is correct (1 - p_wrong), in [0, 1]
++    // returns -1.0 if the model has no probe or no rows were accumulated for seq_id
++    LLAMA_API float llama_probe_confidence(struct llama_context * ctx, llama_seq_id seq_id);
++
++    // reset the accumulated probe state of seq_id (call before starting a new request)
++    LLAMA_API void llama_probe_reset(struct llama_context * ctx, llama_seq_id seq_id);
++
+ #ifdef __cplusplus
+ }
+ #endif
+diff --git a/src/llama-context.cpp b/src/llama-context.cpp
+index 69c755a..17246ca 100644
+--- a/src/llama-context.cpp
++++ b/src/llama-context.cpp
+@@ -3833,13 +3833,13 @@ float * llama_get_embeddings_layer_inp(llama_context * ctx, uint32_t lid) {
+     return ctx->get_embeddings_layer_inp(lid);
+ }
+ 
+-float llama_probe_confidence(llama_context * ctx, llama_seq_id seq_id) {
++extern "C" float llama_probe_confidence(llama_context * ctx, llama_seq_id seq_id) {
+     ctx->synchronize();
+ 
+     return ctx->probe_confidence(seq_id);
+ }
+ 
+-void llama_probe_reset(llama_context * ctx, llama_seq_id seq_id) {
++extern "C" void llama_probe_reset(llama_context * ctx, llama_seq_id seq_id) {
+     ctx->probe_reset(seq_id);
+ }
+ 
+diff --git a/src/llama-ext.h b/src/llama-ext.h
+index 902c466..b70dfb1 100644
+--- a/src/llama-ext.h
++++ b/src/llama-ext.h
+@@ -121,15 +121,15 @@ LLAMA_API llama_context * llama_get_ctx_other(struct llama_context * ctx);
+ //
+ 
+ // returns true if the model has a handoff probe head
+-LLAMA_API bool llama_model_has_probe(const struct llama_model * model);
++LLAMA_API extern "C" bool llama_model_has_probe(const struct llama_model * model);
+ 
+ // confidence that the answer generated for seq_id is correct (1 - p_wrong), in [0, 1]
+ // returns -1.0 if the model has no probe or no rows were accumulated for seq_id
+-LLAMA_API float llama_probe_confidence(struct llama_context * ctx, llama_seq_id seq_id);
++LLAMA_API extern "C" float llama_probe_confidence(struct llama_context * ctx, llama_seq_id seq_id);
+ 
+ // reset the accumulated probe state of seq_id (call before starting a new request)
+ // note: the state is also reset automatically when seq_id decodes a token at pos 0
+-LLAMA_API void llama_probe_reset(struct llama_context * ctx, llama_seq_id seq_id);
++LLAMA_API extern "C" void llama_probe_reset(struct llama_context * ctx, llama_seq_id seq_id);
+ 
+ //
+ // model/context data extraction
+diff --git a/src/llama-model.cpp b/src/llama-model.cpp
+index dcb58cd..9b0b5d5 100644
+--- a/src/llama-model.cpp
++++ b/src/llama-model.cpp
+@@ -2714,7 +2714,7 @@ bool llama_model_is_diffusion(const llama_model * model) {
+     return llm_arch_is_diffusion(model->arch);
+ }
+ 
+-bool llama_model_has_probe(const llama_model * model) {
++extern "C" bool llama_model_has_probe(const llama_model * model) {
+     return model->arch == LLM_ARCH_GEMMA_4_E2B_IT_HYBRID;
+ }
+ 
+-- 
+2.47.0
+

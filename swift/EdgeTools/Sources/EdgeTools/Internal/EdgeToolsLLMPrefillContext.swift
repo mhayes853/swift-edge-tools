@@ -4,6 +4,12 @@
 
   // MARK: - EdgeToolsLLMPrefillContext
 
+  enum EdgeToolsLLMPrefillContinuation: Equatable {
+    case textOnly
+    case additionalMedia
+    case incompatible
+  }
+
   struct EdgeToolsLLMPrefillContext: Hashable {
     private enum Message: Hashable {
       case system(String)
@@ -16,6 +22,10 @@
       let images: [Asset]
       let videos: [Asset]
       let audio: [Asset]
+
+      var isEmpty: Bool {
+        self.images.isEmpty && self.videos.isEmpty && self.audio.isEmpty
+      }
     }
 
     private enum Asset: Hashable {
@@ -72,9 +82,16 @@
       self.tools = tools
     }
 
-    func hasMediaPrefix(in other: Self) -> Bool {
-      self.media.count <= other.media.count
-        && zip(self.media, other.media).allSatisfy(==)
+    func continuation(in other: Self) -> EdgeToolsLLMPrefillContinuation {
+      guard self.media.count <= other.media.count else {
+        return .incompatible
+      }
+      guard zip(self.media, other.media).allSatisfy(==) else {
+        return .incompatible
+      }
+      return other.media.dropFirst(self.media.count).allSatisfy(\.isEmpty)
+        ? .textOnly
+        : .additionalMedia
     }
   }
 #endif

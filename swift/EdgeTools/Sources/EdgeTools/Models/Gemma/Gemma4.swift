@@ -10,7 +10,7 @@
   import MLXNN
   import MLXVLM
 
-  public struct Gemma4MLXProfile: MLXVLMModelProfile {
+  public struct Gemma4MLXProfile: MLXVLMModelProfile, EdgeToolsMultimodalModelProfile {
     public typealias Prompt = EdgeToolsTranscript
     public typealias GenerationParser = Gemma4GenerationParser
     public typealias GenerateParameters = DefaultMLXGenerateParameters
@@ -103,23 +103,6 @@
   }
 
   extension EdgeToolsTranscript {
-    fileprivate var gemma4PreparedForReasoning: Self {
-      guard self.reasoningEffort != .default, self.reasoningEffort.isEnabled else { return self }
-      var prompt = self
-      if case .system(let message) = prompt.messages.first {
-        guard !message.content.hasPrefix("<|think|>\n") else { return prompt }
-        prompt.messages[0] = .system(
-          EdgeToolsTranscript.SystemMessage(content: "<|think|>\n\(message.content)")
-        )
-      } else {
-        prompt.messages.insert(
-          .system(EdgeToolsTranscript.SystemMessage(content: "<|think|>")),
-          at: 0
-        )
-      }
-      return prompt
-    }
-
     fileprivate func gemma4UserInput(
       tools: [EdgeToolDefinition],
       addGenerationPrompt: Bool
@@ -132,9 +115,10 @@
         case .system:
           return try message.mlxMessage()
         case .user(let message):
-          var content: [MLXLMCommon.Message] = message.images.map { _ in ["type": "image"] }
-          content.append(["type": "text", "text": message.content])
-          return ["role": "user", "content": content]
+          return [
+            "role": "user",
+            "content": Gemma4MLXProfile.multimodalContent(for: message).map(\.mlxMessage)
+          ]
         case .assistant, .tool:
           var result = try message.mlxMessage()
           if let text = result["content"] as? String {
@@ -146,6 +130,9 @@
     }
   }
 
+#endif
+
+#if XGrammar
   extension XGRGrammar {
     static func gemma4Reasoning() throws -> XGRGrammar {
       let opener = try Self.literal("<|channel>thought\n")
@@ -154,3 +141,66 @@
     }
   }
 #endif
+
+#if Llama && XGrammar && canImport(CLlama)
+  public struct Gemma4LlamaProfile:
+    LlamaModelProfile,
+    EdgeToolsMultimodalModelProfile {
+    public typealias Prompt = EdgeToolsTranscript
+    public typealias GenerationParser = Gemma4GenerationParser
+    public typealias GenerateParameters = DefaultLlamaGenerateParameters
+    public typealias GrammarEngine = XGrammarEngine
+
+    public static var extraStopTokens: Set<String> { ["<|tool_response>"] }
+
+    public static func grammar(
+      prompt: EdgeToolsTranscript,
+      tools: [EdgeToolDefinition],
+      parameters: DefaultLlamaGenerateParameters,
+      grammarEngine: borrowing XGrammarEngine
+    ) throws -> XGRGrammar {
+      try Self.constrainedGrammar(
+        tools: tools,
+        parameters: parameters,
+        grammarEngine: grammarEngine
+      ) { range in
+        let toolCalls = try XGRGrammar.gemma4(tools: tools, range: range)
+        guard prompt.reasoningEffort != .default, prompt.reasoningEffort.isEnabled else {
+          return toolCalls
+        }
+        return try XGRGrammar.gemma4Reasoning().concatenate(toolCalls)
+      }
+    }
+
+    public static func prepare(
+      prompt: inout EdgeToolsTranscript,
+      tools: [EdgeToolDefinition],
+      parser: inout Gemma4GenerationParser
+    ) {
+      prompt = prompt.gemma4PreparedForReasoning
+    }
+  }
+
+  public typealias Gemma4LlamaModelEngine = LlamaEngine<Gemma4LlamaProfile>
+#endif
+
+// MARK: - Gemma4 Reasoning Preparation
+
+extension EdgeToolsTranscript {
+  var gemma4PreparedForReasoning: Self {
+    guard self.reasoningEffort != .default, self.reasoningEffort.isEnabled else { return self }
+    var prompt = self
+    if case .system(let message) = prompt.messages.first {
+      guard !message.content.hasPrefix("<|think|>\n") else { return prompt }
+      prompt.messages[0] = .system(
+        EdgeToolsTranscript.SystemMessage(content: "<|think|>\n\(message.content)")
+      )
+    } else {
+      prompt.messages.insert(
+        .system(EdgeToolsTranscript.SystemMessage(content: "<|think|>")),
+        at: 0
+      )
+    }
+    return prompt
+  }
+}

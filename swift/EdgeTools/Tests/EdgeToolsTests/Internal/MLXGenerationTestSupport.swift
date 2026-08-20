@@ -8,11 +8,7 @@
   import UniformTypeIdentifiers
 
   private enum MLXGenerationTestError: Error {
-    case missingToolCall
     case missingToolOutput
-    case missingFinalResponse
-    case missingReasoning
-    case missingUserMessage
     case failedToCreateImage
     case failedToCreateVideo
     case failedToAppendVideoFrame
@@ -30,14 +26,28 @@
       using: engine,
       prompt: .weatherTest,
       tool: .weatherTest,
-      toolResponse: [
-        "location": "Paris",
-        "condition": "sunny",
-        "temperatureCelsius": 21
-      ],
+      toolResponse: .weatherTestResponse,
       toolMaxTokens: 256
     )
     .transcript
+  }
+
+  func generateReasoning<Profile: MLXModelProfile>(
+    using engine: MLXEngine<Profile>
+  ) async throws -> EdgeToolsEngineGeneration
+  where
+    Profile.Prompt == EdgeToolsTranscript,
+    Profile.GenerateParameters == DefaultMLXGenerateParameters
+  {
+    try await reasoningGeneration(
+      from: try engine.generate(
+        prompt: .user(.reasoningTest),
+        tools: [],
+        parameters: DefaultMLXGenerateParameters(maxTokens: 512),
+        context: engine.context(MLXContextParameters(reasoningEffort: .high)),
+        channel: EdgeToolsGenerationChannel()
+      )
+    )
   }
 
   struct SessionWeatherTurnSnapshot: Hashable, Sendable {
@@ -66,7 +76,7 @@
       )
     )
     guard let toolCall = toolGeneration.toolCalls.first else {
-      throw MLXGenerationTestError.missingToolCall
+      throw GenerationTestError.missingToolCall
     }
     guard let toolOutput = try await toolCall.output as? String else {
       throw MLXGenerationTestError.missingToolOutput
@@ -84,7 +94,7 @@
       channel: EdgeToolsGenerationChannel()
     )
     let response = try await responseTask.value.response
-    guard !response.isEmpty else { throw MLXGenerationTestError.missingFinalResponse }
+    guard !response.isEmpty else { throw GenerationTestError.missingFinalResponse }
     return SessionWeatherTurnSnapshot(
       toolCalls: toolGeneration.engineGeneration.toolCalls,
       toolOutput: toolOutput,
@@ -109,58 +119,7 @@
     }
   }
 
-  func generateReasoning<Profile: MLXModelProfile>(
-    using engine: MLXEngine<Profile>
-  ) async throws -> EdgeToolsEngineGeneration
-  where
-    Profile.Prompt == EdgeToolsTranscript,
-    Profile.GenerateParameters == DefaultMLXGenerateParameters
-  {
-    let context = engine.context(
-      MLXContextParameters(reasoningEffort: .high)
-    )
-    let task = try engine.generate(
-      prompt: .user(
-        "Think carefully before answering: what is the sum of 19 and 23? Keep the final answer brief."
-      ),
-      tools: [],
-      parameters: DefaultMLXGenerateParameters(maxTokens: 512),
-      context: context,
-      channel: EdgeToolsGenerationChannel()
-    )
-    let generation = try await task.value
-    guard !generation.reasoning.isEmpty else {
-      throw MLXGenerationTestError.missingReasoning
-    }
-    return generation
-  }
-
-  extension EdgeToolsTranscript {
-    static let weatherTest = Self(messages: [
-      .system(
-        "Use getWeather when needed. After receiving its result, summarize it for the user."
-      ),
-      .user("What is the weather in Paris?")
-    ])
-  }
-
   extension EdgeToolDefinition {
-    fileprivate static let weatherTest = Self(
-      name: "getWeather",
-      description: "Gets the weather for a city.",
-      arguments: EdgeToolsGenerationSchema(
-        .type(.object),
-        .properties([
-          "location": EdgeToolsGenerationSchema(
-            .string,
-            .enum(["Paris"])
-          )
-        ]),
-        .required(["location"]),
-        .additionalProperties(false)
-      )
-    )
-
     fileprivate static let colorTest = Self(
       name: "reportColor",
       description: "Reports the dominant color visible in an image.",
@@ -231,50 +190,39 @@
     tool: EdgeToolDefinition,
     toolResponse: EdgeToolsValue,
     toolMaxTokens: Int
-  ) async throws -> (
-    transcript: EdgeToolsTranscript,
-    toolCalls: [EdgeRawToolCall],
-    response: String
-  )
+  ) async throws -> ToolTurnSnapshot
   where
     Profile.Prompt == EdgeToolsTranscript,
     Profile.GenerateParameters == DefaultMLXGenerateParameters
   {
     let turn = try splitUserMessage(from: prompt)
     let context = engine.context(MLXContextParameters(transcript: turn.transcript))
-    let toolGenerationTask = try engine.generate(
-      prompt: .user(turn.userMessage),
-      tools: [tool],
-      parameters: DefaultMLXGenerateParameters(
-        sampler: ArgMaxSampler(),
-        constraint: .toolsWithGrammar(range: .exact(1)),
-        maxTokens: toolMaxTokens
-      ),
-      context: context,
-      channel: EdgeToolsGenerationChannel()
-    )
-    let toolGeneration = try await toolGenerationTask.value
-    guard !toolGeneration.toolCalls.isEmpty else {
-      throw MLXGenerationTestError.missingToolCall
-    }
-
-    context.transcript.messages.append(.tool(name: tool.name, response: toolResponse))
-
-    let responseGenerationTask = try engine.generate(
-      tools: [],
-      parameters: DefaultMLXGenerateParameters(maxTokens: 64),
-      context: context,
-      channel: EdgeToolsGenerationChannel()
-    )
-    let responseGeneration = try await responseGenerationTask.value
-    guard !responseGeneration.response.isEmpty else {
-      throw MLXGenerationTestError.missingFinalResponse
-    }
-
-    return (
-      transcript: context.transcript,
-      toolCalls: toolGeneration.toolCalls,
-      response: responseGeneration.response
+    return try await completeToolTurn(
+      in: context,
+      tool: tool,
+      toolResponse: toolResponse,
+      generatingToolCall: {
+        try engine.generate(
+          prompt: .user(turn.userMessage),
+          tools: [tool],
+          parameters: DefaultMLXGenerateParameters(
+            sampler: ArgMaxSampler(),
+            constraint: .toolsWithGrammar(range: .exact(1)),
+            maxTokens: toolMaxTokens
+          ),
+          context: context,
+          channel: EdgeToolsGenerationChannel()
+        )
+      },
+      generatingResponse: { toolMessage in
+        try engine.generate(
+          prompt: .tools([toolMessage]),
+          tools: [],
+          parameters: DefaultMLXGenerateParameters(maxTokens: 64),
+          context: context,
+          channel: EdgeToolsGenerationChannel()
+        )
+      }
     )
   }
 
@@ -349,20 +297,7 @@
     return VLMToolTurnSnapshot(toolCalls: turn.toolCalls, response: turn.response)
   }
 
-  private func splitUserMessage(
-    from transcript: EdgeToolsTranscript
-  ) throws -> (
-    transcript: EdgeToolsTranscript,
-    userMessage: EdgeToolsTranscript.UserMessage
-  ) {
-    var transcript = transcript
-    guard case .user(let userMessage) = transcript.messages.popLast() else {
-      throw MLXGenerationTestError.missingUserMessage
-    }
-    return (transcript, userMessage)
-  }
-
-  private func redImageAsset() throws -> EdgeToolsTranscript.Asset {
+  func redImageAsset() throws -> EdgeToolsTranscript.Asset {
     let width = 128
     let height = 128
     guard

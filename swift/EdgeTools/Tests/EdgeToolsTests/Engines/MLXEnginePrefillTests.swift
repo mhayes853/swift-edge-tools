@@ -71,10 +71,29 @@
         context.transcript = .tokens([10, 11, 12], imageValue: 1)
         _ = try await engine.prefill(context: context)
 
-        context.transcript = .tokens([10, 11, 12, 13, 14], imageValue: 1)
+        context.transcript = .tokens([
+          ([10, 11, 12], 1),
+          ([13, 14], nil)
+        ])
         let extended = try await engine.prefill(context: context)
 
         expectNoDifference(extended.metrics.tokens, 2)
+      }
+
+      @Test
+      func `Extending Prefill With Another Image Processes Full Input`() async throws {
+        let engine = try makePrefillTestEngine(VLMPrefillTestProfile.self)
+        let context = engine.context()
+        context.transcript = .tokens([10, 11, 12], imageValue: 1)
+        _ = try await engine.prefill(context: context)
+
+        context.transcript = .tokens([
+          ([10, 11, 12], 1),
+          ([13, 14], 2)
+        ])
+        let extended = try await engine.prefill(context: context)
+
+        expectNoDifference(extended.metrics.tokens, 5)
       }
     }
   #endif
@@ -163,19 +182,29 @@
       _ tokenIds: [EdgeToolsToken.ID],
       imageValue: UInt8? = nil
     ) -> Self {
+      self.tokens([(tokenIds, imageValue)])
+    }
+
+    fileprivate static func tokens(
+      _ messages: [([EdgeToolsToken.ID], UInt8?)]
+    ) -> Self {
       Self(
-        messages: [
+        messages: messages.map { tokenIds, imageValue in
           .user(
             tokenIds.map(String.init).joined(separator: ","),
             images: imageValue.map { [Asset(bytes: [$0])] } ?? []
           )
-        ]
+        }
       )
     }
 
     fileprivate var prefillTestTokenIds: [EdgeToolsToken.ID] {
-      guard case .user(let message) = self.messages.last else { return [] }
-      return message.content.split(separator: ",").compactMap { EdgeToolsToken.ID($0) }
+      self.messages.flatMap { message -> [EdgeToolsToken.ID] in
+        guard case .user(let message) = message else {
+          return []
+        }
+        return message.content.split(separator: ",").compactMap { EdgeToolsToken.ID($0) }
+      }
     }
 
     fileprivate var prefillTestImageValue: Float? {

@@ -93,6 +93,7 @@ public struct CLIMetricFormat: Hashable, Sendable {
   public static let milliseconds = Self(precision: 0, suffix: "ms")
   public static let tokensPerSecond = Self(precision: 1, suffix: " tok/s")
   public static let megabytes = Self(precision: 1, suffix: " MB")
+  public static let percentage = Self(precision: 1, suffix: "%")
 
   func string(from value: Double) -> String {
     self.numberString(from: value) + self.suffix
@@ -103,13 +104,46 @@ public struct CLIMetricFormat: Hashable, Sendable {
   }
 }
 
+// MARK: - Confidence
+
+/// The confidence group an engine reports, empty when the model scores neither.
+func confidenceMetricGroup(from generation: EdgeToolsEngineGeneration) -> CLIMetricGroup? {
+  var metrics = [CLIMetric]()
+  if let confidence = generation.metadata.generationConfidence {
+    metrics.append(
+      CLIMetric(
+        id: "generationConfidence",
+        jsonKey: "generationConfidencePercentage",
+        value: Double(confidence) * 100,
+        format: .percentage,
+        benchmarkLabel: "Confidence %",
+        benchmarkAggregation: .distribution
+      )
+    )
+  }
+  if let probe = generation.metadata.probeConfidence {
+    metrics.append(
+      CLIMetric(
+        id: "probeConfidence",
+        jsonKey: "probeConfidencePercentage",
+        label: "probe ",
+        value: Double(probe) * 100,
+        format: .percentage,
+        benchmarkLabel: "Probe %",
+        benchmarkAggregation: .distribution
+      )
+    )
+  }
+  return metrics.isEmpty ? nil : CLIMetricGroup(label: "Confidence", metrics: metrics)
+}
+
 // MARK: - StandardGenerationMetricsExtractor
 
 public struct StandardGenerationMetricsExtractor: GenerationMetricsExtractor {
   public init() {}
 
   public func extract(from generation: EdgeToolsEngineGeneration) -> CLIGenerationMetrics {
-    CLIGenerationMetrics(groups: [
+    var groups = [
       CLIMetricGroup(
         label: "Prefill",
         metrics: [
@@ -169,7 +203,11 @@ public struct StandardGenerationMetricsExtractor: GenerationMetricsExtractor {
           )
         ]
       )
-    ])
+    ]
+    if let confidence = confidenceMetricGroup(from: generation) {
+      groups.append(confidence)
+    }
+    return CLIGenerationMetrics(groups: groups)
   }
 }
 
@@ -231,6 +269,9 @@ public struct Needle2GenerationMetricsExtractor: GenerationMetricsExtractor {
           ]
         )
       )
+    }
+    if let confidence = confidenceMetricGroup(from: generation) {
+      groups.append(confidence)
     }
     return CLIGenerationMetrics(groups: groups)
   }

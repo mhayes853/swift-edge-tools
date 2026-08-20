@@ -28,8 +28,7 @@ extension EdgeToolsEngine where ContextParameters == Void {
 }
 
 extension EdgeToolsEngine {
-  public func context<Parameters>() -> Context
-  where ContextParameters == Parameters? {
+  public func context<Parameters>() -> Context where ContextParameters == Parameters? {
     self.context(nil)
   }
 
@@ -64,11 +63,7 @@ extension EdgeToolsTokenizingEngine {
     prompt: Prompt,
     tools: [EdgeToolDefinition] = []
   ) async throws -> [EdgeToolsToken] {
-    try await self.tokenize(
-      prompt: prompt,
-      tools: tools,
-      context: self.context()
-    )
+    try await self.tokenize(prompt: prompt, tools: tools, context: self.context())
   }
 }
 
@@ -88,10 +83,7 @@ public struct EdgeToolsEnginePrefill: Sendable {
   public var metrics: EdgeToolsPrefillMetrics
   public var metadata: EdgeToolsMetadata
 
-  public init(
-    metrics: EdgeToolsPrefillMetrics,
-    metadata: EdgeToolsMetadata = [:]
-  ) {
+  public init(metrics: EdgeToolsPrefillMetrics, metadata: EdgeToolsMetadata = [:]) {
     self.metrics = metrics
     self.metadata = metadata
   }

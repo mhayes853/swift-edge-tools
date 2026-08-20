@@ -19,13 +19,13 @@ struct `InfoAction tests` {
     expectNoDifference(report.model, "Qwen3")
     expectNoDifference(report.engines, ["mlx"])
     expectNoDifference(report.defaultEngine, "mlx")
-    expectNoDifference(report.unavailableEngines, [])
+    expectNoDifference(report.unavailableEngines, ["llama"])
   }
 
   @Test
   func `Propagates Detection Failures`() async {
     var context = EdgeContext.stub()
-    context.detectModel = { _ in throw EdgeCLIError("no config") }
+    context.detectModel = { _, _ in throw EdgeCLIError("no config") }
     await #expect(throws: EdgeCLIError("no config")) {
       try await inspectModel(context: context, source: .test())
     }

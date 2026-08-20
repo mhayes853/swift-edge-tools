@@ -74,23 +74,32 @@ extension RunReport {
     }
     let metrics = self.metrics
     lines.append("")
-    lines.append("Model   \(self.model)")
-    lines.append("Engine  \(self.engine)\(self.wasStopped ? "  (stopped early)" : "")")
-    lines.append("Load    \(metrics.load.displayText)")
+    lines.append(row("Model", self.model))
     lines.append(
-      "Memory  \(metrics.peakResident.displayText) peak RSS"
-        + (metrics.peakGPU.isEmpty ? "" : " · \(metrics.peakGPU.displayText) peak GPU")
+      row("Engine", self.engine + (self.wasStopped ? "  (stopped early)" : ""))
+    )
+    lines.append(row("Load", metrics.load.displayText))
+    lines.append(
+      row(
+        "Memory",
+        metrics.peakResident.displayText + " peak RSS"
+          + (metrics.peakGPU.isEmpty ? "" : " · \(metrics.peakGPU.displayText) peak GPU")
+      )
     )
     lines.append(
       contentsOf: metrics.generation.groups.map {
-        $0.label.rightPadded(to: 8) + $0.metrics.map(\.displayText).joined(separator: "  ")
+        row($0.label, $0.metrics.map(\.displayText).joined(separator: "  "))
       }
     )
-    lines.append("E2E     \(metrics.endToEnd.displayText) (excludes load)")
+    lines.append(row("E2E", "\(metrics.endToEnd.displayText) (excludes load)"))
     return lines.joined(separator: "\n")
   }
 
   public func jsonText() throws -> String {
     try self.encodedJSON()
   }
+}
+
+private func row(_ label: String, _ value: String) -> String {
+  label.rightPadded(to: 11) + value
 }

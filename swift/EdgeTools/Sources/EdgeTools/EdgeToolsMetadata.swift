@@ -26,6 +26,7 @@ public typealias EdgeToolsMetadata = [EdgeToolsMetadataKey: any Sendable]
 extension EdgeToolsMetadataKey {
   public static let generationConfidence = Self(rawValue: "GenerationConfidence")
   public static let perTokenConfidences = Self(rawValue: "PerTokenConfidences")
+  public static let probeConfidence = Self(rawValue: "ProbeConfidence")
 }
 
 extension EdgeToolsMetadata {
@@ -37,6 +38,11 @@ extension EdgeToolsMetadata {
   public var perTokenConfidences: [Float]? {
     get { self[.perTokenConfidences] as? [Float] }
     set { self[.perTokenConfidences] = newValue }
+  }
+
+  public var probeConfidence: Float? {
+    get { self[.probeConfidence] as? Float }
+    set { self[.probeConfidence] = newValue }
   }
 }
 

@@ -1,0 +1,105 @@
+▿ EdgeToolsTranscript
+  ▿ messages: 5 elements
+    ▿ Message
+      ▿ system: SystemMessage
+        - content: "Use getWeather when needed. After receiving its result, summarize it for the user."
+    ▿ Message
+      ▿ user: UserMessage
+        - audio: 0 elements
+        - content: "What is the weather in Paris?"
+        - images: 0 elements
+        - videos: 0 elements
+    ▿ Message
+      ▿ assistant: AssistantMessage
+        ▿ parts: 1 element
+          ▿ EdgeToolsGenerationPart
+            ▿ toolCall: EdgeRawToolCall
+              ▿ arguments: EdgeToolsValue
+                ▿ object: 1 key/value pair
+                  ▿ (2 elements)
+                    - key: "location"
+                    ▿ value: EdgeToolsValue
+                      - string: "Paris"
+              - name: "getWeather"
+    ▿ Message
+      ▿ tool: ToolMessage
+        - name: "getWeather"
+        ▿ response: EdgeToolsValue
+          ▿ object: 3 key/value pairs
+            ▿ (2 elements)
+              - key: "condition"
+              ▿ value: EdgeToolsValue
+                - string: "sunny"
+            ▿ (2 elements)
+              - key: "location"
+              ▿ value: EdgeToolsValue
+                - string: "Paris"
+            ▿ (2 elements)
+              - key: "temperatureCelsius"
+              ▿ value: EdgeToolsValue
+                - integer: 21
+    ▿ Message
+      ▿ assistant: AssistantMessage
+        ▿ parts: 30 elements
+          ▿ EdgeToolsGenerationPart
+            - text: "The"
+          ▿ EdgeToolsGenerationPart
+            - text: " weather"
+          ▿ EdgeToolsGenerationPart
+            - text: " in"
+          ▿ EdgeToolsGenerationPart
+            - text: " Paris"
+          ▿ EdgeToolsGenerationPart
+            - text: " is"
+          ▿ EdgeToolsGenerationPart
+            - text: ":"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n\n"
+          ▿ EdgeToolsGenerationPart
+            - text: "*"
+          ▿ EdgeToolsGenerationPart
+            - text: "   "
+          ▿ EdgeToolsGenerationPart
+            - text: "**"
+          ▿ EdgeToolsGenerationPart
+            - text: "Location"
+          ▿ EdgeToolsGenerationPart
+            - text: ":**"
+          ▿ EdgeToolsGenerationPart
+            - text: " Paris"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n"
+          ▿ EdgeToolsGenerationPart
+            - text: "*"
+          ▿ EdgeToolsGenerationPart
+            - text: "   "
+          ▿ EdgeToolsGenerationPart
+            - text: "**"
+          ▿ EdgeToolsGenerationPart
+            - text: "Condition"
+          ▿ EdgeToolsGenerationPart
+            - text: ":**"
+          ▿ EdgeToolsGenerationPart
+            - text: " Sunny"
+          ▿ EdgeToolsGenerationPart
+            - text: "\n"
+          ▿ EdgeToolsGenerationPart
+            - text: "*"
+          ▿ EdgeToolsGenerationPart
+            - text: "   "
+          ▿ EdgeToolsGenerationPart
+            - text: "**"
+          ▿ EdgeToolsGenerationPart
+            - text: "Temperature"
+          ▿ EdgeToolsGenerationPart
+            - text: ":**"
+          ▿ EdgeToolsGenerationPart
+            - text: " "
+          ▿ EdgeToolsGenerationPart
+            - text: "2"
+          ▿ EdgeToolsGenerationPart
+            - text: "1"
+          ▿ EdgeToolsGenerationPart
+            - text: " Celsius"
+  ▿ reasoningEffort: EdgeToolsReasoningEffort
+    - rawValue: "default"

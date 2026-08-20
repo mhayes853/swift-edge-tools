@@ -4,6 +4,7 @@ public struct GenerationRequest: Sendable {
   public var system: String
   public var user: String
   public var images: [EdgeToolsTranscript.Asset]
+  public var audio: [EdgeToolsTranscript.Asset]
   public var tools: [EdgeToolDefinition]
   public var grammar: GrammarOption
   public var toolCallRange: GrammarToolCallRange
@@ -15,6 +16,7 @@ public struct GenerationRequest: Sendable {
     system: String = "",
     user: String,
     images: [EdgeToolsTranscript.Asset] = [],
+    audio: [EdgeToolsTranscript.Asset] = [],
     tools: [EdgeToolDefinition] = [],
     grammar: GrammarOption = .auto,
     toolCallRange: GrammarToolCallRange = .unbounded(minimum: 0),
@@ -25,6 +27,7 @@ public struct GenerationRequest: Sendable {
     self.system = system
     self.user = user
     self.images = images
+    self.audio = audio
     self.tools = tools
     self.grammar = grammar
     self.toolCallRange = toolCallRange

@@ -79,6 +79,14 @@ Parse, don't validate: turn external input into a usable internal representation
 
 Do not use scoped extension modifiers (so no `private extension`, `public extension`, etc.).
 
+Avoid the name or name prefix `make` to describe an API that creates any value.
+
+When wrapping a pointer-based C type in Swift, prefer making the wrapper type a non-Copyable struct first before making it a class. If you do make it a class, then you cannot provide non-private access to it's underlying pointer, but must have a scoped `withUnsafePointer` access method instead.
+
+Avoid excessive amounts of comments. Comments are to explain details that cannot easily be expressed in code, not to serve as annotations. (This does not prohibit documentation comments.)
+
+Only public APIs should have documentation comments.
+
 DO NOT ASSUME WASI IS A SINGLE THREADED ENVIRONMENT. It is not ok to conform types to `@unchecked Sendable` just because they have a member variable that uses a type from `JavaScriptKit`, and because "JS is single-threaded". `JavaScriptKit` does not conform most of its types to Sendable because Swift WASM supports sdks that enable multithreading through web workers or other means.
 
 If a lot of public APIs are using shared package or internal scoped APIs, it's likely that the API should also be public since it has inherent useful reusability. That is, users should get the same tools as us to make their own abstractions.

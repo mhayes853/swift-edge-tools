@@ -49,6 +49,48 @@ import OrderedCollections
   public typealias MiniCPM5MLXModelEngine = MLXEngine<MiniCPM5MLXProfile>
 #endif
 
+#if Llama && XGrammar && canImport(CLlama)
+  public struct MiniCPM5LlamaProfile: LlamaModelProfile {
+    public typealias Prompt = EdgeToolsTranscript
+    public typealias GenerationParser = MiniCPM5GenerationParser
+    public typealias GenerateParameters = DefaultLlamaGenerateParameters
+    public typealias GrammarEngine = XGrammarEngine
+
+    public static func grammar(
+      prompt: EdgeToolsTranscript,
+      tools: [EdgeToolDefinition],
+      parameters: DefaultLlamaGenerateParameters,
+      grammarEngine: borrowing XGrammarEngine
+    ) throws -> XGRGrammar {
+      try Self.constrainedGrammar(
+        tools: tools,
+        parameters: parameters,
+        grammarEngine: grammarEngine
+      ) { range in
+        let toolCalls = try XGRGrammar.miniCPM5(tools: tools, range: range)
+        guard prompt.reasoningEffort.isEnabled else { return toolCalls }
+        return try .qwenReasoning().concatenate(toolCalls)
+      }
+    }
+
+    public static func templateContext(prompt: EdgeToolsTranscript) -> [String: EdgeToolsValue]? {
+      guard prompt.reasoningEffort != .default else { return nil }
+      return ["enable_thinking": .boolean(prompt.reasoningEffort.isEnabled)]
+    }
+
+    public static func prepare(
+      prompt: inout EdgeToolsTranscript,
+      tools: [EdgeToolDefinition],
+      parser: inout MiniCPM5GenerationParser
+    ) {
+      let prefix = prompt.reasoningEffort.isEnabled ? "<think>\n" : "<think>\n\n</think>\n\n"
+      _ = parser.accept(token: EdgeToolsToken(id: -1, stringValue: prefix))
+    }
+  }
+
+  public typealias MiniCPM5LlamaModelEngine = LlamaEngine<MiniCPM5LlamaProfile>
+#endif
+
 // MARK: - MiniCPM5 Tool Call Parsing
 
 public struct MiniCPM5GenerationParser: EdgeToolsGenerationParser, Sendable {

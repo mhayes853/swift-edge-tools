@@ -77,6 +77,92 @@ import Foundation
 
 #endif
 
+#if HuggingFaceTokenizers && Llama && canImport(CLlama)
+
+  private enum GGUFModelDownloadError: Error {
+    case missingMultimodalProjector
+  }
+
+  enum GGUFModelID: String {
+    case qwen3 = "Qwen/Qwen3-0.6B-GGUF"
+    case qwen3P5 = "unsloth/Qwen3.5-0.8B-GGUF"
+    case qwen3P5VL = "bartowski/Qwen_Qwen3.5-2B-GGUF"
+    case functionGemma = "ggml-org/functiongemma-270m-it-GGUF"
+    case lfm2P5 = "LiquidAI/LFM2.5-230M-GGUF"
+    case lfm2P5VL = "LiquidAI/LFM2.5-VL-450M-GGUF"
+    case lfm2P5Thinking = "LiquidAI/LFM2.5-1.2B-Thinking-GGUF"
+    case gemma4E2BHybrid = "Cactus-Compute/gemma-4-e2b-it-hybrid-GGUF"
+    case miniCPM5 = "openbmb/MiniCPM5-1B-GGUF"
+    case graniteMoeHybrid = "ibm-granite/granite-4.0-h-350m-GGUF"
+
+    var file: String {
+      switch self {
+      case .qwen3: "Qwen3-0.6B-Q8_0.gguf"
+      case .qwen3P5: "Qwen3.5-0.8B-Q4_K_M.gguf"
+      case .qwen3P5VL: "Qwen_Qwen3.5-2B-Q4_K_M.gguf"
+      case .functionGemma: "functiongemma-270m-it-q8_0.gguf"
+      case .lfm2P5: "LFM2.5-230M-Q8_0.gguf"
+      case .lfm2P5VL: "LFM2.5-VL-450M-Q8_0.gguf"
+      case .lfm2P5Thinking: "LFM2.5-1.2B-Thinking-Q4_K_M.gguf"
+      case .gemma4E2BHybrid: "gemma-4-e2b-it-hybrid-Q4_K_M.gguf"
+      case .miniCPM5: "MiniCPM5-1B-Q4_K_M.gguf"
+      case .graniteMoeHybrid: "granite-4.0-h-350m-Q4_K_M.gguf"
+      }
+    }
+
+    var multimodalProjectorFile: String? {
+      switch self {
+      case .gemma4E2BHybrid: "mmproj-F16.gguf"
+      case .qwen3P5VL: "mmproj-Qwen_Qwen3.5-2B-f16.gguf"
+      case .lfm2P5VL: "mmproj-LFM2.5-VL-450m-Q8_0.gguf"
+      case .qwen3, .qwen3P5, .functionGemma, .lfm2P5, .lfm2P5Thinking, .miniCPM5,
+        .graniteMoeHybrid:
+        nil
+      }
+    }
+  }
+
+  func downloadGGUFModel(id: GGUFModelID) async throws -> URL {
+    let hub = HubApi(downloadBase: URL.swiftEdgeToolsTestsDirectory)
+    let repo = Hub.Repo(id: id.rawValue, type: .models)
+    let destination = hub.localRepoLocation(repo).appending(path: id.file)
+
+    if FileManager.default.fileExists(atPath: destination.path()) {
+      print("=== GGUF Already Downloaded At \(destination.path) ===")
+      return destination
+    }
+
+    print("=== Downloading GGUF From \(repo.id) ===")
+    let url = try await hub.snapshot(from: repo, matching: [id.file])
+    print("=== Finished Downloading GGUF To \(url.path) ===")
+    return url.appending(path: id.file)
+  }
+
+  func downloadGGUFMultimodalModel(
+    id: GGUFModelID
+  ) async throws -> (model: URL, projector: URL) {
+    guard let projectorFile = id.multimodalProjectorFile else {
+      throw GGUFModelDownloadError.missingMultimodalProjector
+    }
+    let hub = HubApi(downloadBase: URL.swiftEdgeToolsTestsDirectory)
+    let repo = Hub.Repo(id: id.rawValue, type: .models)
+    let directory = hub.localRepoLocation(repo)
+    let model = directory.appending(path: id.file)
+    let projector = directory.appending(path: projectorFile)
+    if FileManager.default.fileExists(atPath: model.path()),
+      FileManager.default.fileExists(atPath: projector.path())
+    {
+      print("=== GGUF VLM Already Downloaded At \(directory.path) ===")
+      return (model, projector)
+    }
+
+    print("=== Downloading GGUF VLM From \(repo.id) ===")
+    let url = try await hub.snapshot(from: repo, matching: [id.file, projectorFile])
+    print("=== Finished Downloading GGUF VLM To \(url.path) ===")
+    return (url.appending(path: id.file), url.appending(path: projectorFile))
+  }
+#endif
+
 extension URL {
   static let swiftEdgeToolsTestsDirectory = {
     #if os(macOS) || os(Linux)
