@@ -3,13 +3,13 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const revision = "b7ce80e07a8c76fb30a3a78db1e4aea7d72198da";
+const revision = "16f97bcfe1b005d0d969d2d71ea30236224c9e83";
 const repository = `https://huggingface.co/Cactus-Compute/needle2/resolve/${revision}`;
 const checksums = {
   "wasm/needle.js":
     "06499ec635d7e2790cb84791bc0e323fa4d0c5a8948108ca357b76685e085a66",
   "wasm/needle.wasm":
-    "4bd9538633573078419ba09b8d2e943d7a99abcdb67bf3c7dd874055e1e10fc8",
+    "077a7ba9f9b7a7eed21bc24f5ca5611b0f333c72633b9662a88b23f10e6a0531",
   "needle2.cact":
     "b43aabfcaf1a6db6acf488076eab71d823c08697c7af4521fc1d174b60ede5ba",
   LICENSE: "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",

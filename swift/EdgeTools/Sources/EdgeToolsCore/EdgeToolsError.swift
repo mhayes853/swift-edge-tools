@@ -1,3 +1,9 @@
+// MARK: - EdgeToolsDescribableError
+
+public protocol EdgeToolsDescribableError: Error {
+  var edgeToolsErrorDescription: String { get }
+}
+
 // MARK: - EdgeToolsError
 
 public struct EdgeToolsError: Error, Hashable, Sendable {
@@ -14,6 +20,7 @@ public struct EdgeToolsError: Error, Hashable, Sendable {
     public static let jsonIntegerOutOfRange = Self(rawValue: "json-integer-out-of-range")
     public static let nonFiniteJSONNumber = Self(rawValue: "non-finite-json-number")
     public static let invalidJSONValue = Self(rawValue: "invalid-json-value")
+    public static let toolInvocationFailed = Self(rawValue: "tool-invocation-failed")
   }
 
   public let code: Code
@@ -23,6 +30,10 @@ public struct EdgeToolsError: Error, Hashable, Sendable {
     self.code = code
     self.message = message
   }
+}
+
+extension EdgeToolsError: EdgeToolsDescribableError {
+  public var edgeToolsErrorDescription: String { self.message }
 }
 
 extension EdgeToolsError {

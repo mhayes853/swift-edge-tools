@@ -3,13 +3,13 @@
 set -euo pipefail
 
 package_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-repository="https://huggingface.co/Cactus-Compute/needle2/resolve/b7ce80e07a8c76fb30a3a78db1e4aea7d72198da"
+repository="https://huggingface.co/Cactus-Compute/needle2/resolve/16f97bcfe1b005d0d969d2d71ea30236224c9e83"
 output_directory="${2:-$package_directory/dist/native}"
 artifact="${1:-}"
 workspace="$(mktemp -d)"
 trap 'rm -rf "$workspace"' EXIT
 
-repository_artifact="$package_directory/../../bin/needle2-2.0.2.artifactbundle.zip"
+repository_artifact="$package_directory/../../bin/needle2-2.0.3.artifactbundle.zip"
 if [[ -z "$artifact" && -f "$repository_artifact" ]]; then
   artifact="$repository_artifact"
 fi
@@ -17,17 +17,17 @@ fi
 case "$(uname -s)-$(uname -m)" in
 Darwin-arm64)
   platform="macos-arm64"
-  checksum="1d071ab8337da74ae1b168e766474ee0b8f86039ec4768c97f2cc66322ccc7b5"
+  checksum="4e1895b2ac286eea76f632d4c3be6d116bea75b92a81884002028769ebb40806"
   shared_name="libneedle2.dylib"
   ;;
 Linux-x86_64)
   platform="linux-x86_64"
-  checksum="150b4bad3909f5be4d1889e57ca1486ab77ca01014dc2b52b143a7d575312b02"
+  checksum="3f32e00cf26751c13659b7e8749e4b39ffe23573e45ec0594f2bd657b7b50995"
   shared_name="libneedle2.so"
   ;;
 Linux-aarch64)
   platform="linux-arm64"
-  checksum="289fee626efe9f3367a085ce631a0ca3661854c6717acd06d2d93fd34e7912a5"
+  checksum="78970de7a23d0e7443ecd7d8e930c5d9d8465f287e4ca393c8acbe44171ba391"
   shared_name="libneedle2.so"
   ;;
 *)

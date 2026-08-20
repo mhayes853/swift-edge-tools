@@ -40,6 +40,8 @@ public protocol EdgeTool<Input, Output>: Sendable {
   var includesSchemaInInstructions: Bool { get }
 
   func invoke(input: Input) async throws(Failure) -> Output
+
+  func describeFailure(_ failure: Failure) -> String
 }
 
 extension EdgeTool where Input: EdgeToolsGenerable {
@@ -58,6 +60,20 @@ extension EdgeTool {
       arguments: self.arguments,
       includesSchemaInInstructions: self.includesSchemaInInstructions
     )
+  }
+
+  public func describeFailure(_ failure: Failure) -> String {
+    #if $Embedded
+      "unknown error"
+    #else
+      String(describing: failure)
+    #endif
+  }
+}
+
+extension EdgeTool where Failure: EdgeToolsDescribableError {
+  public func describeFailure(_ failure: Failure) -> String {
+    failure.edgeToolsErrorDescription
   }
 }
 
@@ -309,9 +325,7 @@ public final class AnyEdgeToolCall: Sendable, Identifiable {
   ) -> AnyEdgeToolCall {
     AnyEdgeToolCall(
       base: toolCall,
-      encodeOutput: {
-        try encodeOutput(await toolCall.output)
-      }
+      encodeOutput: { try encodeOutput(await describedOutput(of: toolCall)) }
     )
   }
 
@@ -487,3 +501,11 @@ public struct EdgeToolCallCollection: Sendable, RangeReplaceableCollection {
 }
 
 extension EdgeToolCallCollection: RandomAccessCollection {}
+
+private func describedOutput<Tool: EdgeTool>(of toolCall: EdgeToolCall<Tool>) async throws -> Tool.Output {
+  do {
+    return try await toolCall.output
+  } catch {
+    throw EdgeToolsError(code: .toolInvocationFailed, message: toolCall.tool.describeFailure(error))
+  }
+}

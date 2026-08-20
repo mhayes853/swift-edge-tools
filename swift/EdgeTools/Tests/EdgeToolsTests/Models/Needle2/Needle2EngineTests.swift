@@ -234,8 +234,14 @@
     }
   }
 
-  private enum Needle2ToolFailure: Error, Sendable {
+  private enum Needle2ToolFailure: EdgeToolsDescribableError, Sendable {
     case mailServerOffline
+
+    var edgeToolsErrorDescription: String {
+      switch self {
+      case .mailServerOffline: "mailServerOffline"
+      }
+    }
   }
 
   private struct FailingSendEmailTool: EdgeTool {
