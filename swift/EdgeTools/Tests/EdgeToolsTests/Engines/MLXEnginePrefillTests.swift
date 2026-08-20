@@ -69,10 +69,11 @@
         vocabularySize: TestTokenizer.vocabularySize
       )
       let context = engine.context()
-      context.transcript = .tokens([1])
 
       let generation = try await engine.generate(
-        tools: [],
+        prompt: EdgeToolsTranscript.Prompt(
+          messages: EdgeToolsTranscript.tokens([1]).messages
+        ),
         parameters: DefaultMLXGenerateParameters(
           sampling: EdgeToolsFusedSamplingParameters(
             temperature: 0,
@@ -340,6 +341,7 @@
     Profile.GenerateParameters == DefaultMLXGenerateParameters
   {
     let task = try engine.generate(
+      prompt: EdgeToolsTranscript.Prompt(messages: []),
       parameters: DefaultMLXGenerateParameters(
         sampler: ArgMaxSampler(),
         maxTokens: 1,
