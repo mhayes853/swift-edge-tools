@@ -59,6 +59,34 @@
 
       expectNoDifference(secondGeneration.prefillMetrics.tokens, 1)
     }
+
+    @Test
+    func `Default Fused Sampler Seeds Penalties With Prompt Tokens`() async throws {
+      let tokenizer = try testTokenizer()
+      let engine = try MLXEngine<LLMPrefillTestProfile>(
+        languageModel: PromptPenaltyLanguageModel(),
+        tokenizer: tokenizer,
+        vocabularySize: TestTokenizer.vocabularySize
+      )
+      let context = engine.context()
+      context.transcript = .tokens([1])
+
+      let generation = try await engine.generate(
+        tools: [],
+        parameters: DefaultMLXGenerateParameters(
+          sampling: EdgeToolsFusedSamplingParameters(
+            temperature: 0,
+            repetitionPenalty: 2
+          ),
+          maxTokens: 1,
+          synchronizeStreamForMemorySnapshots: false
+        ),
+        context: context,
+        channel: EdgeToolsGenerationChannel()
+      ).value
+
+      expectNoDifference(generation.tokens.map(\.id), [2])
+    }
   }
 
   #if canImport(CoreImage) && canImport(MLXVLM)
@@ -251,6 +279,35 @@
       )
       for index in 0..<tokenCount {
         logits[index * self.vocabularySize + self.sampleTokenId] = 100
+      }
+      return MLXArray(logits, [1, tokenCount, self.vocabularySize])
+    }
+  }
+
+  private final class PromptPenaltyLanguageModel:
+    Module, LanguageModel, KVCacheDimensionProvider
+  {
+    var vocabularySize: Int { TestTokenizer.vocabularySize }
+    var kvHeads: [Int] { [1] }
+
+    func prepare(
+      _ input: LMInput,
+      cache: [any KVCache],
+      windowSize: Int?
+    ) throws -> PrepareResult {
+      .tokens(input.text)
+    }
+
+    func callAsFunction(_ inputs: MLXArray, cache: [any KVCache]?) -> MLXArray {
+      let tokenCount = inputs.size
+      let values = MLXArray.zeros([1, 1, tokenCount, 1])
+      for cache in cache ?? [] {
+        _ = cache.update(keys: values, values: values)
+      }
+      var logits = [Float](repeating: -100, count: tokenCount * self.vocabularySize)
+      for index in 0..<tokenCount {
+        logits[index * self.vocabularySize + 1] = 5
+        logits[index * self.vocabularySize + 2] = 3
       }
       return MLXArray(logits, [1, tokenCount, self.vocabularySize])
     }

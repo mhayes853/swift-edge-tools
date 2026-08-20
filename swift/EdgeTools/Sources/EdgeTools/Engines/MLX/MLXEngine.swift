@@ -826,6 +826,7 @@
       let start = clock.now
       var processor = parameters.processor
       processor?.prompt(input.text.tokens)
+      (sampler as? MLXFusedSampler)?.history.seed(tokenIds)
       let prepared = try self.preparedOutput(input: input, tokenIds: tokenIds)
       let metrics = EdgeToolsPrefillMetrics(
         tokens: prepared.tokenCount,

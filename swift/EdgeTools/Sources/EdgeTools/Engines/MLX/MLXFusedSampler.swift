@@ -78,6 +78,7 @@
     }
 
     public func seed(_ tokens: some Sequence<EdgeToolsToken.ID>) {
+      self.reset()
       let ids = Array(tokens.map { Int32($0) }.suffix(self.capacity))
       guard let last = ids.last else { return }
       var padded = [Int32](repeating: last, count: self.capacity)

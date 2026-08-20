@@ -36,6 +36,19 @@
     }
 
     @Test
+    func `Reseeding History Replaces Earlier Tokens`() {
+      let history = MLXTokenHistory(capacity: 4)
+      history.seed([1])
+      history.seed([2])
+      let sampler = MLXFusedSampler(
+        parameters: EdgeToolsFusedSamplingParameters(temperature: 0, repetitionPenalty: 2),
+        history: history
+      )
+
+      expectNoDifference(sampler.pick(from: .test), 1)
+    }
+
+    @Test
     func `Presence Penalty Demotes An Already Sampled Token`() {
       let sampler = MLXFusedSampler(
         parameters: EdgeToolsFusedSamplingParameters(temperature: 0, presencePenalty: 3)
