@@ -11,11 +11,9 @@
     @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
     func `Generates Tool Call Through Session`() async throws {
       let engine = Needle2Engine()
-      let context = engine.context()
+      let context = engine.context { SendEmailTool() }
       defer { try? engine.reset(context) }
-      let session = EdgeToolsSession(engine: engine) {
-        SendEmailTool()
-      }
+      let session = EdgeToolsSession(engine: engine)
 
       let generation = try await session.generate(
         prompt: "Send an email to blob@gmail.com asking them to go hiking.",
@@ -49,13 +47,10 @@
     @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
     func `Extracts Structured Data Through Session`() async throws {
       let engine = Needle2Engine()
-      let context = engine.context()
-      defer { try? engine.reset(context) }
       let session = EdgeToolsSession(engine: engine)
       let invoice = try await session.extract(
         prompt: "Extract this invoice: Acme Corp, total $1,200.00, due 2026-09-01.",
-        as: Needle2Invoice.self,
-        context: context
+        as: Needle2Invoice.self
       )
 
       let extractedInvoice = try #require(invoice)
@@ -68,11 +63,10 @@
     @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
     func `Extracts Structured Data Through Needle 2`() async throws {
       let engine = Needle2Engine()
-      let context = engine.context()
+      let context = engine.context { DefinitionTool(Needle2Invoice.definition) }
       defer { try? engine.reset(context) }
       let task = try engine.generate(
         prompt: "Extract this invoice: Acme Corp, total $1,200.00, due 2026-09-01.",
-        tools: [Needle2Invoice.definition],
         parameters: .default,
         context: context,
         channel: EdgeToolsGenerationChannel()
@@ -94,11 +88,9 @@
     @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
     func `Drives Tool Loop Through Needle 2`() async throws {
       let engine = Needle2Engine()
-      let context = engine.context()
+      let context = engine.context { SendEmailTool() }
       defer { try? engine.reset(context) }
-      let session = EdgeToolsSession(engine: engine) {
-        SendEmailTool()
-      }
+      let session = EdgeToolsSession(engine: engine)
 
       let response = try await session.runLoop(
         prompt: "Send an email to blob@gmail.com asking them to go hiking.",
@@ -118,11 +110,9 @@
     @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
     func `Failed Tool Feeds Error Back Into Loop`() async throws {
       let engine = Needle2Engine()
-      let context = engine.context()
+      let context = engine.context { FailingSendEmailTool() }
       defer { try? engine.reset(context) }
-      let session = EdgeToolsSession(engine: engine) {
-        FailingSendEmailTool()
-      }
+      let session = EdgeToolsSession(engine: engine)
 
       let response = try await session.runLoop(
         prompt: "Send an email to blob@gmail.com asking them to go hiking.",
@@ -141,11 +131,9 @@
     @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
     func `Undecodable Tool Arguments Feed Error Back Into Loop`() async throws {
       let engine = Needle2Engine()
-      let context = engine.context()
+      let context = engine.context { MismatchedSchemaTool() }
       defer { try? engine.reset(context) }
-      let session = EdgeToolsSession(engine: engine) {
-        MismatchedSchemaTool()
-      }
+      let session = EdgeToolsSession(engine: engine)
 
       let response = try await session.runLoop(
         prompt: "Set the thermostat in the living room.",
@@ -164,9 +152,9 @@
     @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
     func `Existential Tools Encode Their Loop Responses`() async throws {
       let engine = Needle2Engine()
-      let context = engine.context()
+      let context = engine.context { SendEmailTool() }
       defer { try? engine.reset(context) }
-      let session = EdgeToolsSession(engine: engine, tools: [SendEmailTool()])
+      let session = EdgeToolsSession(engine: engine)
 
       let response = try await session.runLoop(
         prompt: "Send an email to blob@gmail.com asking them to go hiking.",
@@ -184,11 +172,9 @@
     @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
     func `Rejects Turn Counts Needle 2 Cannot Support`() async throws {
       let engine = Needle2Engine()
-      let context = engine.context()
+      let context = engine.context { SendEmailTool() }
       defer { try? engine.reset(context) }
-      let session = EdgeToolsSession(engine: engine) {
-        SendEmailTool()
-      }
+      let session = EdgeToolsSession(engine: engine)
 
       await #expect(throws: Needle2LoopError.unsupportedTurnCount(9)) {
         try await session.runLoop(prompt: "Hello.", context: context, maximumTurns: 9)
@@ -199,7 +185,7 @@
     @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
     func `Stopped Generation Completes With Its Response`() async throws {
       let engine = Needle2Engine()
-      let context = engine.context()
+      let context = engine.context { SendEmailTool() }
       defer { try? engine.reset(context) }
       let emittedParts = Lock([EdgeToolsGenerationPart]())
       let didObserveResponse = Lock(false)
@@ -210,7 +196,6 @@
       }
       let task = try engine.generate(
         prompt: "Send an email to blob@gmail.com asking them to go hiking.",
-        tools: [SendEmailTool().definition],
         parameters: .default,
         context: context,
         channel: EdgeToolsGenerationChannel(

@@ -31,7 +31,7 @@ public struct EdgeRawToolCall: Hashable, Sendable {
 
 public protocol EdgeTool<Input, Output>: Sendable {
   associatedtype Input: ConvertibleFromEdgeToolsValue & Sendable
-  associatedtype Output: Sendable
+  associatedtype Output: ConvertibleToEdgeToolsValue & Sendable
   associatedtype Failure: Error & Sendable = any Error & Sendable
 
   var name: String { get }
@@ -40,6 +40,11 @@ public protocol EdgeTool<Input, Output>: Sendable {
   var includesSchemaInInstructions: Bool { get }
 
   func invoke(input: Input) async throws(Failure) -> Output
+
+  func toolCall(
+    id: EdgeToolCallID,
+    arguments: EdgeToolsValue
+  ) throws -> AnyEdgeToolCall
 
   func describeFailure(_ failure: Failure) -> String
 }
@@ -59,6 +64,19 @@ extension EdgeTool {
       description: self.description,
       arguments: self.arguments,
       includesSchemaInInstructions: self.includesSchemaInInstructions
+    )
+  }
+
+  public func toolCall(
+    id: EdgeToolCallID,
+    arguments: EdgeToolsValue
+  ) throws -> AnyEdgeToolCall {
+    AnyEdgeToolCall.erasing(
+      try EdgeToolCall(
+        id: id,
+        tool: self,
+        rawInput: arguments
+      )
     )
   }
 
@@ -297,35 +315,25 @@ public final class AnyEdgeToolCall: Sendable, Identifiable {
     get async throws { try await self.base.erasedOutput }
   }
 
-  public func outputValue() async throws -> EdgeToolsValue? {
-    guard let encodeOutput = self.encodeOutput else {
-      return nil
-    }
+  public func outputValue() async throws -> EdgeToolsValue {
     return try await encodeOutput()
   }
 
   private let base: any _AnyEdgeToolCall
-  private let encodeOutput: (@Sendable () async throws -> EdgeToolsValue)?
+  private let encodeOutput: @Sendable () async throws -> EdgeToolsValue
 
   private init(
     base: any _AnyEdgeToolCall,
-    encodeOutput: (@Sendable () async throws -> EdgeToolsValue)? = nil
+    encodeOutput: @escaping @Sendable () async throws -> EdgeToolsValue
   ) {
     self.base = base
     self.encodeOutput = encodeOutput
   }
 
   public static func erasing<Tool: EdgeTool>(_ toolCall: EdgeToolCall<Tool>) -> AnyEdgeToolCall {
-    AnyEdgeToolCall(base: toolCall)
-  }
-
-  static func erasing<Tool: EdgeTool>(
-    _ toolCall: EdgeToolCall<Tool>,
-    encodeOutput: @escaping @Sendable (Tool.Output) throws -> EdgeToolsValue
-  ) -> AnyEdgeToolCall {
     AnyEdgeToolCall(
       base: toolCall,
-      encodeOutput: { try encodeOutput(await describedOutput(of: toolCall)) }
+      encodeOutput: { try await describedOutput(of: toolCall).edgeToolsValue }
     )
   }
 
@@ -337,7 +345,10 @@ public final class AnyEdgeToolCall: Sendable, Identifiable {
 #if !$Embedded
   extension AnyEdgeToolCall {
     public convenience init(_ toolCall: EdgeToolCall<some EdgeTool>) {
-      self.init(base: toolCall)
+      self.init(
+        base: toolCall,
+        encodeOutput: { try await describedOutput(of: toolCall).edgeToolsValue }
+      )
     }
   }
 #endif

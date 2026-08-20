@@ -7,7 +7,13 @@ private typealias MockGenerationTaskValue = Task<EdgeToolsEngineGeneration, Mock
 final class MockEngine: EdgeToolsPrefillableEngine, EdgeToolsTokenizingEngine, Sendable {
   typealias Prompt = TestPrompt
 
-  final class Context: Identifiable, Sendable {
+  final class Context: EdgeToolsEngineContext {
+    let tools: [any EdgeTool]
+
+    init(tools: [any EdgeTool]) {
+      self.tools = tools
+    }
+
     var id: ObjectIdentifier {
       ObjectIdentifier(self)
     }
@@ -208,16 +214,23 @@ final class MockEngine: EdgeToolsPrefillableEngine, EdgeToolsTokenizingEngine, S
     MockEngine()
   }
 
-  func context(_ parameters: Void) -> Context {
-    Context()
+  func context() -> Context {
+    Context(tools: [])
+  }
+
+  func context(tools: [any EdgeTool]) -> Context {
+    Context(tools: tools)
+  }
+
+  func context(_ parameters: Void, tools: [any EdgeTool]) -> Context {
+    Context(tools: tools)
   }
 
   func tokenize(
     prompt: TestPrompt,
-    tools: [EdgeToolDefinition],
     context: Context
   ) async throws -> [EdgeToolsToken] {
-    self.tokenizeHandler?(prompt, tools) ?? []
+    self.tokenizeHandler?(prompt, context.tools.map(\.definition)) ?? []
   }
 
   func push(_ event: Event?) {
@@ -226,11 +239,10 @@ final class MockEngine: EdgeToolsPrefillableEngine, EdgeToolsTokenizingEngine, S
 
   func prefill(
     promptPrefix: TestPrompt,
-    tools: [EdgeToolDefinition],
     context: Context
   ) async throws -> EdgeToolsEnginePrefill {
     let handler = self._prefillHandler.withLock { $0 }
-    return try handler?(promptPrefix, tools)
+    return try handler?(promptPrefix, context.tools.map(\.definition))
       ?? EdgeToolsEnginePrefill(
         metrics: EdgeToolsPrefillMetrics(tokens: 0, duration: .zero)
       )
@@ -238,11 +250,11 @@ final class MockEngine: EdgeToolsPrefillableEngine, EdgeToolsTokenizingEngine, S
 
   func generate(
     prompt: TestPrompt,
-    tools: [EdgeToolDefinition] = [],
     parameters: GenerateParameters,
     context: Context,
     channel: sending EdgeToolsGenerationChannel
   ) throws -> GenerationTask {
+    let tools = context.tools.map(\.definition)
     self._generateCallCount.withLock { $0 += 1 }
     self._generationTools.withLock { $0.append(tools) }
     let (id, generationStorage) = self.storage.makeGeneration()

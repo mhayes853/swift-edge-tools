@@ -11,7 +11,8 @@
   where Profile.GenerateParameters == DefaultLlamaGenerateParameters {
     let turn = try splitUserMessage(from: .weatherTest)
     let context = engine.context(
-      EdgeToolsTranscriptContextParameters(transcript: turn.transcript)
+      EdgeToolsTranscriptContextParameters(transcript: turn.transcript),
+      tools: [DefinitionTool(.weatherTest)]
     )
     return try await completeToolTurn(
       in: context,
@@ -20,7 +21,6 @@
       generatingToolCall: {
         try engine.generate(
           prompt: .user(turn.userMessage),
-          tools: [.weatherTest],
           parameters: DefaultLlamaGenerateParameters(
             sampling: .greedy,
             constraint: .toolsWithGrammar(range: .exact(1)),
@@ -33,7 +33,6 @@
       generatingResponse: { toolMessage in
         try engine.generate(
           prompt: .tools([toolMessage]),
-          tools: [],
           parameters: DefaultLlamaGenerateParameters(maxTokens: 64),
           context: context,
           channel: EdgeToolsGenerationChannel()
@@ -50,7 +49,6 @@
     try await reasoningGeneration(
       from: try engine.generate(
         prompt: .user(.reasoningTest),
-        tools: [],
         parameters: DefaultLlamaGenerateParameters(maxTokens: 512),
         context: engine.context(
           EdgeToolsTranscriptContextParameters(reasoningEffort: .high)
@@ -74,7 +72,6 @@
         "What is the dominant color in this image? Answer briefly.",
         images: [try llamaRedImageAsset()]
       ),
-      tools: [],
       parameters: DefaultLlamaGenerateParameters(sampling: .greedy, maxTokens: 64),
       context: engine.context(),
       channel: EdgeToolsGenerationChannel()
@@ -95,7 +92,8 @@
       ])
     )
     let context = engine.context(
-      EdgeToolsTranscriptContextParameters(transcript: turn.transcript)
+      EdgeToolsTranscriptContextParameters(transcript: turn.transcript),
+      tools: [DefinitionTool(.llamaColorTest)]
     )
     let result = try await completeToolTurn(
       in: context,
@@ -104,7 +102,6 @@
       generatingToolCall: {
         try engine.generate(
           prompt: .user(turn.userMessage),
-          tools: [.llamaColorTest],
           parameters: DefaultLlamaGenerateParameters(
             sampling: .greedy,
             constraint: .toolsWithGrammar(range: .exact(1)),
@@ -117,7 +114,6 @@
       generatingResponse: { toolMessage in
         try engine.generate(
           prompt: .tools([toolMessage]),
-          tools: [],
           parameters: DefaultLlamaGenerateParameters(sampling: .greedy, maxTokens: 64),
           context: context,
           channel: EdgeToolsGenerationChannel()
@@ -140,7 +136,8 @@
       ])
     )
     let context = engine.context(
-      EdgeToolsTranscriptContextParameters(transcript: turn.transcript)
+      EdgeToolsTranscriptContextParameters(transcript: turn.transcript),
+      tools: [DefinitionTool(.llamaAudioTest)]
     )
     let result = try await completeToolTurn(
       in: context,
@@ -149,7 +146,6 @@
       generatingToolCall: {
         try engine.generate(
           prompt: .user(turn.userMessage),
-          tools: [.llamaAudioTest],
           parameters: DefaultLlamaGenerateParameters(
             sampling: .greedy,
             constraint: .toolsWithGrammar(range: .exact(1)),
@@ -162,7 +158,6 @@
       generatingResponse: { toolMessage in
         try engine.generate(
           prompt: .tools([toolMessage]),
-          tools: [],
           parameters: DefaultLlamaGenerateParameters(sampling: .greedy, maxTokens: 64),
           context: context,
           channel: EdgeToolsGenerationChannel()

@@ -1092,12 +1092,20 @@
     }
 
     public func context() -> MLXContext<Profile> {
-      self.context(MLXContextParameters())
+      self.context(MLXContextParameters(), tools: [])
     }
 
-    public func context(_ parameters: MLXContextParameters) -> MLXContext<Profile> {
+    public func context(tools: [any EdgeTool]) -> MLXContext<Profile> {
+      self.context(MLXContextParameters(), tools: tools)
+    }
+
+    public func context(
+      _ parameters: MLXContextParameters,
+      tools: [any EdgeTool]
+    ) -> MLXContext<Profile> {
       MLXContext(
         parameters: parameters,
+        tools: tools,
         model: self.makeModelState(),
         engineIdentity: self.identity
       )
@@ -1105,7 +1113,6 @@
 
     public func tokenize(
       prompt: EdgeToolsTranscript.Prompt,
-      tools: [EdgeToolDefinition],
       context: MLXContext<Profile>
     ) async throws -> [EdgeToolsToken] {
       try self.validate(context)
@@ -1113,7 +1120,7 @@
       var model = self.makeModelState()
       let tokenIds = try await model.tokenIds(
         prompt: transcript,
-        tools: tools,
+        tools: context.tools.map { $0.definition },
         tokenizer: self.tokenizer
       )
       return self.tokenizer.tokens(forIds: tokenIds).compactMap { $0 }
@@ -1129,14 +1136,13 @@
 
     public func generate(
       prompt: EdgeToolsTranscript.Prompt,
-      tools: [EdgeToolDefinition] = [],
       parameters: sending Profile.GenerateParameters,
       context: MLXContext<Profile>,
       channel: sending EdgeToolsGenerationChannel
     ) throws -> AnyGenerationTask {
       self.generationTask(
         prompt: prompt,
-        tools: tools,
+        tools: context.tools.map { $0.definition },
         parameters: parameters,
         context: context,
         channel: channel,
@@ -1218,31 +1224,28 @@
 
     public func prefill(
       promptPrefix: EdgeToolsTranscript.Prompt,
-      tools: [EdgeToolDefinition],
       context: MLXContext<Profile>
     ) async throws -> EdgeToolsEnginePrefill {
       try self.validate(context)
       return try await self.prefill(
         snapshot: context.begin(appending: promptPrefix),
-        tools: tools,
+        tools: context.tools.map { $0.definition },
         context: context
       )
     }
 
     public func prefill(
-      tools: [EdgeToolDefinition] = [],
       context: MLXContext<Profile>
     ) async throws -> EdgeToolsEnginePrefill {
       try self.validate(context)
       return try await self.prefill(
         snapshot: context.begin(),
-        tools: tools,
+        tools: context.tools.map { $0.definition },
         context: context
       )
     }
 
     public func generate(
-      tools: [EdgeToolDefinition] = [],
       parameters: sending Profile.GenerateParameters,
       context: MLXContext<Profile>,
       channel: sending EdgeToolsGenerationChannel
@@ -1250,7 +1253,7 @@
       try self.validate(context)
       return self.generationTask(
         prompt: EdgeToolsTranscript.Prompt(messages: []),
-        tools: tools,
+        tools: context.tools.map { $0.definition },
         parameters: parameters,
         context: context,
         channel: channel,

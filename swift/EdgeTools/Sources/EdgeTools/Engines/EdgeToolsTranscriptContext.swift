@@ -46,7 +46,7 @@ public struct EdgeToolsTranscriptContextParameters: Hashable, Sendable {
 // MARK: - EdgeToolsTranscriptContext
 
 public final class EdgeToolsTranscriptContext<ModelState: EdgeToolsForkableModelState>:
-  Identifiable, Sendable {
+  EdgeToolsEngineContext {
   private struct State {
     var transcript: EdgeToolsTranscript
     var reasoningEffort: EdgeToolsReasoningEffort
@@ -88,6 +88,7 @@ public final class EdgeToolsTranscriptContext<ModelState: EdgeToolsForkableModel
   }
 
   private let state: Lock<State>
+  public let tools: [any EdgeTool]
   public let engineIdentity: EdgeToolsEngineIdentity
   private let observationRegistrar = _ObservationRegistrar()
 
@@ -128,6 +129,7 @@ public final class EdgeToolsTranscriptContext<ModelState: EdgeToolsForkableModel
 
   public init(
     parameters: EdgeToolsTranscriptContextParameters,
+    tools: [any EdgeTool] = [],
     model: sending ModelState,
     engineIdentity: EdgeToolsEngineIdentity
   ) {
@@ -138,6 +140,7 @@ public final class EdgeToolsTranscriptContext<ModelState: EdgeToolsForkableModel
         model: model
       )
     )
+    self.tools = tools
     self.engineIdentity = engineIdentity
   }
 
@@ -153,6 +156,7 @@ public final class EdgeToolsTranscriptContext<ModelState: EdgeToolsForkableModel
     }
     return EdgeToolsTranscriptContext(
       parameters: snapshot.parameters,
+      tools: self.tools,
       model: snapshot.model,
       engineIdentity: self.engineIdentity
     )
