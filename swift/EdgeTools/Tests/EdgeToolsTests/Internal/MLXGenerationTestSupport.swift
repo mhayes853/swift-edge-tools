@@ -42,7 +42,6 @@
     try await reasoningGeneration(
       from: try engine.generate(
         prompt: .user(.reasoningTest),
-        tools: [],
         parameters: DefaultMLXGenerateParameters(maxTokens: 512),
         context: engine.context(MLXContextParameters(reasoningEffort: .high)),
         channel: EdgeToolsGenerationChannel()
@@ -65,7 +64,11 @@
     Profile.GenerateParameters == DefaultMLXGenerateParameters
   {
     let turn = try splitUserMessage(from: .weatherTest)
-    let context = session.context(transcript: turn.transcript, reasoningEffort: .none)
+    let context = session.context(
+      MLXContextParameters(transcript: turn.transcript, reasoningEffort: .none)
+    ) {
+      WeatherTestTool()
+    }
     let toolGeneration = try await session.generate(
       prompt: .user(turn.userMessage),
       context: context,
@@ -84,7 +87,6 @@
 
     context.transcript.messages.append(.tool(name: "getWeather", response: .string(toolOutput)))
     let responseTask = try session.engine.generate(
-      tools: [],
       parameters: DefaultMLXGenerateParameters(
         sampler: MLXFusedSampler(parameters: parameters),
         constraint: .unconstrained,
@@ -154,7 +156,6 @@
         "What is the dominant color in this image? Answer briefly.",
         images: [try redImageAsset()]
       ),
-      tools: [],
       parameters: DefaultMLXGenerateParameters(maxTokens: 64),
       context: engine.context(),
       channel: EdgeToolsGenerationChannel()
@@ -196,7 +197,10 @@
     Profile.GenerateParameters == DefaultMLXGenerateParameters
   {
     let turn = try splitUserMessage(from: prompt)
-    let context = engine.context(MLXContextParameters(transcript: turn.transcript))
+    let context = engine.context(
+      MLXContextParameters(transcript: turn.transcript),
+      tools: [DefinitionTool(tool)]
+    )
     return try await completeToolTurn(
       in: context,
       tool: tool,
@@ -204,7 +208,6 @@
       generatingToolCall: {
         try engine.generate(
           prompt: .user(turn.userMessage),
-          tools: [tool],
           parameters: DefaultMLXGenerateParameters(
             sampler: ArgMaxSampler(),
             constraint: .toolsWithGrammar(range: .exact(1)),
@@ -217,7 +220,6 @@
       generatingResponse: { toolMessage in
         try engine.generate(
           prompt: .tools([toolMessage]),
-          tools: [],
           parameters: DefaultMLXGenerateParameters(maxTokens: 64),
           context: context,
           channel: EdgeToolsGenerationChannel()
@@ -241,7 +243,6 @@
     )
     let task = try engine.generate(
       prompt: .user(prompt),
-      tools: [],
       parameters: DefaultMLXGenerateParameters(maxTokens: 64),
       context: engine.context(),
       channel: EdgeToolsGenerationChannel()
@@ -265,7 +266,6 @@
     )
     let task = try engine.generate(
       prompt: .user(prompt),
-      tools: [],
       parameters: DefaultMLXGenerateParameters(maxTokens: 64),
       context: engine.context(),
       channel: EdgeToolsGenerationChannel()

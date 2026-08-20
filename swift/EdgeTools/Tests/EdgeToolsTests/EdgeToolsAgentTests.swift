@@ -17,11 +17,11 @@ struct `EdgeToolsAgent tests` {
         .response(#""done""#),
       ]
     )
-    let session = EdgeToolsSession(engine: engine) {
+    let session = EdgeToolsSession(engine: engine)
+    let context = session.context {
       first
       second
     }
-    let context = session.context()
 
     let result = try await session.respond(
       to: .user("Run both tools."),
@@ -52,6 +52,7 @@ struct `EdgeToolsAgent tests` {
     _ = try await session.respond(
       to: .user("Respond."),
       as: String.self,
+      context: session.context(),
       constraint: { response, turn in
         .toolCallsOrResponse(response, toolCallRange: .exact(turn.index + 2))
       }
@@ -80,8 +81,13 @@ private struct AgentTurnConstraint: EdgeToolsTurnGenerationConstraint {
 }
 
 private final class AgentScriptEngine: EdgeToolsEngine {
-  final class Context: Identifiable, Sendable {
+  final class Context: EdgeToolsEngineContext {
     private let _prompts = Lock([EdgeToolsTranscript.Prompt]())
+    let tools: [any EdgeTool]
+
+    init(tools: [any EdgeTool]) {
+      self.tools = tools
+    }
 
     var prompts: [EdgeToolsTranscript.Prompt] {
       self._prompts.withLock { $0 }
@@ -113,13 +119,20 @@ private final class AgentScriptEngine: EdgeToolsEngine {
     self.generations = Lock(generations)
   }
 
-  func context(_ parameters: Void) -> Context {
-    Context()
+  func context() -> Context {
+    Context(tools: [])
+  }
+
+  func context(tools: [any EdgeTool]) -> Context {
+    Context(tools: tools)
+  }
+
+  func context(_ parameters: Void, tools: [any EdgeTool]) -> Context {
+    Context(tools: tools)
   }
 
   func generate(
     prompt: Prompt,
-    tools: [EdgeToolDefinition],
     parameters: sending GenerateParameters,
     context: Context,
     channel: sending EdgeToolsGenerationChannel

@@ -1,20 +1,26 @@
 import EdgeToolsCore
 
+// MARK: - EdgeToolsEngineContext
+
+public protocol EdgeToolsEngineContext: Identifiable, Sendable {
+  var tools: [any EdgeTool] { get }
+}
+
 // MARK: - EdgeToolsEngine
 
 public protocol EdgeToolsEngine: Sendable {
-  associatedtype Context: Identifiable & Sendable where Context.ID: Sendable
+  associatedtype Context: EdgeToolsEngineContext where Context.ID: Sendable
   associatedtype ContextParameters: Sendable = Void
   associatedtype Prompt: Sendable
   associatedtype GenerateParameters: EdgeToolsEngineGenerateParameters
   associatedtype GenerationTask: EdgeToolsEngineGenerationTask
 
   func context() -> Context
-  func context(_ parameters: ContextParameters) -> Context
+  func context(tools: [any EdgeTool]) -> Context
+  func context(_ parameters: ContextParameters, tools: [any EdgeTool]) -> Context
 
   func generate(
     prompt: Prompt,
-    tools: [EdgeToolDefinition],
     parameters: sending GenerateParameters,
     context: Context,
     channel: sending EdgeToolsGenerationChannel
@@ -23,29 +29,36 @@ public protocol EdgeToolsEngine: Sendable {
 
 extension EdgeToolsEngine where ContextParameters == Void {
   public func context() -> Context {
-    self.context(())
+    self.context((), tools: [])
+  }
+
+  public func context(tools: [any EdgeTool]) -> Context {
+    self.context((), tools: tools)
   }
 }
 
 extension EdgeToolsEngine {
   public func context<Parameters>() -> Context where ContextParameters == Parameters? {
-    self.context(nil)
+    self.context(nil, tools: [])
   }
 
-  public func generate(
-    prompt: Prompt,
-    tools: [EdgeToolDefinition] = [],
-    parameters: sending GenerateParameters,
-    channel: sending EdgeToolsGenerationChannel
-  ) throws -> GenerationTask {
-    try self.generate(
-      prompt: prompt,
-      tools: tools,
-      parameters: parameters,
-      context: self.context(),
-      channel: channel
-    )
+  public func context(_ parameters: ContextParameters) -> Context {
+    self.context(parameters, tools: [])
   }
+
+  public func context(
+    @EdgeToolsToolBuilder tools: () -> [any EdgeTool]
+  ) -> Context {
+    self.context(tools: tools())
+  }
+
+  public func context(
+    _ parameters: ContextParameters,
+    @EdgeToolsToolBuilder tools: () -> [any EdgeTool]
+  ) -> Context {
+    self.context(parameters, tools: tools())
+  }
+
 }
 
 // MARK: - EdgeToolsTokenizingEngine
@@ -53,17 +66,15 @@ extension EdgeToolsEngine {
 public protocol EdgeToolsTokenizingEngine: EdgeToolsEngine {
   func tokenize(
     prompt: Prompt,
-    tools: [EdgeToolDefinition],
     context: Context
   ) async throws -> [EdgeToolsToken]
 }
 
 extension EdgeToolsTokenizingEngine {
   public func tokenize(
-    prompt: Prompt,
-    tools: [EdgeToolDefinition] = []
+    prompt: Prompt
   ) async throws -> [EdgeToolsToken] {
-    try await self.tokenize(prompt: prompt, tools: tools, context: self.context())
+    try await self.tokenize(prompt: prompt, context: self.context())
   }
 }
 
@@ -72,7 +83,6 @@ extension EdgeToolsTokenizingEngine {
 public protocol EdgeToolsPrefillableEngine: EdgeToolsEngine {
   func prefill(
     promptPrefix: Prompt,
-    tools: [EdgeToolDefinition],
     context: Context
   ) async throws -> EdgeToolsEnginePrefill
 }

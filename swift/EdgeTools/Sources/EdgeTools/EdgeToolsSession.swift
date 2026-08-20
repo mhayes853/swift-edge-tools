@@ -10,23 +10,8 @@ import _Concurrency
 
 public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable {
   public let engine: Engine
-  private let _tools: Lock<[EdgeToolsSessionTool]>
   private let _activeStreams = Lock([EdgeToolsSessionStream]())
   private let observationRegistrar = _ObservationRegistrar()
-
-  public var tools: [EdgeToolsSessionTool] {
-    get {
-      self.access(.tools)
-      return self._tools.withLock { $0 }
-    }
-    set {
-      self._tools.withLock { tools in
-        self.withMutation(of: .tools) {
-          tools = newValue
-        }
-      }
-    }
-  }
 
   public var isResponding: Bool {
     !self.activeStreams.isEmpty
@@ -37,32 +22,8 @@ public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable {
     return self._activeStreams.withLock { $0 }
   }
 
-  #if !$Embedded
-    public init(engine: sending Engine, tools: [any EdgeTool]) {
-      self.engine = engine
-      self._tools = Lock(
-        tools.map { tool in
-          EdgeToolsSessionTool(tool) { output in
-            guard let value = output as? any ConvertibleToEdgeToolsValue else {
-              throw EdgeToolsAgentError.invalidToolOutput(tool.name)
-            }
-            return value.edgeToolsValue
-          }
-        }
-      )
-    }
-  #endif
-
-  public init(engine: sending Engine, tools: [EdgeToolsSessionTool] = []) {
+  public init(engine: sending Engine) {
     self.engine = engine
-    self._tools = Lock(tools)
-  }
-
-  public convenience init(
-    engine: sending Engine,
-    @EdgeToolsToolBuilder tools: () -> [EdgeToolsSessionTool]
-  ) {
-    self.init(engine: engine, tools: tools())
   }
 
   fileprivate func registerActiveStream(_ stream: EdgeToolsSessionStream) {
@@ -96,6 +57,19 @@ extension EdgeToolsSession {
   public func context(_ parameters: Engine.ContextParameters) -> Engine.Context {
     self.engine.context(parameters)
   }
+
+  public func context(
+    @EdgeToolsToolBuilder tools: () -> [any EdgeTool]
+  ) -> Engine.Context {
+    self.engine.context(tools: tools)
+  }
+
+  public func context(
+    _ parameters: Engine.ContextParameters,
+    @EdgeToolsToolBuilder tools: () -> [any EdgeTool]
+  ) -> Engine.Context {
+    self.engine.context(parameters, tools: tools)
+  }
 }
 
 extension EdgeToolsSession where Engine: EdgeToolsTokenizingEngine {
@@ -103,11 +77,9 @@ extension EdgeToolsSession where Engine: EdgeToolsTokenizingEngine {
     prompt: Engine.Prompt,
     context: Engine.Context? = nil
   ) async throws -> [EdgeToolsToken] {
-    let toolDefinitions = self.tools.map { $0.definition }
     let context = self.resolveContext(context)
     return try await self.engine.tokenize(
       prompt: prompt,
-      tools: toolDefinitions,
       context: context
     )
   }
@@ -120,15 +92,14 @@ extension EdgeToolsSession {
   public func extract<Response: EdgeToolsGenerable>(
     prompt: Engine.Prompt,
     as type: Response.Type,
-    context: Engine.Context? = nil,
     parameters: sending Engine.GenerateParameters = .default
   ) async throws -> Response? {
     let definition = Response.extractionToolDefinition
+    let context = self.engine.context(tools: [EdgeToolsExtractionTool<Response>()])
     let task = try self.engine.generate(
       prompt: prompt,
-      tools: [definition],
       parameters: parameters,
-      context: self.resolveContext(context),
+      context: context,
       channel: EdgeToolsGenerationChannel()
     )
     let generation = try await task.value
@@ -140,15 +111,25 @@ extension EdgeToolsSession {
   }
 }
 
+private struct EdgeToolsExtractionTool<Response: EdgeToolsGenerable>: EdgeTool {
+  private let extractionDefinition = Response.extractionToolDefinition
+
+  var name: String { self.extractionDefinition.name }
+  var description: String { self.extractionDefinition.description }
+  var arguments: EdgeToolsGenerationSchema { self.extractionDefinition.arguments }
+
+  func invoke(input: Response) async -> Response {
+    input
+  }
+}
+
 extension EdgeToolsSession where Engine: EdgeToolsPrefillableEngine {
   public func prefill(
     promptPrefix: Engine.Prompt,
     context: Engine.Context
   ) async throws -> EdgeToolsEnginePrefill {
-    let toolDefinitions = self.tools.map { $0.definition }
     return try await self.engine.prefill(
       promptPrefix: promptPrefix,
-      tools: toolDefinitions,
       context: context
     )
   }
@@ -190,7 +171,6 @@ public struct EdgeToolsAgentResult<Result: Sendable>: Sendable {
 
 public enum EdgeToolsAgentError: Error, Sendable {
   case maximumTurnsExceeded(Int)
-  case invalidToolOutput(String)
 }
 
 extension EdgeToolsSession
@@ -203,7 +183,7 @@ where
   public func respond<Result: EdgeToolsGenerable>(
     to initialPrompt: Engine.Prompt,
     as type: Result.Type,
-    context: Engine.Context? = nil,
+    context: Engine.Context,
     maximumTurns: Int? = nil,
     parameters: @escaping @Sendable (EdgeToolsAgentTurn<Engine.Context>) -> Engine.GenerateParameters = {
       _ in .default
@@ -216,7 +196,6 @@ where
     }
   ) async throws -> EdgeToolsAgentResult<Result> {
     var prompt = initialPrompt
-    let context = self.resolveContext(context)
     var generations = [EdgeToolsSessionGeneration]()
     var toolCalls = EdgeToolCallCollection()
 
@@ -250,99 +229,31 @@ where
   }
 }
 
-// MARK: - EdgeToolsSessionTool
-
-private protocol _SessionTool: AnyObject, Sendable {
-  var erasedTool: any EdgeTool { get }
-  var erasedName: String { get }
-  var erasedDefinition: EdgeToolDefinition { get }
-  func call(id: EdgeToolCallID, rawInput: EdgeToolsValue) -> AnyEdgeToolCall?
-}
-
-private final class SessionToolBox<Tool: EdgeTool>: _SessionTool {
-  let tool: Tool
-  let encodeOutput: (@Sendable (Tool.Output) throws -> EdgeToolsValue)?
-
-  var erasedTool: any EdgeTool { self.tool }
-  var erasedName: String { self.tool.name }
-  var erasedDefinition: EdgeToolDefinition { self.tool.definition }
-
-  init(
-    _ tool: Tool,
-    encodeOutput: (@Sendable (Tool.Output) throws -> EdgeToolsValue)? = nil
-  ) {
-    self.tool = tool
-    self.encodeOutput = encodeOutput
-  }
-
-  func call(id: EdgeToolCallID, rawInput: EdgeToolsValue) -> AnyEdgeToolCall? {
-    guard let call = try? EdgeToolCall(id: id, tool: self.tool, rawInput: rawInput) else {
-      return nil
-    }
-    guard let encodeOutput else {
-      return AnyEdgeToolCall.erasing(call)
-    }
-    return AnyEdgeToolCall.erasing(call, encodeOutput: encodeOutput)
-  }
-}
-
-public struct EdgeToolsSessionTool: Sendable {
-  private let base: any _SessionTool
-
-  public var tool: any EdgeTool { self.base.erasedTool }
-  public var name: String { self.base.erasedName }
-  public var definition: EdgeToolDefinition { self.base.erasedDefinition }
-
-  public init<Tool>(_ tool: Tool) where Tool: EdgeTool, Tool.Output: ConvertibleToEdgeToolsValue {
-    self.base = SessionToolBox(tool, encodeOutput: { $0.edgeToolsValue })
-  }
-
-  public init<Tool>(
-    _ tool: Tool,
-    encodeOutput: @escaping @Sendable (Tool.Output) throws -> EdgeToolsValue
-  ) where Tool: EdgeTool {
-    self.base = SessionToolBox(tool, encodeOutput: encodeOutput)
-  }
-
-  public init(_ tool: some EdgeTool) {
-    self.base = SessionToolBox(tool)
-  }
-
-  func call(id: EdgeToolCallID, rawInput: EdgeToolsValue) -> AnyEdgeToolCall? {
-    self.base.call(id: id, rawInput: rawInput)
-  }
-}
-
 // MARK: - EdgeToolsToolBuilder
 
 @resultBuilder
 public enum EdgeToolsToolBuilder {
-  public static func buildExpression<Tool>(_ tool: Tool) -> EdgeToolsSessionTool
-  where Tool: EdgeTool, Tool.Output: ConvertibleToEdgeToolsValue {
-    EdgeToolsSessionTool(tool)
-  }
-
-  public static func buildExpression(_ tool: EdgeToolsSessionTool) -> EdgeToolsSessionTool {
+  public static func buildExpression<Tool: EdgeTool>(_ tool: Tool) -> any EdgeTool {
     tool
   }
 
-  public static func buildBlock(_ tools: EdgeToolsSessionTool...) -> [EdgeToolsSessionTool] {
+  public static func buildBlock(_ tools: any EdgeTool...) -> [any EdgeTool] {
     tools
   }
 
-  public static func buildOptional(_ tools: [EdgeToolsSessionTool]?) -> [EdgeToolsSessionTool] {
+  public static func buildOptional(_ tools: [any EdgeTool]?) -> [any EdgeTool] {
     tools ?? []
   }
 
-  public static func buildEither(first tools: [EdgeToolsSessionTool]) -> [EdgeToolsSessionTool] {
+  public static func buildEither(first tools: [any EdgeTool]) -> [any EdgeTool] {
     tools
   }
 
-  public static func buildEither(second tools: [EdgeToolsSessionTool]) -> [EdgeToolsSessionTool] {
+  public static func buildEither(second tools: [any EdgeTool]) -> [any EdgeTool] {
     tools
   }
 
-  public static func buildArray(_ tools: [[EdgeToolsSessionTool]]) -> [EdgeToolsSessionTool] {
+  public static func buildArray(_ tools: [[any EdgeTool]]) -> [any EdgeTool] {
     tools.flatMap { $0 }
   }
 }
@@ -431,7 +342,7 @@ public final class EdgeToolsSessionStream: Sendable, Identifiable {
 
   private let state = Lock(State())
   private let registrar = _ObservationRegistrar()
-  private let toolsByName: [String: EdgeToolsSessionTool]
+  private let toolsByName: [String: any EdgeTool]
   private let shouldInvokeTools: @Sendable (AnyEdgeToolCall) -> Bool
 
   public var isGenerating: Bool {
@@ -476,7 +387,7 @@ public final class EdgeToolsSessionStream: Sendable, Identifiable {
   }
 
   fileprivate init(
-    tools: [EdgeToolsSessionTool],
+    tools: [any EdgeTool],
     shouldInvokeTools: @escaping @Sendable (AnyEdgeToolCall) -> Bool
   ) {
     self.toolsByName = Dictionary(
@@ -629,8 +540,7 @@ extension EdgeToolsSessionStream {
   fileprivate func start<Engine: EdgeToolsEngine>(
     session: EdgeToolsSession<Engine>,
     prompt: Engine.Prompt,
-    context: Engine.Context?,
-    toolDefinitions: [EdgeToolDefinition],
+    context: Engine.Context,
     parameters: sending Engine.GenerateParameters
   ) {
     let shouldStart = self.state.withLock { state in
@@ -648,7 +558,6 @@ extension EdgeToolsSessionStream {
         session: session,
         prompt: prompt,
         context: context,
-        toolDefinitions: toolDefinitions,
         parameters: parameters
       )
     }
@@ -683,8 +592,7 @@ extension EdgeToolsSessionStream {
   private func runGeneration<Engine: EdgeToolsEngine>(
     session: EdgeToolsSession<Engine>,
     prompt: Engine.Prompt,
-    context: Engine.Context?,
-    toolDefinitions: [EdgeToolDefinition],
+    context: Engine.Context,
     parameters: sending Engine.GenerateParameters
   ) async throws -> EdgeToolsSessionGeneration {
     let wasStopped = self.state.withLock { $0.wasStoppedBeforeGeneration }
@@ -703,10 +611,8 @@ extension EdgeToolsSessionStream {
       onPart: { part in self.emit(part: part) }
     )
     do {
-      let context = session.resolveContext(context)
       let generationTask = try session.engine.generate(
         prompt: prompt,
-        tools: toolDefinitions,
         parameters: parameters,
         context: context,
         channel: channel
@@ -793,10 +699,16 @@ extension EdgeToolsSessionStream {
     guard let tool = self.toolsByName[rawCall.name.snakeCased()] else {
       return .unknownTool(rawCall)
     }
-    guard let call = tool.call(id: EdgeToolCallID(), rawInput: rawCall.arguments) else {
+    do {
+      return .resolved(
+        try tool.toolCall(
+          id: EdgeToolCallID(),
+          arguments: rawCall.arguments
+        )
+      )
+    } catch {
       return .invalidArguments(rawCall)
     }
-    return .resolved(call)
   }
 }
 
@@ -881,11 +793,11 @@ extension EdgeToolsSessionStream {
 extension EdgeToolsSession {
   public func stream(
     prompt: Engine.Prompt,
-    context: Engine.Context?,
+    context: Engine.Context,
     parameters: sending Engine.GenerateParameters = .default,
     shouldInvokeTools: @escaping @Sendable (AnyEdgeToolCall) -> Bool = { _ in true }
   ) -> EdgeToolsSessionStream {
-    let tools = self.tools
+    let tools = context.tools
     if let message = duplicateToolNameError(tools.map { $0.name }) {
       assertionFailure(message)
     }
@@ -898,7 +810,6 @@ extension EdgeToolsSession {
       session: self,
       prompt: prompt,
       context: context,
-      toolDefinitions: tools.map { $0.definition },
       parameters: parameters
     )
     return stream
@@ -907,7 +818,7 @@ extension EdgeToolsSession {
   @concurrent
   public func generate(
     prompt: Engine.Prompt,
-    context: Engine.Context?,
+    context: Engine.Context,
     parameters: sending Engine.GenerateParameters = .default,
     shouldInvokeTools: @escaping @Sendable (AnyEdgeToolCall) -> Bool = { _ in true }
   ) async throws -> EdgeToolsSessionGeneration {
@@ -940,14 +851,12 @@ private final class RawToolCallDeliveryState: Sendable {
 
 extension EdgeToolsSession {
   fileprivate enum ObservedProperty {
-    case tools
     case activeStreams
   }
 
   fileprivate func access(_ property: ObservedProperty) {
     #if !$Embedded
       switch property {
-      case .tools: self.observationRegistrar.access(self, keyPath: \.tools)
       case .activeStreams: self.observationRegistrar.access(self, keyPath: \.activeStreams)
       }
     #endif
@@ -959,8 +868,6 @@ extension EdgeToolsSession {
   ) -> Result {
     #if !$Embedded
       switch property {
-      case .tools:
-        self.observationRegistrar.withMutation(of: self, keyPath: \.tools, body)
       case .activeStreams:
         self.observationRegistrar.withMutation(of: self, keyPath: \.activeStreams, body)
       }
@@ -1049,10 +956,7 @@ extension EdgeToolCallOutcome {
       return edgeToolErrorResponse("invalid arguments for tool: \(self.name)")
     case .resolved(let call):
       do {
-        guard let value = try await call.outputValue() else {
-          return edgeToolErrorResponse("unencodable output from tool: \(self.name)")
-        }
-        return value
+        return try await call.outputValue()
       } catch {
         return edgeToolErrorResponse(edgeToolErrorDescription(error))
       }
