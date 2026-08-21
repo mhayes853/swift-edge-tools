@@ -83,7 +83,8 @@ extension GrammarBitmask: RandomAccessCollection {}
 
     public func process(logits: MLXArray) -> MLXArray {
       guard !self.matcher.isTerminated else { return logits }
-      return applyBitmaskMLX(logits: logits, mask: self.matcher.grammarBitmask())
+      guard let bitmask = self.matcher.grammarBitmask() else { return logits }
+      return applyBitmaskMLX(logits: logits, mask: bitmask)
     }
   }
 #endif

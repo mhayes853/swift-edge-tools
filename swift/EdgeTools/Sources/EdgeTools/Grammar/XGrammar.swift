@@ -36,8 +36,8 @@
   // MARK: - Matcher
 
   extension XGRMatcher {
-    public func grammarBitmask() -> GrammarBitmask {
-      let words = self.bitmask()
+    public func grammarBitmask() -> GrammarBitmask? {
+      guard let words = self.bitmask() else { return nil }
       let storage = words.withUnsafeBytes { Array($0) }
       return GrammarBitmask(storage: storage)
     }

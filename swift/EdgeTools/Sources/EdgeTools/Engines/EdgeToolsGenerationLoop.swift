@@ -41,7 +41,7 @@ public struct EdgeToolsGenerationLoop: Sendable {
     maximumTokenCount: Int? = nil,
     grammar: (State) throws -> GrammarEngine.Grammar,
     prepare: (inout Parser, inout State) async throws -> Preparation,
-    decode: (GrammarBitmask, inout State) async throws -> EdgeToolsToken.ID
+    decode: (GrammarBitmask?, inout State) async throws -> EdgeToolsToken.ID
   ) async throws -> EdgeToolsEngineGeneration
   where Parser: EdgeToolsGenerationParser, GrammarEngine: EdgeToolsGrammarEngine {
     try Task.checkCancellation()
@@ -63,18 +63,13 @@ public struct EdgeToolsGenerationLoop: Sendable {
     var durationToFirstToken: Duration?
     let maximumTokenCount = maximumTokenCount ?? .max
 
-    var bitmask: GrammarBitmask?
-    if !matcher.isTerminated,
+    while !matcher.isTerminated,
       !stopper.isStopped,
       generatedTokens.count < maximumTokenCount,
       generatedTokens.last.map({ !self.stopTokenIds.contains($0.id) }) ?? true
     {
       try Task.checkCancellation()
-      bitmask = matcher.grammarBitmask()
-    }
-
-    while let currentBitmask = bitmask {
-      let tokenId = try await decode(currentBitmask, &state)
+      let tokenId = try await decode(matcher.grammarBitmask(), &state)
       durationToFirstToken = durationToFirstToken ?? clock.duration(since: generateStart)
 
       let tokenString = detokenizer.decode(tokenId: tokenId, using: self.tokenizer)
@@ -92,16 +87,6 @@ public struct EdgeToolsGenerationLoop: Sendable {
       for part in parsedParts {
         parts.append(part)
         channel.emit(part: part)
-      }
-
-      bitmask = nil
-      if !matcher.isTerminated,
-        !stopper.isStopped,
-        generatedTokens.count < maximumTokenCount,
-        generatedTokens.last.map({ !self.stopTokenIds.contains($0.id) }) ?? true
-      {
-        try Task.checkCancellation()
-        bitmask = matcher.grammarBitmask()
       }
     }
 

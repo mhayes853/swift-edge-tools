@@ -853,7 +853,7 @@
     }
 
     public nonisolated(nonsending) mutating func decode(
-      bitmask: GrammarBitmask,
+      bitmask: GrammarBitmask?,
       parameters: Profile.GenerateParameters
     ) async throws -> EdgeToolsToken.ID {
       guard var generation = self.generation else {
@@ -878,7 +878,9 @@
       }
       var stepLogits = generation.logits[0..., -1, 0...]
       stepLogits = generation.processor?.process(logits: stepLogits) ?? stepLogits
-      let maskedLogits = applyBitmaskMLX(logits: stepLogits, mask: bitmask)
+      let maskedLogits =
+        bitmask.map { applyBitmaskMLX(logits: stepLogits, mask: $0) }
+        ?? stepLogits
       let confidenceValues = top(maskedLogits.flattened(), k: 2)
       let token = generation.sampler.sample(logits: maskedLogits)
       eval(confidenceValues, token)
@@ -1184,7 +1186,7 @@
     }
 
     public func decode(
-      bitmask: GrammarBitmask,
+      bitmask: GrammarBitmask?,
       parameters: Profile.GenerateParameters,
       state: inout ModelGenerationState
     ) async throws -> EdgeToolsToken.ID {

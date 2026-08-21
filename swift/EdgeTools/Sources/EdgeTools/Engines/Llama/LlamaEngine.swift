@@ -305,7 +305,7 @@
     }
 
     private func decode(
-      bitmask: GrammarBitmask,
+      bitmask: GrammarBitmask?,
       state: inout ModelGenerationState
     ) throws -> EdgeToolsToken.ID {
       guard var decoder = state.decoder else {
