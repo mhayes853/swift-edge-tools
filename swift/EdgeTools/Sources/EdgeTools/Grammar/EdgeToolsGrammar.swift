@@ -5,7 +5,8 @@ import EdgeToolsCore
 public protocol EdgeToolsGrammarMatcher: ~Copyable {
   var isTerminated: Bool { get }
 
-  mutating func grammarBitmask() -> GrammarBitmask
+  /// Returns the current vocabulary constraint, or `nil` when every token is accepted.
+  mutating func grammarBitmask() -> GrammarBitmask?
 
   @discardableResult
   mutating func accept(tokenId: EdgeToolsToken.ID) -> Bool

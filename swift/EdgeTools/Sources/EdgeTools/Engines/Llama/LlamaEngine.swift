@@ -13,10 +13,6 @@
 
   // MARK: - LlamaEngine
 
-  /// A llama.cpp engine.
-  ///
-  /// Initialize `LlamaBackend` before creating an engine and keep it initialized while any engine
-  /// resources remain in use.
   public final class LlamaEngine<Profile: LlamaModelProfile>:
     EdgeToolsEngine, EdgeToolsPrefillableEngine, EdgeToolsTokenizingEngine {
     public typealias Context = LlamaContext<Profile>
@@ -286,7 +282,9 @@
         cache: state.contextState.preparedInputCache
       )
       let contextState = state.contextState
-      contextState.sequenceStore.resetProbe(sequenceId: contextState.sequence.sequenceId)
+      if parameters.confidence.contains(.probe) {
+        contextState.sequenceStore.resetProbe(sequenceId: contextState.sequence.sequenceId)
+      }
       let metrics = try self.synchronize(
         input: input,
         contextState: contextState,
@@ -299,13 +297,14 @@
       state.decoder = ModelGenerationState.Decoder(
         sampler: EdgeToolsCPUFusedSampler(
           parameters: parameters.sampling.applying(to: defaultSampling)
-        )
+        ),
+        confidenceOptions: parameters.confidence
       )
       return EdgeToolsGenerationLoop.Preparation(metrics: metrics)
     }
 
     private func decode(
-      bitmask: GrammarBitmask,
+      bitmask: GrammarBitmask?,
       state: inout ModelGenerationState
     ) throws -> EdgeToolsToken.ID {
       guard var decoder = state.decoder else {
@@ -319,7 +318,10 @@
       ) {
         decoder.sampler.sample(logits: &$0, bitmask: bitmask)
       }
-      decoder.confidence.add(confidence: sample.confidence)
+      decoder.confidence.add(
+        confidence: sample.confidence,
+        options: decoder.confidenceOptions
+      )
       decoder.pendingTokenId = sample.tokenId
       state.decoder = decoder
       return sample.tokenId
@@ -402,11 +404,17 @@
     private func metadata(for state: ModelGenerationState) -> EdgeToolsMetadata {
       guard let decoder = state.decoder else { return EdgeToolsMetadata() }
       var metadata = EdgeToolsMetadata()
-      metadata.generationConfidence = decoder.confidence.mean
-      metadata.perTokenConfidences = decoder.confidence.perTokenConfidences
-      metadata.probeConfidence = state.contextState.sequenceStore.probeConfidence(
-        sequenceId: state.contextState.sequence.sequenceId
-      )
+      if decoder.confidenceOptions.contains(.generation) {
+        metadata.generationConfidence = decoder.confidence.mean
+      }
+      if decoder.confidenceOptions.contains(.perToken) {
+        metadata.perTokenConfidences = decoder.confidence.perTokenConfidences
+      }
+      if decoder.confidenceOptions.contains(.probe) {
+        metadata.probeConfidence = state.contextState.sequenceStore.probeConfidence(
+          sequenceId: state.contextState.sequence.sequenceId
+        )
+      }
       return metadata
     }
 

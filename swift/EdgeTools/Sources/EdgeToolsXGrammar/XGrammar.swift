@@ -900,14 +900,15 @@ public struct XGRMatcher: ~Copyable, @unchecked Sendable {
   /// Each bit corresponds to a token ID: a set bit indicates that accepting that token preserves a
   /// valid continuation. Bits are packed into `Int32` words in token-ID order.
   ///
-  /// - Returns: A bitmask of token IDs accepted at the current state.
-  public func bitmask() -> [Int32] {
+  /// - Returns: A bitmask of token IDs accepted at the current state, or `nil` when every token is
+  ///   accepted.
+  public func bitmask() -> [Int32]? {
     let bitCount = Int(xgrammar_matcher_bit_count(self.handle))
     var bitmask = [Int32](repeating: 0, count: (bitCount + 31) / 32)
-    _ = bitmask.withUnsafeMutableBufferPointer { bitmask in
+    let isRequired = bitmask.withUnsafeMutableBufferPointer { bitmask in
       xgrammar_matcher_bitmask(self.handle, bitmask.baseAddress)
-    }
-    return bitmask
+    } != 0
+    return isRequired ? bitmask : nil
   }
 
   /// Advances the matcher with a token ID.

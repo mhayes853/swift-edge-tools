@@ -173,6 +173,7 @@
     struct Decoder {
       var pendingTokenId: EdgeToolsToken.ID?
       let sampler: EdgeToolsCPUFusedSampler
+      let confidenceOptions: EdgeToolsConfidenceOptions
       var confidence = ConfidenceState()
     }
 

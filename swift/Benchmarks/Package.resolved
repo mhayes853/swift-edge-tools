@@ -1,5 +1,5 @@
 {
-  "originHash" : "f7f848cf311aa68078697b57cfda0330a22af4dea6e53d9ab4eadea238dbe55b",
+  "originHash" : "8ddea31bfdc8cb035c721ef493da00ab8b430ca2ddccf8af309658af9966b53a",
   "pins" : [
     {
       "identity" : "hdrhistogram-swift",
@@ -26,6 +26,24 @@
       "state" : {
         "revision" : "9221411ac2e845a93ce65b9ca2ab84f8c1084b0d",
         "version" : "1.4.0"
+      }
+    },
+    {
+      "identity" : "mlx-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ml-explore/mlx-swift",
+      "state" : {
+        "revision" : "0bb916c67f4b9e5c682cbe02a42c701c93ab5021",
+        "version" : "0.31.6"
+      }
+    },
+    {
+      "identity" : "mlx-swift-lm",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ml-explore/mlx-swift-lm",
+      "state" : {
+        "revision" : "bd4b7434e6bdb588c7ef55706ff8904cb7fd4c57",
+        "version" : "3.31.4"
       }
     },
     {

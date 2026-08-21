@@ -59,6 +59,134 @@
 
       expectNoDifference(secondGeneration.prefillMetrics.tokens, 1)
     }
+
+    @Test
+    func `Context Cache Policy Persists Across Prefill And Forks`() async throws {
+      let recorder = CachePolicyRecorder()
+      let engine = try cachePolicyTestEngine(recorder: recorder)
+      let context = engine.context(
+        MLXContextParameters(
+          transcript: .tokens([10, 11, 12, 13, 14]),
+          maxKVSize: 8,
+          prefillChunkSize: 2
+        )
+      )
+
+      _ = try await engine.prefill(context: context)
+      context.transcript = .tokens([10, 11, 12, 13, 14, 15, 16, 17])
+      _ = try await engine.prefill(context: context)
+      let fork = context.fork()
+      fork.transcript = .tokens([10, 11, 12, 13, 14, 15, 16, 17, 18, 19])
+      _ = try await engine.prefill(context: fork)
+
+      expectNoDifference(
+        recorder.snapshot,
+        CachePolicyRecord(
+          maxKVSizes: [8],
+          prefillChunkSizes: [2],
+          evaluationChunkSizes: [2, 2, 1, 2, 1, 2],
+          evaluatedQuantizedCaches: [false, false, false, false, false, false]
+        )
+      )
+    }
+
+    @Test
+    func `Context Quantization Persists Into Extended Prefill`() async throws {
+      let recorder = CachePolicyRecorder()
+      let engine = try cachePolicyTestEngine(recorder: recorder)
+      let context = engine.context(
+        MLXContextParameters(
+          transcript: .tokens([10, 11, 12]),
+          prefillChunkSize: 2,
+          kvCacheQuantization: MLXKVCacheQuantization(
+            bits: 4,
+            groupSize: 32
+          )
+        )
+      )
+
+      _ = try await engine.prefill(context: context)
+      context.transcript = .tokens([10, 11, 12, 13])
+      _ = try await engine.prefill(context: context)
+
+      expectNoDifference(recorder.snapshot.maxKVSizes, [nil])
+      expectNoDifference(recorder.snapshot.evaluationChunkSizes, [2, 1, 1])
+      expectNoDifference(
+        recorder.snapshot.evaluatedQuantizedCaches,
+        [false, false, true]
+      )
+    }
+
+    @Test
+    func `Default Fused Sampler Seeds Penalties With Prompt Tokens`() async throws {
+      let tokenizer = try testTokenizer()
+      let engine = try MLXEngine<LLMPrefillTestProfile>(
+        languageModel: PromptPenaltyLanguageModel(),
+        tokenizer: tokenizer,
+        vocabularySize: TestTokenizer.vocabularySize
+      )
+      let context = engine.context()
+
+      let generation = try await engine.generate(
+        prompt: EdgeToolsTranscript.Prompt(
+          messages: EdgeToolsTranscript.tokens([1]).messages
+        ),
+        parameters: DefaultMLXGenerateParameters(
+          sampling: EdgeToolsFusedSamplingParameters(
+            temperature: 0,
+            repetitionPenalty: 2
+          ),
+          maxTokens: 1,
+          synchronizeStreamForMemorySnapshots: false
+        ),
+        context: context,
+        channel: EdgeToolsGenerationChannel()
+      ).value
+
+      expectNoDifference(generation.tokens.map(\.id), [2])
+    }
+
+    @Test(arguments: [
+      (EdgeToolsConfidenceOptions(), false, false),
+      (.generation, true, false),
+      (.perToken, false, true),
+      (EdgeToolsConfidenceOptions.generation.union(.perToken), true, true),
+      (.probe, false, false)
+    ])
+    func `Confidence Options Independently Control Metadata`(
+      confidence: EdgeToolsConfidenceOptions,
+      expectsGeneration: Bool,
+      expectsPerToken: Bool
+    ) async throws {
+      let tokenizer = try testTokenizer()
+      let engine = try MLXEngine<LLMPrefillTestProfile>(
+        languageModel: PromptPenaltyLanguageModel(),
+        tokenizer: tokenizer,
+        vocabularySize: TestTokenizer.vocabularySize
+      )
+      let generation = try await engine.generate(
+        prompt: EdgeToolsTranscript.Prompt(
+          messages: EdgeToolsTranscript.tokens([1]).messages
+        ),
+        parameters: DefaultMLXGenerateParameters(
+          sampler: ArgMaxSampler(),
+          confidence: confidence,
+          maxTokens: 1,
+          synchronizeStreamForMemorySnapshots: false
+        ),
+        context: engine.context(),
+        channel: EdgeToolsGenerationChannel()
+      ).value
+
+      expectNoDifference(
+        generation.metadata.generationConfidence != nil,
+        expectsGeneration
+      )
+      expectNoDifference(
+        generation.metadata.perTokenConfidences?.count,
+        expectsPerToken ? 1 : nil
+      )
+    }
   }
 
   #if canImport(CoreImage) && canImport(MLXVLM)
@@ -256,6 +384,114 @@
     }
   }
 
+  private final class PromptPenaltyLanguageModel:
+    Module, LanguageModel, KVCacheDimensionProvider
+  {
+    var vocabularySize: Int { TestTokenizer.vocabularySize }
+    var kvHeads: [Int] { [1] }
+
+    func prepare(
+      _ input: LMInput,
+      cache: [any KVCache],
+      windowSize: Int?
+    ) throws -> PrepareResult {
+      .tokens(input.text)
+    }
+
+    func callAsFunction(_ inputs: MLXArray, cache: [any KVCache]?) -> MLXArray {
+      let tokenCount = inputs.size
+      let values = MLXArray.zeros([1, 1, tokenCount, 1])
+      for cache in cache ?? [] {
+        _ = cache.update(keys: values, values: values)
+      }
+      var logits = [Float](repeating: -100, count: tokenCount * self.vocabularySize)
+      for index in 0..<tokenCount {
+        logits[index * self.vocabularySize + 1] = 5
+        logits[index * self.vocabularySize + 2] = 3
+      }
+      return MLXArray(logits, [1, tokenCount, self.vocabularySize])
+    }
+  }
+
+  private struct CachePolicyRecord: Equatable, Sendable {
+    var maxKVSizes = [Int?]()
+    var prefillChunkSizes = [Int?]()
+    var evaluationChunkSizes = [Int]()
+    var evaluatedQuantizedCaches = [Bool]()
+  }
+
+  private final class CachePolicyRecorder: Sendable {
+    private let value = LockBox(CachePolicyRecord())
+
+    var snapshot: CachePolicyRecord {
+      self.value.withLock { $0 }
+    }
+
+    func recordCache(maxKVSize: Int?) {
+      self.value.withLock { $0.maxKVSizes.append(maxKVSize) }
+    }
+
+    func recordPrefill(chunkSize: Int?) {
+      self.value.withLock { $0.prefillChunkSizes.append(chunkSize) }
+    }
+
+    func recordEvaluation(chunkSize: Int, isQuantized: Bool) {
+      self.value.withLock {
+        $0.evaluationChunkSizes.append(chunkSize)
+        $0.evaluatedQuantizedCaches.append(isQuantized)
+      }
+    }
+  }
+
+  private final class CachePolicyTestLanguageModel: Module, LanguageModel {
+    let recorder: CachePolicyRecorder
+    var vocabularySize: Int { TestTokenizer.vocabularySize }
+
+    init(recorder: CachePolicyRecorder) {
+      self.recorder = recorder
+      super.init()
+    }
+
+    func prepare(
+      _ input: LMInput,
+      cache: [any KVCache],
+      windowSize: Int?
+    ) throws -> PrepareResult {
+      self.recorder.recordPrefill(chunkSize: windowSize)
+      return .tokens(input.text)
+    }
+
+    func callAsFunction(_ inputs: MLXArray, cache: [any KVCache]?) -> MLXArray {
+      let tokenCount = inputs.dim(-1)
+      self.recorder.recordEvaluation(
+        chunkSize: tokenCount,
+        isQuantized: cache?.first is QuantizedKVCache
+      )
+      let values = MLXArray.zeros([1, 1, tokenCount, 32])
+      for cache in cache ?? [] {
+        if let cache = cache as? any QuantizedKVCacheProtocol {
+          _ = cache.updateQuantized(keys: values, values: values)
+        } else {
+          _ = cache.update(keys: values, values: values)
+        }
+      }
+      var logits = [Float](repeating: -100, count: tokenCount * self.vocabularySize)
+      for index in 0..<tokenCount {
+        logits[index * self.vocabularySize + 1] = 100
+      }
+      return MLXArray(logits, [1, tokenCount, self.vocabularySize])
+    }
+
+    func newCache(parameters: GenerateParameters?) -> [any KVCache] {
+      let maxKVSize = parameters?.maxKVSize
+      self.recorder.recordCache(maxKVSize: maxKVSize)
+      if let maxKVSize {
+        return [RotatingKVCache(maxSize: maxKVSize, keep: 4)]
+      }
+      return [KVCacheSimple()]
+    }
+  }
+
   // MARK: - Test Helpers
 
   private func makePrefillTestEngine<Profile: MLXModelProfile>(
@@ -274,6 +510,16 @@
     )
   }
 
+  private func cachePolicyTestEngine(
+    recorder: CachePolicyRecorder
+  ) throws -> MLXEngine<LLMPrefillTestProfile> {
+    try MLXEngine<LLMPrefillTestProfile>(
+      languageModel: CachePolicyTestLanguageModel(recorder: recorder),
+      tokenizer: testTokenizer(),
+      vocabularySize: TestTokenizer.vocabularySize
+    )
+  }
+
   private func generate<Profile: MLXModelProfile>(
     using engine: MLXEngine<Profile>,
     context: MLXContext<Profile>
@@ -283,6 +529,7 @@
     Profile.GenerateParameters == DefaultMLXGenerateParameters
   {
     let task = try engine.generate(
+      prompt: EdgeToolsTranscript.Prompt(messages: []),
       parameters: DefaultMLXGenerateParameters(
         sampler: ArgMaxSampler(),
         maxTokens: 1,

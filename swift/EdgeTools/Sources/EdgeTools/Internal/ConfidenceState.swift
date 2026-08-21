@@ -17,16 +17,22 @@
 struct ConfidenceState {
   private(set) var perTokenConfidences = [Float]()
   private var totalSum = Float(0)
+  private var count = 0
 
   var mean: Float? {
-    !self.perTokenConfidences.isEmpty
-      ? self.totalSum / Float(self.perTokenConfidences.count)
+    self.count > 0
+      ? self.totalSum / Float(self.count)
       : nil
   }
 
-  mutating func add(confidence: Float) {
-    self.perTokenConfidences.append(confidence)
-    self.totalSum += confidence
+  mutating func add(confidence: Float, options: EdgeToolsConfidenceOptions) {
+    if options.contains(.generation) {
+      self.totalSum += confidence
+      self.count += 1
+    }
+    if options.contains(.perToken) {
+      self.perTokenConfidences.append(confidence)
+    }
   }
 }
 

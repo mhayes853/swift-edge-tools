@@ -361,7 +361,7 @@
     }
 
     func decode(
-      bitmask: GrammarBitmask,
+      bitmask: GrammarBitmask?,
       parameters: Parameters,
       state: inout TestGenerationState
     ) async throws -> EdgeToolsToken.ID {

@@ -48,7 +48,11 @@
           Issue.record("Tokenizer produced no tokens for the grammar fixture")
           return
         }
-        expectNoDifference(matcher.grammarBitmask()[firstToken], true)
+        guard let bitmask = matcher.grammarBitmask() else {
+          Issue.record("Expected the grammar to require a bitmask")
+          return
+        }
+        expectNoDifference(bitmask[firstToken], true)
         expectNoDifference(matcher.accept(tokenId: firstToken), true)
 
         matcher.rollback(1)
@@ -110,7 +114,10 @@
       func `Bitmask Disallows Eos Before Completion`() throws {
         let matcher = try self.engine.makeMatcher(try genericGrammar())
 
-        let bitmask = matcher.grammarBitmask()
+        guard let bitmask = matcher.grammarBitmask() else {
+          Issue.record("Expected the grammar to require a bitmask")
+          return
+        }
         expectNoDifference(bitmask[self.eosToken], false)
       }
 
@@ -124,18 +131,31 @@
         }
         expectNoDifference(matcher.isCompleted, true)
 
-        let bitmask = matcher.grammarBitmask()
+        guard let bitmask = matcher.grammarBitmask() else {
+          Issue.record("Expected the grammar to require a bitmask")
+          return
+        }
         expectNoDifference(bitmask[self.eosToken], true)
       }
 
       @Test
       func `Bitmask Has Expected Size`() throws {
         let matcher = try self.engine.makeMatcher(try genericGrammar())
-        let bitmask = matcher.grammarBitmask()
+        guard let bitmask = matcher.grammarBitmask() else {
+          Issue.record("Expected the grammar to require a bitmask")
+          return
+        }
         let expectedBitCount = GrammarBitmask.bitCount(
           forVocabularySize: TestTokenizer.vocabularySize
         )
         expectNoDifference(bitmask.count, expectedBitCount)
+      }
+
+      @Test
+      func `Universal Grammar Does Not Require A Bitmask`() throws {
+        let matcher = try self.engine.makeMatcher(.universal)
+
+        expectNoDifference(matcher.grammarBitmask(), nil)
       }
 
       @Test(arguments: [
