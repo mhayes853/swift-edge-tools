@@ -1,7 +1,7 @@
 import { rm } from "node:fs/promises";
 import { dts } from "rollup-plugin-dts";
 
-const declarations = ["index", "standalone"];
+const declarations = ["index", "zod", "standalone"];
 
 export default declarations.map((name, index) => ({
 	input: `dist/types/${name}.d.ts`,

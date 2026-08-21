@@ -8,13 +8,17 @@ export default defineConfig(({ mode }) => {
       ? "src/worker-entry.ts"
       : mode === "standalone"
         ? "src/standalone.ts"
-        : "src/index.ts";
+        : mode === "zod"
+          ? "src/zod.ts"
+          : "src/index.ts";
   const fileName =
     mode === "worker"
       ? "needle2.worker.mjs"
       : mode === "standalone"
         ? "needle2.min.js"
-        : "index.js";
+        : mode === "zod"
+          ? "zod.js"
+          : "index.js";
 
   return {
     build: {
@@ -27,7 +31,7 @@ export default defineConfig(({ mode }) => {
       },
       minify: mode === "standalone",
       rollupOptions: {
-        external: (id: string) => id.startsWith("node:")
+        external: (id: string) => id.startsWith("node:") || id === "zod"
       },
       target: "es2022"
     },

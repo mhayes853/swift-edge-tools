@@ -89,6 +89,26 @@ behave exactly as before and produce no `output`. Handlers never run for a faile
 is why `output` is reachable only after narrowing on `success`. If a handler throws, `generate`
 rejects with a `Needle2ToolCallError` carrying every failure and the generation that produced them.
 
+Writing `parameters` as a raw JSON schema and `call`'s argument type by hand leaves the two free to
+drift apart. `@edge-tools/needle2/zod` derives both from a single [zod](https://zod.dev) object
+schema instead, and validates every call's raw arguments against it before `call` ever runs:
+
+```ts
+import { zodTool } from "@edge-tools/needle2/zod";
+import { z } from "zod";
+
+const getWeather = zodTool({
+  name: "get_weather",
+  description: "Get the weather for a city.",
+  parameters: z.object({ city: z.string() }),
+  call: async ({ city }) => ({ celsius: 21 }) // city: string
+});
+```
+
+`zodTool` requires a `call`; use `zodToolParameters` to derive just the JSON schema for tools
+declared without one. Zod is a peer dependency of `@edge-tools/needle2`, so installing the package
+does not install zod: only `npm install zod` and importing `@edge-tools/needle2/zod` pulls it in.
+
 `runLoop` drives the whole loop for you, feeding each turn's tool responses back as the next
 turn's prompt until the model answers:
 

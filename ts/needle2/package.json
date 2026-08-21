@@ -25,20 +25,33 @@
     "./standalone": {
       "types": "./dist/standalone.d.ts",
       "default": "./dist/needle2.min.js"
+    },
+    "./zod": {
+      "types": "./dist/zod.d.ts",
+      "import": "./dist/zod.js",
+      "default": "./dist/zod.js"
     }
   },
   "scripts": {
     "assets": "node ../../scripts/needle2/prepare-ts-assets.mjs",
     "native:build": "bash ./scripts/build-native.sh",
-    "build": "vite build && vite build --mode worker && vite build --mode standalone && npm run build:types",
+    "build": "vite build && vite build --mode worker && vite build --mode standalone && vite build --mode zod && npm run build:types",
     "build:types": "tsc --outDir dist/types && rollup --config rollup.types.config.mjs",
     "prepack": "npm run build",
     "test": "npm run build && npm run test:types && vitest run && npm run test:deno && npm run test:bun",
-    "test:types": "tsc --noEmit --skipLibCheck false --module NodeNext --moduleResolution NodeNext --target ES2022 dist/index.d.ts dist/standalone.d.ts && tsc --noEmit --skipLibCheck false --module ESNext --moduleResolution Bundler --target ES2022 --lib ES2022 dist/index.d.ts dist/standalone.d.ts && tsc -p tsconfig.test.json",
+    "test:types": "tsc --noEmit --skipLibCheck false --module NodeNext --moduleResolution NodeNext --target ES2022 dist/index.d.ts dist/standalone.d.ts dist/zod.d.ts && tsc --noEmit --skipLibCheck false --module ESNext --moduleResolution Bundler --target ES2022 --lib ES2022 dist/index.d.ts dist/standalone.d.ts dist/zod.d.ts && tsc -p tsconfig.test.json",
     "test:bun": "bun test ./tests/runtime-compatibility.ts",
     "test:deno": "deno test --allow-read tests/runtime-compatibility.ts",
     "test:native": "npm run native:build && node --experimental-strip-types --test tests/native-compatibility.ts",
     "test:native-library": "npm run native:build && deno test --allow-ffi --allow-read tests/native-library-compatibility.ts && bun test ./tests/native-library-compatibility.ts"
+  },
+  "peerDependencies": {
+    "zod": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "zod": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
@@ -47,6 +60,7 @@
     "rollup-plugin-dts": "^6.5.1",
     "typescript": "^5.9.0",
     "vite": "^7.0.0",
-    "vitest": "^4.0.0"
+    "vitest": "^4.0.0",
+    "zod": "^4.4.3"
   }
 }
