@@ -66,6 +66,14 @@
     }
   }
 
+  // MARK: - LlamaDecodedLogits
+
+  // Evidence that a decode asked for logits at `sequenceId`'s last position. Only the decode
+  // primitives return one, so a path that claims to produce logits cannot skip decoding.
+  struct LlamaDecodedLogits {
+    let sequenceId: Int
+  }
+
   // MARK: - LlamaRuntimeContext
 
   struct LlamaRuntimeContext: ~Copyable {
@@ -96,6 +104,33 @@
     }
 
     borrowing func decode(
+      tokenIds: some Collection<EdgeToolsToken.ID>,
+      startPosition: Int,
+      sequenceId: Int
+    ) throws {
+      try self.decode(
+        tokenIds: tokenIds,
+        startPosition: startPosition,
+        sequenceId: sequenceId,
+        wantsLogits: false
+      )
+    }
+
+    borrowing func decodeProducingLogits(
+      tokenIds: some Collection<EdgeToolsToken.ID>,
+      startPosition: Int,
+      sequenceId: Int
+    ) throws -> LlamaDecodedLogits {
+      try self.decode(
+        tokenIds: tokenIds,
+        startPosition: startPosition,
+        sequenceId: sequenceId,
+        wantsLogits: true
+      )
+      return LlamaDecodedLogits(sequenceId: sequenceId)
+    }
+
+    private borrowing func decode(
       tokenIds: some Collection<EdgeToolsToken.ID>,
       startPosition: Int,
       sequenceId: Int,

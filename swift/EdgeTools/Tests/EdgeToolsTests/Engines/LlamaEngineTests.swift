@@ -19,17 +19,15 @@
       let second = try #require(store.lease(copyingFrom: nil))
       let input = LlamaPreparedInput(tokenIds: [1])
 
-      _ = try store.synchronize(
+      _ = try store.synchronizeForLogits(
         sequenceId: first.sequenceId,
         input: input,
-        multimodalRuntime: nil,
-        output: .lastTokenLogits
+        multimodalRuntime: nil
       )
       _ = try store.synchronize(
         sequenceId: second.sequenceId,
         input: input,
-        multimodalRuntime: nil,
-        output: .none
+        multimodalRuntime: nil
       )
 
       #expect(throws: Never.self) {

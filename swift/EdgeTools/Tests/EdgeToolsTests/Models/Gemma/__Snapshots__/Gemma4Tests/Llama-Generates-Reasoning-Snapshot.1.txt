@@ -3,8 +3,8 @@
     ▿ (2 elements)
       ▿ key: EdgeToolsMetricKey
         - rawValue: "DecodeDuration"
-      ▿ value: 4.672544667 seconds
-        - _low: 4672544667000000000
+      ▿ value: 4.237948875 seconds
+        - _low: 4237948875000000000
         - _high: 0
     ▿ (2 elements)
       ▿ key: EdgeToolsMetricKey
@@ -13,14 +13,14 @@
     ▿ (2 elements)
       ▿ key: EdgeToolsMetricKey
         - rawValue: "DurationToFirstToken"
-      ▿ value: 1.069318333 seconds
-        - _low: 1069318333000000000
+      ▿ value: 12.058075833 seconds
+        - _low: 12058075833000000000
         - _high: 0
     ▿ (2 elements)
       ▿ key: EdgeToolsMetricKey
         - rawValue: "PrefillDuration"
-      ▿ value: 0.168916708 seconds
-        - _low: 168916708000000000
+      ▿ value: 0.2365385 seconds
+        - _low: 236538500000000000
         - _high: 0
     ▿ (2 elements)
       ▿ key: EdgeToolsMetricKey

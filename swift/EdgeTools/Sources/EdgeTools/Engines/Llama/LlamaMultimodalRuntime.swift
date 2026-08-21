@@ -238,14 +238,11 @@
     let units: [LlamaPreparedInputUnit]
     let chunks: [Chunk]
 
-    var hasMedia: Bool {
-      self.media != nil
-    }
-
     init(tokenIds: [EdgeToolsToken.ID]) {
       self.media = nil
       self.units = tokenIds.map { LlamaPreparedInputUnit(value: .token($0)) }
-      self.chunks = []
+      self.chunks =
+        tokenIds.isEmpty ? [] : [.text(tokenIds: tokenIds, units: 0..<tokenIds.count)]
     }
 
     fileprivate init(chunks: consuming sending LlamaInputChunks) throws {
@@ -456,8 +453,7 @@
       chunkIndex: Int,
       position: Int,
       sequenceId: Int,
-      batchSize: Int,
-      wantsLogits: Bool
+      batchSize: Int
     ) throws -> Int {
       try self.state.withBorrowedLock { state in
         try input.evaluateMedia(
@@ -467,9 +463,31 @@
           position: position,
           sequenceId: sequenceId,
           batchSize: batchSize,
-          wantsLogits: wantsLogits
+          wantsLogits: false
         )
       }
+    }
+
+    func evaluateProducingLogits(
+      input: borrowing LlamaPreparedInput,
+      context: borrowing LlamaRuntimeContext,
+      chunkIndex: Int,
+      position: Int,
+      sequenceId: Int,
+      batchSize: Int
+    ) throws -> (position: Int, logits: LlamaDecodedLogits) {
+      let position = try self.state.withBorrowedLock { state in
+        try input.evaluateMedia(
+          runtime: state.handle,
+          context: context,
+          chunkIndex: chunkIndex,
+          position: position,
+          sequenceId: sequenceId,
+          batchSize: batchSize,
+          wantsLogits: true
+        )
+      }
+      return (position, LlamaDecodedLogits(sequenceId: sequenceId))
     }
   }
 

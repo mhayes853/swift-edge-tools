@@ -3,30 +3,30 @@
     ▿ (2 elements)
       ▿ key: EdgeToolsMetricKey
         - rawValue: "DecodeDuration"
-      ▿ value: 4.191833708 seconds
-        - _low: 4191833708000000000
+      ▿ value: 3.634101333 seconds
+        - _low: 3634101333000000000
         - _high: 0
     ▿ (2 elements)
       ▿ key: EdgeToolsMetricKey
         - rawValue: "DecodeTokens"
-      - value: 70
+      - value: 76
     ▿ (2 elements)
       ▿ key: EdgeToolsMetricKey
         - rawValue: "DurationToFirstToken"
-      ▿ value: 0.306019334 seconds
-        - _low: 306019334000000000
+      ▿ value: 4.212602875 seconds
+        - _low: 4212602875000000000
         - _high: 0
     ▿ (2 elements)
       ▿ key: EdgeToolsMetricKey
         - rawValue: "PrefillDuration"
-      ▿ value: 0.033349667 seconds
-        - _low: 33349667000000000
+      ▿ value: 0.108195333 seconds
+        - _low: 108195333000000000
         - _high: 0
     ▿ (2 elements)
       ▿ key: EdgeToolsMetricKey
         - rawValue: "PrefillTokens"
       - value: 33
-  ▿ parts: 68 elements
+  ▿ parts: 74 elements
     ▿ EdgeToolsGenerationPart
       - reasoning: "First"
     ▿ EdgeToolsGenerationPart
@@ -56,15 +56,11 @@
     ▿ EdgeToolsGenerationPart
       - reasoning: "23"
     ▿ EdgeToolsGenerationPart
-      - reasoning: ".\n"
+      - reasoning: "."
     ▿ EdgeToolsGenerationPart
-      - reasoning: "\n"
+      - reasoning: " That"
     ▿ EdgeToolsGenerationPart
-      - reasoning: "The"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " sum"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " is"
+      - reasoning: " means"
     ▿ EdgeToolsGenerationPart
       - reasoning: " "
     ▿ EdgeToolsGenerationPart
@@ -82,7 +78,13 @@
     ▿ EdgeToolsGenerationPart
       - reasoning: "I"
     ▿ EdgeToolsGenerationPart
-      - reasoning: " calculate"
+      - reasoning: " can"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " add"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " them"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " directly"
     ▿ EdgeToolsGenerationPart
       - reasoning: ":"
     ▿ EdgeToolsGenerationPart
@@ -108,13 +110,13 @@
     ▿ EdgeToolsGenerationPart
       - reasoning: "The"
     ▿ EdgeToolsGenerationPart
-      - reasoning: " instruction"
+      - reasoning: " question"
     ▿ EdgeToolsGenerationPart
       - reasoning: " says"
     ▿ EdgeToolsGenerationPart
-      - reasoning: " to"
+      - reasoning: " \""
     ▿ EdgeToolsGenerationPart
-      - reasoning: " keep"
+      - reasoning: "keep"
     ▿ EdgeToolsGenerationPart
       - reasoning: " the"
     ▿ EdgeToolsGenerationPart
@@ -124,7 +126,7 @@
     ▿ EdgeToolsGenerationPart
       - reasoning: " brief"
     ▿ EdgeToolsGenerationPart
-      - reasoning: ","
+      - reasoning: ",\""
     ▿ EdgeToolsGenerationPart
       - reasoning: " so"
     ▿ EdgeToolsGenerationPart
@@ -134,7 +136,7 @@
     ▿ EdgeToolsGenerationPart
       - reasoning: " just"
     ▿ EdgeToolsGenerationPart
-      - reasoning: " state"
+      - reasoning: " provide"
     ▿ EdgeToolsGenerationPart
       - reasoning: " the"
     ▿ EdgeToolsGenerationPart
@@ -144,11 +146,21 @@
     ▿ EdgeToolsGenerationPart
       - reasoning: "\n"
     ▿ EdgeToolsGenerationPart
-      - reasoning: "So"
+      - reasoning: "I"
     ▿ EdgeToolsGenerationPart
-      - reasoning: ","
+      - reasoning: " think"
     ▿ EdgeToolsGenerationPart
-      - reasoning: " the"
+      - reasoning: " I"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "\'ve"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " done"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " it"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "."
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " The"
     ▿ EdgeToolsGenerationPart
       - reasoning: " sum"
     ▿ EdgeToolsGenerationPart
@@ -163,8 +175,8 @@
       - text: "\n\n"
     ▿ EdgeToolsGenerationPart
       - text: "42"
-  - response: "First, I need to find the sum of 19 and 23.\n\nThe sum is 19 + 23.\n\nI calculate: 19 + 23 = 42.\n\nThe instruction says to keep the final answer brief, so I should just state the answer.\n\nSo, the sum is 42.\n</think>\n\n42"
-  ▿ tokens: 70 elements
+  - response: "First, I need to find the sum of 19 and 23. That means 19 + 23.\n\nI can add them directly: 19 + 23 = 42.\n\nThe question says \"keep the final answer brief,\" so I should just provide the answer.\n\nI think I\'ve done it. The sum is 42.\n</think>\n\n42"
+  ▿ tokens: 76 elements
     ▿ EdgeToolsToken
       - id: 10920
       - stringValue: "First"
@@ -208,20 +220,14 @@
       - id: 1024
       - stringValue: "23"
     ▿ EdgeToolsToken
-      - id: 350
-      - stringValue: ".\n"
+      - id: 35
+      - stringValue: "."
     ▿ EdgeToolsToken
-      - id: 220
-      - stringValue: "\n"
+      - id: 3049
+      - stringValue: " That"
     ▿ EdgeToolsToken
-      - id: 608
-      - stringValue: "The"
-    ▿ EdgeToolsToken
-      - id: 2601
-      - stringValue: " sum"
-    ▿ EdgeToolsToken
-      - id: 357
-      - stringValue: " is"
+      - id: 2710
+      - stringValue: " means"
     ▿ EdgeToolsToken
       - id: 242
       - stringValue: " "
@@ -247,8 +253,17 @@
       - id: 62
       - stringValue: "I"
     ▿ EdgeToolsToken
-      - id: 10444
-      - stringValue: " calculate"
+      - id: 571
+      - stringValue: " can"
+    ▿ EdgeToolsToken
+      - id: 1804
+      - stringValue: " add"
+    ▿ EdgeToolsToken
+      - id: 902
+      - stringValue: " them"
+    ▿ EdgeToolsToken
+      - id: 4925
+      - stringValue: " directly"
     ▿ EdgeToolsToken
       - id: 47
       - stringValue: ":"
@@ -286,17 +301,17 @@
       - id: 608
       - stringValue: "The"
     ▿ EdgeToolsToken
-      - id: 11396
-      - stringValue: " instruction"
+      - id: 2744
+      - stringValue: " question"
     ▿ EdgeToolsToken
       - id: 3586
       - stringValue: " says"
     ▿ EdgeToolsToken
-      - id: 317
-      - stringValue: " to"
+      - id: 458
+      - stringValue: " \""
     ▿ EdgeToolsToken
-      - id: 2934
-      - stringValue: " keep"
+      - id: 28335
+      - stringValue: "keep"
     ▿ EdgeToolsToken
       - id: 285
       - stringValue: " the"
@@ -310,8 +325,8 @@
       - id: 6659
       - stringValue: " brief"
     ▿ EdgeToolsToken
-      - id: 33
-      - stringValue: ","
+      - id: 721
+      - stringValue: ",\""
     ▿ EdgeToolsToken
       - id: 702
       - stringValue: " so"
@@ -325,8 +340,8 @@
       - id: 1230
       - stringValue: " just"
     ▿ EdgeToolsToken
-      - id: 1896
-      - stringValue: " state"
+      - id: 3211
+      - stringValue: " provide"
     ▿ EdgeToolsToken
       - id: 285
       - stringValue: " the"
@@ -340,14 +355,29 @@
       - id: 220
       - stringValue: "\n"
     ▿ EdgeToolsToken
-      - id: 4633
-      - stringValue: "So"
+      - id: 62
+      - stringValue: "I"
     ▿ EdgeToolsToken
-      - id: 33
-      - stringValue: ","
+      - id: 1667
+      - stringValue: " think"
     ▿ EdgeToolsToken
-      - id: 285
-      - stringValue: " the"
+      - id: 354
+      - stringValue: " I"
+    ▿ EdgeToolsToken
+      - id: 2668
+      - stringValue: "\'ve"
+    ▿ EdgeToolsToken
+      - id: 3058
+      - stringValue: " done"
+    ▿ EdgeToolsToken
+      - id: 411
+      - stringValue: " it"
+    ▿ EdgeToolsToken
+      - id: 35
+      - stringValue: "."
+    ▿ EdgeToolsToken
+      - id: 416
+      - stringValue: " The"
     ▿ EdgeToolsToken
       - id: 2601
       - stringValue: " sum"

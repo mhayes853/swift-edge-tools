@@ -285,11 +285,13 @@
       if parameters.confidence.contains(.probe) {
         contextState.sequenceStore.resetProbe(sequenceId: contextState.sequence.sequenceId)
       }
-      let metrics = try self.synchronize(
-        input: input,
-        contextState: contextState,
-        output: .lastTokenLogits
-      )
+      let metrics = try self.metrics {
+        try contextState.sequenceStore.synchronizeForLogits(
+          sequenceId: contextState.sequence.sequenceId,
+          input: input,
+          multimodalRuntime: self.multimodalRuntime
+        )
+      }
       let defaultSampling =
         Profile.defaultSampling(prompt: state.transcript, parameters: parameters)
         ?? contextState.configuredSampling
@@ -374,27 +376,20 @@
         cache: snapshot.model.preparedInputCache
       )
       return EdgeToolsEnginePrefill(
-        metrics: try self.synchronize(
-          input: input,
-          contextState: snapshot.model,
-          output: .none
-        )
+        metrics: try self.metrics {
+          try snapshot.model.sequenceStore.synchronize(
+            sequenceId: snapshot.model.sequence.sequenceId,
+            input: input,
+            multimodalRuntime: self.multimodalRuntime
+          )
+        }
       )
     }
 
-    private func synchronize(
-      input: borrowing LlamaPreparedInput,
-      contextState: LlamaContextState<Profile>,
-      output: LlamaEvaluationOutput
-    ) throws -> EdgeToolsMetrics {
+    private func metrics(evaluating: () throws -> Int) rethrows -> EdgeToolsMetrics {
       let clock = ContinuousClock()
       let start = clock.now
-      let evaluatedCount = try contextState.sequenceStore.synchronize(
-        sequenceId: contextState.sequence.sequenceId,
-        input: input,
-        multimodalRuntime: self.multimodalRuntime,
-        output: output
-      )
+      let evaluatedCount = try evaluating()
       var metrics = EdgeToolsMetrics()
       metrics.prefillTokens = evaluatedCount
       metrics.prefillDuration = start.duration(to: clock.now)

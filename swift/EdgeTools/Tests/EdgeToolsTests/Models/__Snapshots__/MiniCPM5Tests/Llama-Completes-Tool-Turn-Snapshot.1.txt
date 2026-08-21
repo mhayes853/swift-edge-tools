@@ -254,7 +254,7 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 53 elements
+        ▿ parts: 42 elements
           ▿ EdgeToolsGenerationPart
             - reasoning: "<think>"
           ▿ EdgeToolsGenerationPart
@@ -262,39 +262,21 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: "The"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " user"
+            - reasoning: " function"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " asked"
+            - reasoning: " call"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " for"
+            - reasoning: " returned"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
             - reasoning: " weather"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " in"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " Paris"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "."
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " I"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " have"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " received"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " the"
-          ▿ EdgeToolsGenerationPart
             - reasoning: " information"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " from"
+            - reasoning: " for"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " the"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " function"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " call"
+            - reasoning: " Paris"
           ▿ EdgeToolsGenerationPart
             - reasoning: ":"
           ▿ EdgeToolsGenerationPart
@@ -304,13 +286,11 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " temperature"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "C"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "elsius"
-          ▿ EdgeToolsGenerationPart
             - reasoning: " "
           ▿ EdgeToolsGenerationPart
             - reasoning: "21"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "°C"
           ▿ EdgeToolsGenerationPart
             - reasoning: "."
           ▿ EdgeToolsGenerationPart
@@ -318,13 +298,11 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " should"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " present"
+            - reasoning: " summarize"
           ▿ EdgeToolsGenerationPart
             - reasoning: " this"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " information"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " to"
+            - reasoning: " for"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
