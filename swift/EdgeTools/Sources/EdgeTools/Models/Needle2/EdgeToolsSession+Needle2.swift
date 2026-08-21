@@ -53,7 +53,7 @@
     @concurrent
     public func runLoop(
       prompt: String,
-      context: Engine.Context? = nil,
+      context: Engine.Context,
       maximumTurns: Int = 8,
       parameters: @escaping @Sendable (Int) -> Engine.GenerateParameters = { _ in .default },
       shouldInvokeTools: @escaping @Sendable (AnyEdgeToolCall) -> Bool = { _ in true }
@@ -62,7 +62,6 @@
         throw Needle2LoopError.unsupportedTurnCount(maximumTurns)
       }
 
-      let context = self.resolveContext(context)
       var prompt = Needle2Prompt.user(prompt)
       var steps = [Needle2LoopStep]()
 

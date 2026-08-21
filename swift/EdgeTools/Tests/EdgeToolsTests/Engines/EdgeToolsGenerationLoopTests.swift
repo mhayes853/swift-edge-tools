@@ -14,6 +14,7 @@
       let task = try engine.generate(
         prompt: TestPrompt(system: "", user: "Prompt"),
         parameters: TestEngine.Parameters(tokenIds: responseTokenIds + [eosTokenId]),
+        context: engine.context(),
         channel: EdgeToolsGenerationChannel()
       )
 
@@ -44,6 +45,7 @@
         parameters: TestEngine.Parameters(
           tokenIds: responseTokenIds + [stopTokenId, eosTokenId]
         ),
+        context: engine.context(),
         channel: EdgeToolsGenerationChannel()
       )
 
@@ -73,6 +75,7 @@
           tokenIds: [eosTokenId],
           constraint: constraint
         ),
+        context: engine.context(),
         channel: EdgeToolsGenerationChannel()
       )
 
@@ -169,7 +172,7 @@
     var index = 0
   }
 
-  private final class TestContext: Identifiable, Sendable {
+  private final class TestContext: EdgeToolsEngineContext {
     private actor Runtime {
       var state: TestGenerationState? = TestGenerationState()
 
@@ -186,6 +189,11 @@
     }
 
     private let runtime = Runtime()
+    let tools: [any EdgeTool]
+
+    init(tools: [any EdgeTool]) {
+      self.tools = tools
+    }
 
     var id: ObjectIdentifier {
       ObjectIdentifier(self)
@@ -251,8 +259,8 @@
       )
     }
 
-    func context(_ parameters: Void) -> TestContext {
-      TestContext()
+    func context(_ parameters: Void, tools: [any EdgeTool]) -> TestContext {
+      TestContext(tools: tools)
     }
 
     func grammar(
@@ -271,7 +279,6 @@
 
     func tokenize(
       prompt: TestPrompt,
-      tools: [EdgeToolDefinition],
       context: TestContext
     ) async throws -> [EdgeToolsToken] {
       self.tokenizer.encode(text: prompt.user)
@@ -286,12 +293,12 @@
 
     func generate(
       prompt: TestPrompt,
-      tools: [EdgeToolDefinition] = [],
       parameters: sending Parameters,
       context: TestContext,
       channel: sending EdgeToolsGenerationChannel
     ) throws -> AnyGenerationTask {
-      AnyGenerationTask { stopper in
+      let tools = context.tools.map { $0.definition }
+      return AnyGenerationTask { stopper in
         var state = try await self.generationState(prompt: prompt, context: context)
         var preparedPrompt = prompt
         let result: Result<EdgeToolsEngineGeneration, any Error>

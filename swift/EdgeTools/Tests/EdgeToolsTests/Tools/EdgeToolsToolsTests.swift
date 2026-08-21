@@ -37,6 +37,15 @@ struct `EdgeToolsTools tests` {
     }
 
     @Test
+    func `Existential Tool Call Propagates Input Conversion Errors`() {
+      let tool: any EdgeTool = EchoTool()
+
+      #expect(throws: EdgeToolsValueTypeError(expected: .string, received: .integer)) {
+        try tool.toolCall(id: EdgeToolCallID(), arguments: 1)
+      }
+    }
+
+    @Test
     func `Invoke Returns Output And Status Becomes Finished`() async throws {
       let call = try EdgeToolCall(id: EdgeToolCallID(), tool: EchoTool(), rawInput: "hello")
       let output = try await call.output

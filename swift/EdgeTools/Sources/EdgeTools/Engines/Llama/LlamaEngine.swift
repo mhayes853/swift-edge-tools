@@ -138,14 +138,20 @@
     }
 
     public func context() -> LlamaContext<Profile> {
-      self.context(EdgeToolsTranscriptContextParameters())
+      self.context(EdgeToolsTranscriptContextParameters(), tools: [])
+    }
+
+    public func context(tools: [any EdgeTool]) -> LlamaContext<Profile> {
+      self.context(EdgeToolsTranscriptContextParameters(), tools: tools)
     }
 
     public func context(
-      _ parameters: EdgeToolsTranscriptContextParameters
+      _ parameters: EdgeToolsTranscriptContextParameters,
+      tools: [any EdgeTool]
     ) -> LlamaContext<Profile> {
       EdgeToolsTranscriptContext(
         parameters: parameters,
+        tools: tools,
         model: self.contextState(),
         engineIdentity: self.identity
       )
@@ -153,14 +159,13 @@
 
     public func tokenize(
       prompt: EdgeToolsTranscript.Prompt,
-      tools: [EdgeToolDefinition],
       context: LlamaContext<Profile>
     ) async throws -> [EdgeToolsToken] {
       try self.validate(context)
       let transcript = context.transcript(appending: prompt)
       let input = try await self.inputProcessor.inputConcurrently(
         prompt: transcript,
-        tools: tools,
+        tools: context.tools.map { $0.definition },
         addGenerationPrompt: true,
         kind: .generation,
         cache: EdgeToolsLLMPreparedInputCache()
@@ -170,14 +175,13 @@
 
     public func generate(
       prompt: EdgeToolsTranscript.Prompt,
-      tools: [EdgeToolDefinition] = [],
       parameters: sending Profile.GenerateParameters,
       context: LlamaContext<Profile>,
       channel: sending EdgeToolsGenerationChannel
     ) throws -> AnyGenerationTask {
       try self.validate(context)
       return self.generationTask(
-        tools: tools,
+        tools: context.tools.map { $0.definition },
         parameters: parameters,
         context: context,
         channel: channel,
@@ -187,22 +191,25 @@
 
     public func prefill(
       promptPrefix: EdgeToolsTranscript.Prompt,
-      tools: [EdgeToolDefinition],
       context: LlamaContext<Profile>
     ) async throws -> EdgeToolsEnginePrefill {
       try self.validate(context)
       let snapshot = try context.begin(appending: promptPrefix)
-      return try await self.prefill(snapshot: snapshot, tools: tools, context: context)
+      return try await self.prefill(
+        snapshot: snapshot,
+        tools: context.tools.map { $0.definition },
+        context: context
+      )
     }
 
-    public func warmUp(tools: [EdgeToolDefinition] = [], context: LlamaContext<Profile>) throws {
+    public func warmUp(context: LlamaContext<Profile>) throws {
       try self.validate(context)
       let snapshot = try context.begin()
       defer { context.finish(generation: nil, revision: snapshot.revision, model: snapshot.model) }
       try snapshot.model.sequenceStore.warmUp()
       _ = try self.inputProcessor.input(
         prompt: snapshot.transcript,
-        tools: tools,
+        tools: context.tools.map { $0.definition },
         addGenerationPrompt: true,
         kind: .generation,
         cache: snapshot.model.preparedInputCache
@@ -210,13 +217,12 @@
     }
 
     public func prefill(
-      tools: [EdgeToolDefinition] = [],
       context: LlamaContext<Profile>
     ) async throws -> EdgeToolsEnginePrefill {
       try self.validate(context)
       return try await self.prefill(
         snapshot: context.begin(),
-        tools: tools,
+        tools: context.tools.map { $0.definition },
         context: context
       )
     }
