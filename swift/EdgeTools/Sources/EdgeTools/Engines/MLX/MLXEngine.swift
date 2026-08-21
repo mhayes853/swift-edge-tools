@@ -86,6 +86,7 @@
     var sampler: (any LogitSampler)? { get }
     var sampling: EdgeToolsFusedSamplingParameters { get }
     var processor: (any LogitProcessor)? { get }
+    var confidence: EdgeToolsConfidenceOptions { get }
     var kvCacheQuantizationBits: Int? { get }
     var kvCacheQuantizationGroupSize: Int { get }
     var quantizedKVStart: Int { get }
@@ -96,6 +97,8 @@
     public var sampling: EdgeToolsFusedSamplingParameters {
       EdgeToolsFusedSamplingParameters()
     }
+
+    public var confidence: EdgeToolsConfidenceOptions { [] }
   }
 
   // MARK: - DefaultMLXGenerateParameters
@@ -111,6 +114,7 @@
       public var sampling: EdgeToolsFusedSamplingParameters
       public var processor: (any LogitProcessor)?
       public var constraint: XGRGenerationConstraint
+      public var confidence: EdgeToolsConfidenceOptions
       public var maxTokens: Int?
       public var kvCacheQuantizationBits: Int?
       public var kvCacheQuantizationGroupSize: Int
@@ -122,6 +126,7 @@
         sampling: EdgeToolsFusedSamplingParameters = EdgeToolsFusedSamplingParameters(),
         processor: (any LogitProcessor)? = nil,
         constraint: XGRGenerationConstraint = .unconstrained,
+        confidence: EdgeToolsConfidenceOptions = [],
         maxTokens: Int? = 1024,
         kvCacheQuantizationBits: Int? = nil,
         kvCacheQuantizationGroupSize: Int = 64,
@@ -132,6 +137,7 @@
         self.sampling = sampling
         self.processor = processor
         self.constraint = constraint
+        self.confidence = confidence
         self.maxTokens = maxTokens
         self.kvCacheQuantizationBits = kvCacheQuantizationBits
         self.kvCacheQuantizationGroupSize = kvCacheQuantizationGroupSize
@@ -508,6 +514,7 @@
       let inputContext: EdgeToolsLLMPrefillContext?
       var processor: (any LogitProcessor)?
       let sampler: any LogitSampler
+      let confidenceOptions: EdgeToolsConfidenceOptions
       var confidence = ConfidenceState()
       let synchronizeStreamForMemorySnapshots: Bool
       let generationStartSnapshot: Memory.Snapshot
@@ -845,6 +852,7 @@
         inputContext: self.prefillCacheState.inputContext,
         processor: processor,
         sampler: sampler,
+        confidenceOptions: parameters.confidence,
         synchronizeStreamForMemorySnapshots: parameters.synchronizeStreamForMemorySnapshots,
         generationStartSnapshot: generationStartSnapshot,
         postPrefillSnapshot: postPrefillSnapshot
@@ -881,13 +889,17 @@
       let maskedLogits =
         bitmask.map { applyBitmaskMLX(logits: stepLogits, mask: $0) }
         ?? stepLogits
-      let confidenceValues = top(maskedLogits.flattened(), k: 2)
       let token = generation.sampler.sample(logits: maskedLogits)
-      eval(confidenceValues, token)
-
-      let confidence = tokenConfidence(unorderedPair: confidenceValues.asArray(Float.self))
+      let confidenceOptions = generation.confidenceOptions.intersection([.generation, .perToken])
+      if !confidenceOptions.isEmpty {
+        let confidenceValues = top(maskedLogits.flattened(), k: 2)
+        eval(confidenceValues, token)
+        generation.confidence.add(
+          confidence: tokenConfidence(unorderedPair: confidenceValues.asArray(Float.self)),
+          options: confidenceOptions
+        )
+      }
       let tokenId = token.item(EdgeToolsToken.ID.self)
-      generation.confidence.add(confidence: confidence)
       generation.processor?.didSample(token: token)
       generation.pendingTokenId = tokenId
       self.generation = generation
@@ -897,8 +909,12 @@
     public func finish() -> EdgeToolsMetadata {
       guard let generation = self.generation else { return EdgeToolsMetadata() }
       var metadata = EdgeToolsMetadata()
-      metadata.generationConfidence = generation.confidence.mean
-      metadata.perTokenConfidences = generation.confidence.perTokenConfidences
+      if generation.confidenceOptions.contains(.generation) {
+        metadata.generationConfidence = generation.confidence.mean
+      }
+      if generation.confidenceOptions.contains(.perToken) {
+        metadata.perTokenConfidences = generation.confidence.perTokenConfidences
+      }
       metadata.mlxEngineGenerationStartMemorySnapshot = generation.generationStartSnapshot
       metadata.mlxEnginePostPrefillMemorySnapshot = generation.postPrefillSnapshot
       metadata.mlxEnginePostDecodeMemorySnapshot = Self.memorySnapshot(
@@ -1217,11 +1233,7 @@
       // The state is returned exactly once and is not accessed after this point. Region isolation
       // does not currently infer that exclusivity through the synchronous context method.
       nonisolated(unsafe) let restoredModel = state.model
-      context.finish(
-        generation: generation,
-        revision: state.revision,
-        model: restoredModel
-      )
+      context.finish(generation: generation, revision: state.revision, model: restoredModel)
       return finalResult
     }
 
@@ -1241,11 +1253,8 @@
       context: MLXContext<Profile>
     ) async throws -> EdgeToolsEnginePrefill {
       try self.validate(context)
-      return try await self.prefill(
-        snapshot: context.begin(),
-        tools: context.tools.map { $0.definition },
-        context: context
-      )
+      let definitions = context.tools.map { $0.definition }
+      return try await self.prefill(snapshot: context.begin(), tools: definitions, context: context)
     }
 
     public func generate(
@@ -1260,9 +1269,7 @@
         parameters: parameters,
         context: context,
         channel: channel,
-        makeState: {
-          self.generationState(from: try context.begin())
-        }
+        makeState: { self.generationState(from: try context.begin()) }
       )
     }
 
@@ -1303,13 +1310,7 @@
                   state: &state
                 )
               },
-              decode: { bitmask, state in
-                try await self.decode(
-                  bitmask: bitmask,
-                  parameters: parameters,
-                  state: &state
-                )
-              }
+              decode: { try await self.decode(bitmask: $0, parameters: parameters, state: &$1) }
             )
           )
         } catch {
@@ -1454,10 +1455,7 @@
     ) async throws -> sending any UserInputProcessor {
       let data = try directory.loadProcessorConfigurationData()
       let configuration = try JSONDecoder.json5()
-        .decode(
-          BaseProcessorConfiguration.self,
-          from: data
-        )
+        .decode(BaseProcessorConfiguration.self, from: data)
       let processorType =
         switch modelType {
         case "mistral3": "Mistral3Processor"

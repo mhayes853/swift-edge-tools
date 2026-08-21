@@ -88,6 +88,48 @@
 
       expectNoDifference(generation.tokens.map(\.id), [2])
     }
+
+    @Test(arguments: [
+      (EdgeToolsConfidenceOptions(), false, false),
+      (.generation, true, false),
+      (.perToken, false, true),
+      (EdgeToolsConfidenceOptions.generation.union(.perToken), true, true),
+      (.probe, false, false)
+    ])
+    func `Confidence Options Independently Control Metadata`(
+      confidence: EdgeToolsConfidenceOptions,
+      expectsGeneration: Bool,
+      expectsPerToken: Bool
+    ) async throws {
+      let tokenizer = try testTokenizer()
+      let engine = try MLXEngine<LLMPrefillTestProfile>(
+        languageModel: PromptPenaltyLanguageModel(),
+        tokenizer: tokenizer,
+        vocabularySize: TestTokenizer.vocabularySize
+      )
+      let generation = try await engine.generate(
+        prompt: EdgeToolsTranscript.Prompt(
+          messages: EdgeToolsTranscript.tokens([1]).messages
+        ),
+        parameters: DefaultMLXGenerateParameters(
+          sampler: ArgMaxSampler(),
+          confidence: confidence,
+          maxTokens: 1,
+          synchronizeStreamForMemorySnapshots: false
+        ),
+        context: engine.context(),
+        channel: EdgeToolsGenerationChannel()
+      ).value
+
+      expectNoDifference(
+        generation.metadata.generationConfidence != nil,
+        expectsGeneration
+      )
+      expectNoDifference(
+        generation.metadata.perTokenConfidences?.count,
+        expectsPerToken ? 1 : nil
+      )
+    }
   }
 
   #if canImport(CoreImage) && canImport(MLXVLM)

@@ -42,6 +42,11 @@
 
   public protocol LlamaGenerateParameters: EdgeToolsEngineGenerateParameters {
     var sampling: EdgeToolsFusedSamplingParameters { get }
+    var confidence: EdgeToolsConfidenceOptions { get }
+  }
+
+  extension LlamaGenerateParameters {
+    public var confidence: EdgeToolsConfidenceOptions { [] }
   }
 
   #if XGrammar
@@ -53,15 +58,18 @@
 
       public var sampling: EdgeToolsFusedSamplingParameters
       public var constraint: XGRGenerationConstraint
+      public var confidence: EdgeToolsConfidenceOptions
       public var maxTokens: Int?
 
       public init(
         sampling: EdgeToolsFusedSamplingParameters = EdgeToolsFusedSamplingParameters(),
         constraint: XGRGenerationConstraint = .unconstrained,
+        confidence: EdgeToolsConfidenceOptions = [],
         maxTokens: Int? = 1024
       ) {
         self.sampling = sampling
         self.constraint = constraint
+        self.confidence = confidence
         self.maxTokens = maxTokens
       }
     }
