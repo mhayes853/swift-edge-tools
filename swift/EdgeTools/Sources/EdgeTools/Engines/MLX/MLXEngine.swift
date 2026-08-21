@@ -87,9 +87,6 @@
     var sampling: EdgeToolsFusedSamplingParameters { get }
     var processor: (any LogitProcessor)? { get }
     var confidence: EdgeToolsConfidenceOptions { get }
-    var kvCacheQuantizationBits: Int? { get }
-    var kvCacheQuantizationGroupSize: Int { get }
-    var quantizedKVStart: Int { get }
     var synchronizeStreamForMemorySnapshots: Bool { get }
   }
 
@@ -116,9 +113,6 @@
       public var constraint: XGRGenerationConstraint
       public var confidence: EdgeToolsConfidenceOptions
       public var maxTokens: Int?
-      public var kvCacheQuantizationBits: Int?
-      public var kvCacheQuantizationGroupSize: Int
-      public var quantizedKVStart: Int
       public var synchronizeStreamForMemorySnapshots: Bool
 
       public init(
@@ -128,9 +122,6 @@
         constraint: XGRGenerationConstraint = .unconstrained,
         confidence: EdgeToolsConfidenceOptions = [],
         maxTokens: Int? = 1024,
-        kvCacheQuantizationBits: Int? = nil,
-        kvCacheQuantizationGroupSize: Int = 64,
-        quantizedKVStart: Int = 0,
         synchronizeStreamForMemorySnapshots: Bool = true
       ) {
         self.sampler = sampler
@@ -139,9 +130,6 @@
         self.constraint = constraint
         self.confidence = confidence
         self.maxTokens = maxTokens
-        self.kvCacheQuantizationBits = kvCacheQuantizationBits
-        self.kvCacheQuantizationGroupSize = kvCacheQuantizationGroupSize
-        self.quantizedKVStart = quantizedKVStart
         self.synchronizeStreamForMemorySnapshots = synchronizeStreamForMemorySnapshots
       }
     }
@@ -150,7 +138,43 @@
 
   // MARK: - MLXContext
 
-  public typealias MLXContextParameters = EdgeToolsTranscriptContextParameters
+  public struct MLXKVCacheQuantization: Hashable, Sendable {
+    public var bits: Int
+    public var groupSize: Int
+    public var startTokenCount: Int
+
+    public init(
+      bits: Int,
+      groupSize: Int = 64,
+      startTokenCount: Int = 0
+    ) {
+      self.bits = bits
+      self.groupSize = groupSize
+      self.startTokenCount = startTokenCount
+    }
+  }
+
+  public struct MLXContextParameters: Hashable, Sendable {
+    public var transcript: EdgeToolsTranscript
+    public var reasoningEffort: EdgeToolsReasoningEffort
+    public var maxKVSize: Int?
+    public var prefillChunkSize: Int
+    public var kvCacheQuantization: MLXKVCacheQuantization?
+
+    public init(
+      transcript: EdgeToolsTranscript = EdgeToolsTranscript(),
+      reasoningEffort: EdgeToolsReasoningEffort = .default,
+      maxKVSize: Int? = nil,
+      prefillChunkSize: Int = 512,
+      kvCacheQuantization: MLXKVCacheQuantization? = nil
+    ) {
+      self.transcript = transcript
+      self.reasoningEffort = reasoningEffort
+      self.maxKVSize = maxKVSize
+      self.prefillChunkSize = Swift.max(prefillChunkSize, 1)
+      self.kvCacheQuantization = kvCacheQuantization
+    }
+  }
 
   public typealias MLXContext<Profile> = EdgeToolsTranscriptContext<MLXModelState<Profile>>
   where Profile: MLXModelProfile, Profile.Prompt == EdgeToolsTranscript
@@ -526,6 +550,9 @@
     private let processor: (any UserInputProcessor)?
     private let configuredExtraStopTokenIds: Set<EdgeToolsToken.ID>
     private let configuredSampling: EdgeToolsFusedSamplingParameters?
+    private let maxKVSize: Int?
+    private let prefillChunkSize: Int
+    private let kvCacheQuantization: MLXKVCacheQuantization?
     private var prefillCacheState = PrefillCacheState()
     private var generation: Generation?
 
@@ -536,11 +563,32 @@
       extraStopTokenIds: Set<EdgeToolsToken.ID>,
       defaultSampling: EdgeToolsFusedSamplingParameters? = nil
     ) {
+      self.init(
+        languageModel: languageModel,
+        processor: processor,
+        vocabularySize: vocabularySize,
+        extraStopTokenIds: extraStopTokenIds,
+        defaultSampling: defaultSampling,
+        parameters: MLXContextParameters()
+      )
+    }
+
+    private init(
+      languageModel: any LanguageModel,
+      processor: (any UserInputProcessor)?,
+      vocabularySize: Int,
+      extraStopTokenIds: Set<EdgeToolsToken.ID>,
+      defaultSampling: EdgeToolsFusedSamplingParameters?,
+      parameters: MLXContextParameters
+    ) {
       self.languageModel = languageModel
       self.processor = processor
       self.vocabularySizeValue = vocabularySize
       self.configuredExtraStopTokenIds = extraStopTokenIds
       self.configuredSampling = defaultSampling
+      self.maxKVSize = parameters.maxKVSize
+      self.prefillChunkSize = Swift.max(parameters.prefillChunkSize, 1)
+      self.kvCacheQuantization = parameters.kvCacheQuantization
     }
 
   }
@@ -563,6 +611,7 @@
         generation.outputState = output.state
         generation.logits = output.logits
         generation.cachedTokenIds.append(pendingTokenId)
+        self.quantizeCacheIfNeeded(&generation.cache)
       }
       eval(generation.logits)
       eval(generation.cache)
@@ -592,7 +641,24 @@
         processor: self.processor,
         vocabularySize: self.vocabularySizeValue,
         extraStopTokenIds: self.configuredExtraStopTokenIds,
-        defaultSampling: self.configuredSampling
+        defaultSampling: self.configuredSampling,
+        parameters: MLXContextParameters(
+          maxKVSize: self.maxKVSize,
+          prefillChunkSize: self.prefillChunkSize,
+          kvCacheQuantization: self.kvCacheQuantization
+        )
+      )
+    }
+
+    func contextState(parameters: MLXContextParameters) -> sending Self {
+      nonisolated(unsafe) let languageModel = self.languageModel
+      return Self(
+        languageModel: languageModel,
+        processor: self.processor,
+        vocabularySize: self.vocabularySizeValue,
+        extraStopTokenIds: self.configuredExtraStopTokenIds,
+        defaultSampling: self.configuredSampling,
+        parameters: parameters
       )
     }
 
@@ -605,7 +671,12 @@
         processor: self.processor,
         vocabularySize: self.vocabularySizeValue,
         extraStopTokenIds: self.configuredExtraStopTokenIds,
-        defaultSampling: self.configuredSampling
+        defaultSampling: self.configuredSampling,
+        parameters: MLXContextParameters(
+          maxKVSize: self.maxKVSize,
+          prefillChunkSize: self.prefillChunkSize,
+          kvCacheQuantization: self.kvCacheQuantization
+        )
       )
       state.prefillCacheState = self.prefillCacheState
       state.prefillCacheState.fork(copyingCache: copyingCache)
@@ -704,38 +775,78 @@
           inputContext: self.prefillCacheState.inputContext
         )
       else {
-        let cache = self.languageModel.newCache(parameters: nil)
-        return (try self.prepareModelOutput(input: input, cache: cache), cache, tokenIds.count)
+        let parameters = self.maxKVSize.map {
+          MLXLMCommon.GenerateParameters(maxKVSize: $0)
+        }
+        var cache = self.languageModel.newCache(parameters: parameters)
+        let output = try self.prepareModelOutput(input: input, cache: cache)
+        self.quantizeCacheIfNeeded(&cache)
+        return (output, cache, tokenIds.count)
       }
       let suffixCount = tokenIds.count - cachedPrefill.tokenIds.count
-      let cache = cachedPrefill.cache
-      let output =
-        if suffixCount == 0 {
-          cachedPrefill.output
-        } else {
-          self.languageModel(
-            mlxTextSuffix(input.text, from: cachedPrefill.tokenIds.count),
-            cache: cache,
-            state: cachedPrefill.output.state
-          )
-        }
+      guard suffixCount > 0 else {
+        return (cachedPrefill.output, cachedPrefill.cache, suffixCount)
+      }
+      var cache = cachedPrefill.cache
+      let output = self.evaluateText(
+        mlxTextSuffix(input.text, from: cachedPrefill.tokenIds.count),
+        cache: cache,
+        state: cachedPrefill.output.state
+      )
+      self.quantizeCacheIfNeeded(&cache)
       return (output, cache, suffixCount)
     }
 
     private func prepareModelOutput(input: LMInput, cache: [any KVCache]) throws -> LMOutput {
-      switch try self.languageModel.prepare(input, cache: cache, windowSize: nil) {
+      switch try self.languageModel.prepare(
+        input,
+        cache: cache,
+        windowSize: self.prefillChunkSize
+      ) {
       case .logits(let output):
         return output
       case .tokens(let tokens):
         guard tokens.tokens.size > 0 else {
           throw MLXEngineError(code: .emptyInput, message: "Model received empty input.")
         }
+        return self.evaluateText(tokens, cache: cache, state: nil)
+      }
+    }
+
+    private func evaluateText(
+      _ text: LMInput.Text,
+      cache: [any KVCache],
+      state: LMOutput.State?
+    ) -> LMOutput {
+      var remaining = text
+      var state = state
+      return withPreparedCache(cache, lengths: text.sequenceLengths) {
+        while remaining.tokens.dim(-1) > self.prefillChunkSize {
+          let output = self.languageModel(
+            mlxTextPrefix(remaining, count: self.prefillChunkSize),
+            cache: cache.isEmpty ? nil : cache,
+            state: state
+          )
+          state = output.state
+          asyncEval(cache)
+          remaining = mlxTextSuffix(remaining, from: self.prefillChunkSize)
+        }
         return self.languageModel(
-          tokens[text: .newAxis],
+          mlxTextPrefix(remaining, count: remaining.tokens.dim(-1)),
           cache: cache.isEmpty ? nil : cache,
-          state: nil
+          state: state
         )
       }
+    }
+
+    private func quantizeCacheIfNeeded(_ cache: inout [any KVCache]) {
+      guard let quantization = self.kvCacheQuantization else { return }
+      maybeQuantizeKVCache(
+        cache: &cache,
+        kvBits: quantization.bits,
+        kvGroupSize: quantization.groupSize,
+        quantizedKVStart: quantization.startTokenCount
+      )
     }
 
     private static func memorySnapshot(synchronize: Bool) -> Memory.Snapshot {
@@ -868,12 +979,6 @@
         throw EdgeToolsError.modelNotPrepared
       }
       if let pendingTokenId = generation.pendingTokenId {
-        maybeQuantizeKVCache(
-          cache: &generation.cache,
-          kvBits: parameters.kvCacheQuantizationBits,
-          kvGroupSize: parameters.kvCacheQuantizationGroupSize,
-          quantizedKVStart: parameters.quantizedKVStart
-        )
         let token = MLXArray([pendingTokenId])
         let output = self.languageModel(
           LMInput.Text(tokens: token)[text: .newAxis],
@@ -883,6 +988,7 @@
         generation.outputState = output.state
         generation.logits = output.logits
         generation.cachedTokenIds.append(pendingTokenId)
+        self.quantizeCacheIfNeeded(&generation.cache)
       }
       var stepLogits = generation.logits[0..., -1, 0...]
       stepLogits = generation.processor?.process(logits: stepLogits) ?? stepLogits
@@ -1123,9 +1229,12 @@
       tools: [any EdgeTool]
     ) -> MLXContext<Profile> {
       MLXContext(
-        parameters: parameters,
+        parameters: EdgeToolsTranscriptContextParameters(
+          transcript: parameters.transcript,
+          reasoningEffort: parameters.reasoningEffort
+        ),
         tools: tools,
-        model: self.makeModelState(),
+        model: self.makeModelState(parameters: parameters),
         engineIdentity: self.identity
       )
     }
@@ -1345,8 +1454,10 @@
       }
     }
 
-    private func makeModelState() -> sending MLXModelState<Profile> {
-      self.prototype.withBorrowedLock { $0.contextState() }
+    private func makeModelState(
+      parameters: MLXContextParameters = MLXContextParameters()
+    ) -> sending MLXModelState<Profile> {
+      self.prototype.withBorrowedLock { $0.contextState(parameters: parameters) }
     }
 
     private func validate(_ context: MLXContext<Profile>) throws {
@@ -1530,6 +1641,23 @@
         mask[index...][.newAxis]
       } else {
         mask[.ellipsis, index...]
+      }
+    }
+    return LMInput.Text(tokens: tokens, mask: mask)
+  }
+
+  private func mlxTextPrefix(_ text: LMInput.Text, count: Int) -> LMInput.Text {
+    let tokens =
+      if text.tokens.ndim == 1 {
+        text.tokens[..<count][.newAxis]
+      } else {
+        text.tokens[.ellipsis, ..<count]
+      }
+    let mask = text.mask.map { mask in
+      if mask.ndim == 1 {
+        mask[..<count][.newAxis]
+      } else {
+        mask[.ellipsis, ..<count]
       }
     }
     return LMInput.Text(tokens: tokens, mask: mask)
