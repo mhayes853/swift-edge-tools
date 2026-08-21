@@ -8,7 +8,7 @@
   func completeWeatherTurn<Profile: LlamaModelProfile>(
     using engine: LlamaEngine<Profile>
   ) async throws -> EdgeToolsTranscript
-  where Profile.GenerateParameters == DefaultLlamaGenerateParameters {
+  where Profile.GenerateParameters == LlamaGenerateParameters {
     let turn = try splitUserMessage(from: .weatherTest)
     let context = engine.context(
       EdgeToolsTranscriptContextParameters(transcript: turn.transcript),
@@ -21,7 +21,7 @@
       generatingToolCall: {
         try engine.generate(
           prompt: .user(turn.userMessage),
-          parameters: DefaultLlamaGenerateParameters(
+          parameters: LlamaGenerateParameters(
             sampling: .greedy,
             constraint: .toolsWithGrammar(range: .exact(1)),
             maxTokens: 256
@@ -33,7 +33,7 @@
       generatingResponse: { toolMessage in
         try engine.generate(
           prompt: .tools([toolMessage]),
-          parameters: DefaultLlamaGenerateParameters(maxTokens: 64),
+          parameters: LlamaGenerateParameters(maxTokens: 64),
           context: context,
           channel: EdgeToolsGenerationChannel()
         )
@@ -45,11 +45,11 @@
   func generateReasoning<Profile: LlamaModelProfile>(
     using engine: LlamaEngine<Profile>
   ) async throws -> EdgeToolsEngineGeneration
-  where Profile.GenerateParameters == DefaultLlamaGenerateParameters {
+  where Profile.GenerateParameters == LlamaGenerateParameters {
     try await reasoningGeneration(
       from: try engine.generate(
         prompt: .user(.reasoningTest),
-        parameters: DefaultLlamaGenerateParameters(maxTokens: 512),
+        parameters: LlamaGenerateParameters(maxTokens: 512),
         context: engine.context(
           EdgeToolsTranscriptContextParameters(reasoningEffort: .high)
         ),
@@ -66,13 +66,13 @@
   func describeRedImage<Profile: LlamaModelProfile>(
     using engine: LlamaEngine<Profile>
   ) async throws -> String
-  where Profile.GenerateParameters == DefaultLlamaGenerateParameters {
+  where Profile.GenerateParameters == LlamaGenerateParameters {
     let task = try engine.generate(
       prompt: .user(
         "What is the dominant color in this image? Answer briefly.",
         images: [try llamaRedImageAsset()]
       ),
-      parameters: DefaultLlamaGenerateParameters(sampling: .greedy, maxTokens: 64),
+      parameters: LlamaGenerateParameters(sampling: .greedy, maxTokens: 64),
       context: engine.context(),
       channel: EdgeToolsGenerationChannel()
     )
@@ -82,7 +82,7 @@
   func completeImageColorTurn<Profile: LlamaModelProfile>(
     using engine: LlamaEngine<Profile>
   ) async throws -> LlamaVLMToolTurnSnapshot
-  where Profile.GenerateParameters == DefaultLlamaGenerateParameters {
+  where Profile.GenerateParameters == LlamaGenerateParameters {
     let turn = try splitUserMessage(
       from: EdgeToolsTranscript(messages: [
         .system(
@@ -102,7 +102,7 @@
       generatingToolCall: {
         try engine.generate(
           prompt: .user(turn.userMessage),
-          parameters: DefaultLlamaGenerateParameters(
+          parameters: LlamaGenerateParameters(
             sampling: .greedy,
             constraint: .toolsWithGrammar(range: .exact(1)),
             maxTokens: 128
@@ -114,7 +114,7 @@
       generatingResponse: { toolMessage in
         try engine.generate(
           prompt: .tools([toolMessage]),
-          parameters: DefaultLlamaGenerateParameters(sampling: .greedy, maxTokens: 64),
+          parameters: LlamaGenerateParameters(sampling: .greedy, maxTokens: 64),
           context: context,
           channel: EdgeToolsGenerationChannel()
         )
@@ -126,7 +126,7 @@
   func completeAudioToneTurn<Profile: LlamaModelProfile>(
     using engine: LlamaEngine<Profile>
   ) async throws -> LlamaVLMToolTurnSnapshot
-  where Profile.GenerateParameters == DefaultLlamaGenerateParameters {
+  where Profile.GenerateParameters == LlamaGenerateParameters {
     let turn = try splitUserMessage(
       from: EdgeToolsTranscript(messages: [
         .system(
@@ -146,7 +146,7 @@
       generatingToolCall: {
         try engine.generate(
           prompt: .user(turn.userMessage),
-          parameters: DefaultLlamaGenerateParameters(
+          parameters: LlamaGenerateParameters(
             sampling: .greedy,
             constraint: .toolsWithGrammar(range: .exact(1)),
             maxTokens: 128
@@ -158,7 +158,7 @@
       generatingResponse: { toolMessage in
         try engine.generate(
           prompt: .tools([toolMessage]),
-          parameters: DefaultLlamaGenerateParameters(sampling: .greedy, maxTokens: 64),
+          parameters: LlamaGenerateParameters(sampling: .greedy, maxTokens: 64),
           context: context,
           channel: EdgeToolsGenerationChannel()
         )

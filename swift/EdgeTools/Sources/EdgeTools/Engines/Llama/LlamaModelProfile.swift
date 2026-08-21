@@ -1,15 +1,12 @@
 #if Llama && canImport(CLlama)
   import EdgeToolsCore
   import EdgeToolsTokenizers
-
-  #if XGrammar
-    import EdgeToolsXGrammar
-  #endif
+  import EdgeToolsXGrammar
 
   // MARK: - LlamaModelProfile
 
   public protocol LlamaModelProfile: EdgeToolsModelProfile
-  where GenerateParameters: LlamaGenerateParameters, Prompt == EdgeToolsTranscript {
+  where GenerateParameters == LlamaGenerateParameters, Prompt == EdgeToolsTranscript {
     static func tokenIds(
       prompt: EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
@@ -40,40 +37,26 @@
 
   // MARK: - LlamaGenerateParameters
 
-  public protocol LlamaGenerateParameters: EdgeToolsEngineGenerateParameters {
-    var sampling: EdgeToolsFusedSamplingParameters { get }
-    var confidence: EdgeToolsConfidenceOptions { get }
-  }
+  public struct LlamaGenerateParameters: EdgeToolsConstrainedGenerateParameters {
+    public static var `default`: Self { Self() }
 
-  extension LlamaGenerateParameters {
-    public var confidence: EdgeToolsConfidenceOptions { [] }
-  }
+    public var sampling: EdgeToolsFusedSamplingParameters
+    public var constraint: XGRGenerationConstraint
+    public var confidence: EdgeToolsConfidenceOptions
+    public var maxTokens: Int?
 
-  #if XGrammar
-    public struct DefaultLlamaGenerateParameters:
-      LlamaGenerateParameters,
-      EdgeToolsConstrainedGenerateParameters
-    {
-      public static var `default`: Self { Self() }
-
-      public var sampling: EdgeToolsFusedSamplingParameters
-      public var constraint: XGRGenerationConstraint
-      public var confidence: EdgeToolsConfidenceOptions
-      public var maxTokens: Int?
-
-      public init(
-        sampling: EdgeToolsFusedSamplingParameters = EdgeToolsFusedSamplingParameters(),
-        constraint: XGRGenerationConstraint = .unconstrained,
-        confidence: EdgeToolsConfidenceOptions = [],
-        maxTokens: Int? = 1024
-      ) {
-        self.sampling = sampling
-        self.constraint = constraint
-        self.confidence = confidence
-        self.maxTokens = maxTokens
-      }
+    public init(
+      sampling: EdgeToolsFusedSamplingParameters = EdgeToolsFusedSamplingParameters(),
+      constraint: XGRGenerationConstraint = .unconstrained,
+      confidence: EdgeToolsConfidenceOptions = [],
+      maxTokens: Int? = 1024
+    ) {
+      self.sampling = sampling
+      self.constraint = constraint
+      self.confidence = confidence
+      self.maxTokens = maxTokens
     }
-  #endif
+  }
 
   // MARK: - LlamaContext
 

@@ -1,1 +1,5 @@
-red
+<think>
+
+</think>
+
+The dominant color across the image and video is red.

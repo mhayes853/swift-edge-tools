@@ -112,9 +112,7 @@
       guard prompt.videos.isEmpty else {
         throw EdgeToolsError.unsupportedMedia("Video input is not supported by LlamaEngine.")
       }
-      guard
-        let profile = Profile.self as? any EdgeToolsMultimodalModelProfile.Type
-      else {
+      guard let profile = Profile.self as? any EdgeToolsMultimodalModelProfile.Type else {
         throw EdgeToolsError.unsupportedTokenizer
       }
       let tokenizer = self.tokenizer

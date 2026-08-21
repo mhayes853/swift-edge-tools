@@ -40,7 +40,7 @@ struct `Qwen3 tests` {
 
         let forkedTask = try engine.generate(
           prompt: .user("Say hello in one word."),
-          parameters: DefaultMLXGenerateParameters(
+          parameters: MLXGenerateParameters(
             maxTokens: 1,
             synchronizeStreamForMemorySnapshots: false
           ),
@@ -51,7 +51,7 @@ struct `Qwen3 tests` {
 
         let freshTask = try engine.generate(
           prompt: .user("Say hello in one word."),
-          parameters: DefaultMLXGenerateParameters(
+          parameters: MLXGenerateParameters(
             maxTokens: 1,
             synchronizeStreamForMemorySnapshots: false
           ),
@@ -111,7 +111,7 @@ struct `Qwen3 tests` {
 
         let forkedTask = try engine.generate(
           prompt: .user("Say hello in one word."),
-          parameters: DefaultLlamaGenerateParameters(maxTokens: 1),
+          parameters: LlamaGenerateParameters(maxTokens: 1),
           context: context.fork(),
           channel: EdgeToolsGenerationChannel()
         )
@@ -119,7 +119,7 @@ struct `Qwen3 tests` {
 
         let freshTask = try engine.generate(
           prompt: .user("Say hello in one word."),
-          parameters: DefaultLlamaGenerateParameters(maxTokens: 1),
+          parameters: LlamaGenerateParameters(maxTokens: 1),
           context: engine.context(parameters),
           channel: EdgeToolsGenerationChannel()
         )

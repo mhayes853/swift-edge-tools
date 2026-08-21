@@ -55,7 +55,7 @@
       let emittedTokenCount = Lock(0)
       let task = try engine.generate(
         prompt: .user(filledContext.prompt),
-        parameters: DefaultLlamaGenerateParameters(sampling: .greedy, maxTokens: 1),
+        parameters: LlamaGenerateParameters(sampling: .greedy, maxTokens: 1),
         context: engine.context(),
         channel: EdgeToolsGenerationChannel(
           onToken: { _ in emittedTokenCount.withLock { $0 += 1 } }
@@ -178,7 +178,7 @@
   ) async throws -> EdgeToolsEngineGeneration {
     let task = try engine.generate(
       prompt: .user(llamaUserPrompt),
-      parameters: DefaultLlamaGenerateParameters(sampling: .greedy, maxTokens: 1),
+      parameters: LlamaGenerateParameters(sampling: .greedy, maxTokens: 1),
       context: context,
       channel: EdgeToolsGenerationChannel()
     )

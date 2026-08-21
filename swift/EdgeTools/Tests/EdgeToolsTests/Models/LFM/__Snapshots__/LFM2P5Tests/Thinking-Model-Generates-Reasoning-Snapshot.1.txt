@@ -1,561 +1,59 @@
 ▿ EdgeToolsEngineGeneration
-  ▿ decodeMetrics: EdgeToolsDecodeMetrics
-    ▿ duration: 48.3030565 seconds
-      - _low: 11409568352580896768
-      - _high: 2
-    ▿ durationToFirstToken: 0.506851 seconds
-      - _low: 506851000000000000
-      - _high: 0
-    - tokens: 512
-  ▿ metadata: 5 key/value pairs
+  ▿ metrics: 8 key/value pairs
     ▿ (2 elements)
-      ▿ key: EdgeToolsMetadataKey
-        - rawValue: "GenerationConfidence"
-      - value: 0.8570951
+      ▿ key: EdgeToolsMetricKey
+        - rawValue: "DecodeDuration"
+      ▿ value: 29.401507041000002 seconds
+        - _low: 10954762967290448384
+        - _high: 1
     ▿ (2 elements)
-      ▿ key: EdgeToolsMetadataKey
+      ▿ key: EdgeToolsMetricKey
+        - rawValue: "DecodeTokens"
+      - value: 446
+    ▿ (2 elements)
+      ▿ key: EdgeToolsMetricKey
+        - rawValue: "DurationToFirstToken"
+      ▿ value: 8.767340959 seconds
+        - _low: 8767340959000000000
+        - _high: 0
+    ▿ (2 elements)
+      ▿ key: EdgeToolsMetricKey
         - rawValue: "MLXEngineGenerationStartMemorySnapshot"
-      ▿ value: Peak:   7325M        (7681110942)
-Active: 6932M        (7268955908)
-Cache:  2677M        (2807088043)
-        - activeMemory: 7268955908
-        - cacheMemory: 2807088043
-        - peakMemory: 7681110942
+      ▿ value: Peak:   3161M        (3314965736)
+Active: 2745M        (2878817760)
+Cache:  2193M        (2300472976)
+        - activeMemory: 2878817760
+        - cacheMemory: 2300472976
+        - peakMemory: 3314965736
     ▿ (2 elements)
-      ▿ key: EdgeToolsMetadataKey
+      ▿ key: EdgeToolsMetricKey
         - rawValue: "MLXEnginePostDecodeMemorySnapshot"
-      ▿ value: Peak:   7501M        (7865590050)
-Active: 6589M        (6909497698)
-Cache:  3754M        (3936880044)
-        - activeMemory: 6909497698
-        - cacheMemory: 3936880044
-        - peakMemory: 7865590050
+      ▿ value: Peak:   4311M        (4520527936)
+Active: 3108M        (3259724522)
+Cache:  4966M        (5207811629)
+        - activeMemory: 3259724522
+        - cacheMemory: 5207811629
+        - peakMemory: 4520527936
     ▿ (2 elements)
-      ▿ key: EdgeToolsMetadataKey
+      ▿ key: EdgeToolsMetricKey
         - rawValue: "MLXEnginePostPrefillMemorySnapshot"
-      ▿ value: Peak:   7325M        (7681110942)
-Active: 6932M        (7269070930)
-Cache:  2676M        (2806973031)
-        - activeMemory: 7269070930
-        - cacheMemory: 2806973031
-        - peakMemory: 7681110942
+      ▿ value: Peak:   3161M        (3314965736)
+Active: 2608M        (2735637166)
+Cache:  2334M        (2447847876)
+        - activeMemory: 2735637166
+        - cacheMemory: 2447847876
+        - peakMemory: 3314965736
     ▿ (2 elements)
-      ▿ key: EdgeToolsMetadataKey
-        - rawValue: "PerTokenConfidences"
-      ▿ value: 512 elements
-        - 0.9999946
-        - 0.97068775
-        - 0.9999843
-        - 0.9999862
-        - 0.9968273
-        - 0.62245935
-        - 0.65135485
-        - 0.754915
-        - 0.99719906
-        - 0.9953904
-        - 0.62245935
-        - 0.966914
-        - 0.99999833
-        - 0.98593634
-        - 0.8175745
-        - 0.9978173
-        - 0.99996465
-        - 0.9840936
-        - 0.7310586
-        - 0.65135485
-        - 0.5
-        - 0.8519528
-        - 0.8807971
-        - 0.99994856
-        - 0.9999986
-        - 0.99999964
-        - 1.0
-        - 0.99999994
-        - 0.9999999
-        - 0.9999999
-        - 0.9999997
-        - 0.8175745
-        - 0.7310586
-        - 0.99919593
-        - 0.99994856
-        - 0.9980733
-        - 0.99999964
-        - 0.99993396
-        - 0.9980733
-        - 0.53120935
-        - 0.9999997
-        - 0.70578504
-        - 0.62245935
-        - 0.9840936
-        - 0.99592984
-        - 0.62245935
-        - 0.62245935
-        - 0.9984988
-        - 0.99908894
-        - 0.99999994
-        - 0.99408895
-        - 0.9999995
-        - 0.9999997
-        - 0.9465967
-        - 0.6791787
-        - 0.98593634
-        - 0.70578504
-        - 0.9988305
-        - 0.9933072
-        - 0.99999946
-        - 0.97966766
-        - 0.754915
-        - 0.9626731
-        - 0.9465967
-        - 0.5
-        - 0.9626731
-        - 0.98201376
-        - 0.966914
-        - 0.99999994
-        - 0.99994856
-        - 0.99919593
-        - 0.8175745
-        - 0.9998416
-        - 0.9999971
-        - 0.9046505
-        - 0.98201376
-        - 0.9999999
-        - 0.99999577
-        - 0.8933094
-        - 0.9998416
-        - 0.7310586
-        - 0.9964064
-        - 0.53120935
-        - 0.97404265
-        - 0.5926666
-        - 0.754915
-        - 0.99993396
-        - 0.5621765
-        - 0.8175745
-        - 0.65135485
-        - 0.7310586
-        - 0.8807971
-        - 0.83548355
-        - 0.99242276
-        - 0.9999965
-        - 0.9626731
-        - 0.98593634
-        - 0.93991333
-        - 0.9980733
-        - 0.95791227
-        - 0.99966466
-        - 0.62245935
-        - 0.7772999
-        - 0.99029154
-        - 0.9046505
-        - 0.9046505
-        - 0.99999976
-        - 0.99998987
-        - 0.9999688
-        - 0.5926666
-        - 0.9999969
-        - 0.99999106
-        - 0.86703575
-        - 0.99999994
-        - 0.99999845
-        - 0.91490096
-        - 0.7310586
-        - 0.8807971
-        - 0.8519528
-        - 0.65135485
-        - 0.83548355
-        - 0.97068775
-        - 0.5621765
-        - 0.5926666
-        - 0.99998224
-        - 0.966914
-        - 0.53120935
-        - 0.6791787
-        - 0.70578504
-        - 0.9999986
-        - 0.98593634
-        - 0.9998977
-        - 0.9890131
-        - 0.98201376
-        - 0.9998416
-        - 0.9999885
-        - 0.9999996
-        - 0.97068775
-        - 0.754915
-        - 0.9999757
-        - 0.95257413
-        - 0.9998911
-        - 0.99919593
-        - 0.65135485
-        - 0.86703575
-        - 0.7310586
-        - 0.65135485
-        - 0.9964064
-        - 0.9465967
-        - 0.966914
-        - 0.8175745
-        - 0.5
-        - 0.754915
-        - 0.9997695
-        - 0.65135485
-        - 0.53120935
-        - 0.754915
-        - 0.83548355
-        - 0.9999967
-        - 0.9999853
-        - 0.99029154
-        - 0.65135485
-        - 0.99408895
-        - 0.7310586
-        - 0.95257413
-        - 0.9999926
-        - 0.9982993
-        - 0.9997695
-        - 0.9875684
-        - 0.6791787
-        - 0.91490096
-        - 0.7772999
-        - 0.91490096
-        - 0.9995694
-        - 0.53120935
-        - 0.9947799
-        - 0.70578504
-        - 0.95791227
-        - 0.5926666
-        - 0.8807971
-        - 0.99142253
-        - 0.7772999
-        - 0.99142253
-        - 0.9465967
-        - 0.9964064
-        - 0.5
-        - 0.9465967
-        - 0.70578504
-        - 0.97068775
-        - 0.53120935
-        - 0.9998766
-        - 0.9953904
-        - 0.53120935
-        - 0.99992514
-        - 0.97702265
-        - 0.83548355
-        - 0.99970406
-        - 0.7981868
-        - 0.83548355
-        - 0.7772999
-        - 0.7772999
-        - 0.70578504
-        - 0.9933072
-        - 0.9964064
-        - 0.9626731
-        - 0.8807971
-        - 0.9241418
-        - 0.8175745
-        - 0.62245935
-        - 0.5
-        - 0.7772999
-        - 0.9999853
-        - 0.99999744
-        - 0.9964064
-        - 0.97068775
-        - 0.9999039
-        - 0.99992514
-        - 0.95257413
-        - 0.9999993
-        - 0.9999989
-        - 0.5621765
-        - 0.9241418
-        - 0.65135485
-        - 0.70578504
-        - 0.5621765
-        - 0.9626731
-        - 0.8807971
-        - 0.9994116
-        - 0.7772999
-        - 0.966914
-        - 0.65135485
-        - 0.9465967
-        - 0.99999744
-        - 0.99242276
-        - 0.99979657
-        - 0.9994472
-        - 0.99242276
-        - 0.9982993
-        - 0.99995995
-        - 0.9999885
-        - 0.9046505
-        - 0.65135485
-        - 0.99951214
-        - 0.8933094
-        - 0.9840936
-        - 0.9840936
-        - 0.53120935
-        - 0.7981868
-        - 0.7981868
-        - 0.7772999
-        - 0.5926666
-        - 0.99752736
-        - 0.8175745
-        - 0.99794924
-        - 0.6791787
-        - 0.65135485
-        - 0.7772999
-        - 0.5926666
-        - 0.99142253
-        - 0.91490096
-        - 0.95791227
-        - 0.62245935
-        - 0.9840936
-        - 0.7981868
-        - 0.7310586
-        - 0.9998205
-        - 0.99908894
-        - 0.99978346
-        - 0.5926666
-        - 0.7310586
-        - 0.53120935
-        - 0.754915
-        - 0.7981868
-        - 0.99919593
-        - 0.7310586
-        - 0.7981868
-        - 0.9241418
-        - 0.99986017
-        - 0.9465967
-        - 0.5926666
-        - 0.5926666
-        - 0.70578504
-        - 0.99242276
-        - 0.9984988
-        - 0.8933094
-        - 0.91490096
-        - 0.86703575
-        - 0.86703575
-        - 0.7981868
-        - 0.7772999
-        - 0.6791787
-        - 0.9840936
-        - 0.9890131
-        - 0.95257413
-        - 0.9046505
-        - 0.9465967
-        - 0.7310586
-        - 0.8807971
-        - 0.7981868
-        - 0.65135485
-        - 0.95791227
-        - 0.99142253
-        - 0.95791227
-        - 0.86703575
-        - 0.9465967
-        - 0.6791787
-        - 0.91490096
-        - 0.5621765
-        - 0.7981868
-        - 0.9999152
-        - 0.99997854
-        - 0.98593634
-        - 0.6791787
-        - 0.99993396
-        - 0.99998987
-        - 0.9840936
-        - 0.9999986
-        - 0.99908894
-        - 0.5
-        - 0.62245935
-        - 0.93991333
-        - 0.5
-        - 0.9046505
-        - 0.83548355
-        - 0.99992514
-        - 0.7981868
-        - 0.99998987
-        - 0.8175745
-        - 0.9626731
-        - 0.70578504
-        - 0.7772999
-        - 0.86703575
-        - 0.7981868
-        - 0.7981868
-        - 0.999685
-        - 0.70578504
-        - 0.83548355
-        - 0.7981868
-        - 0.6791787
-        - 0.9999955
-        - 0.754915
-        - 0.9998416
-        - 0.99997854
-        - 0.9241418
-        - 0.99999624
-        - 0.9999993
-        - 0.7310586
-        - 0.95257413
-        - 0.6791787
-        - 0.53120935
-        - 0.86703575
-        - 0.97404265
-        - 0.70578504
-        - 0.9241418
-        - 0.99719906
-        - 0.62245935
-        - 0.7772999
-        - 0.754915
-        - 0.5926666
-        - 0.966914
-        - 0.65135485
-        - 0.6791787
-        - 0.99999523
-        - 0.9046505
-        - 0.62245935
-        - 0.99242276
-        - 0.9933072
-        - 0.9626731
-        - 0.91490096
-        - 0.9995694
-        - 0.99999213
-        - 0.966914
-        - 0.5621765
-        - 0.95257413
-        - 0.5926666
-        - 0.99908894
-        - 0.9997695
-        - 0.99970406
-        - 0.9999688
-        - 0.99142253
-        - 0.7310586
-        - 0.65135485
-        - 0.98593634
-        - 0.7772999
-        - 0.97404265
-        - 0.8933094
-        - 0.6791787
-        - 0.8933094
-        - 0.99029154
-        - 0.6791787
-        - 0.9968273
-        - 0.93991333
-        - 0.9953904
-        - 0.65135485
-        - 0.5621765
-        - 0.70578504
-        - 0.65135485
-        - 0.9046505
-        - 0.91490096
-        - 0.53120935
-        - 0.65135485
-        - 0.7310586
-        - 0.9953904
-        - 0.9241418
-        - 0.8175745
-        - 0.8807971
-        - 0.53120935
-        - 0.97068775
-        - 0.966914
-        - 0.9046505
-        - 0.5621765
-        - 0.9465967
-        - 0.9046505
-        - 0.83548355
-        - 0.91490096
-        - 0.53120935
-        - 0.9046505
-        - 0.98201376
-        - 0.9241418
-        - 0.5926666
-        - 0.95257413
-        - 0.8807971
-        - 0.8175745
-        - 0.91490096
-        - 0.5621765
-        - 0.99988407
-        - 0.62245935
-        - 0.8175745
-        - 0.5926666
-        - 0.5
-        - 0.9999152
-        - 0.99999803
-        - 0.95791227
-        - 0.97068775
-        - 0.9997695
-        - 0.9999152
-        - 0.93245333
-        - 0.9999853
-        - 0.99999905
-        - 0.83548355
-        - 0.7772999
-        - 0.5926666
-        - 0.754915
-        - 0.86703575
-        - 0.9626731
-        - 0.5926666
-        - 0.53120935
-        - 0.95791227
-        - 0.9982993
-        - 0.8807971
-        - 0.9968273
-        - 0.99992514
-        - 0.65135485
-        - 0.7310586
-        - 0.97702265
-        - 0.99142253
-        - 0.9999926
-        - 0.5621765
-        - 0.7772999
-        - 0.9998205
-        - 0.65135485
-        - 0.7981868
-        - 0.9626731
-        - 0.53120935
-        - 0.97404265
-        - 0.7981868
-        - 0.95791227
-        - 0.8519528
-        - 0.6791787
-        - 0.8933094
-        - 0.754915
-        - 0.9997388
-        - 0.5926666
-        - 0.83548355
-        - 0.70578504
-        - 0.7310586
-        - 0.9999757
-        - 0.70578504
-        - 0.9997695
-        - 0.99999774
-        - 0.9465967
-        - 0.9999967
-        - 0.9998416
-        - 0.5621765
-        - 0.5621765
-        - 0.8933094
-        - 0.65135485
-        - 0.5621765
-        - 0.83548355
-        - 0.9840936
-        - 0.754915
-        - 0.7981868
-        - 0.9999988
-        - 0.86703575
-        - 0.9999967
-        - 0.5621765
-        - 0.9465967
-        - 0.86703575
-        - 0.7310586
-        - 0.754915
-        - 0.9241418
-        - 0.86703575
-        - 0.6791787
-        - 0.9968273
-        - 0.9046505
-        - 0.70578504
-        - 0.9465967
-        - 0.7981868
-        - 0.8807971
-        - 0.7772999
-        - 0.6791787
-        - 0.8807971
-  ▿ parts: 511 elements
+      ▿ key: EdgeToolsMetricKey
+        - rawValue: "PrefillDuration"
+      ▿ value: 0.116194667 seconds
+        - _low: 116194667000000000
+        - _high: 0
+    ▿ (2 elements)
+      ▿ key: EdgeToolsMetricKey
+        - rawValue: "PrefillTokens"
+      - value: 31
+  ▿ parts: 443 elements
     ▿ EdgeToolsGenerationPart
       - reasoning: " Ok"
     ▿ EdgeToolsGenerationPart
@@ -593,13 +91,23 @@ Cache:  2676M        (2806973031)
     ▿ EdgeToolsGenerationPart
       - reasoning: " then"
     ▿ EdgeToolsGenerationPart
-      - reasoning: " they"
+      - reasoning: " provide"
     ▿ EdgeToolsGenerationPart
-      - reasoning: " said"
+      - reasoning: " the"
     ▿ EdgeToolsGenerationPart
-      - reasoning: " to"
+      - reasoning: " final"
     ▿ EdgeToolsGenerationPart
-      - reasoning: " find"
+      - reasoning: " answer"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "."
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " They"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " specifically"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " asked"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " for"
     ▿ EdgeToolsGenerationPart
       - reasoning: " the"
     ▿ EdgeToolsGenerationPart
@@ -621,6 +129,8 @@ Cache:  2676M        (2806973031)
     ▿ EdgeToolsGenerationPart
       - reasoning: " and"
     ▿ EdgeToolsGenerationPart
+      - reasoning: " to"
+    ▿ EdgeToolsGenerationPart
       - reasoning: " keep"
     ▿ EdgeToolsGenerationPart
       - reasoning: " the"
@@ -633,13 +143,37 @@ Cache:  2676M        (2806973031)
     ▿ EdgeToolsGenerationPart
       - reasoning: "."
     ▿ EdgeToolsGenerationPart
+      - reasoning: " Also"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: ","
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " they"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " mentioned"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " to"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " think"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " about"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "19"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " +"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "23"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "."
+    ▿ EdgeToolsGenerationPart
       - reasoning: " H"
     ▿ EdgeToolsGenerationPart
       - reasoning: "mm"
     ▿ EdgeToolsGenerationPart
-      - reasoning: "."
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " So"
+      - reasoning: ","
     ▿ EdgeToolsGenerationPart
       - reasoning: " first"
     ▿ EdgeToolsGenerationPart
@@ -663,19 +197,27 @@ Cache:  2676M        (2806973031)
     ▿ EdgeToolsGenerationPart
       - reasoning: "."
     ▿ EdgeToolsGenerationPart
-      - reasoning: " Well"
+      - reasoning: " Let"
     ▿ EdgeToolsGenerationPart
-      - reasoning: ","
+      - reasoning: " me"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " add"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " them"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: ":"
     ▿ EdgeToolsGenerationPart
       - reasoning: " "
     ▿ EdgeToolsGenerationPart
       - reasoning: "19"
     ▿ EdgeToolsGenerationPart
-      - reasoning: " plus"
+      - reasoning: " +"
     ▿ EdgeToolsGenerationPart
       - reasoning: " "
     ▿ EdgeToolsGenerationPart
       - reasoning: "23"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " equals"
     ▿ EdgeToolsGenerationPart
       - reasoning: "..."
     ▿ EdgeToolsGenerationPart
@@ -683,83 +225,7 @@ Cache:  2676M        (2806973031)
     ▿ EdgeToolsGenerationPart
       - reasoning: "19"
     ▿ EdgeToolsGenerationPart
-      - reasoning: " +"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "20"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " is"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "39"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: ","
-    ▿ EdgeToolsGenerationPart
       - reasoning: " plus"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "3"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " more"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " is"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "42"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "?"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " Wait"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " no"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: ","
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "19"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " +"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "23"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "."
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " Let"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "\'s"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " do"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " it"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " properly"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: ":"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "19"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " +"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "23"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "."
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "19"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " +"
     ▿ EdgeToolsGenerationPart
       - reasoning: " "
     ▿ EdgeToolsGenerationPart
@@ -785,113 +251,11 @@ Cache:  2676M        (2806973031)
     ▿ EdgeToolsGenerationPart
       - reasoning: "42"
     ▿ EdgeToolsGenerationPart
-      - reasoning: "."
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " Wait"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: ","
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "23"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " +"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "19"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: ":"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "20"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "+"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "10"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "="
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "30"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: ","
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "9"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "+"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "9"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "="
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "18"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: ","
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " total"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "48"
-    ▿ EdgeToolsGenerationPart
       - reasoning: "?"
     ▿ EdgeToolsGenerationPart
       - reasoning: " Wait"
     ▿ EdgeToolsGenerationPart
-      - reasoning: " wait"
-    ▿ EdgeToolsGenerationPart
       - reasoning: ","
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " no"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "."
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " Wait"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "19"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " +"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "23"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: ":"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "20"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "+"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "23"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " is"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "43"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: ","
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " plus"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "9"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " is"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "52"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "?"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " Wait"
     ▿ EdgeToolsGenerationPart
       - reasoning: " no"
     ▿ EdgeToolsGenerationPart
@@ -903,45 +267,7 @@ Cache:  2676M        (2806973031)
     ▿ EdgeToolsGenerationPart
       - reasoning: "19"
     ▿ EdgeToolsGenerationPart
-      - reasoning: "+"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "23"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " is"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "42"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "?"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " Wait"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " I"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "\'m"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " confused"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "."
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " Let"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " me"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " calculate"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " again"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "."
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "19"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " plus"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
+      - reasoning: " +"
     ▿ EdgeToolsGenerationPart
       - reasoning: "23"
     ▿ EdgeToolsGenerationPart
@@ -949,99 +275,33 @@ Cache:  2676M        (2806973031)
     ▿ EdgeToolsGenerationPart
       - reasoning: " "
     ▿ EdgeToolsGenerationPart
-      - reasoning: "19"
+      - reasoning: "20"
     ▿ EdgeToolsGenerationPart
       - reasoning: " +"
     ▿ EdgeToolsGenerationPart
       - reasoning: " "
     ▿ EdgeToolsGenerationPart
-      - reasoning: "23"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " ="
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "42"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "?"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " Wait"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "19"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "+"
-    ▿ EdgeToolsGenerationPart
       - reasoning: "20"
     ▿ EdgeToolsGenerationPart
       - reasoning: " is"
     ▿ EdgeToolsGenerationPart
       - reasoning: " "
     ▿ EdgeToolsGenerationPart
-      - reasoning: "39"
+      - reasoning: "40"
     ▿ EdgeToolsGenerationPart
       - reasoning: ","
     ▿ EdgeToolsGenerationPart
-      - reasoning: " plus"
+      - reasoning: " minus"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "1"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " +"
     ▿ EdgeToolsGenerationPart
       - reasoning: " "
     ▿ EdgeToolsGenerationPart
       - reasoning: "3"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " is"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "42"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "?"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " Wait"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "23"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "+"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "19"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: ":"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "20"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "+"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "10"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "="
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "30"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: ","
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "9"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "+"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "9"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "="
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "18"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: ","
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " total"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "48"
     ▿ EdgeToolsGenerationPart
       - reasoning: "?"
     ▿ EdgeToolsGenerationPart
@@ -1051,117 +311,47 @@ Cache:  2676M        (2806973031)
     ▿ EdgeToolsGenerationPart
       - reasoning: ","
     ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "19"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "+"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "23"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: ":"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "19"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "+"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "23"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "="
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "42"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "?"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " Wait"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " maybe"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " I"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "\'m"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " mis"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "calcul"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "ating"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "."
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " Let"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " me"
+      - reasoning: " better"
     ▿ EdgeToolsGenerationPart
       - reasoning: " just"
     ▿ EdgeToolsGenerationPart
-      - reasoning: " add"
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "19"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " +"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "23"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "."
     ▿ EdgeToolsGenerationPart
       - reasoning: " "
     ▿ EdgeToolsGenerationPart
       - reasoning: "19"
     ▿ EdgeToolsGenerationPart
       - reasoning: " +"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "23"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " is"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "42"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "?"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " Wait"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "19"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "+"
     ▿ EdgeToolsGenerationPart
       - reasoning: "23"
     ▿ EdgeToolsGenerationPart
       - reasoning: ":"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "19"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " +"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "23"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " ="
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "42"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "?"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " Wait"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "19"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "+"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "23"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " is"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "42"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "?"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " Wait"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "19"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "+"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "23"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " is"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "42"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "?"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " Wait"
     ▿ EdgeToolsGenerationPart
       - reasoning: " "
     ▿ EdgeToolsGenerationPart
@@ -1191,166 +381,6 @@ Cache:  2676M        (2806973031)
     ▿ EdgeToolsGenerationPart
       - reasoning: "42"
     ▿ EdgeToolsGenerationPart
-      - reasoning: "."
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " Yeah"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: ","
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "19"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "+"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "23"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "="
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "42"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "."
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " Wait"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "19"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "+"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "23"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: ":"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "19"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "+"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "20"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "="
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "39"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " plus"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "3"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " is"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "42"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "?"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " Wait"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "23"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "+"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "19"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " is"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "42"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "?"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " Wait"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "20"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "+"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "20"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "="
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "40"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: ","
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " plus"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "9"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "+"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "3"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "="
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "12"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: ","
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " so"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "40"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "+"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "12"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "="
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "52"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "?"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " Wait"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " I"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "\'m"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " getting"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " confused"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "."
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " Wait"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "19"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "+"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "23"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: ":"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "19"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " +"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "23"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "="
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "42"
-    ▿ EdgeToolsGenerationPart
       - reasoning: "?"
     ▿ EdgeToolsGenerationPart
       - reasoning: " Wait"
@@ -1367,25 +397,33 @@ Cache:  2676M        (2806973031)
     ▿ EdgeToolsGenerationPart
       - reasoning: "23"
     ▿ EdgeToolsGenerationPart
-      - reasoning: " is"
+      - reasoning: ":"
     ▿ EdgeToolsGenerationPart
       - reasoning: " "
     ▿ EdgeToolsGenerationPart
-      - reasoning: "42"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "?"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " Wait"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "19"
+      - reasoning: "20"
     ▿ EdgeToolsGenerationPart
       - reasoning: "+"
     ▿ EdgeToolsGenerationPart
       - reasoning: "23"
     ▿ EdgeToolsGenerationPart
       - reasoning: " is"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "43"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: ","
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " subt"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "ract"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "1"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " gives"
     ▿ EdgeToolsGenerationPart
       - reasoning: " "
     ▿ EdgeToolsGenerationPart
@@ -1404,6 +442,86 @@ Cache:  2676M        (2806973031)
       - reasoning: "23"
     ▿ EdgeToolsGenerationPart
       - reasoning: ":"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "19"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "+"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "20"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "="
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "39"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " +"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "3"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "="
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "42"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "."
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " Wait"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "19"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " +"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "23"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " is"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "42"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "?"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " Wait"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "19"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "+"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "23"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " is"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " actually"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "42"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "."
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " Wait"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "19"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "+"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "23"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " is"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "42"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "."
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " Wait"
     ▿ EdgeToolsGenerationPart
       - reasoning: " "
     ▿ EdgeToolsGenerationPart
@@ -1426,94 +544,6 @@ Cache:  2676M        (2806973031)
       - reasoning: " "
     ▿ EdgeToolsGenerationPart
       - reasoning: "3"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " is"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "42"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "."
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " Wait"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "23"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "+"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "19"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " is"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " same"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " as"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "19"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "+"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "23"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: ","
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " which"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " is"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "42"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "."
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " H"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "mm"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: ","
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " maybe"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " I"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " should"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " just"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " do"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "19"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " +"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "23"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: ":"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "20"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "+"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "23"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "="
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "43"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " minus"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " "
-    ▿ EdgeToolsGenerationPart
-      - reasoning: "1"
     ▿ EdgeToolsGenerationPart
       - reasoning: " is"
     ▿ EdgeToolsGenerationPart
@@ -1547,44 +577,371 @@ Cache:  2676M        (2806973031)
     ▿ EdgeToolsGenerationPart
       - reasoning: "."
     ▿ EdgeToolsGenerationPart
-      - reasoning: " Wait"
-    ▿ EdgeToolsGenerationPart
-      - reasoning: " but"
-    ▿ EdgeToolsGenerationPart
       - reasoning: " "
     ▿ EdgeToolsGenerationPart
-      - reasoning: "19"
+      - reasoning: "\n\n"
     ▿ EdgeToolsGenerationPart
-      - reasoning: "+"
+      - reasoning: "But"
     ▿ EdgeToolsGenerationPart
-      - reasoning: "23"
+      - reasoning: " the"
     ▿ EdgeToolsGenerationPart
-      - reasoning: "="
+      - reasoning: " user"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " said"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " to"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " keep"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " the"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " final"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " answer"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " brief"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "."
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " So"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " the"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " answer"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " is"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
     ▿ EdgeToolsGenerationPart
       - reasoning: "42"
     ▿ EdgeToolsGenerationPart
-      - reasoning: "?"
+      - reasoning: "."
     ▿ EdgeToolsGenerationPart
-      - reasoning: " Wait"
+      - reasoning: " But"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " I"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " need"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " to"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " make"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " sure"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " I"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " don"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "\'t"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " over"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "com"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "plicate"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "."
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " The"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " question"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " is"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " straight"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "forward"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "."
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " The"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " user"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " said"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " \""
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "what"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " is"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " the"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " sum"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " of"
     ▿ EdgeToolsGenerationPart
       - reasoning: " "
     ▿ EdgeToolsGenerationPart
       - reasoning: "19"
     ▿ EdgeToolsGenerationPart
-      - reasoning: "+"
+      - reasoning: " and"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "23"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "?"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " Keep"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " the"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " final"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " answer"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " brief"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: ".\""
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " So"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " I"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " just"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " need"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " to"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " say"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "42"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "."
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " But"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " wait"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: ","
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " maybe"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " they"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " just"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " want"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " the"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " sum"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: ","
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " which"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " is"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "42"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "."
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " So"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " the"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " final"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " answer"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " is"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "42"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "."
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " Since"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " they"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " said"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " keep"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " final"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " answer"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " brief"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: ","
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " so"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " just"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "42"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "."
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " Alternatively"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: ","
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " maybe"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " even"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " just"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " \""
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "42"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "\"."
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " Since"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " they"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " said"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " \""
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "sum"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " of"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "19"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " and"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "23"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "\","
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " which"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " is"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "42"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "."
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " Al"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "right"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: ","
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " I"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " think"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " that"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "\'s"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " it"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "."
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " So"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " the"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " answer"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " is"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "42"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "."
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " Let"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " me"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " just"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " confirm"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " again"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: ":"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "19"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " +"
     ▿ EdgeToolsGenerationPart
       - reasoning: "23"
     ▿ EdgeToolsGenerationPart
       - reasoning: " is"
     ▿ EdgeToolsGenerationPart
       - reasoning: " "
-  ▿ prefillMetrics: EdgeToolsPrefillMetrics
-    ▿ duration: 0.086021583 seconds
-      - _low: 86021583000000000
-      - _high: 0
-    - tokens: 31
-  - response: "<think> Okay, let me see. The user wants me to think carefully before answering, then they said to find the sum of 19 and 23, and keep the final answer brief. Hmm. So first, the sum of 19 and 23. Well, 19 plus 23... 19 + 20 is 39, plus 3 more is 42? Wait no, 19 + 23. Let\'s do it properly: 19 + 23. 19 + 20 is 39, plus 3 is 42. Wait, 23 + 19: 20+10=30, 9+9=18, total 48? Wait wait, no. Wait 19 +23: 20+23 is 43, plus 9 is 52? Wait no, wait 19+23 is 42? Wait I\'m confused. Let me calculate again. 19 plus 23: 19 + 23 = 42? Wait 19+20 is 39, plus 3 is 42? Wait 23+19: 20+10=30, 9+9=18, total 48? Wait no, 19+23: 19+23=42? Wait maybe I\'m miscalculating. Let me just add 19 +23: 19 +23 = 42? Wait 19+23 is 42? Wait 19+23 is 42? Wait 20+23 is 43, minus 1 is 42. Yeah, 19+23=42. Wait 19+23: 19+20=39 plus 3 is 42? Wait 23+19 is 42? Wait 20+20=40, plus 9+3=12, so 40+12=52? Wait I\'m getting confused. Wait 19+23: 19 +23=42? Wait no, 19+23 is 42? Wait 19+23 is 42? Wait 19+23: 19+20 is 39, plus 3 is 42. Wait 23+19 is same as 19+23, which is 42. Hmm, maybe I should just do 19 +23: 20+23=43 minus 1 is 42. Yeah, okay. So 19+23=42. Wait but 19+23=42? Wait 19+23 is "
-  ▿ tokens: 512 elements
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "42"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "."
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " Y"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "ep"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "."
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " So"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " I"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "\'ll"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " go"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " with"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: " "
+    ▿ EdgeToolsGenerationPart
+      - reasoning: "42"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: ".\n"
+    ▿ EdgeToolsGenerationPart
+      - text: "\n\n"
+    ▿ EdgeToolsGenerationPart
+      - text: "42"
+    ▿ EdgeToolsGenerationPart
+      - text: "."
+    ▿ EdgeToolsGenerationPart
+      - text: " "
+    ▿ EdgeToolsGenerationPart
+      - text: "\n\n"
+    ▿ EdgeToolsGenerationPart
+      - text: "\\"
+    ▿ EdgeToolsGenerationPart
+      - text: "box"
+    ▿ EdgeToolsGenerationPart
+      - text: "ed"
+    ▿ EdgeToolsGenerationPart
+      - text: "{"
+    ▿ EdgeToolsGenerationPart
+      - text: "42"
+    ▿ EdgeToolsGenerationPart
+      - text: "}"
+  - response: "<think> Okay, let me see. The user wants me to think carefully before answering, then provide the final answer. They specifically asked for the sum of 19 and 23, and to keep the final answer brief. Also, they mentioned to think about 19 + 23. Hmm, first, the sum of 19 and 23. Let me add them: 19 + 23 equals... 19 plus 20 is 39, plus 3 is 42? Wait, no, wait 19 +23: 20 + 20 is 40, minus 1 + 3? Wait no, better just 19 +23. 19 +23 is 42? Wait 19+23: 20+23 is 43, minus 1 is 42? Wait no, 19+23: 20+23 is 43, subtract 1 gives 42? Wait 19+23: 19+20=39 +3=42. Wait 19 +23 is 42? Wait 19+23 is actually 42. Wait 19+23 is 42. Wait 19+20 is 39, plus 3 is 42. Yeah, okay. So 19+23=42. \n\nBut the user said to keep the final answer brief. So the answer is 42. But I need to make sure I don\'t overcomplicate. The question is straightforward. The user said \"what is the sum of 19 and 23? Keep the final answer brief.\" So I just need to say 42. But wait, maybe they just want the sum, which is 42. So the final answer is 42. Since they said keep final answer brief, so just 42. Alternatively, maybe even just \"42\". Since they said \"sum of 19 and 23\", which is 42. Alright, I think that\'s it. So the answer is 42. Let me just confirm again: 19 +23 is 42. Yep. So I\'ll go with 42.\n</think>\n\n42. \n\n\\boxed{42}"
+  ▿ tokens: 446 elements
     ▿ EdgeToolsToken
       - id: 64400
       - stringValue: "<think>"
@@ -1643,17 +1000,32 @@ Cache:  2676M        (2806973031)
       - id: 1757
       - stringValue: " then"
     ▿ EdgeToolsToken
-      - id: 1186
-      - stringValue: " they"
+      - id: 3176
+      - stringValue: " provide"
     ▿ EdgeToolsToken
-      - id: 1845
-      - stringValue: " said"
+      - id: 779
+      - stringValue: " the"
     ▿ EdgeToolsToken
-      - id: 811
-      - stringValue: " to"
+      - id: 2524
+      - stringValue: " final"
     ▿ EdgeToolsToken
-      - id: 2001
-      - stringValue: " find"
+      - id: 5642
+      - stringValue: " answer"
+    ▿ EdgeToolsToken
+      - id: 523
+      - stringValue: "."
+    ▿ EdgeToolsToken
+      - id: 2216
+      - stringValue: " They"
+    ▿ EdgeToolsToken
+      - id: 10285
+      - stringValue: " specifically"
+    ▿ EdgeToolsToken
+      - id: 5751
+      - stringValue: " asked"
+    ▿ EdgeToolsToken
+      - id: 875
+      - stringValue: " for"
     ▿ EdgeToolsToken
       - id: 779
       - stringValue: " the"
@@ -1685,6 +1057,9 @@ Cache:  2676M        (2806973031)
       - id: 810
       - stringValue: " and"
     ▿ EdgeToolsToken
+      - id: 811
+      - stringValue: " to"
+    ▿ EdgeToolsToken
       - id: 3089
       - stringValue: " keep"
     ▿ EdgeToolsToken
@@ -1703,17 +1078,53 @@ Cache:  2676M        (2806973031)
       - id: 523
       - stringValue: "."
     ▿ EdgeToolsToken
+      - id: 7560
+      - stringValue: " Also"
+    ▿ EdgeToolsToken
+      - id: 521
+      - stringValue: ","
+    ▿ EdgeToolsToken
+      - id: 1186
+      - stringValue: " they"
+    ▿ EdgeToolsToken
+      - id: 8815
+      - stringValue: " mentioned"
+    ▿ EdgeToolsToken
+      - id: 811
+      - stringValue: " to"
+    ▿ EdgeToolsToken
+      - id: 2539
+      - stringValue: " think"
+    ▿ EdgeToolsToken
+      - id: 1337
+      - stringValue: " about"
+    ▿ EdgeToolsToken
+      - id: 730
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 913
+      - stringValue: "19"
+    ▿ EdgeToolsToken
+      - id: 2011
+      - stringValue: " +"
+    ▿ EdgeToolsToken
+      - id: 730
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 1968
+      - stringValue: "23"
+    ▿ EdgeToolsToken
+      - id: 523
+      - stringValue: "."
+    ▿ EdgeToolsToken
       - id: 904
       - stringValue: " H"
     ▿ EdgeToolsToken
       - id: 5399
       - stringValue: "mm"
     ▿ EdgeToolsToken
-      - id: 523
-      - stringValue: "."
-    ▿ EdgeToolsToken
-      - id: 2173
-      - stringValue: " So"
+      - id: 521
+      - stringValue: ","
     ▿ EdgeToolsToken
       - id: 1509
       - stringValue: " first"
@@ -1748,11 +1159,20 @@ Cache:  2676M        (2806973031)
       - id: 523
       - stringValue: "."
     ▿ EdgeToolsToken
-      - id: 12022
-      - stringValue: " Well"
+      - id: 6635
+      - stringValue: " Let"
     ▿ EdgeToolsToken
-      - id: 521
-      - stringValue: ","
+      - id: 1123
+      - stringValue: " me"
+    ▿ EdgeToolsToken
+      - id: 1614
+      - stringValue: " add"
+    ▿ EdgeToolsToken
+      - id: 1377
+      - stringValue: " them"
+    ▿ EdgeToolsToken
+      - id: 535
+      - stringValue: ":"
     ▿ EdgeToolsToken
       - id: 730
       - stringValue: " "
@@ -1760,14 +1180,17 @@ Cache:  2676M        (2806973031)
       - id: 913
       - stringValue: "19"
     ▿ EdgeToolsToken
-      - id: 2729
-      - stringValue: " plus"
+      - id: 2011
+      - stringValue: " +"
     ▿ EdgeToolsToken
       - id: 730
       - stringValue: " "
     ▿ EdgeToolsToken
       - id: 1968
       - stringValue: "23"
+    ▿ EdgeToolsToken
+      - id: 30322
+      - stringValue: " equals"
     ▿ EdgeToolsToken
       - id: 2597
       - stringValue: "..."
@@ -1778,122 +1201,8 @@ Cache:  2676M        (2806973031)
       - id: 913
       - stringValue: "19"
     ▿ EdgeToolsToken
-      - id: 2011
-      - stringValue: " +"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 898
-      - stringValue: "20"
-    ▿ EdgeToolsToken
-      - id: 856
-      - stringValue: " is"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 3188
-      - stringValue: "39"
-    ▿ EdgeToolsToken
-      - id: 521
-      - stringValue: ","
-    ▿ EdgeToolsToken
       - id: 2729
       - stringValue: " plus"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 528
-      - stringValue: "3"
-    ▿ EdgeToolsToken
-      - id: 1209
-      - stringValue: " more"
-    ▿ EdgeToolsToken
-      - id: 856
-      - stringValue: " is"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 4344
-      - stringValue: "42"
-    ▿ EdgeToolsToken
-      - id: 540
-      - stringValue: "?"
-    ▿ EdgeToolsToken
-      - id: 35190
-      - stringValue: " Wait"
-    ▿ EdgeToolsToken
-      - id: 1295
-      - stringValue: " no"
-    ▿ EdgeToolsToken
-      - id: 521
-      - stringValue: ","
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 913
-      - stringValue: "19"
-    ▿ EdgeToolsToken
-      - id: 2011
-      - stringValue: " +"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 1968
-      - stringValue: "23"
-    ▿ EdgeToolsToken
-      - id: 523
-      - stringValue: "."
-    ▿ EdgeToolsToken
-      - id: 6635
-      - stringValue: " Let"
-    ▿ EdgeToolsToken
-      - id: 1090
-      - stringValue: "\'s"
-    ▿ EdgeToolsToken
-      - id: 1112
-      - stringValue: " do"
-    ▿ EdgeToolsToken
-      - id: 936
-      - stringValue: " it"
-    ▿ EdgeToolsToken
-      - id: 9455
-      - stringValue: " properly"
-    ▿ EdgeToolsToken
-      - id: 535
-      - stringValue: ":"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 913
-      - stringValue: "19"
-    ▿ EdgeToolsToken
-      - id: 2011
-      - stringValue: " +"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 1968
-      - stringValue: "23"
-    ▿ EdgeToolsToken
-      - id: 523
-      - stringValue: "."
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 913
-      - stringValue: "19"
-    ▿ EdgeToolsToken
-      - id: 2011
-      - stringValue: " +"
     ▿ EdgeToolsToken
       - id: 730
       - stringValue: " "
@@ -1931,167 +1240,14 @@ Cache:  2676M        (2806973031)
       - id: 4344
       - stringValue: "42"
     ▿ EdgeToolsToken
-      - id: 523
-      - stringValue: "."
-    ▿ EdgeToolsToken
-      - id: 35190
-      - stringValue: " Wait"
-    ▿ EdgeToolsToken
-      - id: 521
-      - stringValue: ","
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 1968
-      - stringValue: "23"
-    ▿ EdgeToolsToken
-      - id: 2011
-      - stringValue: " +"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 913
-      - stringValue: "19"
-    ▿ EdgeToolsToken
-      - id: 535
-      - stringValue: ":"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 898
-      - stringValue: "20"
-    ▿ EdgeToolsToken
-      - id: 520
-      - stringValue: "+"
-    ▿ EdgeToolsToken
-      - id: 1155
-      - stringValue: "10"
-    ▿ EdgeToolsToken
-      - id: 538
-      - stringValue: "="
-    ▿ EdgeToolsToken
-      - id: 1664
-      - stringValue: "30"
-    ▿ EdgeToolsToken
-      - id: 521
-      - stringValue: ","
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 534
-      - stringValue: "9"
-    ▿ EdgeToolsToken
-      - id: 520
-      - stringValue: "+"
-    ▿ EdgeToolsToken
-      - id: 534
-      - stringValue: "9"
-    ▿ EdgeToolsToken
-      - id: 538
-      - stringValue: "="
-    ▿ EdgeToolsToken
-      - id: 1133
-      - stringValue: "18"
-    ▿ EdgeToolsToken
-      - id: 521
-      - stringValue: ","
-    ▿ EdgeToolsToken
-      - id: 3426
-      - stringValue: " total"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 3167
-      - stringValue: "48"
-    ▿ EdgeToolsToken
       - id: 540
       - stringValue: "?"
     ▿ EdgeToolsToken
       - id: 35190
       - stringValue: " Wait"
     ▿ EdgeToolsToken
-      - id: 7498
-      - stringValue: " wait"
-    ▿ EdgeToolsToken
       - id: 521
       - stringValue: ","
-    ▿ EdgeToolsToken
-      - id: 1295
-      - stringValue: " no"
-    ▿ EdgeToolsToken
-      - id: 523
-      - stringValue: "."
-    ▿ EdgeToolsToken
-      - id: 35190
-      - stringValue: " Wait"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 913
-      - stringValue: "19"
-    ▿ EdgeToolsToken
-      - id: 2011
-      - stringValue: " +"
-    ▿ EdgeToolsToken
-      - id: 1968
-      - stringValue: "23"
-    ▿ EdgeToolsToken
-      - id: 535
-      - stringValue: ":"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 898
-      - stringValue: "20"
-    ▿ EdgeToolsToken
-      - id: 520
-      - stringValue: "+"
-    ▿ EdgeToolsToken
-      - id: 1968
-      - stringValue: "23"
-    ▿ EdgeToolsToken
-      - id: 856
-      - stringValue: " is"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 4613
-      - stringValue: "43"
-    ▿ EdgeToolsToken
-      - id: 521
-      - stringValue: ","
-    ▿ EdgeToolsToken
-      - id: 2729
-      - stringValue: " plus"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 534
-      - stringValue: "9"
-    ▿ EdgeToolsToken
-      - id: 856
-      - stringValue: " is"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 7058
-      - stringValue: "52"
-    ▿ EdgeToolsToken
-      - id: 540
-      - stringValue: "?"
-    ▿ EdgeToolsToken
-      - id: 35190
-      - stringValue: " Wait"
     ▿ EdgeToolsToken
       - id: 1295
       - stringValue: " no"
@@ -2108,65 +1264,8 @@ Cache:  2676M        (2806973031)
       - id: 913
       - stringValue: "19"
     ▿ EdgeToolsToken
-      - id: 520
-      - stringValue: "+"
-    ▿ EdgeToolsToken
-      - id: 1968
-      - stringValue: "23"
-    ▿ EdgeToolsToken
-      - id: 856
-      - stringValue: " is"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 4344
-      - stringValue: "42"
-    ▿ EdgeToolsToken
-      - id: 540
-      - stringValue: "?"
-    ▿ EdgeToolsToken
-      - id: 35190
-      - stringValue: " Wait"
-    ▿ EdgeToolsToken
-      - id: 859
-      - stringValue: " I"
-    ▿ EdgeToolsToken
-      - id: 6217
-      - stringValue: "\'m"
-    ▿ EdgeToolsToken
-      - id: 22929
-      - stringValue: " confused"
-    ▿ EdgeToolsToken
-      - id: 523
-      - stringValue: "."
-    ▿ EdgeToolsToken
-      - id: 6635
-      - stringValue: " Let"
-    ▿ EdgeToolsToken
-      - id: 1123
-      - stringValue: " me"
-    ▿ EdgeToolsToken
-      - id: 16921
-      - stringValue: " calculate"
-    ▿ EdgeToolsToken
-      - id: 2030
-      - stringValue: " again"
-    ▿ EdgeToolsToken
-      - id: 523
-      - stringValue: "."
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 913
-      - stringValue: "19"
-    ▿ EdgeToolsToken
-      - id: 2729
-      - stringValue: " plus"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
+      - id: 2011
+      - stringValue: " +"
     ▿ EdgeToolsToken
       - id: 1968
       - stringValue: "23"
@@ -2177,8 +1276,8 @@ Cache:  2676M        (2806973031)
       - id: 730
       - stringValue: " "
     ▿ EdgeToolsToken
-      - id: 913
-      - stringValue: "19"
+      - id: 898
+      - stringValue: "20"
     ▿ EdgeToolsToken
       - id: 2011
       - stringValue: " +"
@@ -2186,33 +1285,6 @@ Cache:  2676M        (2806973031)
       - id: 730
       - stringValue: " "
     ▿ EdgeToolsToken
-      - id: 1968
-      - stringValue: "23"
-    ▿ EdgeToolsToken
-      - id: 1051
-      - stringValue: " ="
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 4344
-      - stringValue: "42"
-    ▿ EdgeToolsToken
-      - id: 540
-      - stringValue: "?"
-    ▿ EdgeToolsToken
-      - id: 35190
-      - stringValue: " Wait"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 913
-      - stringValue: "19"
-    ▿ EdgeToolsToken
-      - id: 520
-      - stringValue: "+"
-    ▿ EdgeToolsToken
       - id: 898
       - stringValue: "20"
     ▿ EdgeToolsToken
@@ -2222,101 +1294,29 @@ Cache:  2676M        (2806973031)
       - id: 730
       - stringValue: " "
     ▿ EdgeToolsToken
-      - id: 3188
-      - stringValue: "39"
+      - id: 2108
+      - stringValue: "40"
     ▿ EdgeToolsToken
       - id: 521
       - stringValue: ","
     ▿ EdgeToolsToken
-      - id: 2729
-      - stringValue: " plus"
+      - id: 35067
+      - stringValue: " minus"
+    ▿ EdgeToolsToken
+      - id: 730
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 526
+      - stringValue: "1"
+    ▿ EdgeToolsToken
+      - id: 2011
+      - stringValue: " +"
     ▿ EdgeToolsToken
       - id: 730
       - stringValue: " "
     ▿ EdgeToolsToken
       - id: 528
       - stringValue: "3"
-    ▿ EdgeToolsToken
-      - id: 856
-      - stringValue: " is"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 4344
-      - stringValue: "42"
-    ▿ EdgeToolsToken
-      - id: 540
-      - stringValue: "?"
-    ▿ EdgeToolsToken
-      - id: 35190
-      - stringValue: " Wait"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 1968
-      - stringValue: "23"
-    ▿ EdgeToolsToken
-      - id: 520
-      - stringValue: "+"
-    ▿ EdgeToolsToken
-      - id: 913
-      - stringValue: "19"
-    ▿ EdgeToolsToken
-      - id: 535
-      - stringValue: ":"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 898
-      - stringValue: "20"
-    ▿ EdgeToolsToken
-      - id: 520
-      - stringValue: "+"
-    ▿ EdgeToolsToken
-      - id: 1155
-      - stringValue: "10"
-    ▿ EdgeToolsToken
-      - id: 538
-      - stringValue: "="
-    ▿ EdgeToolsToken
-      - id: 1664
-      - stringValue: "30"
-    ▿ EdgeToolsToken
-      - id: 521
-      - stringValue: ","
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 534
-      - stringValue: "9"
-    ▿ EdgeToolsToken
-      - id: 520
-      - stringValue: "+"
-    ▿ EdgeToolsToken
-      - id: 534
-      - stringValue: "9"
-    ▿ EdgeToolsToken
-      - id: 538
-      - stringValue: "="
-    ▿ EdgeToolsToken
-      - id: 1133
-      - stringValue: "18"
-    ▿ EdgeToolsToken
-      - id: 521
-      - stringValue: ","
-    ▿ EdgeToolsToken
-      - id: 3426
-      - stringValue: " total"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 3167
-      - stringValue: "48"
     ▿ EdgeToolsToken
       - id: 540
       - stringValue: "?"
@@ -2330,77 +1330,26 @@ Cache:  2676M        (2806973031)
       - id: 521
       - stringValue: ","
     ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 913
-      - stringValue: "19"
-    ▿ EdgeToolsToken
-      - id: 520
-      - stringValue: "+"
-    ▿ EdgeToolsToken
-      - id: 1968
-      - stringValue: "23"
-    ▿ EdgeToolsToken
-      - id: 535
-      - stringValue: ":"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 913
-      - stringValue: "19"
-    ▿ EdgeToolsToken
-      - id: 520
-      - stringValue: "+"
-    ▿ EdgeToolsToken
-      - id: 1968
-      - stringValue: "23"
-    ▿ EdgeToolsToken
-      - id: 538
-      - stringValue: "="
-    ▿ EdgeToolsToken
-      - id: 4344
-      - stringValue: "42"
-    ▿ EdgeToolsToken
-      - id: 540
-      - stringValue: "?"
-    ▿ EdgeToolsToken
-      - id: 35190
-      - stringValue: " Wait"
-    ▿ EdgeToolsToken
-      - id: 13122
-      - stringValue: " maybe"
-    ▿ EdgeToolsToken
-      - id: 859
-      - stringValue: " I"
-    ▿ EdgeToolsToken
-      - id: 6217
-      - stringValue: "\'m"
-    ▿ EdgeToolsToken
-      - id: 4939
-      - stringValue: " mis"
-    ▿ EdgeToolsToken
-      - id: 42110
-      - stringValue: "calcul"
-    ▿ EdgeToolsToken
-      - id: 1556
-      - stringValue: "ating"
-    ▿ EdgeToolsToken
-      - id: 523
-      - stringValue: "."
-    ▿ EdgeToolsToken
-      - id: 6635
-      - stringValue: " Let"
-    ▿ EdgeToolsToken
-      - id: 1123
-      - stringValue: " me"
+      - id: 3020
+      - stringValue: " better"
     ▿ EdgeToolsToken
       - id: 1804
       - stringValue: " just"
     ▿ EdgeToolsToken
-      - id: 1614
-      - stringValue: " add"
+      - id: 730
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 913
+      - stringValue: "19"
+    ▿ EdgeToolsToken
+      - id: 2011
+      - stringValue: " +"
+    ▿ EdgeToolsToken
+      - id: 1968
+      - stringValue: "23"
+    ▿ EdgeToolsToken
+      - id: 523
+      - stringValue: "."
     ▿ EdgeToolsToken
       - id: 730
       - stringValue: " "
@@ -2410,93 +1359,39 @@ Cache:  2676M        (2806973031)
     ▿ EdgeToolsToken
       - id: 2011
       - stringValue: " +"
+    ▿ EdgeToolsToken
+      - id: 1968
+      - stringValue: "23"
+    ▿ EdgeToolsToken
+      - id: 856
+      - stringValue: " is"
+    ▿ EdgeToolsToken
+      - id: 730
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 4344
+      - stringValue: "42"
+    ▿ EdgeToolsToken
+      - id: 540
+      - stringValue: "?"
+    ▿ EdgeToolsToken
+      - id: 35190
+      - stringValue: " Wait"
+    ▿ EdgeToolsToken
+      - id: 730
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 913
+      - stringValue: "19"
+    ▿ EdgeToolsToken
+      - id: 520
+      - stringValue: "+"
     ▿ EdgeToolsToken
       - id: 1968
       - stringValue: "23"
     ▿ EdgeToolsToken
       - id: 535
       - stringValue: ":"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 913
-      - stringValue: "19"
-    ▿ EdgeToolsToken
-      - id: 2011
-      - stringValue: " +"
-    ▿ EdgeToolsToken
-      - id: 1968
-      - stringValue: "23"
-    ▿ EdgeToolsToken
-      - id: 1051
-      - stringValue: " ="
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 4344
-      - stringValue: "42"
-    ▿ EdgeToolsToken
-      - id: 540
-      - stringValue: "?"
-    ▿ EdgeToolsToken
-      - id: 35190
-      - stringValue: " Wait"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 913
-      - stringValue: "19"
-    ▿ EdgeToolsToken
-      - id: 520
-      - stringValue: "+"
-    ▿ EdgeToolsToken
-      - id: 1968
-      - stringValue: "23"
-    ▿ EdgeToolsToken
-      - id: 856
-      - stringValue: " is"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 4344
-      - stringValue: "42"
-    ▿ EdgeToolsToken
-      - id: 540
-      - stringValue: "?"
-    ▿ EdgeToolsToken
-      - id: 35190
-      - stringValue: " Wait"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 913
-      - stringValue: "19"
-    ▿ EdgeToolsToken
-      - id: 520
-      - stringValue: "+"
-    ▿ EdgeToolsToken
-      - id: 1968
-      - stringValue: "23"
-    ▿ EdgeToolsToken
-      - id: 856
-      - stringValue: " is"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 4344
-      - stringValue: "42"
-    ▿ EdgeToolsToken
-      - id: 540
-      - stringValue: "?"
-    ▿ EdgeToolsToken
-      - id: 35190
-      - stringValue: " Wait"
     ▿ EdgeToolsToken
       - id: 730
       - stringValue: " "
@@ -2540,246 +1435,6 @@ Cache:  2676M        (2806973031)
       - id: 4344
       - stringValue: "42"
     ▿ EdgeToolsToken
-      - id: 523
-      - stringValue: "."
-    ▿ EdgeToolsToken
-      - id: 62947
-      - stringValue: " Yeah"
-    ▿ EdgeToolsToken
-      - id: 521
-      - stringValue: ","
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 913
-      - stringValue: "19"
-    ▿ EdgeToolsToken
-      - id: 520
-      - stringValue: "+"
-    ▿ EdgeToolsToken
-      - id: 1968
-      - stringValue: "23"
-    ▿ EdgeToolsToken
-      - id: 538
-      - stringValue: "="
-    ▿ EdgeToolsToken
-      - id: 4344
-      - stringValue: "42"
-    ▿ EdgeToolsToken
-      - id: 523
-      - stringValue: "."
-    ▿ EdgeToolsToken
-      - id: 35190
-      - stringValue: " Wait"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 913
-      - stringValue: "19"
-    ▿ EdgeToolsToken
-      - id: 520
-      - stringValue: "+"
-    ▿ EdgeToolsToken
-      - id: 1968
-      - stringValue: "23"
-    ▿ EdgeToolsToken
-      - id: 535
-      - stringValue: ":"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 913
-      - stringValue: "19"
-    ▿ EdgeToolsToken
-      - id: 520
-      - stringValue: "+"
-    ▿ EdgeToolsToken
-      - id: 898
-      - stringValue: "20"
-    ▿ EdgeToolsToken
-      - id: 538
-      - stringValue: "="
-    ▿ EdgeToolsToken
-      - id: 3188
-      - stringValue: "39"
-    ▿ EdgeToolsToken
-      - id: 2729
-      - stringValue: " plus"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 528
-      - stringValue: "3"
-    ▿ EdgeToolsToken
-      - id: 856
-      - stringValue: " is"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 4344
-      - stringValue: "42"
-    ▿ EdgeToolsToken
-      - id: 540
-      - stringValue: "?"
-    ▿ EdgeToolsToken
-      - id: 35190
-      - stringValue: " Wait"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 1968
-      - stringValue: "23"
-    ▿ EdgeToolsToken
-      - id: 520
-      - stringValue: "+"
-    ▿ EdgeToolsToken
-      - id: 913
-      - stringValue: "19"
-    ▿ EdgeToolsToken
-      - id: 856
-      - stringValue: " is"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 4344
-      - stringValue: "42"
-    ▿ EdgeToolsToken
-      - id: 540
-      - stringValue: "?"
-    ▿ EdgeToolsToken
-      - id: 35190
-      - stringValue: " Wait"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 898
-      - stringValue: "20"
-    ▿ EdgeToolsToken
-      - id: 520
-      - stringValue: "+"
-    ▿ EdgeToolsToken
-      - id: 898
-      - stringValue: "20"
-    ▿ EdgeToolsToken
-      - id: 538
-      - stringValue: "="
-    ▿ EdgeToolsToken
-      - id: 2108
-      - stringValue: "40"
-    ▿ EdgeToolsToken
-      - id: 521
-      - stringValue: ","
-    ▿ EdgeToolsToken
-      - id: 2729
-      - stringValue: " plus"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 534
-      - stringValue: "9"
-    ▿ EdgeToolsToken
-      - id: 520
-      - stringValue: "+"
-    ▿ EdgeToolsToken
-      - id: 528
-      - stringValue: "3"
-    ▿ EdgeToolsToken
-      - id: 538
-      - stringValue: "="
-    ▿ EdgeToolsToken
-      - id: 1374
-      - stringValue: "12"
-    ▿ EdgeToolsToken
-      - id: 521
-      - stringValue: ","
-    ▿ EdgeToolsToken
-      - id: 1101
-      - stringValue: " so"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 2108
-      - stringValue: "40"
-    ▿ EdgeToolsToken
-      - id: 520
-      - stringValue: "+"
-    ▿ EdgeToolsToken
-      - id: 1374
-      - stringValue: "12"
-    ▿ EdgeToolsToken
-      - id: 538
-      - stringValue: "="
-    ▿ EdgeToolsToken
-      - id: 7058
-      - stringValue: "52"
-    ▿ EdgeToolsToken
-      - id: 540
-      - stringValue: "?"
-    ▿ EdgeToolsToken
-      - id: 35190
-      - stringValue: " Wait"
-    ▿ EdgeToolsToken
-      - id: 859
-      - stringValue: " I"
-    ▿ EdgeToolsToken
-      - id: 6217
-      - stringValue: "\'m"
-    ▿ EdgeToolsToken
-      - id: 5629
-      - stringValue: " getting"
-    ▿ EdgeToolsToken
-      - id: 22929
-      - stringValue: " confused"
-    ▿ EdgeToolsToken
-      - id: 523
-      - stringValue: "."
-    ▿ EdgeToolsToken
-      - id: 35190
-      - stringValue: " Wait"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 913
-      - stringValue: "19"
-    ▿ EdgeToolsToken
-      - id: 520
-      - stringValue: "+"
-    ▿ EdgeToolsToken
-      - id: 1968
-      - stringValue: "23"
-    ▿ EdgeToolsToken
-      - id: 535
-      - stringValue: ":"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 913
-      - stringValue: "19"
-    ▿ EdgeToolsToken
-      - id: 2011
-      - stringValue: " +"
-    ▿ EdgeToolsToken
-      - id: 1968
-      - stringValue: "23"
-    ▿ EdgeToolsToken
-      - id: 538
-      - stringValue: "="
-    ▿ EdgeToolsToken
-      - id: 4344
-      - stringValue: "42"
-    ▿ EdgeToolsToken
       - id: 540
       - stringValue: "?"
     ▿ EdgeToolsToken
@@ -2804,26 +1459,14 @@ Cache:  2676M        (2806973031)
       - id: 1968
       - stringValue: "23"
     ▿ EdgeToolsToken
-      - id: 856
-      - stringValue: " is"
+      - id: 535
+      - stringValue: ":"
     ▿ EdgeToolsToken
       - id: 730
       - stringValue: " "
     ▿ EdgeToolsToken
-      - id: 4344
-      - stringValue: "42"
-    ▿ EdgeToolsToken
-      - id: 540
-      - stringValue: "?"
-    ▿ EdgeToolsToken
-      - id: 35190
-      - stringValue: " Wait"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 913
-      - stringValue: "19"
+      - id: 898
+      - stringValue: "20"
     ▿ EdgeToolsToken
       - id: 520
       - stringValue: "+"
@@ -2833,6 +1476,30 @@ Cache:  2676M        (2806973031)
     ▿ EdgeToolsToken
       - id: 856
       - stringValue: " is"
+    ▿ EdgeToolsToken
+      - id: 730
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 4613
+      - stringValue: "43"
+    ▿ EdgeToolsToken
+      - id: 521
+      - stringValue: ","
+    ▿ EdgeToolsToken
+      - id: 10559
+      - stringValue: " subt"
+    ▿ EdgeToolsToken
+      - id: 1683
+      - stringValue: "ract"
+    ▿ EdgeToolsToken
+      - id: 730
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 526
+      - stringValue: "1"
+    ▿ EdgeToolsToken
+      - id: 6602
+      - stringValue: " gives"
     ▿ EdgeToolsToken
       - id: 730
       - stringValue: " "
@@ -2860,6 +1527,126 @@ Cache:  2676M        (2806973031)
     ▿ EdgeToolsToken
       - id: 535
       - stringValue: ":"
+    ▿ EdgeToolsToken
+      - id: 730
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 913
+      - stringValue: "19"
+    ▿ EdgeToolsToken
+      - id: 520
+      - stringValue: "+"
+    ▿ EdgeToolsToken
+      - id: 898
+      - stringValue: "20"
+    ▿ EdgeToolsToken
+      - id: 538
+      - stringValue: "="
+    ▿ EdgeToolsToken
+      - id: 3188
+      - stringValue: "39"
+    ▿ EdgeToolsToken
+      - id: 2011
+      - stringValue: " +"
+    ▿ EdgeToolsToken
+      - id: 528
+      - stringValue: "3"
+    ▿ EdgeToolsToken
+      - id: 538
+      - stringValue: "="
+    ▿ EdgeToolsToken
+      - id: 4344
+      - stringValue: "42"
+    ▿ EdgeToolsToken
+      - id: 523
+      - stringValue: "."
+    ▿ EdgeToolsToken
+      - id: 35190
+      - stringValue: " Wait"
+    ▿ EdgeToolsToken
+      - id: 730
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 913
+      - stringValue: "19"
+    ▿ EdgeToolsToken
+      - id: 2011
+      - stringValue: " +"
+    ▿ EdgeToolsToken
+      - id: 1968
+      - stringValue: "23"
+    ▿ EdgeToolsToken
+      - id: 856
+      - stringValue: " is"
+    ▿ EdgeToolsToken
+      - id: 730
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 4344
+      - stringValue: "42"
+    ▿ EdgeToolsToken
+      - id: 540
+      - stringValue: "?"
+    ▿ EdgeToolsToken
+      - id: 35190
+      - stringValue: " Wait"
+    ▿ EdgeToolsToken
+      - id: 730
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 913
+      - stringValue: "19"
+    ▿ EdgeToolsToken
+      - id: 520
+      - stringValue: "+"
+    ▿ EdgeToolsToken
+      - id: 1968
+      - stringValue: "23"
+    ▿ EdgeToolsToken
+      - id: 856
+      - stringValue: " is"
+    ▿ EdgeToolsToken
+      - id: 4703
+      - stringValue: " actually"
+    ▿ EdgeToolsToken
+      - id: 730
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 4344
+      - stringValue: "42"
+    ▿ EdgeToolsToken
+      - id: 523
+      - stringValue: "."
+    ▿ EdgeToolsToken
+      - id: 35190
+      - stringValue: " Wait"
+    ▿ EdgeToolsToken
+      - id: 730
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 913
+      - stringValue: "19"
+    ▿ EdgeToolsToken
+      - id: 520
+      - stringValue: "+"
+    ▿ EdgeToolsToken
+      - id: 1968
+      - stringValue: "23"
+    ▿ EdgeToolsToken
+      - id: 856
+      - stringValue: " is"
+    ▿ EdgeToolsToken
+      - id: 730
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 4344
+      - stringValue: "42"
+    ▿ EdgeToolsToken
+      - id: 523
+      - stringValue: "."
+    ▿ EdgeToolsToken
+      - id: 35190
+      - stringValue: " Wait"
     ▿ EdgeToolsToken
       - id: 730
       - stringValue: " "
@@ -2893,138 +1680,6 @@ Cache:  2676M        (2806973031)
     ▿ EdgeToolsToken
       - id: 528
       - stringValue: "3"
-    ▿ EdgeToolsToken
-      - id: 856
-      - stringValue: " is"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 4344
-      - stringValue: "42"
-    ▿ EdgeToolsToken
-      - id: 523
-      - stringValue: "."
-    ▿ EdgeToolsToken
-      - id: 35190
-      - stringValue: " Wait"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 1968
-      - stringValue: "23"
-    ▿ EdgeToolsToken
-      - id: 520
-      - stringValue: "+"
-    ▿ EdgeToolsToken
-      - id: 913
-      - stringValue: "19"
-    ▿ EdgeToolsToken
-      - id: 856
-      - stringValue: " is"
-    ▿ EdgeToolsToken
-      - id: 2043
-      - stringValue: " same"
-    ▿ EdgeToolsToken
-      - id: 906
-      - stringValue: " as"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 913
-      - stringValue: "19"
-    ▿ EdgeToolsToken
-      - id: 520
-      - stringValue: "+"
-    ▿ EdgeToolsToken
-      - id: 1968
-      - stringValue: "23"
-    ▿ EdgeToolsToken
-      - id: 521
-      - stringValue: ","
-    ▿ EdgeToolsToken
-      - id: 1144
-      - stringValue: " which"
-    ▿ EdgeToolsToken
-      - id: 856
-      - stringValue: " is"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 4344
-      - stringValue: "42"
-    ▿ EdgeToolsToken
-      - id: 523
-      - stringValue: "."
-    ▿ EdgeToolsToken
-      - id: 904
-      - stringValue: " H"
-    ▿ EdgeToolsToken
-      - id: 5399
-      - stringValue: "mm"
-    ▿ EdgeToolsToken
-      - id: 521
-      - stringValue: ","
-    ▿ EdgeToolsToken
-      - id: 13122
-      - stringValue: " maybe"
-    ▿ EdgeToolsToken
-      - id: 859
-      - stringValue: " I"
-    ▿ EdgeToolsToken
-      - id: 1753
-      - stringValue: " should"
-    ▿ EdgeToolsToken
-      - id: 1804
-      - stringValue: " just"
-    ▿ EdgeToolsToken
-      - id: 1112
-      - stringValue: " do"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 913
-      - stringValue: "19"
-    ▿ EdgeToolsToken
-      - id: 2011
-      - stringValue: " +"
-    ▿ EdgeToolsToken
-      - id: 1968
-      - stringValue: "23"
-    ▿ EdgeToolsToken
-      - id: 535
-      - stringValue: ":"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 898
-      - stringValue: "20"
-    ▿ EdgeToolsToken
-      - id: 520
-      - stringValue: "+"
-    ▿ EdgeToolsToken
-      - id: 1968
-      - stringValue: "23"
-    ▿ EdgeToolsToken
-      - id: 538
-      - stringValue: "="
-    ▿ EdgeToolsToken
-      - id: 4613
-      - stringValue: "43"
-    ▿ EdgeToolsToken
-      - id: 35067
-      - stringValue: " minus"
-    ▿ EdgeToolsToken
-      - id: 730
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 526
-      - stringValue: "1"
     ▿ EdgeToolsToken
       - id: 856
       - stringValue: " is"
@@ -3074,35 +1729,149 @@ Cache:  2676M        (2806973031)
       - id: 523
       - stringValue: "."
     ▿ EdgeToolsToken
-      - id: 35190
-      - stringValue: " Wait"
-    ▿ EdgeToolsToken
-      - id: 1203
-      - stringValue: " but"
-    ▿ EdgeToolsToken
       - id: 730
       - stringValue: " "
     ▿ EdgeToolsToken
-      - id: 913
-      - stringValue: "19"
+      - id: 509
+      - stringValue: "\n\n"
     ▿ EdgeToolsToken
-      - id: 520
-      - stringValue: "+"
+      - id: 4412
+      - stringValue: "But"
     ▿ EdgeToolsToken
-      - id: 1968
-      - stringValue: "23"
+      - id: 779
+      - stringValue: " the"
     ▿ EdgeToolsToken
-      - id: 538
-      - stringValue: "="
+      - id: 5196
+      - stringValue: " user"
+    ▿ EdgeToolsToken
+      - id: 1845
+      - stringValue: " said"
+    ▿ EdgeToolsToken
+      - id: 811
+      - stringValue: " to"
+    ▿ EdgeToolsToken
+      - id: 3089
+      - stringValue: " keep"
+    ▿ EdgeToolsToken
+      - id: 779
+      - stringValue: " the"
+    ▿ EdgeToolsToken
+      - id: 2524
+      - stringValue: " final"
+    ▿ EdgeToolsToken
+      - id: 5642
+      - stringValue: " answer"
+    ▿ EdgeToolsToken
+      - id: 9272
+      - stringValue: " brief"
+    ▿ EdgeToolsToken
+      - id: 523
+      - stringValue: "."
+    ▿ EdgeToolsToken
+      - id: 2173
+      - stringValue: " So"
+    ▿ EdgeToolsToken
+      - id: 779
+      - stringValue: " the"
+    ▿ EdgeToolsToken
+      - id: 5642
+      - stringValue: " answer"
+    ▿ EdgeToolsToken
+      - id: 856
+      - stringValue: " is"
+    ▿ EdgeToolsToken
+      - id: 730
+      - stringValue: " "
     ▿ EdgeToolsToken
       - id: 4344
       - stringValue: "42"
     ▿ EdgeToolsToken
-      - id: 540
-      - stringValue: "?"
+      - id: 523
+      - stringValue: "."
     ▿ EdgeToolsToken
-      - id: 35190
-      - stringValue: " Wait"
+      - id: 2439
+      - stringValue: " But"
+    ▿ EdgeToolsToken
+      - id: 859
+      - stringValue: " I"
+    ▿ EdgeToolsToken
+      - id: 1595
+      - stringValue: " need"
+    ▿ EdgeToolsToken
+      - id: 811
+      - stringValue: " to"
+    ▿ EdgeToolsToken
+      - id: 1825
+      - stringValue: " make"
+    ▿ EdgeToolsToken
+      - id: 4029
+      - stringValue: " sure"
+    ▿ EdgeToolsToken
+      - id: 859
+      - stringValue: " I"
+    ▿ EdgeToolsToken
+      - id: 2008
+      - stringValue: " don"
+    ▿ EdgeToolsToken
+      - id: 1901
+      - stringValue: "\'t"
+    ▿ EdgeToolsToken
+      - id: 1391
+      - stringValue: " over"
+    ▿ EdgeToolsToken
+      - id: 1305
+      - stringValue: "com"
+    ▿ EdgeToolsToken
+      - id: 19507
+      - stringValue: "plicate"
+    ▿ EdgeToolsToken
+      - id: 523
+      - stringValue: "."
+    ▿ EdgeToolsToken
+      - id: 941
+      - stringValue: " The"
+    ▿ EdgeToolsToken
+      - id: 3952
+      - stringValue: " question"
+    ▿ EdgeToolsToken
+      - id: 856
+      - stringValue: " is"
+    ▿ EdgeToolsToken
+      - id: 8828
+      - stringValue: " straight"
+    ▿ EdgeToolsToken
+      - id: 20980
+      - stringValue: "forward"
+    ▿ EdgeToolsToken
+      - id: 523
+      - stringValue: "."
+    ▿ EdgeToolsToken
+      - id: 941
+      - stringValue: " The"
+    ▿ EdgeToolsToken
+      - id: 5196
+      - stringValue: " user"
+    ▿ EdgeToolsToken
+      - id: 1845
+      - stringValue: " said"
+    ▿ EdgeToolsToken
+      - id: 997
+      - stringValue: " \""
+    ▿ EdgeToolsToken
+      - id: 9824
+      - stringValue: "what"
+    ▿ EdgeToolsToken
+      - id: 856
+      - stringValue: " is"
+    ▿ EdgeToolsToken
+      - id: 779
+      - stringValue: " the"
+    ▿ EdgeToolsToken
+      - id: 10133
+      - stringValue: " sum"
+    ▿ EdgeToolsToken
+      - id: 803
+      - stringValue: " of"
     ▿ EdgeToolsToken
       - id: 730
       - stringValue: " "
@@ -3110,8 +1879,320 @@ Cache:  2676M        (2806973031)
       - id: 913
       - stringValue: "19"
     ▿ EdgeToolsToken
-      - id: 520
-      - stringValue: "+"
+      - id: 810
+      - stringValue: " and"
+    ▿ EdgeToolsToken
+      - id: 730
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 1968
+      - stringValue: "23"
+    ▿ EdgeToolsToken
+      - id: 540
+      - stringValue: "?"
+    ▿ EdgeToolsToken
+      - id: 16823
+      - stringValue: " Keep"
+    ▿ EdgeToolsToken
+      - id: 779
+      - stringValue: " the"
+    ▿ EdgeToolsToken
+      - id: 2524
+      - stringValue: " final"
+    ▿ EdgeToolsToken
+      - id: 5642
+      - stringValue: " answer"
+    ▿ EdgeToolsToken
+      - id: 9272
+      - stringValue: " brief"
+    ▿ EdgeToolsToken
+      - id: 2927
+      - stringValue: ".\""
+    ▿ EdgeToolsToken
+      - id: 2173
+      - stringValue: " So"
+    ▿ EdgeToolsToken
+      - id: 859
+      - stringValue: " I"
+    ▿ EdgeToolsToken
+      - id: 1804
+      - stringValue: " just"
+    ▿ EdgeToolsToken
+      - id: 1595
+      - stringValue: " need"
+    ▿ EdgeToolsToken
+      - id: 811
+      - stringValue: " to"
+    ▿ EdgeToolsToken
+      - id: 2992
+      - stringValue: " say"
+    ▿ EdgeToolsToken
+      - id: 730
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 4344
+      - stringValue: "42"
+    ▿ EdgeToolsToken
+      - id: 523
+      - stringValue: "."
+    ▿ EdgeToolsToken
+      - id: 2439
+      - stringValue: " But"
+    ▿ EdgeToolsToken
+      - id: 7498
+      - stringValue: " wait"
+    ▿ EdgeToolsToken
+      - id: 521
+      - stringValue: ","
+    ▿ EdgeToolsToken
+      - id: 13122
+      - stringValue: " maybe"
+    ▿ EdgeToolsToken
+      - id: 1186
+      - stringValue: " they"
+    ▿ EdgeToolsToken
+      - id: 1804
+      - stringValue: " just"
+    ▿ EdgeToolsToken
+      - id: 2477
+      - stringValue: " want"
+    ▿ EdgeToolsToken
+      - id: 779
+      - stringValue: " the"
+    ▿ EdgeToolsToken
+      - id: 10133
+      - stringValue: " sum"
+    ▿ EdgeToolsToken
+      - id: 521
+      - stringValue: ","
+    ▿ EdgeToolsToken
+      - id: 1144
+      - stringValue: " which"
+    ▿ EdgeToolsToken
+      - id: 856
+      - stringValue: " is"
+    ▿ EdgeToolsToken
+      - id: 730
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 4344
+      - stringValue: "42"
+    ▿ EdgeToolsToken
+      - id: 523
+      - stringValue: "."
+    ▿ EdgeToolsToken
+      - id: 2173
+      - stringValue: " So"
+    ▿ EdgeToolsToken
+      - id: 779
+      - stringValue: " the"
+    ▿ EdgeToolsToken
+      - id: 2524
+      - stringValue: " final"
+    ▿ EdgeToolsToken
+      - id: 5642
+      - stringValue: " answer"
+    ▿ EdgeToolsToken
+      - id: 856
+      - stringValue: " is"
+    ▿ EdgeToolsToken
+      - id: 730
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 4344
+      - stringValue: "42"
+    ▿ EdgeToolsToken
+      - id: 523
+      - stringValue: "."
+    ▿ EdgeToolsToken
+      - id: 6951
+      - stringValue: " Since"
+    ▿ EdgeToolsToken
+      - id: 1186
+      - stringValue: " they"
+    ▿ EdgeToolsToken
+      - id: 1845
+      - stringValue: " said"
+    ▿ EdgeToolsToken
+      - id: 3089
+      - stringValue: " keep"
+    ▿ EdgeToolsToken
+      - id: 2524
+      - stringValue: " final"
+    ▿ EdgeToolsToken
+      - id: 5642
+      - stringValue: " answer"
+    ▿ EdgeToolsToken
+      - id: 9272
+      - stringValue: " brief"
+    ▿ EdgeToolsToken
+      - id: 521
+      - stringValue: ","
+    ▿ EdgeToolsToken
+      - id: 1101
+      - stringValue: " so"
+    ▿ EdgeToolsToken
+      - id: 1804
+      - stringValue: " just"
+    ▿ EdgeToolsToken
+      - id: 730
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 4344
+      - stringValue: "42"
+    ▿ EdgeToolsToken
+      - id: 523
+      - stringValue: "."
+    ▿ EdgeToolsToken
+      - id: 43993
+      - stringValue: " Alternatively"
+    ▿ EdgeToolsToken
+      - id: 521
+      - stringValue: ","
+    ▿ EdgeToolsToken
+      - id: 13122
+      - stringValue: " maybe"
+    ▿ EdgeToolsToken
+      - id: 1919
+      - stringValue: " even"
+    ▿ EdgeToolsToken
+      - id: 1804
+      - stringValue: " just"
+    ▿ EdgeToolsToken
+      - id: 997
+      - stringValue: " \""
+    ▿ EdgeToolsToken
+      - id: 4344
+      - stringValue: "42"
+    ▿ EdgeToolsToken
+      - id: 3285
+      - stringValue: "\"."
+    ▿ EdgeToolsToken
+      - id: 6951
+      - stringValue: " Since"
+    ▿ EdgeToolsToken
+      - id: 1186
+      - stringValue: " they"
+    ▿ EdgeToolsToken
+      - id: 1845
+      - stringValue: " said"
+    ▿ EdgeToolsToken
+      - id: 997
+      - stringValue: " \""
+    ▿ EdgeToolsToken
+      - id: 6645
+      - stringValue: "sum"
+    ▿ EdgeToolsToken
+      - id: 803
+      - stringValue: " of"
+    ▿ EdgeToolsToken
+      - id: 730
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 913
+      - stringValue: "19"
+    ▿ EdgeToolsToken
+      - id: 810
+      - stringValue: " and"
+    ▿ EdgeToolsToken
+      - id: 730
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 1968
+      - stringValue: "23"
+    ▿ EdgeToolsToken
+      - id: 1878
+      - stringValue: "\","
+    ▿ EdgeToolsToken
+      - id: 1144
+      - stringValue: " which"
+    ▿ EdgeToolsToken
+      - id: 856
+      - stringValue: " is"
+    ▿ EdgeToolsToken
+      - id: 730
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 4344
+      - stringValue: "42"
+    ▿ EdgeToolsToken
+      - id: 523
+      - stringValue: "."
+    ▿ EdgeToolsToken
+      - id: 1491
+      - stringValue: " Al"
+    ▿ EdgeToolsToken
+      - id: 2103
+      - stringValue: "right"
+    ▿ EdgeToolsToken
+      - id: 521
+      - stringValue: ","
+    ▿ EdgeToolsToken
+      - id: 859
+      - stringValue: " I"
+    ▿ EdgeToolsToken
+      - id: 2539
+      - stringValue: " think"
+    ▿ EdgeToolsToken
+      - id: 896
+      - stringValue: " that"
+    ▿ EdgeToolsToken
+      - id: 1090
+      - stringValue: "\'s"
+    ▿ EdgeToolsToken
+      - id: 936
+      - stringValue: " it"
+    ▿ EdgeToolsToken
+      - id: 523
+      - stringValue: "."
+    ▿ EdgeToolsToken
+      - id: 2173
+      - stringValue: " So"
+    ▿ EdgeToolsToken
+      - id: 779
+      - stringValue: " the"
+    ▿ EdgeToolsToken
+      - id: 5642
+      - stringValue: " answer"
+    ▿ EdgeToolsToken
+      - id: 856
+      - stringValue: " is"
+    ▿ EdgeToolsToken
+      - id: 730
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 4344
+      - stringValue: "42"
+    ▿ EdgeToolsToken
+      - id: 523
+      - stringValue: "."
+    ▿ EdgeToolsToken
+      - id: 6635
+      - stringValue: " Let"
+    ▿ EdgeToolsToken
+      - id: 1123
+      - stringValue: " me"
+    ▿ EdgeToolsToken
+      - id: 1804
+      - stringValue: " just"
+    ▿ EdgeToolsToken
+      - id: 10547
+      - stringValue: " confirm"
+    ▿ EdgeToolsToken
+      - id: 2030
+      - stringValue: " again"
+    ▿ EdgeToolsToken
+      - id: 535
+      - stringValue: ":"
+    ▿ EdgeToolsToken
+      - id: 730
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 913
+      - stringValue: "19"
+    ▿ EdgeToolsToken
+      - id: 2011
+      - stringValue: " +"
     ▿ EdgeToolsToken
       - id: 1968
       - stringValue: "23"
@@ -3121,4 +2202,82 @@ Cache:  2676M        (2806973031)
     ▿ EdgeToolsToken
       - id: 730
       - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 4344
+      - stringValue: "42"
+    ▿ EdgeToolsToken
+      - id: 523
+      - stringValue: "."
+    ▿ EdgeToolsToken
+      - id: 1267
+      - stringValue: " Y"
+    ▿ EdgeToolsToken
+      - id: 1201
+      - stringValue: "ep"
+    ▿ EdgeToolsToken
+      - id: 523
+      - stringValue: "."
+    ▿ EdgeToolsToken
+      - id: 2173
+      - stringValue: " So"
+    ▿ EdgeToolsToken
+      - id: 859
+      - stringValue: " I"
+    ▿ EdgeToolsToken
+      - id: 6016
+      - stringValue: "\'ll"
+    ▿ EdgeToolsToken
+      - id: 1638
+      - stringValue: " go"
+    ▿ EdgeToolsToken
+      - id: 916
+      - stringValue: " with"
+    ▿ EdgeToolsToken
+      - id: 730
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 4344
+      - stringValue: "42"
+    ▿ EdgeToolsToken
+      - id: 819
+      - stringValue: ".\n"
+    ▿ EdgeToolsToken
+      - id: 64401
+      - stringValue: "</think>"
+    ▿ EdgeToolsToken
+      - id: 509
+      - stringValue: "\n\n"
+    ▿ EdgeToolsToken
+      - id: 4344
+      - stringValue: "42"
+    ▿ EdgeToolsToken
+      - id: 523
+      - stringValue: "."
+    ▿ EdgeToolsToken
+      - id: 730
+      - stringValue: " "
+    ▿ EdgeToolsToken
+      - id: 509
+      - stringValue: "\n\n"
+    ▿ EdgeToolsToken
+      - id: 569
+      - stringValue: "\\"
+    ▿ EdgeToolsToken
+      - id: 5428
+      - stringValue: "box"
+    ▿ EdgeToolsToken
+      - id: 791
+      - stringValue: "ed"
+    ▿ EdgeToolsToken
+      - id: 600
+      - stringValue: "{"
+    ▿ EdgeToolsToken
+      - id: 4344
+      - stringValue: "42"
+    ▿ EdgeToolsToken
+      - id: 602
+      - stringValue: "}"
+    ▿ EdgeToolsToken
+      - id: 7
+      - stringValue: "<|im_end|>"
   - wasStopped: false

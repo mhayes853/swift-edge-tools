@@ -27,7 +27,7 @@
         try await session.generate(
           prompt: .user("Question"),
           context: context,
-          parameters: DefaultMLXGenerateParameters(maxTokens: 1)
+          parameters: MLXGenerateParameters(maxTokens: 1)
         )
       }
       let capturedTranscript = await ContextTestProfile.gate.waitForCapture()
@@ -78,7 +78,7 @@
       _ = try await session.generate(
         prompt: .user("Idle fork"),
         context: idleFork,
-        parameters: DefaultMLXGenerateParameters(maxTokens: 1)
+        parameters: MLXGenerateParameters(maxTokens: 1)
       )
       expectNoDifference(copyCounter.count, 1)
 
@@ -87,7 +87,7 @@
         try await session.generate(
           prompt: .user("Question"),
           context: context,
-          parameters: DefaultMLXGenerateParameters(maxTokens: 1)
+          parameters: MLXGenerateParameters(maxTokens: 1)
         )
       }
       _ = await ContextTestProfile.gate.waitForCapture()
@@ -128,7 +128,6 @@
   private struct ContextTestProfile: MLXLLMModelProfile {
     typealias Prompt = EdgeToolsTranscript
     typealias GenerationParser = TestGenerationParser
-    typealias GenerateParameters = DefaultMLXGenerateParameters
     typealias GrammarEngine = XGrammarEngine
 
     static let gate = TranscriptCaptureGate()
@@ -136,7 +135,7 @@
     static func grammar(
       prompt: EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
-      parameters: DefaultMLXGenerateParameters,
+      parameters: MLXGenerateParameters,
       grammarEngine: borrowing XGrammarEngine
     ) throws -> XGRGrammar {
       .universal
