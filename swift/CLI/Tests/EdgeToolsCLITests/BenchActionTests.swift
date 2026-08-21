@@ -64,9 +64,9 @@ struct `BenchAction tests` {
 
   @Test
   func `Aggregates Metrics Declared By The Engines Extractor`() async throws {
-    var metadata = EdgeToolsMetadata()
-    metadata.needle2PrefillTokensPerSecond = 800
-    metadata.needle2DecodeTokensPerSecond = 100
+    var metadata = EdgeToolsMetrics()
+    metadata.prefillTokensPerSecond = 800
+    metadata.decodeTokensPerSecond = 100
     metadata.needle2PeakRAMMegabytes = 32
     let report = try await benchmarkModel(
       context: .stub(

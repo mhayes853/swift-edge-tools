@@ -95,12 +95,6 @@ struct `ReasoningGenerationParser tests` {
   @Test
   func `Uses The Raw Response When Parts Are Unavailable`() {
     let generation = EdgeToolsEngineGeneration(
-      prefillMetrics: EdgeToolsPrefillMetrics(tokens: 0, duration: .zero),
-      decodeMetrics: EdgeToolsDecodeMetrics(
-        tokens: 0,
-        duration: .zero,
-        durationToFirstToken: .zero
-      ),
       wasStopped: false,
       tokens: [],
       response: "The forecast is sunny."

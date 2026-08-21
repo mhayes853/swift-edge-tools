@@ -369,27 +369,19 @@
       tokenCount: Int,
       wasStopped: Bool
     ) -> EdgeToolsEngineGeneration {
-      var metadata = EdgeToolsMetadata()
-      metadata.generationConfidence = self.confidence
-      metadata.needle2ResponseType = self.type
-      metadata.needle2PrefillTokensPerSecond = self.prefillTokensPerSecond
-      metadata.needle2DecodeTokensPerSecond = self.decodeTokensPerSecond
-      metadata.needle2PeakRAMMegabytes = self.peakRAMMegabytes
+      var metrics = EdgeToolsMetrics()
+      metrics.generationConfidence = self.confidence
+      metrics.needle2ResponseType = self.type
+      metrics.prefillTokensPerSecond = self.prefillTokensPerSecond
+      metrics.decodeTokens = tokenCount
+      metrics.decodeTokensPerSecond = self.decodeTokensPerSecond
+      metrics.needle2PeakRAMMegabytes = self.peakRAMMegabytes
       return EdgeToolsEngineGeneration(
-        prefillMetrics: EdgeToolsPrefillMetrics(tokens: 0, duration: .zero),
-        decodeMetrics: EdgeToolsDecodeMetrics(
-          tokens: tokenCount,
-          duration: Duration(
-            needle2TokenCount: tokenCount,
-            tokensPerSecond: self.decodeTokensPerSecond
-          ),
-          durationToFirstToken: .zero
-        ),
         wasStopped: wasStopped,
         tokens: [],
         response: "",
         parts: self.parts,
-        metadata: metadata
+        metrics: metrics
       )
     }
   }

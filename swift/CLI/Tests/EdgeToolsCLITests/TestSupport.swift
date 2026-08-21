@@ -114,7 +114,7 @@ extension EngineRunner {
     tokens: [String] = ["do", "ne"],
     capabilities: EngineCapabilities = [.sampling, .customGrammar],
     decodeDuration: Duration = .milliseconds(20),
-    metadata: EdgeToolsMetadata = [:],
+    metadata: EdgeToolsMetrics = [:],
     metricsExtractor: any GenerationMetricsExtractor = StandardGenerationMetricsExtractor(),
     onGenerate: @escaping @Sendable (GenerationRequest) -> Void = { _ in },
     onReset: @escaping @Sendable () -> Void = {}
@@ -132,19 +132,19 @@ extension EngineRunner {
         for call in toolCalls {
           channel.emit(part: .toolCall(call))
         }
+        var metrics = metadata
+        metrics.prefillTokens = 10
+        metrics.prefillDuration = .milliseconds(5)
+        metrics.decodeTokens = tokens.count
+        metrics.decodeDuration = decodeDuration
+        metrics.durationToFirstToken = .milliseconds(2)
         return EdgeToolsEngineGeneration(
-          prefillMetrics: EdgeToolsPrefillMetrics(tokens: 10, duration: .milliseconds(5)),
-          decodeMetrics: EdgeToolsDecodeMetrics(
-            tokens: tokens.count,
-            duration: decodeDuration,
-            durationToFirstToken: .milliseconds(2)
-          ),
           wasStopped: false,
           tokens: tokens.enumerated()
             .map { EdgeToolsToken(id: $0.offset, stringValue: $0.element) },
           response: response,
           parts: toolCalls.map(EdgeToolsGenerationPart.toolCall),
-          metadata: metadata
+          metrics: metrics
         )
       },
       modelResetting: { onReset() }

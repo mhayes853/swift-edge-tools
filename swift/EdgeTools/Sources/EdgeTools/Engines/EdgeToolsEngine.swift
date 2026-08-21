@@ -90,12 +90,10 @@ public protocol EdgeToolsPrefillableEngine: EdgeToolsEngine {
 // MARK: - EdgeToolsEnginePrefill
 
 public struct EdgeToolsEnginePrefill: Sendable {
-  public var metrics: EdgeToolsPrefillMetrics
-  public var metadata: EdgeToolsMetadata
+  public var metrics: EdgeToolsMetrics
 
-  public init(metrics: EdgeToolsPrefillMetrics, metadata: EdgeToolsMetadata = [:]) {
+  public init(metrics: EdgeToolsMetrics) {
     self.metrics = metrics
-    self.metadata = metadata
   }
 }
 
@@ -118,50 +116,40 @@ public protocol EdgeToolsEngineGenerationTask: Sendable {
 // MARK: - EdgeToolsEngineGeneration
 
 public struct EdgeToolsEngineGeneration: Sendable {
-  public var prefillMetrics: EdgeToolsPrefillMetrics
-  public var decodeMetrics: EdgeToolsDecodeMetrics
   public var wasStopped: Bool
   public var tokens: [EdgeToolsToken]
   public var response: String
   public var parts: [EdgeToolsGenerationPart]
-  public var metadata: EdgeToolsMetadata
+  public var metrics: EdgeToolsMetrics
 
   public init(
-    prefillMetrics: EdgeToolsPrefillMetrics,
-    decodeMetrics: EdgeToolsDecodeMetrics,
     wasStopped: Bool,
     tokens: [EdgeToolsToken],
     response: String,
     parts: [EdgeToolsGenerationPart] = [],
-    metadata: EdgeToolsMetadata = [:]
+    metrics: EdgeToolsMetrics = [:]
   ) {
-    self.prefillMetrics = prefillMetrics
-    self.decodeMetrics = decodeMetrics
     self.wasStopped = wasStopped
     self.tokens = tokens
     self.response = response
     self.parts = parts
-    self.metadata = metadata
+    self.metrics = metrics
   }
 }
 
 extension EdgeToolsEngineGeneration {
   public static let empty = Self(
-    prefillMetrics: EdgeToolsPrefillMetrics(tokens: 0, duration: .zero),
-    decodeMetrics: EdgeToolsDecodeMetrics(tokens: 0, duration: .zero, durationToFirstToken: .zero),
     wasStopped: true,
     tokens: [],
     response: ""
   )
 
   public var isEmpty: Bool {
-    self.prefillMetrics == Self.empty.prefillMetrics
-      && self.decodeMetrics == Self.empty.decodeMetrics
-      && self.wasStopped
+    self.wasStopped
       && self.tokens.isEmpty
       && self.response.isEmpty
       && self.parts.isEmpty
-      && self.metadata.isEmpty
+      && self.metrics.isEmpty
   }
 
   public var text: String {

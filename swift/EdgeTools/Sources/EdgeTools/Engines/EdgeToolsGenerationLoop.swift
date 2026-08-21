@@ -6,15 +6,10 @@ import _Concurrency
 
 public struct EdgeToolsGenerationLoop: Sendable {
   public struct Preparation: Sendable {
-    public var metrics: EdgeToolsPrefillMetrics
-    public var metadata: EdgeToolsMetadata
+    public var metrics: EdgeToolsMetrics
 
-    public init(
-      metrics: EdgeToolsPrefillMetrics,
-      metadata: EdgeToolsMetadata = EdgeToolsMetadata()
-    ) {
+    public init(metrics: EdgeToolsMetrics = EdgeToolsMetrics()) {
       self.metrics = metrics
-      self.metadata = metadata
     }
   }
 
@@ -104,18 +99,16 @@ public struct EdgeToolsGenerationLoop: Sendable {
     }
     let response = self.tokenizer.decode(tokens: responseTokenIds)
     let decodeDuration = clock.duration(since: generateStart) - finalDurationToFirstToken
+    var metrics = preparation.metrics
+    metrics.decodeTokens = generatedTokens.count
+    metrics.decodeDuration = decodeDuration
+    metrics.durationToFirstToken = finalDurationToFirstToken
     return EdgeToolsEngineGeneration(
-      prefillMetrics: preparation.metrics,
-      decodeMetrics: EdgeToolsDecodeMetrics(
-        tokens: generatedTokens.count,
-        duration: decodeDuration,
-        durationToFirstToken: finalDurationToFirstToken
-      ),
       wasStopped: stopper.isStopped,
       tokens: generatedTokens,
       response: response,
       parts: parts,
-      metadata: preparation.metadata
+      metrics: metrics
     )
   }
 }

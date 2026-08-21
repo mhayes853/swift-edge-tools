@@ -243,9 +243,7 @@ final class MockEngine: EdgeToolsPrefillableEngine, EdgeToolsTokenizingEngine, S
   ) async throws -> EdgeToolsEnginePrefill {
     let handler = self._prefillHandler.withLock { $0 }
     return try handler?(promptPrefix, context.tools.map(\.definition))
-      ?? EdgeToolsEnginePrefill(
-        metrics: EdgeToolsPrefillMetrics(tokens: 0, duration: .zero)
-      )
+      ?? EdgeToolsEnginePrefill(metrics: [:])
   }
 
   func generate(
@@ -302,17 +300,14 @@ final class MockEngine: EdgeToolsPrefillableEngine, EdgeToolsTokenizingEngine, S
         channel.emit(part: part)
       }
       let response = emittedTokens.map(\.stringValue).joined()
+      var metrics = EdgeToolsMetrics()
+      metrics.decodeTokens = emittedTokens.count
       return EdgeToolsEngineGeneration(
-        prefillMetrics: EdgeToolsPrefillMetrics(tokens: 0, duration: .zero),
-        decodeMetrics: EdgeToolsDecodeMetrics(
-          tokens: emittedTokens.count,
-          duration: .zero,
-          durationToFirstToken: .zero
-        ),
         wasStopped: wasStopped,
         tokens: emittedTokens,
         response: response,
-        parts: parts
+        parts: parts,
+        metrics: metrics
       )
     }
     return GenerationTask(task: task) {

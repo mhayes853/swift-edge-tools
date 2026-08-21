@@ -128,24 +128,4 @@
       }
     }
   }
-
-  // MARK: - Duration
-
-  extension Duration {
-    init(
-      needle2TokenCount tokenCount: Int,
-      tokensPerSecond: Double?
-    ) {
-      guard let tokensPerSecond, tokensPerSecond > 0 else {
-        self = .zero
-        return
-      }
-      let nanoseconds = Double(tokenCount) / tokensPerSecond * 1_000_000_000
-      guard nanoseconds < Double(Int64.max) else {
-        self = .zero
-        return
-      }
-      self = .nanoseconds(Int64(nanoseconds.rounded()))
-    }
-  }
 #endif

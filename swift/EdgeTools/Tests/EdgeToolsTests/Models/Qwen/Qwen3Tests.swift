@@ -66,8 +66,8 @@ struct `Qwen3 tests` {
         let fresh = try await freshTask.value
 
         expectNoDifference(
-          forked.prefillMetrics.tokens + prefill.metrics.tokens,
-          fresh.prefillMetrics.tokens
+          (forked.metrics.prefillTokens ?? 0) + (prefill.metrics.prefillTokens ?? 0),
+          fresh.metrics.prefillTokens ?? 0
         )
       }
     }
@@ -126,8 +126,8 @@ struct `Qwen3 tests` {
         let fresh = try await freshTask.value
 
         expectNoDifference(
-          forked.prefillMetrics.tokens + prefill.metrics.tokens,
-          fresh.prefillMetrics.tokens
+          (forked.metrics.prefillTokens ?? 0) + (prefill.metrics.prefillTokens ?? 0),
+          fresh.metrics.prefillTokens ?? 0
         )
       }
     }

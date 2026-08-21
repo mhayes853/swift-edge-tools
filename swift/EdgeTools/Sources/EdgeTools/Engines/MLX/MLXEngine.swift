@@ -721,15 +721,11 @@
         )
       )
       let snapshot = Self.memorySnapshot(synchronize: true)
-      var metadata = EdgeToolsMetadata()
-      metadata.mlxEnginePostPrefillMemorySnapshot = snapshot
-      return EdgeToolsEnginePrefill(
-        metrics: EdgeToolsPrefillMetrics(
-          tokens: prepared.tokenCount,
-          duration: start.duration(to: clock.now)
-        ),
-        metadata: metadata
-      )
+      var metrics = EdgeToolsMetrics()
+      metrics.mlxEnginePostPrefillMemorySnapshot = snapshot
+      metrics.prefillTokens = prepared.tokenCount
+      metrics.prefillDuration = start.duration(to: clock.now)
+      return EdgeToolsEnginePrefill(metrics: metrics)
     }
 
     private nonisolated(nonsending) mutating func input(
@@ -946,10 +942,9 @@
       processor?.prompt(input.text.tokens)
       (sampler as? MLXFusedSampler)?.history.seed(tokenIds)
       let prepared = try self.preparedOutput(input: input, tokenIds: tokenIds)
-      let metrics = EdgeToolsPrefillMetrics(
-        tokens: prepared.tokenCount,
-        duration: start.duration(to: clock.now)
-      )
+      var metrics = EdgeToolsMetrics()
+      metrics.prefillTokens = prepared.tokenCount
+      metrics.prefillDuration = start.duration(to: clock.now)
       let postPrefillSnapshot = Self.memorySnapshot(
         synchronize: parameters.synchronizeStreamForMemorySnapshots
       )
@@ -1012,21 +1007,21 @@
       return tokenId
     }
 
-    public func finish() -> EdgeToolsMetadata {
-      guard let generation = self.generation else { return EdgeToolsMetadata() }
-      var metadata = EdgeToolsMetadata()
+    public func finish() -> EdgeToolsMetrics {
+      guard let generation = self.generation else { return EdgeToolsMetrics() }
+      var metrics = EdgeToolsMetrics()
       if generation.confidenceOptions.contains(.generation) {
-        metadata.generationConfidence = generation.confidence.mean
+        metrics.generationConfidence = generation.confidence.mean
       }
       if generation.confidenceOptions.contains(.perToken) {
-        metadata.perTokenConfidences = generation.confidence.perTokenConfidences
+        metrics.perTokenConfidences = generation.confidence.perTokenConfidences
       }
-      metadata.mlxEngineGenerationStartMemorySnapshot = generation.generationStartSnapshot
-      metadata.mlxEnginePostPrefillMemorySnapshot = generation.postPrefillSnapshot
-      metadata.mlxEnginePostDecodeMemorySnapshot = Self.memorySnapshot(
+      metrics.mlxEngineGenerationStartMemorySnapshot = generation.generationStartSnapshot
+      metrics.mlxEnginePostPrefillMemorySnapshot = generation.postPrefillSnapshot
+      metrics.mlxEnginePostDecodeMemorySnapshot = Self.memorySnapshot(
         synchronize: generation.synchronizeStreamForMemorySnapshots
       )
-      return metadata
+      return metrics
     }
   }
 
@@ -1324,14 +1319,14 @@
       context: MLXContext<Profile>
     ) async -> Result<EdgeToolsEngineGeneration, any Error> {
       var state = state
-      let metadata = state.model.finish()
+      let metrics = state.model.finish()
 
       let generation: EdgeToolsEngineGeneration?
       let finalResult: Result<EdgeToolsEngineGeneration, any Error>
       switch result {
       case .success(var value):
         state.model.commitGeneration(stopTokenIds: self.generationLoop.stopTokenIds)
-        value.metadata.merge(metadata) { _, finalValue in finalValue }
+        value.metrics.merge(metrics) { _, finalValue in finalValue }
         generation = value
         finalResult = .success(value)
       case .failure(let error):

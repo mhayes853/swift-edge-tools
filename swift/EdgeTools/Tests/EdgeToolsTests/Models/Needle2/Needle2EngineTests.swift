@@ -28,17 +28,17 @@
       withKnownIssue {
         assertSnapshot(of: generation.engineGeneration.parts, as: .dump, record: .all)
       }
-      expectNoDifference(generation.engineGeneration.metadata.generationConfidence != nil, true)
+      expectNoDifference(generation.engineGeneration.metrics.generationConfidence != nil, true)
       expectNoDifference(
-        generation.engineGeneration.metadata.needle2PrefillTokensPerSecond.map { $0 > 0 },
+        generation.engineGeneration.metrics.prefillTokensPerSecond.map { $0 > 0 },
         true
       )
       expectNoDifference(
-        generation.engineGeneration.metadata.needle2DecodeTokensPerSecond.map { $0 > 0 },
+        generation.engineGeneration.metrics.decodeTokensPerSecond.map { $0 > 0 },
         true
       )
       expectNoDifference(
-        generation.engineGeneration.metadata.needle2PeakRAMMegabytes.map { $0 > 0 },
+        generation.engineGeneration.metrics.needle2PeakRAMMegabytes.map { $0 > 0 },
         true
       )
     }
@@ -215,7 +215,7 @@
       expectNoDifference(generation.wasStopped, true)
       expectNoDifference(generation.toolCalls.count, 1)
       expectNoDifference(emittedParts.withLock { $0 }, [])
-      expectNoDifference(generation.metadata.needle2PeakRAMMegabytes != nil, true)
+      expectNoDifference(generation.metrics.needle2PeakRAMMegabytes != nil, true)
     }
   }
 

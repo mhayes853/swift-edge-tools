@@ -24,9 +24,9 @@ struct `RunAction tests` {
 
   @Test
   func `Uses The Engines Metric Extractor For User Facing Reports`() async throws {
-    var metadata = EdgeToolsMetadata()
-    metadata.needle2PrefillTokensPerSecond = 847.5
-    metadata.needle2DecodeTokensPerSecond = 96.25
+    var metadata = EdgeToolsMetrics()
+    metadata.prefillTokensPerSecond = 847.5
+    metadata.decodeTokensPerSecond = 96.25
     metadata.needle2PeakRAMMegabytes = 31.75
     let report = try await runModel(
       context: .stub(
@@ -51,7 +51,7 @@ struct `RunAction tests` {
 
   @Test
   func `Reports Generation And Probe Confidence As Percentages`() async throws {
-    var metadata = EdgeToolsMetadata()
+    var metadata = EdgeToolsMetrics()
     metadata.generationConfidence = 0.8125
     metadata.probeConfidence = 0.5
     let report = try await runModel(
@@ -81,7 +81,7 @@ struct `RunAction tests` {
 
   @Test
   func `Omits Probe Confidence When The Model Carries No Probe`() async throws {
-    var metadata = EdgeToolsMetadata()
+    var metadata = EdgeToolsMetrics()
     metadata.generationConfidence = 0.5
     let report = try await runModel(
       context: .stub(runner: .stub(metadata: metadata)),

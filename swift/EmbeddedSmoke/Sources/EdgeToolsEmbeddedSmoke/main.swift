@@ -62,12 +62,6 @@ final class MockEngine: EdgeToolsEngine {
     channel.emit(part: .toolCall(toolCall))
     return GenerationTask(
       generation: EdgeToolsEngineGeneration(
-        prefillMetrics: EdgeToolsPrefillMetrics(tokens: 0, duration: .zero),
-        decodeMetrics: EdgeToolsDecodeMetrics(
-          tokens: 1,
-          duration: .zero,
-          durationToFirstToken: .zero
-        ),
         wasStopped: false,
         tokens: [token],
         response: token.stringValue,

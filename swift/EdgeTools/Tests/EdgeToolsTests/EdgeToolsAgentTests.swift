@@ -152,12 +152,6 @@ private final class AgentScriptEngine: EdgeToolsEngine {
 private extension EdgeToolsEngineGeneration {
   static func toolCalls(_ calls: [EdgeRawToolCall]) -> Self {
     Self(
-      prefillMetrics: EdgeToolsPrefillMetrics(tokens: 0, duration: .zero),
-      decodeMetrics: EdgeToolsDecodeMetrics(
-        tokens: 0,
-        duration: .zero,
-        durationToFirstToken: .zero
-      ),
       wasStopped: false,
       tokens: [],
       response: "",
@@ -167,12 +161,6 @@ private extension EdgeToolsEngineGeneration {
 
   static func response(_ response: String) -> Self {
     Self(
-      prefillMetrics: EdgeToolsPrefillMetrics(tokens: 0, duration: .zero),
-      decodeMetrics: EdgeToolsDecodeMetrics(
-        tokens: 0,
-        duration: .zero,
-        durationToFirstToken: .zero
-      ),
       wasStopped: false,
       tokens: [],
       response: response,

@@ -340,7 +340,7 @@
       case .success(var value):
         do {
           try self.commitGeneration(state: &state)
-          value.metadata.merge(metadata) { _, finalValue in finalValue }
+          value.metrics.merge(metadata) { _, finalValue in finalValue }
           finalResult = .success(value)
         } catch {
           state.decoder = nil
@@ -386,7 +386,7 @@
       input: borrowing LlamaPreparedInput,
       contextState: LlamaContextState<Profile>,
       output: LlamaEvaluationOutput
-    ) throws -> EdgeToolsPrefillMetrics {
+    ) throws -> EdgeToolsMetrics {
       let clock = ContinuousClock()
       let start = clock.now
       let evaluatedCount = try contextState.sequenceStore.synchronize(
@@ -395,15 +395,15 @@
         multimodalRuntime: self.multimodalRuntime,
         output: output
       )
-      return EdgeToolsPrefillMetrics(
-        tokens: evaluatedCount,
-        duration: start.duration(to: clock.now)
-      )
+      var metrics = EdgeToolsMetrics()
+      metrics.prefillTokens = evaluatedCount
+      metrics.prefillDuration = start.duration(to: clock.now)
+      return metrics
     }
 
-    private func metadata(for state: ModelGenerationState) -> EdgeToolsMetadata {
-      guard let decoder = state.decoder else { return EdgeToolsMetadata() }
-      var metadata = EdgeToolsMetadata()
+    private func metadata(for state: ModelGenerationState) -> EdgeToolsMetrics {
+      guard let decoder = state.decoder else { return EdgeToolsMetrics() }
+      var metadata = EdgeToolsMetrics()
       if decoder.confidenceOptions.contains(.generation) {
         metadata.generationConfidence = decoder.confidence.mean
       }

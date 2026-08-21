@@ -81,8 +81,8 @@
       )
 
       expectNoDifference(
-        cached.prefillMetrics.tokens + prefill.metrics.tokens,
-        fresh.prefillMetrics.tokens
+        (cached.metrics.prefillTokens ?? 0) + (prefill.metrics.prefillTokens ?? 0),
+        fresh.metrics.prefillTokens ?? 0
       )
     }
 
@@ -95,7 +95,7 @@
       let forked = try await singleTokenGeneration(using: engine, context: context.fork())
       let parent = try await singleTokenGeneration(using: engine, context: context)
 
-      expectNoDifference(parent.prefillMetrics.tokens, forked.prefillMetrics.tokens)
+      expectNoDifference(parent.metrics.prefillTokens, forked.metrics.prefillTokens)
     }
 
     @Test
@@ -112,8 +112,8 @@
         context: engine.context(llamaCachedContextParameters())
       )
 
-      expectNoDifference(prefill.metrics.tokens > 0, true)
-      expectNoDifference(forked.prefillMetrics.tokens, fresh.prefillMetrics.tokens)
+      expectNoDifference((prefill.metrics.prefillTokens ?? 0) > 0, true)
+      expectNoDifference(forked.metrics.prefillTokens, fresh.metrics.prefillTokens)
     }
   }
 

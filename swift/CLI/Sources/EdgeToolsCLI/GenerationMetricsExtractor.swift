@@ -109,7 +109,7 @@ public struct CLIMetricFormat: Hashable, Sendable {
 /// The confidence group an engine reports, empty when the model scores neither.
 func confidenceMetricGroup(from generation: EdgeToolsEngineGeneration) -> CLIMetricGroup? {
   var metrics = [CLIMetric]()
-  if let confidence = generation.metadata.generationConfidence {
+  if let confidence = generation.metrics.generationConfidence {
     metrics.append(
       CLIMetric(
         id: "generationConfidence",
@@ -121,7 +121,7 @@ func confidenceMetricGroup(from generation: EdgeToolsEngineGeneration) -> CLIMet
       )
     )
   }
-  if let probe = generation.metadata.probeConfidence {
+  if let probe = generation.metrics.probeConfidence {
     metrics.append(
       CLIMetric(
         id: "probeConfidence",
@@ -143,67 +143,84 @@ public struct StandardGenerationMetricsExtractor: GenerationMetricsExtractor {
   public init() {}
 
   public func extract(from generation: EdgeToolsEngineGeneration) -> CLIGenerationMetrics {
-    var groups = [
-      CLIMetricGroup(
-        label: "Prefill",
-        metrics: [
-          CLIMetric(
-            id: "prefillTokens",
-            jsonKey: "prefillTokens",
-            value: Double(generation.prefillMetrics.tokens),
-            format: .tokenCount
-          ),
-          CLIMetric(
-            id: "prefillMilliseconds",
-            jsonKey: "prefillMilliseconds",
-            value: generation.prefillMetrics.duration.milliseconds,
-            format: .milliseconds
-          ),
-          CLIMetric(
-            id: "prefillTokensPerSecond",
-            jsonKey: "prefillTokensPerSecond",
-            value: generation.prefillMetrics.tokensPerSecond,
-            format: .tokensPerSecond,
-            benchmarkLabel: "Prefill tok/s",
-            benchmarkAggregation: .distribution
-          )
-        ]
-      ),
-      CLIMetricGroup(
-        label: "Decode",
-        metrics: [
-          CLIMetric(
-            id: "decodeTokens",
-            jsonKey: "decodeTokens",
-            value: Double(generation.decodeMetrics.tokens),
-            format: .tokenCount
-          ),
-          CLIMetric(
-            id: "decodeMilliseconds",
-            jsonKey: "decodeMilliseconds",
-            value: generation.decodeMetrics.duration.milliseconds,
-            format: .milliseconds
-          ),
-          CLIMetric(
-            id: "decodeTokensPerSecond",
-            jsonKey: "decodeTokensPerSecond",
-            value: generation.decodeMetrics.tokensPerSecond,
-            format: .tokensPerSecond,
-            benchmarkLabel: "Decode tok/s",
-            benchmarkAggregation: .distribution
-          ),
-          CLIMetric(
-            id: "timeToFirstTokenMilliseconds",
-            jsonKey: "timeToFirstTokenMilliseconds",
-            label: "TTFT ",
-            value: generation.decodeMetrics.durationToFirstToken.milliseconds,
-            format: .milliseconds,
-            benchmarkLabel: "TTFT ms",
-            benchmarkAggregation: .distribution
-          )
-        ]
+    var groups = [CLIMetricGroup]()
+    var prefillMetrics = [CLIMetric]()
+    if let tokens = generation.metrics.prefillTokens {
+      prefillMetrics.append(
+        CLIMetric(id: "prefillTokens", jsonKey: "prefillTokens", value: Double(tokens), format: .tokenCount)
       )
-    ]
+    }
+    if let duration = generation.metrics.prefillDuration {
+      prefillMetrics.append(
+        CLIMetric(
+          id: "prefillMilliseconds",
+          jsonKey: "prefillMilliseconds",
+          value: duration.milliseconds,
+          format: .milliseconds
+        )
+      )
+    }
+    if let rate = generation.metrics.prefillTokensPerSecond {
+      prefillMetrics.append(
+        CLIMetric(
+          id: "prefillTokensPerSecond",
+          jsonKey: "prefillTokensPerSecond",
+          value: rate,
+          format: .tokensPerSecond,
+          benchmarkLabel: "Prefill tok/s",
+          benchmarkAggregation: .distribution
+        )
+      )
+    }
+    if !prefillMetrics.isEmpty {
+      groups.append(CLIMetricGroup(label: "Prefill", metrics: prefillMetrics))
+    }
+
+    var decodeMetrics = [CLIMetric]()
+    if let tokens = generation.metrics.decodeTokens {
+      decodeMetrics.append(
+        CLIMetric(id: "decodeTokens", jsonKey: "decodeTokens", value: Double(tokens), format: .tokenCount)
+      )
+    }
+    if let duration = generation.metrics.decodeDuration {
+      decodeMetrics.append(
+        CLIMetric(
+          id: "decodeMilliseconds",
+          jsonKey: "decodeMilliseconds",
+          value: duration.milliseconds,
+          format: .milliseconds
+        )
+      )
+    }
+    if let rate = generation.metrics.decodeTokensPerSecond {
+      decodeMetrics.append(
+        CLIMetric(
+          id: "decodeTokensPerSecond",
+          jsonKey: "decodeTokensPerSecond",
+          value: rate,
+          format: .tokensPerSecond,
+          benchmarkLabel: "Decode tok/s",
+          benchmarkAggregation: .distribution
+        )
+      )
+    }
+    if let duration = generation.metrics.durationToFirstToken {
+      decodeMetrics.append(
+        CLIMetric(
+          id: "timeToFirstTokenMilliseconds",
+          jsonKey: "timeToFirstTokenMilliseconds",
+          label: "TTFT ",
+          value: duration.milliseconds,
+          format: .milliseconds,
+          benchmarkLabel: "TTFT ms",
+          benchmarkAggregation: .distribution
+        )
+      )
+    }
+    if !decodeMetrics.isEmpty {
+      groups.append(CLIMetricGroup(label: "Decode", metrics: decodeMetrics))
+    }
+
     if let confidence = confidenceMetricGroup(from: generation) {
       groups.append(confidence)
     }
@@ -218,7 +235,7 @@ public struct Needle2GenerationMetricsExtractor: GenerationMetricsExtractor {
 
   public func extract(from generation: EdgeToolsEngineGeneration) -> CLIGenerationMetrics {
     var groups = [CLIMetricGroup]()
-    if let rate = generation.metadata.needle2PrefillTokensPerSecond {
+    if let rate = generation.metrics.prefillTokensPerSecond {
       groups.append(
         CLIMetricGroup(
           label: "Prefill",
@@ -235,7 +252,7 @@ public struct Needle2GenerationMetricsExtractor: GenerationMetricsExtractor {
         )
       )
     }
-    if let rate = generation.metadata.needle2DecodeTokensPerSecond {
+    if let rate = generation.metrics.decodeTokensPerSecond {
       groups.append(
         CLIMetricGroup(
           label: "Decode",
@@ -252,7 +269,7 @@ public struct Needle2GenerationMetricsExtractor: GenerationMetricsExtractor {
         )
       )
     }
-    if let peakRAM = generation.metadata.needle2PeakRAMMegabytes {
+    if let peakRAM = generation.metrics.needle2PeakRAMMegabytes {
       groups.append(
         CLIMetricGroup(
           label: "RAM",

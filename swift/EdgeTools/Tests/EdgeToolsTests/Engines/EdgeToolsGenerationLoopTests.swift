@@ -24,9 +24,9 @@
       expectNoDifference(generation.tokens.map(\.id), responseTokenIds + [eosTokenId])
       expectNoDifference(generation.response, tokenizer.decode(tokens: responseTokenIds))
       expectNoDifference(generation.text, tokenizer.decode(tokens: responseTokenIds))
-      expectNoDifference(generation.prefillMetrics.tokens > 0, true)
-      expectNoDifference(generation.metadata.generationConfidence, nil)
-      expectNoDifference(generation.metadata.perTokenConfidences, nil)
+      expectNoDifference((generation.metrics.prefillTokens ?? 0) > 0, true)
+      expectNoDifference(generation.metrics.generationConfidence, nil)
+      expectNoDifference(generation.metrics.perTokenConfidences, nil)
     }
 
     @Test
@@ -355,9 +355,9 @@
       defer { self.assets?.end() }
       try await Task.sleep(for: parameters.preparationDelay)
       state.index = 0
-      return EdgeToolsGenerationLoop.Preparation(
-        metrics: EdgeToolsPrefillMetrics(tokens: tokens.count, duration: .zero)
-      )
+      var metrics = EdgeToolsMetrics()
+      metrics.prefillTokens = tokens.count
+      return EdgeToolsGenerationLoop.Preparation(metrics: metrics)
     }
 
     func decode(

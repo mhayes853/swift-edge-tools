@@ -18,8 +18,8 @@
       context.transcript = .tokens([10, 11, 12, 13, 14])
       let extended = try await engine.prefill(context: context)
 
-      expectNoDifference(initial.metrics.tokens, 3)
-      expectNoDifference(extended.metrics.tokens, 2)
+      expectNoDifference(initial.metrics.prefillTokens, 3)
+      expectNoDifference(extended.metrics.prefillTokens, 2)
     }
 
     @Test
@@ -31,12 +31,12 @@
 
       context.transcript = .tokens([10, 11, 12, 13, 14])
       let generation = try await generate(using: engine, context: context)
-      expectNoDifference(generation.prefillMetrics.tokens, 2)
+      expectNoDifference(generation.metrics.prefillTokens, 2)
 
       context.transcript = .tokens([10, 99, 12, 13])
       let prefill = try await engine.prefill(context: context)
 
-      expectNoDifference(prefill.metrics.tokens, 4)
+      expectNoDifference(prefill.metrics.prefillTokens, 4)
     }
 
     @Test
@@ -52,12 +52,12 @@
 
       context.transcript = .tokens([10, 11, 12, 13, 14])
       let firstGeneration = try await generate(using: engine, context: context)
-      expectNoDifference(firstGeneration.prefillMetrics.tokens, 2)
+      expectNoDifference(firstGeneration.metrics.prefillTokens, 2)
 
       context.transcript = .tokens([10, 11, 12, 13, 14, generatedTokenId, 15])
       let secondGeneration = try await generate(using: engine, context: context)
 
-      expectNoDifference(secondGeneration.prefillMetrics.tokens, 1)
+      expectNoDifference(secondGeneration.metrics.prefillTokens, 1)
     }
 
     @Test
@@ -179,11 +179,11 @@
       ).value
 
       expectNoDifference(
-        generation.metadata.generationConfidence != nil,
+        generation.metrics.generationConfidence != nil,
         expectsGeneration
       )
       expectNoDifference(
-        generation.metadata.perTokenConfidences?.count,
+        generation.metrics.perTokenConfidences?.count,
         expectsPerToken ? 1 : nil
       )
     }
@@ -205,7 +205,7 @@
         ])
         let extended = try await engine.prefill(context: context)
 
-        expectNoDifference(extended.metrics.tokens, 2)
+        expectNoDifference(extended.metrics.prefillTokens, 2)
       }
 
       @Test
@@ -221,7 +221,7 @@
         ])
         let extended = try await engine.prefill(context: context)
 
-        expectNoDifference(extended.metrics.tokens, 5)
+        expectNoDifference(extended.metrics.prefillTokens, 5)
       }
     }
   #endif

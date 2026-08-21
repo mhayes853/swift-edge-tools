@@ -293,27 +293,19 @@
         }
       }
 
-      var metadata = EdgeToolsMetadata()
-      metadata.generationConfidence = response.confidence
-      metadata.needle2ResponseType = response.type
-      metadata.needle2PrefillTokensPerSecond = response.prefillTokensPerSecond
-      metadata.needle2DecodeTokensPerSecond = response.decodeTokensPerSecond
-      metadata.needle2PeakRAMMegabytes = response.peakRAMMegabytes
+      var metrics = EdgeToolsMetrics()
+      metrics.generationConfidence = response.confidence
+      metrics.needle2ResponseType = response.type
+      metrics.prefillTokensPerSecond = response.prefillTokensPerSecond
+      metrics.decodeTokens = nativeResult.tokenCount
+      metrics.decodeTokensPerSecond = response.decodeTokensPerSecond
+      metrics.needle2PeakRAMMegabytes = response.peakRAMMegabytes
       return EdgeToolsEngineGeneration(
-        prefillMetrics: EdgeToolsPrefillMetrics(tokens: 0, duration: .zero),
-        decodeMetrics: EdgeToolsDecodeMetrics(
-          tokens: nativeResult.tokenCount,
-          duration: Duration(
-            needle2TokenCount: nativeResult.tokenCount,
-            tokensPerSecond: response.decodeTokensPerSecond
-          ),
-          durationToFirstToken: .zero
-        ),
         wasStopped: stopped,
         tokens: [],
         response: nativeResult.response,
         parts: parts,
-        metadata: metadata
+        metrics: metrics
       )
     }
 

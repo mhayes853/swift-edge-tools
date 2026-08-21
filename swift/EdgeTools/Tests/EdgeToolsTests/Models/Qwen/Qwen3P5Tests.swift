@@ -98,8 +98,8 @@ struct `Qwen3P5 tests` {
           let freshTokenIDs = fresh.tokens.map(\.id)
 
           expectNoDifference(forkedTokenIDs, freshTokenIDs)
-          let forkedPrefillTokens = forked.prefillMetrics.tokens + initial.metrics.tokens
-          expectNoDifference(forkedPrefillTokens, fresh.prefillMetrics.tokens)
+          let forkedPrefillTokens = (forked.metrics.prefillTokens ?? 0) + (initial.metrics.prefillTokens ?? 0)
+          expectNoDifference(forkedPrefillTokens, fresh.metrics.prefillTokens ?? 0)
         }
 
         @Test
@@ -167,7 +167,7 @@ struct `Qwen3P5 tests` {
         )
 
         expectNoDifference(forked.tokens, fresh.tokens)
-        expectNoDifference(forked.prefillMetrics.tokens, fresh.prefillMetrics.tokens)
+        expectNoDifference(forked.metrics.prefillTokens, fresh.metrics.prefillTokens)
       }
 
       @Test
@@ -192,7 +192,7 @@ struct `Qwen3P5 tests` {
         )
 
         expectNoDifference(forked.tokens, fresh.tokens)
-        expectNoDifference(forked.prefillMetrics.tokens, fresh.prefillMetrics.tokens)
+        expectNoDifference(forked.metrics.prefillTokens, fresh.metrics.prefillTokens)
       }
 
       @Test
@@ -221,7 +221,7 @@ struct `Qwen3P5 tests` {
         )
 
         expectNoDifference(forked.tokens, fresh.tokens)
-        expectNoDifference(forked.prefillMetrics.tokens, fresh.prefillMetrics.tokens)
+        expectNoDifference(forked.metrics.prefillTokens, fresh.metrics.prefillTokens)
       }
 
       @Test

@@ -72,7 +72,7 @@
           parameters: parameters(turn),
           shouldInvokeTools: shouldInvokeTools
         )
-        guard generation.engineGeneration.metadata.needle2ResponseType == "call",
+        guard generation.engineGeneration.metrics.needle2ResponseType == "call",
           !generation.toolCallOutcomes.isEmpty
         else {
           steps.append(Needle2LoopStep(generation: generation, toolResponses: []))
@@ -103,7 +103,7 @@
   private func needle2LoopTerminationCause(
     for generation: EdgeToolsSessionGeneration
   ) -> Needle2LoopTerminationCause {
-    switch generation.engineGeneration.metadata.needle2ResponseType {
+    switch generation.engineGeneration.metrics.needle2ResponseType {
     case "respond": .responded
     case "refuse": .refused
     default: .noToolCalls
