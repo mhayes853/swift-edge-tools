@@ -121,10 +121,7 @@
       }
       let status = llama_decode(self.handle, batch)
       guard status == 0 else {
-        throw LlamaRuntimeError(
-          code: .decodeFailed,
-          message: "llama_decode failed with status \(status)."
-        )
+        throw llamaDecodeError(status: status)
       }
     }
 
@@ -187,5 +184,20 @@
       }
       return LlamaRuntimeContext(handle: handle)
     }
+  }
+
+  // MARK: - Helpers
+
+  private func llamaDecodeError(status: Int32) -> LlamaRuntimeError {
+    guard status == 1 else {
+      return LlamaRuntimeError(
+        code: .decodeFailed,
+        message: "llama_decode failed with status \(status)."
+      )
+    }
+    return LlamaRuntimeError(
+      code: .contextLengthExceeded,
+      message: "The batch does not fit in the context's remaining KV cache."
+    )
   }
 #endif

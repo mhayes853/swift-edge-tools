@@ -100,7 +100,10 @@
             "This LlamaEngine was initialized without a multimodal runtime."
           )
         }
-        return LlamaPreparedInput(
+        if let cached = cache.input(for: prompt, tools: tools, kind: kind) {
+          return cached
+        }
+        let input = LlamaPreparedInput(
           tokenIds: try Profile.tokenIds(
             prompt: prompt,
             tools: tools,
@@ -108,6 +111,8 @@
             addGenerationPrompt: addGenerationPrompt
           )
         )
+        cache.store(input, for: prompt, tools: tools, kind: kind)
+        return input
       }
       guard prompt.videos.isEmpty else {
         throw EdgeToolsError.unsupportedMedia("Video input is not supported by LlamaEngine.")

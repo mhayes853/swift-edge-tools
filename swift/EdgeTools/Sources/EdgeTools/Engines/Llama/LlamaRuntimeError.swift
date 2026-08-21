@@ -3,6 +3,7 @@
 
   extension LlamaRuntimeError.Code {
     public static let contextCreationFailed = Self(rawValue: "context-creation-failed")
+    public static let contextLengthExceeded = Self(rawValue: "context-length-exceeded")
     public static let decodeFailed = Self(rawValue: "decode-failed")
     public static let multimodalProjectorLoadFailed =
       Self(rawValue: "multimodal-projector-load-failed")

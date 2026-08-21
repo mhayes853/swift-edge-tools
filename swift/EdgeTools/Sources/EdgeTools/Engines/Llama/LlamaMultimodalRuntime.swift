@@ -168,7 +168,8 @@
       chunkIndex: Int,
       position: Int,
       sequenceId: Int,
-      batchSize: Int
+      batchSize: Int,
+      wantsLogits: Bool
     ) throws -> Int {
       guard let chunk = mtmd_input_chunks_get(self.handle, chunkIndex) else {
         throw LlamaRuntimeError(
@@ -184,7 +185,7 @@
         llama_pos(position),
         llama_seq_id(sequenceId),
         Int32(clamping: batchSize),
-        false,
+        wantsLogits,
         &newPosition
       )
       guard status == 0 else {
@@ -210,7 +211,8 @@
       chunkIndex: Int,
       position: Int,
       sequenceId: Int,
-      batchSize: Int
+      batchSize: Int,
+      wantsLogits: Bool
     ) throws -> Int {
       try self.chunks.withBorrowedLock {
         try $0.evaluate(
@@ -219,7 +221,8 @@
           chunkIndex: chunkIndex,
           position: position,
           sequenceId: sequenceId,
-          batchSize: batchSize
+          batchSize: batchSize,
+          wantsLogits: wantsLogits
         )
       }
     }
@@ -299,7 +302,8 @@
       chunkIndex: Int,
       position: Int,
       sequenceId: Int,
-      batchSize: Int
+      batchSize: Int,
+      wantsLogits: Bool
     ) throws -> Int {
       guard let media else {
         throw LlamaRuntimeError(
@@ -313,7 +317,8 @@
         chunkIndex: chunkIndex,
         position: position,
         sequenceId: sequenceId,
-        batchSize: batchSize
+        batchSize: batchSize,
+        wantsLogits: wantsLogits
       )
     }
   }
@@ -451,7 +456,8 @@
       chunkIndex: Int,
       position: Int,
       sequenceId: Int,
-      batchSize: Int
+      batchSize: Int,
+      wantsLogits: Bool
     ) throws -> Int {
       try self.state.withBorrowedLock { state in
         try input.evaluateMedia(
@@ -460,7 +466,8 @@
           chunkIndex: chunkIndex,
           position: position,
           sequenceId: sequenceId,
-          batchSize: batchSize
+          batchSize: batchSize,
+          wantsLogits: wantsLogits
         )
       }
     }

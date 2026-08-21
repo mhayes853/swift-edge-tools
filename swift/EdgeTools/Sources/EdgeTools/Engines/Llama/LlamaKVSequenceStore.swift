@@ -141,6 +141,12 @@
             state: &state
           )
         }
+        guard !output.wantsLogits || state.logitsSequenceId == sequenceId else {
+          throw LlamaRuntimeError(
+            code: .decodeFailed,
+            message: "The evaluated input produced no logits for its last position."
+          )
+        }
         return input.units[prefixCount...].reduce(0) { $0 + $1.tokenCount }
       }
     }
@@ -168,7 +174,13 @@
               message: "The sequence has no evaluated tokens to produce logits from."
             )
           }
-          _ = self.trim(sequenceId: sequenceId, to: cached.count - 1, state: &state)
+          let retained = self.trim(sequenceId: sequenceId, to: cached.count - 1, state: &state)
+          guard retained == cached.count - 1 else {
+            throw LlamaRuntimeError(
+              code: .decodeFailed,
+              message: "The sequence could not be rewound to recover its logits."
+            )
+          }
           try self.evaluate(
             tokenIds: CollectionOfOne(tokenId),
             sequenceId: sequenceId,
@@ -306,6 +318,7 @@
           let unit = input.units[unitIndex]
           let currentPosition = state.cachedInputs[sequenceId]?.positionCount ?? 0
           let batchSize = try state.withContext { $0.microBatchCapacity }
+          let wantsLogits = output.wantsLogits && unitIndex == input.units.count - 1
           let newPosition = try state.withContext {
             try multimodalRuntime.evaluate(
               input: input,
@@ -313,9 +326,11 @@
               chunkIndex: chunkIndex,
               position: currentPosition,
               sequenceId: sequenceId,
-              batchSize: batchSize
+              batchSize: batchSize,
+              wantsLogits: wantsLogits
             )
           }
+          state.logitsSequenceId = wantsLogits ? sequenceId : nil
           state.cachedInputs[sequenceId, default: CachedInput()]
             .append(media: unit, endingAt: newPosition)
         }

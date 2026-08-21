@@ -52,8 +52,6 @@
           ▿ EdgeToolsGenerationPart
             - text: " is"
           ▿ EdgeToolsGenerationPart
-            - text: " currently"
-          ▿ EdgeToolsGenerationPart
             - text: " sunny"
           ▿ EdgeToolsGenerationPart
             - text: " with"
@@ -68,7 +66,9 @@
           ▿ EdgeToolsGenerationPart
             - text: "21"
           ▿ EdgeToolsGenerationPart
-            - text: "°C"
+            - text: " degrees"
+          ▿ EdgeToolsGenerationPart
+            - text: " Celsius"
           ▿ EdgeToolsGenerationPart
             - text: "."
   ▿ reasoningEffort: EdgeToolsReasoningEffort
