@@ -320,10 +320,7 @@
       ) {
         decoder.sampler.sample(logits: &$0, bitmask: bitmask)
       }
-      decoder.confidence.add(
-        confidence: sample.confidence,
-        options: decoder.confidenceOptions
-      )
+      decoder.add(confidence: sample.confidence)
       decoder.pendingTokenId = sample.tokenId
       state.decoder = decoder
       return sample.tokenId
@@ -398,13 +395,7 @@
 
     private func metadata(for state: ModelGenerationState) -> EdgeToolsMetrics {
       guard let decoder = state.decoder else { return EdgeToolsMetrics() }
-      var metadata = EdgeToolsMetrics()
-      if decoder.confidenceOptions.contains(.generation) {
-        metadata.generationConfidence = decoder.confidence.mean
-      }
-      if decoder.confidenceOptions.contains(.perToken) {
-        metadata.perTokenConfidences = decoder.confidence.perTokenConfidences
-      }
+      var metadata = decoder.metrics
       if decoder.confidenceOptions.contains(.probe) {
         metadata.probeConfidence = state.contextState.sequenceStore.probeConfidence(
           sequenceId: state.contextState.sequence.sequenceId

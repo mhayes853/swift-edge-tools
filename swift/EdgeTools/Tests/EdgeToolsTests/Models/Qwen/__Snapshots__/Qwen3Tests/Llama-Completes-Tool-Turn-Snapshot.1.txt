@@ -560,29 +560,25 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: ","
           ▿ EdgeToolsGenerationPart
-            - reasoning: " a"
+            - reasoning: " condition"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " as"
           ▿ EdgeToolsGenerationPart
             - reasoning: " sunny"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " condition"
           ▿ EdgeToolsGenerationPart
             - reasoning: ","
           ▿ EdgeToolsGenerationPart
             - reasoning: " and"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " a"
-          ▿ EdgeToolsGenerationPart
             - reasoning: " temperature"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " of"
+            - reasoning: " Celsius"
           ▿ EdgeToolsGenerationPart
             - reasoning: " "
           ▿ EdgeToolsGenerationPart
             - reasoning: "2"
           ▿ EdgeToolsGenerationPart
             - reasoning: "1"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "°C"
           ▿ EdgeToolsGenerationPart
             - reasoning: "."
           ▿ EdgeToolsGenerationPart
@@ -620,8 +616,12 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " location"
+            - reasoning: " city"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " clearly"
+            - reasoning: " and"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " condition"
   ▿ reasoningEffort: EdgeToolsReasoningEffort
     - rawValue: "default"

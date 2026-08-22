@@ -3,88 +3,75 @@
     ▿ (2 elements)
       ▿ key: EdgeToolsMetricKey
         - rawValue: "DecodeDuration"
-      ▿ value: 3.141984 seconds
-        - _low: 3141984000000000000
+      ▿ value: 1.894790416 seconds
+        - _low: 1894790416000000000
         - _high: 0
     ▿ (2 elements)
       ▿ key: EdgeToolsMetricKey
         - rawValue: "DecodeTokens"
-      - value: 15
+      - value: 7
     ▿ (2 elements)
       ▿ key: EdgeToolsMetricKey
         - rawValue: "DurationToFirstToken"
-      ▿ value: 8.645807459 seconds
-        - _low: 8645807459000000000
+      ▿ value: 0.702543792 seconds
+        - _low: 702543792000000000
         - _high: 0
     ▿ (2 elements)
       ▿ key: EdgeToolsMetricKey
         - rawValue: "MLXEngineGenerationStartMemorySnapshot"
-      ▿ value: Peak:   5386M        (5648610306)
-Active: 5324M        (5583170798)
-Cache:  6284M        (6589411857)
-        - activeMemory: 5583170798
-        - cacheMemory: 6589411857
-        - peakMemory: 5648610306
+      ▿ value: Peak:   7701M        (8075246074)
+Active: 5980M        (6271242576)
+Cache:  6268M        (6572863397)
+        - activeMemory: 6271242576
+        - cacheMemory: 6572863397
+        - peakMemory: 8075246074
     ▿ (2 elements)
       ▿ key: EdgeToolsMetricKey
         - rawValue: "MLXEnginePostDecodeMemorySnapshot"
-      ▿ value: Peak:   5415M        (5678348348)
-Active: 5353M        (5613556952)
-Cache:  6286M        (6591974147)
-        - activeMemory: 5613556952
-        - cacheMemory: 6591974147
-        - peakMemory: 5678348348
+      ▿ value: Peak:   7701M        (8075246074)
+Active: 5377M        (5639111054)
+Cache:  6895M        (7230144355)
+        - activeMemory: 5639111054
+        - cacheMemory: 7230144355
+        - peakMemory: 8075246074
     ▿ (2 elements)
       ▿ key: EdgeToolsMetricKey
         - rawValue: "MLXEnginePostPrefillMemorySnapshot"
-      ▿ value: Peak:   5415M        (5678348348)
-Active: 5327M        (5585940860)
-Cache:  6288M        (6594260569)
-        - activeMemory: 5585940860
-        - cacheMemory: 6594260569
-        - peakMemory: 5678348348
+      ▿ value: Peak:   7701M        (8075246074)
+Active: 5980M        (6271243602)
+Cache:  6268M        (6572862367)
+        - activeMemory: 6271243602
+        - cacheMemory: 6572862367
+        - peakMemory: 8075246074
     ▿ (2 elements)
       ▿ key: EdgeToolsMetricKey
         - rawValue: "PrefillDuration"
-      ▿ value: 0.439862125 seconds
-        - _low: 439862125000000000
+      ▿ value: 0.413774 seconds
+        - _low: 413774000000000000
         - _high: 0
     ▿ (2 elements)
       ▿ key: EdgeToolsMetricKey
         - rawValue: "PrefillTokens"
       - value: 34
-  ▿ parts: 13 elements
+  ▿ parts: 5 elements
     ▿ EdgeToolsGenerationPart
       - reasoning: "<think>"
+    ▿ EdgeToolsGenerationPart
+      - reasoning: ":"
     ▿ EdgeToolsGenerationPart
       - reasoning: "\n\n"
     ▿ EdgeToolsGenerationPart
       - text: "\n\n"
     ▿ EdgeToolsGenerationPart
-      - text: "1"
-    ▿ EdgeToolsGenerationPart
-      - text: "9"
-    ▿ EdgeToolsGenerationPart
-      - text: " +"
-    ▿ EdgeToolsGenerationPart
-      - text: " "
-    ▿ EdgeToolsGenerationPart
-      - text: "2"
-    ▿ EdgeToolsGenerationPart
-      - text: "3"
-    ▿ EdgeToolsGenerationPart
-      - text: " ="
-    ▿ EdgeToolsGenerationPart
-      - text: " "
-    ▿ EdgeToolsGenerationPart
       - text: "4"
-    ▿ EdgeToolsGenerationPart
-      - text: "2"
-  - response: "<think>\n\n</think>\n\n19 + 23 = 42"
-  ▿ tokens: 15 elements
+  - response: "<think>:\n\n</think>\n\n4"
+  ▿ tokens: 7 elements
     ▿ EdgeToolsToken
       - id: 248068
       - stringValue: "<think>"
+    ▿ EdgeToolsToken
+      - id: 25
+      - stringValue: ":"
     ▿ EdgeToolsToken
       - id: 271
       - stringValue: "\n\n"
@@ -95,35 +82,8 @@ Cache:  6288M        (6594260569)
       - id: 271
       - stringValue: "\n\n"
     ▿ EdgeToolsToken
-      - id: 16
-      - stringValue: "1"
-    ▿ EdgeToolsToken
-      - id: 24
-      - stringValue: "9"
-    ▿ EdgeToolsToken
-      - id: 478
-      - stringValue: " +"
-    ▿ EdgeToolsToken
-      - id: 220
-      - stringValue: " "
-    ▿ EdgeToolsToken
-      - id: 17
-      - stringValue: "2"
-    ▿ EdgeToolsToken
-      - id: 18
-      - stringValue: "3"
-    ▿ EdgeToolsToken
-      - id: 283
-      - stringValue: " ="
-    ▿ EdgeToolsToken
-      - id: 220
-      - stringValue: " "
-    ▿ EdgeToolsToken
       - id: 19
       - stringValue: "4"
-    ▿ EdgeToolsToken
-      - id: 17
-      - stringValue: "2"
     ▿ EdgeToolsToken
       - id: 248046
       - stringValue: "<|im_end|>"

@@ -34,7 +34,7 @@
       self.vocabularySizeValue
     }
 
-    public func forkedContextState(copyingCache: Bool) -> sending Self {
+    public func forkedContextState() -> sending Self {
       if let sequence = self.sequenceStore.lease(copyingFrom: self.sequence.sequenceId) {
         return Self(
           sequenceStore: self.sequenceStore,
@@ -173,12 +173,7 @@
   // MARK: - LlamaGenerationTransaction
 
   struct LlamaGenerationTransaction<Profile: LlamaModelProfile> {
-    struct Decoder {
-      var pendingTokenId: EdgeToolsToken.ID?
-      let sampler: EdgeToolsCPUFusedSampler
-      let confidenceOptions: EdgeToolsConfidenceOptions
-      var confidence = ConfidenceState()
-    }
+    typealias Decoder = DecoderState<EdgeToolsCPUFusedSampler>
 
     let contextState: LlamaContextState<Profile>
     var transcript: EdgeToolsTranscript

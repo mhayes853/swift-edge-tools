@@ -50,9 +50,9 @@
           ▿ EdgeToolsGenerationPart
             - text: " Paris"
           ▿ EdgeToolsGenerationPart
-            - text: " today"
-          ▿ EdgeToolsGenerationPart
             - text: " is"
+          ▿ EdgeToolsGenerationPart
+            - text: " currently"
           ▿ EdgeToolsGenerationPart
             - text: " sunny"
           ▿ EdgeToolsGenerationPart

@@ -15,7 +15,11 @@ public final class EdgeToolsEngineIdentity: Sendable {
 public protocol EdgeToolsForkableModelState {
   /// The state for a forked context, which may later run generations concurrently with
   /// this state's context.
-  func forkedContextState(copyingCache: Bool) -> sending Self
+  ///
+  /// The returned state must not alias any state this one mutates, and forking must not
+  /// itself run model work: contexts fork synchronously, off whatever executor the caller
+  /// happens to be on.
+  func forkedContextState() -> sending Self
 
   /// The state a generation on this state's own context runs against. The context's
   /// `isResponding` gate guarantees exclusivity until the state is returned via `finish`.
@@ -24,7 +28,7 @@ public protocol EdgeToolsForkableModelState {
 
 extension EdgeToolsForkableModelState {
   public func generationState() -> sending Self {
-    self.forkedContextState(copyingCache: false)
+    self.forkedContextState()
   }
 }
 
@@ -151,7 +155,7 @@ public final class EdgeToolsTranscriptContext<ModelState: EdgeToolsForkableModel
           transcript: state.transcript,
           reasoningEffort: state.reasoningEffort
         ),
-        model: state.model.forkedContextState(copyingCache: state.isResponding)
+        model: state.model.forkedContextState()
       )
     }
     return EdgeToolsTranscriptContext(
@@ -225,16 +229,10 @@ public final class EdgeToolsTranscriptContext<ModelState: EdgeToolsForkableModel
     revision: Int,
     model: sending ModelState
   ) {
-    // The compiler cannot track a `sending` parameter through the lock closure. This method
+    // NB: The compiler cannot track a `sending` parameter through the lock closure. This method
     // stores the generation branch once when its context revision still matches.
     nonisolated(unsafe) let model = model
-    self.state.withLock { state in
-      state.finish(
-        generation: generation,
-        revision: revision,
-        model: model
-      )
-    }
+    self.state.withLock { $0.finish(generation: generation, revision: revision, model: model) }
     self.withMutation(of: .transcript) {
     }
     self.withMutation(of: .isResponding) {
