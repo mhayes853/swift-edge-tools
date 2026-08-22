@@ -207,44 +207,134 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 19 elements
+        ▿ parts: 64 elements
           ▿ EdgeToolsGenerationPart
-            - reasoning: "###"
+            - reasoning: "<think>"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " Summary"
+            - reasoning: "\n"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "\n\n"
+            - reasoning: "I"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "Paris"
+            - reasoning: " need"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " is"
+            - reasoning: " to"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " currently"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " having"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " sunny"
+            - reasoning: " get"
           ▿ EdgeToolsGenerationPart
             - reasoning: " weather"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " with"
+            - reasoning: " information"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " a"
+            - reasoning: " for"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " temperature"
+            - reasoning: " Paris"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " of"
+            - reasoning: " using"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " "
+            - reasoning: " the"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "2"
+            - reasoning: " Get"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "1"
+            - reasoning: "Weather"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "°"
+            - reasoning: " function"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " Celsius"
+            - reasoning: " I"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " already"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " have"
           ▿ EdgeToolsGenerationPart
             - reasoning: "."
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " Based"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " on"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " my"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " previous"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " calls"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " and"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " this"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " one"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: ","
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " it"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " appears"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " to"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " be"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " weather"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " in"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " Paris"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " as"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " stated"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " by"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " me"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "."
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " Let"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " me"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " use"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " summary"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " from"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " this"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " result"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: ":"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "\n\n"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "{\""
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "location"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "\":\""
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "Paris"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "\",\""
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "condition"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "\":\""
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "s"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "unny"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "\",\""
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "temperature"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "C"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "elsius"
   ▿ reasoningEffort: EdgeToolsReasoningEffort
     - rawValue: "default"

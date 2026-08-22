@@ -10,13 +10,12 @@
   public struct Qwen3MLXProfile: MLXLLMModelProfile {
     public typealias Prompt = EdgeToolsTranscript
     public typealias GenerationParser = Qwen3GenerationParser
-    public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarEngine = XGrammarEngine
 
     public static func grammar(
       prompt: EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
-      parameters: DefaultMLXGenerateParameters,
+      parameters: MLXGenerateParameters,
       grammarEngine: borrowing XGrammarEngine
     ) throws -> XGRGrammar {
       let grammar = try Self.constrainedGrammar(
@@ -37,7 +36,7 @@
 
     public static func defaultSampling(
       prompt: EdgeToolsTranscript,
-      parameters: DefaultMLXGenerateParameters
+      parameters: MLXGenerateParameters
     ) -> EdgeToolsFusedSamplingParameters? {
       prompt.reasoningEffort.isEnabled
         ? EdgeToolsFusedSamplingParameters(temperature: 0.6, topK: 20, topP: 0.95)
@@ -54,13 +53,12 @@
   public struct Qwen3LlamaProfile: LlamaModelProfile {
     public typealias Prompt = EdgeToolsTranscript
     public typealias GenerationParser = Qwen3GenerationParser
-    public typealias GenerateParameters = DefaultLlamaGenerateParameters
     public typealias GrammarEngine = XGrammarEngine
 
     public static func grammar(
       prompt: EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
-      parameters: DefaultLlamaGenerateParameters,
+      parameters: LlamaGenerateParameters,
       grammarEngine: borrowing XGrammarEngine
     ) throws -> XGRGrammar {
       try Self.constrainedGrammar(
@@ -81,7 +79,7 @@
 
     public static func defaultSampling(
       prompt: EdgeToolsTranscript,
-      parameters: DefaultLlamaGenerateParameters
+      parameters: LlamaGenerateParameters
     ) -> EdgeToolsFusedSamplingParameters? {
       prompt.reasoningEffort.isEnabled
         ? EdgeToolsFusedSamplingParameters(temperature: 0.6, topK: 20, topP: 0.95)

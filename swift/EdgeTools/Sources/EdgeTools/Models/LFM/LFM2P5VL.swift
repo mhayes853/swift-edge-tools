@@ -13,7 +13,6 @@
     EdgeToolsMultimodalModelProfile {
     public typealias Prompt = EdgeToolsTranscript
     public typealias GenerationParser = LFM2P5GenerationParser
-    public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarEngine = XGrammarEngine
 
     public static func multimodalContent(
@@ -25,7 +24,7 @@
     public static func grammar(
       prompt: EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
-      parameters: DefaultMLXGenerateParameters,
+      parameters: MLXGenerateParameters,
       grammarEngine: borrowing XGrammarEngine
     ) throws -> XGRGrammar {
       try Self.constrainedGrammar(tools: tools, parameters: parameters, grammarEngine: grammarEngine) {
@@ -113,7 +112,6 @@
     EdgeToolsMultimodalModelProfile {
     public typealias Prompt = EdgeToolsTranscript
     public typealias GenerationParser = LFM2P5GenerationParser
-    public typealias GenerateParameters = DefaultLlamaGenerateParameters
     public typealias GrammarEngine = XGrammarEngine
 
     public static func multimodalContent(
@@ -125,7 +123,7 @@
     public static func grammar(
       prompt: EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
-      parameters: DefaultLlamaGenerateParameters,
+      parameters: LlamaGenerateParameters,
       grammarEngine: borrowing XGrammarEngine
     ) throws -> XGRGrammar {
       try Self.constrainedGrammar(tools: tools, parameters: parameters, grammarEngine: grammarEngine) {

@@ -1,10 +1,7 @@
-#if XGrammar
-  import EdgeToolsXGrammar
-#endif
-
 #if MLX && canImport(MLX)
   import EdgeToolsCore
   import EdgeToolsTokenizers
+  import EdgeToolsXGrammar
   import OrderedCollections
   import _EdgeToolsFoundation
   import MLX
@@ -22,7 +19,7 @@
 
   // MARK: - MLXModelProfile
 
-  public protocol MLXModelProfile: EdgeToolsModelProfile where GenerateParameters: MLXGenerateParameters {
+  public protocol MLXModelProfile: EdgeToolsModelProfile where GenerateParameters == MLXGenerateParameters {
     static nonisolated(nonsending) func input(
       prompt: Prompt,
       tools: [EdgeToolDefinition],
@@ -82,59 +79,35 @@
 
   // MARK: - MLXGenerateParameters
 
-  public protocol MLXGenerateParameters: EdgeToolsEngineGenerateParameters {
-    var sampler: (any LogitSampler)? { get }
-    var sampling: EdgeToolsFusedSamplingParameters { get }
-    var processor: (any LogitProcessor)? { get }
-    var confidence: EdgeToolsConfidenceOptions { get }
-    var synchronizeStreamForMemorySnapshots: Bool { get }
-  }
+  public struct MLXGenerateParameters: EdgeToolsConstrainedGenerateParameters {
+    public static var `default`: Self { Self() }
 
-  extension MLXGenerateParameters {
-    public var sampling: EdgeToolsFusedSamplingParameters {
-      EdgeToolsFusedSamplingParameters()
+    public var sampler: (any LogitSampler)?
+    public var sampling: EdgeToolsFusedSamplingParameters
+    public var processor: (any LogitProcessor)?
+    public var constraint: XGRGenerationConstraint
+    public var confidence: EdgeToolsConfidenceOptions
+    public var maxTokens: Int?
+    public var synchronizeStreamForMemorySnapshots: Bool
+
+    public init(
+      sampler: (any LogitSampler)? = nil,
+      sampling: EdgeToolsFusedSamplingParameters = EdgeToolsFusedSamplingParameters(),
+      processor: (any LogitProcessor)? = nil,
+      constraint: XGRGenerationConstraint = .unconstrained,
+      confidence: EdgeToolsConfidenceOptions = [],
+      maxTokens: Int? = 1024,
+      synchronizeStreamForMemorySnapshots: Bool = true
+    ) {
+      self.sampler = sampler
+      self.sampling = sampling
+      self.processor = processor
+      self.constraint = constraint
+      self.confidence = confidence
+      self.maxTokens = maxTokens
+      self.synchronizeStreamForMemorySnapshots = synchronizeStreamForMemorySnapshots
     }
-
-    public var confidence: EdgeToolsConfidenceOptions { [] }
   }
-
-  // MARK: - DefaultMLXGenerateParameters
-
-  #if XGrammar
-    public struct DefaultMLXGenerateParameters:
-      MLXGenerateParameters,
-      EdgeToolsConstrainedGenerateParameters
-    {
-      public static var `default`: Self { Self() }
-
-      public var sampler: (any LogitSampler)?
-      public var sampling: EdgeToolsFusedSamplingParameters
-      public var processor: (any LogitProcessor)?
-      public var constraint: XGRGenerationConstraint
-      public var confidence: EdgeToolsConfidenceOptions
-      public var maxTokens: Int?
-      public var synchronizeStreamForMemorySnapshots: Bool
-
-      public init(
-        sampler: (any LogitSampler)? = nil,
-        sampling: EdgeToolsFusedSamplingParameters = EdgeToolsFusedSamplingParameters(),
-        processor: (any LogitProcessor)? = nil,
-        constraint: XGRGenerationConstraint = .unconstrained,
-        confidence: EdgeToolsConfidenceOptions = [],
-        maxTokens: Int? = 1024,
-        synchronizeStreamForMemorySnapshots: Bool = true
-      ) {
-        self.sampler = sampler
-        self.sampling = sampling
-        self.processor = processor
-        self.constraint = constraint
-        self.confidence = confidence
-        self.maxTokens = maxTokens
-        self.synchronizeStreamForMemorySnapshots = synchronizeStreamForMemorySnapshots
-      }
-    }
-
-  #endif
 
   // MARK: - MLXContext
 
@@ -1472,25 +1445,21 @@
     }
   }
 
-  #if XGrammar
-    extension MLXEngine where Profile.GrammarEngine == XGrammarEngine {
-      public func clearCaches() {
-        self.grammarEngine.clearCaches()
-      }
+  extension MLXEngine where Profile.GrammarEngine == XGrammarEngine {
+    public func clearCaches() {
+      self.grammarEngine.clearCaches()
     }
-  #endif
+  }
 
   // MARK: - EdgeToolsSession + MLX
 
-  #if XGrammar
-    extension EdgeToolsSession {
-      public func clearCaches<Profile>() where Engine == MLXEngine<Profile>,
-        Profile.GrammarEngine == XGrammarEngine
-      {
-        self.engine.clearCaches()
-      }
+  extension EdgeToolsSession {
+    public func clearCaches<Profile>() where Engine == MLXEngine<Profile>,
+      Profile.GrammarEngine == XGrammarEngine
+    {
+      self.engine.clearCaches()
     }
-  #endif
+  }
 
   extension EdgeToolsSession {
     public func context<Profile>(

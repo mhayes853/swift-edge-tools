@@ -51,12 +51,12 @@ let package = Package(
     .trait(
       name: "MLX",
       description: "MLX model support.",
-      enabledTraits: ["HuggingFaceTokenizers", "FoundationEssentials"]
+      enabledTraits: ["HuggingFaceTokenizers", "FoundationEssentials", "XGrammar"]
     ),
     .trait(
       name: "Llama",
       description: "Vendored cactus-patched llama.cpp engine support.",
-      enabledTraits: ["ChatTemplates"]
+      enabledTraits: ["ChatTemplates", "XGrammar"]
     ),
     .default(enabledTraits: ["Foundation"])
   ],

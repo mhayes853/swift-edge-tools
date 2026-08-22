@@ -8,13 +8,12 @@
   public struct FunctionGemmaMLXProfile: MLXLLMModelProfile {
     public typealias Prompt = EdgeToolsTranscript
     public typealias GenerationParser = FunctionGemmaGenerationParser
-    public typealias GenerateParameters = DefaultMLXGenerateParameters
     public typealias GrammarEngine = XGrammarEngine
 
     public static func grammar(
       prompt: EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
-      parameters: DefaultMLXGenerateParameters,
+      parameters: MLXGenerateParameters,
       grammarEngine: borrowing XGrammarEngine
     ) throws -> XGRGrammar {
       try Self.constrainedGrammar(
@@ -36,13 +35,12 @@
   public struct FunctionGemmaLlamaProfile: LlamaModelProfile {
     public typealias Prompt = EdgeToolsTranscript
     public typealias GenerationParser = FunctionGemmaGenerationParser
-    public typealias GenerateParameters = DefaultLlamaGenerateParameters
     public typealias GrammarEngine = XGrammarEngine
 
     public static func grammar(
       prompt: EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
-      parameters: DefaultLlamaGenerateParameters,
+      parameters: LlamaGenerateParameters,
       grammarEngine: borrowing XGrammarEngine
     ) throws -> XGRGrammar {
       try Self.constrainedGrammar(

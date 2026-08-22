@@ -12,11 +12,11 @@ struct `Qwen3P5 tests` {
     func `Default Sampling Follows The Reasoning Effort`() {
       let thinking = Qwen3P5MLXProfile.defaultSampling(
         prompt: EdgeToolsTranscript(messages: [.user("hi")], reasoningEffort: .high),
-        parameters: DefaultMLXGenerateParameters()
+        parameters: MLXGenerateParameters()
       )
       let nonThinking = Qwen3P5MLXProfile.defaultSampling(
         prompt: EdgeToolsTranscript(messages: [.user("hi")], reasoningEffort: .none),
-        parameters: DefaultMLXGenerateParameters()
+        parameters: MLXGenerateParameters()
       )
 
       expectNoDifference(thinking?.topP, 0.95)
@@ -294,7 +294,7 @@ struct `Qwen3P5 tests` {
   ) async throws -> EdgeToolsEngineGeneration {
     let task = try engine.generate(
       prompt: .user(prompt),
-      parameters: DefaultMLXGenerateParameters(
+      parameters: MLXGenerateParameters(
         sampling: .greedy,
         maxTokens: 1,
         synchronizeStreamForMemorySnapshots: false
@@ -324,7 +324,7 @@ struct `Qwen3P5 tests` {
   ) async throws -> EdgeToolsEngineGeneration {
     let task = try engine.generate(
       prompt: .user(prompt),
-      parameters: DefaultLlamaGenerateParameters(sampling: .greedy, maxTokens: 1),
+      parameters: LlamaGenerateParameters(sampling: .greedy, maxTokens: 1),
       context: context,
       channel: EdgeToolsGenerationChannel()
     )

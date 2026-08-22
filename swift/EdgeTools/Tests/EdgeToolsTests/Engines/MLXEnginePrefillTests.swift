@@ -131,7 +131,7 @@
         prompt: EdgeToolsTranscript.Prompt(
           messages: EdgeToolsTranscript.tokens([1]).messages
         ),
-        parameters: DefaultMLXGenerateParameters(
+        parameters: MLXGenerateParameters(
           sampling: EdgeToolsFusedSamplingParameters(
             temperature: 0,
             repetitionPenalty: 2
@@ -168,7 +168,7 @@
         prompt: EdgeToolsTranscript.Prompt(
           messages: EdgeToolsTranscript.tokens([1]).messages
         ),
-        parameters: DefaultMLXGenerateParameters(
+        parameters: MLXGenerateParameters(
           sampler: ArgMaxSampler(),
           confidence: confidence,
           maxTokens: 1,
@@ -231,13 +231,12 @@
   private struct LLMPrefillTestProfile: MLXLLMModelProfile {
     typealias Prompt = EdgeToolsTranscript
     typealias GenerationParser = TestGenerationParser
-    typealias GenerateParameters = DefaultMLXGenerateParameters
     typealias GrammarEngine = XGrammarEngine
 
     static func grammar(
       prompt: EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
-      parameters: DefaultMLXGenerateParameters,
+      parameters: MLXGenerateParameters,
       grammarEngine: borrowing XGrammarEngine
     ) throws -> XGRGrammar {
       .universal
@@ -271,13 +270,12 @@
     private struct VLMPrefillTestProfile: MLXVLMModelProfile {
       typealias Prompt = EdgeToolsTranscript
       typealias GenerationParser = TestGenerationParser
-      typealias GenerateParameters = DefaultMLXGenerateParameters
       typealias GrammarEngine = XGrammarEngine
 
       static func grammar(
         prompt: EdgeToolsTranscript,
         tools: [EdgeToolDefinition],
-        parameters: DefaultMLXGenerateParameters,
+        parameters: MLXGenerateParameters,
         grammarEngine: borrowing XGrammarEngine
       ) throws -> XGRGrammar {
         .universal
@@ -526,11 +524,11 @@
   ) async throws -> EdgeToolsEngineGeneration
   where
     Profile.Prompt == EdgeToolsTranscript,
-    Profile.GenerateParameters == DefaultMLXGenerateParameters
+    Profile.GenerateParameters == MLXGenerateParameters
   {
     let task = try engine.generate(
       prompt: EdgeToolsTranscript.Prompt(messages: []),
-      parameters: DefaultMLXGenerateParameters(
+      parameters: MLXGenerateParameters(
         sampler: ArgMaxSampler(),
         maxTokens: 1,
         synchronizeStreamForMemorySnapshots: false

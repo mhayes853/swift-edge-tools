@@ -20,7 +20,7 @@
   ) async throws -> EdgeToolsTranscript
   where
     Profile.Prompt == EdgeToolsTranscript,
-    Profile.GenerateParameters == DefaultMLXGenerateParameters
+    Profile.GenerateParameters == MLXGenerateParameters
   {
     try await completeToolTurn(
       using: engine,
@@ -37,12 +37,12 @@
   ) async throws -> EdgeToolsEngineGeneration
   where
     Profile.Prompt == EdgeToolsTranscript,
-    Profile.GenerateParameters == DefaultMLXGenerateParameters
+    Profile.GenerateParameters == MLXGenerateParameters
   {
     try await reasoningGeneration(
       from: try engine.generate(
         prompt: .user(.reasoningTest),
-        parameters: DefaultMLXGenerateParameters(maxTokens: 512),
+        parameters: MLXGenerateParameters(maxTokens: 512),
         context: engine.context(MLXContextParameters(reasoningEffort: .high)),
         channel: EdgeToolsGenerationChannel()
       )
@@ -61,7 +61,7 @@
   ) async throws -> SessionWeatherTurnSnapshot
   where
     Profile.Prompt == EdgeToolsTranscript,
-    Profile.GenerateParameters == DefaultMLXGenerateParameters
+    Profile.GenerateParameters == MLXGenerateParameters
   {
     let turn = try splitUserMessage(from: .weatherTest)
     let context = session.context(
@@ -72,7 +72,7 @@
     let toolGeneration = try await session.generate(
       prompt: .user(turn.userMessage),
       context: context,
-      parameters: DefaultMLXGenerateParameters(
+      parameters: MLXGenerateParameters(
         sampler: MLXFusedSampler(parameters: parameters),
         constraint: .toolsWithGrammar(range: .exact(1)),
         maxTokens: 256
@@ -87,7 +87,7 @@
 
     context.transcript.messages.append(.tool(name: "getWeather", response: .string(toolOutput)))
     let responseTask = try session.engine.generate(
-      parameters: DefaultMLXGenerateParameters(
+      parameters: MLXGenerateParameters(
         sampler: MLXFusedSampler(parameters: parameters),
         constraint: .unconstrained,
         maxTokens: 64
@@ -149,14 +149,14 @@
   ) async throws -> String
   where
     Profile.Prompt == EdgeToolsTranscript,
-    Profile.GenerateParameters == DefaultMLXGenerateParameters
+    Profile.GenerateParameters == MLXGenerateParameters
   {
     let task = try engine.generate(
       prompt: .user(
         "What is the dominant color in this image? Answer briefly.",
         images: [try redImageAsset()]
       ),
-      parameters: DefaultMLXGenerateParameters(maxTokens: 64),
+      parameters: MLXGenerateParameters(maxTokens: 64),
       context: engine.context(),
       channel: EdgeToolsGenerationChannel()
     )
@@ -168,7 +168,7 @@
   ) async throws -> VLMToolTurnSnapshot
   where
     Profile.Prompt == EdgeToolsTranscript,
-    Profile.GenerateParameters == DefaultMLXGenerateParameters
+    Profile.GenerateParameters == MLXGenerateParameters
   {
     let turn = try await completeToolTurn(
       using: engine,
@@ -194,7 +194,7 @@
   ) async throws -> ToolTurnSnapshot
   where
     Profile.Prompt == EdgeToolsTranscript,
-    Profile.GenerateParameters == DefaultMLXGenerateParameters
+    Profile.GenerateParameters == MLXGenerateParameters
   {
     let turn = try splitUserMessage(from: prompt)
     let context = engine.context(
@@ -208,7 +208,7 @@
       generatingToolCall: {
         try engine.generate(
           prompt: .user(turn.userMessage),
-          parameters: DefaultMLXGenerateParameters(
+          parameters: MLXGenerateParameters(
             sampler: ArgMaxSampler(),
             constraint: .toolsWithGrammar(range: .exact(1)),
             maxTokens: toolMaxTokens
@@ -220,7 +220,7 @@
       generatingResponse: { toolMessage in
         try engine.generate(
           prompt: .tools([toolMessage]),
-          parameters: DefaultMLXGenerateParameters(maxTokens: 64),
+          parameters: MLXGenerateParameters(maxTokens: 64),
           context: context,
           channel: EdgeToolsGenerationChannel()
         )
@@ -233,7 +233,7 @@
   ) async throws -> String
   where
     Profile.Prompt == EdgeToolsTranscript,
-    Profile.GenerateParameters == DefaultMLXGenerateParameters
+    Profile.GenerateParameters == MLXGenerateParameters
   {
     let video = try await redVideoAsset()
     defer { video.remove() }
@@ -243,7 +243,7 @@
     )
     let task = try engine.generate(
       prompt: .user(prompt),
-      parameters: DefaultMLXGenerateParameters(maxTokens: 64),
+      parameters: MLXGenerateParameters(maxTokens: 64),
       context: engine.context(),
       channel: EdgeToolsGenerationChannel()
     )
@@ -255,7 +255,7 @@
   ) async throws -> String
   where
     Profile.Prompt == EdgeToolsTranscript,
-    Profile.GenerateParameters == DefaultMLXGenerateParameters
+    Profile.GenerateParameters == MLXGenerateParameters
   {
     let video = try await redVideoAsset()
     defer { video.remove() }
@@ -266,7 +266,7 @@
     )
     let task = try engine.generate(
       prompt: .user(prompt),
-      parameters: DefaultMLXGenerateParameters(maxTokens: 64),
+      parameters: MLXGenerateParameters(maxTokens: 64),
       context: engine.context(),
       channel: EdgeToolsGenerationChannel()
     )
@@ -278,7 +278,7 @@
   ) async throws -> VLMToolTurnSnapshot
   where
     Profile.Prompt == EdgeToolsTranscript,
-    Profile.GenerateParameters == DefaultMLXGenerateParameters
+    Profile.GenerateParameters == MLXGenerateParameters
   {
     let video = try await redVideoAsset()
     defer { video.remove() }

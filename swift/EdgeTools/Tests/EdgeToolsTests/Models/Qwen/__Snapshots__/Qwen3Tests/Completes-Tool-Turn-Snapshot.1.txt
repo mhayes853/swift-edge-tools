@@ -442,11 +442,7 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " I"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " need"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " to"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " use"
+            - reasoning: " used"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
@@ -456,15 +452,11 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " function"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " here"
+            - reasoning: ","
           ▿ EdgeToolsGenerationPart
-            - reasoning: "."
+            - reasoning: " which"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " The"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " function"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " requires"
+            - reasoning: " takes"
           ▿ EdgeToolsGenerationPart
             - reasoning: " a"
           ▿ EdgeToolsGenerationPart
@@ -472,74 +464,82 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " parameter"
           ▿ EdgeToolsGenerationPart
-            - reasoning: ","
+            - reasoning: "."
           ▿ EdgeToolsGenerationPart
-            - reasoning: " which"
+            - reasoning: " I"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " is"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " already"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " provided"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " as"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " \""
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "Paris"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "\"."
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " Since"
+            - reasoning: " set"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " user"
+            - reasoning: " location"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " is"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " asking"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " for"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " the"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " weather"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " in"
+            - reasoning: " to"
           ▿ EdgeToolsGenerationPart
             - reasoning: " Paris"
           ▿ EdgeToolsGenerationPart
             - reasoning: ","
           ▿ EdgeToolsGenerationPart
-            - reasoning: " I"
+            - reasoning: " so"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " don"
+            - reasoning: " the"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "\'t"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " need"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " to"
+            - reasoning: " tool"
           ▿ EdgeToolsGenerationPart
             - reasoning: " call"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " get"
+            - reasoning: " was"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " {\""
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "name"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "\":"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " \""
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "get"
           ▿ EdgeToolsGenerationPart
             - reasoning: "Weather"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " again"
+            - reasoning: "\","
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " \""
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "arguments"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "\":"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " {\""
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "location"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "\":"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " \""
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "Paris"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "\"}}"
           ▿ EdgeToolsGenerationPart
             - reasoning: "."
           ▿ EdgeToolsGenerationPart
-            - reasoning: " I"
+            - reasoning: " The"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " can"
+            - reasoning: " response"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " just"
+            - reasoning: " came"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " return"
+            - reasoning: " back"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " with"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " condition"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " being"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " sunny"
   ▿ reasoningEffort: EdgeToolsReasoningEffort
     - rawValue: "default"
