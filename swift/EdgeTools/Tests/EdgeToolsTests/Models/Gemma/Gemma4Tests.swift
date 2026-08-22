@@ -185,7 +185,7 @@ struct `Gemma4 tests` {
         return try Gemma4LlamaModelEngine(
           modelPath: model.model.path(),
           multimodalProjectorPath: model.projector.path(),
-          contextParameters: LlamaContextParameters(maximumSequenceCount: 1),
+          contextParameters: LlamaContextParameters(cacheForking: .isolated),
           multimodalParameters: LlamaMultimodalParameters(warmUp: false)
         )
       }

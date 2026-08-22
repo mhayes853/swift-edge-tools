@@ -60,7 +60,7 @@ struct `LFM2P5VL tests` {
         return try LFM2P5VLLlamaModelEngine(
           modelPath: model.model.path(),
           multimodalProjectorPath: model.projector.path(),
-          contextParameters: LlamaContextParameters(maximumSequenceCount: 1),
+          contextParameters: LlamaContextParameters(cacheForking: .isolated),
           multimodalParameters: LlamaMultimodalParameters(warmUp: false)
         )
       }

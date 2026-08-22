@@ -22,7 +22,6 @@
     typealias ModelGenerationState = LlamaGenerationTransaction<Profile>
 
     private let model: LlamaModelBox
-    private let multimodalRuntime: LlamaMultimodalRuntime?
     private let contextParameters: LlamaContextParameters
     private let defaultSampling: EdgeToolsFusedSamplingParameters?
     private let vocabularySizeValue: Int
@@ -106,7 +105,6 @@
       let multimodalRuntime = try projectorPath.map {
         try LlamaMultimodalRuntime(path: $0, model: model, parameters: multimodalParameters)
       }
-      self.multimodalRuntime = multimodalRuntime
       self.contextParameters = contextParameters
       self.defaultSampling = defaultSampling
 
@@ -114,7 +112,9 @@
       self.tokenizer = tokenizer
       self.inputProcessor = LlamaInputProcessor(
         tokenizer: tokenizer,
-        multimodalRuntime: multimodalRuntime
+        multimodal: multimodalRuntime.map {
+          LlamaMultimodalInputProcessor(tokenizer: tokenizer, runtime: $0)
+        }
       )
       self.vocabularySizeValue = tokenizer.vocabularySize
 
@@ -202,7 +202,7 @@
       try self.validate(context)
       let snapshot = try context.begin()
       defer { context.finish(generation: nil, revision: snapshot.revision, model: snapshot.model) }
-      try snapshot.model.sequenceStore.warmUp()
+      try snapshot.model.runtime.sequences.warmUp()
       _ = try self.inputProcessor.input(
         prompt: snapshot.transcript,
         tools: context.tools.map { $0.definition },
@@ -283,13 +283,13 @@
       )
       let contextState = state.contextState
       if parameters.confidence.contains(.probe) {
-        contextState.sequenceStore.resetProbe(sequenceId: contextState.sequence.sequenceId)
+        contextState.runtime.sequences.resetProbe(sequenceId: contextState.sequence.sequenceId)
       }
       let metrics = try self.metrics {
-        try contextState.sequenceStore.synchronizeForLogits(
+        try contextState.runtime.sequences.synchronizeForLogits(
           sequenceId: contextState.sequence.sequenceId,
           input: input,
-          multimodalRuntime: self.multimodalRuntime
+          multimodalRuntime: self.inputProcessor.multimodalRuntime
         )
       }
       let defaultSampling =
@@ -313,7 +313,7 @@
         throw EdgeToolsError.modelNotPrepared
       }
       let contextState = state.contextState
-      let sample = try contextState.sequenceStore.withLogits(
+      let sample = try contextState.runtime.sequences.withLogits(
         sequenceId: contextState.sequence.sequenceId,
         appending: decoder.pendingTokenId,
         vocabularySize: contextState.vocabularySizeValue
@@ -374,10 +374,10 @@
       )
       return EdgeToolsEnginePrefill(
         metrics: try self.metrics {
-          try snapshot.model.sequenceStore.synchronize(
+          try snapshot.model.runtime.sequences.synchronize(
             sequenceId: snapshot.model.sequence.sequenceId,
             input: input,
-            multimodalRuntime: self.multimodalRuntime
+            multimodalRuntime: self.inputProcessor.multimodalRuntime
           )
         }
       )
@@ -397,7 +397,7 @@
       guard let decoder = state.decoder else { return EdgeToolsMetrics() }
       var metadata = decoder.metrics
       if decoder.confidenceOptions.contains(.probe) {
-        metadata.probeConfidence = state.contextState.sequenceStore.probeConfidence(
+        metadata.probeConfidence = state.contextState.runtime.sequences.probeConfidence(
           sequenceId: state.contextState.sequence.sequenceId
         )
       }
@@ -409,7 +409,7 @@
       if let pendingTokenId = decoder.pendingTokenId,
         !self.generationLoop.stopTokenIds.contains(pendingTokenId)
       {
-        try state.contextState.sequenceStore.commit(
+        try state.contextState.runtime.sequences.commit(
           tokenId: pendingTokenId,
           sequenceId: state.contextState.sequence.sequenceId
         )
@@ -418,13 +418,13 @@
     }
 
     private func contextState() -> sending LlamaContextState<Profile> {
-      let sequenceStore = LlamaKVSequenceStore(
+      let runtime = LlamaRuntime(
         model: self.model,
         parameters: self.contextParameters
       )
       return LlamaContextState(
-        sequenceStore: sequenceStore,
-        sequence: sequenceStore.lease(copyingFrom: nil)!,
+        runtime: runtime,
+        sequence: runtime.lease(copyingFrom: nil)!,
         vocabularySize: self.vocabularySizeValue,
         defaultSampling: self.defaultSampling
       )

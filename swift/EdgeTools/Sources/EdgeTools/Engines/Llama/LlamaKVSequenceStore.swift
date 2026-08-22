@@ -24,7 +24,7 @@
       var positionCount = 0
 
       mutating func append(tokenIds: some Collection<EdgeToolsToken.ID>) {
-        self.units.append(contentsOf: tokenIds.map { LlamaPreparedInputUnit(value: .token($0)) })
+        self.units.append(contentsOf: tokenIds.map(LlamaPreparedInputUnit.token))
         self.positionCount += tokenIds.count
       }
 
@@ -67,7 +67,7 @@
     func lease(copyingFrom parentSequenceId: Int?) -> LlamaSequenceLease? {
       self.state.withLock { state in
         guard
-          let sequenceId = (0..<Int(self.parameters.maximumSequenceCount))
+          let sequenceId = (0..<self.parameters.cacheForking.maxContexts)
             .first(where: { !state.allocatedSequenceIds.contains($0) })
         else {
           return nil
@@ -112,15 +112,14 @@
           retaining: input.units.count,
           state: &state
         )
-        let evaluation = LlamaEvaluation(input: input, from: prefixCount)
         try self.evaluate(
-          evaluation,
+          units: input.units[prefixCount...],
           input: input,
           sequenceId: sequenceId,
           multimodalRuntime: multimodalRuntime,
           state: &state
         )
-        return evaluation.tokenCount
+        return input.units[prefixCount...].reduce(0) { $0 + $1.tokenCount }
       }
     }
 
@@ -131,29 +130,35 @@
     ) throws -> Int {
       try self.state.withLock { state in
         try self.ensureContext(&state)
+        guard let tail = input.units.last else {
+          throw LlamaRuntimeError(
+            code: .decodeFailed,
+            message: "The prepared input has nothing to evaluate for logits."
+          )
+        }
+        let tailIndex = input.units.index(before: input.units.endIndex)
         let prefixCount = self.prefix(
           matching: input,
           sequenceId: sequenceId,
-          retaining: input.logitsRetainableUnitCount,
+          retaining: tailIndex,
           state: &state
         )
-        let evaluation = try LlamaLogitsEvaluation(input: input, from: prefixCount)
         try self.evaluate(
-          evaluation.leading,
+          units: input.units[prefixCount..<tailIndex],
           input: input,
           sequenceId: sequenceId,
           multimodalRuntime: multimodalRuntime,
           state: &state
         )
-        let logits = try self.evaluate(
-          tail: evaluation.tail,
+        let logits = try self.evaluateProducingLogits(
+          unit: tail,
           input: input,
           sequenceId: sequenceId,
           multimodalRuntime: multimodalRuntime,
           state: &state
         )
         state.logitsSequenceId = logits.sequenceId
-        return evaluation.tokenCount
+        return input.units[prefixCount...].reduce(0) { $0 + $1.tokenCount }
       }
     }
 
@@ -174,7 +179,7 @@
           state.logitsSequenceId = logits.sequenceId
         } else if state.logitsSequenceId != sequenceId {
           let cached = state.cachedInputs[sequenceId]?.units ?? []
-          guard case .token(let tokenId) = cached.last?.value else {
+          guard case .token(let tokenId) = cached.last else {
             throw LlamaRuntimeError(
               code: .decodeFailed,
               message: "The sequence has no evaluated tokens to produce logits from."
@@ -242,7 +247,9 @@
       var prefixCount = prefixCount
       var retainedUnits = Array(cached.units.prefix(prefixCount))
       var retainedPositions = retainedUnits.reduce(0) { $0 + $1.positionCount }
-      if state.context?.memoryRemove(sequenceId: sequenceId, from: retainedPositions, to: -1) != true {
+      if state.context?.memoryRemove(sequenceId: sequenceId, from: retainedPositions, to: -1)
+        != true
+      {
         _ = state.context?.memoryRemove(sequenceId: sequenceId, from: 0, to: -1)
         prefixCount = 0
         retainedUnits = []
@@ -267,43 +274,54 @@
     }
 
     private func evaluate(
-      _ evaluation: borrowing LlamaEvaluation,
+      units: ArraySlice<LlamaPreparedInputUnit>,
       input: borrowing LlamaPreparedInput,
       sequenceId: Int,
       multimodalRuntime: LlamaMultimodalRuntime?,
       state: inout State
     ) throws {
-      for segment in evaluation.segments {
-        switch segment {
-        case .tokens(let tokenIds):
-          try self.decode(tokenIds: tokenIds, sequenceId: sequenceId, state: &state)
-        case .media(let chunkIndex, let unit):
+      var start = units.startIndex
+      while start != units.endIndex {
+        switch units[start] {
+        case .token:
+          let end =
+            units[start...]
+            .firstIndex {
+              guard case .media = $0 else { return false }
+              return true
+            } ?? units.endIndex
+          try self.decode(
+            tokenIds: units[start..<end].tokenIds,
+            sequenceId: sequenceId,
+            state: &state
+          )
+          start = end
+        case .media(let media):
           try self.decodeMedia(
-            chunkIndex: chunkIndex,
-            unit: unit,
+            media: media,
             input: input,
             sequenceId: sequenceId,
             multimodalRuntime: multimodalRuntime,
             state: &state
           )
+          start = units.index(after: start)
         }
       }
     }
 
-    private func evaluate(
-      tail: LlamaLogitsEvaluation.Tail,
+    private func evaluateProducingLogits(
+      unit: LlamaPreparedInputUnit,
       input: borrowing LlamaPreparedInput,
       sequenceId: Int,
       multimodalRuntime: LlamaMultimodalRuntime?,
       state: inout State
     ) throws -> LlamaDecodedLogits {
-      switch tail {
+      switch unit {
       case .token(let tokenId):
         try self.decodeProducingLogits(tokenId: tokenId, sequenceId: sequenceId, state: &state)
-      case .media(let chunkIndex, let unit):
+      case .media(let media):
         try self.decodeMediaProducingLogits(
-          chunkIndex: chunkIndex,
-          unit: unit,
+          media: media,
           input: input,
           sequenceId: sequenceId,
           multimodalRuntime: multimodalRuntime,
@@ -356,8 +374,7 @@
     }
 
     private func decodeMedia(
-      chunkIndex: Int,
-      unit: LlamaPreparedInputUnit,
+      media: LlamaPreparedInputUnit.Media,
       input: borrowing LlamaPreparedInput,
       sequenceId: Int,
       multimodalRuntime: LlamaMultimodalRuntime?,
@@ -370,7 +387,7 @@
         try runtime.evaluate(
           input: input,
           context: $0,
-          chunkIndex: chunkIndex,
+          chunkIndex: media.chunkIndex,
           position: position,
           sequenceId: sequenceId,
           batchSize: batchSize
@@ -378,12 +395,11 @@
       }
       state.logitsSequenceId = nil
       state.cachedInputs[sequenceId, default: CachedInput()]
-        .append(media: unit, endingAt: newPosition)
+        .append(media: .media(media), endingAt: newPosition)
     }
 
     private func decodeMediaProducingLogits(
-      chunkIndex: Int,
-      unit: LlamaPreparedInputUnit,
+      media: LlamaPreparedInputUnit.Media,
       input: borrowing LlamaPreparedInput,
       sequenceId: Int,
       multimodalRuntime: LlamaMultimodalRuntime?,
@@ -396,14 +412,14 @@
         try runtime.evaluateProducingLogits(
           input: input,
           context: $0,
-          chunkIndex: chunkIndex,
+          chunkIndex: media.chunkIndex,
           position: position,
           sequenceId: sequenceId,
           batchSize: batchSize
         )
       }
       state.cachedInputs[sequenceId, default: CachedInput()]
-        .append(media: unit, endingAt: evaluated.position)
+        .append(media: .media(media), endingAt: evaluated.position)
       return evaluated.logits
     }
 
@@ -422,6 +438,24 @@
     private func ensureContext(_ state: inout State) throws {
       guard state.context == nil else { return }
       state.context = try self.model.model.createContext(parameters: self.parameters)
+    }
+  }
+
+  // MARK: - LlamaRuntime
+
+  final class LlamaRuntime: Sendable {
+    let sequences: LlamaKVSequenceStore
+
+    init(model: LlamaModelBox, parameters: LlamaContextParameters) {
+      self.sequences = LlamaKVSequenceStore(model: model, parameters: parameters)
+    }
+
+    func fresh() -> Self {
+      Self(model: self.sequences.model, parameters: self.sequences.parameters)
+    }
+
+    func lease(copyingFrom sequenceId: Int?) -> LlamaSequenceLease? {
+      self.sequences.lease(copyingFrom: sequenceId)
     }
   }
 #endif
