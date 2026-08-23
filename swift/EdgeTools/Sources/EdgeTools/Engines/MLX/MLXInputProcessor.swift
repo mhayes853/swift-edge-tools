@@ -10,10 +10,7 @@
     private let processor: (any UserInputProcessor)?
     private let tokenizer: any EdgeToolsTokenizer
 
-    init(
-      processor: (any UserInputProcessor)?,
-      tokenizer: any EdgeToolsTokenizer
-    ) {
+    init(processor: (any UserInputProcessor)?, tokenizer: any EdgeToolsTokenizer) {
       self.processor = processor
       self.tokenizer = tokenizer
     }

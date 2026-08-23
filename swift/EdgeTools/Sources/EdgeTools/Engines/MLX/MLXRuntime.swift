@@ -28,13 +28,6 @@
       self.inputProcessor = inputProcessor
     }
 
-    private func memorySnapshot(synchronize: Bool) -> Memory.Snapshot {
-      if synchronize {
-        Stream.defaultStream(.defaultDevice()).synchronize()
-      }
-      return Memory.snapshot()
-    }
-
     func generate(
       prompt: EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
@@ -44,7 +37,7 @@
       grammarEngine: Profile.GrammarEngine,
       stopper: AnyGenerationTask.Stopper,
       channel: EdgeToolsGenerationChannel,
-      checkpoint: MLXCheckpoint?,
+      checkpoint: MLXPrefixCacheHandle?,
       policy: MLXCachePolicy
     ) async throws -> MLXGenerationResult {
       try Task.checkCancellation()
@@ -78,9 +71,9 @@
         channel: channel,
         grammarEngine: grammarEngine,
         maximumTokenCount: parameters.maxTokens,
-        grammar: { transaction in
+        grammar: {
           try Profile.grammar(
-            prompt: transaction.transcript,
+            prompt: $0.transcript,
             tools: tools,
             parameters: parameters,
             grammarEngine: grammarEngine
@@ -111,7 +104,7 @@
     func prefill(
       prompt: EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
-      checkpoint: MLXCheckpoint?,
+      checkpoint: MLXPrefixCacheHandle?,
       policy: MLXCachePolicy
     ) async throws -> MLXPrefillResult {
       let preparedInput = try await self.input(
@@ -132,17 +125,20 @@
       )
       eval(prepared.state.output.logits)
       eval(prepared.state.cache)
-      let checkpoint = self.store(
-        MLXPrefixCache(state: prepared.state, inputKind: .prefill)
-      )
+      let checkpoint = self.store(MLXPrefixCache(state: prepared.state, inputKind: .prefill))
       var metrics = EdgeToolsMetrics()
       metrics.mlxEnginePostPrefillMemorySnapshot = self.memorySnapshot(synchronize: true)
       metrics.prefillTokens = prepared.tokenCount
       metrics.prefillDuration = start.duration(to: clock.now)
-      return MLXPrefillResult(
-        prefill: EdgeToolsEnginePrefill(metrics: metrics),
-        checkpoint: checkpoint
-      )
+      let prefill = EdgeToolsEnginePrefill(metrics: metrics)
+      return MLXPrefillResult(prefill: prefill, checkpoint: checkpoint)
+    }
+
+    private func memorySnapshot(synchronize: Bool) -> Memory.Snapshot {
+      if synchronize {
+        Stream.defaultStream(.defaultDevice()).synchronize()
+      }
+      return Memory.snapshot()
     }
 
     private func prepareGeneration(
@@ -152,7 +148,7 @@
       processor: (any LogitProcessor)?,
       confidenceOptions: EdgeToolsConfidenceOptions,
       synchronizeMemorySnapshots: Bool,
-      checkpoint: MLXCheckpoint?,
+      checkpoint: MLXPrefixCacheHandle?,
       policy: MLXCachePolicy
     ) async throws -> (generation: MLXGeneration, metrics: EdgeToolsMetrics) {
       let preparedInput = try await self.input(
@@ -206,9 +202,9 @@
       if generation.decoder.tracksTokenConfidence {
         let confidenceValues = top(maskedLogits.flattened(), k: 2)
         eval(confidenceValues, token)
-        generation.decoder.add(
-          confidence: tokenConfidence(unorderedPair: confidenceValues.asArray(Float.self))
-        )
+
+        let confidence = tokenConfidence(unorderedPair: confidenceValues.asArray(Float.self))
+        generation.decoder.add(confidence: confidence)
       }
       let tokenId = token.item(EdgeToolsToken.ID.self)
       generation.processor?.didSample(token: token)
@@ -230,7 +226,7 @@
       _ generation: inout MLXGeneration,
       stopTokenIds: Set<EdgeToolsToken.ID>,
       policy: MLXCachePolicy
-    ) -> MLXCheckpoint {
+    ) -> MLXPrefixCacheHandle {
       if let pendingTokenId = generation.decoder.pendingTokenId,
         !stopTokenIds.contains(pendingTokenId)
       {
@@ -238,16 +234,14 @@
       }
       eval(generation.prefix.output.logits)
       eval(generation.prefix.cache)
-      return self.store(
-        MLXPrefixCache(state: generation.prefix, inputKind: .generation)
-      )
+      return self.store(MLXPrefixCache(state: generation.prefix, inputKind: .generation))
     }
 
     private func input(
       prompt: EdgeToolsTranscript,
       tools: [EdgeToolDefinition],
       kind: EdgeToolsLLMInputKind,
-      checkpoint: MLXCheckpoint?
+      checkpoint: MLXPrefixCacheHandle?
     ) async throws -> (input: LMInput, context: EdgeToolsLLMPrefillContext) {
       let context = EdgeToolsLLMPrefillContext(prompt: prompt, tools: tools)
       if let checkpoint,
@@ -277,7 +271,7 @@
       input: LMInput,
       context: EdgeToolsLLMPrefillContext,
       tokenIds: [EdgeToolsToken.ID],
-      checkpoint: MLXCheckpoint?,
+      checkpoint: MLXPrefixCacheHandle?,
       policy: MLXCachePolicy
     ) throws -> (state: MLXPrefixState, tokenCount: Int) {
       func state(output: LMOutput, cache: [any KVCache]) -> MLXPrefixState {
@@ -291,12 +285,11 @@
       }
       guard
         let checkpoint,
-        let snapshot = self.checkpoints[checkpoint.id]?
-          .state(
-            continuingWith: tokenIds,
-            input: input,
-            context: context
-          )
+        let snapshot = self.checkpoints[checkpoint.id]?.state(
+          continuingWith: tokenIds,
+          input: input,
+          context: context
+        )
       else {
         let parameters = policy.maxKVSize.map { MLXLMCommon.GenerateParameters(maxKVSize: $0) }
         var cache = self.languageModel.newCache(parameters: parameters)
@@ -323,11 +316,11 @@
       return (state(output: output, cache: cache), suffixCount)
     }
 
-    private func store(_ prefixCache: MLXPrefixCache) -> MLXCheckpoint {
+    private func store(_ prefixCache: MLXPrefixCache) -> MLXPrefixCacheHandle {
       self.nextCheckpointID += 1
       let id = self.nextCheckpointID
       self.checkpoints[id] = prefixCache
-      return MLXCheckpoint(id: id) { [weak self] id in
+      return MLXPrefixCacheHandle(id: id) { [weak self] id in
         Task { await self?.removeCheckpoint(id: id) }
       }
     }
@@ -382,10 +375,7 @@
 
   // MARK: - Helpers
 
-  private func quantizeCache(
-    _ cache: inout [any KVCache],
-    quantization: MLXKVCacheQuantization?
-  ) {
+  private func quantizeCache(_ cache: inout [any KVCache], quantization: MLXKVCacheQuantization?) {
     guard let quantization else { return }
     maybeQuantizeKVCache(
       cache: &cache,
@@ -394,5 +384,4 @@
       quantizedKVStart: quantization.startTokenCount
     )
   }
-
 #endif

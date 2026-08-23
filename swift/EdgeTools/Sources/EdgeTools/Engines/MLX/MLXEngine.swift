@@ -194,10 +194,6 @@
       self.tokenizer = tokenizer
     }
 
-    public func context() -> MLXContext<Profile> {
-      self.context(MLXContextParameters(), tools: [])
-    }
-
     public func context(tools: [any EdgeTool]) -> MLXContext<Profile> {
       self.context(MLXContextParameters(), tools: tools)
     }
@@ -338,7 +334,6 @@
         throw EdgeToolsError.incompatibleContext
       }
     }
-
   }
 
   #if XGrammar
@@ -354,9 +349,7 @@
   #if XGrammar
     extension EdgeToolsSession {
       public func clearCaches<Profile>()
-      where
-        Engine == MLXEngine<Profile>,
-        Profile.GrammarEngine == XGrammarEngine
+      where Engine == MLXEngine<Profile>, Profile.GrammarEngine == XGrammarEngine
       {
         self.engine.clearCaches()
       }
@@ -400,10 +393,7 @@
 
   private func mlxVocabularySize(from configurationData: Data) throws -> Int {
     let configuration = try JSONDecoder.json5()
-      .decode(
-        MLXVocabularyConfiguration.self,
-        from: configurationData
-      )
+      .decode(MLXVocabularyConfiguration.self, from: configurationData)
     guard
       let vocabularySize = configuration.vocabularySize
         ?? configuration.textConfiguration?.vocabularySize
@@ -420,7 +410,9 @@
   ) throws -> Set<EdgeToolsToken.ID> {
     var tokenIds = try directory.loadStopTokenIds()
     tokenIds.formUnion(Profile.extraStopTokens.compactMap { tokenizer.token(forText: $0)?.id })
-    if let eosTokenId = tokenizer.eos?.id { tokenIds.remove(eosTokenId) }
+    if let eosTokenId = tokenizer.eos?.id {
+      tokenIds.remove(eosTokenId)
+    }
     return tokenIds
   }
 
@@ -451,10 +443,7 @@
     from directory: MLXModelDirectory,
     into model: sending any LanguageModel,
     configuration: BaseConfiguration,
-    patchWeights: (
-      _ weights: inout [String: MLXArray],
-      _ model: any LanguageModel
-    ) throws -> Void
+    patchWeights: (_ weights: inout [String: MLXArray], _ model: any LanguageModel) throws -> Void
   ) throws -> sending any LanguageModel {
     let safetensors = try directory.loadSafetensors()
     var weights = model.sanitize(
@@ -468,12 +457,9 @@
         return perLayerQuantization.quantization(layer: path)?.asTuple
       }
     }
-    try model.update(
-      parameters: ModuleParameters.unflattened(weights),
-      verify: [.all]
-    )
+    let params = ModuleParameters.unflattened(weights)
+    try model.update(parameters: params, verify: [.all])
     eval(model)
     return model
   }
-
 #endif

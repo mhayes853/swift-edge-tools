@@ -133,10 +133,6 @@
       )
     }
 
-    public func context() -> LlamaContext<Profile> {
-      self.context(EdgeToolsTranscriptContextParameters(), tools: [])
-    }
-
     public func context(tools: [any EdgeTool]) -> LlamaContext<Profile> {
       self.context(EdgeToolsTranscriptContextParameters(), tools: tools)
     }
@@ -212,9 +208,7 @@
       )
     }
 
-    public func prefill(
-      context: LlamaContext<Profile>
-    ) async throws -> EdgeToolsEnginePrefill {
+    public func prefill(context: LlamaContext<Profile>) async throws -> EdgeToolsEnginePrefill {
       try self.validate(context)
       return try await self.prefill(
         snapshot: context.begin(),
@@ -250,12 +244,7 @@
                 )
               },
               prepare: {
-                try await self.prepare(
-                  parser: &$0,
-                  tools: tools,
-                  parameters: parameters,
-                  state: &$1
-                )
+                try await self.prepare(parser: &$0, tools: tools, parameters: parameters, state: &$1)
               },
               decode: { try self.decode(bitmask: $0, state: &$1) }
             )

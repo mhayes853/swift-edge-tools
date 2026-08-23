@@ -15,7 +15,6 @@ public protocol EdgeToolsEngine: Sendable {
   associatedtype GenerateParameters: EdgeToolsEngineGenerateParameters
   associatedtype GenerationTask: EdgeToolsEngineGenerationTask
 
-  func context() -> Context
   func context(tools: [any EdgeTool]) -> Context
   func context(_ parameters: ContextParameters, tools: [any EdgeTool]) -> Context
 
@@ -27,11 +26,13 @@ public protocol EdgeToolsEngine: Sendable {
   ) throws -> GenerationTask
 }
 
-extension EdgeToolsEngine where ContextParameters == Void {
+extension EdgeToolsEngine {
   public func context() -> Context {
-    self.context((), tools: [])
+    self.context(tools: [])
   }
+}
 
+extension EdgeToolsEngine where ContextParameters == Void {
   public func context(tools: [any EdgeTool]) -> Context {
     self.context((), tools: tools)
   }
@@ -58,22 +59,16 @@ extension EdgeToolsEngine {
   ) -> Context {
     self.context(parameters, tools: tools())
   }
-
 }
 
 // MARK: - EdgeToolsTokenizingEngine
 
 public protocol EdgeToolsTokenizingEngine: EdgeToolsEngine {
-  func tokenize(
-    prompt: Prompt,
-    context: Context
-  ) async throws -> [EdgeToolsToken]
+  func tokenize(prompt: Prompt, context: Context) async throws -> [EdgeToolsToken]
 }
 
 extension EdgeToolsTokenizingEngine {
-  public func tokenize(
-    prompt: Prompt
-  ) async throws -> [EdgeToolsToken] {
+  public func tokenize(prompt: Prompt) async throws -> [EdgeToolsToken] {
     try await self.tokenize(prompt: prompt, context: self.context())
   }
 }
@@ -81,10 +76,7 @@ extension EdgeToolsTokenizingEngine {
 // MARK: - EdgeToolsPrefillableEngine
 
 public protocol EdgeToolsPrefillableEngine: EdgeToolsEngine {
-  func prefill(
-    promptPrefix: Prompt,
-    context: Context
-  ) async throws -> EdgeToolsEnginePrefill
+  func prefill(promptPrefix: Prompt, context: Context) async throws -> EdgeToolsEnginePrefill
 }
 
 // MARK: - EdgeToolsEnginePrefill
@@ -138,11 +130,7 @@ public struct EdgeToolsEngineGeneration: Sendable {
 }
 
 extension EdgeToolsEngineGeneration {
-  public static let empty = Self(
-    wasStopped: true,
-    tokens: [],
-    response: ""
-  )
+  public static let empty = Self(wasStopped: true, tokens: [], response: "")
 
   public var isEmpty: Bool {
     self.wasStopped

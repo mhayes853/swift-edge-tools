@@ -297,19 +297,12 @@
       self.media = LlamaPreparedMedia(chunks: consume chunks)
     }
 
-    private init(
-      media: LlamaPreparedMedia,
-      units: [LlamaPreparedInputUnit]
-    ) {
+    private init(media: LlamaPreparedMedia, units: [LlamaPreparedInputUnit]) {
       self.media = media
       self.units = units
     }
 
-    func replacingText(
-      _ text: String,
-      mediaMarker: String,
-      tokenizer: LlamaTokenizer
-    ) throws -> Self? {
+    func replacingText(_ text: String, mediaMarker: String, tokenizer: LlamaTokenizer) throws -> Self? {
       guard let preparedMedia = self.media else { return nil }
       let mediaUnits = self.units.compactMap { unit -> LlamaPreparedInputUnit? in
         guard case .media = unit else { return nil }
@@ -538,10 +531,7 @@
     }
   }
 
-  private func llamaTextSegments(
-    _ text: String,
-    separatedBy separator: String
-  ) -> [Substring] {
+  private func llamaTextSegments(_ text: String, separatedBy separator: String) -> [Substring] {
     guard !separator.isEmpty else { return [text[...]] }
     var segments = [Substring]()
     var remainder = text[...]

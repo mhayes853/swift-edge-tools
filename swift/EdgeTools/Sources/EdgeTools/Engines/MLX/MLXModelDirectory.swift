@@ -19,13 +19,10 @@
         self.url.appending(path: "configuration.json"),
         self.url.appending(path: "config.json")
       ]
-      guard
-        let configurationURL = configurationURLs.first(where: {
-          FileManager.default.fileExists(atPath: $0.path())
-        })
-      else {
-        throw EdgeToolsError.failedToLoadConfiguration
+      let configurationURL = configurationURLs.first {
+        FileManager.default.fileExists(atPath: $0.path())
       }
+      guard let configurationURL else { throw EdgeToolsError.failedToLoadConfiguration }
       return try Data(contentsOf: configurationURL)
     }
 
@@ -61,20 +58,15 @@
     ) throws -> GenerationConfigFile? {
       let configurationURL = self.url.appending(path: "generation_config.json")
       guard FileManager.default.fileExists(atPath: configurationURL.path()) else { return nil }
-      return try decoder.decode(
-        GenerationConfigFile.self,
-        from: Data(contentsOf: configurationURL)
-      )
+      let data = Data(contentsOf: configurationURL)
+      return try decoder.decode(GenerationConfigFile.self, from: data)
     }
 
     public func loadDefaultSampling() throws -> EdgeToolsFusedSamplingParameters? {
       let configurationURL = self.url.appending(path: "generation_config.json")
       guard FileManager.default.fileExists(atPath: configurationURL.path()) else { return nil }
       let configuration = try JSONDecoder.json5()
-        .decode(
-          MLXSamplingConfiguration.self,
-          from: Data(contentsOf: configurationURL)
-        )
+        .decode(MLXSamplingConfiguration.self, from: Data(contentsOf: configurationURL))
       return configuration.samplingParameters
     }
 
@@ -90,14 +82,11 @@
     }
 
     public func safetensorURLs() throws -> [URL] {
-      guard
-        let enumerator = FileManager.default.enumerator(
-          at: self.url,
-          includingPropertiesForKeys: nil
-        )
-      else {
-        throw EdgeToolsError.missingModelWeights
-      }
+      let enumerator = FileManager.default.enumerator(
+        at: self.url,
+        includingPropertiesForKeys: nil
+      )
+      guard let enumerator else { throw EdgeToolsError.missingModelWeights }
       var urls = [URL]()
       for case let url as URL in enumerator where url.pathExtension == "safetensors" {
         urls.append(url)
@@ -130,10 +119,7 @@
     public var weights: [String: MLXArray]
     public var metadataByFile: [URL: [String: String]]
 
-    public init(
-      weights: [String: MLXArray],
-      metadataByFile: [URL: [String: String]]
-    ) {
+    public init(weights: [String: MLXArray], metadataByFile: [URL: [String: String]]) {
       self.weights = weights
       self.metadataByFile = metadataByFile
     }

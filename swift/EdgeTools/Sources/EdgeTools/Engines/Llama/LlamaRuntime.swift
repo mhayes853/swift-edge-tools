@@ -15,9 +15,7 @@
 
     public static let f32 = Self(rawValue: 0)
     public static let f16 = Self(rawValue: 1)
-    // pi-lens-ignore: identifier_name
     public static let q4_0 = Self(rawValue: 2)
-    // pi-lens-ignore: identifier_name
     public static let q8_0 = Self(rawValue: 8)
   }
 
@@ -97,6 +95,10 @@
   // primitives return one, so a path that claims to produce logits cannot skip decoding.
   struct LlamaDecodedLogits {
     let sequenceId: Int
+
+    fileprivate init(sequenceId: Int) {
+      self.sequenceId = sequenceId
+    }
   }
 
   // MARK: - LlamaRuntimeContext
@@ -116,9 +118,7 @@
     init(handle: OpaquePointer) {
       self.handle = handle
       self.batch = UnsafeMutablePointer.allocate(capacity: 1)
-      self.batch.initialize(
-        to: llama_batch_init(Int32(clamping: llama_n_batch(handle)), 0, 1)
-      )
+      self.batch.initialize(to: llama_batch_init(Int32(clamping: llama_n_batch(handle)), 0, 1))
     }
 
     deinit {
@@ -190,22 +190,14 @@
     }
 
     borrowing func memoryRemove(sequenceId: Int, from: Int, to: Int) -> Bool {
-      llama_memory_seq_rm(
-        llama_get_memory(self.handle), Int32(sequenceId), Int32(from), Int32(to)
-      )
+      llama_memory_seq_rm(llama_get_memory(self.handle), Int32(sequenceId), Int32(from), Int32(to))
     }
 
     borrowing func memoryCopy(source: Int, destination: Int, from: Int, to: Int) -> Bool {
       let memory = llama_get_memory(self.handle)
       let sourceMinimumPosition = llama_memory_seq_pos_min(memory, Int32(source))
       let sourceMaximumPosition = llama_memory_seq_pos_max(memory, Int32(source))
-      llama_memory_seq_cp(
-        memory,
-        Int32(source),
-        Int32(destination),
-        Int32(from),
-        Int32(to)
-      )
+      llama_memory_seq_cp(memory, Int32(source), Int32(destination), Int32(from), Int32(to))
       return llama_memory_seq_pos_min(memory, Int32(destination)) == sourceMinimumPosition
         && llama_memory_seq_pos_max(memory, Int32(destination)) == sourceMaximumPosition
     }
