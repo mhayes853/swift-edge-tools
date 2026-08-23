@@ -42,9 +42,6 @@ public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable {
     }
   }
 
-  private func resolveContext(_ context: Engine.Context?) -> Engine.Context {
-    context ?? self.context()
-  }
 }
 
 // MARK: - Contexts
@@ -77,7 +74,7 @@ extension EdgeToolsSession where Engine: EdgeToolsTokenizingEngine {
     prompt: Engine.Prompt,
     context: Engine.Context? = nil
   ) async throws -> [EdgeToolsToken] {
-    let context = self.resolveContext(context)
+    let context = context ?? self.context()
     return try await self.engine.tokenize(
       prompt: prompt,
       context: context

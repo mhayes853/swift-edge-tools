@@ -90,7 +90,6 @@ let package = Package(
           name: "_EdgeToolsJavaScript",
           condition: .when(traits: ["JS"])
         ),
-        .product(name: "yyjson", package: "yyjson"),
         .product(name: "HeapModule", package: "swift-collections"),
         .product(name: "OrderedCollections", package: "swift-collections"),
         .product(name: "Atomics", package: "swift-atomics"),
