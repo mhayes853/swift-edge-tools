@@ -21,9 +21,7 @@
       for context: EdgeToolsLLMPrefillContext,
       kind: EdgeToolsLLMInputKind
     ) -> LMInput? {
-      guard self.state.context == context, self.inputKind == kind else {
-        return nil
-      }
+      guard self.state.context == context, self.inputKind == kind else { return nil }
       return self.state.input
     }
 

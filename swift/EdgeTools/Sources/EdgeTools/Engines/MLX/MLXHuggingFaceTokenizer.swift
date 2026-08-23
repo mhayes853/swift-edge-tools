@@ -8,7 +8,7 @@
   // MARK: - HuggingFaceTokenizer + MLXLMCommon
 
   extension HuggingFaceTokenizer {
-    package var mlxTokenizer: any MLXLMCommon.Tokenizer {
+    var mlxTokenizer: any MLXLMCommon.Tokenizer {
       MLXHuggingFaceTokenizerAdapter(tokenizer: self)
     }
   }
@@ -41,11 +41,16 @@
       tools: [[String: any Sendable]]?,
       additionalContext: [String: any Sendable]?
     ) throws -> [Int] {
-      try self.tokenizer.applyChatTemplate(
-        messages: try messages.map { try EdgeToolsValue(sendable: $0) },
-        tools: try tools?.map { try EdgeToolsValue(sendable: $0) },
+      let messageValues = try messages.map { try EdgeToolsValue(sendable: $0) }
+      let toolValues = try tools?.map { try EdgeToolsValue(sendable: $0) }
+      let additionalContextValues = try additionalContext?.mapValues {
+        try EdgeToolsValue(sendable: $0)
+      }
+      return try self.tokenizer.applyChatTemplate(
+        messages: messageValues,
+        tools: toolValues,
         addGenerationPrompt: true,
-        additionalContext: try additionalContext?.mapValues { try EdgeToolsValue(sendable: $0) }
+        additionalContext: additionalContextValues
       ).map(\.id)
     }
   }
@@ -53,7 +58,7 @@
   // MARK: - Untyped Conversion
 
   extension EdgeToolsValue {
-    package init(sendable value: any Sendable) throws {
+    fileprivate init(sendable value: any Sendable) throws {
       switch value {
       case let value as EdgeToolsValue: self = value
       case let value as String: self = .string(value)

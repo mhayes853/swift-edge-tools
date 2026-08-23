@@ -10,11 +10,7 @@
     public var groupSize: Int
     public var startTokenCount: Int
 
-    public init(
-      bits: Int,
-      groupSize: Int = 64,
-      startTokenCount: Int = 0
-    ) {
+    public init(bits: Int, groupSize: Int = 64, startTokenCount: Int = 0) {
       self.bits = bits
       self.groupSize = groupSize
       self.startTokenCount = startTokenCount
@@ -58,7 +54,7 @@
     }
   }
 
-  final class MLXCheckpoint: Sendable {
+  final class MLXPrefixCacheHandle: Sendable {
     let id: UInt64
     private let release: @Sendable (UInt64) -> Void
 
@@ -74,21 +70,21 @@
 
   struct MLXPrefillResult: Sendable {
     let prefill: EdgeToolsEnginePrefill
-    let checkpoint: MLXCheckpoint
+    let checkpoint: MLXPrefixCacheHandle
   }
 
   struct MLXGenerationResult: Sendable {
     var generation: EdgeToolsEngineGeneration
-    let checkpoint: MLXCheckpoint?
+    let checkpoint: MLXPrefixCacheHandle?
   }
 
   // MARK: - MLXModelState
 
   public struct MLXModelState<Profile: MLXModelProfile>: Sendable {
     let policy: MLXCachePolicy
-    var checkpoint: MLXCheckpoint?
+    var checkpoint: MLXPrefixCacheHandle?
 
-    init(policy: MLXCachePolicy, checkpoint: MLXCheckpoint? = nil) {
+    init(policy: MLXCachePolicy, checkpoint: MLXPrefixCacheHandle? = nil) {
       self.policy = policy
       self.checkpoint = checkpoint
     }

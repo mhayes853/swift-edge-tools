@@ -47,6 +47,15 @@
       )
     }
 
+    @Test
+    func `Projects Backend Metadata In Stable Order`() throws {
+      let tokenizer = try self.makeTokenizer()
+      expectNoDifference(
+        tokenizer.backendJSON,
+        #"{"normalizer":{ "type": "Lowercase" },"pre_tokenizer":{ "type": "Whitespace" }}"#
+      )
+    }
+
     #if XGrammar
       @Test
       func `Builds Tokenizer Info From A Sparse Vocabulary`() throws {

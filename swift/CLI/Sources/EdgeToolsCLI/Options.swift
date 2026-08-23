@@ -33,7 +33,7 @@ struct ModelSourceOptions: ParsableArguments {
     default:
       break
     }
-    if self.path != nil, self.revision != "main" || self.cacheDirectory != nil {
+    if self.path != nil && (self.revision != "main" || self.cacheDirectory != nil) {
       throw ValidationError("--revision and --cache-dir do not apply to --path.")
     }
   }
@@ -242,8 +242,8 @@ struct SamplingOptions: ParsableArguments {
     if let topK = self.topK, topK < 0 {
       throw ValidationError("--top-k must be at least 0.")
     }
-    if let topP = self.topP, !(0...1).contains(topP) {
-      throw ValidationError("--top-p must be between 0 and 1.")
+    if let topP = self.topP, !(topP > 0 && topP <= 1) {
+      throw ValidationError("--top-p must be greater than 0 and at most 1.")
     }
     if let minP = self.minP, !(0...1).contains(minP) {
       throw ValidationError("--min-p must be between 0 and 1.")

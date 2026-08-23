@@ -7,7 +7,7 @@ import Testing
 
 @Suite
 struct `LFM2P5 tests` {
-  #if MLX && XGrammar && canImport(MLX) && !os(WASI)
+  #if MLX && canImport(MLX) && !os(WASI)
     @Suite(.serialized, .enabledIfMLXTests())
     struct `LFM2P5MLXModelEngine tests` {
       @Test
@@ -162,7 +162,7 @@ struct `LFM2P5 tests` {
     }
   #endif
 
-  #if HuggingFaceTokenizers && Llama && XGrammar && canImport(CLlama) && !os(WASI)
+  #if HuggingFaceTokenizers && Llama && canImport(CLlama) && !os(WASI)
     @Suite(.serialized)
     struct `LFM2P5LlamaModelEngine tests` {
       @Test

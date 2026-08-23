@@ -1,4 +1,4 @@
-#if MLX && XGrammar && canImport(MLX)
+#if MLX && canImport(MLX)
   import EdgeToolsXGrammar
 
   public struct LFM2P5MLXProfile: MLXLLMModelProfile {
@@ -21,7 +21,7 @@
   public typealias LFM2P5MLXModelEngine = MLXEngine<LFM2P5MLXProfile>
 #endif
 
-#if Llama && XGrammar && canImport(CLlama)
+#if Llama && canImport(CLlama)
   import EdgeToolsXGrammar
 
   public struct LFM2P5LlamaProfile: LlamaModelProfile {

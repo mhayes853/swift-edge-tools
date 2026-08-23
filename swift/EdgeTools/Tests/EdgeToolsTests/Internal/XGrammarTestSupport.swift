@@ -137,14 +137,21 @@ struct TestGenerationParser: EdgeToolsGenerationParser, Sendable {
   }
 
   private static func toolCalls(in json: String) -> [EdgeRawToolCall]? {
-    guard let value = try? EdgeToolsValue(json: json) else { return nil }
+    guard let value = try? EdgeToolsValue(json: Array(json.utf8)) else { return nil }
     let values: [EdgeToolsValue]
     if case .array(let array) = value {
       values = array
     } else {
       values = [value]
     }
-    return values.compactMap(EdgeRawToolCall.init(jsonValue:))
+    return values.compactMap { value in
+      guard
+        case .object(let object) = value,
+        case .string(let name) = object["name"],
+        let arguments = object["arguments"]
+      else { return nil }
+      return EdgeRawToolCall(name: name, arguments: arguments)
+    }
   }
 
 }

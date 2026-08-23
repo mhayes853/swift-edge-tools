@@ -2,7 +2,7 @@
   import EdgeToolsXGrammar
 #endif
 
-#if MLX && XGrammar && canImport(MLX)
+#if MLX && canImport(MLX)
   import EdgeToolsCore
 
   public struct FunctionGemmaMLXProfile: MLXLLMModelProfile {
@@ -29,7 +29,7 @@
   public typealias FunctionGemmaMLXModelEngine = MLXEngine<FunctionGemmaMLXProfile>
 #endif
 
-#if Llama && XGrammar && canImport(CLlama)
+#if Llama && canImport(CLlama)
   import EdgeToolsCore
 
   public struct FunctionGemmaLlamaProfile: LlamaModelProfile {

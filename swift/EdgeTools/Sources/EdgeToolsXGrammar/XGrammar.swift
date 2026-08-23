@@ -46,9 +46,6 @@ public struct XGRError: Error, Hashable, Sendable {
     /// Invalid ``XGRTokenizerInfo``.
     public static let invalidTokenizerInfo = Self(rawValue: "invalid-tokenizer-info")
 
-    /// Invalid HuggingFace metadata.
-    public static let invalidHuggingFaceMetadata = Self(rawValue: "invalid-hugging-face-metadata")
-
     /// An invalid JSON Schema configuration.
     public static let invalidJSONSchemaConfiguration = Self(
       rawValue: "invalid-json-schema-configuration"
@@ -515,11 +512,6 @@ public struct XGRGrammar: ~Copyable, @unchecked Sendable {
     try EdgeToolsXGrammar.concatenate(self, grammar)
   }
 
-  /// Produces a concatenated grammar with this grammar and other grammars.
-  ///
-  /// - Parameters:
-  ///   - grammars: The other grammars, matched in order after this grammar.
-  /// - Returns: An ``XGRGrammar``.
   /// Produces a unioned grammar with this grammar and another grammar.
   ///
   /// - Parameters:
@@ -529,11 +521,6 @@ public struct XGRGrammar: ~Copyable, @unchecked Sendable {
     try EdgeToolsXGrammar.union(self, grammar)
   }
 
-  /// Produces a unioned grammar with this grammar and other grammars.
-  ///
-  /// - Parameters:
-  ///   - grammars: The other accepted alternatives.
-  /// - Returns: An ``XGRGrammar``.
   /// Concatenates two grammars.
   ///
   /// The resulting grammar accepts an input only when it first matches ``lhs`` and then matches

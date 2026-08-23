@@ -7,7 +7,7 @@ import Testing
 
 @Suite
 struct `Qwen3P5 tests` {
-  #if MLX && XGrammar && canImport(MLX) && !os(WASI)
+  #if MLX && canImport(MLX) && !os(WASI)
     @Test
     func `Default Sampling Follows The Reasoning Effort`() {
       let thinking = Qwen3P5MLXProfile.defaultSampling(
@@ -27,7 +27,7 @@ struct `Qwen3P5 tests` {
 
   #endif
 
-  #if MLX && XGrammar && canImport(MLX) && !os(WASI)
+  #if MLX && canImport(MLX) && !os(WASI)
     @Suite(.serialized, .enabledIfMLXTests())
     struct `Qwen3P5MLXModelEngine tests` {
       @Test
@@ -81,7 +81,10 @@ struct `Qwen3P5 tests` {
             )
           )
           let context = engine.context(parameters)
-          let initial = try await engine.prefill(context: context)
+          let initial = try await engine.prefill(
+            promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+            context: context
+          )
           let prompt = EdgeToolsTranscript.UserMessage("Answer red or blue.")
 
           let forked = try await qwenVLMGeneration(
@@ -138,7 +141,7 @@ struct `Qwen3P5 tests` {
     #endif
   #endif
 
-  #if HuggingFaceTokenizers && Llama && XGrammar && canImport(CLlama) && !os(WASI)
+  #if HuggingFaceTokenizers && Llama && canImport(CLlama) && !os(WASI)
     @Suite(.serialized)
     struct `Qwen3P5LlamaModelEngine tests` {
       @Test
@@ -154,7 +157,10 @@ struct `Qwen3P5 tests` {
           reasoningEffort: .none
         )
         let context = engine.context(parameters)
-        _ = try await engine.prefill(context: context)
+        _ = try await engine.prefill(
+          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+          context: context
+        )
 
         let forked = try await qwenLlamaGeneration(
           using: engine,
@@ -179,7 +185,10 @@ struct `Qwen3P5 tests` {
           reasoningEffort: .none
         )
         let context = engine.context(parameters)
-        _ = try await engine.prefill(context: context)
+        _ = try await engine.prefill(
+          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+          context: context
+        )
 
         let forked = try await qwenLlamaGeneration(
           using: engine,
@@ -204,7 +213,10 @@ struct `Qwen3P5 tests` {
           reasoningEffort: .none
         )
         let context = engine.context(parameters)
-        _ = try await engine.prefill(context: context)
+        _ = try await engine.prefill(
+          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+          context: context
+        )
         let prompt = EdgeToolsTranscript.UserMessage(
           "Is this image also red?",
           images: [try llamaRedImageAsset()]
@@ -289,7 +301,7 @@ struct `Qwen3P5 tests` {
   #endif
 }
 
-#if MLX && XGrammar && canImport(MLX) && canImport(CoreImage) && canImport(MLXVLM) && !os(WASI)
+#if MLX && canImport(MLX) && canImport(CoreImage) && canImport(MLXVLM) && !os(WASI)
   private func qwenVLMGeneration(
     using engine: Qwen3P5VLMLXModelEngine,
     prompt: EdgeToolsTranscript.UserMessage,
@@ -309,7 +321,7 @@ struct `Qwen3P5 tests` {
   }
 #endif
 
-#if HuggingFaceTokenizers && Llama && XGrammar && canImport(CLlama) && !os(WASI)
+#if HuggingFaceTokenizers && Llama && canImport(CLlama) && !os(WASI)
   private func qwenLlamaImagePrefix() throws -> EdgeToolsTranscript {
     EdgeToolsTranscript(
       messages: [

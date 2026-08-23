@@ -41,13 +41,6 @@ export class PromiseQueue {
 	}
 }
 
-export function isBrowserEnvironment(): boolean {
-	return (
-		typeof globalThis.document !== "undefined" ||
-		typeof globalThis.WorkerGlobalScope !== "undefined"
-	);
-}
-
 export function isNodeLikeEnvironment(): boolean {
 	return (
 		globalThis.process?.versions?.node !== undefined ||

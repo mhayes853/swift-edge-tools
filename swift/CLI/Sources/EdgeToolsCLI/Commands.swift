@@ -15,11 +15,6 @@ public struct EdgeCommand: AsyncParsableCommand {
 }
 
 extension EdgeCommand {
-  public static func main() async {
-    initializeLlamaBackendIfRequested(arguments: CommandLine.arguments)
-    await self.main(nil)
-  }
-
   public static func run(
     arguments: [String],
     context: EdgeContext

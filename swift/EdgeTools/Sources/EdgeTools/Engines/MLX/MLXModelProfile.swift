@@ -100,6 +100,5 @@
         self.synchronizeStreamForMemorySnapshots = synchronizeStreamForMemorySnapshots
       }
     }
-
   #endif
 #endif

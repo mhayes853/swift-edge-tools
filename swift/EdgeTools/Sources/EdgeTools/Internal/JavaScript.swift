@@ -7,7 +7,7 @@
   // MARK: - JSRemote
 
   extension JSRemote where T == JSObject {
-    package func promiseValue(
+    func promiseValue(
       failure: @Sendable @escaping (JSValue?) -> any Error,
       operation: @Sendable @escaping (JSObject) -> JSValue
     ) async throws {
@@ -18,7 +18,7 @@
       )
     }
 
-    package func promiseValue<Output: Sendable>(
+    func promiseValue<Output: Sendable>(
       transform: @Sendable @escaping (JSValue) throws -> Output,
       failure: @Sendable @escaping (JSValue?) -> any Error,
       operation: @Sendable @escaping (JSObject) -> JSValue
@@ -55,7 +55,7 @@
   // MARK: - JSObject
 
   extension JSObject {
-    package func promisingCall(
+    func promisingCall(
       this receiver: JSObject? = nil,
       arguments: [JSValue] = []
     ) -> JSValue {

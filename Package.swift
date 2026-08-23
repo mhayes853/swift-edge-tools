@@ -90,7 +90,6 @@ let package = Package(
           name: "_EdgeToolsJavaScript",
           condition: .when(traits: ["JS"])
         ),
-        .product(name: "yyjson", package: "yyjson"),
         .product(name: "HeapModule", package: "swift-collections"),
         .product(name: "OrderedCollections", package: "swift-collections"),
         .product(name: "Atomics", package: "swift-atomics"),
@@ -410,7 +409,6 @@ let package = Package(
         .product(name: "SwiftSyntax", package: "swift-syntax"),
         .product(name: "SwiftSyntaxBuilder", package: "swift-syntax"),
         .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
-        .product(name: "SwiftParser", package: "swift-syntax"),
         .product(name: "SwiftDiagnostics", package: "swift-syntax")
       ],
       path: "swift/EdgeTools/Sources/EdgeToolsMacros"

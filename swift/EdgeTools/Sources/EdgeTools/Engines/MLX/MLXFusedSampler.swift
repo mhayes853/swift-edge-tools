@@ -167,10 +167,11 @@
     }
     guard let topP = parameters.topP, topP < 1 else { return logProbabilities }
 
-    let ascending = argSort(logProbabilities, axis: -1)
-    let sorted = takeAlong(logProbabilities, ascending, axis: -1)
-    let cumulative = cumsum(exp(sorted), axis: -1)
-    let filtered = MLX.where(cumulative .> (1 - topP), sorted, -Float.infinity)
-    return putAlong(logProbabilities, ascending, values: filtered, axis: -1)
+    let descending = argSort(-logProbabilities, axis: -1)
+    let sorted = takeAlong(logProbabilities, descending, axis: -1)
+    let probabilities = exp(sorted)
+    let exclusive = cumsum(probabilities, axis: -1) - probabilities
+    let filtered = MLX.where(exclusive .< topP, sorted, -Float.infinity)
+    return putAlong(logProbabilities, descending, values: filtered, axis: -1)
   }
 #endif

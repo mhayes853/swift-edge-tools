@@ -5,7 +5,7 @@ import OrderedCollections
   import EdgeToolsXGrammar
 #endif
 
-#if MLX && XGrammar && canImport(MLX)
+#if MLX && canImport(MLX)
   import EdgeToolsTokenizers
 
   // MARK: - Qwen3P5 Model
@@ -64,7 +64,7 @@ import OrderedCollections
   public typealias Qwen3P5MLXModelEngine = MLXEngine<Qwen3P5MLXProfile>
 #endif
 
-#if Llama && XGrammar && canImport(CLlama)
+#if Llama && canImport(CLlama)
   public struct Qwen3P5LlamaProfile:
     LlamaModelProfile,
     EdgeToolsMultimodalModelProfile {
@@ -128,7 +128,7 @@ import OrderedCollections
   public typealias Qwen3P5VLLlamaModelEngine = LlamaEngine<Qwen3P5VLLlamaProfile>
 #endif
 
-#if MLX && XGrammar && canImport(CoreImage) && canImport(MLX) && canImport(MLXVLM)
+#if MLX && canImport(CoreImage) && canImport(MLX) && canImport(MLXVLM)
   import Foundation
   import MLXLMCommon
   import MLXVLM

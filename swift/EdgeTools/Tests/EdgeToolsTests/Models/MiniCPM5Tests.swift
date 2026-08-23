@@ -7,7 +7,7 @@ import Testing
 
 @Suite
 struct `MiniCPM5 tests` {
-  #if MLX && XGrammar && canImport(MLX) && !os(WASI)
+  #if MLX && canImport(MLX) && !os(WASI)
     @Suite(.serialized, .enabledIfMLXTests())
     struct `MiniCPM5MLXModelEngine tests` {
       @Test
@@ -191,7 +191,7 @@ struct `MiniCPM5 tests` {
     }
   #endif
 
-  #if HuggingFaceTokenizers && Llama && XGrammar && canImport(CLlama) && !os(WASI)
+  #if HuggingFaceTokenizers && Llama && canImport(CLlama) && !os(WASI)
     @Suite(.serialized)
     struct `MiniCPM5LlamaModelEngine tests` {
       @Test

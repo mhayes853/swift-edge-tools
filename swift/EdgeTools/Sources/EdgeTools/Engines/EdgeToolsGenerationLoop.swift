@@ -67,48 +67,28 @@ struct EdgeToolsGenerationLoop: Sendable {
       let tokenId = try await decode(matcher.grammarBitmask(), &state)
       durationToFirstToken = durationToFirstToken ?? clock.duration(since: generateStart)
 
-      let tokenString = detokenizer.decode(tokenId: tokenId, using: self.tokenizer)
-      let token = EdgeToolsToken(id: tokenId, stringValue: tokenString)
-      generatedTokens.append(token)
-      guard matcher.accept(tokenId: token.id) else {
-        throw EdgeToolsError.grammarRejectedToken(token: token)
-      }
-
-      channel.emit(token: token)
-      let parsedParts =
-        self.stopTokenIds.contains(token.id)
-        ? []
-        : parser.accept(token: token)
-      for part in parsedParts {
-        parts.append(part)
-        channel.emit(part: part)
-      }
+      try self.process(
+        tokenId: tokenId,
+        matcher: &matcher,
+        detokenizer: &detokenizer,
+        generatedTokens: &generatedTokens,
+        parser: &parser,
+        parts: &parts,
+        channel: channel
+      )
     }
 
-    for part in parser.finish() {
-      parts.append(part)
-      channel.emit(part: part)
-    }
-
-    let finalDurationToFirstToken = durationToFirstToken ?? .zero
-    var responseTokenIds = detokenizer.tokenIds
-    if let lastTokenId = responseTokenIds.last,
-      self.stopTokenIds.contains(lastTokenId)
-    {
-      responseTokenIds.removeLast()
-    }
-    let response = self.tokenizer.decode(tokens: responseTokenIds)
-    let decodeDuration = clock.duration(since: generateStart) - finalDurationToFirstToken
-    var metrics = preparation.metrics
-    metrics.decodeTokens = generatedTokens.count
-    metrics.decodeDuration = decodeDuration
-    metrics.durationToFirstToken = finalDurationToFirstToken
-    return EdgeToolsEngineGeneration(
-      wasStopped: stopper.isStopped,
-      tokens: generatedTokens,
-      response: response,
-      parts: parts,
-      metrics: metrics
+    return self.generation(
+      stopper: stopper,
+      parser: &parser,
+      preparation: preparation,
+      clock: clock,
+      generateStart: generateStart,
+      durationToFirstToken: durationToFirstToken,
+      detokenizer: detokenizer,
+      generatedTokens: generatedTokens,
+      parts: &parts,
+      channel: channel
     )
   }
 
@@ -150,24 +130,72 @@ struct EdgeToolsGenerationLoop: Sendable {
       let tokenId = try decode(matcher.grammarBitmask(), &state)
       durationToFirstToken = durationToFirstToken ?? clock.duration(since: generateStart)
 
-      let tokenString = detokenizer.decode(tokenId: tokenId, using: self.tokenizer)
-      let token = EdgeToolsToken(id: tokenId, stringValue: tokenString)
-      generatedTokens.append(token)
-      guard matcher.accept(tokenId: token.id) else {
-        throw EdgeToolsError.grammarRejectedToken(token: token)
-      }
-
-      channel.emit(token: token)
-      let parsedParts =
-        self.stopTokenIds.contains(token.id)
-        ? []
-        : parser.accept(token: token)
-      for part in parsedParts {
-        parts.append(part)
-        channel.emit(part: part)
-      }
+      try self.process(
+        tokenId: tokenId,
+        matcher: &matcher,
+        detokenizer: &detokenizer,
+        generatedTokens: &generatedTokens,
+        parser: &parser,
+        parts: &parts,
+        channel: channel
+      )
     }
 
+    return self.generation(
+      stopper: stopper,
+      parser: &parser,
+      preparation: preparation,
+      clock: clock,
+      generateStart: generateStart,
+      durationToFirstToken: durationToFirstToken,
+      detokenizer: detokenizer,
+      generatedTokens: generatedTokens,
+      parts: &parts,
+      channel: channel
+    )
+  }
+
+  private func process<Parser, Matcher: ~Copyable>(
+    tokenId: EdgeToolsToken.ID,
+    matcher: inout Matcher,
+    detokenizer: inout StreamingDetokenizer,
+    generatedTokens: inout [EdgeToolsToken],
+    parser: inout Parser,
+    parts: inout [EdgeToolsGenerationPart],
+    channel: EdgeToolsGenerationChannel
+  ) throws
+  where Parser: EdgeToolsGenerationParser, Matcher: EdgeToolsGrammarMatcher {
+    let tokenString = detokenizer.decode(tokenId: tokenId, using: self.tokenizer)
+    let token = EdgeToolsToken(id: tokenId, stringValue: tokenString)
+    generatedTokens.append(token)
+    guard matcher.accept(tokenId: token.id) else {
+      throw EdgeToolsError.grammarRejectedToken(token: token)
+    }
+
+    channel.emit(token: token)
+    let parsedParts =
+      self.stopTokenIds.contains(token.id)
+      ? []
+      : parser.accept(token: token)
+    for part in parsedParts {
+      parts.append(part)
+      channel.emit(part: part)
+    }
+  }
+
+  private func generation<Parser>(
+    stopper: AnyGenerationTask.Stopper,
+    parser: inout Parser,
+    preparation: Preparation,
+    clock: GenerationClock,
+    generateStart: GenerationClock.Instant,
+    durationToFirstToken: Duration?,
+    detokenizer: StreamingDetokenizer,
+    generatedTokens: [EdgeToolsToken],
+    parts: inout [EdgeToolsGenerationPart],
+    channel: EdgeToolsGenerationChannel
+  ) -> EdgeToolsEngineGeneration
+  where Parser: EdgeToolsGenerationParser {
     for part in parser.finish() {
       parts.append(part)
       channel.emit(part: part)
