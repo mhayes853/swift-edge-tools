@@ -6,13 +6,13 @@ import EdgeToolsCore
 
 // MARK: - Gemma Tool Call Format
 
-package struct GemmaToolCallFormat: Hashable, Sendable {
-  package var opener: String
-  package var closer: String
-  package var stringMarker: String
-  package var marksAllValues: Bool
+struct GemmaToolCallFormat: Hashable, Sendable {
+  var opener: String
+  var closer: String
+  var stringMarker: String
+  var marksAllValues: Bool
 
-  package static var functionGemma: Self {
+  static var functionGemma: Self {
     Self(
       opener: "<start_function_call>",
       closer: "<end_function_call>",
@@ -21,7 +21,7 @@ package struct GemmaToolCallFormat: Hashable, Sendable {
     )
   }
 
-  package static var gemma4: Self {
+  static var gemma4: Self {
     Self(
       opener: "<|tool_call>",
       closer: "<tool_call|>",

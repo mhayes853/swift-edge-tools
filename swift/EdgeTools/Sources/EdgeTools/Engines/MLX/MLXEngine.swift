@@ -258,27 +258,6 @@
       )
     }
 
-    package func prefill(context: MLXContext<Profile>) async throws -> EdgeToolsEnginePrefill {
-      try self.validate(context)
-      let definitions = context.tools.map { $0.definition }
-      return try await self.prefill(snapshot: context.begin(), tools: definitions, context: context)
-    }
-
-    package func generate(
-      parameters: sending Profile.GenerateParameters,
-      context: MLXContext<Profile>,
-      channel: sending EdgeToolsGenerationChannel
-    ) throws -> AnyGenerationTask {
-      try self.validate(context)
-      return self.generationTask(
-        tools: context.tools.map { $0.definition },
-        parameters: parameters,
-        context: context,
-        channel: channel,
-        snapshot: { try context.begin() }
-      )
-    }
-
     private func generationTask(
       tools: [EdgeToolDefinition],
       parameters: sending Profile.GenerateParameters,

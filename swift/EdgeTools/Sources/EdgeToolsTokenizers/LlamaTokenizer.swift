@@ -11,7 +11,7 @@
   // MARK: - LlamaTokenizer
 
   public final class LlamaTokenizer: EdgeToolsTokenizer, Sendable {
-    package let model: LlamaModelBox
+    private let model: LlamaModelBox
 
     private nonisolated(unsafe) let vocabulary: OpaquePointer
 

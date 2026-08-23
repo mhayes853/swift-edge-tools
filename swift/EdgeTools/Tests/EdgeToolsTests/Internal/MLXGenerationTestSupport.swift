@@ -87,6 +87,7 @@
 
     context.transcript.messages.append(.tool(name: "getWeather", response: .string(toolOutput)))
     let responseTask = try session.engine.generate(
+      prompt: EdgeToolsTranscript.Prompt(messages: []),
       parameters: MLXGenerateParameters(
         sampler: { MLXFusedSampler(parameters: parameters) },
         constraint: .unconstrained,

@@ -81,7 +81,10 @@ struct `Qwen3P5 tests` {
             )
           )
           let context = engine.context(parameters)
-          let initial = try await engine.prefill(context: context)
+          let initial = try await engine.prefill(
+            promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+            context: context
+          )
           let prompt = EdgeToolsTranscript.UserMessage("Answer red or blue.")
 
           let forked = try await qwenVLMGeneration(
@@ -154,7 +157,10 @@ struct `Qwen3P5 tests` {
           reasoningEffort: .none
         )
         let context = engine.context(parameters)
-        _ = try await engine.prefill(context: context)
+        _ = try await engine.prefill(
+          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+          context: context
+        )
 
         let forked = try await qwenLlamaGeneration(
           using: engine,
@@ -179,7 +185,10 @@ struct `Qwen3P5 tests` {
           reasoningEffort: .none
         )
         let context = engine.context(parameters)
-        _ = try await engine.prefill(context: context)
+        _ = try await engine.prefill(
+          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+          context: context
+        )
 
         let forked = try await qwenLlamaGeneration(
           using: engine,
@@ -204,7 +213,10 @@ struct `Qwen3P5 tests` {
           reasoningEffort: .none
         )
         let context = engine.context(parameters)
-        _ = try await engine.prefill(context: context)
+        _ = try await engine.prefill(
+          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+          context: context
+        )
         let prompt = EdgeToolsTranscript.UserMessage(
           "Is this image also red?",
           images: [try llamaRedImageAsset()]

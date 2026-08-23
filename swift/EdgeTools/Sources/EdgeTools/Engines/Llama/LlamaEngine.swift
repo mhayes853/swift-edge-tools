@@ -203,17 +203,6 @@
       )
     }
 
-    package func prefill(
-      context: LlamaContext<Profile>
-    ) async throws -> EdgeToolsEnginePrefill {
-      try self.validate(context)
-      return try await self.prefill(
-        snapshot: context.begin(),
-        tools: context.tools.map { $0.definition },
-        context: context
-      )
-    }
-
     private func generationTask(
       tools: [EdgeToolDefinition],
       parameters: sending Profile.GenerateParameters,

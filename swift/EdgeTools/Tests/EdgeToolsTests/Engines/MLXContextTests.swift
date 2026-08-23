@@ -74,7 +74,10 @@
           transcript: EdgeToolsTranscript(messages: [.system("System")])
         )
       )
-      _ = try await engine.prefill(context: context)
+      _ = try await engine.prefill(
+        promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+        context: context
+      )
       expectNoDifference(copyCounter.count, 0)
 
       let idleFork = context.fork()
@@ -130,7 +133,10 @@
       let context = firstEngine.context()
 
       let error = await #expect(throws: EdgeToolsError.self) {
-        _ = try await secondEngine.prefill(context: context)
+        _ = try await secondEngine.prefill(
+          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+          context: context
+        )
       }
 
       expectNoDifference(error?.code, .incompatibleContext)

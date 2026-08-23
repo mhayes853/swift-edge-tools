@@ -36,7 +36,10 @@ struct `Qwen3 tests` {
             reasoningEffort: .none
           )
         )
-        let prefill = try await engine.prefill(context: context)
+        let prefill = try await engine.prefill(
+          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+          context: context
+        )
 
         let forkedTask = try engine.generate(
           prompt: .user("Say hello in one word."),
@@ -107,7 +110,10 @@ struct `Qwen3 tests` {
           reasoningEffort: .none
         )
         let context = engine.context(parameters)
-        let prefill = try await engine.prefill(context: context)
+        let prefill = try await engine.prefill(
+          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+          context: context
+        )
 
         let forkedTask = try engine.generate(
           prompt: .user("Say hello in one word."),

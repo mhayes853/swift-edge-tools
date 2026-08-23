@@ -244,10 +244,6 @@ extension EdgeToolsValue {
     defer { yyjson_doc_free(document) }
     self = try readEdgeToolsValue(from: root)
   }
-
-  package init(json string: String) throws {
-    try self.init(json: Array(string.utf8))
-  }
 }
 
 // MARK: - JSON Encoding

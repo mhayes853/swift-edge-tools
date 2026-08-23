@@ -42,7 +42,7 @@ public final class EdgeToolsSession<Engine: EdgeToolsEngine>: Sendable {
     }
   }
 
-  package func resolveContext(_ context: Engine.Context?) -> Engine.Context {
+  private func resolveContext(_ context: Engine.Context?) -> Engine.Context {
     context ?? self.context()
   }
 }
@@ -914,7 +914,7 @@ extension EdgeToolsSessionStream {
 
 // MARK: - Duplicate Tool Name Error
 
-package func duplicateToolNameError(_ names: some Sequence<String>) -> String? {
+private func duplicateToolNameError(_ names: some Sequence<String>) -> String? {
   let grouped = Dictionary(grouping: names) { $0.snakeCased() }
   let duplicates = grouped.filter { $0.value.count > 1 }
   guard !duplicates.isEmpty else { return nil }
@@ -925,7 +925,7 @@ package func duplicateToolNameError(_ names: some Sequence<String>) -> String? {
     .joined(separator: "\n")
 }
 
-package func agentToolResponses(
+func agentToolResponses(
   for outcomes: [EdgeToolCallOutcome]
 ) async -> [EdgeToolsTranscript.ToolMessage] {
   await withTaskGroup(of: (Int, EdgeToolsTranscript.ToolMessage).self) { group in

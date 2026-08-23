@@ -12,7 +12,7 @@
   import Synchronization
 #endif
 
-package struct Lock<Value: ~Copyable>: ~Copyable {
+struct Lock<Value: ~Copyable>: ~Copyable {
   #if $Embedded
     #if canImport(wasi_pthread)
       private let mutex: UnsafeMutablePointer<pthread_mutex_t>
@@ -27,7 +27,7 @@ package struct Lock<Value: ~Copyable>: ~Copyable {
     private let lock: Mutex<Value>
   #endif
 
-  package init(_ value: consuming sending Value) {
+  init(_ value: consuming sending Value) {
     #if $Embedded || (canImport(Darwin) && canImport(os))
       self.value = UnsafeMutablePointer<Value>.allocate(capacity: 1)
       self.value.initialize(to: value)
@@ -39,7 +39,7 @@ package struct Lock<Value: ~Copyable>: ~Copyable {
     #endif
   }
 
-  package init<E: Error>(_ makeValue: () throws(E) -> Value) throws(E) {
+  init<E: Error>(_ makeValue: () throws(E) -> Value) throws(E) {
     #if $Embedded || (canImport(Darwin) && canImport(os))
       let value = try makeValue()
       self.value = UnsafeMutablePointer<Value>.allocate(capacity: 1)
@@ -63,7 +63,7 @@ package struct Lock<Value: ~Copyable>: ~Copyable {
     #endif
   }
 
-  package borrowing func withLock<Result: ~Copyable, E: Error>(
+  borrowing func withLock<Result: ~Copyable, E: Error>(
     _ body: (inout sending Value) throws(E) -> sending Result
   ) throws(E) -> sending Result {
     #if $Embedded
@@ -79,7 +79,7 @@ package struct Lock<Value: ~Copyable>: ~Copyable {
     #endif
   }
 
-  package borrowing func withBorrowedLock<Result: ~Copyable, E: Error>(
+  borrowing func withBorrowedLock<Result: ~Copyable, E: Error>(
     _ body: (borrowing Value) throws(E) -> sending Result
   ) throws(E) -> sending Result {
     #if $Embedded
