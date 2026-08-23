@@ -5,7 +5,7 @@ import OrderedCollections
   import EdgeToolsXGrammar
 #endif
 
-#if MLX && XGrammar && canImport(MLX)
+#if MLX && canImport(MLX)
   // MARK: - MiniCPM5 Model
 
   public struct MiniCPM5MLXProfile: MLXLLMModelProfile {
@@ -48,7 +48,7 @@ import OrderedCollections
   public typealias MiniCPM5MLXModelEngine = MLXEngine<MiniCPM5MLXProfile>
 #endif
 
-#if Llama && XGrammar && canImport(CLlama)
+#if Llama && canImport(CLlama)
   public struct MiniCPM5LlamaProfile: LlamaModelProfile {
     public typealias Prompt = EdgeToolsTranscript
     public typealias GenerationParser = MiniCPM5GenerationParser

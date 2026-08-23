@@ -17,7 +17,7 @@ export type Needle2NativeGeneration = {
 	tokenCount: number;
 };
 
-export interface Needle2Binding {
+interface Needle2Binding {
 	readonly provider: "direct";
 	generate(
 		options: Needle2ResolvedGenerateOptions,
@@ -380,7 +380,7 @@ class ManagedNeedle2Binding implements Needle2Binding {
 	}
 }
 
-export class Needle2WASMBinding extends ManagedNeedle2Binding {
+class Needle2WASMBinding extends ManagedNeedle2Binding {
 	static async create(
 		wasm: Needle2BinarySource,
 		weights: Needle2BinarySource,
@@ -402,7 +402,7 @@ export class Needle2WASMBinding extends ManagedNeedle2Binding {
 	}
 }
 
-export class Needle2NativeBinding extends ManagedNeedle2Binding {
+class Needle2NativeBinding extends ManagedNeedle2Binding {
 	static async create(
 		weights: Needle2BinarySource,
 	): Promise<Needle2NativeBinding> {

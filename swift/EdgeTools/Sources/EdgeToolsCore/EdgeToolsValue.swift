@@ -81,10 +81,7 @@ extension EdgeToolsValue {
   }
 
   public var isNull: Bool {
-    if case .null = self {
-      return true
-    }
-    return false
+    self == .null
   }
 }
 

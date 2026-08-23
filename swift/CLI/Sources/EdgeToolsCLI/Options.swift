@@ -33,7 +33,7 @@ struct ModelSourceOptions: ParsableArguments {
     default:
       break
     }
-    if self.path != nil, self.revision != "main" || self.cacheDirectory != nil {
+    if self.path != nil && (self.revision != "main" || self.cacheDirectory != nil) {
       throw ValidationError("--revision and --cache-dir do not apply to --path.")
     }
   }

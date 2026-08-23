@@ -7,7 +7,7 @@ import Testing
 
 @Suite
 struct `Qwen3 tests` {
-  #if MLX && XGrammar && canImport(MLX) && !os(WASI)
+  #if MLX && canImport(MLX) && !os(WASI)
     @Suite(.serialized, .enabledIfMLXTests())
     struct `Qwen3MLXModelEngine tests` {
       @Test
@@ -73,7 +73,7 @@ struct `Qwen3 tests` {
     }
   #endif
 
-  #if HuggingFaceTokenizers && Llama && XGrammar && canImport(CLlama) && !os(WASI)
+  #if HuggingFaceTokenizers && Llama && canImport(CLlama) && !os(WASI)
     @Suite(.serialized)
     struct `Qwen3LlamaModelEngine tests` {
       @Test

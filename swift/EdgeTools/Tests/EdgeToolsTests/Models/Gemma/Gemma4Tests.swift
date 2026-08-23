@@ -8,7 +8,7 @@ import Testing
 
 @Suite
 struct `Gemma4 tests` {
-  #if MLX && XGrammar && canImport(MLX) && !os(WASI)
+  #if MLX && canImport(MLX) && !os(WASI)
     @Suite(.serialized, .enabledIfMLXTests())
     struct `Gemma4MLXModelEngine tests` {
       @Test
@@ -45,7 +45,7 @@ struct `Gemma4 tests` {
     }
   #endif
 
-  #if HuggingFaceTokenizers && Llama && XGrammar && canImport(CLlama) && !os(WASI)
+  #if HuggingFaceTokenizers && Llama && canImport(CLlama) && !os(WASI)
     @Suite(.serialized)
     struct `Gemma4LlamaModelEngine tests` {
       @Test

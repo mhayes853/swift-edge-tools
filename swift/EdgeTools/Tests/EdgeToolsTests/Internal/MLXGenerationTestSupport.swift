@@ -1,4 +1,4 @@
-#if MLX && XGrammar && canImport(MLX)
+#if MLX && canImport(MLX)
   import CoreGraphics
   import AVFoundation
   import EdgeTools

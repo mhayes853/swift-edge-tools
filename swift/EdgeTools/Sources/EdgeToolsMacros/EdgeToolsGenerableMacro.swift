@@ -1,11 +1,10 @@
 import Foundation
 import SwiftDiagnostics
-import SwiftParser
 import SwiftSyntax
 import SwiftSyntaxBuilder
 import SwiftSyntaxMacros
 
-public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro, MemberAttributeMacro {
+public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
   public static func expansion(
     of node: AttributeSyntax,
     providingMembersOf declaration: some DeclGroupSyntax,
@@ -107,15 +106,6 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro, MemberAttribut
       )
     ]
   }
-
-  public static func expansion(
-    of node: AttributeSyntax,
-    attachedTo declaration: some DeclGroupSyntax,
-    providingAttributesFor member: some DeclSyntaxProtocol,
-    in context: some MacroExpansionContext
-  ) throws -> [AttributeSyntax] {
-    []
-  }
 }
 
 extension EdgeToolsGenerableMacro {
@@ -139,6 +129,7 @@ extension EdgeToolsGenerableMacro {
     let sourceLabel: String?
     let schemaKey: String
     let typeName: String
+    let isOptional: Bool
     let bindingName: String
   }
 
@@ -150,8 +141,7 @@ extension EdgeToolsGenerableMacro {
 
   private static func hasExistingEdgeToolsGenerationSchema(
     in declaration: some DeclGroupSyntax
-  ) -> Bool
-  {
+  ) -> Bool {
     declaration.memberBlock.members.contains { member in
       guard let variableDecl = member.decl.as(VariableDeclSyntax.self) else { return false }
       guard Self.isStatic(variableDecl) else { return false }
@@ -166,8 +156,7 @@ extension EdgeToolsGenerableMacro {
 
   private static func hasExistingExtractionToolDefinition(
     in declaration: some DeclGroupSyntax
-  ) -> Bool
-  {
+  ) -> Bool {
     declaration.memberBlock.members.contains { member in
       guard let variableDecl = member.decl.as(VariableDeclSyntax.self) else { return false }
       guard Self.isStatic(variableDecl) else { return false }
@@ -182,8 +171,7 @@ extension EdgeToolsGenerableMacro {
 
   private static func hasExistingEdgeToolsValueInitializer(
     in declaration: some DeclGroupSyntax
-  ) -> Bool
-  {
+  ) -> Bool {
     declaration.memberBlock.members.contains { member in
       guard let initializer = member.decl.as(InitializerDeclSyntax.self) else { return false }
       let parameters = initializer.signature.parameterClause.parameters
@@ -215,7 +203,7 @@ extension EdgeToolsGenerableMacro {
     declaration.modifiers
       .first { modifier in
         switch modifier.name.tokenKind {
-        case .keyword(.public), .keyword(.fileprivate), .keyword(.private):
+        case .keyword(.public), .keyword(.package), .keyword(.fileprivate), .keyword(.private):
           true
         default:
           false
@@ -225,6 +213,8 @@ extension EdgeToolsGenerableMacro {
         switch modifier.name.tokenKind {
         case .keyword(.public):
           "public"
+        case .keyword(.package):
+          "package"
         case .keyword(.fileprivate):
           "fileprivate"
         case .keyword(.private):
@@ -400,6 +390,7 @@ extension EdgeToolsGenerableMacro {
           sourceLabel: label == nil ? nil : parameter.firstName?.trimmedDescription,
           schemaKey: schemaKey,
           typeName: parameter.type.trimmedDescription,
+          isOptional: Self.isOptionalTypeName(parameter.type.trimmedDescription),
           bindingName: "value\(index)"
         )
       }
@@ -514,8 +505,27 @@ extension EdgeToolsGenerableMacro {
         "\(Self.quotedStringLiteral(value.schemaKey)): \(value.typeName).edgeToolsGenerationSchema"
       }
       .joined(separator: ",\n                      ")
-      let required = enumCase.associatedValues.map { Self.quotedStringLiteral($0.schemaKey) }
+      let required = enumCase.associatedValues.filter { !$0.isOptional }
+        .map { Self.quotedStringLiteral($0.schemaKey) }
         .joined(separator: ", ")
+      if required.isEmpty {
+        return """
+          EdgeToolsGenerationSchema(
+            .type(.object),
+            .properties([
+              \(Self.quotedStringLiteral(enumCase.name)): EdgeToolsGenerationSchema(
+                .type(.object),
+                .properties([
+                  \(propertyPairs)
+                ]),
+                .additionalProperties(false)
+              )
+            ]),
+            .required([\(Self.quotedStringLiteral(enumCase.name))]),
+            .additionalProperties(false)
+          )
+          """
+      }
       return """
         EdgeToolsGenerationSchema(
           .type(.object),
@@ -584,7 +594,8 @@ extension EdgeToolsGenerableMacro {
     modifierPrefix: String
   ) -> DeclSyntax {
     let caseInitializers = cases.map { enumCase in
-      let keys = enumCase.associatedValues.map { Self.quotedStringLiteral($0.schemaKey) }
+      let keys = enumCase.associatedValues.filter { !$0.isOptional }
+        .map { Self.quotedStringLiteral($0.schemaKey) }
         .joined(separator: ", ")
       let arguments = enumCase.associatedValues.map { value in
         let expression =
@@ -677,27 +688,22 @@ extension EdgeToolsGenerableMacro {
   }
 
   private static func guideAttributes(in variableDecl: VariableDeclSyntax) -> [AttributeSyntax] {
-    variableDecl.attributes.compactMap { element in
-      guard let attribute = element.as(AttributeSyntax.self) else { return nil }
-      guard let identifierType = attribute.attributeName.as(IdentifierTypeSyntax.self) else {
-        return nil
-      }
-      let name = identifierType.name.text
-      return name == "EdgeToolsGuide" || name == "EdgeTools.EdgeToolsGuide" ? attribute : nil
-    }
+    Self.attributes(named: ["EdgeToolsGuide", "EdgeTools.EdgeToolsGuide"], in: variableDecl)
   }
 
   private static func ignoredAttribute(in variableDecl: VariableDeclSyntax) -> AttributeSyntax? {
-    variableDecl.attributes
-      .compactMap { element -> AttributeSyntax? in
-        guard let attribute = element.as(AttributeSyntax.self) else { return nil }
-        guard let identifierType = attribute.attributeName.as(IdentifierTypeSyntax.self) else {
-          return nil
-        }
-        let name = identifierType.name.text
-        return name == "EdgeToolsIgnored" || name == "EdgeTools.EdgeToolsIgnored" ? attribute : nil
-      }
+    Self.attributes(named: ["EdgeToolsIgnored", "EdgeTools.EdgeToolsIgnored"], in: variableDecl)
       .first
+  }
+
+  private static func attributes(
+    named names: Set<String>,
+    in variableDecl: VariableDeclSyntax
+  ) -> [AttributeSyntax] {
+    variableDecl.attributes.compactMap { element in
+      guard let attribute = element.as(AttributeSyntax.self) else { return nil }
+      return names.contains(attribute.attributeName.trimmedDescription) ? attribute : nil
+    }
   }
 
   private static func isStoredProperty(_ binding: PatternBindingSyntax) -> Bool {

@@ -127,7 +127,8 @@ struct `EdgeToolsEncoding tests` {
         enumCaseSchema("move", properties: ["_0": .number, "_1": .number]),
         enumCaseSchema(
           "search",
-          properties: ["query": .string, "limit": .integer.nullable()]
+          properties: ["query": .string, "limit": .integer.nullable()],
+          required: ["query"]
         ),
         enumCaseSchema("replace", properties: ["_0": .string, "with": .string])
       ])
@@ -529,7 +530,8 @@ private struct Address: Equatable {
 
 private func enumCaseSchema(
   _ name: String,
-  properties: KeyValuePairs<String, EdgeToolsGenerationSchema>
+  properties: KeyValuePairs<String, EdgeToolsGenerationSchema>,
+  required: [String]? = nil
 ) -> EdgeToolsGenerationSchema {
   EdgeToolsGenerationSchema(
     .type(.object),
@@ -537,7 +539,7 @@ private func enumCaseSchema(
       name: EdgeToolsGenerationSchema(
         .type(.object),
         .properties(properties),
-        .required(properties.map(\.0)),
+        .required(required ?? properties.map(\.0)),
         .additionalProperties(false)
       )
     ]),

@@ -96,6 +96,26 @@ struct `Command tests` {
   }
 
   @Test
+  func `Accepts A Cache Directory For A Hugging Face Repository`() async throws {
+    let source = LockedBox<ModelSource?>(nil)
+    let (context, _) = EdgeContext.test(
+      context: .stub(onResolve: { source.value = $0 })
+    )
+
+    try await EdgeCommand.run(
+      arguments: [
+        "--cache-dir", "/models/cache", "Qwen/Qwen3-0.6B", "--prompt", "hello"
+      ],
+      context: context
+    )
+
+    expectNoDifference(
+      try #require(source.value).cacheDirectory,
+      URL(fileURLWithPath: "/models/cache")
+    )
+  }
+
+  @Test
   func `Passes Fused Sampler Options To The Request`() async throws {
     let requests = LockedBox<GenerationRequest?>(nil)
     let (context, _) = EdgeContext.test(

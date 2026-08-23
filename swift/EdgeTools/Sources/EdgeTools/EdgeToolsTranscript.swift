@@ -180,35 +180,6 @@ extension EdgeToolsTranscript.Message {
   }
 }
 
-extension EdgeToolsTranscript.SystemMessage {
-  public static func system(_ content: String) -> Self {
-    Self(content: content)
-  }
-}
-
-extension EdgeToolsTranscript.UserMessage {
-  public static func user(
-    _ content: String,
-    images: [EdgeToolsTranscript.Asset] = [],
-    videos: [EdgeToolsTranscript.Asset] = [],
-    audio: [EdgeToolsTranscript.Asset] = []
-  ) -> Self {
-    Self(content: content, images: images, videos: videos, audio: audio)
-  }
-}
-
-extension EdgeToolsTranscript.AssistantMessage {
-  public static func assistant(_ parts: [EdgeToolsGenerationPart]) -> Self {
-    Self(parts: parts)
-  }
-}
-
-extension EdgeToolsTranscript.ToolMessage {
-  public static func tool(name: String, response: EdgeToolsValue) -> Self {
-    Self(name: name, response: response)
-  }
-}
-
 // MARK: - Asset
 
 extension EdgeToolsTranscript {

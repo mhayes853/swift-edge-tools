@@ -37,8 +37,8 @@ struct `EdgeToolsAgent tests` {
       [
         .user("Run both tools."),
         .tools([
-          .tool(name: first.name, response: .string("first:true")),
-          .tool(name: second.name, response: .string("second:true")),
+          EdgeToolsTranscript.ToolMessage(name: first.name, response: .string("first:true")),
+          EdgeToolsTranscript.ToolMessage(name: second.name, response: .string("second:true")),
         ]),
       ]
     )

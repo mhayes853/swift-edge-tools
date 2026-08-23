@@ -14,7 +14,6 @@ import OrderedCollections
   names: named(edgeToolsGenerationSchema), named(extractionToolDefinition), named(init),
   named(edgeToolsValue)
 )
-@attached(memberAttribute)
 public macro EdgeToolsGenerable(
   _ schema: EdgeToolsGenerationSchema...
 ) = #externalMacro(module: "EdgeToolsMacros", type: "EdgeToolsGenerableMacro")

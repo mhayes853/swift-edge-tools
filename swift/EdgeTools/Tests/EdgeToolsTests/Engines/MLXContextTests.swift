@@ -1,4 +1,4 @@
-#if MLX && XGrammar && canImport(MLX) && !os(WASI)
+#if MLX && canImport(MLX) && !os(WASI)
   import CustomDump
   import EdgeTools
   import MLX
