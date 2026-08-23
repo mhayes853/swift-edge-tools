@@ -31,7 +31,6 @@ let package = Package(
       name: "EdgeToolsCLI",
       dependencies: [
         .product(name: "EdgeTools", package: "swift-edge-tools"),
-        .product(name: "EdgeToolsLlama", package: "swift-edge-tools"),
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
         .product(name: "Hub", package: "swift-transformers"),
         .product(name: "MLX", package: "mlx-swift", condition: .when(platforms: [.macOS])),

@@ -11,6 +11,8 @@
     import EdgeToolsXGrammar
   #endif
 
+  private let llamaBackendInitialization: Void = LlamaBackend.initialize()
+
   // MARK: - LlamaEngine
 
   public final class LlamaEngine<Profile: LlamaModelProfile>:
@@ -37,6 +39,7 @@
       contextParameters: LlamaContextParameters = LlamaContextParameters(),
       defaultSampling: EdgeToolsFusedSamplingParameters? = nil
     ) throws {
+      _ = llamaBackendInitialization
       try self.init(
         model: LlamaModel(path: modelPath, parameters: modelParameters),
         projectorPath: nil,
@@ -68,6 +71,7 @@
       multimodalParameters: LlamaMultimodalParameters = LlamaMultimodalParameters(),
       defaultSampling: EdgeToolsFusedSamplingParameters? = nil
     ) throws where Profile: EdgeToolsMultimodalModelProfile {
+      _ = llamaBackendInitialization
       try self.init(
         model: LlamaModel(path: modelPath, parameters: modelParameters),
         projectorPath: multimodalProjectorPath,
@@ -100,6 +104,7 @@
       multimodalParameters: LlamaMultimodalParameters,
       defaultSampling: EdgeToolsFusedSamplingParameters?
     ) throws {
+      _ = llamaBackendInitialization
       let model = LlamaModelBox(model: consume model)
       self.model = model
       let multimodalRuntime = try projectorPath.map {
@@ -486,6 +491,30 @@
       }
     }
   #endif
+
+  // MARK: - EdgeToolsSession + Llama
+
+  extension EdgeToolsSession {
+    public func context<Profile>(
+      transcript: EdgeToolsTranscript = EdgeToolsTranscript(),
+      reasoningEffort: EdgeToolsReasoningEffort = .default
+    ) -> LlamaContext<Profile> where Engine == LlamaEngine<Profile> {
+      self.context(
+        EdgeToolsTranscriptContextParameters(
+          transcript: transcript,
+          reasoningEffort: reasoningEffort
+        )
+      )
+    }
+
+    public func context<Profile>(
+      systemPrompt: String,
+      reasoningEffort: EdgeToolsReasoningEffort = .default
+    ) -> LlamaContext<Profile> where Engine == LlamaEngine<Profile> {
+      let transcript = EdgeToolsTranscript(messages: [.system(systemPrompt)])
+      return self.context(transcript: transcript, reasoningEffort: reasoningEffort)
+    }
+  }
 
   // MARK: - XGrammar Cache
 

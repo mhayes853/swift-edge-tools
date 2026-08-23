@@ -15,9 +15,9 @@
 
     private nonisolated(unsafe) let vocabulary: OpaquePointer
 
-    package let vocabularySize: Int
+    public let vocabularySize: Int
     public let eos: EdgeToolsToken?
-    package let bos: EdgeToolsToken?
+    public let bos: EdgeToolsToken?
 
     public convenience init(model: consuming LlamaModel) {
       self.init(model: LlamaModelBox(model: consume model))
@@ -36,7 +36,7 @@
       self.encode(text: text, addSpecialTokens: true)
     }
 
-    package func encode(text: String, addSpecialTokens: Bool) -> [EdgeToolsToken] {
+    public func encode(text: String, addSpecialTokens: Bool) -> [EdgeToolsToken] {
       let ids = (try? self.tokenIds(text: text, addSpecialTokens: addSpecialTokens)) ?? []
       return self.tokens(forIds: ids).compactMap { $0 }
     }
@@ -96,7 +96,7 @@
       }
     }
 
-    package func endOfGenerationTokenIds() -> Set<EdgeToolsToken.ID> {
+    public func endOfGenerationTokenIds() -> Set<EdgeToolsToken.ID> {
       Set(
         (0..<self.vocabularySize).lazy
           .filter { llama_vocab_is_eog(self.vocabulary, Int32($0)) }

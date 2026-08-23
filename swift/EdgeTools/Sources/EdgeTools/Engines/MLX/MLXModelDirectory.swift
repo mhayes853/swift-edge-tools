@@ -8,13 +8,13 @@
   // MARK: - MLXModelDirectory
 
   public struct MLXModelDirectory: Sendable {
-    let url: URL
+    public let url: URL
 
     public init(url: URL) {
       self.url = url
     }
 
-    package func loadConfigurationData() throws -> Data {
+    public func loadConfigurationData() throws -> Data {
       let configurationURLs = [
         self.url.appending(path: "configuration.json"),
         self.url.appending(path: "config.json")
@@ -29,21 +29,21 @@
       return try Data(contentsOf: configurationURL)
     }
 
-    package func loadConfiguration<Configuration: Decodable>(
+    public func loadConfiguration<Configuration: Decodable>(
       _ type: Configuration.Type,
       decoder: JSONDecoder = .json5()
     ) throws -> Configuration {
       try decoder.decode(type, from: self.loadConfigurationData())
     }
 
-    package func loadProcessorConfiguration<Configuration: Decodable>(
+    public func loadProcessorConfiguration<Configuration: Decodable>(
       _ type: Configuration.Type,
       decoder: JSONDecoder = .json5()
     ) throws -> Configuration {
       try decoder.decode(type, from: self.loadProcessorConfigurationData())
     }
 
-    package func loadProcessorConfigurationData() throws -> Data {
+    public func loadProcessorConfigurationData() throws -> Data {
       let preprocessorURL = self.url.appending(path: "preprocessor_config.json")
       let processorURL = self.url.appending(path: "processor_config.json")
       let url =
@@ -56,7 +56,7 @@
       return try Data(contentsOf: url)
     }
 
-    package func loadGenerationConfiguration(
+    public func loadGenerationConfiguration(
       decoder: JSONDecoder = .json5()
     ) throws -> GenerationConfigFile? {
       let configurationURL = self.url.appending(path: "generation_config.json")
@@ -67,7 +67,7 @@
       )
     }
 
-    package func loadDefaultSampling() throws -> EdgeToolsFusedSamplingParameters? {
+    public func loadDefaultSampling() throws -> EdgeToolsFusedSamplingParameters? {
       let configurationURL = self.url.appending(path: "generation_config.json")
       guard FileManager.default.fileExists(atPath: configurationURL.path()) else { return nil }
       let configuration = try JSONDecoder.json5()
@@ -78,7 +78,7 @@
       return configuration.samplingParameters
     }
 
-    package func loadStopTokenIds() throws -> Set<EdgeToolsToken.ID> {
+    public func loadStopTokenIds() throws -> Set<EdgeToolsToken.ID> {
       let baseConfiguration = try self.loadConfiguration(BaseConfiguration.self)
       var tokenIds = Set(baseConfiguration.eosTokenIds?.values ?? [])
       if let generationConfiguration = try self.loadGenerationConfiguration(),
@@ -89,7 +89,7 @@
       return tokenIds
     }
 
-    package func safetensorURLs() throws -> [URL] {
+    public func safetensorURLs() throws -> [URL] {
       guard
         let enumerator = FileManager.default.enumerator(
           at: self.url,
@@ -105,7 +105,7 @@
       return urls.sorted { $0.path() < $1.path() }
     }
 
-    package func loadSafetensors() throws -> MLXSafetensors {
+    public func loadSafetensors() throws -> MLXSafetensors {
       let urls = try self.safetensorURLs()
       guard !urls.isEmpty else { throw EdgeToolsError.missingModelWeights }
 
@@ -119,7 +119,7 @@
       return MLXSafetensors(weights: weights, metadataByFile: metadataByFile)
     }
 
-    package func loadTokenizer() async throws -> sending any EdgeToolsTokenizer {
+    public func loadTokenizer() async throws -> sending any EdgeToolsTokenizer {
       try await EdgeToolsAutoTokenizer.from(modelDirectory: self.url)
     }
   }
@@ -127,8 +127,8 @@
   // MARK: - MLXSafetensors
 
   public struct MLXSafetensors {
-    package var weights: [String: MLXArray]
-    package var metadataByFile: [URL: [String: String]]
+    public var weights: [String: MLXArray]
+    public var metadataByFile: [URL: [String: String]]
 
     public init(
       weights: [String: MLXArray],
@@ -138,7 +138,7 @@
       self.metadataByFile = metadataByFile
     }
 
-    package var mergedMetadata: [String: String] {
+    public var mergedMetadata: [String: String] {
       var result = [String: String]()
       for url in self.metadataByFile.keys.sorted(by: { $0.path() < $1.path() }) {
         result.merge(self.metadataByFile[url] ?? [:]) { _, new in new }

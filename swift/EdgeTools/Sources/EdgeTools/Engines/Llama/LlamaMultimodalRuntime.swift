@@ -7,19 +7,19 @@
   // MARK: - LlamaMultimodalParameters
 
   public struct LlamaMultimodalParameters: Hashable, Sendable {
-    var useGPU: Bool
-    var printTimings: Bool
-    var threadCount: Int32
-    var flashAttention: LlamaFlashAttention
-    var warmUp: Bool
-    var minimumImageTokenCount: Int32?
-    var maximumImageTokenCount: Int32?
+    public var useGPU: Bool
+    public var printTimings: Bool
+    public var threadCount: Int32
+    public var flashAttention: LlamaFlashAttention
+    public var warmUp: Bool
+    public var minimumImageTokenCount: Int32?
+    public var maximumImageTokenCount: Int32?
 
     public init(
       useGPU: Bool = true,
       printTimings: Bool = false,
       threadCount: Int32 = 0,
-      flashAttention: LlamaFlashAttention = LlamaFlashAttention(rawValue: -1),
+      flashAttention: LlamaFlashAttention = .auto,
       warmUp: Bool = true,
       minimumImageTokenCount: Int32? = nil,
       maximumImageTokenCount: Int32? = nil

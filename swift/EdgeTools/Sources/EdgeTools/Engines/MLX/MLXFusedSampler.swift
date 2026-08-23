@@ -7,8 +7,8 @@
   // MARK: - MLXFusedSampler
 
   public final class MLXFusedSampler: LogitSampler {
-    let parameters: EdgeToolsFusedSamplingParameters
-    package let history: MLXTokenHistory
+    public let parameters: EdgeToolsFusedSamplingParameters
+    public let history: MLXTokenHistory
 
     private var prngKey: MLXArray
     private let unpenalized: (MLXArray, MLXArray) -> MLXArray
@@ -56,7 +56,7 @@
   // MARK: - MLXTokenHistory
 
   public final class MLXTokenHistory {
-    let capacity: Int
+    public let capacity: Int
 
     private var buffer: MLXArray?
     private var writeIndex = 0
@@ -68,16 +68,16 @@
       self.positions = MLXArray(0..<capacity)
     }
 
-    var tokens: MLXArray? {
+    public var tokens: MLXArray? {
       self.buffer
     }
 
-    package func reset() {
+    public func reset() {
       self.buffer = nil
       self.writeIndex = 0
     }
 
-    package func seed(_ tokens: some Sequence<EdgeToolsToken.ID>) {
+    public func seed(_ tokens: some Sequence<EdgeToolsToken.ID>) {
       self.reset()
       let ids = Array(tokens.map { Int32($0) }.suffix(self.capacity))
       guard let last = ids.last else { return }
@@ -87,7 +87,7 @@
       self.writeIndex = ids.count % self.capacity
     }
 
-    func append(_ token: MLXArray) {
+    public func append(_ token: MLXArray) {
       let token = token.asType(.int32).reshaped([1])
       if let buffer = self.buffer {
         self.buffer = MLX.where(self.positions .== Int32(self.writeIndex), token, buffer)

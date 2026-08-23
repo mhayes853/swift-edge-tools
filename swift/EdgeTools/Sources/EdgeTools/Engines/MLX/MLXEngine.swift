@@ -340,6 +340,25 @@
     }
   }
 
+  // MARK: - EdgeToolsSession + MLX
+
+  extension EdgeToolsSession {
+    public func context<Profile>(
+      transcript: EdgeToolsTranscript = EdgeToolsTranscript(),
+      reasoningEffort: EdgeToolsReasoningEffort = .default
+    ) -> MLXContext<Profile> where Engine == MLXEngine<Profile> {
+      self.context(MLXContextParameters(transcript: transcript, reasoningEffort: reasoningEffort))
+    }
+
+    public func context<Profile>(
+      systemPrompt: String,
+      reasoningEffort: EdgeToolsReasoningEffort = .default
+    ) -> MLXContext<Profile> where Engine == MLXEngine<Profile> {
+      let transcript = EdgeToolsTranscript(messages: [.system(systemPrompt)])
+      return self.context(transcript: transcript, reasoningEffort: reasoningEffort)
+    }
+  }
+
   // MARK: - XGrammar Cache
 
   #if XGrammar

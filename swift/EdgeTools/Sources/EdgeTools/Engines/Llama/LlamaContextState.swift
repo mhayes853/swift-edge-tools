@@ -30,7 +30,7 @@
       self.preparedInputCache = preparedInputCache
     }
 
-    var vocabularySize: Int {
+    public var vocabularySize: Int {
       self.vocabularySizeValue
     }
 
