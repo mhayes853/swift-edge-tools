@@ -133,15 +133,13 @@ jobs:
       - name: Cache build directories
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
-          path: |
-            .build
-            swift/EmbeddedSmoke/.build
+          path: swift/EmbeddedSmoke/.build
           key: >-
-            spm-embedded-${{ runner.os }}-${{ steps.snapshot.outputs.tag }}-${{
+            spm-embedded-v2-${{ runner.os }}-${{ steps.snapshot.outputs.tag }}-${{
             hashFiles('Package.resolved',
             'swift/EmbeddedSmoke/Package.resolved') }}
           restore-keys: |
-            spm-embedded-${{ runner.os }}-${{ steps.snapshot.outputs.tag }}-
+            spm-embedded-v2-${{ runner.os }}-${{ steps.snapshot.outputs.tag }}-
       - name: Run the embedded smoke test
         env:
           EMBEDDED_SWIFT_SNAPSHOT: ${{ steps.snapshot.outputs.tag }}
