@@ -11,8 +11,6 @@
     import EdgeToolsXGrammar
   #endif
 
-  private let llamaBackendInitialization: Void = LlamaBackend.initialize()
-
   // MARK: - LlamaEngine
 
   public final class LlamaEngine<Profile: LlamaModelProfile>:
@@ -39,7 +37,7 @@
       contextParameters: LlamaContextParameters = LlamaContextParameters(),
       defaultSampling: EdgeToolsFusedSamplingParameters? = nil
     ) throws {
-      _ = llamaBackendInitialization
+      LlamaBackend.initialize()
       try self.init(
         model: LlamaModel(path: modelPath, parameters: modelParameters),
         projectorPath: nil,
@@ -71,7 +69,7 @@
       multimodalParameters: LlamaMultimodalParameters = LlamaMultimodalParameters(),
       defaultSampling: EdgeToolsFusedSamplingParameters? = nil
     ) throws where Profile: EdgeToolsMultimodalModelProfile {
-      _ = llamaBackendInitialization
+      LlamaBackend.initialize()
       try self.init(
         model: LlamaModel(path: modelPath, parameters: modelParameters),
         projectorPath: multimodalProjectorPath,
@@ -104,7 +102,7 @@
       multimodalParameters: LlamaMultimodalParameters,
       defaultSampling: EdgeToolsFusedSamplingParameters?
     ) throws {
-      _ = llamaBackendInitialization
+      LlamaBackend.initialize()
       let model = LlamaModelBox(model: consume model)
       self.model = model
       let multimodalRuntime = try projectorPath.map {
@@ -290,10 +288,12 @@
         Profile.defaultSampling(prompt: state.transcript, parameters: parameters)
         ?? contextState.configuredSampling
         ?? EdgeToolsFusedSamplingParameters()
+
+      let sampler = EdgeToolsCPUFusedSampler(
+        parameters: parameters.sampling.applying(to: defaultSampling)
+      )
       state.decoder = ModelGenerationState.Decoder(
-        sampler: EdgeToolsCPUFusedSampler(
-          parameters: parameters.sampling.applying(to: defaultSampling)
-        ),
+        sampler: sampler,
         confidenceOptions: parameters.confidence
       )
       return EdgeToolsGenerationLoop.Preparation(metrics: metrics)
@@ -303,9 +303,7 @@
       bitmask: GrammarBitmask?,
       state: inout ModelGenerationState
     ) throws -> EdgeToolsToken.ID {
-      guard var decoder = state.decoder else {
-        throw EdgeToolsError.modelNotPrepared
-      }
+      guard var decoder = state.decoder else { throw EdgeToolsError.modelNotPrepared }
       let contextState = state.contextState
       let sample = try contextState.runtime.sequences.withLogits(
         sequenceId: contextState.sequence.sequenceId,
@@ -356,9 +354,7 @@
       tools: [EdgeToolDefinition],
       context: LlamaContext<Profile>
     ) async throws -> EdgeToolsEnginePrefill {
-      defer {
-        context.finish(generation: nil, revision: snapshot.revision, model: snapshot.model)
-      }
+      defer { context.finish(generation: nil, revision: snapshot.revision, model: snapshot.model) }
       let input = try await self.inputProcessor.inputConcurrently(
         prompt: snapshot.transcript,
         tools: tools,
@@ -412,10 +408,7 @@
     }
 
     private func contextState() -> sending LlamaContextState<Profile> {
-      let runtime = LlamaRuntime(
-        model: self.model,
-        parameters: self.contextParameters
-      )
+      let runtime = LlamaRuntime(model: self.model, parameters: self.contextParameters)
       return LlamaContextState(
         runtime: runtime,
         sequence: runtime.lease(copyingFrom: nil)!,
@@ -530,9 +523,7 @@
 
     extension EdgeToolsSession {
       public func clearCaches<Profile>()
-      where
-        Engine == LlamaEngine<Profile>,
-        Profile.GrammarEngine == XGrammarEngine
+      where Engine == LlamaEngine<Profile>, Profile.GrammarEngine == XGrammarEngine
       {
         self.engine.clearCaches()
       }
