@@ -2,7 +2,7 @@
   import EdgeToolsXGrammar
 #endif
 
-#if MLX && XGrammar && canImport(MLX)
+#if MLX && canImport(MLX)
   import EdgeToolsCore
 
   // MARK: - Granite Model
@@ -48,7 +48,7 @@
   public typealias GraniteMoeHybridMLXModelEngine = MLXEngine<GraniteMoeHybridMLXProfile>
 #endif
 
-#if Llama && XGrammar && canImport(CLlama)
+#if Llama && canImport(CLlama)
   import EdgeToolsCore
 
   public struct GraniteLlamaProfile: LlamaModelProfile {

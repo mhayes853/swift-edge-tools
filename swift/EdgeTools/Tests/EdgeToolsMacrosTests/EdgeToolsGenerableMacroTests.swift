@@ -58,7 +58,7 @@ extension `EdgeToolsMacros tests` {
                   "query": String.edgeToolsGenerationSchema,
                                 "limit": Int?.edgeToolsGenerationSchema
                 ]),
-                .required(["query", "limit"]),
+                .required(["query"]),
                 .additionalProperties(false)
               )
             ]),
@@ -81,7 +81,7 @@ extension `EdgeToolsMacros tests` {
             return
             }
             if let value = object["search"] {
-              let payload = try _edgeToolsRequireObjectValue(value, keys: ["query", "limit"])
+              let payload = try _edgeToolsRequireObjectValue(value, keys: ["query"])
               self = .search(
                 query: try String(edgeToolsValue: _edgeToolsValue(payload, forKey: "query")),
                       limit: try Optional<Int>(edgeToolsValue: _edgeToolsValue(payload, forKey: "limit"))
@@ -273,6 +273,63 @@ extension `EdgeToolsMacros tests` {
         }
 
         extension Person: EdgeToolsGenerable {
+        }
+        """
+      }
+    }
+
+    @Test
+    func `Recognizes Qualified Property Macros And Package Access`() {
+      assertMacro {
+        """
+        @EdgeToolsGenerable
+        package struct Payload {
+          @EdgeTools.EdgeToolsGuide(key: "renamed")
+          package var value: String
+          @EdgeTools.EdgeToolsIgnored
+          package var cache: Int = 0
+        }
+        """
+      } expansion: {
+        """
+        package struct Payload {
+          @EdgeTools.EdgeToolsGuide(key: "renamed")
+          package var value: String
+          @EdgeTools.EdgeToolsIgnored
+          package var cache: Int = 0
+
+          package static var extractionToolDefinition: EdgeToolDefinition {
+            EdgeToolDefinition(
+              name: "payload",
+              description: edgeToolsGenerationSchema.objectValue? [.description]?.string
+                ?? "Extract structured data from the input.",
+              arguments: edgeToolsGenerationSchema
+            )
+          }
+
+          package static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
+            EdgeToolsGenerationSchema(
+              .type(.object),
+                    .properties([
+                          "renamed": String.edgeToolsGenerationSchema
+                        ]),
+                    .required(["renamed"])
+            )
+          }
+
+          package init(edgeToolsValue: EdgeToolsValue) throws {
+            let object = try _edgeToolsRequireObjectValue(edgeToolsValue)
+            self.value = try String(edgeToolsValue: _edgeToolsValue(object, forKey: "renamed"))
+          }
+
+          package var edgeToolsValue: EdgeToolsValue {
+            _edgeToolsBuildObjectValue(
+              (key: "renamed", value: self.value.edgeToolsValue)
+            )
+          }
+        }
+
+        extension Payload: EdgeToolsGenerable {
         }
         """
       }

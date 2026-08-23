@@ -160,8 +160,8 @@
     private let configuredSampling: EdgeToolsFusedSamplingParameters?
     private let identity = EdgeToolsEngineIdentity()
     private let generationLoop: EdgeToolsGenerationLoop
-    public let tokenizer: any EdgeToolsTokenizer
-    public let grammarEngine: Profile.GrammarEngine
+    let tokenizer: any EdgeToolsTokenizer
+    let grammarEngine: Profile.GrammarEngine
 
     public init(
       languageModel: sending any LanguageModel,
@@ -254,27 +254,6 @@
       )
     }
 
-    public func prefill(context: MLXContext<Profile>) async throws -> EdgeToolsEnginePrefill {
-      try self.validate(context)
-      let definitions = context.tools.map { $0.definition }
-      return try await self.prefill(snapshot: context.begin(), tools: definitions, context: context)
-    }
-
-    public func generate(
-      parameters: sending Profile.GenerateParameters,
-      context: MLXContext<Profile>,
-      channel: sending EdgeToolsGenerationChannel
-    ) throws -> AnyGenerationTask {
-      try self.validate(context)
-      return self.generationTask(
-        tools: context.tools.map { $0.definition },
-        parameters: parameters,
-        context: context,
-        channel: channel,
-        snapshot: { try context.begin() }
-      )
-    }
-
     private func generationTask(
       tools: [EdgeToolDefinition],
       parameters: sending Profile.GenerateParameters,
@@ -336,25 +315,7 @@
     }
   }
 
-  #if XGrammar
-    extension MLXEngine where Profile.GrammarEngine == XGrammarEngine {
-      public func clearCaches() {
-        self.grammarEngine.clearCaches()
-      }
-    }
-  #endif
-
   // MARK: - EdgeToolsSession + MLX
-
-  #if XGrammar
-    extension EdgeToolsSession {
-      public func clearCaches<Profile>()
-      where Engine == MLXEngine<Profile>, Profile.GrammarEngine == XGrammarEngine
-      {
-        self.engine.clearCaches()
-      }
-    }
-  #endif
 
   extension EdgeToolsSession {
     public func context<Profile>(
@@ -372,6 +333,26 @@
       return self.context(transcript: transcript, reasoningEffort: reasoningEffort)
     }
   }
+
+  // MARK: - XGrammar Cache
+
+  #if XGrammar
+    extension MLXEngine where Profile.GrammarEngine == XGrammarEngine {
+      public func clearCaches() {
+        self.grammarEngine.clearCaches()
+      }
+    }
+
+    extension EdgeToolsSession {
+      public func clearCaches<Profile>()
+      where
+        Engine == MLXEngine<Profile>,
+        Profile.GrammarEngine == XGrammarEngine
+      {
+        self.engine.clearCaches()
+      }
+    }
+  #endif
 
   private struct MLXTextVocabularyConfiguration: Decodable {
     var vocabularySize: Int

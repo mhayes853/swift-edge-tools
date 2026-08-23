@@ -574,18 +574,14 @@ import EdgeToolsCore
 // MARK: - HF Backend JSON
 
 #if FoundationEssentials
-  package func loadHuggingFaceBackendJSON(from tokenizerURL: URL) throws -> String {
-    try loadHuggingFaceBackendJSON(from: Data(contentsOf: tokenizerURL))
-  }
-
-  package func loadHuggingFaceBackendJSON(from data: Data) throws -> String {
+  private func loadHuggingFaceBackendJSON(from data: Data) throws -> String {
     try data.withUnsafeBytes { buffer in
       try huggingFaceBackendJSON(from: buffer.bindMemory(to: UInt8.self))
     }
   }
 #endif
 
-package func huggingFaceBackendJSON(from bytes: UnsafeBufferPointer<UInt8>) throws -> String {
+private func huggingFaceBackendJSON(from bytes: UnsafeBufferPointer<UInt8>) throws -> String {
   var scanner = HuggingFaceBackendJSONScanner(buffer: bytes)
   return "{\(try scanner.metadataFields().joined(separator: ","))}"
 }
@@ -712,5 +708,21 @@ private struct HuggingFaceBackendJSONScanner {
     guard self.index < self.buffer.count, self.buffer[self.index] == byte else { return false }
     self.index += 1
     return true
+  }
+}
+
+extension UInt8 {
+  fileprivate static let jsonOpenArray = UInt8(ascii: "[")
+  fileprivate static let jsonCloseArray = UInt8(ascii: "]")
+  fileprivate static let jsonOpenObject = UInt8(ascii: "{")
+  fileprivate static let jsonCloseObject = UInt8(ascii: "}")
+  fileprivate static let jsonComma = UInt8(ascii: ",")
+  fileprivate static let jsonColon = UInt8(ascii: ":")
+  fileprivate static let jsonQuote = UInt8(ascii: "\"")
+  fileprivate static let jsonEscape = UInt8(ascii: "\\")
+
+  fileprivate var isASCIIWhitespace: Bool {
+    self == UInt8(ascii: " ") || self == UInt8(ascii: "\n")
+      || self == UInt8(ascii: "\r") || self == UInt8(ascii: "\t")
   }
 }

@@ -11,6 +11,8 @@
     import EdgeToolsXGrammar
   #endif
 
+  private let llamaBackendInitialization: Void = LlamaBackend.initialize()
+
   // MARK: - LlamaEngine
 
   public final class LlamaEngine<Profile: LlamaModelProfile>:
@@ -28,8 +30,8 @@
     private let identity = EdgeToolsEngineIdentity()
     private let generationLoop: EdgeToolsGenerationLoop
     private let inputProcessor: LlamaInputProcessor<Profile>
-    public let tokenizer: any EdgeToolsTokenizer
-    public let grammarEngine: Profile.GrammarEngine
+    private let tokenizer: any EdgeToolsTokenizer
+    private let grammarEngine: Profile.GrammarEngine
 
     public convenience init(
       modelPath: String,
@@ -37,6 +39,7 @@
       contextParameters: LlamaContextParameters = LlamaContextParameters(),
       defaultSampling: EdgeToolsFusedSamplingParameters? = nil
     ) throws {
+      _ = llamaBackendInitialization
       try self.init(
         model: LlamaModel(path: modelPath, parameters: modelParameters),
         projectorPath: nil,
@@ -68,6 +71,7 @@
       multimodalParameters: LlamaMultimodalParameters = LlamaMultimodalParameters(),
       defaultSampling: EdgeToolsFusedSamplingParameters? = nil
     ) throws where Profile: EdgeToolsMultimodalModelProfile {
+      _ = llamaBackendInitialization
       try self.init(
         model: LlamaModel(path: modelPath, parameters: modelParameters),
         projectorPath: multimodalProjectorPath,
@@ -100,6 +104,7 @@
       multimodalParameters: LlamaMultimodalParameters,
       defaultSampling: EdgeToolsFusedSamplingParameters?
     ) throws {
+      _ = llamaBackendInitialization
       let model = LlamaModelBox(model: consume model)
       self.model = model
       let multimodalRuntime = try projectorPath.map {
@@ -513,4 +518,25 @@
       return self.context(transcript: transcript, reasoningEffort: reasoningEffort)
     }
   }
+
+  // MARK: - XGrammar Cache
+
+  #if XGrammar
+    extension LlamaEngine where Profile.GrammarEngine == XGrammarEngine {
+      public func clearCaches() {
+        self.grammarEngine.clearCaches()
+      }
+    }
+
+    extension EdgeToolsSession {
+      public func clearCaches<Profile>()
+      where
+        Engine == LlamaEngine<Profile>,
+        Profile.GrammarEngine == XGrammarEngine
+      {
+        self.engine.clearCaches()
+      }
+    }
+  #endif
+
 #endif

@@ -226,10 +226,6 @@
       self.state.withLock { $0.context?.probeReset(sequenceId: sequenceId) }
     }
 
-    func warmUp() throws {
-      try self.state.withLock { try self.ensureContext(&$0) }
-    }
-
     fileprivate func release(sequenceId: Int) {
       self.state.withLock { state in
         _ = state.context?.memoryRemove(sequenceId: sequenceId, from: 0, to: -1)

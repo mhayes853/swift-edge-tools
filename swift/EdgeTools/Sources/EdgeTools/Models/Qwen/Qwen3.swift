@@ -2,7 +2,7 @@
   import EdgeToolsXGrammar
 #endif
 
-#if MLX && XGrammar && canImport(MLX)
+#if MLX && canImport(MLX)
   import EdgeToolsCore
 
   // MARK: - Qwen3 Model
@@ -47,7 +47,7 @@
   public typealias Qwen3MLXModelEngine = MLXEngine<Qwen3MLXProfile>
 #endif
 
-#if Llama && XGrammar && canImport(CLlama)
+#if Llama && canImport(CLlama)
   import EdgeToolsCore
 
   public struct Qwen3LlamaProfile: LlamaModelProfile {

@@ -1,4 +1,4 @@
-#if HuggingFaceTokenizers && Llama && XGrammar && canImport(CLlama) && !os(WASI)
+#if HuggingFaceTokenizers && Llama && canImport(CLlama) && !os(WASI)
   import CustomDump
   @testable import EdgeTools
   import EdgeToolsLlama
@@ -70,7 +70,10 @@
     func `Continuing A Context Only Prefills The Unseen Suffix`() async throws {
       let engine = try await qwen3LlamaEngine()
       let context = engine.context(llamaCachedContextParameters())
-      let prefill = try await engine.prefill(context: context)
+      let prefill = try await engine.prefill(
+        promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+        context: context
+      )
 
       let cached = try await singleTokenGeneration(using: engine, context: context)
       let fresh = try await singleTokenGeneration(
@@ -88,7 +91,10 @@
     func `Forking Leaves The Parent Cache Intact`() async throws {
       let engine = try await qwen3LlamaEngine()
       let context = engine.context(llamaCachedContextParameters())
-      _ = try await engine.prefill(context: context)
+      _ = try await engine.prefill(
+        promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+        context: context
+      )
 
       let forked = try await singleTokenGeneration(using: engine, context: context.fork())
       let parent = try await singleTokenGeneration(using: engine, context: context)
@@ -102,7 +108,10 @@
         contextParameters: LlamaContextParameters(cacheForking: .isolated)
       )
       let context = engine.context(llamaCachedContextParameters())
-      let prefill = try await engine.prefill(context: context)
+      let prefill = try await engine.prefill(
+        promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+        context: context
+      )
 
       let forked = try await singleTokenGeneration(using: engine, context: context.fork())
       let fresh = try await singleTokenGeneration(

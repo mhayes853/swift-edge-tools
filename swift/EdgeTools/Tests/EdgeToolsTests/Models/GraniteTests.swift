@@ -7,7 +7,7 @@ import Testing
 
 @Suite
 struct `Granite tests` {
-  #if MLX && XGrammar && canImport(MLX) && !os(WASI)
+  #if MLX && canImport(MLX) && !os(WASI)
     @Suite(.serialized, .enabledIfMLXTests())
     struct `GraniteMoeHybridMLXModelEngine tests` {
       @Test
@@ -20,7 +20,7 @@ struct `Granite tests` {
     }
   #endif
 
-  #if HuggingFaceTokenizers && Llama && XGrammar && canImport(CLlama) && !os(WASI)
+  #if HuggingFaceTokenizers && Llama && canImport(CLlama) && !os(WASI)
     @Suite(.serialized)
     struct `GraniteLlamaModelEngine tests` {
       @Test

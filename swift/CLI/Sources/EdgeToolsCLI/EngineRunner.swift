@@ -408,7 +408,7 @@ extension EngineRunner {
   ) -> ModelEngineFactory
   where
     Profile.Prompt == EdgeToolsTranscript,
-    Profile.GenerateParameters == DefaultLlamaGenerateParameters,
+    Profile.GenerateParameters == LlamaGenerateParameters,
     Profile.GrammarEngine == XGrammarEngine
   {
     { context in
@@ -432,7 +432,7 @@ extension EngineRunner {
   ) -> ModelEngineFactory
   where
     Profile.Prompt == EdgeToolsTranscript,
-    Profile.GenerateParameters == DefaultLlamaGenerateParameters,
+    Profile.GenerateParameters == LlamaGenerateParameters,
     Profile.GrammarEngine == XGrammarEngine
   {
     { context in
@@ -454,7 +454,7 @@ extension EngineRunner {
   ) -> Self
   where
     Profile.Prompt == EdgeToolsTranscript,
-    Profile.GenerateParameters == DefaultLlamaGenerateParameters,
+    Profile.GenerateParameters == LlamaGenerateParameters,
     Profile.GrammarEngine == XGrammarEngine
   {
     // Held across generations so multi-turn runs reuse the KV cache; `bench` drops it per run.
@@ -466,7 +466,7 @@ extension EngineRunner {
         let context = llamaContext(engine: engine, cache: cachedContext, request: request)
         let task = try engine.generate(
           prompt: .user(request.user, images: request.images, audio: request.audio),
-          parameters: DefaultLlamaGenerateParameters(
+          parameters: LlamaGenerateParameters(
             sampling: request.sampling,
             constraint: try request.grammar.constraint(toolCallRange: request.toolCallRange),
             maxTokens: request.maxTokens
@@ -478,7 +478,8 @@ extension EngineRunner {
       },
       modelResetting: { cachedContext.withLock { $0 = nil } },
       modelWarmingUp: { request in
-        try engine.warmUp(
+        _ = try await engine.prefill(
+          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
           context: llamaContext(engine: engine, cache: cachedContext, request: request)
         )
       }
@@ -491,7 +492,7 @@ extension EngineRunner {
     ) -> ModelEngineFactory
     where
       Profile.Prompt == EdgeToolsTranscript,
-      Profile.GenerateParameters == DefaultMLXGenerateParameters,
+      Profile.GenerateParameters == MLXGenerateParameters,
       Profile.GrammarEngine == XGrammarEngine
     {
       { context in
@@ -507,7 +508,7 @@ extension EngineRunner {
     ) async throws -> Self
     where
       Profile.Prompt == EdgeToolsTranscript,
-      Profile.GenerateParameters == DefaultMLXGenerateParameters,
+      Profile.GenerateParameters == MLXGenerateParameters,
       Profile.GrammarEngine == XGrammarEngine
     {
       let engine = try await Device.withDefaultDevice(hardwareUnit.device) {
@@ -532,7 +533,7 @@ extension EngineRunner {
               images: request.images,
               audio: request.audio
             ),
-            parameters: DefaultMLXGenerateParameters(
+            parameters: MLXGenerateParameters(
               sampling: request.sampling,
               constraint: try request.grammar.constraint(
                 toolCallRange: request.toolCallRange

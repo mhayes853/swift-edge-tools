@@ -39,7 +39,7 @@ package struct Lock<Value: ~Copyable>: ~Copyable {
     #endif
   }
 
-  package init<E: Error>(_ makeValue: () throws(E) -> Value) throws(E) {
+  init<E: Error>(_ makeValue: () throws(E) -> Value) throws(E) {
     #if $Embedded || (canImport(Darwin) && canImport(os))
       let value = try makeValue()
       self.value = UnsafeMutablePointer<Value>.allocate(capacity: 1)
@@ -79,7 +79,7 @@ package struct Lock<Value: ~Copyable>: ~Copyable {
     #endif
   }
 
-  package borrowing func withBorrowedLock<Result: ~Copyable, E: Error>(
+  borrowing func withBorrowedLock<Result: ~Copyable, E: Error>(
     _ body: (borrowing Value) throws(E) -> sending Result
   ) throws(E) -> sending Result {
     #if $Embedded

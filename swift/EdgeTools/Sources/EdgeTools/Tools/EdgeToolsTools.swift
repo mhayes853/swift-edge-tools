@@ -13,7 +13,7 @@ public struct EdgeRawToolCall: Hashable, Sendable {
     self.arguments = arguments
   }
 
-  package init?(jsonValue: EdgeToolsValue) {
+  init?(jsonValue: EdgeToolsValue) {
     guard
       case .object(let object) = jsonValue,
       case .string(let name) = object["name"],

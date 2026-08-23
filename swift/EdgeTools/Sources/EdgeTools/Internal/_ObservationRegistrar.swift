@@ -1,9 +1,9 @@
 #if !$Embedded
   import Observation
 
-  package typealias _ObservationRegistrar = ObservationRegistrar
+  typealias _ObservationRegistrar = ObservationRegistrar
 #else
-  package struct _ObservationRegistrar: Sendable {
-    package init() {}
+  struct _ObservationRegistrar: Sendable {
+    init() {}
   }
 #endif

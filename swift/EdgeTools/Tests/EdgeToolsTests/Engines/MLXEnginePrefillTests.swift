@@ -1,4 +1,4 @@
-#if MLX && XGrammar && canImport(MLX) && !os(WASI)
+#if MLX && canImport(MLX) && !os(WASI)
   import CustomDump
   import EdgeTools
   import MLX
@@ -14,9 +14,15 @@
       let context = engine.context()
 
       context.transcript = .tokens([10, 11, 12])
-      let initial = try await engine.prefill(context: context)
+      let initial = try await engine.prefill(
+        promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+        context: context
+      )
       context.transcript = .tokens([10, 11, 12, 13, 14])
-      let extended = try await engine.prefill(context: context)
+      let extended = try await engine.prefill(
+        promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+        context: context
+      )
 
       expectNoDifference(initial.metrics.prefillTokens, 3)
       expectNoDifference(extended.metrics.prefillTokens, 2)
@@ -27,14 +33,20 @@
       let engine = try makePrefillTestEngine(LLMPrefillTestProfile.self)
       let context = engine.context()
       context.transcript = .tokens([10, 11, 12])
-      _ = try await engine.prefill(context: context)
+      _ = try await engine.prefill(
+        promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+        context: context
+      )
 
       context.transcript = .tokens([10, 11, 12, 13, 14])
       let generation = try await generate(using: engine, context: context)
       expectNoDifference(generation.metrics.prefillTokens, 2)
 
       context.transcript = .tokens([10, 99, 12, 13])
-      let prefill = try await engine.prefill(context: context)
+      let prefill = try await engine.prefill(
+        promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+        context: context
+      )
 
       expectNoDifference(prefill.metrics.prefillTokens, 4)
     }
@@ -48,7 +60,10 @@
       )
       let context = engine.context()
       context.transcript = .tokens([10, 11, 12])
-      _ = try await engine.prefill(context: context)
+      _ = try await engine.prefill(
+        promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+        context: context
+      )
 
       context.transcript = .tokens([10, 11, 12, 13, 14])
       let firstGeneration = try await generate(using: engine, context: context)
@@ -72,12 +87,21 @@
         )
       )
 
-      _ = try await engine.prefill(context: context)
+      _ = try await engine.prefill(
+        promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+        context: context
+      )
       context.transcript = .tokens([10, 11, 12, 13, 14, 15, 16, 17])
-      _ = try await engine.prefill(context: context)
+      _ = try await engine.prefill(
+        promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+        context: context
+      )
       let fork = context.fork()
       fork.transcript = .tokens([10, 11, 12, 13, 14, 15, 16, 17, 18, 19])
-      _ = try await engine.prefill(context: fork)
+      _ = try await engine.prefill(
+        promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+        context: fork
+      )
 
       expectNoDifference(
         recorder.snapshot,
@@ -105,9 +129,15 @@
         )
       )
 
-      _ = try await engine.prefill(context: context)
+      _ = try await engine.prefill(
+        promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+        context: context
+      )
       context.transcript = .tokens([10, 11, 12, 13])
-      _ = try await engine.prefill(context: context)
+      _ = try await engine.prefill(
+        promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+        context: context
+      )
 
       expectNoDifference(recorder.snapshot.maxKVSizes, [nil])
       expectNoDifference(recorder.snapshot.evaluationChunkSizes, [2, 1, 1])
@@ -197,13 +227,19 @@
         let engine = try makePrefillTestEngine(VLMPrefillTestProfile.self)
         let context = engine.context()
         context.transcript = .tokens([10, 11, 12], imageValue: 1)
-        _ = try await engine.prefill(context: context)
+        _ = try await engine.prefill(
+          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+          context: context
+        )
 
         context.transcript = .tokens([
           ([10, 11, 12], 1),
           ([13, 14], nil)
         ])
-        let extended = try await engine.prefill(context: context)
+        let extended = try await engine.prefill(
+          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+          context: context
+        )
 
         expectNoDifference(extended.metrics.prefillTokens, 2)
       }
@@ -213,13 +249,19 @@
         let engine = try makePrefillTestEngine(VLMPrefillTestProfile.self)
         let context = engine.context()
         context.transcript = .tokens([10, 11, 12], imageValue: 1)
-        _ = try await engine.prefill(context: context)
+        _ = try await engine.prefill(
+          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+          context: context
+        )
 
         context.transcript = .tokens([
           ([10, 11, 12], 1),
           ([13, 14], 2)
         ])
-        let extended = try await engine.prefill(context: context)
+        let extended = try await engine.prefill(
+          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+          context: context
+        )
 
         expectNoDifference(extended.metrics.prefillTokens, 5)
       }

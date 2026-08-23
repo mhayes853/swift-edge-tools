@@ -11,7 +11,7 @@
   // MARK: - LlamaTokenizer
 
   public final class LlamaTokenizer: EdgeToolsTokenizer, Sendable {
-    package let model: LlamaModelBox
+    private let model: LlamaModelBox
 
     private nonisolated(unsafe) let vocabulary: OpaquePointer
 
@@ -42,7 +42,10 @@
     }
 
     public func decode(tokens: [EdgeToolsToken.ID]) -> String {
-      let ids = tokens.map { Int32($0) }
+      let ids = tokens.compactMap(Int32.init(exactly:))
+      guard ids.count == tokens.count else {
+        return ""
+      }
       return ids.withUnsafeBufferPointer { ids in
         llamaMeasuredCString(
           measure: {

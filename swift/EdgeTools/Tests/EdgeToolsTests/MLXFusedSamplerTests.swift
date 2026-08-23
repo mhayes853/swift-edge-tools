@@ -89,6 +89,19 @@
     }
 
     @Test
+    func `Positive Top P Retains The Highest Probability Token`() {
+      let sampler = MLXFusedSampler(
+        parameters: EdgeToolsFusedSamplingParameters(
+          temperature: 2,
+          topP: 1e-8,
+          seed: 7
+        )
+      )
+
+      expectNoDifference(sampler.picks(from: .test, count: 8), [1])
+    }
+
+    @Test
     func `Min P Only Samples Tokens Near The Most Probable One`() {
       let sampler = MLXFusedSampler(
         parameters: EdgeToolsFusedSamplingParameters(temperature: 2, minP: 0.5, seed: 7)

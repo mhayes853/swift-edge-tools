@@ -8,7 +8,7 @@ import Testing
 
 @Suite
 struct `Gemma4 tests` {
-  #if MLX && XGrammar && canImport(MLX) && !os(WASI)
+  #if MLX && canImport(MLX) && !os(WASI)
     @Suite(.serialized, .enabledIfMLXTests())
     struct `Gemma4MLXModelEngine tests` {
       @Test
@@ -45,7 +45,7 @@ struct `Gemma4 tests` {
     }
   #endif
 
-  #if HuggingFaceTokenizers && Llama && XGrammar && canImport(CLlama) && !os(WASI)
+  #if HuggingFaceTokenizers && Llama && canImport(CLlama) && !os(WASI)
     @Suite(.serialized)
     struct `Gemma4LlamaModelEngine tests` {
       @Test
@@ -102,14 +102,23 @@ struct `Gemma4 tests` {
             ])
           )
         )
-        _ = try await engine.prefill(context: context)
+        _ = try await engine.prefill(
+          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+          context: context
+        )
         context.transcript.messages.append(.assistant([.text("The dominant color is red.")]))
         context.transcript.messages.append(.user("Confirm that briefly."))
 
-        let cached = try await engine.prefill(context: context)
+        let cached = try await engine.prefill(
+          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+          context: context
+        )
 
         let params = EdgeToolsTranscriptContextParameters(transcript: context.transcript)
-        let fresh = try await engine.prefill(context: engine.context(params))
+        let fresh = try await engine.prefill(
+          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+          context: engine.context(params)
+        )
 
         expectNoDifference(
           try #require(cached.metrics.prefillTokens) < #require(fresh.metrics.prefillTokens),
@@ -147,12 +156,18 @@ struct `Gemma4 tests` {
             ])
           )
         )
-        _ = try await engine.prefill(context: context)
+        _ = try await engine.prefill(
+          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+          context: context
+        )
         try FileManager.default.removeItem(at: validImageURL)
         context.transcript.messages.append(.assistant([.text("The dominant color is red.")]))
         context.transcript.messages.append(.user("Confirm that briefly."))
 
-        _ = try await engine.prefill(context: context)
+        _ = try await engine.prefill(
+          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+          context: context
+        )
       }
 
       @Test
@@ -165,14 +180,23 @@ struct `Gemma4 tests` {
             ])
           )
         )
-        _ = try await engine.prefill(context: context)
+        _ = try await engine.prefill(
+          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+          context: context
+        )
         context.transcript.messages.append(.assistant([.text("The audio contains a tone.")]))
         context.transcript.messages.append(.user("Confirm that briefly."))
 
-        let cached = try await engine.prefill(context: context)
+        let cached = try await engine.prefill(
+          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+          context: context
+        )
 
         let params = EdgeToolsTranscriptContextParameters(transcript: context.transcript)
-        let fresh = try await engine.prefill(context: engine.context(params))
+        let fresh = try await engine.prefill(
+          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+          context: engine.context(params)
+        )
 
         expectNoDifference(
           try #require(cached.metrics.prefillTokens) < #require(fresh.metrics.prefillTokens),

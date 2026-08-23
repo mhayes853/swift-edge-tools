@@ -20,7 +20,13 @@ export function zodTool<
 	return {
 		name: tool.name,
 		...(tool.description === undefined ? {} : { description: tool.description }),
-		parameters: z.toJSONSchema(tool.parameters) as Needle2JSONObject,
+		parameters: zodToolParameters(tool.parameters),
 		call: (args) => tool.call(tool.parameters.parse(args)),
 	};
+}
+
+export function zodToolParameters<Schema extends z.ZodObject<z.core.$ZodShape>>(
+	parameters: Schema,
+): Needle2JSONObject {
+	return z.toJSONSchema(parameters) as Needle2JSONObject;
 }

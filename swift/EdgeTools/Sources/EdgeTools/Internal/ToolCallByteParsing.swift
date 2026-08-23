@@ -133,7 +133,10 @@ extension Array where Element == UInt8 {
 
   mutating func removeLeadingASCIIWhitespaceAndCommas() {
     while let first = self.first {
-      guard first == UInt8(ascii: ",") || first.isASCIIWhitespace else { return }
+      let isWhitespace =
+        first == UInt8(ascii: " ") || first == UInt8(ascii: "\t")
+        || first == UInt8(ascii: "\n") || first == UInt8(ascii: "\r")
+      guard first == UInt8(ascii: ",") || isWhitespace else { return }
       self.removeFirst()
     }
   }

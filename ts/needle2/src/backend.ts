@@ -16,7 +16,6 @@ import type {
 	Needle2ResolvedGenerateOptions,
 } from "./runtime.js";
 
-export { Needle2WASMBinding as Needle2DirectBackend } from "./bindings.js";
 export type { Needle2NativeGeneration } from "./bindings.js";
 
 export interface Needle2Backend {

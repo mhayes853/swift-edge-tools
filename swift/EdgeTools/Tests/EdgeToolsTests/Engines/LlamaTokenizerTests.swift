@@ -1,4 +1,4 @@
-#if HuggingFaceTokenizers && Llama && XGrammar && canImport(CLlama) && !os(WASI)
+#if HuggingFaceTokenizers && Llama && canImport(CLlama) && !os(WASI)
   import CustomDump
   import EdgeTools
   import EdgeToolsXGrammar
@@ -32,6 +32,13 @@
         tokenizer.tokens(forIds: [tokenizer.vocabularySize, -1]),
         [nil, nil]
       )
+    }
+
+    @Test
+    func `IDs Outside The Native Range Decode To An Empty String`() async throws {
+      let tokenizer = try await qwen3LlamaTokenizer()
+
+      expectNoDifference(tokenizer.decode(tokens: [Int.max]), "")
     }
 
     @Test
@@ -79,9 +86,8 @@
   // MARK: - Helpers
 
   private func qwen3LlamaTokenizer() async throws -> LlamaTokenizer {
-    let engine = try Qwen3LlamaModelEngine(
-      modelPath: (try await downloadGGUFModel(id: .qwen3)).path()
+    LlamaTokenizer(
+      model: try LlamaModel(path: (try await downloadGGUFModel(id: .qwen3)).path())
     )
-    return try #require(engine.tokenizer as? LlamaTokenizer)
   }
 #endif

@@ -2,14 +2,14 @@ import _Concurrency
 
 #if $Embedded
   extension Task where Success == Never, Failure == Never {
-    package static func checkCancellation() throws {
+    static func checkCancellation() throws {
       if Task.isCancelled { throw _Concurrency.CancellationError() }
     }
   }
 #endif
 
 extension Task where Success: Sendable, Failure: Error {
-  package var cancellableValue: Success {
+  var cancellableValue: Success {
     get async throws(Failure) {
       do {
         return try await withTaskCancellationHandler {

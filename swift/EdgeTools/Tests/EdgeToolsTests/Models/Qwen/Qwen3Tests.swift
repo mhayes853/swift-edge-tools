@@ -7,7 +7,7 @@ import Testing
 
 @Suite
 struct `Qwen3 tests` {
-  #if MLX && XGrammar && canImport(MLX) && !os(WASI)
+  #if MLX && canImport(MLX) && !os(WASI)
     @Suite(.serialized, .enabledIfMLXTests())
     struct `Qwen3MLXModelEngine tests` {
       @Test
@@ -36,7 +36,10 @@ struct `Qwen3 tests` {
             reasoningEffort: .none
           )
         )
-        let prefill = try await engine.prefill(context: context)
+        let prefill = try await engine.prefill(
+          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+          context: context
+        )
 
         let forkedTask = try engine.generate(
           prompt: .user("Say hello in one word."),
@@ -73,7 +76,7 @@ struct `Qwen3 tests` {
     }
   #endif
 
-  #if HuggingFaceTokenizers && Llama && XGrammar && canImport(CLlama) && !os(WASI)
+  #if HuggingFaceTokenizers && Llama && canImport(CLlama) && !os(WASI)
     @Suite(.serialized)
     struct `Qwen3LlamaModelEngine tests` {
       @Test
@@ -107,7 +110,10 @@ struct `Qwen3 tests` {
           reasoningEffort: .none
         )
         let context = engine.context(parameters)
-        let prefill = try await engine.prefill(context: context)
+        let prefill = try await engine.prefill(
+          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+          context: context
+        )
 
         let forkedTask = try engine.generate(
           prompt: .user("Say hello in one word."),

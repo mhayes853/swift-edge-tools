@@ -81,10 +81,7 @@ extension EdgeToolsValue {
   }
 
   public var isNull: Bool {
-    if case .null = self {
-      return true
-    }
-    return false
+    self == .null
   }
 }
 
@@ -246,10 +243,6 @@ extension EdgeToolsValue {
     }
     defer { yyjson_doc_free(document) }
     self = try readEdgeToolsValue(from: root)
-  }
-
-  package init(json string: String) throws {
-    try self.init(json: Array(string.utf8))
   }
 }
 

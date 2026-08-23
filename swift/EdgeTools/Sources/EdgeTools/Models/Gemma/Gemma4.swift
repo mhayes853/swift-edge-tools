@@ -2,7 +2,7 @@
   import EdgeToolsXGrammar
 #endif
 
-#if MLX && XGrammar && canImport(CoreImage) && canImport(MLX) && canImport(MLXVLM)
+#if MLX && canImport(CoreImage) && canImport(MLX) && canImport(MLXVLM)
   import EdgeToolsCore
   import EdgeToolsTokenizers
   import Foundation
@@ -141,7 +141,7 @@
   }
 #endif
 
-#if Llama && XGrammar && canImport(CLlama)
+#if Llama && canImport(CLlama)
   public struct Gemma4LlamaProfile:
     LlamaModelProfile,
     EdgeToolsMultimodalModelProfile {

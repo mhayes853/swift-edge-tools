@@ -3,8 +3,8 @@
     ▿ (2 elements)
       ▿ key: EdgeToolsMetricKey
         - rawValue: "DecodeDuration"
-      ▿ value: 1.894790416 seconds
-        - _low: 1894790416000000000
+      ▿ value: 1.619465167 seconds
+        - _low: 1619465167000000000
         - _high: 0
     ▿ (2 elements)
       ▿ key: EdgeToolsMetricKey
@@ -13,41 +13,41 @@
     ▿ (2 elements)
       ▿ key: EdgeToolsMetricKey
         - rawValue: "DurationToFirstToken"
-      ▿ value: 0.702543792 seconds
-        - _low: 702543792000000000
+      ▿ value: 0.720230083 seconds
+        - _low: 720230083000000000
         - _high: 0
     ▿ (2 elements)
       ▿ key: EdgeToolsMetricKey
         - rawValue: "MLXEngineGenerationStartMemorySnapshot"
-      ▿ value: Peak:   7701M        (8075246074)
-Active: 5980M        (6271242576)
-Cache:  6268M        (6572863397)
-        - activeMemory: 6271242576
-        - cacheMemory: 6572863397
-        - peakMemory: 8075246074
+      ▿ value: Peak:   7582M        (7951211956)
+Active: 5479M        (5745985732)
+Cache:  7134M        (7481569832)
+        - activeMemory: 5745985732
+        - cacheMemory: 7481569832
+        - peakMemory: 7951211956
     ▿ (2 elements)
       ▿ key: EdgeToolsMetricKey
         - rawValue: "MLXEnginePostDecodeMemorySnapshot"
-      ▿ value: Peak:   7701M        (8075246074)
-Active: 5377M        (5639111054)
-Cache:  6895M        (7230144355)
-        - activeMemory: 5639111054
-        - cacheMemory: 7230144355
-        - peakMemory: 8075246074
+      ▿ value: Peak:   7582M        (7951211956)
+Active: 5546M        (5815667226)
+Cache:  7092M        (7437037778)
+        - activeMemory: 5815667226
+        - cacheMemory: 7437037778
+        - peakMemory: 7951211956
     ▿ (2 elements)
       ▿ key: EdgeToolsMetricKey
         - rawValue: "MLXEnginePostPrefillMemorySnapshot"
-      ▿ value: Peak:   7701M        (8075246074)
-Active: 5980M        (6271243602)
-Cache:  6268M        (6572862367)
-        - activeMemory: 6271243602
-        - cacheMemory: 6572862367
-        - peakMemory: 8075246074
+      ▿ value: Peak:   7582M        (7951211956)
+Active: 5479M        (5745985952)
+Cache:  7134M        (7481569612)
+        - activeMemory: 5745985952
+        - cacheMemory: 7481569612
+        - peakMemory: 7951211956
     ▿ (2 elements)
       ▿ key: EdgeToolsMetricKey
         - rawValue: "PrefillDuration"
-      ▿ value: 0.413774 seconds
-        - _low: 413774000000000000
+      ▿ value: 0.401903875 seconds
+        - _low: 401903875000000000
         - _high: 0
     ▿ (2 elements)
       ▿ key: EdgeToolsMetricKey
@@ -57,21 +57,18 @@ Cache:  6268M        (6572862367)
     ▿ EdgeToolsGenerationPart
       - reasoning: "<think>"
     ▿ EdgeToolsGenerationPart
-      - reasoning: ":"
-    ▿ EdgeToolsGenerationPart
       - reasoning: "\n\n"
     ▿ EdgeToolsGenerationPart
       - text: "\n\n"
     ▿ EdgeToolsGenerationPart
       - text: "4"
-  - response: "<think>:\n\n</think>\n\n4"
+    ▿ EdgeToolsGenerationPart
+      - text: "2"
+  - response: "<think>\n\n</think>\n\n42"
   ▿ tokens: 7 elements
     ▿ EdgeToolsToken
       - id: 248068
       - stringValue: "<think>"
-    ▿ EdgeToolsToken
-      - id: 25
-      - stringValue: ":"
     ▿ EdgeToolsToken
       - id: 271
       - stringValue: "\n\n"
@@ -84,6 +81,9 @@ Cache:  6268M        (6572862367)
     ▿ EdgeToolsToken
       - id: 19
       - stringValue: "4"
+    ▿ EdgeToolsToken
+      - id: 17
+      - stringValue: "2"
     ▿ EdgeToolsToken
       - id: 248046
       - stringValue: "<|im_end|>"
