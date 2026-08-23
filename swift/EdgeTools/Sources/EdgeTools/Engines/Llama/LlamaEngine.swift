@@ -28,8 +28,8 @@
     private let identity = EdgeToolsEngineIdentity()
     private let generationLoop: EdgeToolsGenerationLoop
     private let inputProcessor: LlamaInputProcessor<Profile>
-    public let tokenizer: any EdgeToolsTokenizer
-    public let grammarEngine: Profile.GrammarEngine
+    private let tokenizer: any EdgeToolsTokenizer
+    private let grammarEngine: Profile.GrammarEngine
 
     public convenience init(
       modelPath: String,
@@ -198,21 +198,7 @@
       )
     }
 
-    public func warmUp(context: LlamaContext<Profile>) throws {
-      try self.validate(context)
-      let snapshot = try context.begin()
-      defer { context.finish(generation: nil, revision: snapshot.revision, model: snapshot.model) }
-      try snapshot.model.runtime.sequences.warmUp()
-      _ = try self.inputProcessor.input(
-        prompt: snapshot.transcript,
-        tools: context.tools.map { $0.definition },
-        addGenerationPrompt: true,
-        kind: .generation,
-        cache: snapshot.model.preparedInputCache
-      )
-    }
-
-    public func prefill(
+    package func prefill(
       context: LlamaContext<Profile>
     ) async throws -> EdgeToolsEnginePrefill {
       try self.validate(context)
@@ -501,27 +487,24 @@
     }
   #endif
 
-  // MARK: - EdgeToolsSession + Llama
+  // MARK: - XGrammar Cache
 
-  extension EdgeToolsSession {
-    public func context<Profile>(
-      transcript: EdgeToolsTranscript = EdgeToolsTranscript(),
-      reasoningEffort: EdgeToolsReasoningEffort = .default
-    ) -> LlamaContext<Profile> where Engine == LlamaEngine<Profile> {
-      self.context(
-        EdgeToolsTranscriptContextParameters(
-          transcript: transcript,
-          reasoningEffort: reasoningEffort
-        )
-      )
+  #if XGrammar
+    extension LlamaEngine where Profile.GrammarEngine == XGrammarEngine {
+      public func clearCaches() {
+        self.grammarEngine.clearCaches()
+      }
     }
 
-    public func context<Profile>(
-      systemPrompt: String,
-      reasoningEffort: EdgeToolsReasoningEffort = .default
-    ) -> LlamaContext<Profile> where Engine == LlamaEngine<Profile> {
-      let transcript = EdgeToolsTranscript(messages: [.system(systemPrompt)])
-      return self.context(transcript: transcript, reasoningEffort: reasoningEffort)
+    extension EdgeToolsSession {
+      public func clearCaches<Profile>()
+      where
+        Engine == LlamaEngine<Profile>,
+        Profile.GrammarEngine == XGrammarEngine
+      {
+        self.engine.clearCaches()
+      }
     }
-  }
+  #endif
+
 #endif

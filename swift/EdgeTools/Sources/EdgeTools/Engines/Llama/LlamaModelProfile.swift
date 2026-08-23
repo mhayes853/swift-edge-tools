@@ -40,9 +40,9 @@
   public struct LlamaGenerateParameters: EdgeToolsConstrainedGenerateParameters {
     public static var `default`: Self { Self() }
 
-    public var sampling: EdgeToolsFusedSamplingParameters
+    var sampling: EdgeToolsFusedSamplingParameters
     public var constraint: XGRGenerationConstraint
-    public var confidence: EdgeToolsConfidenceOptions
+    var confidence: EdgeToolsConfidenceOptions
     public var maxTokens: Int?
 
     public init(

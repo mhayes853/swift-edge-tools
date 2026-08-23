@@ -6,9 +6,9 @@
   // MARK: - MLXContext
 
   public struct MLXKVCacheQuantization: Hashable, Sendable {
-    public var bits: Int
-    public var groupSize: Int
-    public var startTokenCount: Int
+    var bits: Int
+    var groupSize: Int
+    var startTokenCount: Int
 
     public init(
       bits: Int,
@@ -22,11 +22,11 @@
   }
 
   public struct MLXContextParameters: Hashable, Sendable {
-    public var transcript: EdgeToolsTranscript
-    public var reasoningEffort: EdgeToolsReasoningEffort
-    public var maxKVSize: Int?
-    public var prefillChunkSize: Int
-    public var kvCacheQuantization: MLXKVCacheQuantization?
+    var transcript: EdgeToolsTranscript
+    var reasoningEffort: EdgeToolsReasoningEffort
+    var maxKVSize: Int?
+    var prefillChunkSize: Int
+    var kvCacheQuantization: MLXKVCacheQuantization?
 
     public init(
       transcript: EdgeToolsTranscript = EdgeToolsTranscript(),

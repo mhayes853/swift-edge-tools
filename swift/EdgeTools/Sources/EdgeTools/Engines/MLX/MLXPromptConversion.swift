@@ -71,13 +71,13 @@
     }
 
     extension EdgeToolsTranscript.Message {
-      public func mlxMessage() throws -> MLXLMCommon.Message {
+      func mlxMessage() throws -> MLXLMCommon.Message {
         try self.chatTemplateValue().mlxMessage
       }
     }
 
     extension EdgeToolDefinition {
-      public var mlxToolSpec: ToolSpec {
+      var mlxToolSpec: ToolSpec {
         self.chatTemplateValue.mlxMessage
       }
     }
@@ -164,7 +164,7 @@
     }
 
     extension EdgeToolsTranscript.Asset {
-      public func mlxImage() throws -> UserInput.Image {
+      func mlxImage() throws -> UserInput.Image {
         switch self.content {
         case .path(let path):
           return .url(URL(filePath: path))
@@ -198,7 +198,7 @@
         )
       }
 
-      public func mlxUserInput(
+      func mlxUserInput(
         tools: [EdgeToolDefinition],
         videos: [UserInput.Video] = [],
         additionalContext: [String: EdgeToolsValue]? = nil,
@@ -215,7 +215,7 @@
         )
       }
 
-      public func mlxVLMInput(
+      func mlxVLMInput(
         tools: [EdgeToolDefinition],
         processor: any UserInputProcessor,
         additionalContext: [String: EdgeToolsValue]? = nil,

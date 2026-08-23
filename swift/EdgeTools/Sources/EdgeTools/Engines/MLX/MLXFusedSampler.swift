@@ -7,8 +7,8 @@
   // MARK: - MLXFusedSampler
 
   public final class MLXFusedSampler: LogitSampler {
-    public let parameters: EdgeToolsFusedSamplingParameters
-    public let history: MLXTokenHistory
+    let parameters: EdgeToolsFusedSamplingParameters
+    package let history: MLXTokenHistory
 
     private var prngKey: MLXArray
     private let unpenalized: (MLXArray, MLXArray) -> MLXArray
@@ -56,7 +56,7 @@
   // MARK: - MLXTokenHistory
 
   public final class MLXTokenHistory {
-    public let capacity: Int
+    let capacity: Int
 
     private var buffer: MLXArray?
     private var writeIndex = 0
@@ -68,16 +68,16 @@
       self.positions = MLXArray(0..<capacity)
     }
 
-    public var tokens: MLXArray? {
+    var tokens: MLXArray? {
       self.buffer
     }
 
-    public func reset() {
+    package func reset() {
       self.buffer = nil
       self.writeIndex = 0
     }
 
-    public func seed(_ tokens: some Sequence<EdgeToolsToken.ID>) {
+    package func seed(_ tokens: some Sequence<EdgeToolsToken.ID>) {
       self.reset()
       let ids = Array(tokens.map { Int32($0) }.suffix(self.capacity))
       guard let last = ids.last else { return }
@@ -87,7 +87,7 @@
       self.writeIndex = ids.count % self.capacity
     }
 
-    public func append(_ token: MLXArray) {
+    func append(_ token: MLXArray) {
       let token = token.asType(.int32).reshaped([1])
       if let buffer = self.buffer {
         self.buffer = MLX.where(self.positions .== Int32(self.writeIndex), token, buffer)
@@ -167,10 +167,11 @@
     }
     guard let topP = parameters.topP, topP < 1 else { return logProbabilities }
 
-    let ascending = argSort(logProbabilities, axis: -1)
-    let sorted = takeAlong(logProbabilities, ascending, axis: -1)
-    let cumulative = cumsum(exp(sorted), axis: -1)
-    let filtered = MLX.where(cumulative .> (1 - topP), sorted, -Float.infinity)
-    return putAlong(logProbabilities, ascending, values: filtered, axis: -1)
+    let descending = argSort(-logProbabilities, axis: -1)
+    let sorted = takeAlong(logProbabilities, descending, axis: -1)
+    let probabilities = exp(sorted)
+    let exclusive = cumsum(probabilities, axis: -1) - probabilities
+    let filtered = MLX.where(exclusive .< topP, sorted, -Float.infinity)
+    return putAlong(logProbabilities, descending, values: filtered, axis: -1)
   }
 #endif

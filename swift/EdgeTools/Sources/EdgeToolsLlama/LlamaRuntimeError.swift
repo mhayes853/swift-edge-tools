@@ -7,11 +7,11 @@
         self.rawValue = rawValue
       }
 
-      public static let modelLoadFailed = Self(rawValue: "model-load-failed")
+      static let modelLoadFailed = Self(rawValue: "model-load-failed")
     }
 
-    public let code: Code
-    public let message: String
+    package let code: Code
+    package let message: String
 
     public init(code: Code, message: String) {
       self.code = code

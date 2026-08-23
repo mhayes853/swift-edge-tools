@@ -13,12 +13,12 @@
       self.rawValue = rawValue
     }
 
-    public static let f32 = Self(rawValue: 0)
-    public static let f16 = Self(rawValue: 1)
+    static let f32 = Self(rawValue: 0)
+    static let f16 = Self(rawValue: 1)
     // pi-lens-ignore: identifier_name
-    public static let q4_0 = Self(rawValue: 2)
+    static let q4_0 = Self(rawValue: 2)
     // pi-lens-ignore: identifier_name
-    public static let q8_0 = Self(rawValue: 8)
+    static let q8_0 = Self(rawValue: 8)
   }
 
   // MARK: - LlamaFlashAttention
@@ -30,9 +30,9 @@
       self.rawValue = rawValue
     }
 
-    public static let auto = Self(rawValue: -1)
-    public static let disabled = Self(rawValue: 0)
-    public static let enabled = Self(rawValue: 1)
+    static let auto = Self(rawValue: -1)
+    static let disabled = Self(rawValue: 0)
+    static let enabled = Self(rawValue: 1)
   }
 
   // MARK: - LlamaKVCacheForkingStrategy
@@ -63,22 +63,21 @@
   // MARK: - LlamaContextParameters
 
   public struct LlamaContextParameters: Hashable, Sendable {
-    public var contextLength: UInt32
+    var contextLength: UInt32
 
-    /// The KV cache behavior used when a context is forked.
-    public var cacheForking: LlamaKVCacheForkingStrategy
-    public var threadCount: Int32
-    public var flashAttention: LlamaFlashAttention
-    public var keyCacheType: LlamaKVCacheType
-    public var valueCacheType: LlamaKVCacheType
+    var cacheForking: LlamaKVCacheForkingStrategy
+    var threadCount: Int32
+    var flashAttention: LlamaFlashAttention
+    var keyCacheType: LlamaKVCacheType
+    var valueCacheType: LlamaKVCacheType
 
     public init(
       contextLength: UInt32 = 4096,
       cacheForking: LlamaKVCacheForkingStrategy = .copyOnWrite(maxContexts: 8),
       threadCount: Int32 = 0,
-      flashAttention: LlamaFlashAttention = .auto,
-      keyCacheType: LlamaKVCacheType = .f16,
-      valueCacheType: LlamaKVCacheType = .f16
+      flashAttention: LlamaFlashAttention = LlamaFlashAttention(rawValue: -1),
+      keyCacheType: LlamaKVCacheType = LlamaKVCacheType(rawValue: 1),
+      valueCacheType: LlamaKVCacheType = LlamaKVCacheType(rawValue: 1)
     ) {
       precondition(cacheForking.maxContexts > 0)
       precondition(cacheForking.maxContexts <= UInt32.max)

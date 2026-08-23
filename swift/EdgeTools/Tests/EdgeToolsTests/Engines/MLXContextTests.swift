@@ -20,7 +20,9 @@
       )
       let session = EdgeToolsSession(engine: engine)
       let context = session.context(
-        transcript: EdgeToolsTranscript(messages: [.system("System")])
+        MLXContextParameters(
+          transcript: EdgeToolsTranscript(messages: [.system("System")])
+        )
       )
 
       let generation = Task {
@@ -68,7 +70,9 @@
       )
       let session = EdgeToolsSession(engine: engine)
       let context = session.context(
-        transcript: EdgeToolsTranscript(messages: [.system("System")])
+        MLXContextParameters(
+          transcript: EdgeToolsTranscript(messages: [.system("System")])
+        )
       )
       _ = try await engine.prefill(context: context)
       expectNoDifference(copyCounter.count, 0)

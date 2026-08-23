@@ -86,9 +86,8 @@
   // MARK: - Helpers
 
   private func qwen3LlamaTokenizer() async throws -> LlamaTokenizer {
-    let engine = try Qwen3LlamaModelEngine(
-      modelPath: (try await downloadGGUFModel(id: .qwen3)).path()
+    LlamaTokenizer(
+      model: try LlamaModel(path: (try await downloadGGUFModel(id: .qwen3)).path())
     )
-    return try #require(engine.tokenizer as? LlamaTokenizer)
   }
 #endif

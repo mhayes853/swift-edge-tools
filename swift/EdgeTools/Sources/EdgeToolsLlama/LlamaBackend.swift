@@ -1,15 +1,14 @@
 #if canImport(CLlama)
   import CLlama
 
-  /// The process-wide llama.cpp backend lifecycle.
-  public enum LlamaBackend {
-    /// Initializes llama.cpp once at the start of the process.
-    public static func initialize() {
+  /// An owned process-wide llama.cpp backend lifecycle.
+  public struct LlamaBackend: ~Copyable {
+    /// Initializes llama.cpp for the lifetime of this value.
+    public init() {
       llama_backend_init()
     }
 
-    /// Frees llama.cpp once at the end of the process.
-    public static func free() {
+    deinit {
       llama_backend_free()
     }
   }

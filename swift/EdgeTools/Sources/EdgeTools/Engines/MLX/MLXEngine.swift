@@ -160,8 +160,8 @@
     private let configuredSampling: EdgeToolsFusedSamplingParameters?
     private let identity = EdgeToolsEngineIdentity()
     private let generationLoop: EdgeToolsGenerationLoop
-    public let tokenizer: any EdgeToolsTokenizer
-    public let grammarEngine: Profile.GrammarEngine
+    let tokenizer: any EdgeToolsTokenizer
+    let grammarEngine: Profile.GrammarEngine
 
     public init(
       languageModel: sending any LanguageModel,
@@ -258,13 +258,13 @@
       )
     }
 
-    public func prefill(context: MLXContext<Profile>) async throws -> EdgeToolsEnginePrefill {
+    package func prefill(context: MLXContext<Profile>) async throws -> EdgeToolsEnginePrefill {
       try self.validate(context)
       let definitions = context.tools.map { $0.definition }
       return try await self.prefill(snapshot: context.begin(), tools: definitions, context: context)
     }
 
-    public func generate(
+    package func generate(
       parameters: sending Profile.GenerateParameters,
       context: MLXContext<Profile>,
       channel: sending EdgeToolsGenerationChannel
@@ -338,8 +338,9 @@
         throw EdgeToolsError.incompatibleContext
       }
     }
-
   }
+
+  // MARK: - XGrammar Cache
 
   #if XGrammar
     extension MLXEngine where Profile.GrammarEngine == XGrammarEngine {
@@ -347,11 +348,7 @@
         self.grammarEngine.clearCaches()
       }
     }
-  #endif
 
-  // MARK: - EdgeToolsSession + MLX
-
-  #if XGrammar
     extension EdgeToolsSession {
       public func clearCaches<Profile>()
       where
@@ -362,23 +359,6 @@
       }
     }
   #endif
-
-  extension EdgeToolsSession {
-    public func context<Profile>(
-      transcript: EdgeToolsTranscript = EdgeToolsTranscript(),
-      reasoningEffort: EdgeToolsReasoningEffort = .default
-    ) -> MLXContext<Profile> where Engine == MLXEngine<Profile> {
-      self.context(MLXContextParameters(transcript: transcript, reasoningEffort: reasoningEffort))
-    }
-
-    public func context<Profile>(
-      systemPrompt: String,
-      reasoningEffort: EdgeToolsReasoningEffort = .default
-    ) -> MLXContext<Profile> where Engine == MLXEngine<Profile> {
-      let transcript = EdgeToolsTranscript(messages: [.system(systemPrompt)])
-      return self.context(transcript: transcript, reasoningEffort: reasoningEffort)
-    }
-  }
 
   private struct MLXTextVocabularyConfiguration: Decodable {
     var vocabularySize: Int

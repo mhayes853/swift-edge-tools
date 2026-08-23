@@ -167,6 +167,14 @@ struct `Command tests` {
   }
 
   @Test
+  func `Rejects An Empty Top P Candidate Range`() async {
+    await expectCommandError(
+      arguments: ["--path", "/models/qwen3", "--prompt", "hello", "--top-p", "0"],
+      message: "--top-p must be greater than 0 and at most 1."
+    )
+  }
+
+  @Test
   func `Rejects An Image Directory`() async throws {
     let directory = URL.temporaryDirectory.appending(path: "edge-image-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

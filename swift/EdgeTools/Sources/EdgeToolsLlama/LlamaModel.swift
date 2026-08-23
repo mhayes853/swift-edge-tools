@@ -8,9 +8,9 @@
   // MARK: - LlamaModelParameters
 
   public struct LlamaModelParameters: Hashable, Sendable {
-    public var gpuLayerCount: Int
-    public var useMemoryMapping: Bool
-    public var vocabularyOnly: Bool
+    var gpuLayerCount: Int
+    var useMemoryMapping: Bool
+    var vocabularyOnly: Bool
 
     public init(
       gpuLayerCount: Int = .max,
@@ -25,7 +25,7 @@
 
   // MARK: - System Info
 
-  public func llamaSystemInfo() -> String {
+  package func llamaSystemInfo() -> String {
     String(cString: llama_print_system_info())
   }
 
@@ -33,10 +33,9 @@
 
   /// An owned llama.cpp model.
   ///
-  /// Initialize `LlamaBackend` before creating a model directly and keep it initialized for the
-  /// model's lifetime. Higher-level engine APIs manage this lifecycle automatically.
+  /// Keep a `LlamaBackend` alive for the model's lifetime.
   public struct LlamaModel: ~Copyable, @unchecked Sendable {
-    public let handle: OpaquePointer
+    package let handle: OpaquePointer
 
     public init(path: String, parameters: LlamaModelParameters = LlamaModelParameters()) throws {
       var modelParameters = llama_model_default_params()
@@ -57,7 +56,7 @@
 
     deinit { llama_model_free(self.handle) }
 
-    public borrowing func chatTemplate(named name: String? = nil) -> String? {
+    package borrowing func chatTemplate(named name: String? = nil) -> String? {
       let template =
         if let name {
           name.withCString { llama_model_chat_template(self.handle, $0) }
@@ -67,7 +66,7 @@
       return template.map { String(cString: $0) }
     }
 
-    public borrowing func metadataValue(forKey key: String) -> String? {
+    package borrowing func metadataValue(forKey key: String) -> String? {
       llamaMeasuredCString(
         measure: { llama_model_meta_val_str(self.handle, key, nil, 0) },
         fill: { llama_model_meta_val_str(self.handle, key, $0, $1) }
@@ -87,7 +86,7 @@
 
   /// Read-only metadata from a llama.cpp model.
   ///
-  /// Initialize `LlamaBackend` before loading metadata from a GGUF path.
+  /// Keep a `LlamaBackend` alive while loading metadata from a GGUF path.
   public struct LlamaModelMetadata: ~Copyable, Sendable {
     private let model: LlamaModel
 
@@ -100,19 +99,21 @@
       self.model = consume model
     }
 
+    @_spi(EdgeToolsCLI)
     public var architecture: String? {
       self["general.architecture"]
     }
 
-    public var name: String? {
+    package var name: String? {
       self["general.name"]
     }
 
+    @_spi(EdgeToolsCLI)
     public var chatTemplate: String? {
       self.model.chatTemplate()
     }
 
-    public subscript(key: String) -> String? {
+    package subscript(key: String) -> String? {
       self.model.metadataValue(forKey: key)
     }
   }

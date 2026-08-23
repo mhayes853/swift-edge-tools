@@ -478,7 +478,8 @@ extension EngineRunner {
       },
       modelResetting: { cachedContext.withLock { $0 = nil } },
       modelWarmingUp: { request in
-        try engine.warmUp(
+        _ = try await engine.prefill(
+          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
           context: llamaContext(engine: engine, cache: cachedContext, request: request)
         )
       }

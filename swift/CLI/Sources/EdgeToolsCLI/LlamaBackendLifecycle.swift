@@ -1,10 +1,8 @@
-import Darwin
 import EdgeTools
 
-package func initializeLlamaBackendIfRequested(arguments: [String]) {
-  guard argumentsRequestLlamaBackend(arguments) else { return }
-  LlamaBackend.initialize()
-  atexit(freeLlamaBackend)
+package func llamaBackendIfRequested(arguments: [String]) -> LlamaBackend? {
+  guard argumentsRequestLlamaBackend(arguments) else { return nil }
+  return LlamaBackend()
 }
 
 private func argumentsRequestLlamaBackend(_ arguments: [String]) -> Bool {
@@ -19,8 +17,4 @@ private func argumentsRequestLlamaBackend(_ arguments: [String]) -> Bool {
     guard argument.hasPrefix("--engine=") else { return false }
     return EngineKind(argument: String(argument.dropFirst("--engine=".count))) == .llama
   }
-}
-
-private func freeLlamaBackend() {
-  LlamaBackend.free()
 }

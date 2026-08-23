@@ -1,4 +1,5 @@
 import EdgeTools
+@_spi(EdgeToolsCLI) import EdgeToolsLlama
 import Foundation
 
 // MARK: - DetectedModel

@@ -56,11 +56,11 @@
         self.rawValue = rawValue
       }
 
-      public static let emptyInput = Self(rawValue: "empty-input")
+      static let emptyInput = Self(rawValue: "empty-input")
     }
 
-    public let code: Code
-    public let message: String
+    let code: Code
+    let message: String
 
     public init(code: Code, message: String) {
       self.code = code
@@ -74,13 +74,13 @@
     public struct MLXGenerateParameters: EdgeToolsConstrainedGenerateParameters, Sendable {
       public static var `default`: Self { Self() }
 
-      public var sampler: (@Sendable () -> any LogitSampler)?
-      public var sampling: EdgeToolsFusedSamplingParameters
-      public var processor: (@Sendable () -> any LogitProcessor)?
+      var sampler: (@Sendable () -> any LogitSampler)?
+      var sampling: EdgeToolsFusedSamplingParameters
+      var processor: (@Sendable () -> any LogitProcessor)?
       public var constraint: XGRGenerationConstraint
-      public var confidence: EdgeToolsConfidenceOptions
+      var confidence: EdgeToolsConfidenceOptions
       public var maxTokens: Int?
-      public var synchronizeStreamForMemorySnapshots: Bool
+      var synchronizeStreamForMemorySnapshots: Bool
 
       public init(
         sampler: (@Sendable () -> any LogitSampler)? = nil,
