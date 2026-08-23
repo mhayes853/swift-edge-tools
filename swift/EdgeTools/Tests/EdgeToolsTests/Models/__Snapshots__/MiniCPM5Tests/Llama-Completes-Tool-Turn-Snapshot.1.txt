@@ -260,13 +260,39 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: "\n"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "The"
+            - reasoning: "I"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "\'ve"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " received"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " weather"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " information"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " for"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " Paris"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " from"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " function"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " call"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "."
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " The"
           ▿ EdgeToolsGenerationPart
             - reasoning: " user"
           ▿ EdgeToolsGenerationPart
             - reasoning: " asked"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " about"
+            - reasoning: " for"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
@@ -276,6 +302,34 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " Paris"
           ▿ EdgeToolsGenerationPart
+            - reasoning: ","
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " and"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " I"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " have"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " response"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: ":"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " sunny"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: ","
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " temperature"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "C"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "elsius"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " "
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "21"
+          ▿ EdgeToolsGenerationPart
             - reasoning: "."
           ▿ EdgeToolsGenerationPart
             - reasoning: " I"
@@ -284,73 +338,15 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " to"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " provide"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " the"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " information"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " I"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " have"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " received"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "."
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " The"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " response"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " from"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " the"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " get"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "Weather"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " function"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " shows"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " that"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " Paris"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " has"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " sunny"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " weather"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " with"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " a"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " temperature"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " of"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " "
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "21"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "°C"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "."
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " I"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " should"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " summarize"
+            - reasoning: " present"
           ▿ EdgeToolsGenerationPart
             - reasoning: " this"
           ▿ EdgeToolsGenerationPart
             - reasoning: " information"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " for"
+            - reasoning: " clearly"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " to"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
@@ -370,8 +366,6 @@
           ▿ EdgeToolsGenerationPart
             - text: " is"
           ▿ EdgeToolsGenerationPart
-            - text: " currently"
-          ▿ EdgeToolsGenerationPart
             - text: " sunny"
           ▿ EdgeToolsGenerationPart
             - text: " with"
@@ -381,5 +375,11 @@
             - text: " temperature"
           ▿ EdgeToolsGenerationPart
             - text: " of"
+          ▿ EdgeToolsGenerationPart
+            - text: " "
+          ▿ EdgeToolsGenerationPart
+            - text: "21"
+          ▿ EdgeToolsGenerationPart
+            - text: "°C"
   ▿ reasoningEffort: EdgeToolsReasoningEffort
     - rawValue: "default"

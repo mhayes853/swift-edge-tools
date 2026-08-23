@@ -44,6 +44,8 @@
           ▿ EdgeToolsGenerationPart
             - text: "The"
           ▿ EdgeToolsGenerationPart
+            - text: " current"
+          ▿ EdgeToolsGenerationPart
             - text: " weather"
           ▿ EdgeToolsGenerationPart
             - text: " in"
@@ -66,9 +68,7 @@
           ▿ EdgeToolsGenerationPart
             - text: "21"
           ▿ EdgeToolsGenerationPart
-            - text: " degrees"
-          ▿ EdgeToolsGenerationPart
-            - text: " Celsius"
+            - text: "°C"
           ▿ EdgeToolsGenerationPart
             - text: "."
   ▿ reasoningEffort: EdgeToolsReasoningEffort

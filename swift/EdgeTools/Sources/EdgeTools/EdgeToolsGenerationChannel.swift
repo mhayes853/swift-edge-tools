@@ -1,12 +1,12 @@
 import EdgeToolsCore
 
-public struct EdgeToolsGenerationChannel {
-  public var onToken: ((EdgeToolsToken) -> Void)?
-  public var onPart: ((EdgeToolsGenerationPart) -> Void)?
+public struct EdgeToolsGenerationChannel: Sendable {
+  public var onToken: (@Sendable (EdgeToolsToken) -> Void)?
+  public var onPart: (@Sendable (EdgeToolsGenerationPart) -> Void)?
 
   public init(
-    onToken: ((EdgeToolsToken) -> Void)? = nil,
-    onPart: ((EdgeToolsGenerationPart) -> Void)? = nil
+    onToken: (@Sendable (EdgeToolsToken) -> Void)? = nil,
+    onPart: (@Sendable (EdgeToolsGenerationPart) -> Void)? = nil
   ) {
     self.onToken = onToken
     self.onPart = onPart

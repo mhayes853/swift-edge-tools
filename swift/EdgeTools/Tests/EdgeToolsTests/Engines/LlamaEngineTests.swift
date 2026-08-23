@@ -13,23 +13,21 @@
       let modelBox = LlamaModelBox(model: consume model)
       let store = LlamaKVSequenceStore(
         model: modelBox,
-        parameters: LlamaContextParameters(maximumSequenceCount: 2)
+        parameters: LlamaContextParameters(cacheForking: .copyOnWrite(maxContexts: 2))
       )
       let first = try #require(store.lease(copyingFrom: nil))
       let second = try #require(store.lease(copyingFrom: nil))
       let input = LlamaPreparedInput(tokenIds: [1])
 
-      _ = try store.synchronize(
+      _ = try store.synchronizeForLogits(
         sequenceId: first.sequenceId,
         input: input,
-        multimodalRuntime: nil,
-        output: .lastTokenLogits
+        multimodalRuntime: nil
       )
       _ = try store.synchronize(
         sequenceId: second.sequenceId,
         input: input,
-        multimodalRuntime: nil,
-        output: .none
+        multimodalRuntime: nil
       )
 
       #expect(throws: Never.self) {
@@ -49,7 +47,7 @@
         modelPath: modelPath,
         contextParameters: LlamaContextParameters(
           contextLength: UInt32(filledContext.tokenCount),
-          maximumSequenceCount: 1
+          cacheForking: .isolated
         )
       )
       let emittedTokenCount = Lock(0)
@@ -101,7 +99,7 @@
     @Test
     func `Forking Beyond Sequence Capacity Falls Back To A Cold Cache`() async throws {
       let engine = try await qwen3LlamaEngine(
-        contextParameters: LlamaContextParameters(maximumSequenceCount: 1)
+        contextParameters: LlamaContextParameters(cacheForking: .isolated)
       )
       let context = engine.context(llamaCachedContextParameters())
       let prefill = try await engine.prefill(context: context)

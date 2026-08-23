@@ -456,7 +456,7 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " which"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " takes"
+            - reasoning: " requires"
           ▿ EdgeToolsGenerationPart
             - reasoning: " a"
           ▿ EdgeToolsGenerationPart
@@ -466,61 +466,31 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: "."
           ▿ EdgeToolsGenerationPart
-            - reasoning: " I"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " set"
+            - reasoning: " Since"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " location"
+            - reasoning: " user"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " to"
+            - reasoning: " specified"
           ▿ EdgeToolsGenerationPart
             - reasoning: " Paris"
           ▿ EdgeToolsGenerationPart
             - reasoning: ","
           ▿ EdgeToolsGenerationPart
-            - reasoning: " so"
+            - reasoning: " I"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " called"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " tool"
+            - reasoning: " function"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " call"
+            - reasoning: " with"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " was"
+            - reasoning: " that"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " {\""
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "name"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "\":"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " \""
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "get"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "Weather"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "\","
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " \""
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "arguments"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "\":"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " {\""
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "location"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "\":"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " \""
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "Paris"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "\"}}"
+            - reasoning: " location"
           ▿ EdgeToolsGenerationPart
             - reasoning: "."
           ▿ EdgeToolsGenerationPart
@@ -538,8 +508,38 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " condition"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " being"
+            - reasoning: " as"
           ▿ EdgeToolsGenerationPart
             - reasoning: " sunny"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " and"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " temperature"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " at"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " "
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "2"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "1"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "°C"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "."
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " Now"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " I"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " need"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " to"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " summarize"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " this"
   ▿ reasoningEffort: EdgeToolsReasoningEffort
     - rawValue: "default"

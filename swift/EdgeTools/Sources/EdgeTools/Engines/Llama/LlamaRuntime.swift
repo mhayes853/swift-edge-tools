@@ -35,12 +35,38 @@
     public static let enabled = Self(rawValue: 1)
   }
 
+  // MARK: - LlamaKVCacheForkingStrategy
+
+  /// Configures how llama contexts fork their KV cache state.
+  public enum LlamaKVCacheForkingStrategy: Hashable, Sendable {
+    /// Gives each fork an independent KV cache.
+    case isolated
+
+    /// Shares one copy-on-write KV cache among up to `maxContexts` active contexts.
+    case copyOnWrite(maxContexts: Int)
+
+    var maxContexts: Int {
+      switch self {
+      case .isolated: 1
+      case .copyOnWrite(let maxContexts): maxContexts
+      }
+    }
+
+    var usesUnifiedCache: Bool {
+      switch self {
+      case .isolated: false
+      case .copyOnWrite: true
+      }
+    }
+  }
+
   // MARK: - LlamaContextParameters
 
   public struct LlamaContextParameters: Hashable, Sendable {
     public var contextLength: UInt32
-    public var maximumSequenceCount: UInt32
-    public var unifiedKVCache: Bool
+
+    /// The KV cache behavior used when a context is forked.
+    public var cacheForking: LlamaKVCacheForkingStrategy
     public var threadCount: Int32
     public var flashAttention: LlamaFlashAttention
     public var keyCacheType: LlamaKVCacheType
@@ -48,22 +74,29 @@
 
     public init(
       contextLength: UInt32 = 4096,
-      maximumSequenceCount: UInt32 = 8,
-      unifiedKVCache: Bool = true,
+      cacheForking: LlamaKVCacheForkingStrategy = .copyOnWrite(maxContexts: 8),
       threadCount: Int32 = 0,
       flashAttention: LlamaFlashAttention = .auto,
       keyCacheType: LlamaKVCacheType = .f16,
       valueCacheType: LlamaKVCacheType = .f16
     ) {
-      precondition(maximumSequenceCount > 0)
+      precondition(cacheForking.maxContexts > 0)
+      precondition(cacheForking.maxContexts <= UInt32.max)
       self.contextLength = contextLength
-      self.maximumSequenceCount = maximumSequenceCount
-      self.unifiedKVCache = unifiedKVCache
+      self.cacheForking = cacheForking
       self.threadCount = threadCount
       self.flashAttention = flashAttention
       self.keyCacheType = keyCacheType
       self.valueCacheType = valueCacheType
     }
+  }
+
+  // MARK: - LlamaDecodedLogits
+
+  // Evidence that a decode asked for logits at `sequenceId`'s last position. Only the decode
+  // primitives return one, so a path that claims to produce logits cannot skip decoding.
+  struct LlamaDecodedLogits {
+    let sequenceId: Int
   }
 
   // MARK: - LlamaRuntimeContext
@@ -98,6 +131,33 @@
     borrowing func decode(
       tokenIds: some Collection<EdgeToolsToken.ID>,
       startPosition: Int,
+      sequenceId: Int
+    ) throws {
+      try self.decode(
+        tokenIds: tokenIds,
+        startPosition: startPosition,
+        sequenceId: sequenceId,
+        wantsLogits: false
+      )
+    }
+
+    borrowing func decodeProducingLogits(
+      tokenIds: some Collection<EdgeToolsToken.ID>,
+      startPosition: Int,
+      sequenceId: Int
+    ) throws -> LlamaDecodedLogits {
+      try self.decode(
+        tokenIds: tokenIds,
+        startPosition: startPosition,
+        sequenceId: sequenceId,
+        wantsLogits: true
+      )
+      return LlamaDecodedLogits(sequenceId: sequenceId)
+    }
+
+    private borrowing func decode(
+      tokenIds: some Collection<EdgeToolsToken.ID>,
+      startPosition: Int,
       sequenceId: Int,
       wantsLogits: Bool
     ) throws {
@@ -121,10 +181,7 @@
       }
       let status = llama_decode(self.handle, batch)
       guard status == 0 else {
-        throw LlamaRuntimeError(
-          code: .decodeFailed,
-          message: "llama_decode failed with status \(status)."
-        )
+        throw llamaDecodeError(status: status)
       }
     }
 
@@ -169,8 +226,8 @@
     borrowing func createContext(parameters: LlamaContextParameters) throws -> LlamaRuntimeContext {
       var contextParameters = llama_context_default_params()
       contextParameters.n_ctx = parameters.contextLength
-      contextParameters.n_seq_max = parameters.maximumSequenceCount
-      contextParameters.kv_unified = parameters.unifiedKVCache
+      contextParameters.n_seq_max = UInt32(parameters.cacheForking.maxContexts)
+      contextParameters.kv_unified = parameters.cacheForking.usesUnifiedCache
       if parameters.threadCount > 0 {
         contextParameters.n_threads = parameters.threadCount
         contextParameters.n_threads_batch = parameters.threadCount
@@ -187,5 +244,20 @@
       }
       return LlamaRuntimeContext(handle: handle)
     }
+  }
+
+  // MARK: - Helpers
+
+  private func llamaDecodeError(status: Int32) -> LlamaRuntimeError {
+    guard status == 1 else {
+      return LlamaRuntimeError(
+        code: .decodeFailed,
+        message: "llama_decode failed with status \(status)."
+      )
+    }
+    return LlamaRuntimeError(
+      code: .contextLengthExceeded,
+      message: "The batch does not fit in the context's remaining KV cache."
+    )
   }
 #endif

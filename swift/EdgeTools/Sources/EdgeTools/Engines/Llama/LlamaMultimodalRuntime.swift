@@ -46,30 +46,93 @@
     let asset: EdgeToolsTranscript.Asset
   }
 
-  struct LlamaPreparedInputUnit: Equatable, Sendable {
+  struct LlamaMultimodalInputProcessor<Profile: LlamaModelProfile>: Sendable {
+    let tokenizer: LlamaTokenizer
+    let runtime: LlamaMultimodalRuntime
+
+    func input(
+      prompt: EdgeToolsTranscript,
+      tools: [EdgeToolDefinition],
+      addGenerationPrompt: Bool,
+      kind: EdgeToolsLLMInputKind,
+      cache: EdgeToolsLLMPreparedInputCache<LlamaPreparedInput>
+    ) throws -> LlamaPreparedInput {
+      guard prompt.videos.isEmpty else {
+        throw EdgeToolsError.unsupportedMedia("Video input is not supported by LlamaEngine.")
+      }
+      guard let profile = Profile.self as? any EdgeToolsMultimodalModelProfile.Type else {
+        throw EdgeToolsError.unsupportedTokenizer
+      }
+      var media = [LlamaMultimodalAsset]()
+      let messages = try prompt.chatTemplateMessages { userMessage in
+        let content = try profile.multimodalContent(for: userMessage)
+          .reduce(into: "") { content, part in
+            switch part {
+            case .text(let text):
+              content.append(text)
+            case .image(let image):
+              content.append(self.runtime.mediaMarker)
+              media.append(LlamaMultimodalAsset(kind: .image, asset: image))
+            case .audio(let audio):
+              content.append(self.runtime.mediaMarker)
+              media.append(LlamaMultimodalAsset(kind: .audio, asset: audio))
+            case .video:
+              throw EdgeToolsError.unsupportedMedia(
+                "Video input is not supported by LlamaEngine."
+              )
+            }
+          }
+        return ["role": "user", "content": .string(content)]
+      }
+      let text = try self.tokenizer.renderChatTemplate(
+        messages: messages,
+        tools: tools.chatTemplateToolValues,
+        addGenerationPrompt: addGenerationPrompt,
+        additionalContext: Profile.templateContext(prompt: prompt)
+      )
+      let cachedInput = cache.input(
+        for: prompt,
+        tools: tools,
+        kind: kind,
+        allowingTextOnlyContinuation: true
+      )
+      if let cached = cachedInput,
+        let input = try cached.replacingText(
+          text,
+          mediaMarker: self.runtime.mediaMarker,
+          tokenizer: self.tokenizer
+        )
+      {
+        cache.store(input, for: prompt, tools: tools, kind: kind)
+        return input
+      }
+      let input = try self.runtime.prepare(text: text, media: media)
+      cache.store(input, for: prompt, tools: tools, kind: kind)
+      return input
+    }
+  }
+
+  enum LlamaPreparedInputUnit: Equatable, Sendable {
     struct Media: Equatable, Sendable {
       let kind: LlamaMediaKind
       let id: String
+      let chunkIndex: Int
       let tokenCount: Int
       let positionCount: Int
     }
 
-    enum Value: Equatable, Sendable {
-      case token(EdgeToolsToken.ID)
-      case media(Media)
-    }
-
-    let value: Value
+    case token(EdgeToolsToken.ID)
+    case media(Media)
 
     var tokenCount: Int {
-      switch self.value {
+      switch self {
       case .token: 1
       case .media(let media): media.tokenCount
       }
     }
 
     var positionCount: Int {
-      switch self.value {
+      switch self {
       case .token: 1
       case .media(let media): media.positionCount
       }
@@ -120,22 +183,16 @@
       }
     }
 
-    borrowing func contents() throws -> (
-      units: [LlamaPreparedInputUnit],
-      chunks: [LlamaPreparedInput.Chunk]
-    ) {
+    borrowing func units() throws -> [LlamaPreparedInputUnit] {
       var units = [LlamaPreparedInputUnit]()
-      var chunks = [LlamaPreparedInput.Chunk]()
       for chunkIndex in 0..<mtmd_input_chunks_size(self.handle) {
         guard let chunk = mtmd_input_chunks_get(self.handle, chunkIndex) else { continue }
-        let unitStart = units.count
         switch mtmd_input_chunk_get_type(chunk) {
         case MTMD_INPUT_CHUNK_TYPE_TEXT:
           var tokenCount = 0
           let tokens = mtmd_input_chunk_get_tokens_text(chunk, &tokenCount)
           let tokenIds = (0..<tokenCount).map { EdgeToolsToken.ID(tokens![$0]) }
-          units.append(contentsOf: tokenIds.map { LlamaPreparedInputUnit(value: .token($0)) })
-          chunks.append(.text(tokenIds: tokenIds, units: unitStart..<units.count))
+          units.append(contentsOf: tokenIds.map(LlamaPreparedInputUnit.token))
         case MTMD_INPUT_CHUNK_TYPE_IMAGE, MTMD_INPUT_CHUNK_TYPE_AUDIO:
           let kind: LlamaMediaKind =
             mtmd_input_chunk_get_type(chunk) == MTMD_INPUT_CHUNK_TYPE_AUDIO ? .audio : .image
@@ -143,23 +200,21 @@
           let positionCount = Int(mtmd_input_chunk_get_n_pos(chunk))
           let id = mtmd_input_chunk_get_id(chunk).map { String(cString: $0) } ?? ""
           units.append(
-            LlamaPreparedInputUnit(
-              value: .media(
-                LlamaPreparedInputUnit.Media(
-                  kind: kind,
-                  id: id,
-                  tokenCount: tokenCount,
-                  positionCount: positionCount
-                )
+            .media(
+              LlamaPreparedInputUnit.Media(
+                kind: kind,
+                id: id,
+                chunkIndex: chunkIndex,
+                tokenCount: tokenCount,
+                positionCount: positionCount
               )
             )
           )
-          chunks.append(.media(chunkIndex: chunkIndex, unit: unitStart))
         default:
           throw EdgeToolsError.unsupportedMedia("Unsupported llama multimodal input chunk.")
         }
       }
-      return (units, chunks)
+      return units
     }
 
     borrowing func evaluate(
@@ -168,7 +223,8 @@
       chunkIndex: Int,
       position: Int,
       sequenceId: Int,
-      batchSize: Int
+      batchSize: Int,
+      wantsLogits: Bool
     ) throws -> Int {
       guard let chunk = mtmd_input_chunks_get(self.handle, chunkIndex) else {
         throw LlamaRuntimeError(
@@ -184,7 +240,7 @@
         llama_pos(position),
         llama_seq_id(sequenceId),
         Int32(clamping: batchSize),
-        false,
+        wantsLogits,
         &newPosition
       )
       guard status == 0 else {
@@ -210,7 +266,8 @@
       chunkIndex: Int,
       position: Int,
       sequenceId: Int,
-      batchSize: Int
+      batchSize: Int,
+      wantsLogits: Bool
     ) throws -> Int {
       try self.chunks.withBorrowedLock {
         try $0.evaluate(
@@ -219,47 +276,33 @@
           chunkIndex: chunkIndex,
           position: position,
           sequenceId: sequenceId,
-          batchSize: batchSize
+          batchSize: batchSize,
+          wantsLogits: wantsLogits
         )
       }
     }
   }
 
   struct LlamaPreparedInput: Sendable {
-    enum Chunk {
-      case text(tokenIds: [EdgeToolsToken.ID], units: Range<Int>)
-      case media(chunkIndex: Int, unit: Int)
-    }
-
     private let media: LlamaPreparedMedia?
     let units: [LlamaPreparedInputUnit]
-    let chunks: [Chunk]
-
-    var hasMedia: Bool {
-      self.media != nil
-    }
 
     init(tokenIds: [EdgeToolsToken.ID]) {
       self.media = nil
-      self.units = tokenIds.map { LlamaPreparedInputUnit(value: .token($0)) }
-      self.chunks = []
+      self.units = tokenIds.map(LlamaPreparedInputUnit.token)
     }
 
     fileprivate init(chunks: consuming sending LlamaInputChunks) throws {
-      let contents = try chunks.contents()
+      self.units = try chunks.units()
       self.media = LlamaPreparedMedia(chunks: consume chunks)
-      self.units = contents.units
-      self.chunks = contents.chunks
     }
 
     private init(
       media: LlamaPreparedMedia,
-      units: [LlamaPreparedInputUnit],
-      chunks: [Chunk]
+      units: [LlamaPreparedInputUnit]
     ) {
       self.media = media
       self.units = units
-      self.chunks = chunks
     }
 
     func replacingText(
@@ -268,29 +311,22 @@
       tokenizer: LlamaTokenizer
     ) throws -> Self? {
       guard let preparedMedia = self.media else { return nil }
-      let mediaUnits = self.chunks.compactMap { chunk -> (Int, LlamaPreparedInputUnit)? in
-        guard case .media(let chunkIndex, let unitIndex) = chunk else { return nil }
-        return (chunkIndex, self.units[unitIndex])
+      let mediaUnits = self.units.compactMap { unit -> LlamaPreparedInputUnit? in
+        guard case .media = unit else { return nil }
+        return unit
       }
       let segments = llamaTextSegments(text, separatedBy: mediaMarker)
       guard segments.count == mediaUnits.count + 1 else { return nil }
 
       var units = [LlamaPreparedInputUnit]()
-      var chunks = [Chunk]()
       for (index, segment) in segments.enumerated() {
         let tokenIds = try tokenizer.tokenIds(text: String(segment), addSpecialTokens: false)
-        if !tokenIds.isEmpty {
-          let unitStart = units.count
-          units.append(contentsOf: tokenIds.map { LlamaPreparedInputUnit(value: .token($0)) })
-          chunks.append(.text(tokenIds: tokenIds, units: unitStart..<units.count))
-        }
+        units.append(contentsOf: tokenIds.map(LlamaPreparedInputUnit.token))
         if index < mediaUnits.count {
-          let unitIndex = units.count
-          units.append(mediaUnits[index].1)
-          chunks.append(.media(chunkIndex: mediaUnits[index].0, unit: unitIndex))
+          units.append(mediaUnits[index])
         }
       }
-      return Self(media: preparedMedia, units: units, chunks: chunks)
+      return Self(media: preparedMedia, units: units)
     }
 
     func evaluateMedia(
@@ -299,7 +335,8 @@
       chunkIndex: Int,
       position: Int,
       sequenceId: Int,
-      batchSize: Int
+      batchSize: Int,
+      wantsLogits: Bool
     ) throws -> Int {
       guard let media else {
         throw LlamaRuntimeError(
@@ -313,7 +350,8 @@
         chunkIndex: chunkIndex,
         position: position,
         sequenceId: sequenceId,
-        batchSize: batchSize
+        batchSize: batchSize,
+        wantsLogits: wantsLogits
       )
     }
   }
@@ -460,9 +498,32 @@
           chunkIndex: chunkIndex,
           position: position,
           sequenceId: sequenceId,
-          batchSize: batchSize
+          batchSize: batchSize,
+          wantsLogits: false
         )
       }
+    }
+
+    func evaluateProducingLogits(
+      input: borrowing LlamaPreparedInput,
+      context: borrowing LlamaRuntimeContext,
+      chunkIndex: Int,
+      position: Int,
+      sequenceId: Int,
+      batchSize: Int
+    ) throws -> (position: Int, logits: LlamaDecodedLogits) {
+      let position = try self.state.withBorrowedLock { state in
+        try input.evaluateMedia(
+          runtime: state.handle,
+          context: context,
+          chunkIndex: chunkIndex,
+          position: position,
+          sequenceId: sequenceId,
+          batchSize: batchSize,
+          wantsLogits: true
+        )
+      }
+      return (position, LlamaDecodedLogits(sequenceId: sequenceId))
     }
   }
 
@@ -471,7 +532,7 @@
   extension Sequence<LlamaPreparedInputUnit> {
     var tokenIds: [EdgeToolsToken.ID] {
       self.compactMap { unit in
-        guard case .token(let tokenId) = unit.value else { return nil }
+        guard case .token(let tokenId) = unit else { return nil }
         return tokenId
       }
     }

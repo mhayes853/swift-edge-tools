@@ -6,10 +6,6 @@
   import _EdgeToolsFoundation
 
   // MARK: - HuggingFaceTokenizer + MLXLMCommon
-  //
-  // `HuggingFaceTokenizer`'s `encode`/token lookup methods return `EdgeToolsToken` for
-  // `EdgeToolsTokenizer`, not the raw `Int`/`String` that `MLXLMCommon.Tokenizer` requires, so the
-  // conformance lives on a separate adapter rather than on `HuggingFaceTokenizer` itself.
 
   extension HuggingFaceTokenizer {
     package var mlxTokenizer: any MLXLMCommon.Tokenizer {

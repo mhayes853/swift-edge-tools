@@ -98,7 +98,8 @@ struct `Qwen3P5 tests` {
           let freshTokenIDs = fresh.tokens.map(\.id)
 
           expectNoDifference(forkedTokenIDs, freshTokenIDs)
-          let forkedPrefillTokens = (forked.metrics.prefillTokens ?? 0) + (initial.metrics.prefillTokens ?? 0)
+          let forkedPrefillTokens =
+            (forked.metrics.prefillTokens ?? 0) + (initial.metrics.prefillTokens ?? 0)
           expectNoDifference(forkedPrefillTokens, fresh.metrics.prefillTokens ?? 0)
         }
 
@@ -249,7 +250,9 @@ struct `Qwen3P5 tests` {
         return try Qwen3P5LlamaModelEngine(
           modelPath: model.model.path(),
           multimodalProjectorPath: model.projector.path(),
-          contextParameters: LlamaContextParameters(maximumSequenceCount: 2),
+          contextParameters: LlamaContextParameters(
+            cacheForking: .copyOnWrite(maxContexts: 2)
+          ),
           multimodalParameters: LlamaMultimodalParameters(warmUp: false)
         )
       }
@@ -278,7 +281,7 @@ struct `Qwen3P5 tests` {
         return try Qwen3P5VLLlamaModelEngine(
           modelPath: model.model.path(),
           multimodalProjectorPath: model.projector.path(),
-          contextParameters: LlamaContextParameters(maximumSequenceCount: 1),
+          contextParameters: LlamaContextParameters(cacheForking: .isolated),
           multimodalParameters: LlamaMultimodalParameters(warmUp: false)
         )
       }

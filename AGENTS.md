@@ -83,7 +83,7 @@ Avoid the name or name prefix `make` to describe an API that creates any value.
 
 When wrapping a pointer-based C type in Swift, prefer making the wrapper type a non-Copyable struct first before making it a class. If you do make it a class, then you cannot provide non-private access to it's underlying pointer, but must have a scoped `withUnsafePointer` access method instead.
 
-Avoid excessive amounts of comments. Comments are to explain details that cannot easily be expressed in code, not to serve as annotations. (This does not prohibit documentation comments.)
+Do not write excessive amounts of comments. Comments are to explain details that cannot easily be expressed in code, not to serve as annotations. (This does not prohibit documentation comments.)
 
 Only public APIs should have documentation comments.
 

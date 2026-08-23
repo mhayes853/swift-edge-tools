@@ -117,49 +117,14 @@ jobs:
         run: |
           set -euo pipefail
           tag="$(scripts/smoke-embedded.sh --print-snapshot)"
-          toolchain="$(
-            sed -E '
-              s/^swift-//
-              s/-DEVELOPMENT-SNAPSHOT-/-snapshot-/
-            ' <<<"$tag"
-          )"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "toolchain=$toolchain" >> "$GITHUB_OUTPUT"
-          echo "Resolved $tag (swiftly toolchain $toolchain)."
-      - name: Cache Swift toolchain
-        id: toolchain-cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+          echo "Resolved $tag."
+      - name: Install Swift development snapshot
+        uses: SwiftyLab/setup-swift@76e3e48ac9c85b393a30adefd96afe0395b23c29
         with:
-          path: ~/.local/share/swiftly
-          key: swiftly-${{ runner.os }}-${{ steps.snapshot.outputs.toolchain }}
-      - name: Install swiftly and the Swift toolchain
-        if: steps.toolchain-cache.outputs.cache-hit != 'true'
-        run: |
-          set -ex
-          swiftly_url="https://download.swift.org/swiftly/linux"
-          curl -O "$swiftly_url/swiftly-$(uname -m).tar.gz"
-          tar zxf "swiftly-$(uname -m).tar.gz"
-          ./swiftly init --quiet-shell-followup --assume-yes --skip-install
-          # shellcheck source=/dev/null
-          . "$HOME/.local/share/swiftly/env.sh"
-          swiftly install "${{ steps.snapshot.outputs.toolchain }}" \
-            --post-install-file "$HOME/.local/share/swiftly/post-install.sh"
-      - name: Install Swift system dependencies
-        run: |
-          set -euo pipefail
-          post_install="$HOME/.local/share/swiftly/post-install.sh"
-          if [[ -s "$post_install" ]]; then
-            sudo bash "$post_install"
-          fi
-      - name: Select the Swift toolchain
-        run: |
-          set -euo pipefail
-          echo "$HOME/.local/share/swiftly/bin" >> "$GITHUB_PATH"
-          # NB: The repository pins a release toolchain in
-          # .swift-version, which would otherwise win over the snapshot that
-          # matches the Swift SDK.
-          "$HOME/.local/share/swiftly/bin/swiftly" use \
-            "${{ steps.snapshot.outputs.toolchain }}"
+          # The smoke script resolves the snapshot from the Wasm SDK feed so
+          # the host toolchain and SDK always use the same snapshot.
+          swift-version: ${{ steps.snapshot.outputs.tag }}
       - name: Cache Swift SDKs
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
@@ -168,15 +133,13 @@ jobs:
       - name: Cache build directories
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
-          path: |
-            .build
-            swift/EmbeddedSmoke/.build
+          path: swift/EmbeddedSmoke/.build
           key: >-
-            spm-embedded-${{ runner.os }}-${{ steps.snapshot.outputs.tag }}-${{
+            spm-embedded-v2-${{ runner.os }}-${{ steps.snapshot.outputs.tag }}-${{
             hashFiles('Package.resolved',
             'swift/EmbeddedSmoke/Package.resolved') }}
           restore-keys: |
-            spm-embedded-${{ runner.os }}-${{ steps.snapshot.outputs.tag }}-
+            spm-embedded-v2-${{ runner.os }}-${{ steps.snapshot.outputs.tag }}-
       - name: Run the embedded smoke test
         env:
           EMBEDDED_SWIFT_SNAPSHOT: ${{ steps.snapshot.outputs.tag }}

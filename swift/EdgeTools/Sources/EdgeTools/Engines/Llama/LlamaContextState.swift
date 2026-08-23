@@ -9,21 +9,21 @@
   // MARK: - LlamaContextState
 
   public struct LlamaContextState<Profile: LlamaModelProfile>: Sendable {
-    let sequenceStore: LlamaKVSequenceStore
+    let runtime: LlamaRuntime
     let sequence: LlamaSequenceLease
     let vocabularySizeValue: Int
     let configuredSampling: EdgeToolsFusedSamplingParameters?
     let preparedInputCache: EdgeToolsLLMPreparedInputCache<LlamaPreparedInput>
 
     init(
-      sequenceStore: LlamaKVSequenceStore,
+      runtime: LlamaRuntime,
       sequence: LlamaSequenceLease,
       vocabularySize: Int,
       defaultSampling: EdgeToolsFusedSamplingParameters?,
       preparedInputCache: EdgeToolsLLMPreparedInputCache<LlamaPreparedInput> =
         EdgeToolsLLMPreparedInputCache()
     ) {
-      self.sequenceStore = sequenceStore
+      self.runtime = runtime
       self.sequence = sequence
       self.vocabularySizeValue = vocabularySize
       self.configuredSampling = defaultSampling
@@ -34,23 +34,20 @@
       self.vocabularySizeValue
     }
 
-    public func forkedContextState(copyingCache: Bool) -> sending Self {
-      if let sequence = self.sequenceStore.lease(copyingFrom: self.sequence.sequenceId) {
+    public func forkedContextState() -> sending Self {
+      if let sequence = self.runtime.lease(copyingFrom: self.sequence.sequenceId) {
         return Self(
-          sequenceStore: self.sequenceStore,
+          runtime: self.runtime,
           sequence: sequence,
           vocabularySize: self.vocabularySizeValue,
           defaultSampling: self.configuredSampling,
           preparedInputCache: self.preparedInputCache.forked()
         )
       }
-      let sequenceStore = LlamaKVSequenceStore(
-        model: self.sequenceStore.model,
-        parameters: self.sequenceStore.parameters
-      )
+      let runtime = self.runtime.fresh()
       return Self(
-        sequenceStore: sequenceStore,
-        sequence: sequenceStore.lease(copyingFrom: nil)!,
+        runtime: runtime,
+        sequence: runtime.lease(copyingFrom: nil)!,
         vocabularySize: self.vocabularySizeValue,
         defaultSampling: self.configuredSampling,
         preparedInputCache: self.preparedInputCache.forked()
@@ -68,7 +65,11 @@
 
   struct LlamaInputProcessor<Profile: LlamaModelProfile>: Sendable {
     let tokenizer: LlamaTokenizer
-    let multimodalRuntime: LlamaMultimodalRuntime?
+    let multimodal: LlamaMultimodalInputProcessor<Profile>?
+
+    var multimodalRuntime: LlamaMultimodalRuntime? {
+      self.multimodal?.runtime
+    }
 
     @concurrent
     func inputConcurrently(
@@ -94,13 +95,16 @@
       kind: EdgeToolsLLMInputKind,
       cache: EdgeToolsLLMPreparedInputCache<LlamaPreparedInput>
     ) throws -> LlamaPreparedInput {
-      guard let multimodalRuntime else {
+      guard let multimodal else {
         guard prompt.images.isEmpty, prompt.videos.isEmpty, prompt.audio.isEmpty else {
           throw EdgeToolsError.unsupportedMedia(
             "This LlamaEngine was initialized without a multimodal runtime."
           )
         }
-        return LlamaPreparedInput(
+        if let cached = cache.input(for: prompt, tools: tools, kind: kind) {
+          return cached
+        }
+        let input = LlamaPreparedInput(
           tokenIds: try Profile.tokenIds(
             prompt: prompt,
             tools: tools,
@@ -108,72 +112,23 @@
             addGenerationPrompt: addGenerationPrompt
           )
         )
-      }
-      guard prompt.videos.isEmpty else {
-        throw EdgeToolsError.unsupportedMedia("Video input is not supported by LlamaEngine.")
-      }
-      guard let profile = Profile.self as? any EdgeToolsMultimodalModelProfile.Type else {
-        throw EdgeToolsError.unsupportedTokenizer
-      }
-      let tokenizer = self.tokenizer
-      var media = [LlamaMultimodalAsset]()
-      let messages = try prompt.chatTemplateMessages { userMessage in
-        let content = try profile.multimodalContent(for: userMessage)
-          .reduce(into: "") { content, part in
-            switch part {
-            case .text(let text):
-              content.append(text)
-            case .image(let image):
-              content.append(multimodalRuntime.mediaMarker)
-              media.append(LlamaMultimodalAsset(kind: .image, asset: image))
-            case .audio(let audio):
-              content.append(multimodalRuntime.mediaMarker)
-              media.append(LlamaMultimodalAsset(kind: .audio, asset: audio))
-            case .video:
-              throw EdgeToolsError.unsupportedMedia(
-                "Video input is not supported by LlamaEngine."
-              )
-            }
-          }
-        return ["role": "user", "content": .string(content)]
-      }
-      let text = try tokenizer.renderChatTemplate(
-        messages: messages,
-        tools: tools.chatTemplateToolValues,
-        addGenerationPrompt: addGenerationPrompt,
-        additionalContext: Profile.templateContext(prompt: prompt)
-      )
-      let cachedInput = cache.input(
-        for: prompt,
-        tools: tools,
-        kind: kind,
-        allowingTextOnlyContinuation: true
-      )
-      if let cached = cachedInput,
-        let input = try cached.replacingText(
-          text,
-          mediaMarker: multimodalRuntime.mediaMarker,
-          tokenizer: tokenizer
-        )
-      {
         cache.store(input, for: prompt, tools: tools, kind: kind)
         return input
       }
-      let input = try multimodalRuntime.prepare(text: text, media: media)
-      cache.store(input, for: prompt, tools: tools, kind: kind)
-      return input
+      return try multimodal.input(
+        prompt: prompt,
+        tools: tools,
+        addGenerationPrompt: addGenerationPrompt,
+        kind: kind,
+        cache: cache
+      )
     }
   }
 
   // MARK: - LlamaGenerationTransaction
 
   struct LlamaGenerationTransaction<Profile: LlamaModelProfile> {
-    struct Decoder {
-      var pendingTokenId: EdgeToolsToken.ID?
-      let sampler: EdgeToolsCPUFusedSampler
-      let confidenceOptions: EdgeToolsConfidenceOptions
-      var confidence = ConfidenceState()
-    }
+    typealias Decoder = DecoderState<EdgeToolsCPUFusedSampler>
 
     let contextState: LlamaContextState<Profile>
     var transcript: EdgeToolsTranscript

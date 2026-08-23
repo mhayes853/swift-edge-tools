@@ -54,7 +54,7 @@
     }
 
     @Test
-    func `Fork Copies The Cache Lazily Unless Responding`() async throws {
+    func `Fork Copies The Cache Lazily`() async throws {
       let tokenizer = try testTokenizer()
       let eosTokenId = try requiredTestEOSToken(tokenizer: tokenizer)
       let copyCounter = CacheCopyCounter()
@@ -95,10 +95,18 @@
 
       let fork = context.fork()
 
-      expectNoDifference(copyCounter.count, 2)
+      expectNoDifference(copyCounter.count, 1)
       expectNoDifference(fork.isResponding, false)
       await ContextTestProfile.gate.resume()
       _ = try await generation.value
+      expectNoDifference(copyCounter.count, 2)
+
+      _ = try await session.generate(
+        prompt: .user("Responding fork"),
+        context: fork,
+        parameters: MLXGenerateParameters(maxTokens: 1)
+      )
+      expectNoDifference(copyCounter.count, 3)
     }
 
     @Test

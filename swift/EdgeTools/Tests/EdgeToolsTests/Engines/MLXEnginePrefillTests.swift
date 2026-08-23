@@ -169,7 +169,7 @@
           messages: EdgeToolsTranscript.tokens([1]).messages
         ),
         parameters: MLXGenerateParameters(
-          sampler: ArgMaxSampler(),
+          sampler: { ArgMaxSampler() },
           confidence: confidence,
           maxTokens: 1,
           synchronizeStreamForMemorySnapshots: false
@@ -231,6 +231,7 @@
   private struct LLMPrefillTestProfile: MLXLLMModelProfile {
     typealias Prompt = EdgeToolsTranscript
     typealias GenerationParser = TestGenerationParser
+    typealias GenerateParameters = MLXGenerateParameters
     typealias GrammarEngine = XGrammarEngine
 
     static func grammar(
@@ -270,6 +271,7 @@
     private struct VLMPrefillTestProfile: MLXVLMModelProfile {
       typealias Prompt = EdgeToolsTranscript
       typealias GenerationParser = TestGenerationParser
+      typealias GenerateParameters = MLXGenerateParameters
       typealias GrammarEngine = XGrammarEngine
 
       static func grammar(
@@ -529,7 +531,7 @@
     let task = try engine.generate(
       prompt: EdgeToolsTranscript.Prompt(messages: []),
       parameters: MLXGenerateParameters(
-        sampler: ArgMaxSampler(),
+        sampler: { ArgMaxSampler() },
         maxTokens: 1,
         synchronizeStreamForMemorySnapshots: false
       ),

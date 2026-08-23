@@ -1,6 +1,6 @@
 #if XGrammar && FoundationEssentials
   import CustomDump
-  import EdgeTools
+  @testable import EdgeTools
   import Testing
 
   @Suite

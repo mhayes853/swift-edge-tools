@@ -111,7 +111,10 @@ struct `Gemma4 tests` {
         let params = EdgeToolsTranscriptContextParameters(transcript: context.transcript)
         let fresh = try await engine.prefill(context: engine.context(params))
 
-        expectNoDifference(cached.metrics.tokens < fresh.metrics.tokens, true)
+        expectNoDifference(
+          try #require(cached.metrics.prefillTokens) < #require(fresh.metrics.prefillTokens),
+          true
+        )
       }
 
       @Test
@@ -171,7 +174,10 @@ struct `Gemma4 tests` {
         let params = EdgeToolsTranscriptContextParameters(transcript: context.transcript)
         let fresh = try await engine.prefill(context: engine.context(params))
 
-        expectNoDifference(cached.metrics.tokens < fresh.metrics.tokens, true)
+        expectNoDifference(
+          try #require(cached.metrics.prefillTokens) < #require(fresh.metrics.prefillTokens),
+          true
+        )
       }
 
       private func multimodalEngine() async throws -> Gemma4LlamaModelEngine {
@@ -179,7 +185,7 @@ struct `Gemma4 tests` {
         return try Gemma4LlamaModelEngine(
           modelPath: model.model.path(),
           multimodalProjectorPath: model.projector.path(),
-          contextParameters: LlamaContextParameters(maximumSequenceCount: 1),
+          contextParameters: LlamaContextParameters(cacheForking: .isolated),
           multimodalParameters: LlamaMultimodalParameters(warmUp: false)
         )
       }

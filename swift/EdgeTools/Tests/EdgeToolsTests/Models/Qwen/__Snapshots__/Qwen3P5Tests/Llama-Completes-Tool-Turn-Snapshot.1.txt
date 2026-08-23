@@ -410,7 +410,7 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 29 elements
+        ▿ parts: 41 elements
           ▿ EdgeToolsGenerationPart
             - reasoning: "The"
           ▿ EdgeToolsGenerationPart
@@ -430,7 +430,25 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: "unny"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "**."
+            - reasoning: "**"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " at"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " a"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " temperature"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " of"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " "
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "2"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "1"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "°C"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "."
           ▿ EdgeToolsGenerationPart
             - reasoning: " The"
           ▿ EdgeToolsGenerationPart
@@ -444,11 +462,9 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " with"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " a"
-          ▿ EdgeToolsGenerationPart
             - reasoning: " pleasant"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " temperature"
+            - reasoning: " conditions"
           ▿ EdgeToolsGenerationPart
             - reasoning: ","
           ▿ EdgeToolsGenerationPart
@@ -460,13 +476,21 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " ideal"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " day"
+            - reasoning: " time"
           ▿ EdgeToolsGenerationPart
             - reasoning: " for"
           ▿ EdgeToolsGenerationPart
             - reasoning: " outdoor"
           ▿ EdgeToolsGenerationPart
             - reasoning: " activities"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " and"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " enjoying"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " beautiful"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " views"
           ▿ EdgeToolsGenerationPart
             - reasoning: "."
   ▿ reasoningEffort: EdgeToolsReasoningEffort

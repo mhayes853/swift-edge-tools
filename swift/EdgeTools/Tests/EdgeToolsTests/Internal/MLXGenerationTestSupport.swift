@@ -73,7 +73,7 @@
       prompt: .user(turn.userMessage),
       context: context,
       parameters: MLXGenerateParameters(
-        sampler: MLXFusedSampler(parameters: parameters),
+        sampler: { MLXFusedSampler(parameters: parameters) },
         constraint: .toolsWithGrammar(range: .exact(1)),
         maxTokens: 256
       )
@@ -88,7 +88,7 @@
     context.transcript.messages.append(.tool(name: "getWeather", response: .string(toolOutput)))
     let responseTask = try session.engine.generate(
       parameters: MLXGenerateParameters(
-        sampler: MLXFusedSampler(parameters: parameters),
+        sampler: { MLXFusedSampler(parameters: parameters) },
         constraint: .unconstrained,
         maxTokens: 64
       ),
@@ -209,7 +209,7 @@
         try engine.generate(
           prompt: .user(turn.userMessage),
           parameters: MLXGenerateParameters(
-            sampler: ArgMaxSampler(),
+            sampler: { ArgMaxSampler() },
             constraint: .toolsWithGrammar(range: .exact(1)),
             maxTokens: toolMaxTokens
           ),
