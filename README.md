@@ -71,7 +71,6 @@ Furthermore, Edge Tools compiles for _every_ platform that Swift supports, inclu
 The framework compiles quite lean without any traits enabled since it doesn't import Foundation, but if you want to do actual inference you'll need to enable the appropriate package traits to do so.
 - `MLX` enables MLX inference.
 - `Llama` enables llama inference.
-  - The llama build is also patched to include a hybrid Gemma 4 probe, which is useful for hybrid (local -> cloud) inference.
   - There is also a dedicated `EdgeToolsLlama` target that wraps parts of the C API in Swift
 - `XGrammar` enables XGrammar usage.
   - This is enabled by `MLX` and `Llama`. 

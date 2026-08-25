@@ -16,15 +16,15 @@ describe("Needle2 system facts tests", () => {
 	});
 
 	test("lets overrides suppress and replace environment facts", async () => {
-		const facts = await defaultSystemValues({
-			overrides: {
+    const facts = await defaultSystemValues({
+      overrides: {
 				date: "tomorrow",
 				device: null,
 				"account tier": "pro",
 			},
 			providers: {
 				date: () => "today",
-				device: () => "phone",
+        device: () => "phone",
 				"account tier": async () => "free",
 			},
 		});
