@@ -78,11 +78,8 @@ jobs:
         curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource.sh &&
         bash /tmp/nodesource.sh &&
         DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs
-      # Targets are not trait-conditional, so a bare `swift build` would also
-      # compile the ChatTemplates and Llama native targets that Wasm excludes.
       wasm_sdk_build_command: >-
-        swift build --disable-experimental-prebuilts --product EdgeTools
-        --traits Needle2,JS
+        swift build --disable-experimental-prebuilts --traits Needle2,JS
 
   macos:
     name: macOS Build
