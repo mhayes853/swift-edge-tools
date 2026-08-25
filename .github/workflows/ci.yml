@@ -34,11 +34,13 @@ jobs:
       linux_pre_build_command: >-
         git config --global --add safe.directory '*' &&
         git submodule update --init --recursive
-      # Needle 2 links libc++ on Linux, which the Swift image does not ship.
+      # `swift build` compiles every target regardless of traits, so the JS
+      # target's BridgeJS plugin needs Node even though the JS trait is off.
+      # Needle 2 also links libc++, which the Swift image does not ship.
       linux_build_command: >-
-        apt-get update &&
+        curl -fsSL https://deb.nodesource.com/setup_22.x | bash - &&
         DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends
-        libc++-dev libc++abi-dev &&
+        nodejs libc++-dev libc++abi-dev &&
         export LIBRARY_PATH="$(dirname "$(find /usr/lib/llvm-* -name libc++.so
         -print -quit)")${LIBRARY_PATH:+:$LIBRARY_PATH}" &&
         swift build --disable-experimental-prebuilts
@@ -50,9 +52,10 @@ jobs:
       windows_pre_build_command: >-
         Invoke-Program git config --global --add safe.directory '*';
         Invoke-Program git submodule update --init --recursive
+      # PowerShell splits a bare comma-separated token into separate arguments.
       windows_build_command: >-
         Invoke-Program swift build --disable-experimental-prebuilts
-        --traits Foundation,FoundationEssentials,XGrammar,Needle2,ChatTemplates,HuggingFaceTokenizers,FoundationModels
+        --traits "Foundation,FoundationEssentials,XGrammar,Needle2,ChatTemplates,HuggingFaceTokenizers,FoundationModels"
 
       enable_android_sdk_build: true
       enable_android_sdk_checks: false
@@ -65,6 +68,9 @@ jobs:
 
       enable_wasm_sdk_build: true
       wasm_sdk_versions: '["6.3"]'
+      wasm_sdk_pre_build_command: >-
+        curl -fsSL https://deb.nodesource.com/setup_22.x | bash - &&
+        DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs
       wasm_sdk_build_command: >-
         swift build --disable-experimental-prebuilts --traits Needle2,JS
 
