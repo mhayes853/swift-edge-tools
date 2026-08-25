@@ -15,6 +15,38 @@ let edgeToolsJavaScriptSwiftSettings = edgeToolsSwiftSettings + [
   .enableExperimentalFeature("Extern")
 ]
 
+// No llama.cpp artifact is published for Windows, and SwiftPM resolves binary targets regardless of
+// traits or platform conditions, so CLlama is omitted entirely on Windows hosts.
+#if os(Windows)
+  let isLlamaSupported = false
+#else
+  let isLlamaSupported = true
+#endif
+
+let llamaPlatforms: [Platform] = [.macOS, .iOS, .tvOS, .watchOS, .visionOS, .linux, .android]
+
+let cLlamaTraitDependency: [Target.Dependency] =
+  isLlamaSupported
+  ? [.target(name: "CLlama", condition: .when(platforms: llamaPlatforms, traits: ["Llama"]))]
+  : []
+
+let cLlamaDependency: [Target.Dependency] =
+  isLlamaSupported
+  ? [.target(name: "CLlama", condition: .when(platforms: llamaPlatforms))]
+  : []
+
+let cLlamaTargets: [Target] =
+  isLlamaSupported
+  ? [
+    .binaryTarget(
+      name: "CLlama",
+      url:
+        "https://github.com/mhayes853/swift-edge-tools/releases/download/0.0.1-binaries/llama-b10076.artifactbundleindex",
+      checksum: "758701b221bbdf1a6f75f7c14176489c84aaa9ab857f1834edb3acd81ba829f9"
+    )
+  ]
+  : []
+
 let package = Package(
   name: "swift-edge-tools",
   platforms: [.macOS(.v14), .iOS(.v17), .tvOS(.v17), .watchOS(.v10), .visionOS(.v1)],
@@ -146,22 +178,13 @@ let package = Package(
         .target(name: "EdgeToolsTokenizers"),
         .target(name: "EdgeToolsXGrammar", condition: .when(traits: ["XGrammar"])),
         .target(
-          name: "CLlama",
-          condition: .when(
-            platforms: [
-              .macOS, .iOS, .tvOS, .watchOS, .visionOS, .linux, .android
-            ],
-            traits: ["Llama"]
-          )
-        ),
-        .target(
           name: "CNeedle2",
           condition: .when(
             platforms: [.macOS, .iOS, .tvOS, .watchOS, .linux, .windows, .android],
             traits: ["Needle2"]
           )
         )
-      ],
+      ] + cLlamaTraitDependency,
       path: "swift/EdgeTools/Sources/EdgeTools",
       swiftSettings: edgeToolsSwiftSettings,
       linkerSettings: [
@@ -215,16 +238,8 @@ let package = Package(
         .target(
           name: "_EdgeToolsFoundation",
           condition: .when(traits: ["FoundationEssentials"])
-        ),
-        .target(
-          name: "CLlama",
-          condition: .when(
-            platforms: [
-              .macOS, .iOS, .tvOS, .watchOS, .visionOS, .linux, .android
-            ]
-          )
         )
-      ],
+      ] + cLlamaDependency,
       path: "swift/EdgeTools/Sources/EdgeToolsLlama",
       swiftSettings: edgeToolsSwiftSettings,
       linkerSettings: [
@@ -296,17 +311,8 @@ let package = Package(
             ],
             traits: ["ChatTemplates"]
           )
-        ),
-        .target(
-          name: "CLlama",
-          condition: .when(
-            platforms: [
-              .macOS, .iOS, .tvOS, .watchOS, .visionOS, .linux, .android
-            ],
-            traits: ["Llama"]
-          )
         )
-      ],
+      ] + cLlamaTraitDependency,
       path: "swift/EdgeTools/Sources/EdgeToolsTokenizers",
       swiftSettings: edgeToolsSwiftSettings,
       linkerSettings: [
@@ -369,11 +375,6 @@ let package = Package(
       name: "CNeedle2",
       url: "https://github.com/mhayes853/swift-edge-tools/releases/download/0.0.1-binaries/needle2-2.0.3.artifactbundleindex",
       checksum: "3665ce1fe0e984dfae9a09c1276186c3f456c3343b64a5b65d6bdbbc022e00a6"
-    ),
-    .binaryTarget(
-      name: "CLlama",
-      url: "https://github.com/mhayes853/swift-edge-tools/releases/download/0.0.1-binaries/llama-b10076.artifactbundleindex",
-      checksum: "758701b221bbdf1a6f75f7c14176489c84aaa9ab857f1834edb3acd81ba829f9"
     ),
     .binaryTarget(
       name: "CTokenizers",
@@ -464,7 +465,7 @@ let package = Package(
         "Tokenization/__Snapshots__"
       ]
     )
-  ],
+  ] + cLlamaTargets,
   swiftLanguageModes: [.v6],
   cxxLanguageStandard: .cxx17
 )
