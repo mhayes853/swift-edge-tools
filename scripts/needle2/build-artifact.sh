@@ -30,29 +30,35 @@ curl --fail --location --silent --show-error \
 
 cp "$script_directory/module.modulemap" "$bundle/include/module.modulemap"
 
-platforms=(
-  android-arm64
-  android-armv7
-  android-riscv64
-  ios-arm64
-  ios-sim-arm64
-  linux-arm64
-  linux-armv7
-  linux-mipsel
-  linux-riscv64
-  linux-x86_64
-  macos-arm64
-  tvos-arm64
-  watchos-arm64
-  windows-arm64
-  windows-x86_64
+android_arm64_triples="$(printf 'aarch64-unknown-linux-android%s,' {28..36})"
+android_armv7_triples="$(printf 'armv7-unknown-linux-androideabi%s,' {28..36})"
+android_riscv64_triples="$(printf 'riscv64-unknown-linux-android%s,' {35..36})"
+targets=(
+  "android-arm64|${android_arm64_triples%,}"
+  "android-armv7|${android_armv7_triples%,}"
+  "android-riscv64|${android_riscv64_triples%,}"
+  "ios-arm64|arm64-apple-ios"
+  "ios-sim-arm64|arm64-apple-ios-simulator"
+  "linux-arm64|aarch64-unknown-linux-gnu"
+  "linux-armv7|armv7-unknown-linux-gnueabihf"
+  "linux-mipsel|mipsel-unknown-linux-gnu"
+  "linux-riscv64|riscv64-unknown-linux-gnu"
+  "linux-x86_64|x86_64-unknown-linux-gnu"
+  "macos-arm64|arm64-apple-macosx"
+  "tvos-arm64|arm64-apple-tvos"
+  "watchos-arm64|arm64_32-apple-watchos"
+  "windows-arm64|aarch64-unknown-windows-msvc"
+  "windows-x86_64|x86_64-unknown-windows-msvc"
 )
 
-for platform in "${platforms[@]}"; do
+variants=()
+for target in "${targets[@]}"; do
+  IFS='|' read -r platform triples <<<"$target"
   mkdir -p "$bundle/$platform"
   curl --fail --location --silent --show-error \
     "$repository/$platform/libneedle.a" \
     --output "$bundle/$platform/libneedle.a"
+  variants+=("$platform|$triples")
 done
 
 if ! (cd "$bundle" && shasum --algorithm 256 --check "$checksum_file"); then
@@ -61,9 +67,38 @@ if ! (cd "$bundle" && shasum --algorithm 256 --check "$checksum_file"); then
   exit 1
 fi
 
-cp "$script_directory/info.json" "$bundle/info.json"
+VARIANTS="$(printf '%s\n' "${variants[@]}")" \
+  BUNDLE="$bundle" \
+  VERSION="$version" \
+  python3 - <<'PY'
+import json
+import os
+from pathlib import Path
+
+variants = []
+for entry in os.environ["VARIANTS"].splitlines():
+    path, triples = entry.split("|", 1)
+    variants.append({
+        "path": f"{path}/libneedle.a",
+        "staticLibraryMetadata": {"headerPaths": ["include"]},
+        "supportedTriples": triples.split(","),
+    })
+
+Path(os.environ["BUNDLE"], "info.json").write_text(json.dumps({
+    "artifacts": {
+        "CNeedle2": {
+            "type": "staticLibrary",
+            "variants": variants,
+            "version": os.environ["VERSION"],
+        }
+    },
+    "schemaVersion": "1.0",
+}, indent=2) + "\n")
+PY
+
 mkdir -p "$(dirname "$output")"
 find "$bundle" -exec touch -t 202001010000 {} +
 rm -f "$output"
 (cd "$workspace" && COPYFILE_DISABLE=1 zip -X -q -r "$output" needle2.artifactbundle)
-swift package compute-checksum "$output"
+echo "Monolithic checksum: $(swift package compute-checksum "$output")"
+"$repository_directory/scripts/partition-artifact-bundle.py" "$bundle" "$output"

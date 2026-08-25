@@ -367,15 +367,18 @@ let package = Package(
     ),
     .binaryTarget(
       name: "CNeedle2",
-      path: "bin/needle2-2.0.3.artifactbundle.zip"
+      url: "https://github.com/mhayes853/swift-edge-tools/releases/download/0.0.1-binaries/needle2-2.0.3.artifactbundleindex",
+      checksum: "3665ce1fe0e984dfae9a09c1276186c3f456c3343b64a5b65d6bdbbc022e00a6"
     ),
     .binaryTarget(
       name: "CLlama",
-      path: "bin/llama-b10076.artifactbundle.zip"
+      url: "https://github.com/mhayes853/swift-edge-tools/releases/download/0.0.1-binaries/llama-b10076.artifactbundleindex",
+      checksum: "758701b221bbdf1a6f75f7c14176489c84aaa9ab857f1834edb3acd81ba829f9"
     ),
     .binaryTarget(
       name: "CTokenizers",
-      path: "bin/tokenizers-0.1.0.artifactbundle.zip"
+      url: "https://github.com/mhayes853/swift-edge-tools/releases/download/0.0.1-binaries/tokenizers-0.2.0.artifactbundleindex",
+      checksum: "2c4b65cb17b1e8ec1f550595138aa0a05dbd98a9ffa7b69468a80bfe8359b0d9"
     ),
     .target(
       name: "CXGrammar",

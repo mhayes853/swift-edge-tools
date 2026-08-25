@@ -2,6 +2,10 @@
 /.build
 /.artifacts
 /bin/.build/
+/bin/*.artifactbundleindex
+/bin/*-apple.artifactbundle.zip
+/bin/*-linux.artifactbundle.zip
+/bin/*-windows.artifactbundle.zip
 /Packages
 xcuserdata/
 DerivedData/

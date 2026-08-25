@@ -22,7 +22,6 @@ jobs:
   #   steps:
   #     - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
   #       with:
-  #         lfs: true
   #         persist-credentials: false
   #         submodules: recursive
   #     - name: Select Xcode 26.4
@@ -72,7 +71,6 @@ jobs:
   #   steps:
   #     - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
   #       with:
-  #         lfs: true
   #         persist-credentials: false
   #         submodules: recursive
   #     - name: Check disk space
@@ -88,7 +86,6 @@ jobs:
   #   steps:
   #     - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
   #       with:
-  #         lfs: true
   #         persist-credentials: false
   #         submodules: recursive
   #     - name: Build Swift package for Android
@@ -109,7 +106,6 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          lfs: true
           persist-credentials: false
           submodules: recursive
       - name: Resolve development snapshot
@@ -152,7 +148,6 @@ jobs:
   #   steps:
   #     - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
   #       with:
-  #         lfs: true
   #         persist-credentials: false
   #         submodules: recursive
   #     - name: Set up Swift 6.3

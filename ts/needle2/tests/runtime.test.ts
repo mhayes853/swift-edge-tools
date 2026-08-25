@@ -63,7 +63,7 @@ test("returns the native error response for truncated generation", async () => {
 		prompt: "Send an email to blob@gmail.com asking them to go hiking.",
 		initialization: emailInitialization,
 		maxTokens: 4,
-	});
+  });
 
 	expect(result.success).toBe(false);
 	expect(result.type).toBe("call");

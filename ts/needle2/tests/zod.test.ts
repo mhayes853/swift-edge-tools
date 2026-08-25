@@ -8,7 +8,7 @@ describe("Needle2 zod tool tests", () => {
 			name: "get_weather",
 			description: "Get the weather for a city.",
 			parameters: z.object({ city: z.string(), days: z.number().int().optional() }),
-			call: () => null
+      call: () => null
 		});
 
 		expect(tool.parameters).toMatchObject({

@@ -701,7 +701,8 @@ assemble() (
   find "$bundle" -exec touch -t 202001010000 {} +
   rm -f "$output"
   (cd "$workspace" && COPYFILE_DISABLE=1 zip -X -q -r "$output" CLlama.artifactbundle)
-  swift package compute-checksum "$output"
+  echo "Monolithic checksum: $(swift package compute-checksum "$output")"
+  "$repository_directory/scripts/partition-artifact-bundle.py" "$bundle" "$output"
   echo "Built $output with ${#artifact_targets[@]} slices."
 )
 

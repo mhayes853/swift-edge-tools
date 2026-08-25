@@ -64,7 +64,6 @@ mkdir -p "$bundle/include"
 cp "$script_directory/include/tokenizers.h" "$bundle/include/tokenizers.h"
 cp "$script_directory/include/module.modulemap" "$bundle/include/module.modulemap"
 cp "$crate_directory/LICENSE" "$bundle/LICENSE"
-cp "$crate_directory/THIRD_PARTY_NOTICES.md" "$bundle/THIRD_PARTY_NOTICES.md"
 
 variants=()
 for entry in "${targets[@]}"; do
@@ -133,4 +132,5 @@ mkdir -p "$(dirname "$output")"
 find "$bundle" -exec touch -t 202001010000 {} +
 rm -f "$output"
 (cd "$workspace" && COPYFILE_DISABLE=1 zip -X -q -r "$output" CTokenizers.artifactbundle)
-swift package compute-checksum "$output"
+echo "Monolithic checksum: $(swift package compute-checksum "$output")"
+"$repository_directory/scripts/partition-artifact-bundle.py" "$bundle" "$output"

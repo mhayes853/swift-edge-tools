@@ -18,40 +18,41 @@ To understand the differences between this framework, and similar frameworks for
 
 ## Files + Layout
 
-The framework is organized into a `swift` and `python` directories.
+The framework is organized into directories by language, though the primary framework is written in Swift.
 
-The `swift` side contains the actual Swift framework, as well as other products that can be consumed by end-users.
+The `rust` side is mainly just a wrapper around the tokenizers crate for now, such that it can be bundled into an artifactbundle for use in the Swift package.
 
-The `python` side contains python code for handling modeling and exporting of various models that the framework optimizes for. It is generally split into sub-directories by model-type with a single file to run a basic CLI at the root.
+The `ts` side is for typescript packages for WASM use. This is mainly just the `needle2` package for now.
 
-The `swift` side also may contain patch files that are applied through a custom build plugin. Feel free to add patches to any third-party libraries provided they aren't excessive changes.
+The `swift` side may contain patch files that are applied through a custom build plugin. Feel free to add patches to any third-party libraries provided they aren't excessive changes.
 
 ## Framework Basics
 
-On the Swift side, `EdgeToolsSession` is currently the primary way to interact with a model. It manages active generation streams on the model, but unlike other frameworks does not hold onto conversation history (the user passes that through the session). It conforms to `Observable`, and so does the streams it manages.
+On the Swift side, `EdgeToolsSession` is currently the primary way to interact with a model. It manages active generation streams from its underlying engine, but unlike other frameworks it manages multiple contexts windows at once. This provides more flexibility to the engine for underlying inference tasks. The session conforms to `Observable`, and so does the streams and contexts it manages which makes consumption in UI frameworks ideal.
 
-The session also consumes a generic `EdgeToolsEngine`, which is the underlying protocol for handling generation. Most engine conformances share the same logic for the overall generation loop and grammar constraints, and build on top of `EdgeToolsModelActorEngine`. However, other future engines may implement the generation loop themselves, in which case it would be more correct to conform to `EdgeToolsEngine` directly.
+The session consumes a generic `EdgeToolsEngine`, which is the underlying protocol for handling generation.
 
 Engines generally handle the following responsibilities:
-
-- Grammar constraints (typically using XGrammar).
+- Executing inference tasks.
+- Grammar constraints, and managing grammar schema compilation.
+  - This is typically through XGrammar, but some engines (eg. Needle2) may have this built in.
 - Tool call parsing.
   - Tool call parsing is done incrementally, meaning that the moment enough tokens have been emitted to parse the information for a single tool call, we immediately publish it through the generation channel. This allows decoding to continue while the tool call is invoked by the session in the background.
 - The full generation loop, including the ability to control when it starts and stops.
-- An `Model` protocol that adapts specific models to the engine.
-  - Certain engines may want to have general implementations for this protocol for LLM-based models that support simple conversational workflows (eg. Qwen, Gemma, etc). This is because those models generally function the same architecturally.
+- Updating contexts per-inference task.
+- Context creation.
 
-A `Model` protocol generally consists of:
+Contexts are generally reference types created by the engine that hold state for a sequential set of inference tasks. An instance of a context generally consists of:
+- The KV Cache/Prefill state.
+- The conversational state if the underlying model supports multi-turn conversations (ie. Everything except for Needle 2).
+- An indicator for whether or not the context is being used.
+- Any tools that the model can invoke.
 
-- A model-specific tool call grammar.
-- A model-specific tool call parser.
-- A preparation step that runs before generation.
-  - This is not a prefill, but rather something that runs right before the decode phase. This is because not all supported models can have conventional prefill phases.
-  - For models that can support conventional prefill phases, an engine should offer a `PrefillableModel` protocol with a `prefill` requirement. The `prefill` requirement can be used as the default implementation for `prepare`.
-- A decode step to predict the next token.
-  - This step includes logit sampling and masking.
+The contexts for the MLX and llama engines are also forkable. An example use case is creating a context to prefill the system prompt, and then subsequently creating forks of that context for future tasks. This avoids prefilling the system prompt for the forked contexts, which can massively reduce latency. Forked contexts also implement a copy-on-write mechanism, so no KV vectors are actually copied until an inference task needs to write to the forked context.
 
-The session represents generally collects tool calls into an `EdgeToolsToolCallCollection`. This collection contains individual `AnyEdgeToolCall` instances that represent the active response state of the tool call, and this can be further casted down a strongly typed `EdgeToolCall`. One must `await` the `output` of a tool call since the tool may or may not be actively responding. Multiple calls to `output` are deduplicated.
+The session invokes the engine with a context in order to perform an inference task. Under the hood, the engine manages any state updates, including updating KV Cache states, the transcript, and any responding indicators. Each
+
+The session represents generally collects tool calls into an `EdgeToolsToolCallCollection`. This collection contains individual `AnyEdgeToolCall` instances that represent the active response state of the tool call, and this can be further casted down a strongly typed `EdgeToolCall`. One must `await` the `output` of a tool call since the tool may or may not be actively responding. Multiple calls to `output` are deduplicated. This gives flexibility at the cost of convenience, and existing convenience APIs like multi-turn responses are built on top of this more general mechanism.
 
 Grammar constraints and tool argument parsing are generally represented through the `EdgeToolsGenerationSchema` struct and associated conversion protocols. The schema struct represents a valid JSON schema object under the hood. Generally, a user doesn't need to create generation schema's by hand because the `@EdgeToolsGenerable` macro can be applied to any struct. This macro will create a schema for the type, and conform the type to various protocols that use the schema.
 
