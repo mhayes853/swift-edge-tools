@@ -149,7 +149,7 @@ let package = Package(
           name: "CLlama",
           condition: .when(
             platforms: [
-              .macOS, .iOS, .tvOS, .watchOS, .visionOS, .linux, .android, .windows
+              .macOS, .iOS, .tvOS, .watchOS, .visionOS, .linux, .android
             ],
             traits: ["Llama"]
           )
@@ -220,7 +220,7 @@ let package = Package(
           name: "CLlama",
           condition: .when(
             platforms: [
-              .macOS, .iOS, .tvOS, .watchOS, .visionOS, .linux, .android, .windows
+              .macOS, .iOS, .tvOS, .watchOS, .visionOS, .linux, .android
             ]
           )
         )
@@ -301,7 +301,7 @@ let package = Package(
           name: "CLlama",
           condition: .when(
             platforms: [
-              .macOS, .iOS, .tvOS, .watchOS, .visionOS, .linux, .android, .windows
+              .macOS, .iOS, .tvOS, .watchOS, .visionOS, .linux, .android
             ],
             traits: ["Llama"]
           )

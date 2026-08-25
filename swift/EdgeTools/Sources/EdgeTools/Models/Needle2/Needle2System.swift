@@ -323,7 +323,7 @@
     }
 
     public static func platformNetwork() async -> Network? {
-    #if canImport(Network) || os(Linux) || os(Android)
+    #if canImport(Network) || (Foundation && (os(Linux) || os(Android)))
       await Needle2PlatformDefaults.network
     #else
       Needle2PlatformDefaults.network
@@ -413,7 +413,7 @@
         }
       #elseif os(macOS) && canImport(IOKit.ps)
         Self.macOSBatteryPercentage()
-      #elseif os(Linux) || os(Android)
+      #elseif Foundation && (os(Linux) || os(Android))
         Self.unixBatteryPercentage()
       #elseif os(Windows)
         Self.windowsBatteryPercentage()
@@ -470,7 +470,7 @@
           }
         }
       }
-    #elseif os(Linux) || os(Android)
+    #elseif Foundation && (os(Linux) || os(Android))
       static var network: Needle2System.Network? {
         get async { Self.unixNetwork() }
       }
@@ -480,7 +480,7 @@
 
     static var location: String? { nil }
 
-    #if os(Linux) || os(Android)
+    #if Foundation && (os(Linux) || os(Android))
       static func unixBatteryPercentage() -> Float? {
         let root = "/sys/class/power_supply"
         guard let names = try? FileManager.default.contentsOfDirectory(atPath: root) else {
@@ -505,7 +505,7 @@
         }
 
         return [("energy_now", "energy_full"), ("charge_now", "charge_full")]
-          .compactMap { currentKey, maximumKey in
+          .compactMap { (currentKey, maximumKey) -> Float? in
             guard let current = powerSupplyValue(name, key: currentKey, root: root),
               let maximum = powerSupplyValue(name, key: maximumKey, root: root),
               maximum > 0
@@ -548,7 +548,7 @@
         return contents
           .split(whereSeparator: \.isNewline)
           .dropFirst()
-          .compactMap { line in
+          .compactMap { line -> String? in
             let fields = line.split(whereSeparator: { $0 == " " || $0 == "\t" })
             guard fields.count > 1, fields[1] == "00000000" else { return nil }
             return String(fields[0])
