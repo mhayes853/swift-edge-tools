@@ -58,7 +58,7 @@
     ) throws -> GenerationConfigFile? {
       let configurationURL = self.url.appending(path: "generation_config.json")
       guard FileManager.default.fileExists(atPath: configurationURL.path()) else { return nil }
-      let data = Data(contentsOf: configurationURL)
+      let data = try Data(contentsOf: configurationURL)
       return try decoder.decode(GenerationConfigFile.self, from: data)
     }
 

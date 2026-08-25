@@ -38,9 +38,12 @@ jobs:
       # target's BridgeJS plugin needs Node even though the JS trait is off.
       # Needle 2 also links libc++, which the Swift image does not ship.
       linux_build_command: >-
-        curl -fsSL https://deb.nodesource.com/setup_22.x | bash - &&
+        apt-get update &&
         DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends
-        nodejs libc++-dev libc++abi-dev &&
+        curl ca-certificates gnupg libc++-dev libc++abi-dev &&
+        curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource.sh &&
+        bash /tmp/nodesource.sh &&
+        DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs &&
         export LIBRARY_PATH="$(dirname "$(find /usr/lib/llvm-* -name libc++.so
         -print -quit)")${LIBRARY_PATH:+:$LIBRARY_PATH}" &&
         swift build --disable-experimental-prebuilts
@@ -69,7 +72,11 @@ jobs:
       enable_wasm_sdk_build: true
       wasm_sdk_versions: '["6.3"]'
       wasm_sdk_pre_build_command: >-
-        curl -fsSL https://deb.nodesource.com/setup_22.x | bash - &&
+        apt-get update &&
+        DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends
+        curl ca-certificates gnupg &&
+        curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource.sh &&
+        bash /tmp/nodesource.sh &&
         DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs
       wasm_sdk_build_command: >-
         swift build --disable-experimental-prebuilts --traits Needle2,JS

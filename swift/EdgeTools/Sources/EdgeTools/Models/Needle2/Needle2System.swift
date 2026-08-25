@@ -566,7 +566,7 @@
 
       private static func network(for interface: String) -> Needle2System.Network? {
         let name = interface.lowercased()
-        switch name {
+        return switch name {
         case _ where name.contains("wlan") || name.contains("wifi"):
           .wifi
         case _ where name.contains("rmnet") || name.contains("ccmni") || name.contains("wwan"):

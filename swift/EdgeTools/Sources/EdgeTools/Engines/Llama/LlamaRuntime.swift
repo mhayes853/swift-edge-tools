@@ -95,10 +95,6 @@
   // primitives return one, so a path that claims to produce logits cannot skip decoding.
   struct LlamaDecodedLogits {
     let sequenceId: Int
-
-    fileprivate init(sequenceId: Int) {
-      self.sequenceId = sequenceId
-    }
   }
 
   // MARK: - LlamaRuntimeContext
