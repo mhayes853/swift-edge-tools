@@ -21,6 +21,9 @@ jobs:
     timeout-minutes: 30
     container:
       image: swift:6.3.2-jammy
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -91,6 +94,9 @@ jobs:
     timeout-minutes: 30
     container:
       image: swift:6.3.2-jammy
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
