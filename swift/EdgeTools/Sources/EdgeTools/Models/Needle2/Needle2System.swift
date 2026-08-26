@@ -582,7 +582,7 @@
     #if os(Windows) && canImport(WinSDK)
       static func windowsBatteryPercentage() -> Float? {
         var status = SYSTEM_POWER_STATUS()
-        guard GetSystemPowerStatus(&status) != FALSE else { return nil }
+        guard GetSystemPowerStatus(&status).boolValue else { return nil }
 
         let percentage = Int(status.BatteryLifePercent)
         guard (0...100).contains(percentage) else { return nil }
