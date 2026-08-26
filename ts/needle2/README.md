@@ -25,12 +25,12 @@ const getWeather = {
 }
 
 const needle = await needle2({ 
-  provider: "direct" // Can also be "worker" if you want inference to run in a web worker.
+  provider: "direct", // Can also be "worker" if you want inference to run in a web worker.
+  tools: [getWeather]
 })
 
 const results = await needle.generate({
-  prompt: "What is the weather in San Francisco?",
-  initialization: { tools: [getWeather] }
+  prompt: "What is the weather in San Francisco?"
 })
 console.log(results.functionCalls[0].output)
 ```
@@ -54,10 +54,10 @@ const getWeather = zodTool({
 ### With System Values
 
 ```ts
-import { defaultSystemValues, defaultSystemPrompt } from "@edge-tools/needle2"
+import { defaultSystemValues } from "@edge-tools/needle2"
 
 // Loads all the default keys (eg. Battery life, location, etc.)
-const values = await defaultSystemValues()
+const defaultValues = await defaultSystemValues()
 
 // Also can provide overrides and custom factories for various environments.
 const values = await defaultSystemValues({
@@ -70,11 +70,13 @@ const values = await defaultSystemValues({
   }
 })
 
+const needle = await needle2({
+  provider: "direct",
+  tools: [getWeather],
+  systemValues: values
+})
+
 const results = await needle.generate({
-  prompt: "What is the weather in San Francisco?",
-  initialization: { 
-    tools: [getWeather],
-    systemPrompt: defaultSystemPrompt(values)
-  }
+  prompt: "What is the weather in San Francisco?"
 })
 ```

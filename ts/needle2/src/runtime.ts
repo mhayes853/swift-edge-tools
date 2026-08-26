@@ -4,8 +4,9 @@ import {
 	defaultAssetURL,
 	Needle2Error,
 	Needle2ProtocolError,
+	PromiseQueue,
 } from "./internal.js";
-import { defaultSystemPrompt, type Needle2SystemValues } from "./system.js";
+import { formatSystemPrompt, type Needle2SystemValues } from "./system.js";
 import type { Needle2JSONObject, Needle2JSONValue } from "./value.js";
 import type { Needle2Backend } from "./backend.js";
 import type {
@@ -17,7 +18,15 @@ import type {
 export type Needle2Provider = "direct" | "worker";
 export type Needle2Engine = "wasm" | "native" | "auto";
 
-export type Needle2RuntimeOptions =
+const directRuntimeOperations = new PromiseQueue();
+
+export type Needle2RuntimeOptions<
+	Tools extends readonly Needle2AnyTool[] = readonly Needle2ToolDefinition[],
+> = {
+	tools?: Tools;
+	systemValues?: Needle2SystemValues;
+	toolIndexPath?: string;
+} & (
 	| {
 			provider: "direct";
 			wasm?: Needle2BinarySource;
@@ -31,7 +40,8 @@ export type Needle2RuntimeOptions =
 			weights?: Needle2BinarySource;
 			workerOptions?: Needle2WorkerOptions;
 			engine?: Needle2Engine;
-	  };
+	  }
+);
 
 export type Needle2ToolDefinition = {
 	name: string;
@@ -89,34 +99,21 @@ export type Needle2UninvokedToolCall<Tool> = Tool extends {
 	? { name: Name; arguments: ToolArguments<Tool> }
 	: never;
 
-export type Needle2Initialization<
-	Tools extends readonly Needle2AnyTool[] = readonly Needle2ToolDefinition[],
-> = {
-	systemValues?: Needle2SystemValues;
-	tools: Tools;
-	toolIndexPath?: string;
-};
-
 export type Needle2ResolvedInitialization = {
 	systemPrompt: string;
 	tools: readonly Needle2ToolDefinition[];
 	toolIndexPath?: string;
 };
 
-export type Needle2GenerateOptions<
-	Tools extends readonly Needle2AnyTool[] = readonly Needle2ToolDefinition[],
-> = {
+export type Needle2GenerateOptions = {
 	prompt: string;
-	initialization: Needle2Initialization<Tools>;
 	maxTokens?: number;
-	outputCapacity?: number;
 };
 
 export type Needle2ResolvedGenerateOptions = {
 	prompt: string;
 	initialization: Needle2ResolvedInitialization;
 	maxTokens?: number;
-	outputCapacity?: number;
 };
 
 export type Needle2FunctionCall = {
@@ -168,12 +165,7 @@ export type Needle2GenerationResult<
 	Tools extends readonly Needle2AnyTool[] = readonly Needle2ToolDefinition[],
 > = Needle2GenerationSuccess<Tools> | Needle2GenerationFailure<Tools>;
 
-/**
- * A generation with no tool outputs attached, as returned by `generateRaw` and held
- * by each loop step. Loop outputs live in the step's `toolResponses`, because a
- * failed handler contributes an error response rather than an output.
- */
-export type Needle2RawGeneration<
+export type Needle2NonInvokingGeneration<
 	Tools extends readonly Needle2AnyTool[] = readonly Needle2ToolDefinition[],
 > =
 	| (Omit<Needle2GenerationSuccess<Tools>, "functionCalls"> & {
@@ -184,7 +176,7 @@ export type Needle2RawGeneration<
 export type Needle2LoopStep<
 	Tools extends readonly Needle2AnyTool[] = readonly Needle2ToolDefinition[],
 > = {
-	generation: Needle2RawGeneration<Tools>;
+	generation: Needle2NonInvokingGeneration<Tools>;
 	toolResponses: Needle2JSONValue[];
 };
 
@@ -198,21 +190,20 @@ export type Needle2LoopTerminationCause =
 export type Needle2LoopResponse<
 	Tools extends readonly Needle2AnyTool[] = readonly Needle2ToolDefinition[],
 > = {
+	response: Needle2NonInvokingGeneration<Tools>;
+	results: Needle2JSONValue[];
 	steps: Needle2LoopStep<Tools>[];
 	terminationCause: Needle2LoopTerminationCause;
 };
 
 export type Needle2LoopTurnParameters = {
 	maxTokens?: number;
-	outputCapacity?: number;
 };
 
-export type Needle2LoopOptions<
-	Tools extends readonly Needle2AnyTool[] = readonly Needle2ToolDefinition[],
-> = {
+export type Needle2LoopOptions = {
 	prompt: string;
-	initialization: Needle2Initialization<Tools>;
-	maximumTurns?: number;
+	maxTurns?: number;
+	maxTokens?: number;
 	parameters?: (turn: number) => Needle2LoopTurnParameters;
 };
 
@@ -236,26 +227,40 @@ export class Needle2ToolCallError extends Needle2Error {
 	}
 }
 
-export class Needle2Runtime {
+export class Needle2Runtime<
+	Tools extends readonly Needle2AnyTool[] = readonly Needle2ToolDefinition[],
+> {
 	readonly provider: Needle2Provider;
 
-	private constructor(private readonly backend: Needle2Backend) {
+	private constructor(
+		private readonly backend: Needle2Backend,
+		private readonly initialization: Needle2ResolvedInitialization,
+		private readonly tools: Tools,
+	) {
 		this.provider = backend.provider;
 	}
 
-	/** @internal */
-	static async create(options: Needle2RuntimeOptions): Promise<Needle2Runtime> {
+	static async create<const Tools extends readonly Needle2AnyTool[]>(
+		options: Needle2RuntimeOptions<Tools>,
+	): Promise<Needle2Runtime<Tools>> {
+		const tools = options.tools ?? ([] as unknown as Tools);
+		requireUniqueToolNames(tools);
+		const initialization = resolvedInitialization(options, tools);
 		const weights = options.weights ?? defaultAssetURL("needle2.cact");
 		const engine = options.engine ?? "wasm";
 		if (options.provider === "direct") {
 			const wasm = options.wasm ?? defaultAssetURL("needle.wasm");
 			return new Needle2Runtime(
-				await createNeedle2Binding(
-					engine,
-					wasm,
-					weights,
-					options.factory,
+				await directRuntimeOperations.enqueue(() =>
+					createNeedle2Binding(
+						engine,
+						wasm,
+						weights,
+						options.factory,
+					),
 				),
+				initialization,
+				tools,
 			);
 		}
 
@@ -267,16 +272,20 @@ export class Needle2Runtime {
 				options.workerOptions,
 				engine,
 			),
+			initialization,
+			tools,
 		);
 	}
 
-	async generate<const Tools extends readonly Needle2AnyTool[]>(
-		options: Needle2GenerateOptions<Tools>,
+	async generate(
+		options: Needle2GenerateOptions,
 	): Promise<Needle2GenerationResult<Tools>> {
-		const result = await this.generateRaw<readonly Needle2AnyTool[]>(options);
+		const result = await this.perform(() =>
+			this.generateNonInvokingInternal(options),
+		);
 		return (await attachToolOutputs(
 			result,
-			options.initialization.tools,
+			this.tools,
 		)) as Needle2GenerationResult<Tools>;
 	}
 
@@ -284,16 +293,10 @@ export class Needle2Runtime {
 	 * Generates one turn without invoking any tool handlers, leaving the calls for the
 	 * caller to execute and feed back as the next prompt.
 	 */
-	async generateRaw<const Tools extends readonly Needle2AnyTool[]>(
-		options: Needle2GenerateOptions<Tools>,
-	): Promise<Needle2RawGeneration<Tools>> {
-		const generation = await this.backend.generate(
-			resolveGenerateOptions(options),
-		);
-		return parseGenerationResult(
-			generation.json,
-			generation.tokenCount,
-		) as Needle2RawGeneration<Tools>;
+	async generateNonInvoking(
+		options: Needle2GenerateOptions,
+	): Promise<Needle2NonInvokingGeneration<Tools>> {
+		return this.perform(() => this.generateNonInvokingInternal(options));
 	}
 
 	/**
@@ -303,29 +306,62 @@ export class Needle2Runtime {
 	 * back to the model as that call's response, so the model can recover on the next
 	 * turn, and it stays visible to the caller in the step's `toolResponses`.
 	 */
-	async runLoop<const Tools extends readonly Needle2AnyTool[]>(
-		options: Needle2LoopOptions<Tools>,
+	async runLoop(
+		options: Needle2LoopOptions,
 	): Promise<Needle2LoopResponse<Tools>> {
-		const maximumTurns = options.maximumTurns ?? 8;
+		return this.perform(() => this.runLoopInternal(options));
+	}
+
+	load(weights: Needle2BinarySource): Promise<void> {
+		return this.perform(() => this.backend.load(weights));
+	}
+
+	reset(): Promise<void> {
+		return this.perform(() => this.backend.reset());
+	}
+
+	dispose(): Promise<void> {
+		return this.perform(() => this.backend.dispose());
+	}
+
+	private async generateNonInvokingInternal(
+		options: Needle2GenerateOptions,
+	): Promise<Needle2NonInvokingGeneration<Tools>> {
+		const generation = await this.backend.generate({
+			...options,
+			initialization: this.initialization,
+		});
+		return parseGenerationResult(
+			generation.json,
+			generation.tokenCount,
+		) as Needle2NonInvokingGeneration<Tools>;
+	}
+
+	private async runLoopInternal(
+		options: Needle2LoopOptions,
+	): Promise<Needle2LoopResponse<Tools>> {
+		const maxTurns = options.maxTurns ?? 8;
 		if (
-			!Number.isInteger(maximumTurns) ||
-			maximumTurns < 1 ||
-			maximumTurns > 8
+			!Number.isInteger(maxTurns) ||
+			maxTurns < 1 ||
+			maxTurns > 8
 		) {
 			throw new Needle2Error(
 				"invalid-turns",
-				`Needle 2 supports between 1 and 8 loop turns, but received ${maximumTurns}.`,
+				`Needle 2 supports between 1 and 8 loop turns, but received ${maxTurns}.`,
 			);
 		}
 
-		const tools = options.initialization.tools;
 		const steps: Needle2LoopStep[] = [];
+		const results: Needle2JSONValue[] = [];
 		let prompt = options.prompt;
 
-		for (let turn = 0; turn < maximumTurns; turn += 1) {
-			const generation = await this.generateRaw<readonly Needle2AnyTool[]>({
+		for (let turn = 0; turn < maxTurns; turn += 1) {
+			const generation = await this.generateNonInvokingInternal({
 				prompt,
-				initialization: options.initialization,
+				...(options.maxTokens === undefined
+					? {}
+					: { maxTokens: options.maxTokens }),
 				...options.parameters?.(turn),
 			});
 			if (
@@ -335,59 +371,75 @@ export class Needle2Runtime {
 			) {
 				steps.push({ generation, toolResponses: [] });
 				return {
+					response: generation,
+					results,
 					steps,
 					terminationCause: loopTerminationCause(generation),
 				} as Needle2LoopResponse<Tools>;
 			}
 
-			const outcomes = await toolOutcomes(generation.functionCalls, tools);
+			const outcomes = await toolOutcomes(generation.functionCalls, this.tools);
 			const toolResponses = outcomes.map((outcome, index) =>
 				toolResponse(outcome, generation.functionCalls[index]?.name ?? ""),
 			);
 			steps.push({ generation, toolResponses });
+			results.push(...toolResponses);
 			prompt = JSON.stringify(toolResponses);
 		}
 
+		const response = steps[steps.length - 1]?.generation;
+		if (!response) {
+			throw new Needle2ProtocolError("Needle 2 completed an empty tool loop.");
+		}
 		return {
+			response,
+			results,
 			steps,
 			terminationCause: "maximum-turns-reached",
 		} as Needle2LoopResponse<Tools>;
 	}
 
-	load(weights: Needle2BinarySource): Promise<void> {
-		return this.backend.load(weights);
-	}
-
-	reset(): Promise<void> {
-		return this.backend.reset();
-	}
-
-	dispose(): Promise<void> {
-		return this.backend.dispose();
+	private perform<Result>(operation: () => Promise<Result>): Promise<Result> {
+		return this.provider === "direct"
+			? directRuntimeOperations.enqueue(operation)
+			: operation();
 	}
 }
 
-export function needle2(
-	options: Needle2RuntimeOptions,
-): Promise<Needle2Runtime> {
+export function needle2<const Tools extends readonly Needle2AnyTool[]>(
+	options: Needle2RuntimeOptions<Tools>,
+): Promise<Needle2Runtime<Tools>> {
 	return Needle2Runtime.create(options);
 }
 
-function resolveGenerateOptions(
-	options: Needle2GenerateOptions<readonly Needle2AnyTool[]>,
-): Needle2ResolvedGenerateOptions {
-	const initialization = options.initialization;
-	const systemPrompt = defaultSystemPrompt(initialization.systemValues);
+function resolvedInitialization(
+	options: Needle2RuntimeOptions<readonly Needle2AnyTool[]>,
+	tools: readonly Needle2AnyTool[],
+): Needle2ResolvedInitialization {
 	return {
-		...options,
-		initialization: {
-			systemPrompt,
-			tools: initialization.tools.map(toolDefinition),
-			...(initialization.toolIndexPath === undefined
-				? {}
-				: { toolIndexPath: initialization.toolIndexPath }),
-		},
+		systemPrompt: formatSystemPrompt(options.systemValues),
+		tools: tools.map(toolDefinition),
+		...(options.toolIndexPath === undefined
+			? {}
+			: { toolIndexPath: options.toolIndexPath }),
 	};
+}
+
+function requireUniqueToolNames(tools: readonly Needle2AnyTool[]): void {
+	const names = new Set<string>();
+	const duplicate = tools.find((tool) => {
+		if (names.has(tool.name)) {
+			return true;
+		}
+		names.add(tool.name);
+		return false;
+	});
+	if (duplicate) {
+		throw new Needle2Error(
+			"duplicate-tool-name",
+			`Needle 2 tools must have unique names, but '${duplicate.name}' is declared more than once.`,
+		);
+	}
 }
 
 function toolDefinition(tool: Needle2AnyTool): Needle2ToolDefinition {

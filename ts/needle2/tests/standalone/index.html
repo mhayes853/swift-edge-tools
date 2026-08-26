@@ -8,23 +8,23 @@
     <script src="/needle2.min.js"></script>
     <script>
       globalThis.needle2Result = (async () => {
-        const runtime = await needle2({ provider: "direct" });
+        const runtime = await needle2({
+          provider: "direct",
+          tools: [
+            {
+              name: "set_thermostat",
+              description: "Set the thermostat temperature.",
+              parameters: {
+                type: "object",
+                properties: { temperature: { type: "integer" } },
+                required: ["temperature"]
+              }
+            }
+          ]
+        });
         try {
           const result = await runtime.generate({
-            prompt: "set the thermostat to 21 degrees",
-            initialization: {
-              tools: [
-                {
-                  name: "set_thermostat",
-                  description: "Set the thermostat temperature.",
-                  parameters: {
-                    type: "object",
-                    properties: { temperature: { type: "integer" } },
-                    required: ["temperature"]
-                  }
-                }
-              ]
-            }
+            prompt: "set the thermostat to 21 degrees"
           });
           return {
             success: result.success,

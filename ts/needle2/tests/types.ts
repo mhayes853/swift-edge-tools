@@ -1,15 +1,13 @@
-import type { Needle2Initialization, Needle2Runtime } from "@edge-tools/needle2";
+import { needle2 } from "@edge-tools/needle2";
+import type { Needle2Runtime } from "@edge-tools/needle2";
 
 // Type-level coverage for the inference `generate` performs over its tool list.
 // Nothing here runs; `npm run test:types` fails if any assertion stops holding.
 
-declare const runtime: Needle2Runtime;
-
 export async function infersToolOutputsPerTool(): Promise<void> {
-	const result = await runtime.generate({
-		prompt: "weather in Paris, then email blob@gmail.com about it",
-		initialization: {
-			tools: [
+	const runtime = await needle2({
+		provider: "direct",
+		tools: [
 				{
 					name: "get_weather",
 					description: "Get the current weather for a city.",
@@ -34,8 +32,10 @@ export async function infersToolOutputsPerTool(): Promise<void> {
 					name: "log_event",
 					parameters: { type: "object", properties: {} },
 				},
-			],
-		},
+		],
+	});
+	const result = await runtime.generate({
+		prompt: "weather in Paris, then email blob@gmail.com about it",
 	});
 
 	if (!result.success) {
@@ -61,19 +61,19 @@ export async function infersToolOutputsPerTool(): Promise<void> {
 }
 
 export async function keepsUntypedToolListsWorking(): Promise<void> {
-	const initialization: Needle2Initialization = {
+	const runtime: Needle2Runtime = await needle2({
+		provider: "direct",
 		tools: [{ name: "set_thermostat", parameters: { type: "object" } }],
-	};
-	const result = await runtime.generate({ prompt: "21 degrees", initialization });
+	});
+	const result = await runtime.generate({ prompt: "21 degrees" });
 	const name: string = result.functionCalls[0]?.name ?? "";
 	void name;
 }
 
 export async function keepsLoopOutputsInToolResponses(): Promise<void> {
-	const response = await runtime.runLoop({
-		prompt: "weather in Paris, then email blob@gmail.com about it",
-		initialization: {
-			tools: [
+	const runtime = await needle2({
+		provider: "direct",
+		tools: [
 				{
 					name: "get_weather",
 					parameters: {
@@ -83,8 +83,10 @@ export async function keepsLoopOutputsInToolResponses(): Promise<void> {
 					},
 					call: async (args: { city: string }) => ({ celsius: 21, city: args.city }),
 				},
-			],
-		},
+		],
+	});
+	const response = await runtime.runLoop({
+		prompt: "weather in Paris, then email blob@gmail.com about it",
 	});
 
 	const cause: "responded" | "refused" | "no-tool-calls" | "maximum-turns-reached" | "failed" =
@@ -106,11 +108,10 @@ export async function keepsLoopOutputsInToolResponses(): Promise<void> {
 	}
 }
 
-export async function omitsOutputsFromRawGenerations(): Promise<void> {
-	const generation = await runtime.generateRaw({
-		prompt: "weather in Paris",
-		initialization: {
-			tools: [
+export async function omitsOutputsFromNonInvokingGenerations(): Promise<void> {
+	const runtime = await needle2({
+		provider: "direct",
+		tools: [
 				{
 					name: "get_weather",
 					parameters: {
@@ -120,8 +121,10 @@ export async function omitsOutputsFromRawGenerations(): Promise<void> {
 					},
 					call: async (args: { city: string }) => ({ celsius: 21, city: args.city }),
 				},
-			],
-		},
+		],
+	});
+	const generation = await runtime.generateNonInvoking({
+		prompt: "weather in Paris",
 	});
 
 	if (!generation.success) {
@@ -130,7 +133,7 @@ export async function omitsOutputsFromRawGenerations(): Promise<void> {
 	for (const call of generation.functionCalls) {
 		const city: string = call.arguments.city;
 		void city;
-		// @ts-expect-error generateRaw never invokes handlers, so there is no output
+		// @ts-expect-error generateNonInvoking never invokes handlers, so there is no output
 		call.output;
 	}
 }

@@ -1,16 +1,14 @@
 import { afterEach, describe, expect, test } from "vitest";
 import { needle2 } from "@edge-tools/needle2";
 import type {
-	Needle2Initialization,
 	Needle2Factory,
 	Needle2Provider,
 	Needle2Runtime,
 } from "@edge-tools/needle2";
-import { thermostatInitialization, thermostatRequest } from "./support.ts";
+import { thermostatRequest, thermostatTools } from "./support.ts";
 
-const runtimes: Needle2Runtime[] = [];
-const emailInitialization: Needle2Initialization = {
-	tools: [
+const runtimes: Needle2Runtime<any>[] = [];
+const emailTools = [
 		{
 			name: "send_email",
 			description: "Sends an email to a recipient with an email address.",
@@ -35,10 +33,8 @@ const emailInitialization: Needle2Initialization = {
 				required: ["address", "subject", "body"],
 			},
 		},
-	],
-};
-const weatherInitialization: Needle2Initialization = {
-	tools: [
+	] as const;
+const weatherTools = [
 		{
 			name: "get_weather",
 			description: "Get the weather for a city.",
@@ -48,20 +44,18 @@ const weatherInitialization: Needle2Initialization = {
 				required: ["city"],
 			},
 		},
-	],
-};
+	] as const;
 
 afterEach(async () => {
 	await Promise.all(runtimes.splice(0).map((runtime) => runtime.dispose()));
 });
 
 test("returns the native error response for truncated generation", async () => {
-	const runtime = await needle2({ provider: "direct" });
+	const runtime = await needle2({ provider: "direct", tools: emailTools });
 	runtimes.push(runtime);
 
 	const result = await runtime.generate({
 		prompt: "Send an email to blob@gmail.com asking them to go hiking.",
-		initialization: emailInitialization,
 		maxTokens: 4,
   });
 
@@ -104,37 +98,45 @@ const emailTool = {
 const weatherAndEmailPrompt =
 	"What's the weather in Paris, and email blob@gmail.com about it?";
 
-test("invokes tool handlers in parallel and attaches their outputs", async () => {
-	const runtime = await needle2({ provider: "direct" });
-	runtimes.push(runtime);
+test("rejects duplicate tool names", async () => {
+	await expect(
+		needle2({
+			provider: "direct",
+			tools: [weatherTool, weatherTool],
+		}),
+	).rejects.toMatchObject({ code: "duplicate-tool-name" });
+});
 
+test("invokes tool handlers in parallel and attaches their outputs", async () => {
 	// The first handler only settles once the second has started, so a sequential
 	// implementation deadlocks rather than quietly passing.
 	let startSecond!: () => void;
 	const second = new Promise<void>((resolve) => {
 		startSecond = resolve;
 	});
+	const runtime = await needle2({
+		provider: "direct",
+		tools: [
+			{
+				...weatherTool,
+				call: async (args: { city: string }) => {
+					await second;
+					return { celsius: 21, city: args.city };
+				},
+			},
+			{
+				...emailTool,
+				call: (args: { address: string }) => {
+					startSecond();
+					return `sent to ${args.address}`;
+				},
+			},
+		],
+	});
+	runtimes.push(runtime);
 
 	const result = await runtime.generate({
 		prompt: weatherAndEmailPrompt,
-		initialization: {
-			tools: [
-				{
-					...weatherTool,
-					call: async (args: { city: string }) => {
-						await second;
-						return { celsius: 21, city: args.city };
-					},
-				},
-				{
-					...emailTool,
-					call: (args: { address: string }) => {
-						startSecond();
-						return `sent to ${args.address}`;
-					},
-				},
-			],
-		},
 	});
 
 	expect(result.success).toBe(true);
@@ -153,17 +155,14 @@ test("invokes tool handlers in parallel and attaches their outputs", async () =>
 });
 
 test("leaves tools declared without a handler uninvoked", async () => {
-	const runtime = await needle2({ provider: "direct" });
+	const runtime = await needle2({
+		provider: "direct",
+		tools: [{ ...weatherTool, call: () => "sunny" }, emailTool],
+	});
 	runtimes.push(runtime);
 
 	const result = await runtime.generate({
 		prompt: weatherAndEmailPrompt,
-		initialization: {
-			tools: [
-				{ ...weatherTool, call: () => "sunny" },
-				emailTool,
-			],
-		},
 	});
 
 	expect(result.success).toBe(true);
@@ -178,23 +177,23 @@ test("leaves tools declared without a handler uninvoked", async () => {
 });
 
 test("reports every failed tool handler without losing the generation", async () => {
-	const runtime = await needle2({ provider: "direct" });
+	const runtime = await needle2({
+		provider: "direct",
+		tools: [
+			{
+				...weatherTool,
+				call: () => {
+					throw new Error("the weather station is down");
+				},
+			},
+			{ ...emailTool, call: () => "sent" },
+		],
+	});
 	runtimes.push(runtime);
 
 	const failure = await runtime
 		.generate({
 			prompt: weatherAndEmailPrompt,
-			initialization: {
-				tools: [
-					{
-						...weatherTool,
-						call: () => {
-							throw new Error("the weather station is down");
-						},
-					},
-					{ ...emailTool, call: () => "sent" },
-				],
-			},
 		})
 		.catch((error: unknown) => error);
 
@@ -207,24 +206,24 @@ test("reports every failed tool handler without losing the generation", async ()
 
 test("skips tool invocation entirely for a failed generation", async () => {
 	let invocations = 0;
-	const runtime = await needle2({ provider: "direct" });
+	const runtime = await needle2({
+		provider: "direct",
+		tools: [
+			{
+				...weatherTool,
+				call: () => {
+					invocations += 1;
+					return "sunny";
+				},
+			},
+			emailTool,
+		],
+	});
 	runtimes.push(runtime);
 
 	const result = await runtime.generate({
 		prompt: weatherAndEmailPrompt,
 		maxTokens: 4,
-		initialization: {
-			tools: [
-				{
-					...weatherTool,
-					call: () => {
-						invocations += 1;
-						return "sunny";
-					},
-				},
-				emailTool,
-			],
-		},
 	});
 
 	expect(result.success).toBe(false);
@@ -232,25 +231,25 @@ test("skips tool invocation entirely for a failed generation", async () => {
 	expect(invocations).toBe(0);
 });
 
-test("leaves tool handlers uninvoked when generating a raw turn", async () => {
+test("leaves tool handlers uninvoked when generating a non-invoking turn", async () => {
 	let invocations = 0;
-	const runtime = await needle2({ provider: "direct" });
+	const runtime = await needle2({
+		provider: "direct",
+		tools: [
+			{
+				...weatherTool,
+				call: () => {
+					invocations += 1;
+					return "sunny";
+				},
+			},
+			{ ...emailTool, call: () => "sent" },
+		],
+	});
 	runtimes.push(runtime);
 
-	const generation = await runtime.generateRaw({
+	const generation = await runtime.generateNonInvoking({
 		prompt: weatherAndEmailPrompt,
-		initialization: {
-			tools: [
-				{
-					...weatherTool,
-					call: () => {
-						invocations += 1;
-						return "sunny";
-					},
-				},
-				{ ...emailTool, call: () => "sent" },
-			],
-		},
 	});
 
 	expect(generation.success).toBe(true);
@@ -263,17 +262,17 @@ test("leaves tool handlers uninvoked when generating a raw turn", async () => {
 });
 
 test("drives the tool loop until the model responds", async () => {
-	const runtime = await needle2({ provider: "direct" });
+	const runtime = await needle2({
+		provider: "direct",
+		tools: [
+			{ ...weatherTool, call: () => ({ celsius: 21, condition: "sunny" }) },
+			{ ...emailTool, call: () => ({ status: "sent" }) },
+		],
+	});
 	runtimes.push(runtime);
 
 	const response = await runtime.runLoop({
 		prompt: weatherAndEmailPrompt,
-		initialization: {
-			tools: [
-				{ ...weatherTool, call: () => ({ celsius: 21, condition: "sunny" }) },
-				{ ...emailTool, call: () => ({ status: "sent" }) },
-			],
-		},
 	});
 
 	expect(response.terminationCause).toBe("responded");
@@ -284,25 +283,30 @@ test("drives the tool loop until the model responds", async () => {
 	]);
 	expect(response.steps[1]?.generation.functionCalls).toEqual([]);
 	expect(response.steps[1]?.toolResponses).toEqual([]);
+	expect(response.response).toBe(response.steps[1]?.generation);
+	expect(response.results).toEqual([
+		{ celsius: 21, condition: "sunny" },
+		{ status: "sent" },
+	]);
 });
 
 test("feeds a failed tool handler back to the model instead of throwing", async () => {
-	const runtime = await needle2({ provider: "direct" });
+	const runtime = await needle2({
+		provider: "direct",
+		tools: [
+			{
+				...weatherTool,
+				call: () => {
+					throw new Error("the weather station is down");
+				},
+			},
+			{ ...emailTool, call: () => ({ status: "sent" }) },
+		],
+	});
 	runtimes.push(runtime);
 
 	const response = await runtime.runLoop({
 		prompt: weatherAndEmailPrompt,
-		initialization: {
-			tools: [
-				{
-					...weatherTool,
-					call: () => {
-						throw new Error("the weather station is down");
-					},
-				},
-				{ ...emailTool, call: () => ({ status: "sent" }) },
-			],
-		},
 	});
 
 	expect(response.steps[0]?.toolResponses).toEqual([
@@ -313,14 +317,14 @@ test("feeds a failed tool handler back to the model instead of throwing", async 
 });
 
 test("feeds an unknown tool error back for a tool declared without a handler", async () => {
-	const runtime = await needle2({ provider: "direct" });
+	const runtime = await needle2({
+		provider: "direct",
+		tools: [{ ...weatherTool, call: () => ({ celsius: 21 }) }, emailTool],
+	});
 	runtimes.push(runtime);
 
 	const response = await runtime.runLoop({
 		prompt: weatherAndEmailPrompt,
-		initialization: {
-			tools: [{ ...weatherTool, call: () => ({ celsius: 21 }) }, emailTool],
-		},
 	});
 
 	expect(response.steps[0]?.toolResponses).toEqual([
@@ -330,18 +334,18 @@ test("feeds an unknown tool error back for a tool declared without a handler", a
 });
 
 test("stops the loop once it runs out of turns", async () => {
-	const runtime = await needle2({ provider: "direct" });
+	const runtime = await needle2({
+		provider: "direct",
+		tools: [
+			{ ...weatherTool, call: () => ({ celsius: 21 }) },
+			{ ...emailTool, call: () => ({ status: "sent" }) },
+		],
+	});
 	runtimes.push(runtime);
 
 	const response = await runtime.runLoop({
 		prompt: weatherAndEmailPrompt,
-		maximumTurns: 1,
-		initialization: {
-			tools: [
-				{ ...weatherTool, call: () => ({ celsius: 21 }) },
-				{ ...emailTool, call: () => ({ status: "sent" }) },
-			],
-		},
+		maxTurns: 1,
 	});
 
 	expect(response.terminationCause).toBe("maximum-turns-reached");
@@ -349,43 +353,38 @@ test("stops the loop once it runs out of turns", async () => {
 });
 
 test("rejects a turn count Needle 2 cannot support", async () => {
-	const runtime = await needle2({ provider: "direct" });
+	const runtime = await needle2({
+		provider: "direct",
+		tools: [{ ...weatherTool, call: () => ({ celsius: 21 }) }],
+	});
 	runtimes.push(runtime);
 
 	await expect(
 		runtime.runLoop({
 			prompt: weatherAndEmailPrompt,
-			maximumTurns: 9,
-			initialization: {
-				tools: [{ ...weatherTool, call: () => ({ celsius: 21 }) }],
-			},
+			maxTurns: 9,
 		}),
 	).rejects.toMatchObject({ code: "invalid-turns" });
 });
 
-test("shares one direct model and requires reset between active runtimes", async () => {
-	const thermostat = await needle2({ provider: "direct" });
-	const weather = await needle2({ provider: "direct" });
+test("serializes direct runtimes with different initializations", async () => {
+	const thermostat = await needle2({ provider: "direct", tools: thermostatTools });
+	const weather = await needle2({ provider: "direct", tools: weatherTools });
 	runtimes.push(thermostat, weather);
 
 	const thermostatPrompt = {
 		prompt: "set it to 21 degrees",
-		initialization: thermostatInitialization,
 	};
 	const weatherPrompt = {
 		prompt: "what's the weather in Paris?",
-		initialization: weatherInitialization,
 	};
 
-	expect(
-		(await thermostat.generate(thermostatPrompt)).functionCalls[0]?.name,
-	).toBe("set_thermostat");
-	await expect(weather.generate(weatherPrompt)).rejects.toMatchObject({
-		code: "active-session",
-	});
-	await thermostat.reset();
-	expect((await weather.generate(weatherPrompt)).functionCalls[0]?.name).toBe("get_weather");
-	await weather.reset();
+	const [thermostatResult, weatherResult] = await Promise.all([
+		thermostat.generate(thermostatPrompt),
+		weather.generate(weatherPrompt),
+	]);
+	expect(thermostatResult.functionCalls[0]?.name).toBe("set_thermostat");
+	expect(weatherResult.functionCalls[0]?.name).toBe("get_weather");
 	expect(
 		(await thermostat.generate(thermostatPrompt)).functionCalls[0]?.name,
 	).toBe("set_thermostat");
@@ -396,12 +395,11 @@ describe.each([
 	"worker",
 ] satisfies Needle2Provider[])("Needle2Runtime with the %s provider", (provider) => {
 	test("generates a parsed response", async () => {
-		const runtime = await needle2({ provider });
+		const runtime = await needle2({ provider, tools: emailTools });
 		runtimes.push(runtime);
 
 		const result = await runtime.generate({
 			prompt: "Send an email to blob@gmail.com asking them to go hiking.",
-			initialization: emailInitialization,
 		});
 
 		expect(result.success).toBe(true);
@@ -422,28 +420,28 @@ describe.each([
 	});
 
 	test("invokes tool handlers across the provider boundary", async () => {
-		const runtime = await needle2({ provider });
+		const runtime = await needle2({
+			provider,
+			tools: [
+				{
+					name: "set_thermostat",
+					description: "Set the thermostat temperature.",
+					parameters: {
+						type: "object",
+						properties: { temperature: { type: "integer" } },
+						required: ["temperature"],
+					},
+					call: async (args: { temperature: number }) => ({
+						status: "ok" as const,
+						temperature: args.temperature,
+					}),
+				},
+			],
+		});
 		runtimes.push(runtime);
 
 		const result = await runtime.generate({
 			prompt: "set the thermostat to 21 degrees",
-			initialization: {
-				tools: [
-					{
-						name: "set_thermostat",
-						description: "Set the thermostat temperature.",
-						parameters: {
-							type: "object",
-							properties: { temperature: { type: "integer" } },
-							required: ["temperature"],
-						},
-						call: async (args: { temperature: number }) => ({
-							status: "ok" as const,
-							temperature: args.temperature,
-						}),
-					},
-				],
-			},
 		});
 
 		expect(result.success).toBe(true);
@@ -457,7 +455,7 @@ describe.each([
 	});
 
 	test("rejects generation after disposal", async () => {
-		const runtime = await needle2({ provider });
+		const runtime = await needle2({ provider, tools: thermostatTools });
 		runtimes.push(runtime);
 		await runtime.dispose();
 
@@ -507,7 +505,7 @@ describe.each([
 	"worker",
 ] satisfies Needle2Provider[])("Needle2Runtime auto engine with the %s provider", (provider) => {
 	test("falls back to WASM when native artifacts are unavailable", async () => {
-		const runtime = await needle2({ provider, engine: "auto" });
+		const runtime = await needle2({ provider, engine: "auto", tools: thermostatTools });
 		runtimes.push(runtime);
 
 		const result = await runtime.generate(thermostatRequest);

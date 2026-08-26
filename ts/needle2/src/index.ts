@@ -21,14 +21,13 @@ export type {
 	Needle2GenerationMetrics,
 	Needle2GenerationResult,
 	Needle2GenerationSuccess,
-	Needle2Initialization,
 	Needle2InvokedToolCall,
 	Needle2LoopOptions,
 	Needle2LoopResponse,
 	Needle2LoopStep,
 	Needle2LoopTerminationCause,
 	Needle2LoopTurnParameters,
-	Needle2RawGeneration,
+	Needle2NonInvokingGeneration,
 	Needle2ResponseType,
 	Needle2ResolvedGenerateOptions,
 	Needle2Tool,
@@ -55,4 +54,4 @@ export type {
 	Needle2SystemValuesOptions,
 } from "./system.js";
 export { Needle2Runtime, Needle2ToolCallError, needle2 } from "./runtime.js";
-export { defaultSystemValues, defaultSystemPrompt } from "./system.js";
+export { defaultSystemValues, formatSystemPrompt } from "./system.js";
