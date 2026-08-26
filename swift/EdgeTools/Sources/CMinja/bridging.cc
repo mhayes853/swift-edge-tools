@@ -5,11 +5,24 @@
 #include <ctime>
 #include <iomanip>
 #include <memory>
-#include <mutex>
 #include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
+#include <version>
+
+// Standard libraries built without thread support (such as wasi-libc on a Swift SDK that does not
+// enable threads) do not ship <mutex>. Key off the library's own advertisement rather than the
+// target, so a threaded SDK still locks.
+#if defined(_LIBCPP_HAS_NO_THREADS) || (defined(_LIBCPP_HAS_THREADS) && !_LIBCPP_HAS_THREADS)
+#define EDGE_TOOLS_CMINJA_HAS_THREADS 0
+#else
+#define EDGE_TOOLS_CMINJA_HAS_THREADS 1
+#endif
+
+#if EDGE_TOOLS_CMINJA_HAS_THREADS
+#include <mutex>
+#endif
 
 #include <minja/minja.hpp>
 
@@ -171,10 +184,12 @@ std::string formatted_utc(std::time_t instant, const std::string &format) {
 
 std::shared_ptr<minja::TemplateNode> parsed_template(const std::string &source) {
   constexpr size_t max_cached_templates = 4;
-  static std::mutex mutex;
   static std::vector<std::pair<std::string, std::shared_ptr<minja::TemplateNode>>> cache;
 
+#if EDGE_TOOLS_CMINJA_HAS_THREADS
+  static std::mutex mutex;
   std::lock_guard<std::mutex> guard(mutex);
+#endif
   auto cached = std::find_if(cache.begin(), cache.end(), [&source](const auto &entry) {
     return entry.first == source;
   });
