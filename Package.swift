@@ -15,6 +15,19 @@ let edgeToolsJavaScriptSwiftSettings = edgeToolsSwiftSettings + [
   .enableExperimentalFeature("Extern")
 ]
 
+// JavaScriptKit does not support Windows, and SwiftPM builds every target in the root package
+// regardless of traits, so the JavaScript target is omitted entirely on Windows hosts.
+#if os(Windows)
+  let isJavaScriptSupported = false
+#else
+  let isJavaScriptSupported = true
+#endif
+
+let edgeToolsJavaScriptDependency: [Target.Dependency] =
+  isJavaScriptSupported
+  ? [.target(name: "_EdgeToolsJavaScript", condition: .when(traits: ["JS"]))]
+  : []
+
 // No llama.cpp artifact is published for Windows, and SwiftPM resolves binary targets regardless of
 // traits or platform conditions, so CLlama is omitted entirely on Windows hosts.
 #if os(Windows)
@@ -33,6 +46,21 @@ let cLlamaTraitDependency: [Target.Dependency] =
 let cLlamaDependency: [Target.Dependency] =
   isLlamaSupported
   ? [.target(name: "CLlama", condition: .when(platforms: llamaPlatforms))]
+  : []
+
+let edgeToolsJavaScriptTargets: [Target] =
+  isJavaScriptSupported
+  ? [
+    .target(
+      name: "_EdgeToolsJavaScript",
+      dependencies: [
+        .product(name: "JavaScriptKit", package: "JavaScriptKit")
+      ],
+      path: "swift/EdgeTools/Sources/_EdgeToolsJavaScript",
+      swiftSettings: edgeToolsJavaScriptSwiftSettings,
+      plugins: [.plugin(name: "BridgeJS", package: "JavaScriptKit")]
+    )
+  ]
   : []
 
 let cLlamaTargets: [Target] =
@@ -118,10 +146,6 @@ let package = Package(
           name: "_EdgeToolsFoundation",
           condition: .when(traits: ["FoundationEssentials"])
         ),
-        .target(
-          name: "_EdgeToolsJavaScript",
-          condition: .when(traits: ["JS"])
-        ),
         .product(name: "HeapModule", package: "swift-collections"),
         .product(name: "OrderedCollections", package: "swift-collections"),
         .product(name: "Atomics", package: "swift-atomics"),
@@ -184,7 +208,7 @@ let package = Package(
             traits: ["Needle2"]
           )
         )
-      ] + cLlamaTraitDependency,
+      ] + cLlamaTraitDependency + edgeToolsJavaScriptDependency,
       path: "swift/EdgeTools/Sources/EdgeTools",
       swiftSettings: edgeToolsSwiftSettings,
       linkerSettings: [
@@ -358,15 +382,6 @@ let package = Package(
       ]
     ),
     .target(
-      name: "_EdgeToolsJavaScript",
-      dependencies: [
-        .product(name: "JavaScriptKit", package: "JavaScriptKit")
-      ],
-      path: "swift/EdgeTools/Sources/_EdgeToolsJavaScript",
-      swiftSettings: edgeToolsJavaScriptSwiftSettings,
-      plugins: [.plugin(name: "BridgeJS", package: "JavaScriptKit")]
-    ),
-    .target(
       name: "EdgeToolsXGrammar",
       dependencies: ["CXGrammar"],
       path: "swift/EdgeTools/Sources/EdgeToolsXGrammar"
@@ -465,7 +480,7 @@ let package = Package(
         "Tokenization/__Snapshots__"
       ]
     )
-  ] + cLlamaTargets,
+  ] + cLlamaTargets + edgeToolsJavaScriptTargets,
   swiftLanguageModes: [.v6],
   cxxLanguageStandard: .cxx17
 )
