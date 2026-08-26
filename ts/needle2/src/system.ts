@@ -43,7 +43,7 @@ const DEFAULT_SYSTEM_KEYS = [
 	"assistant",
 ] as const;
 
-export function defaultSystemPrompt(facts: Needle2SystemValues = {}): string {
+export function formatSystemPrompt(facts: Needle2SystemValues = {}): string {
 	const standardValues = DEFAULT_SYSTEM_KEYS.flatMap((key) =>
 		facts[key] == null ? [] : [[key, facts[key]] as const],
 	);

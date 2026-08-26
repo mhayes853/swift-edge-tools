@@ -1,49 +1,242 @@
-import type { Needle2NativeGeneration } from "./bindings.js";
+import { nativeBinding, wasmBinding } from "./bindings.js";
+import type {
+	Needle2Binding,
+	Needle2NativeGeneration,
+} from "./bindings.js";
 import {
+	binarySourceBytes,
 	defaultAssetURL,
 	Needle2Error,
 	isNodeLikeEnvironment,
+	PromiseQueue,
 	serializeBinarySource,
 } from "./internal.js";
 import type {
 	Needle2BinarySource,
+	Needle2Factory,
 	Needle2SerializedBinarySource,
 	Needle2WorkerOptions,
 } from "./internal.js";
 import type {
 	Needle2Engine,
+	Needle2CompletionOptions,
 	Needle2Provider,
-	Needle2ResolvedGenerateOptions,
+	Needle2ResolvedInitialization,
 } from "./runtime.js";
 
 export type { Needle2NativeGeneration } from "./bindings.js";
 
+export type Needle2Complete = (
+	options: Needle2CompletionOptions,
+) => Promise<Needle2NativeGeneration>;
+
 export interface Needle2Backend {
 	readonly provider: Needle2Provider;
-	generate(
-		options: Needle2ResolvedGenerateOptions,
-	): Promise<Needle2NativeGeneration>;
+	withModel<Result>(
+		operation: (complete: Needle2Complete) => Promise<Result>,
+	): Promise<Result>;
 	load(weights: Needle2BinarySource): Promise<void>;
 	reset(): Promise<void>;
 	dispose(): Promise<void>;
 }
 
+type WeightIdentity = object | string;
+
+class DirectModel {
+	readonly operations = new PromiseQueue();
+	activeBackend: Needle2DirectBackend | undefined;
+	loadedWeightsIdentity: WeightIdentity | undefined;
+
+	constructor(readonly binding: Needle2Binding) {}
+}
+
+let sharedDirectNativeModel: Promise<DirectModel> | undefined;
+let sharedDirectWasmModel: Promise<DirectModel> | undefined;
+let sharedDirectWasmFactory: Needle2Factory | undefined;
+
+export class Needle2DirectBackend implements Needle2Backend {
+	readonly provider = "direct" as const;
+
+	private disposed = false;
+	private weightsIdentity: WeightIdentity;
+
+	private constructor(
+		private readonly model: DirectModel,
+		private readonly initialization: Needle2ResolvedInitialization,
+		private weights: Uint8Array,
+		weightsIdentity: WeightIdentity,
+	) {
+		this.weightsIdentity = weightsIdentity;
+	}
+
+	static async create(
+		engine: Needle2Engine,
+		wasm: Needle2BinarySource,
+		weights: Needle2BinarySource,
+		initialization: Needle2ResolvedInitialization,
+		factory?: Needle2Factory,
+	): Promise<Needle2DirectBackend> {
+		const weightBytes = await binarySourceBytes(weights);
+		const model = await directModel(engine, wasm, factory);
+		const backend = new Needle2DirectBackend(
+			model,
+			initialization,
+			weightBytes,
+			binarySourceIdentity(weights),
+		);
+		return model.operations.enqueue(() => {
+			backend.loadWeights();
+			return backend;
+		});
+	}
+
+	withModel<Result>(
+		operation: (complete: Needle2Complete) => Promise<Result>,
+	): Promise<Result> {
+		return this.model.operations.enqueue(() => {
+			this.requireActive();
+			this.activate();
+			return operation(async (options) => this.model.binding.complete(options));
+		});
+	}
+
+	async load(weights: Needle2BinarySource): Promise<void> {
+		const loadedWeights = await binarySourceBytes(weights);
+		return this.model.operations.enqueue(() => {
+			this.requireActive();
+			if (this.model.activeBackend === this) {
+				throw new Needle2Error(
+					"active-session",
+					"Reset the active Needle 2 runtime before loading new weights.",
+				);
+			}
+			const weightsIdentity = {};
+			this.loadWeights(loadedWeights, weightsIdentity);
+			this.weights = loadedWeights;
+			this.weightsIdentity = weightsIdentity;
+		});
+	}
+
+	reset(): Promise<void> {
+		return this.model.operations.enqueue(() => {
+			this.requireActive();
+			this.deactivate();
+		});
+	}
+
+	dispose(): Promise<void> {
+		return this.model.operations.enqueue(() => {
+			if (this.disposed) {
+				return;
+			}
+			this.deactivate();
+			this.disposed = true;
+		});
+	}
+
+	private activate(): void {
+		this.loadWeights();
+		if (this.model.activeBackend !== this) {
+			this.model.binding.initialize(this.initialization);
+			this.model.activeBackend = this;
+		}
+	}
+
+	private loadWeights(
+		weights = this.weights,
+		weightsIdentity = this.weightsIdentity,
+	): void {
+		if (this.model.loadedWeightsIdentity === weightsIdentity) {
+			return;
+		}
+		this.model.binding.load(weights);
+		this.model.loadedWeightsIdentity = weightsIdentity;
+		this.model.activeBackend = undefined;
+	}
+
+	private deactivate(): void {
+		if (this.model.activeBackend === this) {
+			this.model.binding.reset();
+			this.model.activeBackend = undefined;
+		}
+	}
+
+	private requireActive(): void {
+		if (this.disposed) {
+			throw new Needle2Error(
+				"disposed",
+				"This Needle 2 runtime has been disposed.",
+			);
+		}
+	}
+}
+
+function directModel(
+	engine: Needle2Engine,
+	wasm: Needle2BinarySource,
+	factory?: Needle2Factory,
+): Promise<DirectModel> {
+	if (engine === "native") {
+		return directNativeModel();
+	}
+	if (engine === "auto") {
+		return directNativeModel().catch(() => directWasmModel(wasm, factory));
+	}
+	return directWasmModel(wasm, factory);
+}
+
+function directNativeModel(): Promise<DirectModel> {
+	if (sharedDirectNativeModel) {
+		return sharedDirectNativeModel;
+	}
+	const modelPromise = nativeBinding().then((binding) => new DirectModel(binding));
+	const cachedPromise = modelPromise.catch((error) => {
+		if (sharedDirectNativeModel === cachedPromise) {
+			sharedDirectNativeModel = undefined;
+		}
+		throw error;
+	});
+	sharedDirectNativeModel = cachedPromise;
+	return cachedPromise;
+}
+
+function directWasmModel(
+	wasm: Needle2BinarySource,
+	factory?: Needle2Factory,
+): Promise<DirectModel> {
+	if (sharedDirectWasmModel && sharedDirectWasmFactory === factory) {
+		return sharedDirectWasmModel;
+	}
+	sharedDirectWasmFactory = factory;
+	const modelPromise = binarySourceBytes(wasm).then(async (bytes) =>
+		new DirectModel(await wasmBinding(bytes, factory)),
+	);
+	const cachedPromise = modelPromise.catch((error) => {
+		if (sharedDirectWasmModel === cachedPromise) {
+			sharedDirectWasmModel = undefined;
+			sharedDirectWasmFactory = undefined;
+		}
+		throw error;
+	});
+	sharedDirectWasmModel = cachedPromise;
+	return cachedPromise;
+}
+
 export type Needle2WorkerRequest =
 	| {
-			id: number;
 			operation: "initialize";
 			wasm: Needle2SerializedBinarySource;
 			weights: Needle2SerializedBinarySource;
 			engine: Needle2Engine;
+			initialization: Needle2ResolvedInitialization;
 	  }
 	| {
-			id: number;
 			operation: "generate";
-			options: Needle2ResolvedGenerateOptions;
+			options: Needle2CompletionOptions;
 	  }
-	| { id: number; operation: "load"; weights: Needle2SerializedBinarySource }
-	| { id: number; operation: "reset" }
-	| { id: number; operation: "dispose" };
+	| { operation: "load"; weights: Needle2SerializedBinarySource }
+	| { operation: "reset" }
+	| { operation: "dispose" };
 
 export type Needle2WorkerResult = Needle2NativeGeneration | undefined;
 
@@ -55,13 +248,8 @@ export type Needle2SerializedError = {
 };
 
 export type Needle2WorkerResponse =
-	| { id: number; success: true; result?: Needle2WorkerResult }
-	| { id: number; success: false; error: Needle2SerializedError };
-
-type WithoutID<Request> = Request extends { id: number }
-	? Omit<Request, "id">
-	: never;
-type Needle2WorkerRequestInput = WithoutID<Needle2WorkerRequest>;
+	| { success: true; result?: Needle2WorkerResult }
+	| { success: false; error: Needle2SerializedError };
 
 type WorkerConnection = {
 	postMessage(message: Needle2WorkerRequest): void;
@@ -78,14 +266,15 @@ type PendingRequest = {
 export class Needle2WorkerBackend implements Needle2Backend {
 	readonly provider = "worker" as const;
 
-	private readonly pending = new Map<number, PendingRequest>();
-	private nextRequestID = 0;
+	private readonly operations = new PromiseQueue();
+	private pending: PendingRequest | undefined;
 	private terminalError: Error | undefined;
 	private disposePromise: Promise<void> | undefined;
 
 	static async create(
 		wasm: Needle2BinarySource,
 		weights: Needle2BinarySource,
+		initialization: Needle2ResolvedInitialization,
 		options?: Needle2WorkerOptions,
 		engine: Needle2Engine = "wasm",
 	): Promise<Needle2WorkerBackend> {
@@ -100,6 +289,7 @@ export class Needle2WorkerBackend implements Needle2Backend {
 				wasm: serializeBinarySource(wasm),
 				weights: serializeBinarySource(weights),
 				engine,
+				initialization,
 			});
 			return backend;
 		} catch (error) {
@@ -113,33 +303,40 @@ export class Needle2WorkerBackend implements Needle2Backend {
 		connection.onFailure((error) => this.handleFailure(error));
 	}
 
-	async generate(
-		options: Needle2ResolvedGenerateOptions,
-	): Promise<Needle2NativeGeneration> {
-		const result = await this.request({ operation: "generate", options });
-		if (!result) {
-			throw new Needle2Error(
-				"worker-protocol",
-				"The Needle 2 worker returned no generation.",
-			);
-		}
-		return result;
+	withModel<Result>(
+		operation: (complete: Needle2Complete) => Promise<Result>,
+	): Promise<Result> {
+		return this.operations.enqueue(() =>
+			operation((options) => this.complete(options)),
+		);
 	}
 
-	async load(weights: Needle2BinarySource): Promise<void> {
-		await this.request({
-			operation: "load",
-			weights: serializeBinarySource(weights),
+	load(weights: Needle2BinarySource): Promise<void> {
+		return this.operations.enqueue(async () => {
+			await this.request({
+				operation: "load",
+				weights: serializeBinarySource(weights),
+			});
 		});
 	}
 
-	async reset(): Promise<void> {
-		await this.request({ operation: "reset" });
+	reset(): Promise<void> {
+		return this.operations.enqueue(async () => {
+			await this.request({ operation: "reset" });
+		});
 	}
 
 	dispose(): Promise<void> {
-		this.disposePromise ??= this.disposeInternal();
+		this.disposePromise ??= this.operations.enqueue(() =>
+			this.disposeInternal(),
+		);
 		return this.disposePromise;
+	}
+
+	private async complete(
+		options: Needle2CompletionOptions,
+	): Promise<Needle2NativeGeneration> {
+		return this.request({ operation: "generate", options }) as Promise<Needle2NativeGeneration>;
 	}
 
 	private async disposeInternal(): Promise<void> {
@@ -161,29 +358,28 @@ export class Needle2WorkerBackend implements Needle2Backend {
 		}
 	}
 
-	private request(
-		request: Needle2WorkerRequestInput,
-	): Promise<Needle2WorkerResult> {
+	private request(request: Needle2WorkerRequest): Promise<Needle2WorkerResult> {
 		if (this.terminalError) {
 			return Promise.reject(this.terminalError);
 		}
-		const id = this.nextRequestID++;
 		return new Promise((resolve, reject) => {
-			this.pending.set(id, { resolve, reject });
+			this.pending = { resolve, reject };
 			try {
-				this.connection.postMessage({ ...request, id } as Needle2WorkerRequest);
+				this.connection.postMessage(request);
 			} catch (error) {
-				this.pending.delete(id);
+				this.pending = undefined;
 				reject(error);
 			}
 		});
 	}
 
 	private receive(response: Needle2WorkerResponse): void {
-		const pending = this.pending.get(response.id);
-		if (!pending) return;
+		const pending = this.pending;
+		if (!pending) {
+			return;
+		}
 
-		this.pending.delete(response.id);
+		this.pending = undefined;
 		if (response.success) {
 			pending.resolve(response.result);
 		} else {
@@ -192,8 +388,8 @@ export class Needle2WorkerBackend implements Needle2Backend {
 	}
 
 	private failPending(error: Error): void {
-		for (const pending of this.pending.values()) pending.reject(error);
-		this.pending.clear();
+		this.pending?.reject(error);
+		this.pending = undefined;
 	}
 
 	private handleFailure(error: Error): void {
@@ -284,4 +480,14 @@ function deserializeError(error: Needle2SerializedError): Error {
 	result.name = error.name;
 	if (error.stack) result.stack = error.stack;
 	return result;
+}
+
+function binarySourceIdentity(source: Needle2BinarySource): WeightIdentity {
+	if (typeof source === "string") {
+		return source;
+	}
+	if (source instanceof URL) {
+		return source.href;
+	}
+	return source;
 }

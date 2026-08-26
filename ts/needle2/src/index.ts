@@ -1,4 +1,4 @@
-export { Needle2Error, Needle2ProtocolError } from "./internal.js";
+export { Needle2Error } from "./internal.js";
 export type {
 	Needle2BinarySource,
 	Needle2Factory,
@@ -21,31 +21,16 @@ export type {
 	Needle2GenerationMetrics,
 	Needle2GenerationResult,
 	Needle2GenerationSuccess,
-	Needle2Initialization,
-	Needle2InvokedToolCall,
 	Needle2LoopOptions,
 	Needle2LoopResponse,
 	Needle2LoopStep,
 	Needle2LoopTerminationCause,
-	Needle2LoopTurnParameters,
-	Needle2RawGeneration,
 	Needle2ResponseType,
-	Needle2ResolvedGenerateOptions,
 	Needle2Tool,
-	Needle2ToolCallFailure,
 	Needle2ToolDefinition,
 	Needle2ToolHandler,
 	Needle2ToolOutput,
-	Needle2UninvokedToolCall,
 } from "./runtime.js";
-export type {
-	Needle2Backend,
-	Needle2NativeGeneration,
-	Needle2SerializedError,
-	Needle2WorkerRequest,
-	Needle2WorkerResponse,
-	Needle2WorkerResult,
-} from "./backend.js";
 export type {
 	Needle2SystemFactOverrides,
 	Needle2SystemFactProvider,
@@ -54,5 +39,5 @@ export type {
 	Needle2SystemValues,
 	Needle2SystemValuesOptions,
 } from "./system.js";
-export { Needle2Runtime, Needle2ToolCallError, needle2 } from "./runtime.js";
-export { defaultSystemValues, defaultSystemPrompt } from "./system.js";
+export { Needle2Runtime, needle2 } from "./runtime.js";
+export { defaultSystemValues, formatSystemPrompt } from "./system.js";

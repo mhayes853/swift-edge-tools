@@ -1,10 +1,10 @@
 import { describe, expect, test } from "vitest";
-import { defaultSystemValues, defaultSystemPrompt } from "@edge-tools/needle2";
+import { defaultSystemValues, formatSystemPrompt } from "@edge-tools/needle2";
 
 describe("Needle2 system facts tests", () => {
 	test("formats standard and arbitrary facts in a stable order", () => {
 		expect(
-			defaultSystemPrompt({
+			formatSystemPrompt({
 				assistant: "Needle",
 				date: "2026-07-21 Tue 14:30",
 				"account tier": "pro",

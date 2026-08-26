@@ -23,7 +23,7 @@ struct `Needle2JSEngine tests` {
   }
 
   @Test
-  func `Generates Real Tool Call Through Worker Runtime`() async throws {
+  func `Generates Real Tool Calls Across Context Reset`() async throws {
     let createRuntime = try #require(JSObject.global["edgeToolsNeedle2Runtime"].object)
     let engine = try await Needle2JSEngine(createRuntime: createRuntime)
     let context = engine.context { Needle2SendEmailTool() }
@@ -50,6 +50,18 @@ struct `Needle2JSEngine tests` {
     let input = try #require(call.input as? Needle2SendEmailTool.Input)
     #expect(input.address == "blob@gmail.com")
     #expect(input.body.lowercased().contains("hiking"))
+
+    try await engine.reset(context)
+    let thermostatContext = engine.context { Needle2SetThermostatTool() }
+    let thermostatGeneration = try await session.generate(
+      prompt: "Set the thermostat to 21 degrees.",
+      context: thermostatContext,
+      shouldInvokeTools: { _ in false }
+    )
+    let thermostatCall = try #require(thermostatGeneration.toolCalls.first)
+    let thermostatInput = try #require(thermostatCall.input as? Needle2SetThermostatTool.Input)
+    #expect(thermostatGeneration.engineGeneration.toolCalls.first?.name == "set_thermostat")
+    #expect(thermostatInput.temperature == 21)
   }
 }
 
@@ -75,5 +87,19 @@ private struct Needle2SendEmailTool: EdgeTool {
 
   func invoke(input: Input) async throws -> String {
     "Sent email to \(input.address)"
+  }
+}
+
+private struct Needle2SetThermostatTool: EdgeTool {
+  @EdgeToolsGenerable
+  struct Input: Sendable {
+    var temperature: Int
+  }
+
+  let name = "setThermostat"
+  let description = "Sets the thermostat temperature."
+
+  func invoke(input: Input) async throws -> String {
+    "Set thermostat to \(input.temperature)"
   }
 }
