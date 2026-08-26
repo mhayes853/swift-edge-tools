@@ -47,7 +47,7 @@ const weatherTools = [
 	] as const;
 
 afterEach(async () => {
-	await Promise.all(runtimes.splice(0).map((runtime) => runtime.dispose()));
+	await Promise.allSettled(runtimes.splice(0).map((runtime) => runtime.dispose()));
 });
 
 test("returns the native error response for truncated generation", async () => {
@@ -69,8 +69,6 @@ test("returns the native error response for truncated generation", async () => {
 	expect(result.errorCode).toBe("truncated");
 });
 
-// `as const` keeps the literal tool names when these are spread into a tool with a
-// handler, which is what drives the per-tool typing of `output`.
 const weatherTool = {
 	name: "get_weather",
 	description: "Get the current weather for a city.",
@@ -97,6 +95,12 @@ const emailTool = {
 
 const weatherAndEmailPrompt =
 	"What's the weather in Paris, and email blob@gmail.com about it?";
+const toolCallResponse = JSON.stringify({
+	success: true,
+	type: "call",
+	function_calls: [{ name: "pause", arguments: {} }],
+});
+const textResponse = JSON.stringify({ success: true, type: "respond" });
 
 test("rejects duplicate tool names", async () => {
 	await expect(
@@ -107,131 +111,7 @@ test("rejects duplicate tool names", async () => {
 	).rejects.toMatchObject({ code: "duplicate-tool-name" });
 });
 
-test("invokes tool handlers in parallel and attaches their outputs", async () => {
-	// The first handler only settles once the second has started, so a sequential
-	// implementation deadlocks rather than quietly passing.
-	let startSecond!: () => void;
-	const second = new Promise<void>((resolve) => {
-		startSecond = resolve;
-	});
-	const runtime = await needle2({
-		provider: "direct",
-		tools: [
-			{
-				...weatherTool,
-				call: async (args: { city: string }) => {
-					await second;
-					return { celsius: 21, city: args.city };
-				},
-			},
-			{
-				...emailTool,
-				call: (args: { address: string }) => {
-					startSecond();
-					return `sent to ${args.address}`;
-				},
-			},
-		],
-	});
-	runtimes.push(runtime);
-
-	const result = await runtime.generate({
-		prompt: weatherAndEmailPrompt,
-	});
-
-	expect(result.success).toBe(true);
-	if (!result.success) {
-		throw new Error("Expected Needle 2 to call both tools.");
-	}
-	expect(result.functionCalls.map((call) => call.name)).toEqual([
-		"get_weather",
-		"send_email",
-	]);
-	expect(result.functionCalls[0]?.output).toEqual({
-		celsius: 21,
-		city: "Paris",
-	});
-	expect(result.functionCalls[1]?.output).toBe("sent to blob@gmail.com");
-});
-
-test("leaves tools declared without a handler uninvoked", async () => {
-	const runtime = await needle2({
-		provider: "direct",
-		tools: [{ ...weatherTool, call: () => "sunny" }, emailTool],
-	});
-	runtimes.push(runtime);
-
-	const result = await runtime.generate({
-		prompt: weatherAndEmailPrompt,
-	});
-
-	expect(result.success).toBe(true);
-	if (!result.success) {
-		throw new Error("Expected Needle 2 to call both tools.");
-	}
-	expect(result.functionCalls[0]).toMatchObject({
-		name: "get_weather",
-		output: "sunny",
-	});
-	expect(result.functionCalls[1]).not.toHaveProperty("output");
-});
-
-test("reports every failed tool handler without losing the generation", async () => {
-	const runtime = await needle2({
-		provider: "direct",
-		tools: [
-			{
-				...weatherTool,
-				call: () => {
-					throw new Error("the weather station is down");
-				},
-			},
-			{ ...emailTool, call: () => "sent" },
-		],
-	});
-	runtimes.push(runtime);
-
-	const failure = await runtime
-		.generate({
-			prompt: weatherAndEmailPrompt,
-		})
-		.catch((error: unknown) => error);
-
-	expect(failure).toMatchObject({
-		code: "tool-call-failed",
-		failures: [{ name: "get_weather", index: 0 }],
-		generation: { success: true, type: "call" },
-	});
-});
-
-test("skips tool invocation entirely for a failed generation", async () => {
-	let invocations = 0;
-	const runtime = await needle2({
-		provider: "direct",
-		tools: [
-			{
-				...weatherTool,
-				call: () => {
-					invocations += 1;
-					return "sunny";
-				},
-			},
-			emailTool,
-		],
-	});
-	runtimes.push(runtime);
-
-	const result = await runtime.generate({
-		prompt: weatherAndEmailPrompt,
-		maxTokens: 4,
-	});
-
-	expect(result.success).toBe(false);
-	expect(result.functionCalls).toEqual([]);
-	expect(invocations).toBe(0);
-});
-
-test("leaves tool handlers uninvoked when generating a non-invoking turn", async () => {
+test("generate leaves tool execution to the caller", async () => {
 	let invocations = 0;
 	const runtime = await needle2({
 		provider: "direct",
@@ -248,7 +128,7 @@ test("leaves tool handlers uninvoked when generating a non-invoking turn", async
 	});
 	runtimes.push(runtime);
 
-	const generation = await runtime.generateNonInvoking({
+	const generation = await runtime.generate({
 		prompt: weatherAndEmailPrompt,
 	});
 
@@ -284,10 +164,6 @@ test("drives the tool loop until the model responds", async () => {
 	expect(response.steps[1]?.generation.functionCalls).toEqual([]);
 	expect(response.steps[1]?.toolResponses).toEqual([]);
 	expect(response.response).toBe(response.steps[1]?.generation);
-	expect(response.results).toEqual([
-		{ celsius: 21, condition: "sunny" },
-		{ status: "sent" },
-	]);
 });
 
 test("feeds a failed tool handler back to the model instead of throwing", async () => {
@@ -379,15 +255,43 @@ test("serializes direct runtimes with different initializations", async () => {
 		prompt: "what's the weather in Paris?",
 	};
 
-	const [thermostatResult, weatherResult] = await Promise.all([
+	const settled = await Promise.allSettled([
 		thermostat.generate(thermostatPrompt),
 		weather.generate(weatherPrompt),
 	]);
+	const [thermostatResult, weatherResult] = settled.map((result) => {
+		if (result.status === "rejected") {
+			throw result.reason;
+		}
+		return result.value;
+	});
 	expect(thermostatResult.functionCalls[0]?.name).toBe("set_thermostat");
 	expect(weatherResult.functionCalls[0]?.name).toBe("get_weather");
 	expect(
 		(await thermostat.generate(thermostatPrompt)).functionCalls[0]?.name,
 	).toBe("set_thermostat");
+});
+
+test("keeps a direct model leased while a tool loop is suspended", async () => {
+	const prompts: string[] = [];
+	const factory = scriptedFactory((prompt) => {
+		prompts.push(prompt);
+		return prompt === "loop" ? toolCallResponse : textResponse;
+	});
+	const paused = await pausingRuntime(factory);
+	const second = await directRuntime(factory);
+	runtimes.push(paused.runtime, second);
+
+	const loop = paused.runtime.runLoop({ prompt: "loop" });
+	await paused.started;
+	const generation = second.generate({ prompt: "other" });
+	await new Promise((resolve) => setTimeout(resolve, 0));
+	const promptsWhileSuspended = [...prompts];
+	paused.release();
+	const completed = await Promise.allSettled([loop, generation]);
+
+	expect(promptsWhileSuspended).toEqual(["loop"]);
+	expect(completed.every((result) => result.status === "fulfilled")).toBe(true);
 });
 
 describe.each([
@@ -419,7 +323,7 @@ describe.each([
 		});
 	});
 
-	test("invokes tool handlers across the provider boundary", async () => {
+	test("runs tool handlers across the provider boundary", async () => {
 		const runtime = await needle2({
 			provider,
 			tools: [
@@ -440,15 +344,12 @@ describe.each([
 		});
 		runtimes.push(runtime);
 
-		const result = await runtime.generate({
+		const result = await runtime.runLoop({
 			prompt: "set the thermostat to 21 degrees",
+			maxTurns: 1,
 		});
 
-		expect(result.success).toBe(true);
-		if (!result.success) {
-			throw new Error("Expected Needle 2 to call the thermostat tool.");
-		}
-		expect(result.functionCalls[0]?.output).toEqual({
+		expect(result.steps[0]?.toolResponses[0]).toEqual({
 			status: "ok",
 			temperature: 21,
 		});
@@ -500,6 +401,39 @@ test("shares initial weights but reloads an explicitly loaded source", async () 
 	expect(loadCount).toBe(2);
 });
 
+test("initializes a direct runtime again after reset", async () => {
+	let initializationCount = 0;
+	const factory: Needle2Factory = () => ({
+		HEAPU8: new Uint8Array(65_537),
+		_needle_load: () => 0,
+		_needle_reset() {},
+		_malloc: () => 1,
+		_free() {},
+		UTF8ToString: () => '{"success":true,"type":"respond"}',
+		ccall: (name: string) => {
+			if (name === "needle_init") {
+				initializationCount += 1;
+			}
+			return name === "needle_complete" ? 1 : 0;
+		},
+	});
+	const runtime = await needle2({
+		provider: "direct",
+		factory,
+		wasm: new Uint8Array([0]),
+		weights: new Uint8Array([1]),
+	});
+	runtimes.push(runtime);
+
+	await runtime.generate({ prompt: "first" });
+	await runtime.generate({ prompt: "second" });
+	expect(initializationCount).toBe(1);
+
+	await runtime.reset();
+	await runtime.generate({ prompt: "third" });
+	expect(initializationCount).toBe(2);
+});
+
 describe.each([
 	"direct",
 	"worker",
@@ -514,3 +448,63 @@ describe.each([
 		expect(result.functionCalls[0]?.name).toBe("set_thermostat");
 	});
 });
+
+function scriptedFactory(
+	response: (prompt: string) => string,
+): Needle2Factory {
+	let output = textResponse;
+	return () => ({
+		HEAPU8: new Uint8Array(65_537),
+		_needle_load: () => 0,
+		_needle_reset() {},
+		_malloc: () => 1,
+		_free() {},
+		UTF8ToString: () => output,
+		ccall: (name: string, ...args: unknown[]) => {
+			if (name === "needle_complete") {
+				const argumentValues = args[2] as readonly unknown[];
+				output = response(String(argumentValues[0]));
+				return 1;
+			}
+			return 0;
+		},
+	});
+}
+
+async function pausingRuntime(factory: Needle2Factory) {
+	let toolStarted!: () => void;
+	const started = new Promise<void>((resolve) => {
+		toolStarted = resolve;
+	});
+	let release!: () => void;
+	const released = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	const runtime = await needle2({
+		provider: "direct",
+		factory,
+		wasm: new Uint8Array([0]),
+		weights: new Uint8Array([1]),
+		tools: [
+			{
+				name: "pause",
+				parameters: { type: "object", properties: {} },
+				call: async () => {
+					toolStarted();
+					await released;
+					return "done";
+				},
+			},
+		],
+	});
+	return { runtime, started, release };
+}
+
+function directRuntime(factory: Needle2Factory) {
+	return needle2({
+		provider: "direct",
+		factory,
+		wasm: new Uint8Array([0]),
+		weights: new Uint8Array([1]),
+	});
+}

@@ -9,8 +9,8 @@ const browsers: Browser[] = [];
 const servers: Server[] = [];
 
 afterEach(async () => {
-  await Promise.all(browsers.splice(0).map((browser) => browser.close()));
-  await Promise.all(servers.splice(0).map(closeServer));
+  await Promise.allSettled(browsers.splice(0).map((browser) => browser.close()));
+  await Promise.allSettled(servers.splice(0).map(closeServer));
 });
 
 test("an ordinary HTML page runs with one standalone JavaScript file", async () => {

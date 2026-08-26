@@ -69,16 +69,14 @@ function copyAssets(): Plugin {
     async writeBundle() {
       const outputDirectory = resolve(import.meta.dirname, "dist");
       await mkdir(outputDirectory, { recursive: true });
-      await Promise.all([
-        copyFile(
-          resolve(import.meta.dirname, "assets/needle.wasm"),
-          resolve(outputDirectory, "needle.wasm")
-        ),
-        copyFile(
-          resolve(import.meta.dirname, "assets/needle2.cact"),
-          resolve(outputDirectory, "needle2.cact")
-        )
-      ]);
+      await copyFile(
+        resolve(import.meta.dirname, "assets/needle.wasm"),
+        resolve(outputDirectory, "needle.wasm")
+      );
+      await copyFile(
+        resolve(import.meta.dirname, "assets/needle2.cact"),
+        resolve(outputDirectory, "needle2.cact")
+      );
     }
   };
 }

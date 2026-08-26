@@ -7,7 +7,7 @@ import { build } from "vite";
 const outputDirectories: string[] = [];
 
 afterEach(async () => {
-  await Promise.all(
+  await Promise.allSettled(
     outputDirectories.splice(0).map((directory) =>
       rm(directory, { recursive: true, force: true })
     )
@@ -33,12 +33,14 @@ test("a consumer Vite build emits every runtime asset", async () => {
 
 async function recursiveFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true });
-  return (
-    await Promise.all(
-      entries.map((entry) => {
-        const path = join(directory, entry.name);
-        return entry.isDirectory() ? recursiveFiles(path) : [path];
-      })
-    )
-  ).flat();
+  const results = await Promise.allSettled(
+    entries.map((entry) => {
+      const path = join(directory, entry.name);
+      return entry.isDirectory() ? recursiveFiles(path) : [path];
+    })
+  );
+  return results.flatMap((result) => {
+    if (result.status === "rejected") throw result.reason;
+    return result.value;
+  });
 }

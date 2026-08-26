@@ -29,10 +29,10 @@ const needle = await needle2({
   tools: [getWeather]
 })
 
-const results = await needle.generate({
+const response = await needle.runLoop({
   prompt: "What is the weather in San Francisco?"
 })
-console.log(results.functionCalls[0].output)
+console.log(response.steps[0].toolResponses[0])
 ```
 
 ### Zod

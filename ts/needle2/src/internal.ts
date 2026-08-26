@@ -19,13 +19,6 @@ export class Needle2Error extends Error {
 	}
 }
 
-export class Needle2ProtocolError extends Needle2Error {
-	constructor(message: string, options?: ErrorOptions) {
-		super("invalid-response", message, options);
-		this.name = "Needle2ProtocolError";
-	}
-}
-
 export class PromiseQueue {
 	private tail: Promise<void> = Promise.resolve();
 

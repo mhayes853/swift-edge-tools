@@ -1,10 +1,10 @@
 import { needle2 } from "@edge-tools/needle2";
 import type { Needle2Runtime } from "@edge-tools/needle2";
 
-// Type-level coverage for the inference `generate` performs over its tool list.
+// Type-level coverage for the inference performed over each tool list.
 // Nothing here runs; `npm run test:types` fails if any assertion stops holding.
 
-export async function infersToolOutputsPerTool(): Promise<void> {
+export async function infersToolArgumentsPerTool(): Promise<void> {
 	const runtime = await needle2({
 		provider: "direct",
 		tools: [
@@ -38,25 +38,16 @@ export async function infersToolOutputsPerTool(): Promise<void> {
 		prompt: "weather in Paris, then email blob@gmail.com about it",
 	});
 
-	if (!result.success) {
-		// @ts-expect-error a failed generation never invokes handlers
-		result.functionCalls[0]?.output;
-		return;
-	}
-
 	for (const call of result.functionCalls) {
 		if (call.name === "get_weather") {
-			const celsius: number = call.output.celsius;
 			const city: string = call.arguments.city;
-			void celsius;
 			void city;
 		} else if (call.name === "send_email") {
-			const sent: string = call.output;
-			void sent;
-		} else {
-			// @ts-expect-error a tool declared without `call` produces no output
-			call.output;
+			const address: string = call.arguments.address;
+			void address;
 		}
+		// @ts-expect-error generate never invokes handlers
+		call.output;
 	}
 }
 
@@ -105,35 +96,5 @@ export async function keepsLoopOutputsInToolResponses(): Promise<void> {
 			// @ts-expect-error loop outputs live in `toolResponses`, not on the call
 			call.output;
 		}
-	}
-}
-
-export async function omitsOutputsFromNonInvokingGenerations(): Promise<void> {
-	const runtime = await needle2({
-		provider: "direct",
-		tools: [
-				{
-					name: "get_weather",
-					parameters: {
-						type: "object",
-						properties: { city: { type: "string" } },
-						required: ["city"],
-					},
-					call: async (args: { city: string }) => ({ celsius: 21, city: args.city }),
-				},
-		],
-	});
-	const generation = await runtime.generateNonInvoking({
-		prompt: "weather in Paris",
-	});
-
-	if (!generation.success) {
-		return;
-	}
-	for (const call of generation.functionCalls) {
-		const city: string = call.arguments.city;
-		void city;
-		// @ts-expect-error generateNonInvoking never invokes handlers, so there is no output
-		call.output;
 	}
 }
