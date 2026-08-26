@@ -1,20 +1,23 @@
 #if Needle2 && JS && canImport(JavaScriptKit)
   import EdgeToolsCore
-  import _Concurrency
   import JavaScriptEventLoop
   import JavaScriptKit
 
   // MARK: - Needle2JSProvider
 
-  @nonexhaustive
   public enum Needle2JSProvider: String, Hashable, Sendable {
     case worker
     case direct
   }
 
+  public enum Needle2JSRuntimeEngine: String, Hashable, Sendable {
+    case wasm
+    case native
+    case automatic = "auto"
+  }
+
   // MARK: - Needle2JSBinarySource
 
-  @nonexhaustive
   public enum Needle2JSBinarySource: Hashable, Sendable {
     case location(String)
     case bytes([UInt8])
@@ -24,21 +27,22 @@
 
   public struct Needle2JSRuntimeConfiguration: Hashable, Sendable {
     public var provider: Needle2JSProvider
+    public var engine: Needle2JSRuntimeEngine
     public var wasm: Needle2JSBinarySource?
     public var weights: Needle2JSBinarySource?
 
     public init(
       provider: Needle2JSProvider = .worker,
+      engine: Needle2JSRuntimeEngine = .wasm,
       wasm: Needle2JSBinarySource? = nil,
       weights: Needle2JSBinarySource? = nil
     ) {
       self.provider = provider
+      self.engine = engine
       self.wasm = wasm
       self.weights = weights
     }
   }
-
-  public typealias Needle2JSRuntimeFactory = JSObject
 
   // MARK: - Needle2JSEngine
 
@@ -48,39 +52,30 @@
     public typealias Prompt = Needle2Prompt
     public typealias GenerateParameters = Needle2GenerateParameters
 
-    private let runtime: JSRemote<JSObject>
-    private let defaultContext: Context
-    private let activeContextIdentifier = Lock<UInt64?>(nil)
-
-    public init(
-      createRuntime: sending Needle2JSRuntimeFactory,
-      configuration: Needle2JSRuntimeConfiguration = Needle2JSRuntimeConfiguration()
-    ) async throws {
-      let factory = JSRemote(createRuntime)
-      self.runtime = try await factory.promiseValue(
-        transform: Self.remoteRuntime,
-        failure: Self.error
-      ) { factory in
-        factory.promisingCall(
-          arguments: [Self.configurationObject(configuration).jsValue]
-        )
-      }
-      self.defaultContext = Context(parameters: ContextParameters(), tools: [])
+    private struct State {
+      var configuration: Needle2JSRuntimeConfiguration
+      var activeContextIdentifier: UInt64?
+      var contextParameters: Needle2ContextParameters?
+      var runtime: JSRemote<JSObject>?
     }
 
-    public init(runtime: sending JSObject) throws {
-      self.runtime = JSRemote(try Needle2JSRuntimeObject(runtime).object)
+    private let createRuntime: JSRemote<JSObject>
+    private let defaultContext: Context
+    private let state: Lock<State>
+
+    public init(
+      createRuntime: sending JSObject,
+      configuration: Needle2JSRuntimeConfiguration = Needle2JSRuntimeConfiguration()
+    ) async throws {
+      self.createRuntime = JSRemote(createRuntime)
       self.defaultContext = Context(parameters: ContextParameters(), tools: [])
+      self.state = Lock(State(configuration: configuration))
     }
 
     deinit {
-      let runtime = self.runtime
-      Task { @concurrent in
-        await runtime.withJSObject { runtime in
-          let receiver = runtime["receiver"].object!
-          let dispose = runtime["dispose"].object!
-          JSPromise(unsafelyWrapping: dispose.promisingCall(this: receiver).object!)
-            .catch { _ in .undefined }
+      if let runtime = self.state.withBorrowedLock({ $0.runtime }) {
+        Task {
+          try? await Self.dispose(runtime)
         }
       }
     }
@@ -107,41 +102,27 @@
       channel: sending EdgeToolsGenerationChannel
     ) throws -> AnyGenerationTask {
       let maximumTokenCount = parameters.maxTokens ?? 256
-      guard maximumTokenCount > 0 else {
-        throw Needle2Error(
-          code: .invalidGenerateParameters,
-          message: "Needle 2 maxTokens must be greater than zero."
-        )
-      }
-      guard parameters.outputCapacity > 0 else {
-        throw Needle2Error(
-          code: .invalidGenerateParameters,
-          message: "Needle 2 outputCapacity must be greater than zero."
-        )
-      }
-
       return AnyGenerationTask { stopper in
         let contextParameters = try context.begin()
         let tools = context.tools.map { $0.definition }
         defer { context.finish() }
-        try self.claim(context)
-        let request = Needle2JSRequest(
-          prompt: prompt.needle2Input,
-          systemPrompt: contextParameters.system.formatted(),
-          tools: tools.needle2Value,
-          toolIndexPath: contextParameters.toolIndexPath,
-          maximumTokenCount: maximumTokenCount,
-          outputCapacity: parameters.outputCapacity
+        let runtime = try await self.runtime(
+          contextIdentifier: context.identifier,
+          parameters: contextParameters,
+          tools: tools
         )
-        let response = try await self.runtime.promiseValue(
+        let response = try await runtime.promiseValue(
           transform: Needle2Response.init(javaScriptValue:),
           failure: Self.error
         ) { runtime in
-          Self.invoke(
-            runtime: runtime,
-            function: "generate",
-            arguments: [Self.requestObject(request).jsValue]
-          )
+          let request = JSObject()
+          request["prompt"] = .string(prompt.needle2Input)
+          request["maxTokens"] = .number(Double(maximumTokenCount))
+          return runtime["generate"].object!
+            .promisingCall(
+              this: runtime,
+              arguments: [request.jsValue]
+            )
         }
         if !response.success {
           throw Needle2Error(
@@ -164,18 +145,14 @@
     }
 
     public func load(_ source: Needle2JSBinarySource) async throws {
-      guard self.activeContextIdentifier.withBorrowedLock({ $0 == nil }) else {
-        throw Needle2Error(
-          code: .activeContext,
-          message: "Reset the active Needle 2 context before loading new weights."
-        )
-      }
-      try await self.runtime.promiseValue(failure: Self.error) { runtime in
-        Self.invoke(
-          runtime: runtime,
-          function: "load",
-          arguments: [Self.jsValue(source)]
-        )
+      try self.state.withLock { state in
+        guard state.activeContextIdentifier == nil else {
+          throw Needle2Error(
+            code: .activeContext,
+            message: "Reset the active Needle 2 context before loading new weights."
+          )
+        }
+        state.configuration.weights = source
       }
     }
 
@@ -183,9 +160,9 @@
       guard !context.isResponding else {
         throw EdgeToolsError.contextInUse
       }
-      try self.activeContextIdentifier.withLock { activeContextIdentifier in
-        guard let activeContextIdentifier else {
-          return
+      let runtime: JSRemote<JSObject>? = try self.state.withBorrowedLock { state in
+        guard let activeContextIdentifier = state.activeContextIdentifier else {
+          return nil
         }
         guard activeContextIdentifier == context.identifier else {
           throw Needle2Error(
@@ -193,11 +170,16 @@
             message: "Another Needle 2 context has an active conversation."
           )
         }
+        return state.runtime
       }
-      try await self.runtime.promiseValue(failure: Self.error) { runtime in
-        Self.invoke(runtime: runtime, function: "reset", arguments: [])
+      if let runtime {
+        try await Self.dispose(runtime)
       }
-      self.activeContextIdentifier.withLock { $0 = nil }
+      self.state.withLock { state in
+        state.activeContextIdentifier = nil
+        state.contextParameters = nil
+        state.runtime = nil
+      }
     }
   }
 
@@ -206,69 +188,106 @@
   // MARK: - JavaScript Bridge
 
   extension Needle2JSEngine {
-    private func claim(_ context: Context) throws {
-      try self.activeContextIdentifier.withLock { activeIdentifier in
-        guard let activeIdentifier else {
-          activeIdentifier = context.identifier
-          return
-        }
-        guard activeIdentifier == context.identifier else {
+    private func runtime(
+      contextIdentifier: UInt64,
+      parameters: Needle2ContextParameters,
+      tools: [EdgeToolDefinition]
+    ) async throws -> JSRemote<JSObject> {
+      if let runtime = try self.state.withLock({ state -> JSRemote<JSObject>? in
+        guard state.activeContextIdentifier.map({ $0 == contextIdentifier }) ?? true else {
           throw Needle2Error(
             code: .activeContext,
-            message: "Another Needle 2 context has an active conversation. Reset it before using this context."
+            message:
+              "Another Needle 2 context has an active conversation. Reset it before using this context."
           )
         }
+        guard state.contextParameters.map({ $0 == parameters }) ?? true else {
+          throw Needle2Error(
+            code: .initializationChanged,
+            message: "Reset the Needle 2 context before changing its system values or tool index."
+          )
+        }
+        state.activeContextIdentifier = contextIdentifier
+        state.contextParameters = parameters
+        return state.runtime
+      }) {
+        return runtime
+      }
+
+      do {
+        let configuration = self.state.withBorrowedLock { $0.configuration }
+        let runtime = try await self.createRuntime.promiseValue(
+          transform: Self.remoteRuntime,
+          failure: Self.error
+        ) { createRuntime in
+          createRuntime.promisingCall(
+            arguments: [
+              Self.configurationObject(
+                configuration,
+                parameters: parameters,
+                tools: tools
+              )
+              .jsValue
+            ]
+          )
+        }
+        self.state.withLock { $0.runtime = runtime }
+        return runtime
+      } catch {
+        self.state.withLock { state in
+          state.activeContextIdentifier = nil
+          state.contextParameters = nil
+        }
+        throw error
       }
     }
 
     private static func remoteRuntime(
       _ value: JSValue
     ) throws -> JSRemote<JSObject> {
-      JSRemote(try Needle2JSRuntimeObject(value).object)
+      guard let runtime = value.object else {
+        throw Needle2Error(
+          code: .invalidJavaScriptRuntime,
+          message: "The Needle 2 factory did not resolve to an object."
+        )
+      }
+      return JSRemote(runtime)
     }
 
     private static func error(_ value: JSValue?) -> Needle2Error {
-      guard let value else {
-        return Needle2Error(
-          code: .invalidJavaScriptRuntime,
-          message: "The Needle 2 JavaScript operation did not return a Promise."
-        )
-      }
-      let object = value.object
+      let object = value?.object
       return Needle2Error(
         code: object?["code"].string.map(Needle2Error.Code.init(rawValue:))
           ?? .generationFailed,
-        message: object?["message"].string ?? value.string ?? "Needle 2 JavaScript failed."
+        message: object?["message"].string ?? value?.string ?? "Needle 2 JavaScript failed."
       )
     }
 
-    private static func configurationObject(_ configuration: Needle2JSRuntimeConfiguration)
+    private static func configurationObject(
+      _ configuration: Needle2JSRuntimeConfiguration,
+      parameters: Needle2ContextParameters,
+      tools: [EdgeToolDefinition]
+    )
       -> JSObject
     {
       let object = JSObject()
       object["provider"] = .string(configuration.provider.rawValue)
+      object["engine"] = .string(configuration.engine.rawValue)
       if let wasm = configuration.wasm {
         object["wasm"] = self.jsValue(wasm)
       }
       if let weights = configuration.weights {
         object["weights"] = self.jsValue(weights)
       }
-      return object
-    }
-
-    private static func requestObject(_ request: Needle2JSRequest) -> JSObject {
-      let initialization = JSObject()
-      initialization["systemPrompt"] = .string(request.systemPrompt)
-      initialization["tools"] = request.tools.jsValue
-      if let toolIndexPath = request.toolIndexPath {
-        initialization["toolIndexPath"] = .string(toolIndexPath)
+      let systemValues = JSObject()
+      for (key, value) in parameters.system.values {
+        systemValues[key.rawValue] = .string(value)
       }
-
-      let object = JSObject()
-      object["prompt"] = .string(request.prompt)
-      object["initialization"] = initialization.jsValue
-      object["maxTokens"] = .number(Double(request.maximumTokenCount))
-      object["outputCapacity"] = .number(Double(request.outputCapacity))
+      object["systemValues"] = systemValues.jsValue
+      object["tools"] = tools.needle2Value.jsValue
+      if let toolIndexPath = parameters.toolIndexPath {
+        object["toolIndexPath"] = .string(toolIndexPath)
+      }
       return object
     }
 
@@ -279,59 +298,10 @@
       }
     }
 
-    private static func invoke(
-      runtime: JSObject,
-      function name: String,
-      arguments: [JSValue]
-    ) -> JSValue {
-      runtime[name].object!
-        .promisingCall(
-          this: runtime["receiver"].object!,
-          arguments: arguments
-        )
-    }
-  }
-
-  // MARK: - Request
-
-  private struct Needle2JSRequest: Sendable {
-    var prompt: String
-    var systemPrompt: String
-    var tools: EdgeToolsValue
-    var toolIndexPath: String?
-    var maximumTokenCount: Int
-    var outputCapacity: Int
-  }
-
-  // MARK: - Runtime Object
-
-  private struct Needle2JSRuntimeObject {
-    var object: JSObject
-
-    init(_ value: JSValue) throws {
-      guard let object = value.object else {
-        throw Needle2Error(
-          code: .invalidJavaScriptRuntime,
-          message: "The Needle 2 factory did not resolve to an object."
-        )
+    private static func dispose(_ runtime: JSRemote<JSObject>) async throws {
+      try await runtime.promiseValue(failure: Self.error) { runtime in
+        runtime["dispose"].object!.promisingCall(this: runtime)
       }
-      try self.init(object)
-    }
-
-    init(_ runtime: JSObject) throws {
-      let object = JSObject()
-      object["receiver"] = runtime.jsValue
-      for name in ["generate", "load", "reset", "dispose"] {
-        guard let function = runtime[name].object else {
-          throw Needle2Error(
-            code: .invalidJavaScriptRuntime,
-            message:
-              "The Needle 2 JavaScript runtime must expose generate, load, and dispose functions."
-          )
-        }
-        object[name] = function.jsValue
-      }
-      self.object = object
     }
   }
 
