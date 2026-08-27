@@ -521,9 +521,9 @@ extension EngineRunner {
           let context = engine.context(
             MLXContextParameters(
               transcript: EdgeToolsTranscript(
-                messages: request.system.isEmpty ? [] : [.system(request.system)],
-                reasoningEffort: request.reasoning
-              )
+                messages: request.system.isEmpty ? [] : [.system(request.system)]
+              ),
+              reasoningEffort: request.reasoning
             ),
             tools: definitionTools(request.tools)
           )
@@ -586,10 +586,10 @@ private func llamaContext<Profile: LlamaModelProfile>(
       return context
     }
     let created = engine.context(
-      EdgeToolsTranscript(
-        messages: request.system.isEmpty ? [] : [.system(request.system)],
-        reasoningEffort: request.reasoning
+      transcript: EdgeToolsTranscript(
+        messages: request.system.isEmpty ? [] : [.system(request.system)]
       ),
+      reasoningEffort: request.reasoning,
       tools: definitionTools(request.tools)
     )
     context = created

@@ -9,6 +9,7 @@
   where GenerateParameters == LlamaGenerateParameters, Prompt == EdgeToolsTranscript {
     static func tokenIds(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer,
       addGenerationPrompt: Bool
@@ -18,6 +19,7 @@
   extension LlamaModelProfile {
     public static func tokenIds(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer,
       addGenerationPrompt: Bool
@@ -29,7 +31,10 @@
         messages: prompt.chatTemplateMessages(),
         tools: tools.chatTemplateToolValues,
         addGenerationPrompt: addGenerationPrompt,
-        additionalContext: Self.templateContext(prompt: prompt)
+        additionalContext: Self.templateContext(
+          prompt: prompt,
+          reasoningEffort: reasoningEffort
+        )
       )
       return tokens.map(\.id)
     }

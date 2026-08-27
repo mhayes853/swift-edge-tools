@@ -11,9 +11,9 @@
     @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
     func `Generates Tool Call Through Session`() async throws {
       let engine = Needle2Engine()
-      let context = engine.context { SendEmailTool() }
-      defer { try? engine.reset(context) }
       let session = EdgeToolsSession(engine: engine)
+      let context = session.context { SendEmailTool() }
+      defer { try? engine.reset(context) }
 
       let generation = try await session.generate(
         prompt: "Send an email to blob@gmail.com asking them to go hiking.",
@@ -88,9 +88,9 @@
     @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
     func `Drives Tool Loop Through Needle 2`() async throws {
       let engine = Needle2Engine()
-      let context = engine.context { SendEmailTool() }
-      defer { try? engine.reset(context) }
       let session = EdgeToolsSession(engine: engine)
+      let context = session.context { SendEmailTool() }
+      defer { try? engine.reset(context) }
 
       let response = try await session.runLoop(
         prompt: "Send an email to blob@gmail.com asking them to go hiking.",
@@ -110,9 +110,9 @@
     @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
     func `Failed Tool Feeds Error Back Into Loop`() async throws {
       let engine = Needle2Engine()
-      let context = engine.context { FailingSendEmailTool() }
-      defer { try? engine.reset(context) }
       let session = EdgeToolsSession(engine: engine)
+      let context = session.context { FailingSendEmailTool() }
+      defer { try? engine.reset(context) }
 
       let response = try await session.runLoop(
         prompt: "Send an email to blob@gmail.com asking them to go hiking.",
@@ -131,9 +131,9 @@
     @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
     func `Undecodable Tool Arguments Feed Error Back Into Loop`() async throws {
       let engine = Needle2Engine()
-      let context = engine.context { MismatchedSchemaTool() }
-      defer { try? engine.reset(context) }
       let session = EdgeToolsSession(engine: engine)
+      let context = session.context { MismatchedSchemaTool() }
+      defer { try? engine.reset(context) }
 
       let response = try await session.runLoop(
         prompt: "Set the thermostat in the living room.",
@@ -152,9 +152,9 @@
     @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
     func `Existential Tools Encode Their Loop Responses`() async throws {
       let engine = Needle2Engine()
-      let context = engine.context { SendEmailTool() }
-      defer { try? engine.reset(context) }
       let session = EdgeToolsSession(engine: engine)
+      let context = session.context { SendEmailTool() }
+      defer { try? engine.reset(context) }
 
       let response = try await session.runLoop(
         prompt: "Send an email to blob@gmail.com asking them to go hiking.",
@@ -172,9 +172,9 @@
     @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
     func `Rejects Turn Counts Needle 2 Cannot Support`() async throws {
       let engine = Needle2Engine()
-      let context = engine.context { SendEmailTool() }
-      defer { try? engine.reset(context) }
       let session = EdgeToolsSession(engine: engine)
+      let context = session.context { SendEmailTool() }
+      defer { try? engine.reset(context) }
 
       await #expect(throws: Needle2LoopError.unsupportedTurnCount(9)) {
         try await session.runLoop(prompt: "Hello.", context: context, maximumTurns: 9)

@@ -23,17 +23,20 @@
 
   public struct MLXContextParameters: Hashable, Sendable {
     public var transcript: EdgeToolsTranscript
+    public var reasoningEffort: EdgeToolsReasoningEffort
     public var maxKVSize: Int?
     public var prefillChunkSize: Int
     public var kvCacheQuantization: MLXKVCacheQuantization?
 
     public init(
       transcript: EdgeToolsTranscript = EdgeToolsTranscript(),
+      reasoningEffort: EdgeToolsReasoningEffort = .default,
       maxKVSize: Int? = nil,
       prefillChunkSize: Int = 512,
       kvCacheQuantization: MLXKVCacheQuantization? = nil
     ) {
       self.transcript = transcript
+      self.reasoningEffort = reasoningEffort
       self.maxKVSize = maxKVSize
       self.prefillChunkSize = Swift.max(prefillChunkSize, 1)
       self.kvCacheQuantization = kvCacheQuantization
@@ -71,6 +74,7 @@
     ) {
       self.storage = TranscriptContextStorage(
         transcript: parameters.transcript,
+        reasoningEffort: parameters.reasoningEffort,
         tools: tools,
         model: model,
         engineIdentity: engineIdentity

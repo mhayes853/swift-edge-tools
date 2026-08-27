@@ -137,15 +137,28 @@
     }
 
     public func context(tools: [any EdgeTool]) -> LlamaContext {
-      self.context(EdgeToolsTranscript(), tools: tools)
+      self.context(
+        transcript: EdgeToolsTranscript(),
+        reasoningEffort: .default,
+        tools: tools
+      )
     }
 
     public func context(
       _ transcript: EdgeToolsTranscript,
       tools: [any EdgeTool]
     ) -> LlamaContext {
+      self.context(transcript: transcript, reasoningEffort: .default, tools: tools)
+    }
+
+    public func context(
+      transcript: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
+      tools: [any EdgeTool] = []
+    ) -> LlamaContext {
       LlamaContext(
         transcript: transcript,
+        reasoningEffort: reasoningEffort,
         tools: tools,
         model: self.contextState(),
         engineIdentity: self.identity
@@ -157,9 +170,10 @@
       context: LlamaContext
     ) async throws -> [EdgeToolsToken] {
       try self.validate(context)
-      let transcript = context.storage.transcript(appending: prompt)
+      let prompt = context.storage.prompt(appending: prompt)
       let input = try await self.inputProcessor.inputConcurrently(
-        prompt: transcript,
+        prompt: prompt.transcript,
+        reasoningEffort: prompt.reasoningEffort,
         tools: context.tools.map { $0.definition },
         addGenerationPrompt: true,
         kind: .generation,
@@ -206,6 +220,7 @@
       try snapshot.model.runtime.sequences.warmUp()
       _ = try self.inputProcessor.input(
         prompt: snapshot.transcript,
+        reasoningEffort: snapshot.reasoningEffort,
         tools: context.tools.map { $0.definition },
         addGenerationPrompt: true,
         kind: .generation,
@@ -243,6 +258,7 @@
               grammar: {
                 try Profile.grammar(
                   prompt: $0.transcript,
+                  reasoningEffort: $0.reasoningEffort,
                   tools: tools,
                   parameters: parameters,
                   grammarEngine: self.grammarEngine
@@ -267,9 +283,15 @@
       parameters: Profile.GenerateParameters,
       state: inout ModelGenerationState
     ) async throws -> EdgeToolsGenerationLoop.Preparation {
-      Profile.prepare(prompt: &state.transcript, tools: tools, parser: &parser)
+      Profile.prepare(
+        prompt: &state.transcript,
+        reasoningEffort: state.reasoningEffort,
+        tools: tools,
+        parser: &parser
+      )
       let input = try await self.inputProcessor.inputConcurrently(
         prompt: state.transcript,
+        reasoningEffort: state.reasoningEffort,
         tools: tools,
         addGenerationPrompt: true,
         kind: .generation,
@@ -287,7 +309,11 @@
         )
       }
       let defaultSampling =
-        Profile.defaultSampling(prompt: state.transcript, parameters: parameters)
+        Profile.defaultSampling(
+          prompt: state.transcript,
+          reasoningEffort: state.reasoningEffort,
+          parameters: parameters
+        )
         ?? contextState.configuredSampling
         ?? EdgeToolsFusedSamplingParameters()
 
@@ -361,6 +387,7 @@
       }
       let input = try await self.inputProcessor.inputConcurrently(
         prompt: snapshot.transcript,
+        reasoningEffort: snapshot.reasoningEffort,
         tools: tools,
         addGenerationPrompt: false,
         kind: .prefill,
@@ -433,6 +460,7 @@
       ModelGenerationState(
         contextState: snapshot.model,
         transcript: snapshot.transcript,
+        reasoningEffort: snapshot.reasoningEffort,
         revision: snapshot.revision
       )
     }
@@ -499,20 +527,45 @@
       transcript: EdgeToolsTranscript = EdgeToolsTranscript(),
       reasoningEffort: EdgeToolsReasoningEffort = .default
     ) -> LlamaContext where Engine == LlamaEngine<Profile> {
-      var transcript = transcript
-      transcript.reasoningEffort = reasoningEffort
-      return self.context(transcript)
+      self.engine.context(
+        transcript: transcript,
+        reasoningEffort: reasoningEffort,
+        tools: []
+      )
+    }
+
+    public func context<Profile>(
+      transcript: EdgeToolsTranscript = EdgeToolsTranscript(),
+      reasoningEffort: EdgeToolsReasoningEffort = .default,
+      @EdgeToolsToolBuilder tools: () -> [any EdgeTool]
+    ) -> LlamaContext where Engine == LlamaEngine<Profile> {
+      self.engine.context(
+        transcript: transcript,
+        reasoningEffort: reasoningEffort,
+        tools: tools()
+      )
     }
 
     public func context<Profile>(
       systemPrompt: String,
       reasoningEffort: EdgeToolsReasoningEffort = .default
     ) -> LlamaContext where Engine == LlamaEngine<Profile> {
-      self.context(
-        EdgeToolsTranscript(
-          messages: [.system(systemPrompt)],
-          reasoningEffort: reasoningEffort
-        )
+      self.engine.context(
+        transcript: EdgeToolsTranscript(messages: [.system(systemPrompt)]),
+        reasoningEffort: reasoningEffort,
+        tools: []
+      )
+    }
+
+    public func context<Profile>(
+      systemPrompt: String,
+      reasoningEffort: EdgeToolsReasoningEffort = .default,
+      @EdgeToolsToolBuilder tools: () -> [any EdgeTool]
+    ) -> LlamaContext where Engine == LlamaEngine<Profile> {
+      self.engine.context(
+        transcript: EdgeToolsTranscript(messages: [.system(systemPrompt)]),
+        reasoningEffort: reasoningEffort,
+        tools: tools()
       )
     }
   }

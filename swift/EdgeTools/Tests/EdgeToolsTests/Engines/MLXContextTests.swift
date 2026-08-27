@@ -10,6 +10,27 @@
   @Suite(.serialized)
   struct `MLXContext tests` {
     @Test
+    func `Reasoning Effort And Tools Belong To The Context`() throws {
+      let session = EdgeToolsSession(engine: try contextTestEngine())
+      let context = session.context(
+        systemPrompt: "System",
+        reasoningEffort: .high
+      ) {
+        EchoTool()
+      }
+
+      expectNoDifference(context.transcript.messages, [.system("System")])
+      expectNoDifference(context.reasoningEffort, .high)
+      expectNoDifference(context.tools.map(\.name), ["echo"])
+
+      let fork = context.fork()
+      context.reasoningEffort = .none
+
+      expectNoDifference(context.reasoningEffort, .none)
+      expectNoDifference(fork.reasoningEffort, .high)
+    }
+
+    @Test
     func `Transcript Is Observable Through The Wrapper`() throws {
       let context = try contextTestEngine().context()
       let didChange = LockBox(false)
@@ -152,6 +173,7 @@
 
     static func grammar(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       parameters: MLXGenerateParameters,
       grammarEngine: borrowing XGrammarEngine
@@ -161,6 +183,7 @@
 
     static func input(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer,
       processor: (any UserInputProcessor)?
@@ -171,12 +194,14 @@
 
     static func prefillInput(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer,
       processor: (any UserInputProcessor)?
     ) async throws -> LMInput {
       try await self.input(
         prompt: prompt,
+        reasoningEffort: reasoningEffort,
         tools: tools,
         tokenizer: tokenizer,
         processor: processor

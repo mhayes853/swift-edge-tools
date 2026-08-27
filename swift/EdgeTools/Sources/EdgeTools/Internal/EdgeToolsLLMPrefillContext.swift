@@ -52,9 +52,14 @@
 
     private let messages: [Message]
     private let media: [Media]
+    private let reasoningEffort: EdgeToolsReasoningEffort
     private let tools: [EdgeToolDefinition]
 
-    init(prompt: EdgeToolsTranscript, tools: [EdgeToolDefinition]) {
+    init(
+      prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
+      tools: [EdgeToolDefinition]
+    ) {
       let messages: [Message] = prompt.messages.map { message in
         switch message {
         case .system(let message):
@@ -79,6 +84,7 @@
         }
         return Media(images: images, videos: videos, audio: audio)
       }
+      self.reasoningEffort = reasoningEffort
       self.tools = tools
     }
 

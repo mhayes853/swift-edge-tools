@@ -11,11 +11,13 @@ struct `Qwen3P5 tests` {
     @Test
     func `Default Sampling Follows The Reasoning Effort`() {
       let thinking = Qwen3P5MLXProfile.defaultSampling(
-        prompt: EdgeToolsTranscript(messages: [.user("hi")], reasoningEffort: .high),
+        prompt: EdgeToolsTranscript(messages: [.user("hi")]),
+        reasoningEffort: .high,
         parameters: MLXGenerateParameters()
       )
       let nonThinking = Qwen3P5MLXProfile.defaultSampling(
-        prompt: EdgeToolsTranscript(messages: [.user("hi")], reasoningEffort: .none),
+        prompt: EdgeToolsTranscript(messages: [.user("hi")]),
+        reasoningEffort: .none,
         parameters: MLXGenerateParameters()
       )
 
@@ -76,9 +78,9 @@ struct `Qwen3P5 tests` {
             transcript: EdgeToolsTranscript(
               messages: [
                 .user("Use this image as a reference.", images: [try redImageAsset()])
-              ],
-              reasoningEffort: .none
-            )
+              ]
+            ),
+            reasoningEffort: .none
           )
           let context = engine.context(parameters)
           let initial = try await engine.prefill(
@@ -153,10 +155,9 @@ struct `Qwen3P5 tests` {
           messages: [
             .user("Say hello in one word."),
             .assistant([.text("Hello.")])
-          ],
-          reasoningEffort: .none
+          ]
         )
-        let context = engine.context(parameters)
+        let context = engine.context(transcript: parameters, reasoningEffort: .none)
         _ = try await engine.prefill(
           promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
           context: context
@@ -180,9 +181,8 @@ struct `Qwen3P5 tests` {
       @Test
       func `Llama Image Fork Falls Back To A Cold Cache`() async throws {
         let engine = try await self.multimodalEngine()
-        var parameters = try qwenLlamaImagePrefix()
-        parameters.reasoningEffort = .none
-        let context = engine.context(parameters)
+        let parameters = try qwenLlamaImagePrefix()
+        let context = engine.context(transcript: parameters, reasoningEffort: .none)
         _ = try await engine.prefill(
           promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
           context: context
@@ -196,7 +196,7 @@ struct `Qwen3P5 tests` {
         let fresh = try await qwenLlamaGeneration(
           using: engine,
           prompt: EdgeToolsTranscript.UserMessage("Answer red or blue."),
-          context: engine.context(parameters)
+          context: engine.context(transcript: parameters, reasoningEffort: .none)
         )
 
         expectNoDifference(forked.tokens, fresh.tokens)
@@ -206,9 +206,8 @@ struct `Qwen3P5 tests` {
       @Test
       func `Llama Image Fork With Another Image Matches A Cold Cache`() async throws {
         let engine = try await self.multimodalEngine()
-        var parameters = try qwenLlamaImagePrefix()
-        parameters.reasoningEffort = .none
-        let context = engine.context(parameters)
+        let parameters = try qwenLlamaImagePrefix()
+        let context = engine.context(transcript: parameters, reasoningEffort: .none)
         _ = try await engine.prefill(
           promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
           context: context
@@ -323,8 +322,7 @@ struct `Qwen3P5 tests` {
       messages: [
         .user("What is the dominant color?", images: [try llamaRedImageAsset()]),
         .assistant([.text("The dominant color is red.")])
-      ],
-      reasoningEffort: .none
+      ]
     )
   }
 

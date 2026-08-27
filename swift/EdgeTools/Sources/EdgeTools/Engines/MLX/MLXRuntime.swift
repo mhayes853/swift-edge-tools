@@ -9,6 +9,7 @@
 
   struct MLXGenerationTransaction {
     var transcript: EdgeToolsTranscript
+    let reasoningEffort: EdgeToolsReasoningEffort
     var generation: MLXGeneration?
   }
 
@@ -30,6 +31,7 @@
 
     func generate(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       parameters: Profile.GenerateParameters,
       configuredSampling: EdgeToolsFusedSamplingParameters?,
@@ -44,15 +46,28 @@
       guard !stopper.isStopped else {
         return MLXGenerationResult(generation: .empty, checkpoint: checkpoint)
       }
-      var transaction = MLXGenerationTransaction(transcript: prompt)
+      var transaction = MLXGenerationTransaction(
+        transcript: prompt,
+        reasoningEffort: reasoningEffort
+      )
       var parser = Profile.GenerationParser()
-      Profile.prepare(prompt: &transaction.transcript, tools: tools, parser: &parser)
+      Profile.prepare(
+        prompt: &transaction.transcript,
+        reasoningEffort: reasoningEffort,
+        tools: tools,
+        parser: &parser
+      )
       let defaultSampling =
-        Profile.defaultSampling(prompt: transaction.transcript, parameters: parameters)
+        Profile.defaultSampling(
+          prompt: transaction.transcript,
+          reasoningEffort: reasoningEffort,
+          parameters: parameters
+        )
         ?? configuredSampling
         ?? EdgeToolsFusedSamplingParameters()
       let prepared = try await self.prepareGeneration(
         prompt: transaction.transcript,
+        reasoningEffort: reasoningEffort,
         tools: tools,
         sampler: parameters.sampler?()
           ?? MLXFusedSampler(parameters: parameters.sampling.applying(to: defaultSampling)),
@@ -74,6 +89,7 @@
         grammar: {
           try Profile.grammar(
             prompt: $0.transcript,
+            reasoningEffort: $0.reasoningEffort,
             tools: tools,
             parameters: parameters,
             grammarEngine: grammarEngine
@@ -103,12 +119,14 @@
 
     func prefill(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       checkpoint: MLXPrefixCacheHandle?,
       policy: MLXCachePolicy
     ) async throws -> MLXPrefillResult {
       let preparedInput = try await self.input(
         prompt: prompt,
+        reasoningEffort: reasoningEffort,
         tools: tools,
         kind: .prefill,
         checkpoint: checkpoint
@@ -143,6 +161,7 @@
 
     private func prepareGeneration(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       sampler: any LogitSampler,
       processor: (any LogitProcessor)?,
@@ -153,6 +172,7 @@
     ) async throws -> (generation: MLXGeneration, metrics: EdgeToolsMetrics) {
       let preparedInput = try await self.input(
         prompt: prompt,
+        reasoningEffort: reasoningEffort,
         tools: tools,
         kind: .generation,
         checkpoint: checkpoint
@@ -239,17 +259,27 @@
 
     private func input(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       kind: EdgeToolsLLMInputKind,
       checkpoint: MLXPrefixCacheHandle?
     ) async throws -> (input: LMInput, context: EdgeToolsLLMPrefillContext) {
-      let context = EdgeToolsLLMPrefillContext(prompt: prompt, tools: tools)
+      let context = EdgeToolsLLMPrefillContext(
+        prompt: prompt,
+        reasoningEffort: reasoningEffort,
+        tools: tools
+      )
       if let checkpoint,
         let input = self.checkpoints[checkpoint.id]?.preparedInput(for: context, kind: kind)
       {
         return (input, context)
       }
-      let input = try await self.inputProcessor.input(prompt: prompt, tools: tools, kind: kind)
+      let input = try await self.inputProcessor.input(
+        prompt: prompt,
+        reasoningEffort: reasoningEffort,
+        tools: tools,
+        kind: kind
+      )
       return (input, context)
     }
 

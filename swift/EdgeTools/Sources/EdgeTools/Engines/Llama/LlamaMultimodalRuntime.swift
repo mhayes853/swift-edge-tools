@@ -52,6 +52,7 @@
 
     func input(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       addGenerationPrompt: Bool,
       kind: EdgeToolsLLMInputKind,
@@ -88,10 +89,14 @@
         messages: messages,
         tools: tools.chatTemplateToolValues,
         addGenerationPrompt: addGenerationPrompt,
-        additionalContext: Profile.templateContext(prompt: prompt)
+        additionalContext: Profile.templateContext(
+          prompt: prompt,
+          reasoningEffort: reasoningEffort
+        )
       )
       let cachedInput = cache.input(
         for: prompt,
+        reasoningEffort: reasoningEffort,
         tools: tools,
         kind: kind,
         allowingTextOnlyContinuation: true
@@ -103,11 +108,23 @@
           tokenizer: self.tokenizer
         )
       {
-        cache.store(input, for: prompt, tools: tools, kind: kind)
+        cache.store(
+          input,
+          for: prompt,
+          reasoningEffort: reasoningEffort,
+          tools: tools,
+          kind: kind
+        )
         return input
       }
       let input = try self.runtime.prepare(text: text, media: media)
-      cache.store(input, for: prompt, tools: tools, kind: kind)
+      cache.store(
+        input,
+        for: prompt,
+        reasoningEffort: reasoningEffort,
+        tools: tools,
+        kind: kind
+      )
       return input
     }
   }

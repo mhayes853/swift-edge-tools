@@ -13,6 +13,7 @@ final class EdgeToolsEngineIdentity: Sendable {}
 final class TranscriptContextStorage<ModelState: Sendable>: Sendable {
   private struct State {
     var transcript: EdgeToolsTranscript
+    var reasoningEffort: EdgeToolsReasoningEffort
     var isResponding = false
     var revision = 0
     var model: ModelState
@@ -35,12 +36,14 @@ final class TranscriptContextStorage<ModelState: Sendable>: Sendable {
 
   struct Snapshot: Sendable {
     let transcript: EdgeToolsTranscript
+    let reasoningEffort: EdgeToolsReasoningEffort
     let revision: Int
     let model: ModelState
   }
 
   private struct ForkSnapshot {
     let transcript: EdgeToolsTranscript
+    let reasoningEffort: EdgeToolsReasoningEffort
     let model: ModelState
   }
 
@@ -65,15 +68,15 @@ final class TranscriptContextStorage<ModelState: Sendable>: Sendable {
 
   var reasoningEffort: EdgeToolsReasoningEffort {
     get {
-      self.access(\.transcript)
-      return self.state.withBorrowedLock { $0.transcript.reasoningEffort }
+      self.access(\.reasoningEffort)
+      return self.state.withBorrowedLock { $0.reasoningEffort }
     }
     set {
       self.state.withLock { state in
-        state.transcript.reasoningEffort = newValue
+        state.reasoningEffort = newValue
         state.revision += 1
       }
-      self.notifyMutation(of: \.transcript)
+      self.notifyMutation(of: \.reasoningEffort)
     }
   }
 
@@ -84,6 +87,7 @@ final class TranscriptContextStorage<ModelState: Sendable>: Sendable {
 
   init(
     transcript: EdgeToolsTranscript,
+    reasoningEffort: EdgeToolsReasoningEffort,
     tools: [any EdgeTool],
     model: sending ModelState,
     engineIdentity: EdgeToolsEngineIdentity
@@ -91,6 +95,7 @@ final class TranscriptContextStorage<ModelState: Sendable>: Sendable {
     self.state = Lock(
       State(
         transcript: transcript,
+        reasoningEffort: reasoningEffort,
         model: model
       )
     )
@@ -104,24 +109,26 @@ final class TranscriptContextStorage<ModelState: Sendable>: Sendable {
     let snapshot = self.state.withBorrowedLock { state in
       ForkSnapshot(
         transcript: state.transcript,
+        reasoningEffort: state.reasoningEffort,
         model: forkModel(state.model)
       )
     }
     return TranscriptContextStorage(
       transcript: snapshot.transcript,
+      reasoningEffort: snapshot.reasoningEffort,
       tools: self.tools,
       model: snapshot.model,
       engineIdentity: self.engineIdentity
     )
   }
 
-  func transcript(
+  func prompt(
     appending prompt: EdgeToolsTranscript.Prompt
-  ) -> EdgeToolsTranscript {
+  ) -> (transcript: EdgeToolsTranscript, reasoningEffort: EdgeToolsReasoningEffort) {
     self.state.withBorrowedLock { state in
       var transcript = state.transcript
       transcript.messages.append(contentsOf: prompt.messages)
-      return transcript
+      return (transcript, state.reasoningEffort)
     }
   }
 
@@ -137,6 +144,7 @@ final class TranscriptContextStorage<ModelState: Sendable>: Sendable {
       state.isResponding = true
       return Snapshot(
         transcript: state.transcript,
+        reasoningEffort: state.reasoningEffort,
         revision: state.revision,
         model: state.model
       )

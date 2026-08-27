@@ -33,9 +33,9 @@ struct `Qwen3 tests` {
         let context = engine.context(
           MLXContextParameters(
             transcript: EdgeToolsTranscript(
-              messages: [.system(systemPrompt)],
-              reasoningEffort: .none
-            )
+              messages: [.system(systemPrompt)]
+            ),
+            reasoningEffort: .none
           )
         )
         let prefill = try await engine.prefill(
@@ -63,9 +63,9 @@ struct `Qwen3 tests` {
           context: engine.context(
             MLXContextParameters(
               transcript: EdgeToolsTranscript(
-                messages: [.system(systemPrompt)],
-                reasoningEffort: .none
-              )
+                messages: [.system(systemPrompt)]
+              ),
+              reasoningEffort: .none
             )
           ),
           channel: EdgeToolsGenerationChannel()
@@ -110,10 +110,9 @@ struct `Qwen3 tests` {
         )
         let systemPrompt = "You are a helpful assistant."
         let parameters = EdgeToolsTranscript(
-          messages: [.system(systemPrompt)],
-          reasoningEffort: .none
+          messages: [.system(systemPrompt)]
         )
-        let context = engine.context(parameters)
+        let context = engine.context(transcript: parameters, reasoningEffort: .none)
         let prefill = try await engine.prefill(
           promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
           context: context

@@ -28,16 +28,12 @@ let engine = try await Gemma4MLXModelEngine(from: modelURL)
 let session = EdgeToolsSession(engine: engine)
 
 let context = session.context(
-  MLXContextParameters(
-    transcript: EdgeToolsTranscript(
-      messages: [.system("You are an assistant who can fetch the weather.")]
-    )
-  )
-) { 
-  GetWeather() 
+  systemPrompt: "You are an assistant who can fetch the weather."
+) {
+  GetWeather()
 }
 let response = try await session.respond(
-  to: .user("What is the weather in San Francisco?"), 
+  to: .user("What is the weather in San Francisco?"),
   as: String.self,
   context: context
 )
