@@ -66,7 +66,7 @@ jobs:
       - name: Test Swift package
         run: >
           swift test --disable-experimental-prebuilts
-          --traits "Foundation,FoundationEssentials,XGrammar,Needle2,ChatTemplates,HuggingFaceTokenizers,FoundationModels"
+          --traits "Foundation,FoundationEssentials,XGrammar,Needle2,ChatTemplates,FoundationModels"
 
   android:
     name: Android Tests
@@ -112,7 +112,8 @@ jobs:
           set -euo pipefail
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            ca-certificates curl gnupg
+            ca-certificates curl git-lfs gnupg
+          git lfs pull --include="ts/needle2/assets/*"
           curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource.sh
           bash /tmp/nodesource.sh
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs

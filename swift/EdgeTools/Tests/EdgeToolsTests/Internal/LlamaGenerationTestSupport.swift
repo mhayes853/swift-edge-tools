@@ -1,9 +1,6 @@
 #if HuggingFaceTokenizers && Llama && canImport(CLlama)
-  import CoreGraphics
   import EdgeTools
   import Foundation
-  import ImageIO
-  import UniformTypeIdentifiers
 
   func completeWeatherTurn<Profile: LlamaModelProfile>(
     using engine: LlamaEngine<Profile>
@@ -206,43 +203,15 @@
   }
 
   func llamaRedImageAsset() throws -> EdgeToolsTranscript.Asset {
-    let width = 128
-    let height = 128
     guard
-      let context = CGContext(
-        data: nil,
-        width: width,
-        height: height,
-        bitsPerComponent: 8,
-        bytesPerRow: width * 4,
-        space: CGColorSpaceCreateDeviceRGB(),
-        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+      let data = Data(
+        base64Encoded:
+          "iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAA7klEQVR42u3SMQ0AAAjAsPk3DTZI6DEDS5sa/S0TADACAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEAAAmAGAEAAJAAAgAASAABIAAEAACQAAIAAEgAASAABAAAkAACAABIAAEgAAQAAJAAAgAASAABIAAEAACQAAIAAEgAASAbrRW0YdyUv8SrQAAAABJRU5ErkJggg=="
       )
     else {
       throw LlamaGenerationTestError.failedToCreateImage
     }
-    context.setFillColor(CGColor(red: 1, green: 0, blue: 0, alpha: 1))
-    context.fill(CGRect(x: 0, y: 0, width: width, height: height))
-    guard let image = context.makeImage() else {
-      throw LlamaGenerationTestError.failedToCreateImage
-    }
-
-    let data = NSMutableData()
-    guard
-      let destination = CGImageDestinationCreateWithData(
-        data,
-        UTType.png.identifier as CFString,
-        1,
-        nil
-      )
-    else {
-      throw LlamaGenerationTestError.failedToCreateImage
-    }
-    CGImageDestinationAddImage(destination, image, nil)
-    guard CGImageDestinationFinalize(destination) else {
-      throw LlamaGenerationTestError.failedToCreateImage
-    }
-    return EdgeToolsTranscript.Asset(bytes: Array(data as Data), mimeTypeOverride: .png)
+    return EdgeToolsTranscript.Asset(bytes: Array(data), mimeTypeOverride: .png)
   }
 
   func llamaToneAudioAsset() -> EdgeToolsTranscript.Asset {

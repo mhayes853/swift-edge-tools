@@ -1,4 +1,4 @@
-#if Needle2 && (os(macOS) || os(Linux) || os(Windows) || os(Android))
+#if Needle2 && canImport(CNeedle2)
   import CustomDump
   import EdgeTools
   import Observation
