@@ -105,7 +105,7 @@ Another direction is focusing downwards towards the engine/kernel layer. I think
 
 Needle 2 and its weights are the work of [Cactus Compute](https://github.com/cactus-compute).
 
-```
+```bibtex
 @misc{needle2_2026,
   title        = {Needle 2: A 45M-Parameter Foundation Tool-Calling Model for Tiny Devices},
   author       = {Ndubuaku, Henry and Mosoyan, Karen and Mroz, Jakub and Cylich, Noah and
