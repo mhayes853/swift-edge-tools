@@ -16,9 +16,9 @@ permissions:
 
 jobs:
   linux:
-    name: Linux Build
+    name: Linux Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     container:
       image: swift:6.3.2-jammy
     defaults:
@@ -42,15 +42,15 @@ jobs:
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs
           library_path="$(dirname "$(find /usr/lib/llvm-* -name libc++.so -print -quit)")"
           echo "LIBRARY_PATH=$library_path${LIBRARY_PATH:+:$LIBRARY_PATH}" >> "$GITHUB_ENV"
-      - name: Build Swift package
+      - name: Test Swift package
         run: >
-          swift build --disable-experimental-prebuilts
+          swift test --disable-experimental-prebuilts
           --traits Foundation,FoundationEssentials,XGrammar,Needle2,ChatTemplates,HuggingFaceTokenizers,FoundationModels,Llama
 
   windows:
-    name: Windows Build
+    name: Windows Tests
     runs-on: windows-2022
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -63,33 +63,37 @@ jobs:
           swift-version: swift-6.3-release
           swift-build: 6.3-RELEASE
       # PowerShell splits a bare comma-separated token into separate arguments.
-      - name: Build Swift package
+      - name: Test Swift package
         run: >
-          swift build --disable-experimental-prebuilts
+          swift test --disable-experimental-prebuilts
           --traits "Foundation,FoundationEssentials,XGrammar,Needle2,ChatTemplates,HuggingFaceTokenizers,FoundationModels"
 
   android:
-    name: Android Build
+    name: Android Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
           submodules: recursive
-      - name: Build Swift package for Android
+      - name: Test Swift package on Android
         uses: "swift-android-sdk/swift-android-action@\
           2044b79660f201ccef8cbce62877e4ec5409f9c8"
         with:
-          swift-version: 6.3
+          swift-version: "6.3"
           swift-build-flags: >-
             --disable-experimental-prebuilts
             --traits Foundation,FoundationEssentials,XGrammar,Needle2,ChatTemplates,HuggingFaceTokenizers,FoundationModels
-          build-tests: false
-          run-tests: false
+          swift-test-flags: >-
+            --disable-experimental-prebuilts
+            --traits Foundation,FoundationEssentials,XGrammar,Needle2,ChatTemplates,HuggingFaceTokenizers,FoundationModels
+          build-tests: true
+          run-tests: true
+          free-disk-space: true
 
   wasm:
-    name: WASM Build
+    name: WASM Tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
     container:
@@ -117,15 +121,13 @@ jobs:
           swift sdk install
           "https://download.swift.org/swift-6.3.2-release/wasm-sdk/swift-6.3.2-RELEASE/swift-6.3.2-RELEASE_wasm.artifactbundle.tar.gz"
           --checksum a61f0584c93283589f8b2f42db05c1f9a182b506c2957271402992655591dd7c
-      - name: Build Swift package
-        run: >
-          swift build --disable-experimental-prebuilts
-          --swift-sdk swift-6.3.2-RELEASE_wasm --traits Needle2,JS
+      - name: Test Swift package
+        run: scripts/test-wasm.sh
 
   macos:
-    name: macOS Build
+    name: macOS Tests
     runs-on: macos-26
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -133,10 +135,22 @@ jobs:
           submodules: recursive
       - name: Select Xcode 26.4
         run: sudo xcode-select -s /Applications/Xcode_26.4.app
-      - name: Build Swift package
+      - name: Test Swift package
         run: >
+          swift test --disable-experimental-prebuilts
+          --traits Foundation,FoundationEssentials,XGrammar,Needle2,ChatTemplates,HuggingFaceTokenizers,FoundationModels,Llama
+      - name: Test CLI package
+        working-directory: swift/CLI
+        run: |
+          set -euo pipefail
           swift build --disable-experimental-prebuilts
-          --traits Foundation,FoundationEssentials,XGrammar,Needle2,ChatTemplates,HuggingFaceTokenizers,FoundationModels,MLX,Llama
+          bin_path="$(swift build --show-bin-path --disable-experimental-prebuilts)"
+          metal_library="$bin_path/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib"
+          ln -s "$metal_library" default.metallib
+          trap 'unlink default.metallib' EXIT
+          swift test --disable-experimental-prebuilts
+      - name: Test MLX inference
+        run: scripts/test-mlx.sh
 
   embedded:
     name: Embedded Swift Smoke Test

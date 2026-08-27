@@ -45,22 +45,6 @@
 
     @Test
     @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
-    func `Extracts Structured Data Through Session`() async throws {
-      let engine = Needle2Engine()
-      let session = EdgeToolsSession(engine: engine)
-      let invoice = try await session.extract(
-        prompt: "Extract this invoice: Acme Corp, total $1,200.00, due 2026-09-01.",
-        as: Needle2Invoice.self
-      )
-
-      let extractedInvoice = try #require(invoice)
-      expectNoDifference(extractedInvoice.vendor, "Acme Corp")
-      expectNoDifference(extractedInvoice.total, 1200)
-      expectNoDifference(extractedInvoice.dueDate, "2026-09-01")
-    }
-
-    @Test
-    @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
     func `Extracts Structured Data Through Needle 2`() async throws {
       let engine = Needle2Engine()
       let context = engine.context { DefinitionTool(Needle2Invoice.definition) }

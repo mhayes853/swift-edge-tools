@@ -16,16 +16,7 @@
       ) {
         EchoTool()
       }
-
-      expectNoDifference(context.transcript.messages, [.system("System")])
-      expectNoDifference(context.reasoningEffort, .high)
-      expectNoDifference(context.tools.map(\.name), ["echo"])
-
-      let fork = context.fork()
-      context.reasoningEffort = .none
-
-      expectNoDifference(context.reasoningEffort, .none)
-      expectNoDifference(fork.reasoningEffort, .high)
+      expectTranscriptContextSemantics(context)
     }
 
     @Test
@@ -159,6 +150,8 @@
       expectNoDifference(forked.metrics.prefillTokens, fresh.metrics.prefillTokens)
     }
   }
+
+  extension LlamaContext: TranscriptContextTestable {}
 
   // MARK: - Helpers
 

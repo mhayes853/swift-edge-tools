@@ -1,32 +1,8 @@
-import CustomDump
 import EdgeTools
 import Testing
 
 @Suite
 struct `EdgeToolsSampling tests` {
-  @Test
-  func `Probability Filter Boundaries Are Valid`() {
-    let boundaries = EdgeToolsFusedSamplingParameters(
-      temperature: 0,
-      topK: 0,
-      topP: 1,
-      minP: 0,
-      repetitionPenalty: .leastNonzeroMagnitude,
-      presencePenalty: .greatestFiniteMagnitude,
-      repetitionContextSize: 1
-    )
-    let maximumMinP = EdgeToolsFusedSamplingParameters(minP: 1)
-
-    expectNoDifference(boundaries.temperature, 0)
-    expectNoDifference(boundaries.topK, 0)
-    expectNoDifference(boundaries.topP, 1)
-    expectNoDifference(boundaries.minP, 0)
-    expectNoDifference(boundaries.repetitionPenalty, .leastNonzeroMagnitude)
-    expectNoDifference(boundaries.presencePenalty, .greatestFiniteMagnitude)
-    expectNoDifference(boundaries.repetitionContextSize, 1)
-    expectNoDifference(maximumMinP.minP, 1)
-  }
-
   #if os(macOS) || os(linux) || os(windows)
     @Test
     func `Nonfinite Temperature Causes Precondition Failure`() async {

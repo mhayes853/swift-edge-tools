@@ -18,96 +18,9 @@ import Testing
 
 @Suite
 struct `EdgeToolsCPUFusedSampler tests` {
-  @Test
-  func `Greedy Sampling Picks The Highest Logit`() {
-    let sampler = EdgeToolsCPUFusedSampler(
-      parameters: EdgeToolsFusedSamplingParameters(temperature: 0)
-    )
-
-    expectNoDifference(sampler.pick(from: .test), 1)
-  }
-
-  @Test
-  func `Repetition Penalty Demotes An Already Sampled Token`() {
-    let sampler = EdgeToolsCPUFusedSampler(
-      parameters: EdgeToolsFusedSamplingParameters(temperature: 0, repetitionPenalty: 2)
-    )
-
-    expectNoDifference(sampler.pick(from: .test), 1)
-    expectNoDifference(sampler.pick(from: .test), 2)
-  }
-
-  @Test
-  func `Repetition Penalty Covers A History Seeded With The Prompt`() {
-    let history = EdgeToolsCPUTokenHistory(capacity: 4)
-    history.seed([1])
-    let sampler = EdgeToolsCPUFusedSampler(
-      parameters: EdgeToolsFusedSamplingParameters(temperature: 0, repetitionPenalty: 2),
-      history: history
-    )
-
-    expectNoDifference(sampler.pick(from: .test), 2)
-  }
-
-  @Test
-  func `Presence Penalty Demotes An Already Sampled Token`() {
-    let sampler = EdgeToolsCPUFusedSampler(
-      parameters: EdgeToolsFusedSamplingParameters(temperature: 0, presencePenalty: 3)
-    )
-
-    expectNoDifference(sampler.pick(from: .test), 1)
-    expectNoDifference(sampler.pick(from: .test), 2)
-  }
-
-  @Test
-  func `Resetting The History Restores The Unpenalized Token`() {
-    let sampler = EdgeToolsCPUFusedSampler(
-      parameters: EdgeToolsFusedSamplingParameters(temperature: 0, repetitionPenalty: 2)
-    )
-
-    expectNoDifference(sampler.pick(from: .test), 1)
-    sampler.history.reset()
-
-    expectNoDifference(sampler.pick(from: .test), 1)
-  }
-
-  @Test
-  func `Top K Only Samples The Highest Logits`() {
-    let sampler = EdgeToolsCPUFusedSampler(
-      parameters: EdgeToolsFusedSamplingParameters(temperature: 2, topK: 2, seed: 7)
-    )
-
-    expectNoDifference(sampler.picks(from: .test, count: 64), [1, 2])
-  }
-
-  @Test
-  func `Top P Only Samples The Nucleus`() {
-    let sampler = EdgeToolsCPUFusedSampler(
-      parameters: EdgeToolsFusedSamplingParameters(temperature: 2, topP: 0.6, seed: 7)
-    )
-
-    expectNoDifference(sampler.picks(from: .test, count: 64), [1])
-  }
-
-  @Test
-  func `Min P Only Samples Tokens Near The Most Probable One`() {
-    let sampler = EdgeToolsCPUFusedSampler(
-      parameters: EdgeToolsFusedSamplingParameters(temperature: 2, minP: 0.5, seed: 7)
-    )
-
-    expectNoDifference(sampler.picks(from: .test, count: 64), [1])
-  }
-
-  @Test
-  func `Seeding Repeats The Same Tokens`() {
-    func run() -> [Int] {
-      let sampler = EdgeToolsCPUFusedSampler(
-        parameters: EdgeToolsFusedSamplingParameters(temperature: 1.5, topK: 4, seed: 99)
-      )
-      return (0..<16).map { _ in sampler.pick(from: .test) }
-    }
-
-    expectNoDifference(run(), run())
+  @Test(arguments: FusedSamplerBehavior.allCases)
+  func `Shared Sampling Semantics`(_ behavior: FusedSamplerBehavior) {
+    expectFusedSamplerBehavior(behavior, using: CPUFusedSamplerDriver.self)
   }
 
   @Test
@@ -253,8 +166,115 @@ extension EdgeToolsCPUFusedSampler {
     var logits = logits
     return self.sample(logits: &logits).tokenId
   }
+}
 
-  fileprivate func picks(from logits: [Float], count: Int) -> [Int] {
-    Set((0..<count).map { _ in self.pick(from: logits) }).sorted()
+private struct CPUFusedSamplerDriver: FusedSamplerDriver {
+  let sampler: EdgeToolsCPUFusedSampler
+
+  init(parameters: EdgeToolsFusedSamplingParameters, seededWith tokenIds: [Int]) {
+    let history = EdgeToolsCPUTokenHistory(capacity: 20)
+    history.seed(tokenIds)
+    self.sampler = EdgeToolsCPUFusedSampler(parameters: parameters, history: history)
   }
+
+  func pick(from logits: [Float]) -> Int {
+    self.sampler.pick(from: logits)
+  }
+
+  func resetHistory() {
+    self.sampler.history.reset()
+  }
+}
+
+enum FusedSamplerBehavior: CaseIterable, Sendable {
+  case greedy
+  case repetitionPenalty
+  case promptRepetitionPenalty
+  case presencePenalty
+  case historyReset
+  case topK
+  case topP
+  case minP
+  case deterministicSeed
+}
+
+protocol FusedSamplerDriver {
+  init(parameters: EdgeToolsFusedSamplingParameters, seededWith tokenIds: [Int])
+  func pick(from logits: [Float]) -> Int
+  func resetHistory()
+}
+
+func expectFusedSamplerBehavior<Driver: FusedSamplerDriver>(
+  _ behavior: FusedSamplerBehavior,
+  using driver: Driver.Type
+) {
+  let logits: [Float] = [1, 5, 3, 2]
+  switch behavior {
+  case .greedy:
+    let sampler = Driver(
+      parameters: EdgeToolsFusedSamplingParameters(temperature: 0),
+      seededWith: []
+    )
+    expectNoDifference(sampler.pick(from: logits), 1)
+  case .repetitionPenalty:
+    let sampler = Driver(
+      parameters: EdgeToolsFusedSamplingParameters(temperature: 0, repetitionPenalty: 2),
+      seededWith: []
+    )
+    expectNoDifference([sampler.pick(from: logits), sampler.pick(from: logits)], [1, 2])
+  case .promptRepetitionPenalty:
+    let sampler = Driver(
+      parameters: EdgeToolsFusedSamplingParameters(temperature: 0, repetitionPenalty: 2),
+      seededWith: [1]
+    )
+    expectNoDifference(sampler.pick(from: logits), 2)
+  case .presencePenalty:
+    let sampler = Driver(
+      parameters: EdgeToolsFusedSamplingParameters(temperature: 0, presencePenalty: 3),
+      seededWith: []
+    )
+    expectNoDifference([sampler.pick(from: logits), sampler.pick(from: logits)], [1, 2])
+  case .historyReset:
+    let sampler = Driver(
+      parameters: EdgeToolsFusedSamplingParameters(temperature: 0, repetitionPenalty: 2),
+      seededWith: []
+    )
+    expectNoDifference(sampler.pick(from: logits), 1)
+    sampler.resetHistory()
+    expectNoDifference(sampler.pick(from: logits), 1)
+  case .topK:
+    let sampler = Driver(
+      parameters: EdgeToolsFusedSamplingParameters(temperature: 2, topK: 2, seed: 7),
+      seededWith: []
+    )
+    expectNoDifference(picks(using: sampler, from: logits), [1, 2])
+  case .topP:
+    let sampler = Driver(
+      parameters: EdgeToolsFusedSamplingParameters(temperature: 2, topP: 0.6, seed: 7),
+      seededWith: []
+    )
+    expectNoDifference(picks(using: sampler, from: logits), [1])
+  case .minP:
+    let sampler = Driver(
+      parameters: EdgeToolsFusedSamplingParameters(temperature: 2, minP: 0.5, seed: 7),
+      seededWith: []
+    )
+    expectNoDifference(picks(using: sampler, from: logits), [1])
+  case .deterministicSeed:
+    func run() -> [Int] {
+      let sampler = Driver(
+        parameters: EdgeToolsFusedSamplingParameters(temperature: 1.5, topK: 4, seed: 99),
+        seededWith: []
+      )
+      return (0..<16).map { _ in sampler.pick(from: logits) }
+    }
+    expectNoDifference(run(), run())
+  }
+}
+
+private func picks<Driver: FusedSamplerDriver>(
+  using sampler: Driver,
+  from logits: [Float]
+) -> [Int] {
+  Set((0..<64).map { _ in sampler.pick(from: logits) }).sorted()
 }
