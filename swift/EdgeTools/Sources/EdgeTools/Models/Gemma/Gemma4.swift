@@ -19,6 +19,7 @@
 
     public static func grammar(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       parameters: MLXGenerateParameters,
       grammarEngine: borrowing XGrammarEngine
@@ -30,7 +31,7 @@
       ) {
         try XGRGrammar.gemma4(tools: tools, range: $0)
       }
-      guard prompt.reasoningEffort != .default, prompt.reasoningEffort.isEnabled else {
+      guard reasoningEffort != .default, reasoningEffort.isEnabled else {
         return grammar
       }
       return try XGRGrammar.gemma4Reasoning().concatenate(grammar)
@@ -38,33 +39,44 @@
 
     public static func prepare(
       prompt: inout EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       parser: inout Gemma4GenerationParser
     ) {
-      prompt = prompt.gemma4PreparedForReasoning
+      prompt = prompt.gemma4PreparedForReasoning(reasoningEffort: reasoningEffort)
     }
 
     public static nonisolated(nonsending) func input(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer,
       processor: (any UserInputProcessor)?
     ) async throws -> LMInput {
       guard let processor else { throw EdgeToolsError.failedToLoadConfiguration }
       return try await processor.prepare(
-        input: try prompt.gemma4UserInput(tools: tools, addGenerationPrompt: true)
+        input: try prompt.gemma4UserInput(
+          reasoningEffort: reasoningEffort,
+          tools: tools,
+          addGenerationPrompt: true
+        )
       )
     }
 
     public static nonisolated(nonsending) func prefillInput(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer,
       processor: (any UserInputProcessor)?
     ) async throws -> LMInput {
       guard let processor else { throw EdgeToolsError.failedToLoadConfiguration }
       return try await processor.prepare(
-        input: try prompt.gemma4UserInput(tools: tools, addGenerationPrompt: false)
+        input: try prompt.gemma4UserInput(
+          reasoningEffort: reasoningEffort,
+          tools: tools,
+          addGenerationPrompt: false
+        )
       )
     }
   }
@@ -103,10 +115,11 @@
 
   extension EdgeToolsTranscript {
     fileprivate func gemma4UserInput(
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       addGenerationPrompt: Bool
     ) throws -> UserInput {
-      try self.gemma4PreparedForReasoning.mlxUserInput(
+      try self.gemma4PreparedForReasoning(reasoningEffort: reasoningEffort).mlxUserInput(
         tools: tools,
         additionalContext: ["add_generation_prompt": .boolean(addGenerationPrompt)]
       ) { message in
@@ -153,6 +166,7 @@
 
     public static func grammar(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       parameters: LlamaGenerateParameters,
       grammarEngine: borrowing XGrammarEngine
@@ -163,7 +177,7 @@
         grammarEngine: grammarEngine
       ) { range in
         let toolCalls = try XGRGrammar.gemma4(tools: tools, range: range)
-        guard prompt.reasoningEffort != .default, prompt.reasoningEffort.isEnabled else {
+        guard reasoningEffort != .default, reasoningEffort.isEnabled else {
           return toolCalls
         }
         return try XGRGrammar.gemma4Reasoning().concatenate(toolCalls)
@@ -172,10 +186,11 @@
 
     public static func prepare(
       prompt: inout EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       parser: inout Gemma4GenerationParser
     ) {
-      prompt = prompt.gemma4PreparedForReasoning
+      prompt = prompt.gemma4PreparedForReasoning(reasoningEffort: reasoningEffort)
     }
   }
 
@@ -185,8 +200,10 @@
 // MARK: - Gemma4 Reasoning Preparation
 
 extension EdgeToolsTranscript {
-  var gemma4PreparedForReasoning: Self {
-    guard self.reasoningEffort != .default, self.reasoningEffort.isEnabled else { return self }
+  func gemma4PreparedForReasoning(
+    reasoningEffort: EdgeToolsReasoningEffort
+  ) -> Self {
+    guard reasoningEffort != .default, reasoningEffort.isEnabled else { return self }
     var prompt = self
     if case .system(let message) = prompt.messages.first {
       guard !message.content.hasPrefix("<|think|>\n") else { return prompt }

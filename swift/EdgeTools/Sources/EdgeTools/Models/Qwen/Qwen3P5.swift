@@ -17,6 +17,7 @@ import OrderedCollections
 
     public static func grammar(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       parameters: MLXGenerateParameters,
       grammarEngine: borrowing XGrammarEngine
@@ -28,29 +29,34 @@ import OrderedCollections
       ) {
         try XGRGrammar.qwen3P5(tools: tools, range: $0)
       }
-      guard prompt.reasoningEffort.isEnabled else { return grammar }
+      guard reasoningEffort.isEnabled else { return grammar }
       return try XGRGrammar.qwenReasoning().concatenate(grammar)
     }
 
-    public static func templateContext(prompt: EdgeToolsTranscript) -> [String: EdgeToolsValue]? {
-      guard prompt.reasoningEffort != .default else { return nil }
-      return ["enable_thinking": .boolean(prompt.reasoningEffort.isEnabled)]
+    public static func templateContext(
+      prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort
+    ) -> [String: EdgeToolsValue]? {
+      guard reasoningEffort != .default else { return nil }
+      return ["enable_thinking": .boolean(reasoningEffort.isEnabled)]
     }
 
     public static func prepare(
       prompt: inout EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       parser: inout Qwen3P5GenerationParser
     ) {
-      let prefix = prompt.reasoningEffort.isEnabled ? "<think>\n" : "<think>\n\n</think>\n\n"
+      let prefix = reasoningEffort.isEnabled ? "<think>\n" : "<think>\n\n</think>\n\n"
       _ = parser.accept(token: EdgeToolsToken(id: -1, stringValue: prefix))
     }
 
     public static func defaultSampling(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       parameters: MLXGenerateParameters
     ) -> EdgeToolsFusedSamplingParameters? {
-      prompt.reasoningEffort.isEnabled
+      reasoningEffort.isEnabled
         ? EdgeToolsFusedSamplingParameters(
           temperature: 1,
           topK: 20,
@@ -74,6 +80,7 @@ import OrderedCollections
 
     public static func grammar(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       parameters: LlamaGenerateParameters,
       grammarEngine: borrowing XGrammarEngine
@@ -84,30 +91,35 @@ import OrderedCollections
         grammarEngine: grammarEngine
       ) { range in
         let toolCalls = try XGRGrammar.qwen3P5(tools: tools, range: range)
-        guard prompt.reasoningEffort.isEnabled else { return toolCalls }
+        guard reasoningEffort.isEnabled else { return toolCalls }
         return try XGRGrammar.qwenReasoning().concatenate(toolCalls)
       }
     }
 
-    public static func templateContext(prompt: EdgeToolsTranscript) -> [String: EdgeToolsValue]? {
-      guard prompt.reasoningEffort != .default else { return nil }
-      return ["enable_thinking": .boolean(prompt.reasoningEffort.isEnabled)]
+    public static func templateContext(
+      prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort
+    ) -> [String: EdgeToolsValue]? {
+      guard reasoningEffort != .default else { return nil }
+      return ["enable_thinking": .boolean(reasoningEffort.isEnabled)]
     }
 
     public static func prepare(
       prompt: inout EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       parser: inout Qwen3P5GenerationParser
     ) {
-      let prefix = prompt.reasoningEffort.isEnabled ? "<think>\n" : "<think>\n\n</think>\n\n"
+      let prefix = reasoningEffort.isEnabled ? "<think>\n" : "<think>\n\n</think>\n\n"
       _ = parser.accept(token: EdgeToolsToken(id: -1, stringValue: prefix))
     }
 
     public static func defaultSampling(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       parameters: LlamaGenerateParameters
     ) -> EdgeToolsFusedSamplingParameters? {
-      prompt.reasoningEffort.isEnabled
+      reasoningEffort.isEnabled
         ? EdgeToolsFusedSamplingParameters(
           temperature: 1,
           topK: 20,
@@ -144,6 +156,7 @@ import OrderedCollections
 
     public static func grammar(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       parameters: MLXGenerateParameters,
       grammarEngine: borrowing XGrammarEngine
@@ -155,29 +168,34 @@ import OrderedCollections
       ) {
         try XGRGrammar.qwen3P5(tools: tools, range: $0)
       }
-      guard prompt.reasoningEffort.isEnabled else { return grammar }
+      guard reasoningEffort.isEnabled else { return grammar }
       return try XGRGrammar.qwenReasoning().concatenate(grammar)
     }
 
-    public static func templateContext(prompt: EdgeToolsTranscript) -> [String: EdgeToolsValue]? {
-      guard prompt.reasoningEffort != .default else { return nil }
-      return ["enable_thinking": .boolean(prompt.reasoningEffort.isEnabled)]
+    public static func templateContext(
+      prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort
+    ) -> [String: EdgeToolsValue]? {
+      guard reasoningEffort != .default else { return nil }
+      return ["enable_thinking": .boolean(reasoningEffort.isEnabled)]
     }
 
     public static func prepare(
       prompt: inout EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       parser: inout Qwen3P5GenerationParser
     ) {
-      let prefix = prompt.reasoningEffort.isEnabled ? "<think>\n" : "<think>\n\n</think>\n\n"
+      let prefix = reasoningEffort.isEnabled ? "<think>\n" : "<think>\n\n</think>\n\n"
       _ = parser.accept(token: EdgeToolsToken(id: -1, stringValue: prefix))
     }
 
     public static func defaultSampling(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       parameters: MLXGenerateParameters
     ) -> EdgeToolsFusedSamplingParameters? {
-      prompt.reasoningEffort.isEnabled
+      reasoningEffort.isEnabled
         ? EdgeToolsFusedSamplingParameters(temperature: 0.6, topK: 20, topP: 0.95)
         : EdgeToolsFusedSamplingParameters(
           temperature: 0.7,
@@ -189,12 +207,14 @@ import OrderedCollections
 
     public static nonisolated(nonsending) func input(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer,
       processor: (any UserInputProcessor)?
     ) async throws -> LMInput {
       try await self.input(
         prompt: prompt,
+        reasoningEffort: reasoningEffort,
         tools: tools,
         processor: processor,
         addGenerationPrompt: true
@@ -203,12 +223,14 @@ import OrderedCollections
 
     public static nonisolated(nonsending) func prefillInput(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer,
       processor: (any UserInputProcessor)?
     ) async throws -> LMInput {
       try await self.input(
         prompt: prompt,
+        reasoningEffort: reasoningEffort,
         tools: tools,
         processor: processor,
         addGenerationPrompt: false
@@ -217,12 +239,16 @@ import OrderedCollections
 
     private static nonisolated(nonsending) func input(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       processor: (any UserInputProcessor)?,
       addGenerationPrompt: Bool
     ) async throws -> LMInput {
       guard let processor else { throw EdgeToolsError.failedToLoadConfiguration }
-      var templateContext = Self.templateContext(prompt: prompt) ?? [:]
+      var templateContext = Self.templateContext(
+        prompt: prompt,
+        reasoningEffort: reasoningEffort
+      ) ?? [:]
       templateContext["add_generation_prompt"] = .boolean(addGenerationPrompt)
       return try await prompt.mlxVLMInput(
         tools: tools,

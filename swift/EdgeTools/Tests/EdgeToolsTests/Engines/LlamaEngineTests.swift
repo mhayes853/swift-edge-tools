@@ -8,6 +8,27 @@
   @Suite(.serialized)
   struct `LlamaEngine tests` {
     @Test
+    func `Reasoning Effort And Tools Belong To The Context`() async throws {
+      let session = EdgeToolsSession(engine: try await qwen3LlamaEngine())
+      let context = session.context(
+        systemPrompt: "System",
+        reasoningEffort: .high
+      ) {
+        EchoTool()
+      }
+
+      expectNoDifference(context.transcript.messages, [.system("System")])
+      expectNoDifference(context.reasoningEffort, .high)
+      expectNoDifference(context.tools.map(\.name), ["echo"])
+
+      let fork = context.fork()
+      context.reasoningEffort = .none
+
+      expectNoDifference(context.reasoningEffort, .none)
+      expectNoDifference(fork.reasoningEffort, .high)
+    }
+
+    @Test
     func `A Prefill Without Logits Invalidates Another Sequences Logits`() async throws {
       let model = try LlamaModel(path: (try await downloadGGUFModel(id: .qwen3)).path())
       let modelBox = LlamaModelBox(model: consume model)
@@ -69,7 +90,10 @@
     @Test
     func `Continuing A Context Only Prefills The Unseen Suffix`() async throws {
       let engine = try await qwen3LlamaEngine()
-      let context = engine.context(llamaCachedContextParameters())
+      let context = engine.context(
+        transcript: llamaCachedContextParameters(),
+        reasoningEffort: .none
+      )
       let prefill = try await engine.prefill(
         promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
         context: context
@@ -78,7 +102,10 @@
       let cached = try await singleTokenGeneration(using: engine, context: context)
       let fresh = try await singleTokenGeneration(
         using: engine,
-        context: engine.context(llamaCachedContextParameters())
+        context: engine.context(
+          transcript: llamaCachedContextParameters(),
+          reasoningEffort: .none
+        )
       )
 
       expectNoDifference(
@@ -90,7 +117,10 @@
     @Test
     func `Forking Leaves The Parent Cache Intact`() async throws {
       let engine = try await qwen3LlamaEngine()
-      let context = engine.context(llamaCachedContextParameters())
+      let context = engine.context(
+        transcript: llamaCachedContextParameters(),
+        reasoningEffort: .none
+      )
       _ = try await engine.prefill(
         promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
         context: context
@@ -107,7 +137,10 @@
       let engine = try await qwen3LlamaEngine(
         contextParameters: LlamaContextParameters(cacheForking: .isolated)
       )
-      let context = engine.context(llamaCachedContextParameters())
+      let context = engine.context(
+        transcript: llamaCachedContextParameters(),
+        reasoningEffort: .none
+      )
       let prefill = try await engine.prefill(
         promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
         context: context
@@ -116,7 +149,10 @@
       let forked = try await singleTokenGeneration(using: engine, context: context.fork())
       let fresh = try await singleTokenGeneration(
         using: engine,
-        context: engine.context(llamaCachedContextParameters())
+        context: engine.context(
+          transcript: llamaCachedContextParameters(),
+          reasoningEffort: .none
+        )
       )
 
       expectNoDifference((prefill.metrics.prefillTokens ?? 0) > 0, true)
@@ -130,10 +166,7 @@
   private let llamaUserPrompt = "Say hello in one word."
 
   private func llamaCachedContextParameters() -> EdgeToolsTranscript {
-    EdgeToolsTranscript(
-      messages: [.system(llamaSystemPrompt)],
-      reasoningEffort: .none
-    )
+    EdgeToolsTranscript(messages: [.system(llamaSystemPrompt)])
   }
 
   private func qwen3LlamaEngine(
@@ -164,6 +197,7 @@
       let tokenCount =
         try Qwen3LlamaProfile.tokenIds(
           prompt: EdgeToolsTranscript(messages: [.user(prompt)]),
+          reasoningEffort: .default,
           tools: [],
           tokenizer: tokenizer,
           addGenerationPrompt: true

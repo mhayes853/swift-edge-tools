@@ -23,6 +23,7 @@
 
     public static func grammar(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       parameters: MLXGenerateParameters,
       grammarEngine: borrowing XGrammarEngine
@@ -34,6 +35,7 @@
 
     public static nonisolated(nonsending) func input(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer,
       processor: (any UserInputProcessor)?
@@ -46,6 +48,7 @@
 
     public static nonisolated(nonsending) func prefillInput(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer,
       processor: (any UserInputProcessor)?
@@ -122,6 +125,7 @@
 
     public static func grammar(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       parameters: LlamaGenerateParameters,
       grammarEngine: borrowing XGrammarEngine

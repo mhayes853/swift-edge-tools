@@ -25,12 +25,14 @@
     extension MLXLLMModelProfile where Prompt == EdgeToolsTranscript {
       public static nonisolated(nonsending) func input(
         prompt: EdgeToolsTranscript,
+        reasoningEffort: EdgeToolsReasoningEffort,
         tools: [EdgeToolDefinition],
         tokenizer: any EdgeToolsTokenizer,
         processor: (any UserInputProcessor)?
       ) async throws -> LMInput {
         try self.input(
           prompt: prompt,
+          reasoningEffort: reasoningEffort,
           tools: tools,
           tokenizer: tokenizer,
           addGenerationPrompt: true
@@ -39,12 +41,14 @@
 
       public static nonisolated(nonsending) func prefillInput(
         prompt: EdgeToolsTranscript,
+        reasoningEffort: EdgeToolsReasoningEffort,
         tools: [EdgeToolDefinition],
         tokenizer: any EdgeToolsTokenizer,
         processor: (any UserInputProcessor)?
       ) async throws -> LMInput {
         try self.input(
           prompt: prompt,
+          reasoningEffort: reasoningEffort,
           tools: tools,
           tokenizer: tokenizer,
           addGenerationPrompt: false
@@ -53,6 +57,7 @@
 
       private static func input(
         prompt: EdgeToolsTranscript,
+        reasoningEffort: EdgeToolsReasoningEffort,
         tools: [EdgeToolDefinition],
         tokenizer: any EdgeToolsTokenizer,
         addGenerationPrompt: Bool
@@ -64,7 +69,10 @@
           messages: try prompt.chatTemplateMessages(),
           tools: tools.chatTemplateToolValues,
           addGenerationPrompt: addGenerationPrompt,
-          additionalContext: Self.templateContext(prompt: prompt)
+          additionalContext: Self.templateContext(
+            prompt: prompt,
+            reasoningEffort: reasoningEffort
+          )
         )
         return LMInput(tokens: MLXArray(tokens.map(\.id)))
       }

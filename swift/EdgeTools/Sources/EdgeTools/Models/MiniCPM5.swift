@@ -15,6 +15,7 @@ import OrderedCollections
 
     public static func grammar(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       parameters: MLXGenerateParameters,
       grammarEngine: borrowing XGrammarEngine
@@ -26,21 +27,25 @@ import OrderedCollections
       ) {
         try XGRGrammar.miniCPM5(tools: tools, range: $0)
       }
-      guard prompt.reasoningEffort.isEnabled else { return grammar }
+      guard reasoningEffort.isEnabled else { return grammar }
       return try .qwenReasoning().concatenate(grammar)
     }
 
-    public static func templateContext(prompt: EdgeToolsTranscript) -> [String: EdgeToolsValue]? {
-      guard prompt.reasoningEffort != .default else { return nil }
-      return ["enable_thinking": .boolean(prompt.reasoningEffort.isEnabled)]
+    public static func templateContext(
+      prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort
+    ) -> [String: EdgeToolsValue]? {
+      guard reasoningEffort != .default else { return nil }
+      return ["enable_thinking": .boolean(reasoningEffort.isEnabled)]
     }
 
     public static func prepare(
       prompt: inout EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       parser: inout MiniCPM5GenerationParser
     ) {
-      let prefix = prompt.reasoningEffort.isEnabled ? "<think>\n" : "<think>\n\n</think>\n\n"
+      let prefix = reasoningEffort.isEnabled ? "<think>\n" : "<think>\n\n</think>\n\n"
       _ = parser.accept(token: EdgeToolsToken(id: -1, stringValue: prefix))
     }
   }
@@ -56,6 +61,7 @@ import OrderedCollections
 
     public static func grammar(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       parameters: LlamaGenerateParameters,
       grammarEngine: borrowing XGrammarEngine
@@ -66,22 +72,26 @@ import OrderedCollections
         grammarEngine: grammarEngine
       ) { range in
         let toolCalls = try XGRGrammar.miniCPM5(tools: tools, range: range)
-        guard prompt.reasoningEffort.isEnabled else { return toolCalls }
+        guard reasoningEffort.isEnabled else { return toolCalls }
         return try .qwenReasoning().concatenate(toolCalls)
       }
     }
 
-    public static func templateContext(prompt: EdgeToolsTranscript) -> [String: EdgeToolsValue]? {
-      guard prompt.reasoningEffort != .default else { return nil }
-      return ["enable_thinking": .boolean(prompt.reasoningEffort.isEnabled)]
+    public static func templateContext(
+      prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort
+    ) -> [String: EdgeToolsValue]? {
+      guard reasoningEffort != .default else { return nil }
+      return ["enable_thinking": .boolean(reasoningEffort.isEnabled)]
     }
 
     public static func prepare(
       prompt: inout EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       parser: inout MiniCPM5GenerationParser
     ) {
-      let prefix = prompt.reasoningEffort.isEnabled ? "<think>\n" : "<think>\n\n</think>\n\n"
+      let prefix = reasoningEffort.isEnabled ? "<think>\n" : "<think>\n\n</think>\n\n"
       _ = parser.accept(token: EdgeToolsToken(id: -1, stringValue: prefix))
     }
   }

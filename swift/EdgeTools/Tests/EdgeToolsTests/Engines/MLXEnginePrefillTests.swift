@@ -278,6 +278,7 @@
 
     static func grammar(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       parameters: MLXGenerateParameters,
       grammarEngine: borrowing XGrammarEngine
@@ -287,6 +288,7 @@
 
     static func input(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer,
       processor: (any UserInputProcessor)?
@@ -296,12 +298,14 @@
 
     static func prefillInput(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer,
       processor: (any UserInputProcessor)?
     ) async throws -> LMInput {
       try await self.input(
         prompt: prompt,
+        reasoningEffort: reasoningEffort,
         tools: tools,
         tokenizer: tokenizer,
         processor: processor
@@ -318,6 +322,7 @@
 
       static func grammar(
         prompt: EdgeToolsTranscript,
+        reasoningEffort: EdgeToolsReasoningEffort,
         tools: [EdgeToolDefinition],
         parameters: MLXGenerateParameters,
         grammarEngine: borrowing XGrammarEngine
@@ -327,6 +332,7 @@
 
       static func input(
         prompt: EdgeToolsTranscript,
+        reasoningEffort: EdgeToolsReasoningEffort,
         tools: [EdgeToolDefinition],
         tokenizer: any EdgeToolsTokenizer,
         processor: (any UserInputProcessor)?

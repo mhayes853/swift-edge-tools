@@ -13,6 +13,7 @@
   where GenerateParameters == MLXGenerateParameters {
     static nonisolated(nonsending) func input(
       prompt: Prompt,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer,
       processor: (any UserInputProcessor)?
@@ -20,6 +21,7 @@
 
     static nonisolated(nonsending) func prefillInput(
       prompt: Prompt,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer,
       processor: (any UserInputProcessor)?
@@ -35,12 +37,14 @@
   extension MLXModelProfile {
     public static nonisolated(nonsending) func prefillInput(
       prompt: Prompt,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       tokenizer: any EdgeToolsTokenizer,
       processor: (any UserInputProcessor)?
     ) async throws -> LMInput {
       try await self.input(
         prompt: prompt,
+        reasoningEffort: reasoningEffort,
         tools: tools,
         tokenizer: tokenizer,
         processor: processor

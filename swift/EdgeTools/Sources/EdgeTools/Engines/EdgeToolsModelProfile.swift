@@ -23,6 +23,7 @@ public protocol EdgeToolsModelProfile: SendableMetatype {
 
   static func grammar(
     prompt: Prompt,
+    reasoningEffort: EdgeToolsReasoningEffort,
     tools: [EdgeToolDefinition],
     parameters: GenerateParameters,
     grammarEngine: borrowing GrammarEngine
@@ -30,14 +31,19 @@ public protocol EdgeToolsModelProfile: SendableMetatype {
 
   static func prepare(
     prompt: inout Prompt,
+    reasoningEffort: EdgeToolsReasoningEffort,
     tools: [EdgeToolDefinition],
     parser: inout GenerationParser
   )
 
-  static func templateContext(prompt: Prompt) -> [String: EdgeToolsValue]?
+  static func templateContext(
+    prompt: Prompt,
+    reasoningEffort: EdgeToolsReasoningEffort
+  ) -> [String: EdgeToolsValue]?
 
   static func defaultSampling(
     prompt: Prompt,
+    reasoningEffort: EdgeToolsReasoningEffort,
     parameters: GenerateParameters
   ) -> EdgeToolsFusedSamplingParameters?
 }
@@ -93,6 +99,7 @@ extension EdgeToolsModelProfile {
 
   public static func defaultSampling(
     prompt: Prompt,
+    reasoningEffort: EdgeToolsReasoningEffort,
     parameters: GenerateParameters
   ) -> EdgeToolsFusedSamplingParameters? {
     nil
@@ -100,11 +107,15 @@ extension EdgeToolsModelProfile {
 
   public static func prepare(
     prompt: inout Prompt,
+    reasoningEffort: EdgeToolsReasoningEffort,
     tools: [EdgeToolDefinition],
     parser: inout GenerationParser
   ) {}
 
-  public static func templateContext(prompt: Prompt) -> [String: EdgeToolsValue]? {
+  public static func templateContext(
+    prompt: Prompt,
+    reasoningEffort: EdgeToolsReasoningEffort
+  ) -> [String: EdgeToolsValue]? {
     nil
   }
 }

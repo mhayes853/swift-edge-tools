@@ -37,12 +37,14 @@
 
     init(
       transcript: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [any EdgeTool],
       model: sending LlamaContextState,
       engineIdentity: EdgeToolsEngineIdentity
     ) {
       self.storage = TranscriptContextStorage(
         transcript: transcript,
+        reasoningEffort: reasoningEffort,
         tools: tools,
         model: model,
         engineIdentity: engineIdentity
@@ -120,6 +122,7 @@
     @concurrent
     func inputConcurrently(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       addGenerationPrompt: Bool,
       kind: EdgeToolsLLMInputKind,
@@ -127,6 +130,7 @@
     ) async throws -> LlamaPreparedInput {
       try self.input(
         prompt: prompt,
+        reasoningEffort: reasoningEffort,
         tools: tools,
         addGenerationPrompt: addGenerationPrompt,
         kind: kind,
@@ -136,6 +140,7 @@
 
     func input(
       prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       addGenerationPrompt: Bool,
       kind: EdgeToolsLLMInputKind,
@@ -147,22 +152,35 @@
             "This LlamaEngine was initialized without a multimodal runtime."
           )
         }
-        if let cached = cache.input(for: prompt, tools: tools, kind: kind) {
+        if let cached = cache.input(
+          for: prompt,
+          reasoningEffort: reasoningEffort,
+          tools: tools,
+          kind: kind
+        ) {
           return cached
         }
         let input = LlamaPreparedInput(
           tokenIds: try Profile.tokenIds(
             prompt: prompt,
+            reasoningEffort: reasoningEffort,
             tools: tools,
             tokenizer: self.tokenizer,
             addGenerationPrompt: addGenerationPrompt
           )
         )
-        cache.store(input, for: prompt, tools: tools, kind: kind)
+        cache.store(
+          input,
+          for: prompt,
+          reasoningEffort: reasoningEffort,
+          tools: tools,
+          kind: kind
+        )
         return input
       }
       return try multimodal.input(
         prompt: prompt,
+        reasoningEffort: reasoningEffort,
         tools: tools,
         addGenerationPrompt: addGenerationPrompt,
         kind: kind,
@@ -178,6 +196,7 @@
 
     let contextState: LlamaContextState
     var transcript: EdgeToolsTranscript
+    let reasoningEffort: EdgeToolsReasoningEffort
     let revision: Int
     var decoder: Decoder?
   }

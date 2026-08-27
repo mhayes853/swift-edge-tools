@@ -50,7 +50,10 @@
       from: try engine.generate(
         prompt: .user(.reasoningTest),
         parameters: LlamaGenerateParameters(maxTokens: 512),
-        context: engine.context(EdgeToolsTranscript(reasoningEffort: .high)),
+        context: engine.context(
+          transcript: EdgeToolsTranscript(),
+          reasoningEffort: .high
+        ),
         channel: EdgeToolsGenerationChannel()
       )
     )

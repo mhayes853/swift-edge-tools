@@ -4,14 +4,9 @@ import EdgeToolsCore
 
 public struct EdgeToolsTranscript: Hashable, Sendable {
   public var messages: [Message]
-  public var reasoningEffort: EdgeToolsReasoningEffort
 
-  public init(
-    messages: [Message] = [],
-    reasoningEffort: EdgeToolsReasoningEffort = .default
-  ) {
+  public init(messages: [Message] = []) {
     self.messages = messages
-    self.reasoningEffort = reasoningEffort
   }
 
   public var images: [Asset] {

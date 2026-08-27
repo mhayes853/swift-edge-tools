@@ -60,13 +60,18 @@ final class EdgeToolsLLMPreparedInputCache<Input: Sendable>: Sendable {
 
   func input(
     for prompt: EdgeToolsTranscript,
+    reasoningEffort: EdgeToolsReasoningEffort,
     tools: [EdgeToolDefinition],
     kind: EdgeToolsLLMInputKind,
     allowingTextOnlyContinuation: Bool = false
   ) -> Input? {
     #if FoundationEssentials
       self.input(
-        for: EdgeToolsLLMPrefillContext(prompt: prompt, tools: tools),
+        for: EdgeToolsLLMPrefillContext(
+          prompt: prompt,
+          reasoningEffort: reasoningEffort,
+          tools: tools
+        ),
         kind: kind,
         allowingTextOnlyContinuation: allowingTextOnlyContinuation
       )
@@ -78,13 +83,18 @@ final class EdgeToolsLLMPreparedInputCache<Input: Sendable>: Sendable {
   func store(
     _ input: Input,
     for prompt: EdgeToolsTranscript,
+    reasoningEffort: EdgeToolsReasoningEffort,
     tools: [EdgeToolDefinition],
     kind: EdgeToolsLLMInputKind
   ) {
     #if FoundationEssentials
       self.store(
         input,
-        for: EdgeToolsLLMPrefillContext(prompt: prompt, tools: tools),
+        for: EdgeToolsLLMPrefillContext(
+          prompt: prompt,
+          reasoningEffort: reasoningEffort,
+          tools: tools
+        ),
         kind: kind
       )
     #endif

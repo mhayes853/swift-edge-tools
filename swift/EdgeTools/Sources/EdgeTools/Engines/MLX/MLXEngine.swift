@@ -215,9 +215,10 @@
       context: MLXContext
     ) async throws -> [EdgeToolsToken] {
       try self.validate(context)
-      let transcript = context.storage.transcript(appending: prompt)
+      let prompt = context.storage.prompt(appending: prompt)
       let tokenIds = try await self.inputProcessor.tokenIds(
-        prompt: transcript,
+        prompt: prompt.transcript,
+        reasoningEffort: prompt.reasoningEffort,
         tools: context.tools.map { $0.definition }
       )
       return self.tokenizer.tokens(forIds: tokenIds).compactMap { $0 }
@@ -264,6 +265,7 @@
         do {
           let result = try await self.runtime.generate(
             prompt: snapshot.transcript,
+            reasoningEffort: snapshot.reasoningEffort,
             tools: tools,
             parameters: parameters,
             configuredSampling: self.configuredSampling,
@@ -297,6 +299,7 @@
       defer { context.storage.finish(generation: nil, revision: snapshot.revision, model: model) }
       let result = try await self.runtime.prefill(
         prompt: snapshot.transcript,
+        reasoningEffort: snapshot.reasoningEffort,
         tools: tools,
         checkpoint: model.checkpoint,
         policy: model.policy
@@ -319,9 +322,26 @@
       transcript: EdgeToolsTranscript = EdgeToolsTranscript(),
       reasoningEffort: EdgeToolsReasoningEffort = .default
     ) -> MLXContext where Engine == MLXEngine<Profile> {
-      var transcript = transcript
-      transcript.reasoningEffort = reasoningEffort
-      return self.context(MLXContextParameters(transcript: transcript))
+      self.context(
+        MLXContextParameters(
+          transcript: transcript,
+          reasoningEffort: reasoningEffort
+        )
+      )
+    }
+
+    public func context<Profile>(
+      transcript: EdgeToolsTranscript = EdgeToolsTranscript(),
+      reasoningEffort: EdgeToolsReasoningEffort = .default,
+      @EdgeToolsToolBuilder tools: () -> [any EdgeTool]
+    ) -> MLXContext where Engine == MLXEngine<Profile> {
+      self.engine.context(
+        MLXContextParameters(
+          transcript: transcript,
+          reasoningEffort: reasoningEffort
+        ),
+        tools: tools()
+      )
     }
 
     public func context<Profile>(
@@ -330,11 +350,23 @@
     ) -> MLXContext where Engine == MLXEngine<Profile> {
       self.context(
         MLXContextParameters(
-          transcript: EdgeToolsTranscript(
-            messages: [.system(systemPrompt)],
-            reasoningEffort: reasoningEffort
-          )
+          transcript: EdgeToolsTranscript(messages: [.system(systemPrompt)]),
+          reasoningEffort: reasoningEffort
         )
+      )
+    }
+
+    public func context<Profile>(
+      systemPrompt: String,
+      reasoningEffort: EdgeToolsReasoningEffort = .default,
+      @EdgeToolsToolBuilder tools: () -> [any EdgeTool]
+    ) -> MLXContext where Engine == MLXEngine<Profile> {
+      self.engine.context(
+        MLXContextParameters(
+          transcript: EdgeToolsTranscript(messages: [.system(systemPrompt)]),
+          reasoningEffort: reasoningEffort
+        ),
+        tools: tools()
       )
     }
   }
