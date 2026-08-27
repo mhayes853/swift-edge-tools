@@ -564,7 +564,7 @@
 
   private func generate<Profile: MLXModelProfile>(
     using engine: MLXEngine<Profile>,
-    context: MLXContext<Profile>
+    context: MLXContext
   ) async throws -> EdgeToolsEngineGeneration
   where
     Profile.Prompt == EdgeToolsTranscript,

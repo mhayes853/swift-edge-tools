@@ -458,7 +458,7 @@ extension EngineRunner {
     Profile.GrammarEngine == XGrammarEngine
   {
     // Held across generations so multi-turn runs reuse the KV cache; `bench` drops it per run.
-    let cachedContext = Mutex<LlamaContext<Profile>?>(nil)
+    let cachedContext = Mutex<LlamaContext?>(nil)
     return Self(
       engine: .llama,
       capabilities: [.customGrammar, .sampling],
@@ -521,9 +521,9 @@ extension EngineRunner {
           let context = engine.context(
             MLXContextParameters(
               transcript: EdgeToolsTranscript(
-                messages: request.system.isEmpty ? [] : [.system(request.system)]
-              ),
-              reasoningEffort: request.reasoning
+                messages: request.system.isEmpty ? [] : [.system(request.system)],
+                reasoningEffort: request.reasoning
+              )
             ),
             tools: definitionTools(request.tools)
           )
@@ -576,9 +576,9 @@ private func needle2System(from string: String) throws -> Needle2System {
 
 private func llamaContext<Profile: LlamaModelProfile>(
   engine: LlamaEngine<Profile>,
-  cache: borrowing Mutex<LlamaContext<Profile>?>,
+  cache: borrowing Mutex<LlamaContext?>,
   request: GenerationRequest
-) -> LlamaContext<Profile> {
+) -> LlamaContext {
   cache.withLock { context in
     if let context,
       toolDefinitions(context.tools) == request.tools
@@ -586,10 +586,8 @@ private func llamaContext<Profile: LlamaModelProfile>(
       return context
     }
     let created = engine.context(
-      EdgeToolsTranscriptContextParameters(
-        transcript: EdgeToolsTranscript(
-          messages: request.system.isEmpty ? [] : [.system(request.system)]
-        ),
+      EdgeToolsTranscript(
+        messages: request.system.isEmpty ? [] : [.system(request.system)],
         reasoningEffort: request.reasoning
       ),
       tools: definitionTools(request.tools)

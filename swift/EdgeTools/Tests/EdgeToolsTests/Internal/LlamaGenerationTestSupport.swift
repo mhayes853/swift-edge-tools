@@ -11,11 +11,11 @@
   where Profile.GenerateParameters == LlamaGenerateParameters {
     let turn = try splitUserMessage(from: .weatherTest)
     let context = engine.context(
-      EdgeToolsTranscriptContextParameters(transcript: turn.transcript),
+      turn.transcript,
       tools: [DefinitionTool(.weatherTest)]
     )
     return try await completeToolTurn(
-      in: context,
+      transcript: { context.transcript },
       tool: .weatherTest,
       toolResponse: .weatherTestResponse,
       generatingToolCall: {
@@ -50,9 +50,7 @@
       from: try engine.generate(
         prompt: .user(.reasoningTest),
         parameters: LlamaGenerateParameters(maxTokens: 512),
-        context: engine.context(
-          EdgeToolsTranscriptContextParameters(reasoningEffort: .high)
-        ),
+        context: engine.context(EdgeToolsTranscript(reasoningEffort: .high)),
         channel: EdgeToolsGenerationChannel()
       )
     )
@@ -92,11 +90,11 @@
       ])
     )
     let context = engine.context(
-      EdgeToolsTranscriptContextParameters(transcript: turn.transcript),
+      turn.transcript,
       tools: [DefinitionTool(.llamaColorTest)]
     )
     let result = try await completeToolTurn(
-      in: context,
+      transcript: { context.transcript },
       tool: .llamaColorTest,
       toolResponse: ["color": "red"],
       generatingToolCall: {
@@ -136,11 +134,11 @@
       ])
     )
     let context = engine.context(
-      EdgeToolsTranscriptContextParameters(transcript: turn.transcript),
+      turn.transcript,
       tools: [DefinitionTool(.llamaAudioTest)]
     )
     let result = try await completeToolTurn(
-      in: context,
+      transcript: { context.transcript },
       tool: .llamaAudioTest,
       toolResponse: ["kind": "tone"],
       generatingToolCall: {

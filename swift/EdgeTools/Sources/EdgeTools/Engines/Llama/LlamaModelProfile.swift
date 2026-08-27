@@ -57,10 +57,4 @@
       self.maxTokens = maxTokens
     }
   }
-
-  // MARK: - LlamaContext
-
-  public typealias LlamaContext<Profile: LlamaModelProfile> = EdgeToolsTranscriptContext<
-    LlamaContextState<Profile>
-  >
 #endif

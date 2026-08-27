@@ -6,54 +6,13 @@ import EdgeToolsCore
 
 // MARK: - EdgeToolsEngineIdentity
 
-public final class EdgeToolsEngineIdentity: Sendable {
-  public init() {}
-}
+final class EdgeToolsEngineIdentity: Sendable {}
 
-// MARK: - EdgeToolsForkableModelState
+// MARK: - TranscriptContextStorage
 
-public protocol EdgeToolsForkableModelState {
-  /// The state for a forked context, which may later run generations concurrently with
-  /// this state's context.
-  ///
-  /// The returned state must not alias any state this one mutates, and forking must not
-  /// itself run model work: contexts fork synchronously, off whatever executor the caller
-  /// happens to be on.
-  func forkedContextState() -> sending Self
-
-  /// The state a generation on this state's own context runs against. The context's
-  /// `isResponding` gate guarantees exclusivity until the state is returned via `finish`.
-  func generationState() -> sending Self
-}
-
-extension EdgeToolsForkableModelState {
-  public func generationState() -> sending Self {
-    self.forkedContextState()
-  }
-}
-
-// MARK: - EdgeToolsTranscriptContextParameters
-
-public struct EdgeToolsTranscriptContextParameters: Hashable, Sendable {
-  public var transcript: EdgeToolsTranscript
-  public var reasoningEffort: EdgeToolsReasoningEffort
-
-  public init(
-    transcript: EdgeToolsTranscript = EdgeToolsTranscript(),
-    reasoningEffort: EdgeToolsReasoningEffort = .default
-  ) {
-    self.transcript = transcript
-    self.reasoningEffort = reasoningEffort
-  }
-}
-
-// MARK: - EdgeToolsTranscriptContext
-
-public final class EdgeToolsTranscriptContext<ModelState: EdgeToolsForkableModelState>:
-  EdgeToolsEngineContext {
+final class TranscriptContextStorage<ModelState: Sendable>: Sendable {
   private struct State {
     var transcript: EdgeToolsTranscript
-    var reasoningEffort: EdgeToolsReasoningEffort
     var isResponding = false
     var revision = 0
     var model: ModelState
@@ -74,73 +33,64 @@ public final class EdgeToolsTranscriptContext<ModelState: EdgeToolsForkableModel
     }
   }
 
-  public struct Snapshot {
-    public let transcript: EdgeToolsTranscript
-    public let revision: Int
-    public let model: ModelState
-
-    public init(transcript: EdgeToolsTranscript, revision: Int, model: ModelState) {
-      self.transcript = transcript
-      self.revision = revision
-      self.model = model
-    }
+  struct Snapshot: Sendable {
+    let transcript: EdgeToolsTranscript
+    let revision: Int
+    let model: ModelState
   }
 
   private struct ForkSnapshot {
-    let parameters: EdgeToolsTranscriptContextParameters
+    let transcript: EdgeToolsTranscript
     let model: ModelState
   }
 
   private let state: Lock<State>
-  public let tools: [any EdgeTool]
-  public let engineIdentity: EdgeToolsEngineIdentity
+  let tools: [any EdgeTool]
+  let engineIdentity: EdgeToolsEngineIdentity
   private let observationRegistrar = _ObservationRegistrar()
 
-  public var transcript: EdgeToolsTranscript {
+  var transcript: EdgeToolsTranscript {
     get {
-      self.access(.transcript)
+      self.access(\.transcript)
       return self.state.withBorrowedLock { $0.transcript }
     }
     set {
       self.state.withLock { state in
-        self.withMutation(of: .transcript) {
-          state.transcript = newValue
-          state.revision += 1
-        }
+        state.transcript = newValue
+        state.revision += 1
       }
+      self.notifyMutation(of: \.transcript)
     }
   }
 
-  public var reasoningEffort: EdgeToolsReasoningEffort {
+  var reasoningEffort: EdgeToolsReasoningEffort {
     get {
-      self.access(.reasoningEffort)
-      return self.state.withBorrowedLock { $0.reasoningEffort }
+      self.access(\.transcript)
+      return self.state.withBorrowedLock { $0.transcript.reasoningEffort }
     }
     set {
       self.state.withLock { state in
-        self.withMutation(of: .reasoningEffort) {
-          state.reasoningEffort = newValue
-          state.revision += 1
-        }
+        state.transcript.reasoningEffort = newValue
+        state.revision += 1
       }
+      self.notifyMutation(of: \.transcript)
     }
   }
 
-  public var isResponding: Bool {
-    self.access(.isResponding)
+  var isResponding: Bool {
+    self.access(\.isResponding)
     return self.state.withBorrowedLock { $0.isResponding }
   }
 
-  public init(
-    parameters: EdgeToolsTranscriptContextParameters,
-    tools: [any EdgeTool] = [],
+  init(
+    transcript: EdgeToolsTranscript,
+    tools: [any EdgeTool],
     model: sending ModelState,
     engineIdentity: EdgeToolsEngineIdentity
   ) {
     self.state = Lock(
       State(
-        transcript: parameters.transcript,
-        reasoningEffort: parameters.reasoningEffort,
+        transcript: transcript,
         model: model
       )
     )
@@ -148,136 +98,91 @@ public final class EdgeToolsTranscriptContext<ModelState: EdgeToolsForkableModel
     self.engineIdentity = engineIdentity
   }
 
-  public func fork() -> EdgeToolsTranscriptContext<ModelState> {
+  func fork(
+    model forkModel: @Sendable (borrowing ModelState) -> sending ModelState
+  ) -> TranscriptContextStorage<ModelState> {
     let snapshot = self.state.withBorrowedLock { state in
       ForkSnapshot(
-        parameters: EdgeToolsTranscriptContextParameters(
-          transcript: state.transcript,
-          reasoningEffort: state.reasoningEffort
-        ),
-        model: state.model.forkedContextState()
+        transcript: state.transcript,
+        model: forkModel(state.model)
       )
     }
-    return EdgeToolsTranscriptContext(
-      parameters: snapshot.parameters,
+    return TranscriptContextStorage(
+      transcript: snapshot.transcript,
       tools: self.tools,
       model: snapshot.model,
       engineIdentity: self.engineIdentity
     )
   }
 
-  public func transcript(
+  func transcript(
     appending prompt: EdgeToolsTranscript.Prompt
   ) -> EdgeToolsTranscript {
     self.state.withBorrowedLock { state in
       var transcript = state.transcript
       transcript.messages.append(contentsOf: prompt.messages)
-      transcript.reasoningEffort = state.reasoningEffort
       return transcript
     }
   }
 
-  public func begin(appending prompt: EdgeToolsTranscript.Prompt) throws -> Snapshot {
-    try self.state.withLock { state in
+  func begin(appending prompt: EdgeToolsTranscript.Prompt? = nil) throws -> Snapshot {
+    let snapshot = try self.state.withLock { state in
       guard !state.isResponding else {
         throw EdgeToolsError.contextInUse
       }
-      let model = state.model.generationState()
-      var transcript = state.transcript
-      transcript.messages.append(contentsOf: prompt.messages)
-      var snapshot: Snapshot!
-      self.withMutation(of: .transcript) {
-        self.withMutation(of: .isResponding) {
-          state.transcript = transcript
-          state.revision += 1
-          state.isResponding = true
-          transcript.reasoningEffort = state.reasoningEffort
-          snapshot = Snapshot(
-            transcript: transcript,
-            revision: state.revision,
-            model: model
-          )
-        }
+      if let prompt {
+        state.transcript.messages.append(contentsOf: prompt.messages)
+        state.revision += 1
       }
-      return snapshot
+      state.isResponding = true
+      return Snapshot(
+        transcript: state.transcript,
+        revision: state.revision,
+        model: state.model
+      )
     }
+    if prompt != nil {
+      self.notifyMutation(of: \.transcript)
+    }
+    self.notifyMutation(of: \.isResponding)
+    return snapshot
   }
 
-  public func begin() throws -> Snapshot {
-    try self.state.withLock { state in
-      guard !state.isResponding else {
-        throw EdgeToolsError.contextInUse
-      }
-      let model = state.model.generationState()
-      var snapshot: Snapshot!
-      self.withMutation(of: .isResponding) {
-        state.isResponding = true
-        var transcript = state.transcript
-        transcript.reasoningEffort = state.reasoningEffort
-        snapshot = Snapshot(
-          transcript: transcript,
-          revision: state.revision,
-          model: model
-        )
-      }
-      return snapshot
-    }
-  }
-
-  public func finish(
+  func finish(
     generation: EdgeToolsEngineGeneration?,
     revision: Int,
     model: sending ModelState
   ) {
-    // NB: The compiler cannot track a `sending` parameter through the lock closure. This method
-    // stores the generation branch once when its context revision still matches.
-    nonisolated(unsafe) let model = model
+    let transcriptChanged = generation != nil
     self.state.withLock { $0.finish(generation: generation, revision: revision, model: model) }
-    self.withMutation(of: .transcript) {
+    if transcriptChanged {
+      self.notifyMutation(of: \.transcript)
     }
-    self.withMutation(of: .isResponding) {
-    }
+    self.notifyMutation(of: \.isResponding)
   }
 }
 
 #if !$Embedded
-  extension EdgeToolsTranscriptContext: Observable {}
+  extension TranscriptContextStorage: Observable {}
 #endif
 
 // MARK: - Observation
 
-extension EdgeToolsTranscriptContext {
-  fileprivate enum ObservedProperty {
-    case transcript
-    case reasoningEffort
-    case isResponding
-  }
-
-  fileprivate func access(_ property: ObservedProperty) {
+extension TranscriptContextStorage {
+  fileprivate func access<Member>(
+    _ keyPath: KeyPath<TranscriptContextStorage<ModelState>, Member>
+  ) {
     #if !$Embedded
-      switch property {
-      case .transcript: self.observationRegistrar.access(self, keyPath: \.transcript)
-      case .reasoningEffort: self.observationRegistrar.access(self, keyPath: \.reasoningEffort)
-      case .isResponding: self.observationRegistrar.access(self, keyPath: \.isResponding)
-      }
+      self.observationRegistrar.access(self, keyPath: keyPath)
     #endif
   }
 
-  fileprivate func withMutation<Result>(
-    of property: ObservedProperty,
-    _ body: () -> Result
-  ) -> Result {
+  fileprivate func notifyMutation<Member>(
+    of keyPath: KeyPath<TranscriptContextStorage<ModelState>, Member>
+  ) {
     #if !$Embedded
-      switch property {
-      case .transcript:
-        self.observationRegistrar.withMutation(of: self, keyPath: \.transcript, body)
-      case .reasoningEffort:
-        self.observationRegistrar.withMutation(of: self, keyPath: \.reasoningEffort, body)
-      case .isResponding:
-        self.observationRegistrar.withMutation(of: self, keyPath: \.isResponding, body)
-      }
-    #else
-      body()
+      self.observationRegistrar.willSet(self, keyPath: keyPath)
+      self.observationRegistrar.didSet(self, keyPath: keyPath)
     #endif
   }
 }

@@ -43,7 +43,9 @@
       from: try engine.generate(
         prompt: .user(.reasoningTest),
         parameters: MLXGenerateParameters(maxTokens: 512),
-        context: engine.context(MLXContextParameters(reasoningEffort: .high)),
+        context: engine.context(
+          MLXContextParameters(transcript: EdgeToolsTranscript(reasoningEffort: .high))
+        ),
         channel: EdgeToolsGenerationChannel()
       )
     )
@@ -64,8 +66,10 @@
     Profile.GenerateParameters == MLXGenerateParameters
   {
     let turn = try splitUserMessage(from: .weatherTest)
+    var transcript = turn.transcript
+    transcript.reasoningEffort = .none
     let context = session.context(
-      MLXContextParameters(transcript: turn.transcript, reasoningEffort: .none)
+      MLXContextParameters(transcript: transcript)
     ) {
       WeatherTestTool()
     }
@@ -203,7 +207,7 @@
       tools: [DefinitionTool(tool)]
     )
     return try await completeToolTurn(
-      in: context,
+      transcript: { context.transcript },
       tool: tool,
       toolResponse: toolResponse,
       generatingToolCall: {
