@@ -2,13 +2,69 @@
   import EdgeToolsCore
   import EdgeToolsTokenizers
 
+  #if !$Embedded
+    import Observation
+  #endif
+
   #if XGrammar
     import EdgeToolsXGrammar
   #endif
 
+  // MARK: - LlamaContext
+
+  public final class LlamaContext: EdgeToolsEngineContext {
+    typealias Snapshot = TranscriptContextStorage<LlamaContextState>.Snapshot
+
+    let storage: TranscriptContextStorage<LlamaContextState>
+
+    public var tools: [any EdgeTool] {
+      self.storage.tools
+    }
+
+    public var transcript: EdgeToolsTranscript {
+      get { self.storage.transcript }
+      set { self.storage.transcript = newValue }
+    }
+
+    public var reasoningEffort: EdgeToolsReasoningEffort {
+      get { self.storage.reasoningEffort }
+      set { self.storage.reasoningEffort = newValue }
+    }
+
+    public var isResponding: Bool {
+      self.storage.isResponding
+    }
+
+    init(
+      transcript: EdgeToolsTranscript,
+      tools: [any EdgeTool],
+      model: sending LlamaContextState,
+      engineIdentity: EdgeToolsEngineIdentity
+    ) {
+      self.storage = TranscriptContextStorage(
+        transcript: transcript,
+        tools: tools,
+        model: model,
+        engineIdentity: engineIdentity
+      )
+    }
+
+    private init(storage: TranscriptContextStorage<LlamaContextState>) {
+      self.storage = storage
+    }
+
+    public func fork() -> LlamaContext {
+      LlamaContext(storage: self.storage.fork(model: { $0.forked() }))
+    }
+  }
+
+  #if !$Embedded
+    extension LlamaContext: Observable {}
+  #endif
+
   // MARK: - LlamaContextState
 
-  public struct LlamaContextState<Profile: LlamaModelProfile>: Sendable {
+  struct LlamaContextState: Sendable {
     let runtime: LlamaRuntime
     let sequence: LlamaSequenceLease
     let vocabularySizeValue: Int
@@ -30,11 +86,7 @@
       self.preparedInputCache = preparedInputCache
     }
 
-    public var vocabularySize: Int {
-      self.vocabularySizeValue
-    }
-
-    public func forkedContextState() -> sending Self {
+    func forked() -> sending Self {
       if let sequence = self.runtime.lease(copyingFrom: self.sequence.sequenceId) {
         return Self(
           runtime: self.runtime,
@@ -53,13 +105,7 @@
         preparedInputCache: self.preparedInputCache.forked()
       )
     }
-
-    public func generationState() -> sending Self {
-      self
-    }
   }
-
-  extension LlamaContextState: EdgeToolsForkableModelState {}
 
   // MARK: - LlamaInputProcessor
 
@@ -127,10 +173,10 @@
 
   // MARK: - LlamaGenerationTransaction
 
-  struct LlamaGenerationTransaction<Profile: LlamaModelProfile> {
+  struct LlamaGenerationTransaction {
     typealias Decoder = DecoderState<EdgeToolsCPUFusedSampler>
 
-    let contextState: LlamaContextState<Profile>
+    let contextState: LlamaContextState
     var transcript: EdgeToolsTranscript
     let revision: Int
     var decoder: Decoder?

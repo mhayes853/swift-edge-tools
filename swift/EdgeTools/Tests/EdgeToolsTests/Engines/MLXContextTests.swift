@@ -4,20 +4,30 @@
   import MLX
   import MLXLMCommon
   import MLXNN
+  import Observation
   import Testing
 
   @Suite(.serialized)
   struct `MLXContext tests` {
     @Test
+    func `Transcript Is Observable Through The Wrapper`() throws {
+      let context = try contextTestEngine().context()
+      let didChange = LockBox(false)
+
+      withObservationTracking {
+        _ = context.transcript
+      } onChange: {
+        didChange.withLock { $0 = true }
+      }
+      context.transcript.messages.append(.system("System"))
+
+      expectNoDifference(didChange.withLock { $0 }, true)
+    }
+
+    @Test
     func `In Flight Transcript Mutation Does Not Change The Generation Snapshot`() async throws {
       await ContextTestProfile.gate.pauseNextCapture()
-      let tokenizer = try testTokenizer()
-      let eosTokenId = try requiredTestEOSToken(tokenizer: tokenizer)
-      let engine = try MLXEngine<ContextTestProfile>(
-        languageModel: ContextTestLanguageModel(eosTokenId: eosTokenId),
-        tokenizer: tokenizer,
-        vocabularySize: TestTokenizer.vocabularySize
-      )
+      let engine = try contextTestEngine()
       let session = EdgeToolsSession(engine: engine)
       let context = session.context(
         MLXContextParameters(
@@ -118,18 +128,8 @@
 
     @Test
     func `Context Cannot Be Used With Another Engine`() async throws {
-      let tokenizer = try testTokenizer()
-      let eosTokenId = try requiredTestEOSToken(tokenizer: tokenizer)
-      let firstEngine = try MLXEngine<ContextTestProfile>(
-        languageModel: ContextTestLanguageModel(eosTokenId: eosTokenId),
-        tokenizer: tokenizer,
-        vocabularySize: TestTokenizer.vocabularySize
-      )
-      let secondEngine = try MLXEngine<ContextTestProfile>(
-        languageModel: ContextTestLanguageModel(eosTokenId: eosTokenId),
-        tokenizer: tokenizer,
-        vocabularySize: TestTokenizer.vocabularySize
-      )
+      let firstEngine = try contextTestEngine()
+      let secondEngine = try contextTestEngine()
       let context = firstEngine.context()
 
       let error = await #expect(throws: EdgeToolsError.self) {
@@ -346,5 +346,15 @@
       logits[self.eosTokenId] = 100
       return MLXArray(logits, [1, 1, self.vocabularySize])
     }
+  }
+
+  private func contextTestEngine() throws -> MLXEngine<ContextTestProfile> {
+    let tokenizer = try testTokenizer()
+    let eosTokenId = try requiredTestEOSToken(tokenizer: tokenizer)
+    return try MLXEngine(
+      languageModel: ContextTestLanguageModel(eosTokenId: eosTokenId),
+      tokenizer: tokenizer,
+      vocabularySize: TestTokenizer.vocabularySize
+    )
   }
 #endif

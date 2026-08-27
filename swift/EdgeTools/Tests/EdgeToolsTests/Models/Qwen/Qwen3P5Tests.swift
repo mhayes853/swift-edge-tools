@@ -149,11 +149,11 @@ struct `Qwen3P5 tests` {
         let engine = try Qwen3P5LlamaModelEngine(
           modelPath: (try await downloadGGUFModel(id: .qwen3P5)).path()
         )
-        let parameters = EdgeToolsTranscriptContextParameters(
-          transcript: EdgeToolsTranscript(messages: [
+        let parameters = EdgeToolsTranscript(
+          messages: [
             .user("Say hello in one word."),
             .assistant([.text("Hello.")])
-          ]),
+          ],
           reasoningEffort: .none
         )
         let context = engine.context(parameters)
@@ -164,12 +164,12 @@ struct `Qwen3P5 tests` {
 
         let forked = try await qwenLlamaGeneration(
           using: engine,
-          prompt: .user("Now say goodbye in one word."),
+          prompt: EdgeToolsTranscript.UserMessage("Now say goodbye in one word."),
           context: context.fork()
         )
         let fresh = try await qwenLlamaGeneration(
           using: engine,
-          prompt: .user("Now say goodbye in one word."),
+          prompt: EdgeToolsTranscript.UserMessage("Now say goodbye in one word."),
           context: engine.context(parameters)
         )
 
@@ -180,10 +180,8 @@ struct `Qwen3P5 tests` {
       @Test
       func `Llama Image Fork Falls Back To A Cold Cache`() async throws {
         let engine = try await self.multimodalEngine()
-        let parameters = EdgeToolsTranscriptContextParameters(
-          transcript: try qwenLlamaImagePrefix(),
-          reasoningEffort: .none
-        )
+        var parameters = try qwenLlamaImagePrefix()
+        parameters.reasoningEffort = .none
         let context = engine.context(parameters)
         _ = try await engine.prefill(
           promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
@@ -192,12 +190,12 @@ struct `Qwen3P5 tests` {
 
         let forked = try await qwenLlamaGeneration(
           using: engine,
-          prompt: .user("Answer red or blue."),
+          prompt: EdgeToolsTranscript.UserMessage("Answer red or blue."),
           context: context.fork()
         )
         let fresh = try await qwenLlamaGeneration(
           using: engine,
-          prompt: .user("Answer red or blue."),
+          prompt: EdgeToolsTranscript.UserMessage("Answer red or blue."),
           context: engine.context(parameters)
         )
 
@@ -208,10 +206,8 @@ struct `Qwen3P5 tests` {
       @Test
       func `Llama Image Fork With Another Image Matches A Cold Cache`() async throws {
         let engine = try await self.multimodalEngine()
-        let parameters = EdgeToolsTranscriptContextParameters(
-          transcript: try qwenLlamaImagePrefix(),
-          reasoningEffort: .none
-        )
+        var parameters = try qwenLlamaImagePrefix()
+        parameters.reasoningEffort = .none
         let context = engine.context(parameters)
         _ = try await engine.prefill(
           promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
@@ -305,7 +301,7 @@ struct `Qwen3P5 tests` {
   private func qwenVLMGeneration(
     using engine: Qwen3P5VLMLXModelEngine,
     prompt: EdgeToolsTranscript.UserMessage,
-    context: MLXContext<Qwen3P5VLMLXProfile>
+    context: MLXContext
   ) async throws -> EdgeToolsEngineGeneration {
     let task = try engine.generate(
       prompt: .user(prompt),
@@ -335,7 +331,7 @@ struct `Qwen3P5 tests` {
   private func qwenLlamaGeneration(
     using engine: Qwen3P5LlamaModelEngine,
     prompt: EdgeToolsTranscript.UserMessage,
-    context: LlamaContext<Qwen3P5LlamaProfile>
+    context: LlamaContext
   ) async throws -> EdgeToolsEngineGeneration {
     let task = try engine.generate(
       prompt: .user(prompt),

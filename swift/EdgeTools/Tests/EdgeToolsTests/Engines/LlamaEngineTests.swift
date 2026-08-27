@@ -129,9 +129,9 @@
   private let llamaSystemPrompt = "You are a helpful assistant."
   private let llamaUserPrompt = "Say hello in one word."
 
-  private func llamaCachedContextParameters() -> EdgeToolsTranscriptContextParameters {
-    EdgeToolsTranscriptContextParameters(
-      transcript: EdgeToolsTranscript(messages: [.system(llamaSystemPrompt)]),
+  private func llamaCachedContextParameters() -> EdgeToolsTranscript {
+    EdgeToolsTranscript(
+      messages: [.system(llamaSystemPrompt)],
       reasoningEffort: .none
     )
   }
@@ -181,7 +181,7 @@
 
   private func singleTokenGeneration(
     using engine: Qwen3LlamaModelEngine,
-    context: LlamaContext<Qwen3LlamaProfile>
+    context: LlamaContext
   ) async throws -> EdgeToolsEngineGeneration {
     let task = try engine.generate(
       prompt: .user(llamaUserPrompt),

@@ -148,7 +148,7 @@
   public final class MLXEngine<Profile: MLXModelProfile>:
     EdgeToolsEngine, EdgeToolsPrefillableEngine
   where Profile.Prompt == EdgeToolsTranscript {
-    public typealias Context = MLXContext<Profile>
+    public typealias Context = MLXContext
     public typealias ContextParameters = MLXContextParameters
     public typealias Prompt = EdgeToolsTranscript.Prompt
     public typealias GenerateParameters = Profile.GenerateParameters
@@ -194,31 +194,28 @@
       self.tokenizer = tokenizer
     }
 
-    public func context(tools: [any EdgeTool]) -> MLXContext<Profile> {
+    public func context(tools: [any EdgeTool]) -> MLXContext {
       self.context(MLXContextParameters(), tools: tools)
     }
 
     public func context(
       _ parameters: MLXContextParameters,
       tools: [any EdgeTool]
-    ) -> MLXContext<Profile> {
+    ) -> MLXContext {
       MLXContext(
-        parameters: EdgeToolsTranscriptContextParameters(
-          transcript: parameters.transcript,
-          reasoningEffort: parameters.reasoningEffort
-        ),
+        parameters: parameters,
         tools: tools,
-        model: MLXModelState<Profile>(policy: MLXCachePolicy(parameters: parameters)),
+        model: MLXModelState(policy: MLXCachePolicy(parameters: parameters)),
         engineIdentity: self.identity
       )
     }
 
     public func tokenize(
       prompt: EdgeToolsTranscript.Prompt,
-      context: MLXContext<Profile>
+      context: MLXContext
     ) async throws -> [EdgeToolsToken] {
       try self.validate(context)
-      let transcript = context.transcript(appending: prompt)
+      let transcript = context.storage.transcript(appending: prompt)
       let tokenIds = try await self.inputProcessor.tokenIds(
         prompt: transcript,
         tools: context.tools.map { $0.definition }
@@ -229,7 +226,7 @@
     public func generate(
       prompt: EdgeToolsTranscript.Prompt,
       parameters: sending Profile.GenerateParameters,
-      context: MLXContext<Profile>,
+      context: MLXContext,
       channel: sending EdgeToolsGenerationChannel
     ) throws -> AnyGenerationTask {
       try self.validate(context)
@@ -238,17 +235,17 @@
         parameters: parameters,
         context: context,
         channel: channel,
-        snapshot: { try context.begin(appending: prompt) }
+        snapshot: { try context.storage.begin(appending: prompt) }
       )
     }
 
     public func prefill(
       promptPrefix: EdgeToolsTranscript.Prompt,
-      context: MLXContext<Profile>
+      context: MLXContext
     ) async throws -> EdgeToolsEnginePrefill {
       try self.validate(context)
       return try await self.prefill(
-        snapshot: context.begin(appending: promptPrefix),
+        snapshot: context.storage.begin(appending: promptPrefix),
         tools: context.tools.map { $0.definition },
         context: context
       )
@@ -257,9 +254,9 @@
     private func generationTask(
       tools: [EdgeToolDefinition],
       parameters: sending Profile.GenerateParameters,
-      context: MLXContext<Profile>,
+      context: MLXContext,
       channel: sending EdgeToolsGenerationChannel,
-      snapshot: @escaping @Sendable () throws -> MLXContext<Profile>.Snapshot
+      snapshot: @escaping @Sendable () throws -> MLXContext.Snapshot
     ) -> AnyGenerationTask {
       return AnyGenerationTask { stopper in
         let snapshot = try snapshot()
@@ -278,26 +275,26 @@
             policy: model.policy
           )
           model.checkpoint = result.checkpoint
-          context.finish(
+          context.storage.finish(
             generation: result.generation,
             revision: snapshot.revision,
             model: model
           )
           return result.generation
         } catch {
-          context.finish(generation: nil, revision: snapshot.revision, model: model)
+          context.storage.finish(generation: nil, revision: snapshot.revision, model: model)
           throw error
         }
       }
     }
 
     private func prefill(
-      snapshot: MLXContext<Profile>.Snapshot,
+      snapshot: MLXContext.Snapshot,
       tools: [EdgeToolDefinition],
-      context: MLXContext<Profile>
+      context: MLXContext
     ) async throws -> EdgeToolsEnginePrefill {
       var model = snapshot.model
-      defer { context.finish(generation: nil, revision: snapshot.revision, model: model) }
+      defer { context.storage.finish(generation: nil, revision: snapshot.revision, model: model) }
       let result = try await self.runtime.prefill(
         prompt: snapshot.transcript,
         tools: tools,
@@ -308,8 +305,8 @@
       return result.prefill
     }
 
-    private func validate(_ context: MLXContext<Profile>) throws {
-      guard context.engineIdentity === self.identity else {
+    private func validate(_ context: MLXContext) throws {
+      guard context.storage.engineIdentity === self.identity else {
         throw EdgeToolsError.incompatibleContext
       }
     }
@@ -321,16 +318,24 @@
     public func context<Profile>(
       transcript: EdgeToolsTranscript = EdgeToolsTranscript(),
       reasoningEffort: EdgeToolsReasoningEffort = .default
-    ) -> MLXContext<Profile> where Engine == MLXEngine<Profile> {
-      self.context(MLXContextParameters(transcript: transcript, reasoningEffort: reasoningEffort))
+    ) -> MLXContext where Engine == MLXEngine<Profile> {
+      var transcript = transcript
+      transcript.reasoningEffort = reasoningEffort
+      return self.context(MLXContextParameters(transcript: transcript))
     }
 
     public func context<Profile>(
       systemPrompt: String,
       reasoningEffort: EdgeToolsReasoningEffort = .default
-    ) -> MLXContext<Profile> where Engine == MLXEngine<Profile> {
-      let transcript = EdgeToolsTranscript(messages: [.system(systemPrompt)])
-      return self.context(transcript: transcript, reasoningEffort: reasoningEffort)
+    ) -> MLXContext where Engine == MLXEngine<Profile> {
+      self.context(
+        MLXContextParameters(
+          transcript: EdgeToolsTranscript(
+            messages: [.system(systemPrompt)],
+            reasoningEffort: reasoningEffort
+          )
+        )
+      )
     }
   }
 

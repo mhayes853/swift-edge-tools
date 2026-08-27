@@ -16,8 +16,8 @@
 
   // MARK: - Shared Turns
 
-  func completeToolTurn<ModelState>(
-    in context: EdgeToolsTranscriptContext<ModelState>,
+  func completeToolTurn(
+    transcript: () -> EdgeToolsTranscript,
     tool: EdgeToolDefinition,
     toolResponse: EdgeToolsValue,
     generatingToolCall: () throws -> AnyGenerationTask,
@@ -34,7 +34,7 @@
       throw GenerationTestError.missingFinalResponse
     }
     return ToolTurnSnapshot(
-      transcript: context.transcript,
+      transcript: transcript(),
       toolCalls: toolGeneration.toolCalls,
       response: responseGeneration.response
     )

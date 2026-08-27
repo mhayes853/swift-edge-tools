@@ -96,11 +96,9 @@ struct `Gemma4 tests` {
       func `Llama Reuses Image Conditioned Prefix`() async throws {
         let engine = try await self.multimodalEngine()
         let context = engine.context(
-          EdgeToolsTranscriptContextParameters(
-            transcript: EdgeToolsTranscript(messages: [
-              .user("What is the dominant color?", images: [try llamaRedImageAsset()])
-            ])
-          )
+          EdgeToolsTranscript(messages: [
+            .user("What is the dominant color?", images: [try llamaRedImageAsset()])
+          ])
         )
         _ = try await engine.prefill(
           promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
@@ -114,10 +112,9 @@ struct `Gemma4 tests` {
           context: context
         )
 
-        let params = EdgeToolsTranscriptContextParameters(transcript: context.transcript)
         let fresh = try await engine.prefill(
           promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
-          context: engine.context(params)
+          context: engine.context(context.transcript)
         )
 
         expectNoDifference(
@@ -147,14 +144,12 @@ struct `Gemma4 tests` {
 
         let engine = try await self.multimodalEngine()
         let context = engine.context(
-          EdgeToolsTranscriptContextParameters(
-            transcript: EdgeToolsTranscript(messages: [
-              .user(
-                "What is the dominant color?",
-                images: [EdgeToolsTranscript.Asset(path: imageURL.path())]
-              )
-            ])
-          )
+          EdgeToolsTranscript(messages: [
+            .user(
+              "What is the dominant color?",
+              images: [EdgeToolsTranscript.Asset(path: imageURL.path())]
+            )
+          ])
         )
         _ = try await engine.prefill(
           promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
@@ -174,11 +169,9 @@ struct `Gemma4 tests` {
       func `Llama Reuses Audio Conditioned Prefix`() async throws {
         let engine = try await self.multimodalEngine()
         let context = engine.context(
-          EdgeToolsTranscriptContextParameters(
-            transcript: EdgeToolsTranscript(messages: [
-              .user("Does this contain a tone?", audio: [llamaToneAudioAsset()])
-            ])
-          )
+          EdgeToolsTranscript(messages: [
+            .user("Does this contain a tone?", audio: [llamaToneAudioAsset()])
+          ])
         )
         _ = try await engine.prefill(
           promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
@@ -192,10 +185,9 @@ struct `Gemma4 tests` {
           context: context
         )
 
-        let params = EdgeToolsTranscriptContextParameters(transcript: context.transcript)
         let fresh = try await engine.prefill(
           promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
-          context: engine.context(params)
+          context: engine.context(context.transcript)
         )
 
         expectNoDifference(
