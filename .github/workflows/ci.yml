@@ -73,7 +73,7 @@ jobs:
       # PowerShell splits a bare comma-separated token into separate arguments.
       - name: Test Swift package
         run: >
-          swift test --disable-experimental-prebuilts --no-parallel
+          swift test --disable-experimental-prebuilts
           --traits "Foundation,FoundationEssentials,XGrammar,Needle2,ChatTemplates,FoundationModels"
 
   android:
