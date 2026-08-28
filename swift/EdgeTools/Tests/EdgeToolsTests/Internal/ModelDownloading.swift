@@ -27,7 +27,7 @@ import Foundation
     }
 
     print("=== Downloading Model From \(repo.id) ===")
-    let url = try await hub.snapshot(from: repo)
+    let url = try await retryingTransientNetworkFailures { try await hub.snapshot(from: repo) }
     print("=== Finished Downloading Model To \(url.path) ===")
     return url
   }
@@ -133,7 +133,9 @@ import Foundation
     }
 
     print("=== Downloading GGUF From \(repo.id) ===")
-    let url = try await hub.snapshot(from: repo, matching: [id.file])
+    let url = try await retryingTransientNetworkFailures {
+      try await hub.snapshot(from: repo, matching: [id.file])
+    }
     print("=== Finished Downloading GGUF To \(url.path) ===")
     return url.appending(path: id.file)
   }
@@ -157,10 +159,49 @@ import Foundation
     }
 
     print("=== Downloading GGUF VLM From \(repo.id) ===")
-    let url = try await hub.snapshot(from: repo, matching: [id.file, projectorFile])
+    let url = try await retryingTransientNetworkFailures {
+      try await hub.snapshot(from: repo, matching: [id.file, projectorFile])
+    }
     print("=== Finished Downloading GGUF VLM To \(url.path) ===")
     return (url.appending(path: id.file), url.appending(path: projectorFile))
   }
+#endif
+
+// MARK: - Retrying Downloads
+
+#if HuggingFaceTokenizers
+  private func retryingTransientNetworkFailures<Value>(
+    _ download: () async throws -> Value
+  ) async throws -> Value {
+    for attempt in 1..<maximumDownloadAttempts {
+      do {
+        return try await download()
+      } catch let error where isTransientNetworkFailure(error) {
+        print("=== Download Attempt \(attempt) Failed With \(error), Retrying ===")
+        try await Task.sleep(for: .seconds(attempt * 5))
+      }
+    }
+    return try await download()
+  }
+
+  private func isTransientNetworkFailure(_ error: any Error) -> Bool {
+    let error = error as NSError
+    guard error.domain == NSURLErrorDomain else {
+      return false
+    }
+    return transientNetworkErrorCodes.contains(error.code)
+  }
+
+  private let maximumDownloadAttempts = 3
+
+  private let transientNetworkErrorCodes: Set<Int> = [
+    NSURLErrorNetworkConnectionLost,
+    NSURLErrorTimedOut,
+    NSURLErrorCannotConnectToHost,
+    NSURLErrorNotConnectedToInternet,
+    NSURLErrorDNSLookupFailed,
+    NSURLErrorResourceUnavailable
+  ]
 #endif
 
 extension URL {
