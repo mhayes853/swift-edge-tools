@@ -64,7 +64,7 @@ swift_arguments=(
   --traits MLX,XGrammar
 )
 
-bin_path="$(swift build --show-bin-path "${swift_arguments[@]}")"
+bin_path="$(swift build --show-bin-path "${swift_arguments[@]}" | tail -n 1)"
 metal_library="$bin_path/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib"
 metal_library_link="$root/default.metallib"
 
