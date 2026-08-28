@@ -196,9 +196,14 @@ if [[ "$INSTALL_NODE" == 1 ]]; then
   DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs npm
 fi
 if [[ "$INSTALL_NEEDLE2_RUNTIME" == 1 ]]; then
-  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libc++-dev libc++abi-dev
-  needle2_library_path="$(dirname "$(find /usr/lib/llvm-* -name libc++.so -print -quit)")"
-  export LIBRARY_PATH="$needle2_library_path${LIBRARY_PATH:+:$LIBRARY_PATH}"
+  # Needle 2 calls `std::__1::__hash_memory`, which only libc++ 19 and newer export.
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl gnupg
+  curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | gpg --dearmor -o /usr/share/keyrings/llvm.gpg
+  echo "deb [signed-by=/usr/share/keyrings/llvm.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-20 main" \
+    > /etc/apt/sources.list.d/llvm.list
+  apt-get update
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libc++-20-dev libc++abi-20-dev
+  export LIBRARY_PATH="/usr/lib/llvm-20/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
 fi
 if [[ "$INSTALL_PYTHON_VENV" == 1 ]]; then
   DEBIAN_FRONTEND=noninteractive apt-get install -y python3-venv

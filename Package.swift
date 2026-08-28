@@ -388,8 +388,8 @@ let package = Package(
     ),
     .binaryTarget(
       name: "CNeedle2",
-      url: "https://github.com/mhayes853/swift-edge-tools/releases/download/0.0.1-binaries/needle2-2.0.3.artifactbundleindex",
-      checksum: "3665ce1fe0e984dfae9a09c1276186c3f456c3343b64a5b65d6bdbbc022e00a6"
+      url: "https://github.com/mhayes853/swift-edge-tools/releases/download/0.0.2-binaries/needle2-2.0.3.artifactbundleindex",
+      checksum: "afe78a13bce01ce216cc03752d175a065f599369c3867ba03466b25f43064170"
     ),
     .binaryTarget(
       name: "CTokenizers",

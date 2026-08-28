@@ -5,295 +5,297 @@ import Testing
   import SnapshotTesting
 #endif
 
-@Suite
-struct `Qwen3P5 tests` {
-  #if MLX && canImport(MLX) && !os(WASI)
-    @Test
-    func `Default Sampling Follows The Reasoning Effort`() {
-      let thinking = Qwen3P5MLXProfile.defaultSampling(
-        prompt: EdgeToolsTranscript(messages: [.user("hi")]),
-        reasoningEffort: .high,
-        parameters: MLXGenerateParameters()
-      )
-      let nonThinking = Qwen3P5MLXProfile.defaultSampling(
-        prompt: EdgeToolsTranscript(messages: [.user("hi")]),
-        reasoningEffort: .none,
-        parameters: MLXGenerateParameters()
-      )
-
-      expectNoDifference(thinking?.topP, 0.95)
-      expectNoDifference(thinking?.presencePenalty, 1.5)
-      expectNoDifference(nonThinking?.topP, nil)
-      expectNoDifference(nonThinking?.presencePenalty, 2)
-    }
-
-  #endif
-
-  #if MLX && canImport(MLX) && !os(WASI)
-    @Suite(.serialized, .enabledIfMLXTests())
-    struct `Qwen3P5MLXModelEngine tests` {
+extension `Model tests` {
+  @Suite
+  struct `Qwen3P5 tests` {
+    #if MLX && canImport(MLX) && !os(WASI)
       @Test
-      func `Completes Tool Turn Snapshot`() async throws {
-        let engine = try await Qwen3P5MLXModelEngine(from: downloadQwen3P5())
-        let transcript = try await completeWeatherTurn(using: engine)
-
-        withKnownIssue { assertSnapshot(of: transcript, as: .dump, record: .all) }
-      }
-
-      @Test
-      func `Completes A Session Tool Turn With The Fused Sampler Snapshot`() async throws {
-        let engine = try await Qwen3P5MLXModelEngine(from: downloadQwen3P5())
-        let session = EdgeToolsSession(engine: engine)
-        let turn = try await completeWeatherTurn(
-          using: session,
-          sampling: EdgeToolsFusedSamplingParameters(
-            temperature: 0.7,
-            topK: 40,
-            topP: 0.9,
-            minP: 0.05,
-            repetitionPenalty: 1.1,
-            seed: 1234
-          )
+      func `Default Sampling Follows The Reasoning Effort`() {
+        let thinking = Qwen3P5MLXProfile.defaultSampling(
+          prompt: EdgeToolsTranscript(messages: [.user("hi")]),
+          reasoningEffort: .high,
+          parameters: MLXGenerateParameters()
+        )
+        let nonThinking = Qwen3P5MLXProfile.defaultSampling(
+          prompt: EdgeToolsTranscript(messages: [.user("hi")]),
+          reasoningEffort: .none,
+          parameters: MLXGenerateParameters()
         )
 
-        withKnownIssue { assertSnapshot(of: turn, as: .dump, record: .all) }
+        expectNoDifference(thinking?.topP, 0.95)
+        expectNoDifference(thinking?.presencePenalty, 1.5)
+        expectNoDifference(nonThinking?.topP, nil)
+        expectNoDifference(nonThinking?.presencePenalty, 2)
       }
 
-      @Test
-      func `Generates Reasoning Snapshot`() async throws {
-        let engine = try await Qwen3P5MLXModelEngine(from: downloadQwen3P5())
-        let generation = try await generateReasoning(using: engine)
+    #endif
 
-        withKnownIssue { assertSnapshot(of: generation, as: .dump, record: .all) }
-      }
-    }
-
-    #if canImport(CoreImage) && canImport(MLXVLM)
-      @Suite(.serialized, .enabledIfMLXTests())
-      struct `Qwen3P5VLMLXModelEngine tests` {
+    #if MLX && canImport(MLX) && !os(WASI)
+      @Suite(.enabledIfMLXTests())
+      struct `Qwen3P5MLXModelEngine tests` {
         @Test
-        func `Forked Image Prefill Only Processes Text Suffix`() async throws {
-          let engine = try await Qwen3P5VLMLXModelEngine(from: downloadQwen3P5VL())
-          let parameters = MLXContextParameters(
-            transcript: EdgeToolsTranscript(
-              messages: [
-                .user("Use this image as a reference.", images: [try redImageAsset()])
-              ]
-            ),
-            reasoningEffort: .none
-          )
-          let context = engine.context(parameters)
-          let initial = try await engine.prefill(
-            promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
-            context: context
-          )
-          let prompt = EdgeToolsTranscript.UserMessage("Answer red or blue.")
+        func `Completes Tool Turn Snapshot`() async throws {
+          let engine = try await Qwen3P5MLXModelEngine(from: downloadQwen3P5())
+          let transcript = try await completeWeatherTurn(using: engine)
 
-          let forked = try await qwenVLMGeneration(
-            using: engine,
-            prompt: prompt,
-            context: context.fork()
-          )
-          let fresh = try await qwenVLMGeneration(
-            using: engine,
-            prompt: prompt,
-            context: engine.context(parameters)
-          )
-          let forkedTokenIDs = forked.tokens.map(\.id)
-          let freshTokenIDs = fresh.tokens.map(\.id)
-
-          expectNoDifference(forkedTokenIDs, freshTokenIDs)
-          let forkedPrefillTokens =
-            (forked.metrics.prefillTokens ?? 0) + (initial.metrics.prefillTokens ?? 0)
-          expectNoDifference(forkedPrefillTokens, fresh.metrics.prefillTokens ?? 0)
+          withKnownIssue { assertSnapshot(of: transcript, as: .dump, record: .all) }
         }
 
         @Test
-        func `Describes Video Snapshot`() async throws {
-          let engine = try await Qwen3P5VLMLXModelEngine(from: downloadQwen3P5VL())
-          let response = try await describeRedVideo(using: engine)
+        func `Completes A Session Tool Turn With The Fused Sampler Snapshot`() async throws {
+          let engine = try await Qwen3P5MLXModelEngine(from: downloadQwen3P5())
+          let session = EdgeToolsSession(engine: engine)
+          let turn = try await completeWeatherTurn(
+            using: session,
+            sampling: EdgeToolsFusedSamplingParameters(
+              temperature: 0.7,
+              topK: 40,
+              topP: 0.9,
+              minP: 0.05,
+              repetitionPenalty: 1.1,
+              seed: 1234
+            )
+          )
 
-          withKnownIssue { assertSnapshot(of: response, as: .lines, record: .all) }
-        }
-
-        @Test
-        func `Describes Image And Video Snapshot`() async throws {
-          let engine = try await Qwen3P5VLMLXModelEngine(from: downloadQwen3P5VL())
-          let response = try await describeRedImageAndVideo(using: engine)
-
-          withKnownIssue { assertSnapshot(of: response, as: .lines, record: .all) }
-        }
-
-        @Test
-        func `Completes Video Conditioned Tool Turn Snapshot`() async throws {
-          let engine = try await Qwen3P5VLMLXModelEngine(from: downloadQwen3P5VL())
-          let result = try await completeVideoColorTurn(using: engine)
-
-          withKnownIssue { assertSnapshot(of: result, as: .dump, record: .all) }
+          withKnownIssue { assertSnapshot(of: turn, as: .dump, record: .all) }
         }
 
         @Test
         func `Generates Reasoning Snapshot`() async throws {
-          let engine = try await Qwen3P5VLMLXModelEngine(from: downloadQwen3P5VL())
+          let engine = try await Qwen3P5MLXModelEngine(from: downloadQwen3P5())
           let generation = try await generateReasoning(using: engine)
 
           withKnownIssue { assertSnapshot(of: generation, as: .dump, record: .all) }
         }
       }
+
+      #if canImport(CoreImage) && canImport(MLXVLM)
+        @Suite(.enabledIfMLXTests())
+        struct `Qwen3P5VLMLXModelEngine tests` {
+          @Test
+          func `Forked Image Prefill Only Processes Text Suffix`() async throws {
+            let engine = try await Qwen3P5VLMLXModelEngine(from: downloadQwen3P5VL())
+            let parameters = MLXContextParameters(
+              transcript: EdgeToolsTranscript(
+                messages: [
+                  .user("Use this image as a reference.", images: [try redImageAsset()])
+                ]
+              ),
+              reasoningEffort: .none
+            )
+            let context = engine.context(parameters)
+            let initial = try await engine.prefill(
+              promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+              context: context
+            )
+            let prompt = EdgeToolsTranscript.UserMessage("Answer red or blue.")
+
+            let forked = try await qwenVLMGeneration(
+              using: engine,
+              prompt: prompt,
+              context: context.fork()
+            )
+            let fresh = try await qwenVLMGeneration(
+              using: engine,
+              prompt: prompt,
+              context: engine.context(parameters)
+            )
+            let forkedTokenIDs = forked.tokens.map(\.id)
+            let freshTokenIDs = fresh.tokens.map(\.id)
+
+            expectNoDifference(forkedTokenIDs, freshTokenIDs)
+            let forkedPrefillTokens =
+              (forked.metrics.prefillTokens ?? 0) + (initial.metrics.prefillTokens ?? 0)
+            expectNoDifference(forkedPrefillTokens, fresh.metrics.prefillTokens ?? 0)
+          }
+
+          @Test
+          func `Describes Video Snapshot`() async throws {
+            let engine = try await Qwen3P5VLMLXModelEngine(from: downloadQwen3P5VL())
+            let response = try await describeRedVideo(using: engine)
+
+            withKnownIssue { assertSnapshot(of: response, as: .lines, record: .all) }
+          }
+
+          @Test
+          func `Describes Image And Video Snapshot`() async throws {
+            let engine = try await Qwen3P5VLMLXModelEngine(from: downloadQwen3P5VL())
+            let response = try await describeRedImageAndVideo(using: engine)
+
+            withKnownIssue { assertSnapshot(of: response, as: .lines, record: .all) }
+          }
+
+          @Test
+          func `Completes Video Conditioned Tool Turn Snapshot`() async throws {
+            let engine = try await Qwen3P5VLMLXModelEngine(from: downloadQwen3P5VL())
+            let result = try await completeVideoColorTurn(using: engine)
+
+            withKnownIssue { assertSnapshot(of: result, as: .dump, record: .all) }
+          }
+
+          @Test
+          func `Generates Reasoning Snapshot`() async throws {
+            let engine = try await Qwen3P5VLMLXModelEngine(from: downloadQwen3P5VL())
+            let generation = try await generateReasoning(using: engine)
+
+            withKnownIssue { assertSnapshot(of: generation, as: .dump, record: .all) }
+          }
+        }
+      #endif
     #endif
-  #endif
 
-  #if HuggingFaceTokenizers && Llama && canImport(CLlama) && !os(WASI)
-    @Suite(.serialized)
-    struct `Qwen3P5LlamaModelEngine tests` {
-      @Test
-      func `Llama Hybrid Fork Falls Back To A Cold Cache`() async throws {
-        let engine = try Qwen3P5LlamaModelEngine(
-          modelPath: (try await downloadGGUFModel(id: .qwen3P5)).path()
-        )
-        let parameters = EdgeToolsTranscript(
-          messages: [
-            .user("Say hello in one word."),
-            .assistant([.text("Hello.")])
-          ]
-        )
-        let context = engine.context(transcript: parameters, reasoningEffort: .none)
-        _ = try await engine.prefill(
-          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
-          context: context
-        )
+    #if HuggingFaceTokenizers && Llama && canImport(CLlama) && !os(WASI)
+      @Suite
+      struct `Qwen3P5LlamaModelEngine tests` {
+        @Test
+        func `Llama Hybrid Fork Falls Back To A Cold Cache`() async throws {
+          let engine = try Qwen3P5LlamaModelEngine(
+            modelPath: (try await downloadGGUFModel(id: .qwen3P5)).path()
+          )
+          let parameters = EdgeToolsTranscript(
+            messages: [
+              .user("Say hello in one word."),
+              .assistant([.text("Hello.")])
+            ]
+          )
+          let context = engine.context(transcript: parameters, reasoningEffort: .none)
+          _ = try await engine.prefill(
+            promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+            context: context
+          )
 
-        let forked = try await qwenLlamaGeneration(
-          using: engine,
-          prompt: EdgeToolsTranscript.UserMessage("Now say goodbye in one word."),
-          context: context.fork()
-        )
-        let fresh = try await qwenLlamaGeneration(
-          using: engine,
-          prompt: EdgeToolsTranscript.UserMessage("Now say goodbye in one word."),
-          context: engine.context(transcript: parameters, reasoningEffort: .none)
-        )
+          let forked = try await qwenLlamaGeneration(
+            using: engine,
+            prompt: EdgeToolsTranscript.UserMessage("Now say goodbye in one word."),
+            context: context.fork()
+          )
+          let fresh = try await qwenLlamaGeneration(
+            using: engine,
+            prompt: EdgeToolsTranscript.UserMessage("Now say goodbye in one word."),
+            context: engine.context(transcript: parameters, reasoningEffort: .none)
+          )
 
-        expectNoDifference(forked.tokens, fresh.tokens)
-        expectNoDifference(forked.metrics.prefillTokens, fresh.metrics.prefillTokens)
+          expectNoDifference(forked.tokens, fresh.tokens)
+          expectNoDifference(forked.metrics.prefillTokens, fresh.metrics.prefillTokens)
+        }
+
+        @Test
+        func `Llama Image Fork Falls Back To A Cold Cache`() async throws {
+          let engine = try await self.multimodalEngine()
+          let parameters = try qwenLlamaImagePrefix()
+          let context = engine.context(transcript: parameters, reasoningEffort: .none)
+          _ = try await engine.prefill(
+            promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+            context: context
+          )
+
+          let forked = try await qwenLlamaGeneration(
+            using: engine,
+            prompt: EdgeToolsTranscript.UserMessage("Answer red or blue."),
+            context: context.fork()
+          )
+          let fresh = try await qwenLlamaGeneration(
+            using: engine,
+            prompt: EdgeToolsTranscript.UserMessage("Answer red or blue."),
+            context: engine.context(transcript: parameters, reasoningEffort: .none)
+          )
+
+          expectNoDifference(forked.tokens, fresh.tokens)
+          expectNoDifference(forked.metrics.prefillTokens, fresh.metrics.prefillTokens)
+        }
+
+        @Test
+        func `Llama Image Fork With Another Image Matches A Cold Cache`() async throws {
+          let engine = try await self.multimodalEngine()
+          let parameters = try qwenLlamaImagePrefix()
+          let context = engine.context(transcript: parameters, reasoningEffort: .none)
+          _ = try await engine.prefill(
+            promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+            context: context
+          )
+          let prompt = EdgeToolsTranscript.UserMessage(
+            "Is this image also red?",
+            images: [try llamaRedImageAsset()]
+          )
+
+          let forked = try await qwenLlamaGeneration(
+            using: engine,
+            prompt: prompt,
+            context: context.fork()
+          )
+          let fresh = try await qwenLlamaGeneration(
+            using: engine,
+            prompt: prompt,
+            context: engine.context(transcript: parameters, reasoningEffort: .none)
+          )
+
+          expectNoDifference(forked.tokens, fresh.tokens)
+          expectNoDifference(forked.metrics.prefillTokens, fresh.metrics.prefillTokens)
+        }
+
+        @Test
+        func `Llama Completes Tool Turn Snapshot`() async throws {
+          let engine = try Qwen3P5LlamaModelEngine(
+            modelPath: (try await downloadGGUFModel(id: .qwen3P5)).path()
+          )
+          let transcript = try await completeWeatherTurn(using: engine)
+
+          withKnownIssue { assertSnapshot(of: transcript, as: .dump, record: .all) }
+        }
+
+        @Test
+        func `Llama Generates Reasoning Snapshot`() async throws {
+          let engine = try Qwen3P5LlamaModelEngine(
+            modelPath: (try await downloadGGUFModel(id: .qwen3P5)).path()
+          )
+          let generation = try await generateReasoning(using: engine)
+
+          withKnownIssue { assertSnapshot(of: generation, as: .dump, record: .all) }
+        }
+
+        private func multimodalEngine() async throws -> Qwen3P5LlamaModelEngine {
+          let model = try await downloadGGUFMultimodalModel(id: .qwen3P5VL)
+          return try Qwen3P5LlamaModelEngine(
+            modelPath: model.model.path(),
+            multimodalProjectorPath: model.projector.path(),
+            contextParameters: LlamaContextParameters(
+              cacheForking: .copyOnWrite(maxContexts: 2)
+            ),
+            multimodalParameters: LlamaMultimodalParameters(warmUp: false)
+          )
+        }
       }
 
-      @Test
-      func `Llama Image Fork Falls Back To A Cold Cache`() async throws {
-        let engine = try await self.multimodalEngine()
-        let parameters = try qwenLlamaImagePrefix()
-        let context = engine.context(transcript: parameters, reasoningEffort: .none)
-        _ = try await engine.prefill(
-          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
-          context: context
-        )
+      @Suite
+      struct `Qwen3P5VLLlamaModelEngine tests` {
+        @Test
+        func `Llama Describes Image Snapshot`() async throws {
+          let engine = try await self.multimodalEngine()
+          let response = try await describeRedImage(using: engine)
 
-        let forked = try await qwenLlamaGeneration(
-          using: engine,
-          prompt: EdgeToolsTranscript.UserMessage("Answer red or blue."),
-          context: context.fork()
-        )
-        let fresh = try await qwenLlamaGeneration(
-          using: engine,
-          prompt: EdgeToolsTranscript.UserMessage("Answer red or blue."),
-          context: engine.context(transcript: parameters, reasoningEffort: .none)
-        )
+          withKnownIssue { assertSnapshot(of: response, as: .lines, record: .all) }
+        }
 
-        expectNoDifference(forked.tokens, fresh.tokens)
-        expectNoDifference(forked.metrics.prefillTokens, fresh.metrics.prefillTokens)
+        @Test
+        func `Llama Completes Image Conditioned Tool Turn Snapshot`() async throws {
+          let engine = try await self.multimodalEngine()
+          let result = try await completeImageColorTurn(using: engine)
+
+          withKnownIssue { assertSnapshot(of: result, as: .dump, record: .all) }
+        }
+
+        private func multimodalEngine() async throws -> Qwen3P5VLLlamaModelEngine {
+          let model = try await downloadGGUFMultimodalModel(id: .qwen3P5VL)
+          return try Qwen3P5VLLlamaModelEngine(
+            modelPath: model.model.path(),
+            multimodalProjectorPath: model.projector.path(),
+            contextParameters: LlamaContextParameters(cacheForking: .isolated),
+            multimodalParameters: LlamaMultimodalParameters(warmUp: false)
+          )
+        }
       }
-
-      @Test
-      func `Llama Image Fork With Another Image Matches A Cold Cache`() async throws {
-        let engine = try await self.multimodalEngine()
-        let parameters = try qwenLlamaImagePrefix()
-        let context = engine.context(transcript: parameters, reasoningEffort: .none)
-        _ = try await engine.prefill(
-          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
-          context: context
-        )
-        let prompt = EdgeToolsTranscript.UserMessage(
-          "Is this image also red?",
-          images: [try llamaRedImageAsset()]
-        )
-
-        let forked = try await qwenLlamaGeneration(
-          using: engine,
-          prompt: prompt,
-          context: context.fork()
-        )
-        let fresh = try await qwenLlamaGeneration(
-          using: engine,
-          prompt: prompt,
-          context: engine.context(transcript: parameters, reasoningEffort: .none)
-        )
-
-        expectNoDifference(forked.tokens, fresh.tokens)
-        expectNoDifference(forked.metrics.prefillTokens, fresh.metrics.prefillTokens)
-      }
-
-      @Test
-      func `Llama Completes Tool Turn Snapshot`() async throws {
-        let engine = try Qwen3P5LlamaModelEngine(
-          modelPath: (try await downloadGGUFModel(id: .qwen3P5)).path()
-        )
-        let transcript = try await completeWeatherTurn(using: engine)
-
-        withKnownIssue { assertSnapshot(of: transcript, as: .dump, record: .all) }
-      }
-
-      @Test
-      func `Llama Generates Reasoning Snapshot`() async throws {
-        let engine = try Qwen3P5LlamaModelEngine(
-          modelPath: (try await downloadGGUFModel(id: .qwen3P5)).path()
-        )
-        let generation = try await generateReasoning(using: engine)
-
-        withKnownIssue { assertSnapshot(of: generation, as: .dump, record: .all) }
-      }
-
-      private func multimodalEngine() async throws -> Qwen3P5LlamaModelEngine {
-        let model = try await downloadGGUFMultimodalModel(id: .qwen3P5VL)
-        return try Qwen3P5LlamaModelEngine(
-          modelPath: model.model.path(),
-          multimodalProjectorPath: model.projector.path(),
-          contextParameters: LlamaContextParameters(
-            cacheForking: .copyOnWrite(maxContexts: 2)
-          ),
-          multimodalParameters: LlamaMultimodalParameters(warmUp: false)
-        )
-      }
-    }
-
-    @Suite(.serialized)
-    struct `Qwen3P5VLLlamaModelEngine tests` {
-      @Test
-      func `Llama Describes Image Snapshot`() async throws {
-        let engine = try await self.multimodalEngine()
-        let response = try await describeRedImage(using: engine)
-
-        withKnownIssue { assertSnapshot(of: response, as: .lines, record: .all) }
-      }
-
-      @Test
-      func `Llama Completes Image Conditioned Tool Turn Snapshot`() async throws {
-        let engine = try await self.multimodalEngine()
-        let result = try await completeImageColorTurn(using: engine)
-
-        withKnownIssue { assertSnapshot(of: result, as: .dump, record: .all) }
-      }
-
-      private func multimodalEngine() async throws -> Qwen3P5VLLlamaModelEngine {
-        let model = try await downloadGGUFMultimodalModel(id: .qwen3P5VL)
-        return try Qwen3P5VLLlamaModelEngine(
-          modelPath: model.model.path(),
-          multimodalProjectorPath: model.projector.path(),
-          contextParameters: LlamaContextParameters(cacheForking: .isolated),
-          multimodalParameters: LlamaMultimodalParameters(warmUp: false)
-        )
-      }
-    }
-  #endif
+    #endif
+  }
 }
 
 #if MLX && canImport(MLX) && canImport(CoreImage) && canImport(MLXVLM) && !os(WASI)

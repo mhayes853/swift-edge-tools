@@ -5,149 +5,151 @@
   import EdgeToolsXGrammar
   import Testing
 
-  @Suite(.serialized)
-  struct `LlamaEngine tests` {
-    @Test
-    func `Reasoning Effort And Tools Belong To The Context`() async throws {
-      let session = EdgeToolsSession(engine: try await qwen3LlamaEngine())
-      let context = session.context(
-        systemPrompt: "System",
-        reasoningEffort: .high
-      ) {
-        EchoTool()
+  extension `Model tests` {
+    @Suite
+    struct `LlamaEngine tests` {
+      @Test
+      func `Reasoning Effort And Tools Belong To The Context`() async throws {
+        let session = EdgeToolsSession(engine: try await qwen3LlamaEngine())
+        let context = session.context(
+          systemPrompt: "System",
+          reasoningEffort: .high
+        ) {
+          EchoTool()
+        }
+        expectTranscriptContextSemantics(context)
       }
-      expectTranscriptContextSemantics(context)
-    }
 
-    @Test
-    func `A Prefill Without Logits Invalidates Another Sequences Logits`() async throws {
-      let model = try LlamaModel(path: (try await downloadGGUFModel(id: .qwen3)).path())
-      let modelBox = LlamaModelBox(model: consume model)
-      let store = LlamaKVSequenceStore(
-        model: modelBox,
-        parameters: LlamaContextParameters(cacheForking: .copyOnWrite(maxContexts: 2))
-      )
-      let first = try #require(store.lease(copyingFrom: nil))
-      let second = try #require(store.lease(copyingFrom: nil))
-      let input = LlamaPreparedInput(tokenIds: [1])
+      @Test
+      func `A Prefill Without Logits Invalidates Another Sequences Logits`() async throws {
+        let model = try LlamaModel(path: (try await downloadGGUFModel(id: .qwen3)).path())
+        let modelBox = LlamaModelBox(model: consume model)
+        let store = LlamaKVSequenceStore(
+          model: modelBox,
+          parameters: LlamaContextParameters(cacheForking: .copyOnWrite(maxContexts: 2))
+        )
+        let first = try #require(store.lease(copyingFrom: nil))
+        let second = try #require(store.lease(copyingFrom: nil))
+        let input = LlamaPreparedInput(tokenIds: [1])
 
-      _ = try store.synchronizeForLogits(
-        sequenceId: first.sequenceId,
-        input: input,
-        multimodalRuntime: nil
-      )
-      _ = try store.synchronize(
-        sequenceId: second.sequenceId,
-        input: input,
-        multimodalRuntime: nil
-      )
-
-      #expect(throws: Never.self) {
-        try store.withLogits(
+        _ = try store.synchronizeForLogits(
           sequenceId: first.sequenceId,
-          appending: nil,
-          vocabularySize: 1
-        ) { _ in }
-      }
-    }
-
-    @Test
-    func `A Failed Final Cache Commit Fails The Generation`() async throws {
-      let modelPath = (try await downloadGGUFModel(id: .qwen3)).path()
-      let filledContext = try llamaPromptFillingContext(modelPath: modelPath)
-      let engine = try qwen3LlamaEngine(
-        modelPath: modelPath,
-        contextParameters: LlamaContextParameters(
-          contextLength: UInt32(filledContext.tokenCount),
-          cacheForking: .isolated
+          input: input,
+          multimodalRuntime: nil
         )
-      )
-      let emittedTokenCount = Lock(0)
-      let task = try engine.generate(
-        prompt: .user(filledContext.prompt),
-        parameters: LlamaGenerateParameters(sampling: .greedy, maxTokens: 1),
-        context: engine.context(),
-        channel: EdgeToolsGenerationChannel(
-          onToken: { _ in emittedTokenCount.withLock { $0 += 1 } }
+        _ = try store.synchronize(
+          sequenceId: second.sequenceId,
+          input: input,
+          multimodalRuntime: nil
         )
-      )
 
-      await #expect(throws: LlamaRuntimeError.self) {
-        try await task.value
+        #expect(throws: Never.self) {
+          try store.withLogits(
+            sequenceId: first.sequenceId,
+            appending: nil,
+            vocabularySize: 1
+          ) { _ in }
+        }
       }
-      expectNoDifference(emittedTokenCount.withLock { $0 }, 1)
-    }
 
-    @Test
-    func `Continuing A Context Only Prefills The Unseen Suffix`() async throws {
-      let engine = try await qwen3LlamaEngine()
-      let context = engine.context(
-        transcript: llamaCachedContextParameters(),
-        reasoningEffort: .none
-      )
-      let prefill = try await engine.prefill(
-        promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
-        context: context
-      )
+      @Test
+      func `A Failed Final Cache Commit Fails The Generation`() async throws {
+        let modelPath = (try await downloadGGUFModel(id: .qwen3)).path()
+        let filledContext = try llamaPromptFillingContext(modelPath: modelPath)
+        let engine = try qwen3LlamaEngine(
+          modelPath: modelPath,
+          contextParameters: LlamaContextParameters(
+            contextLength: UInt32(filledContext.tokenCount),
+            cacheForking: .isolated
+          )
+        )
+        let emittedTokenCount = Lock(0)
+        let task = try engine.generate(
+          prompt: .user(filledContext.prompt),
+          parameters: LlamaGenerateParameters(sampling: .greedy, maxTokens: 1),
+          context: engine.context(),
+          channel: EdgeToolsGenerationChannel(
+            onToken: { _ in emittedTokenCount.withLock { $0 += 1 } }
+          )
+        )
 
-      let cached = try await singleTokenGeneration(using: engine, context: context)
-      let fresh = try await singleTokenGeneration(
-        using: engine,
-        context: engine.context(
+        await #expect(throws: LlamaRuntimeError.self) {
+          try await task.value
+        }
+        expectNoDifference(emittedTokenCount.withLock { $0 }, 1)
+      }
+
+      @Test
+      func `Continuing A Context Only Prefills The Unseen Suffix`() async throws {
+        let engine = try await qwen3LlamaEngine()
+        let context = engine.context(
           transcript: llamaCachedContextParameters(),
           reasoningEffort: .none
         )
-      )
+        let prefill = try await engine.prefill(
+          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+          context: context
+        )
 
-      expectNoDifference(
-        (cached.metrics.prefillTokens ?? 0) + (prefill.metrics.prefillTokens ?? 0),
-        fresh.metrics.prefillTokens ?? 0
-      )
-    }
+        let cached = try await singleTokenGeneration(using: engine, context: context)
+        let fresh = try await singleTokenGeneration(
+          using: engine,
+          context: engine.context(
+            transcript: llamaCachedContextParameters(),
+            reasoningEffort: .none
+          )
+        )
 
-    @Test
-    func `Forking Leaves The Parent Cache Intact`() async throws {
-      let engine = try await qwen3LlamaEngine()
-      let context = engine.context(
-        transcript: llamaCachedContextParameters(),
-        reasoningEffort: .none
-      )
-      _ = try await engine.prefill(
-        promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
-        context: context
-      )
+        expectNoDifference(
+          (cached.metrics.prefillTokens ?? 0) + (prefill.metrics.prefillTokens ?? 0),
+          fresh.metrics.prefillTokens ?? 0
+        )
+      }
 
-      let forked = try await singleTokenGeneration(using: engine, context: context.fork())
-      let parent = try await singleTokenGeneration(using: engine, context: context)
-
-      expectNoDifference(parent.metrics.prefillTokens, forked.metrics.prefillTokens)
-    }
-
-    @Test
-    func `Forking Beyond Sequence Capacity Falls Back To A Cold Cache`() async throws {
-      let engine = try await qwen3LlamaEngine(
-        contextParameters: LlamaContextParameters(cacheForking: .isolated)
-      )
-      let context = engine.context(
-        transcript: llamaCachedContextParameters(),
-        reasoningEffort: .none
-      )
-      let prefill = try await engine.prefill(
-        promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
-        context: context
-      )
-
-      let forked = try await singleTokenGeneration(using: engine, context: context.fork())
-      let fresh = try await singleTokenGeneration(
-        using: engine,
-        context: engine.context(
+      @Test
+      func `Forking Leaves The Parent Cache Intact`() async throws {
+        let engine = try await qwen3LlamaEngine()
+        let context = engine.context(
           transcript: llamaCachedContextParameters(),
           reasoningEffort: .none
         )
-      )
+        _ = try await engine.prefill(
+          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+          context: context
+        )
 
-      expectNoDifference((prefill.metrics.prefillTokens ?? 0) > 0, true)
-      expectNoDifference(forked.metrics.prefillTokens, fresh.metrics.prefillTokens)
+        let forked = try await singleTokenGeneration(using: engine, context: context.fork())
+        let parent = try await singleTokenGeneration(using: engine, context: context)
+
+        expectNoDifference(parent.metrics.prefillTokens, forked.metrics.prefillTokens)
+      }
+
+      @Test
+      func `Forking Beyond Sequence Capacity Falls Back To A Cold Cache`() async throws {
+        let engine = try await qwen3LlamaEngine(
+          contextParameters: LlamaContextParameters(cacheForking: .isolated)
+        )
+        let context = engine.context(
+          transcript: llamaCachedContextParameters(),
+          reasoningEffort: .none
+        )
+        let prefill = try await engine.prefill(
+          promptPrefix: EdgeToolsTranscript.Prompt(messages: []),
+          context: context
+        )
+
+        let forked = try await singleTokenGeneration(using: engine, context: context.fork())
+        let fresh = try await singleTokenGeneration(
+          using: engine,
+          context: engine.context(
+            transcript: llamaCachedContextParameters(),
+            reasoningEffort: .none
+          )
+        )
+
+        expectNoDifference((prefill.metrics.prefillTokens ?? 0) > 0, true)
+        expectNoDifference(forked.metrics.prefillTokens, fresh.metrics.prefillTokens)
+      }
     }
   }
 
