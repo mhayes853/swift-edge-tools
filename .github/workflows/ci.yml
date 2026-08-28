@@ -83,10 +83,10 @@ jobs:
         with:
           swift-version: "6.3"
           swift-build-flags: >-
-            --disable-experimental-prebuilts
+            --disable-experimental-prebuilts --disable-index-store
             --traits Foundation,FoundationEssentials,XGrammar,Needle2,ChatTemplates,HuggingFaceTokenizers,FoundationModels
           swift-test-flags: >-
-            --disable-experimental-prebuilts
+            --disable-experimental-prebuilts --disable-index-store
             --traits Foundation,FoundationEssentials,XGrammar,Needle2,ChatTemplates,HuggingFaceTokenizers,FoundationModels
           build-tests: true
           run-tests: true
@@ -113,6 +113,7 @@ jobs:
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             ca-certificates curl git-lfs gnupg
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git lfs pull --include="ts/needle2/assets/*"
           curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource.sh
           bash /tmp/nodesource.sh

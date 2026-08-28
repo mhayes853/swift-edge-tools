@@ -171,7 +171,7 @@ struct `Qwen3P5 tests` {
         let fresh = try await qwenLlamaGeneration(
           using: engine,
           prompt: EdgeToolsTranscript.UserMessage("Now say goodbye in one word."),
-          context: engine.context(parameters)
+          context: engine.context(transcript: parameters, reasoningEffort: .none)
         )
 
         expectNoDifference(forked.tokens, fresh.tokens)
@@ -225,7 +225,7 @@ struct `Qwen3P5 tests` {
         let fresh = try await qwenLlamaGeneration(
           using: engine,
           prompt: prompt,
-          context: engine.context(parameters)
+          context: engine.context(transcript: parameters, reasoningEffort: .none)
         )
 
         expectNoDifference(forked.tokens, fresh.tokens)

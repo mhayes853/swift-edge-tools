@@ -509,26 +509,14 @@ extension `EdgeToolsSession tests` {
     let tokenizer = try testTokenizer()
     let rawToolCall = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
     let toolTokens = rawToolCall.tokenize(using: tokenizer)
-    let engine = MockEngine.live()
-    let didStart = Lock(false)
-    engine.onGenerateStart = { didStart.withLock { $0 = true } }
+    let engine = MockEngine(scripts: [toolTokens.map { .token($0) } + [.finish], [.finish]])
     let weatherTool = WeatherTool()
     let session = EdgeToolsSession(engine: engine)
     let weatherContext = session.context { weatherTool }
     let echoContext = session.context { EchoTool() }
 
-    let stream = session.stream(prompt: .test(user: "weather?"), context: weatherContext)
-    while !didStart.withLock({ $0 }) { await Task.yield() }
-    for token in toolTokens { engine.push(.token(token)) }
-    engine.push(.finish)
-    engine.push(nil)
-
-    let generation = try await stream.finalGeneration
-    let nextStream = session.stream(prompt: .test(user: "echo"), context: echoContext)
-    while engine.generateCallCount < 2 { await Task.yield() }
-    engine.push(.finish)
-    engine.push(nil)
-    _ = try await nextStream.finalGeneration
+    let generation = try await session.generate(prompt: .test(user: "weather?"), context: weatherContext)
+    _ = try await session.generate(prompt: .test(user: "echo"), context: echoContext)
 
     expectNoDifference(
       engine.generationTools,

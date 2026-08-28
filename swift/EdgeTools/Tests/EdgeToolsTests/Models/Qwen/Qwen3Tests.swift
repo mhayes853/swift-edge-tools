@@ -129,7 +129,7 @@ struct `Qwen3 tests` {
         let freshTask = try engine.generate(
           prompt: .user("Say hello in one word."),
           parameters: LlamaGenerateParameters(maxTokens: 1),
-          context: engine.context(parameters),
+          context: engine.context(transcript: parameters, reasoningEffort: .none),
           channel: EdgeToolsGenerationChannel()
         )
         let fresh = try await freshTask.value

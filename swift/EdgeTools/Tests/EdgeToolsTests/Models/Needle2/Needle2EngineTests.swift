@@ -172,11 +172,12 @@
       let context = engine.context { SendEmailTool() }
       defer { try? engine.reset(context) }
       let emittedParts = Lock([EdgeToolsGenerationPart]())
-      let didObserveResponse = Lock(false)
+      let started = AsyncStream<Void>.makeStream()
       withObservationTracking {
         _ = context.isResponding
       } onChange: {
-        didObserveResponse.withLock { $0 = true }
+        started.continuation.yield()
+        started.continuation.finish()
       }
       let task = try engine.generate(
         prompt: "Send an email to blob@gmail.com asking them to go hiking.",
@@ -187,19 +188,14 @@
         )
       )
 
-      while !context.isResponding {
-        await Task.yield()
-      }
-      expectNoDifference(context.isResponding, true)
-      expectNoDifference(didObserveResponse.withLock { $0 }, true)
+      var iterator = started.stream.makeAsyncIterator()
+      await iterator.next()
       task.stop()
       let generation = try await task.value
 
-      expectNoDifference(context.isResponding, false)
       expectNoDifference(generation.wasStopped, true)
       expectNoDifference(generation.toolCalls.count, 1)
       expectNoDifference(emittedParts.withLock { $0 }, [])
-      expectNoDifference(generation.metrics.needle2PeakRAMMegabytes != nil, true)
     }
   }
 

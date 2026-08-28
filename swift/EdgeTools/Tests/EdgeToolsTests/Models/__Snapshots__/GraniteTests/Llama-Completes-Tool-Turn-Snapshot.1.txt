@@ -71,5 +71,3 @@
             - text: "°C"
           ▿ EdgeToolsGenerationPart
             - text: "."
-  ▿ reasoningEffort: EdgeToolsReasoningEffort
-    - rawValue: "default"

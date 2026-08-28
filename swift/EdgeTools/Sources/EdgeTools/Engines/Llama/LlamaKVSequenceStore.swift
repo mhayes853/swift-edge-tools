@@ -1,4 +1,5 @@
 #if Llama && canImport(CLlama)
+  import CLlama
   import EdgeToolsCore
   import EdgeToolsLlama
 
@@ -65,7 +66,8 @@
     }
 
     func lease(copyingFrom parentSequenceId: Int?) -> LlamaSequenceLease? {
-      self.state.withLock { state in
+      guard parentSequenceId == nil || !llama_model_is_recurrent(self.model.model.handle) && !llama_model_is_hybrid(self.model.model.handle) else { return nil }
+      return self.state.withLock { state in
         guard
           let sequenceId = (0..<self.parameters.cacheForking.maxContexts)
             .first(where: { !state.allocatedSequenceIds.contains($0) })
@@ -441,21 +443,4 @@
     }
   }
 
-  // MARK: - LlamaRuntime
-
-  final class LlamaRuntime: Sendable {
-    let sequences: LlamaKVSequenceStore
-
-    init(model: LlamaModelBox, parameters: LlamaContextParameters) {
-      self.sequences = LlamaKVSequenceStore(model: model, parameters: parameters)
-    }
-
-    func fresh() -> Self {
-      Self(model: self.sequences.model, parameters: self.sequences.parameters)
-    }
-
-    func lease(copyingFrom sequenceId: Int?) -> LlamaSequenceLease? {
-      self.sequences.lease(copyingFrom: sequenceId)
-    }
-  }
 #endif

@@ -104,7 +104,7 @@
         sequence: runtime.lease(copyingFrom: nil)!,
         vocabularySize: self.vocabularySizeValue,
         defaultSampling: self.configuredSampling,
-        preparedInputCache: self.preparedInputCache.forked()
+        preparedInputCache: EdgeToolsLLMPreparedInputCache()
       )
     }
   }
