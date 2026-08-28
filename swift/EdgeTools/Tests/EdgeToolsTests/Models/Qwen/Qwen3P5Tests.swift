@@ -179,7 +179,7 @@ extension `Model tests` {
           expectNoDifference(forked.metrics.prefillTokens, fresh.metrics.prefillTokens)
         }
 
-        @Test
+        @Test(.multimodal())
         func `Llama Image Fork Falls Back To A Cold Cache`() async throws {
           let engine = try await self.multimodalEngine()
           let parameters = try qwenLlamaImagePrefix()
@@ -204,7 +204,7 @@ extension `Model tests` {
           expectNoDifference(forked.metrics.prefillTokens, fresh.metrics.prefillTokens)
         }
 
-        @Test
+        @Test(.multimodal())
         func `Llama Image Fork With Another Image Matches A Cold Cache`() async throws {
           let engine = try await self.multimodalEngine()
           let parameters = try qwenLlamaImagePrefix()
