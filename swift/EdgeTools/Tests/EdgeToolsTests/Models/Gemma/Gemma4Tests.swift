@@ -69,7 +69,7 @@ extension `Model tests` {
           withKnownIssue { assertSnapshot(of: generation, as: .dump, record: .all) }
         }
 
-        @Test
+        @Test(.multimodal())
         func `Llama Describes Image Snapshot`() async throws {
           let engine = try await self.multimodalEngine()
           let response = try await describeRedImage(using: engine)
@@ -77,7 +77,7 @@ extension `Model tests` {
           withKnownIssue { assertSnapshot(of: response, as: .lines, record: .all) }
         }
 
-        @Test
+        @Test(.multimodal())
         func `Llama Completes Image Conditioned Tool Turn Snapshot`() async throws {
           let engine = try await self.multimodalEngine()
           let result = try await completeImageColorTurn(using: engine)
@@ -85,7 +85,7 @@ extension `Model tests` {
           withKnownIssue { assertSnapshot(of: result, as: .dump, record: .all) }
         }
 
-        @Test
+        @Test(.multimodal())
         func `Llama Completes Audio Conditioned Tool Turn Snapshot`() async throws {
           let engine = try await self.multimodalEngine()
           let result = try await completeAudioToneTurn(using: engine)
@@ -93,7 +93,7 @@ extension `Model tests` {
           withKnownIssue { assertSnapshot(of: result, as: .dump, record: .all) }
         }
 
-        @Test
+        @Test(.multimodal())
         func `Llama Reuses Image Conditioned Prefix`() async throws {
           let engine = try await self.multimodalEngine()
           let context = engine.context(
@@ -124,7 +124,7 @@ extension `Model tests` {
           )
         }
 
-        @Test
+        @Test(.multimodal())
         func `Llama Reuses Prepared Media For Text Only Continuations`() async throws {
           let source = try llamaRedImageAsset()
           guard case .bytes(let bytes) = source.content else {
@@ -166,7 +166,7 @@ extension `Model tests` {
           )
         }
 
-        @Test
+        @Test(.multimodal())
         func `Llama Reuses Audio Conditioned Prefix`() async throws {
           let engine = try await self.multimodalEngine()
           let context = engine.context(

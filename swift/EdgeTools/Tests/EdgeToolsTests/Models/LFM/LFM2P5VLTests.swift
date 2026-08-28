@@ -38,7 +38,7 @@ extension `Model tests` {
     #endif
 
     #if HuggingFaceTokenizers && Llama && canImport(CLlama) && !os(WASI)
-      @Suite
+      @Suite(.multimodal())
       struct `LFM2P5VLLlamaModelEngine tests` {
         @Test
         func `Llama Describes Image Snapshot`() async throws {

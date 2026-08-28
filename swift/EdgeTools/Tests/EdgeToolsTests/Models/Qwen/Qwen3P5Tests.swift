@@ -266,7 +266,7 @@ extension `Model tests` {
         }
       }
 
-      @Suite
+      @Suite(.multimodal())
       struct `Qwen3P5VLLlamaModelEngine tests` {
         @Test
         func `Llama Describes Image Snapshot`() async throws {
