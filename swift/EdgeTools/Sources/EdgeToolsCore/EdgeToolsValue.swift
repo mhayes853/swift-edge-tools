@@ -335,8 +335,10 @@ private struct OrderedKeyJSONWriter: ~Copyable {
     yyjson_mut_doc_set_root(writer.document, root)
 
     var length = 0
+    // yyjson hands back a buffer from the C allocator, so it has to go back to the same one.
+    // Swift's deallocate uses a different heap on Windows, which corrupts the C heap.
     let output = yyjson_mut_write(writer.document, YYJSON_WRITE_INF_AND_NAN_AS_NULL, &length)!
-    defer { output.deallocate() }
+    defer { free(output) }
 
     let bytes = UnsafeRawPointer(output).assumingMemoryBound(to: UInt8.self)
     let buffer = UnsafeBufferPointer<UInt8>(start: bytes, count: length)
