@@ -152,6 +152,18 @@ jobs:
         run: >
           swift test --disable-experimental-prebuilts
           --traits Foundation,FoundationEssentials,XGrammar,Needle2,ChatTemplates,HuggingFaceTokenizers,FoundationModels,Llama
+          --skip 'Model tests'
+      # The runner's paravirtual Metal device reports no simdgroup matrix multiply, so llama.cpp
+      # falls back to scalar kernels and a single snapshot can decode for half an hour. The full
+      # model matrix only fits on real hardware; CI keeps a subset that still links the engine,
+      # loads weights, forks a context, and completes a tool turn.
+      - name: Smoke test llama inference
+        env:
+          EDGE_TOOLS_DISABLE_MULTIMODAL_TESTS: "1"
+        run: >
+          swift test --disable-experimental-prebuilts
+          --traits Foundation,FoundationEssentials,XGrammar,Needle2,ChatTemplates,HuggingFaceTokenizers,FoundationModels,Llama
+          --filter 'LlamaEngine tests|LlamaTokenizer tests|FunctionGemma tests'
       - name: Test CLI package
         working-directory: swift/CLI
         run: |
