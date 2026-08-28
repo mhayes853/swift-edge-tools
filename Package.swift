@@ -201,10 +201,13 @@ let package = Package(
         ),
         .target(name: "EdgeToolsTokenizers"),
         .target(name: "EdgeToolsXGrammar", condition: .when(traits: ["XGrammar"])),
+        // The published Windows slices are compiled against libc++, which the MSVC toolchain does
+        // not ship, so they resolve but cannot link. Windows is excluded until Needle 2 publishes
+        // binaries built against the MSVC standard library.
         .target(
           name: "CNeedle2",
           condition: .when(
-            platforms: [.macOS, .iOS, .tvOS, .watchOS, .linux, .windows, .android],
+            platforms: [.macOS, .iOS, .tvOS, .watchOS, .linux, .android],
             traits: ["Needle2"]
           )
         )
