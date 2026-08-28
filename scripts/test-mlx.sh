@@ -64,19 +64,10 @@ swift_arguments=(
   --traits MLX,XGrammar
 )
 
-# Only Swift Build compiles MLX's Metal shaders into its resource bundle, and
-# `--show-bin-path` prints resolution progress ahead of the path it reports.
-swift build --build-system swiftbuild "${swift_arguments[@]}"
-bin_path="$(
-  swift build --show-bin-path --build-system swiftbuild "${swift_arguments[@]}" | tail -n 1
-)"
-metal_library="$bin_path/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib"
+swift build "${swift_arguments[@]}"
+metal_library="$("$root/scripts/mlx-metallib.sh" "$root")"
 metal_library_link="$root/default.metallib"
 
-if [[ ! -f "$metal_library" ]]; then
-  echo "Unable to find MLX's Metal library at $metal_library" >&2
-  exit 1
-fi
 if [[ -e "$metal_library_link" || -L "$metal_library_link" ]]; then
   echo "Refusing to replace existing $metal_library_link" >&2
   exit 1
