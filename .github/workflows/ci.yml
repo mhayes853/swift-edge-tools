@@ -160,18 +160,19 @@ jobs:
           swift test --disable-experimental-prebuilts
           --traits Foundation,FoundationEssentials,XGrammar,Needle2,ChatTemplates,HuggingFaceTokenizers,FoundationModels,Llama
           --filter 'LlamaEngine tests|LlamaTokenizer tests|FunctionGemma tests'
-      # Only Swift Build compiles MLX's Metal shaders into `mlx-swift_Cmlx.bundle`; the native
-      # build system emits every other resource bundle but skips that one. Swift 6.3 still
-      # defaults to native, so the CLI package asks for Swift Build by name. `--show-bin-path`
-      # prints resolution progress ahead of the path, and MLX resolves `default.metallib`
-      # against the working directory.
+      # Only Swift Build compiles MLX's Metal shaders into `mlx-swift_Cmlx.bundle`, so it has to
+      # produce the library, but on Swift 6.3 it cannot resolve the binary targets' modules for a
+      # testing build. The default build system compiles the suites, and MLX resolves
+      # `default.metallib` against the working directory rather than the build directory, so the
+      # two halves meet at the symlink. `--show-bin-path` prints resolution progress ahead of the
+      # path it reports.
       - name: Test CLI package
         working-directory: swift/CLI
         run: |
           set -euo pipefail
-          build_arguments=(--disable-experimental-prebuilts --build-system swiftbuild)
-          swift build "${build_arguments[@]}"
-          bin_path="$(swift build --show-bin-path "${build_arguments[@]}" | tail -n 1)"
+          metal_arguments=(--disable-experimental-prebuilts --build-system swiftbuild)
+          swift build "${metal_arguments[@]}"
+          bin_path="$(swift build --show-bin-path "${metal_arguments[@]}" | tail -n 1)"
           metal_library="$bin_path/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib"
           if [[ ! -f "$metal_library" ]]; then
             echo "Unable to find MLX's Metal library at $metal_library" >&2
@@ -179,7 +180,7 @@ jobs:
           fi
           ln -s "$metal_library" default.metallib
           trap 'unlink default.metallib' EXIT
-          swift test "${build_arguments[@]}"
+          swift test --disable-experimental-prebuilts
       - name: Test MLX inference
         run: scripts/test-mlx.sh
 

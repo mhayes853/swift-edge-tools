@@ -59,14 +59,17 @@ if [[ "$(uname)" != "Darwin" ]]; then
   exit 1
 fi
 
-# Only Swift Build compiles MLX's Metal shaders into its resource bundle.
 swift_arguments=(
   --disable-default-traits
   --traits MLX,XGrammar
-  --build-system swiftbuild
 )
 
-bin_path="$(swift build --show-bin-path "${swift_arguments[@]}" | tail -n 1)"
+# Only Swift Build compiles MLX's Metal shaders into its resource bundle, and
+# `--show-bin-path` prints resolution progress ahead of the path it reports.
+swift build --build-system swiftbuild "${swift_arguments[@]}"
+bin_path="$(
+  swift build --show-bin-path --build-system swiftbuild "${swift_arguments[@]}" | tail -n 1
+)"
 metal_library="$bin_path/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib"
 metal_library_link="$root/default.metallib"
 
