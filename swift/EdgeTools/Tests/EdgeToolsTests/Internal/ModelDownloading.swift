@@ -2,6 +2,7 @@ import Foundation
 
 #if HuggingFaceTokenizers
   import Hub
+  import Operation
 
   enum ModelID: String {
     case qwen3 = "mlx-community/Qwen3-0.6B-4bit"
@@ -26,10 +27,7 @@ import Foundation
       return destination
     }
 
-    print("=== Downloading Model From \(repo.id) ===")
-    let url = try await retryingTransientNetworkFailures { try await hub.snapshot(from: repo) }
-    print("=== Finished Downloading Model To \(url.path) ===")
-    return url
+    return try await downloadSnapshot(repoID: id.rawValue, files: [])
   }
 #endif
 
@@ -132,11 +130,7 @@ import Foundation
       return destination
     }
 
-    print("=== Downloading GGUF From \(repo.id) ===")
-    let url = try await retryingTransientNetworkFailures {
-      try await hub.snapshot(from: repo, matching: [id.file])
-    }
-    print("=== Finished Downloading GGUF To \(url.path) ===")
+    let url = try await downloadSnapshot(repoID: id.rawValue, files: [id.file])
     return url.appending(path: id.file)
   }
 
@@ -158,50 +152,40 @@ import Foundation
       return (model, projector)
     }
 
-    print("=== Downloading GGUF VLM From \(repo.id) ===")
-    let url = try await retryingTransientNetworkFailures {
-      try await hub.snapshot(from: repo, matching: [id.file, projectorFile])
-    }
-    print("=== Finished Downloading GGUF VLM To \(url.path) ===")
+    let url = try await downloadSnapshot(repoID: id.rawValue, files: [id.file, projectorFile])
     return (url.appending(path: id.file), url.appending(path: projectorFile))
   }
 #endif
 
-// MARK: - Retrying Downloads
+// MARK: - Snapshot Downloads
 
 #if HuggingFaceTokenizers
-  private func retryingTransientNetworkFailures<Value>(
-    _ download: () async throws -> Value
-  ) async throws -> Value {
-    for attempt in 1..<maximumDownloadAttempts {
-      do {
-        return try await download()
-      } catch let error where isTransientNetworkFailure(error) {
-        print("=== Download Attempt \(attempt) Failed With \(error), Retrying ===")
-        try await Task.sleep(for: .seconds(attempt * 5))
-      }
-    }
-    return try await download()
+  private func downloadSnapshot(repoID: String, files: [String]) async throws -> URL {
+    try await modelDownloads.store(for: $modelSnapshot(repoID: repoID, files: files)).run()
   }
 
-  private func isTransientNetworkFailure(_ error: any Error) -> Bool {
-    let error = error as NSError
-    guard error.domain == NSURLErrorDomain else {
-      return false
-    }
-    return transientNetworkErrorCodes.contains(error.code)
+  @QueryRequest
+  private func modelSnapshot(repoID: String, files: [String]) async throws -> URL {
+    let hub = HubApi(downloadBase: URL.swiftEdgeToolsTestsDirectory)
+    let repo = Hub.Repo(id: repoID, type: .models)
+    print("=== Downloading From \(repoID) ===")
+    let url =
+      files.isEmpty
+      ? try await hub.snapshot(from: repo) : try await hub.snapshot(from: repo, matching: files)
+    print("=== Finished Downloading To \(url.path) ===")
+    return url
   }
 
-  private let maximumDownloadAttempts = 3
-
-  private let transientNetworkErrorCodes: Set<Int> = [
-    NSURLErrorNetworkConnectionLost,
-    NSURLErrorTimedOut,
-    NSURLErrorCannotConnectToHost,
-    NSURLErrorNotConnectedToInternet,
-    NSURLErrorDNSLookupFailed,
-    NSURLErrorResourceUnavailable
-  ]
+  // Hosted runners drop long transfers, and the client's testing defaults disable retries, so the
+  // retry limit is set explicitly. Nothing here reruns on its own, so the observers stay off.
+  private let modelDownloads = OperationClient(
+    storeCreator: .default(
+      retryLimit: 3,
+      automaticRunningSpecification: AlwaysRunSpecification(isTrue: false),
+      networkObserver: nil,
+      activityObserver: nil
+    )
+  )
 #endif
 
 extension URL {

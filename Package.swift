@@ -135,7 +135,8 @@ let package = Package(
     ),
     .package(url: "https://github.com/apple/swift-collections", from: "1.2.1"),
     .package(url: "https://github.com/apple/swift-atomics", from: "1.3.0"),
-    .package(url: "https://github.com/swiftwasm/JavaScriptKit", exact: "0.56.1")
+    .package(url: "https://github.com/swiftwasm/JavaScriptKit", from: "0.58.0"),
+    .package(url: "https://github.com/mhayes853/swift-operation", branch: "main")
   ],
   targets: [
     .target(
@@ -469,6 +470,11 @@ let package = Package(
         .product(
           name: "Hub",
           package: "swift-transformers",
+          condition: .when(traits: ["HuggingFaceTokenizers"])
+        ),
+        .product(
+          name: "Operation",
+          package: "swift-operation",
           condition: .when(traits: ["HuggingFaceTokenizers"])
         )
       ],
