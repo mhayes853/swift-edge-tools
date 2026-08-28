@@ -61,8 +61,9 @@ extension `Model tests` {
           return try LFM2P5VLLlamaModelEngine(
             modelPath: model.model.path(),
             multimodalProjectorPath: model.projector.path(),
+            modelParameters: llamaTestModelParameters(),
             contextParameters: LlamaContextParameters(cacheForking: .isolated),
-            multimodalParameters: LlamaMultimodalParameters(warmUp: false)
+            multimodalParameters: llamaTestMultimodalParameters(warmUp: false)
           )
         }
       }

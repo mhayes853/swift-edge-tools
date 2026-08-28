@@ -52,7 +52,8 @@ extension `Model tests` {
         @Test
         func `Llama Completes Tool Turn Snapshot`() async throws {
           let engine = try Gemma4LlamaModelEngine(
-            modelPath: (try await downloadGGUFModel(id: .gemma4E2BHybrid)).path()
+            modelPath: (try await downloadGGUFModel(id: .gemma4E2BHybrid)).path(),
+            modelParameters: llamaTestModelParameters()
           )
           let transcript = try await completeWeatherTurn(using: engine)
 
@@ -62,7 +63,8 @@ extension `Model tests` {
         @Test
         func `Llama Generates Reasoning Snapshot`() async throws {
           let engine = try Gemma4LlamaModelEngine(
-            modelPath: (try await downloadGGUFModel(id: .gemma4E2BHybrid)).path()
+            modelPath: (try await downloadGGUFModel(id: .gemma4E2BHybrid)).path(),
+            modelParameters: llamaTestModelParameters()
           )
           let generation = try await generateReasoning(using: engine)
 
@@ -202,8 +204,9 @@ extension `Model tests` {
           return try Gemma4LlamaModelEngine(
             modelPath: model.model.path(),
             multimodalProjectorPath: model.projector.path(),
+            modelParameters: llamaTestModelParameters(),
             contextParameters: LlamaContextParameters(cacheForking: .isolated),
-            multimodalParameters: LlamaMultimodalParameters(warmUp: false)
+            multimodalParameters: llamaTestMultimodalParameters(warmUp: false)
           )
         }
       }

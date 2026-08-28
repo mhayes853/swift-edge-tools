@@ -40,7 +40,7 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 24 elements
+        ▿ parts: 21 elements
           ▿ EdgeToolsGenerationPart
             - text: "The"
           ▿ EdgeToolsGenerationPart
@@ -62,9 +62,7 @@
           ▿ EdgeToolsGenerationPart
             - text: "Paris"
           ▿ EdgeToolsGenerationPart
-            - text: "\","
-          ▿ EdgeToolsGenerationPart
-            - text: " \""
+            - text: "\",\""
           ▿ EdgeToolsGenerationPart
             - text: "condition"
           ▿ EdgeToolsGenerationPart
@@ -72,17 +70,13 @@
           ▿ EdgeToolsGenerationPart
             - text: "sunny"
           ▿ EdgeToolsGenerationPart
-            - text: "\","
-          ▿ EdgeToolsGenerationPart
-            - text: " \""
+            - text: "\",\""
           ▿ EdgeToolsGenerationPart
             - text: "temperature"
           ▿ EdgeToolsGenerationPart
             - text: "Celsius"
           ▿ EdgeToolsGenerationPart
             - text: "\":"
-          ▿ EdgeToolsGenerationPart
-            - text: " "
           ▿ EdgeToolsGenerationPart
             - text: "2"
           ▿ EdgeToolsGenerationPart

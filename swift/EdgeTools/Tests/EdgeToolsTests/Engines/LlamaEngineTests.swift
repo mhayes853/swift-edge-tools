@@ -22,7 +22,10 @@
 
       @Test
       func `A Prefill Without Logits Invalidates Another Sequences Logits`() async throws {
-        let model = try LlamaModel(path: (try await downloadGGUFModel(id: .qwen3)).path())
+        let model = try LlamaModel(
+          path: (try await downloadGGUFModel(id: .qwen3)).path(),
+          parameters: llamaTestModelParameters()
+        )
         let modelBox = LlamaModelBox(model: consume model)
         let store = LlamaKVSequenceStore(
           model: modelBox,
@@ -179,6 +182,7 @@
   ) throws -> Qwen3LlamaModelEngine {
     try Qwen3LlamaModelEngine(
       modelPath: modelPath,
+      modelParameters: llamaTestModelParameters(),
       contextParameters: contextParameters
     )
   }
@@ -186,7 +190,9 @@
   private func llamaPromptFillingContext(
     modelPath: String
   ) throws -> (prompt: String, tokenCount: Int) {
-    let tokenizer = LlamaTokenizer(model: try LlamaModel(path: modelPath))
+    let tokenizer = LlamaTokenizer(
+      model: try LlamaModel(path: modelPath, parameters: llamaTestModelParameters())
+    )
     for wordCount in 1...512 {
       let prompt = String(repeating: " word", count: wordCount)
       let tokenCount =

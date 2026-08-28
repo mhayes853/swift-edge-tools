@@ -199,7 +199,8 @@ extension `Model tests` {
         @Test
         func `Llama Completes Tool Turn Snapshot`() async throws {
           let engine = try MiniCPM5LlamaModelEngine(
-            modelPath: (try await downloadGGUFModel(id: .miniCPM5)).path()
+            modelPath: (try await downloadGGUFModel(id: .miniCPM5)).path(),
+            modelParameters: llamaTestModelParameters()
           )
           let transcript = try await completeWeatherTurn(using: engine)
 
@@ -209,7 +210,8 @@ extension `Model tests` {
         @Test
         func `Llama Generates Reasoning Snapshot`() async throws {
           let engine = try MiniCPM5LlamaModelEngine(
-            modelPath: (try await downloadGGUFModel(id: .miniCPM5)).path()
+            modelPath: (try await downloadGGUFModel(id: .miniCPM5)).path(),
+            modelParameters: llamaTestModelParameters()
           )
           let generation = try await generateReasoning(using: engine)
 

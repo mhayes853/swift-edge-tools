@@ -90,7 +90,10 @@
 
   private func qwen3LlamaTokenizer() async throws -> LlamaTokenizer {
     LlamaTokenizer(
-      model: try LlamaModel(path: (try await downloadGGUFModel(id: .qwen3)).path())
+      model: try LlamaModel(
+        path: (try await downloadGGUFModel(id: .qwen3)).path(),
+        parameters: llamaTestModelParameters()
+      )
     )
   }
 #endif

@@ -31,7 +31,8 @@ extension `Model tests` {
         @Test
         func `Llama Completes Tool Turn Snapshot`() async throws {
           let engine = try FunctionGemmaLlamaModelEngine(
-            modelPath: (try await downloadGGUFModel(id: .functionGemma)).path()
+            modelPath: (try await downloadGGUFModel(id: .functionGemma)).path(),
+            modelParameters: llamaTestModelParameters()
           )
           let transcript = try await completeWeatherTurn(using: engine)
 

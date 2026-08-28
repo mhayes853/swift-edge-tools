@@ -144,22 +144,18 @@ jobs:
           submodules: recursive
       - name: Select Xcode 26.4
         run: sudo xcode-select -s /Applications/Xcode_26.4.app
-      # llama.cpp's Metal vision path segfaults on the hosted runner's virtualized GPU. The same
-      # suites pass on real Apple silicon, so they stay enabled everywhere except here.
       - name: Test Swift package
-        env:
-          EDGE_TOOLS_DISABLE_MULTIMODAL_TESTS: "1"
         run: >
           swift test --disable-experimental-prebuilts
           --traits Foundation,FoundationEssentials,XGrammar,Needle2,ChatTemplates,HuggingFaceTokenizers,FoundationModels,Llama
           --skip 'Model tests'
-      # The runner's paravirtual Metal device reports no simdgroup matrix multiply, so llama.cpp
-      # falls back to scalar kernels and a single snapshot can decode for half an hour. The full
-      # model matrix only fits on real hardware; CI keeps a subset that still links the engine,
-      # loads weights, forks a context, and completes a tool turn.
+      # The runner's GPU is paravirtual and reports no simdgroup matrix multiply, so llama.cpp
+      # falls back to scalar Metal kernels and a single snapshot can decode for half an hour. Its
+      # vision path segfaults outright. Pinning the engine to the CPU picks up the NEON repack
+      # kernels instead, and the suite stays on the GPU everywhere else.
       - name: Smoke test llama inference
         env:
-          EDGE_TOOLS_DISABLE_MULTIMODAL_TESTS: "1"
+          EDGE_TOOLS_DISABLE_LLAMA_GPU: "1"
         run: >
           swift test --disable-experimental-prebuilts
           --traits Foundation,FoundationEssentials,XGrammar,Needle2,ChatTemplates,HuggingFaceTokenizers,FoundationModels,Llama

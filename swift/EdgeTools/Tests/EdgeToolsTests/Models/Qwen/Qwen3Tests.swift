@@ -87,7 +87,8 @@ extension `Model tests` {
         @Test
         func `Llama Completes Tool Turn Snapshot`() async throws {
           let engine = try Qwen3LlamaModelEngine(
-            modelPath: (try await downloadGGUFModel(id: .qwen3)).path()
+            modelPath: (try await downloadGGUFModel(id: .qwen3)).path(),
+            modelParameters: llamaTestModelParameters()
           )
           let transcript = try await completeWeatherTurn(using: engine)
 
@@ -97,7 +98,8 @@ extension `Model tests` {
         @Test
         func `Llama Generates Reasoning Snapshot`() async throws {
           let engine = try Qwen3LlamaModelEngine(
-            modelPath: (try await downloadGGUFModel(id: .qwen3)).path()
+            modelPath: (try await downloadGGUFModel(id: .qwen3)).path(),
+            modelParameters: llamaTestModelParameters()
           )
           let generation = try await generateReasoning(using: engine)
 
@@ -107,7 +109,8 @@ extension `Model tests` {
         @Test
         func `Llama Forked System Prefill Only Processes User Suffix`() async throws {
           let engine = try Qwen3LlamaModelEngine(
-            modelPath: (try await downloadGGUFModel(id: .qwen3)).path()
+            modelPath: (try await downloadGGUFModel(id: .qwen3)).path(),
+            modelParameters: llamaTestModelParameters()
           )
           let systemPrompt = "You are a helpful assistant."
           let parameters = EdgeToolsTranscript(

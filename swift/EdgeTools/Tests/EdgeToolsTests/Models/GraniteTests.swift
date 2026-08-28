@@ -27,7 +27,8 @@ extension `Model tests` {
         @Test
         func `Llama Completes Tool Turn Snapshot`() async throws {
           let engine = try GraniteLlamaModelEngine(
-            modelPath: (try await downloadGGUFModel(id: .graniteMoeHybrid)).path()
+            modelPath: (try await downloadGGUFModel(id: .graniteMoeHybrid)).path(),
+            modelParameters: llamaTestModelParameters()
           )
           let transcript = try await completeWeatherTurn(using: engine)
 

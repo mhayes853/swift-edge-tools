@@ -150,7 +150,8 @@ extension `Model tests` {
         @Test
         func `Llama Hybrid Fork Falls Back To A Cold Cache`() async throws {
           let engine = try Qwen3P5LlamaModelEngine(
-            modelPath: (try await downloadGGUFModel(id: .qwen3P5)).path()
+            modelPath: (try await downloadGGUFModel(id: .qwen3P5)).path(),
+            modelParameters: llamaTestModelParameters()
           )
           let parameters = EdgeToolsTranscript(
             messages: [
@@ -236,7 +237,8 @@ extension `Model tests` {
         @Test
         func `Llama Completes Tool Turn Snapshot`() async throws {
           let engine = try Qwen3P5LlamaModelEngine(
-            modelPath: (try await downloadGGUFModel(id: .qwen3P5)).path()
+            modelPath: (try await downloadGGUFModel(id: .qwen3P5)).path(),
+            modelParameters: llamaTestModelParameters()
           )
           let transcript = try await completeWeatherTurn(using: engine)
 
@@ -246,7 +248,8 @@ extension `Model tests` {
         @Test
         func `Llama Generates Reasoning Snapshot`() async throws {
           let engine = try Qwen3P5LlamaModelEngine(
-            modelPath: (try await downloadGGUFModel(id: .qwen3P5)).path()
+            modelPath: (try await downloadGGUFModel(id: .qwen3P5)).path(),
+            modelParameters: llamaTestModelParameters()
           )
           let generation = try await generateReasoning(using: engine)
 
@@ -258,10 +261,11 @@ extension `Model tests` {
           return try Qwen3P5LlamaModelEngine(
             modelPath: model.model.path(),
             multimodalProjectorPath: model.projector.path(),
+            modelParameters: llamaTestModelParameters(),
             contextParameters: LlamaContextParameters(
               cacheForking: .copyOnWrite(maxContexts: 2)
             ),
-            multimodalParameters: LlamaMultimodalParameters(warmUp: false)
+            multimodalParameters: llamaTestMultimodalParameters(warmUp: false)
           )
         }
       }
@@ -289,8 +293,9 @@ extension `Model tests` {
           return try Qwen3P5VLLlamaModelEngine(
             modelPath: model.model.path(),
             multimodalProjectorPath: model.projector.path(),
+            modelParameters: llamaTestModelParameters(),
             contextParameters: LlamaContextParameters(cacheForking: .isolated),
-            multimodalParameters: LlamaMultimodalParameters(warmUp: false)
+            multimodalParameters: llamaTestMultimodalParameters(warmUp: false)
           )
         }
       }
