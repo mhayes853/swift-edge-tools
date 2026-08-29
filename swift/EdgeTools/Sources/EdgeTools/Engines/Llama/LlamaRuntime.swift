@@ -89,6 +89,24 @@
     }
   }
 
+  // MARK: - LlamaRuntime
+
+  final class LlamaRuntime: Sendable {
+    let sequences: LlamaKVSequenceStore
+
+    init(model: LlamaModelBox, parameters: LlamaContextParameters) {
+      self.sequences = LlamaKVSequenceStore(model: model, parameters: parameters)
+    }
+
+    func fresh() -> Self {
+      Self(model: self.sequences.model, parameters: self.sequences.parameters)
+    }
+
+    func lease(copyingFrom sequenceId: Int?) -> LlamaSequenceLease? {
+      self.sequences.lease(copyingFrom: sequenceId)
+    }
+  }
+
   // MARK: - LlamaDecodedLogits
 
   // Evidence that a decode asked for logits at `sequenceId`'s last position. Only the decode

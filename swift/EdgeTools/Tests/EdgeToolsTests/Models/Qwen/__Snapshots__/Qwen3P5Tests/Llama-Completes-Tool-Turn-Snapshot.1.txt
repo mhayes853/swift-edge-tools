@@ -410,7 +410,7 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 41 elements
+        ▿ parts: 33 elements
           ▿ EdgeToolsGenerationPart
             - reasoning: "The"
           ▿ EdgeToolsGenerationPart
@@ -430,17 +430,23 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: "unny"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "**"
+            - reasoning: "**."
           ▿ EdgeToolsGenerationPart
-            - reasoning: " at"
+            - reasoning: " The"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " forecast"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " shows"
           ▿ EdgeToolsGenerationPart
             - reasoning: " a"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " pleasant"
           ▿ EdgeToolsGenerationPart
             - reasoning: " temperature"
           ▿ EdgeToolsGenerationPart
             - reasoning: " of"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " "
+            - reasoning: " **"
           ▿ EdgeToolsGenerationPart
             - reasoning: "2"
           ▿ EdgeToolsGenerationPart
@@ -448,23 +454,13 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: "°C"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "."
+            - reasoning: "**,"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " The"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " forecast"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " indicates"
+            - reasoning: " with"
           ▿ EdgeToolsGenerationPart
             - reasoning: " clear"
           ▿ EdgeToolsGenerationPart
             - reasoning: " skies"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " with"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " pleasant"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " conditions"
           ▿ EdgeToolsGenerationPart
             - reasoning: ","
           ▿ EdgeToolsGenerationPart
@@ -472,11 +468,7 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " it"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " an"
-          ▿ EdgeToolsGenerationPart
             - reasoning: " ideal"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " time"
           ▿ EdgeToolsGenerationPart
             - reasoning: " for"
           ▿ EdgeToolsGenerationPart
@@ -484,14 +476,4 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " activities"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " and"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " enjoying"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " beautiful"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " views"
-          ▿ EdgeToolsGenerationPart
             - reasoning: "."
-  ▿ reasoningEffort: EdgeToolsReasoningEffort
-    - rawValue: "default"

@@ -64,14 +64,10 @@ swift_arguments=(
   --traits MLX,XGrammar
 )
 
-bin_path="$(swift build --show-bin-path "${swift_arguments[@]}")"
-metal_library="$bin_path/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib"
+swift build "${swift_arguments[@]}"
+metal_library="$("$root/scripts/mlx-metallib.sh" "$root")"
 metal_library_link="$root/default.metallib"
 
-if [[ ! -f "$metal_library" ]]; then
-  echo "Unable to find MLX's Metal library at $metal_library" >&2
-  exit 1
-fi
 if [[ -e "$metal_library_link" || -L "$metal_library_link" ]]; then
   echo "Refusing to replace existing $metal_library_link" >&2
   exit 1

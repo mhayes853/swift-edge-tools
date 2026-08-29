@@ -5,185 +5,189 @@ import Testing
   import SnapshotTesting
 #endif
 
-@Suite
-struct `LFM2P5 tests` {
-  #if MLX && canImport(MLX) && !os(WASI)
-    @Suite(.serialized, .enabledIfMLXTests())
-    struct `LFM2P5MLXModelEngine tests` {
-      @Test
-      func `Completes Tool Turn Snapshot`() async throws {
-        let engine = try await LFM2P5MLXModelEngine(from: downloadLFM2P5())
-        let transcript = try await completeWeatherTurn(using: engine)
+extension `Model tests` {
+  @Suite
+  struct `LFM2P5 tests` {
+    #if MLX && canImport(MLX) && !os(WASI)
+      @Suite(.enabledIfMLXTests())
+      struct `LFM2P5MLXModelEngine tests` {
+        @Test
+        func `Completes Tool Turn Snapshot`() async throws {
+          let engine = try await LFM2P5MLXModelEngine(from: downloadLFM2P5())
+          let transcript = try await completeWeatherTurn(using: engine)
 
-        withKnownIssue { assertSnapshot(of: transcript, as: .dump, record: .all) }
+          withKnownIssue { assertSnapshot(of: transcript, as: .dump, record: .all) }
+        }
+
+        @Test
+        func `Thinking Model Generates Reasoning Snapshot`() async throws {
+          let engine = try await LFM2P5MLXModelEngine(from: downloadLFM2P5Thinking())
+          let generation = try await generateReasoning(using: engine)
+
+          withKnownIssue { assertSnapshot(of: generation, as: .dump, record: .all) }
+        }
       }
+    #endif
 
-      @Test
-      func `Thinking Model Generates Reasoning Snapshot`() async throws {
-        let engine = try await LFM2P5MLXModelEngine(from: downloadLFM2P5Thinking())
-        let generation = try await generateReasoning(using: engine)
+    #if XGrammar
+      @Suite
+      struct `LFM2P5XGRCompiler tests`: ~Copyable {
+        private let compiler: XGRCompiler
+        private let tokenizer: TestTokenizer
+        private let eosToken: EdgeToolsToken.ID
 
-        withKnownIssue { assertSnapshot(of: generation, as: .dump, record: .all) }
-      }
-    }
-  #endif
+        init() throws {
+          let tokenizer = try testTokenizer()
+          let compiler = try makeGenericXGRCompiler(tokenizer: tokenizer)
+          let eosToken = try requiredTestEOSToken(tokenizer: tokenizer)
+          self.tokenizer = tokenizer
+          self.compiler = compiler
+          self.eosToken = eosToken
+        }
 
-  #if XGrammar
-    @Suite(.serialized)
-    struct `LFM2P5XGRCompiler tests`: ~Copyable {
-      private let compiler: XGRCompiler
-      private let tokenizer: TestTokenizer
-      private let eosToken: EdgeToolsToken.ID
+        @Test
+        func `LFM2P5 Python Removes Duplicate EBNF Rules`() throws {
+          let grammar = try XGRGrammar.lfm2P5Python(
+            tools: [.getWeather, Self.getForecast],
+            range: .exact(1)
+          )
+          let expressions = Self.expressions(in: grammar.ebnf)
 
-      init() throws {
-        let tokenizer = try testTokenizer()
-        let compiler = try makeGenericXGRCompiler(tokenizer: tokenizer)
-        let eosToken = try requiredTestEOSToken(tokenizer: tokenizer)
-        self.tokenizer = tokenizer
-        self.compiler = compiler
-        self.eosToken = eosToken
-      }
+          expectNoDifference(Set(expressions).count, expressions.count)
+        }
 
-      @Test
-      func `LFM2P5 Python Removes Duplicate EBNF Rules`() throws {
-        let grammar = try XGRGrammar.lfm2P5Python(
-          tools: [.getWeather, Self.getForecast],
-          range: .exact(1)
-        )
-        let expressions = Self.expressions(in: grammar.ebnf)
+        @Test
+        func `LFM2P5 Python Uses Keyword Arguments And Nested Dictionaries`() throws {
+          let validMatcher = try self.compiler.makeMatcher(
+            try XGRGrammar.lfm2P5Python(tools: [Self.nestedTool], range: .exact(1))
+          )
+          let valid =
+            """
+            <|tool_call_start|>[nested(payload={"enabled":True,"child":{"missing":None,"items":[\
+            {"flag":False}]}})]<|tool_call_end|>
+            """
+          assertGrammarAccepts(
+            valid,
+            matcher: validMatcher,
+            tokenizer: self.tokenizer,
+            eosToken: self.eosToken
+          )
 
-        expectNoDifference(Set(expressions).count, expressions.count)
-      }
+          let optionalMatcher = try self.compiler.makeMatcher(
+            try XGRGrammar.lfm2P5Python(tools: [Self.nestedTool], range: .exact(1))
+          )
+          assertGrammarAccepts(
+            """
+            <|tool_call_start|>[nested(payload={"enabled":True,"child":{"missing":None,"items":[]}},\
+            note="hello")]<|tool_call_end|>
+            """,
+            matcher: optionalMatcher,
+            tokenizer: self.tokenizer,
+            eosToken: self.eosToken
+          )
 
-      @Test
-      func `LFM2P5 Python Uses Keyword Arguments And Nested Dictionaries`() throws {
-        let validMatcher = try self.compiler.makeMatcher(
-          try XGRGrammar.lfm2P5Python(tools: [Self.nestedTool], range: .exact(1))
-        )
-        let valid =
-          """
-          <|tool_call_start|>[nested(payload={"enabled":True,"child":{"missing":None,"items":[\
-          {"flag":False}]}})]<|tool_call_end|>
-          """
-        assertGrammarAccepts(
-          valid,
-          matcher: validMatcher,
-          tokenizer: self.tokenizer,
-          eosToken: self.eosToken
-        )
+          let topLevelJSONMatcher = try self.compiler.makeMatcher(
+            try XGRGrammar.lfm2P5Python(tools: [Self.nestedTool], range: .exact(1))
+          )
+          assertGrammarRejects(
+            #"<|tool_call_start|>[nested("payload":{"enabled":True,"child":{"missing":None,"items":[]}})]<|tool_call_end|>"#,
+            matcher: topLevelJSONMatcher,
+            tokenizer: self.tokenizer,
+            eosToken: self.eosToken
+          )
 
-        let optionalMatcher = try self.compiler.makeMatcher(
-          try XGRGrammar.lfm2P5Python(tools: [Self.nestedTool], range: .exact(1))
-        )
-        assertGrammarAccepts(
-          """
-          <|tool_call_start|>[nested(payload={"enabled":True,"child":{"missing":None,"items":[]}},\
-          note="hello")]<|tool_call_end|>
-          """,
-          matcher: optionalMatcher,
-          tokenizer: self.tokenizer,
-          eosToken: self.eosToken
-        )
+          let nestedKeywordMatcher = try self.compiler.makeMatcher(
+            try XGRGrammar.lfm2P5Python(tools: [Self.nestedTool], range: .exact(1))
+          )
+          assertGrammarRejects(
+            #"<|tool_call_start|>[nested(payload={"enabled"=True,"child":{"missing":None,"items":[]}})]<|tool_call_end|>"#,
+            matcher: nestedKeywordMatcher,
+            tokenizer: self.tokenizer,
+            eosToken: self.eosToken
+          )
+        }
 
-        let topLevelJSONMatcher = try self.compiler.makeMatcher(
-          try XGRGrammar.lfm2P5Python(tools: [Self.nestedTool], range: .exact(1))
-        )
-        assertGrammarRejects(
-          #"<|tool_call_start|>[nested("payload":{"enabled":True,"child":{"missing":None,"items":[]}})]<|tool_call_end|>"#,
-          matcher: topLevelJSONMatcher,
-          tokenizer: self.tokenizer,
-          eosToken: self.eosToken
-        )
+        private static func expressions(in ebnf: String) -> [String] {
+          ebnf.split(separator: "\n")
+            .compactMap { line in
+              guard let separator = line.range(of: "::=") else { return nil }
+              return line[separator.upperBound...].trimmingCharacters(in: .whitespaces)
+            }
+        }
 
-        let nestedKeywordMatcher = try self.compiler.makeMatcher(
-          try XGRGrammar.lfm2P5Python(tools: [Self.nestedTool], range: .exact(1))
-        )
-        assertGrammarRejects(
-          #"<|tool_call_start|>[nested(payload={"enabled"=True,"child":{"missing":None,"items":[]}})]<|tool_call_end|>"#,
-          matcher: nestedKeywordMatcher,
-          tokenizer: self.tokenizer,
-          eosToken: self.eosToken
-        )
-      }
+        private static var getForecast: EdgeToolDefinition {
+          var tool = EdgeToolDefinition.getWeather
+          tool.name = "getForecast"
+          return tool
+        }
 
-      private static func expressions(in ebnf: String) -> [String] {
-        ebnf.split(separator: "\n")
-          .compactMap { line in
-            guard let separator = line.range(of: "::=") else { return nil }
-            return line[separator.upperBound...].trimmingCharacters(in: .whitespaces)
-          }
-      }
-
-      private static var getForecast: EdgeToolDefinition {
-        var tool = EdgeToolDefinition.getWeather
-        tool.name = "getForecast"
-        return tool
-      }
-
-      private static let nestedTool = EdgeToolDefinition(
-        name: "nested",
-        description: "Exercises nested Python values.",
-        arguments: EdgeToolsGenerationSchema(
-          .type(.object),
-          .properties([
-            "payload": EdgeToolsGenerationSchema(
-              .type(.object),
-              .properties([
-                "enabled": .boolean,
-                "child": EdgeToolsGenerationSchema(
-                  .type(.object),
-                  .properties([
-                    "missing": .null,
-                    "items": EdgeToolsGenerationSchema(
-                      .type(.array),
-                      .items(
-                        EdgeToolsGenerationSchema(
-                          .type(.object),
-                          .properties(["flag": .boolean]),
-                          .required(["flag"]),
-                          .additionalProperties(false)
+        private static let nestedTool = EdgeToolDefinition(
+          name: "nested",
+          description: "Exercises nested Python values.",
+          arguments: EdgeToolsGenerationSchema(
+            .type(.object),
+            .properties([
+              "payload": EdgeToolsGenerationSchema(
+                .type(.object),
+                .properties([
+                  "enabled": .boolean,
+                  "child": EdgeToolsGenerationSchema(
+                    .type(.object),
+                    .properties([
+                      "missing": .null,
+                      "items": EdgeToolsGenerationSchema(
+                        .type(.array),
+                        .items(
+                          EdgeToolsGenerationSchema(
+                            .type(.object),
+                            .properties(["flag": .boolean]),
+                            .required(["flag"]),
+                            .additionalProperties(false)
+                          )
                         )
                       )
-                    )
-                  ]),
-                  .required(["missing", "items"]),
-                  .additionalProperties(false)
-                )
-              ]),
-              .required(["enabled", "child"]),
-              .additionalProperties(false)
-            ),
-            "note": .string
-          ]),
-          .required(["payload"]),
-          .additionalProperties(false)
+                    ]),
+                    .required(["missing", "items"]),
+                    .additionalProperties(false)
+                  )
+                ]),
+                .required(["enabled", "child"]),
+                .additionalProperties(false)
+              ),
+              "note": .string
+            ]),
+            .required(["payload"]),
+            .additionalProperties(false)
+          )
         )
-      )
-    }
-  #endif
-
-  #if HuggingFaceTokenizers && Llama && canImport(CLlama) && !os(WASI)
-    @Suite(.serialized)
-    struct `LFM2P5LlamaModelEngine tests` {
-      @Test
-      func `Llama Completes Tool Turn Snapshot`() async throws {
-        let engine = try LFM2P5LlamaModelEngine(
-          modelPath: (try await downloadGGUFModel(id: .lfm2P5)).path()
-        )
-        let transcript = try await completeWeatherTurn(using: engine)
-
-        withKnownIssue { assertSnapshot(of: transcript, as: .dump, record: .all) }
       }
+    #endif
 
-      @Test
-      func `Llama Thinking Model Generates Reasoning Snapshot`() async throws {
-        let engine = try LFM2P5LlamaModelEngine(
-          modelPath: (try await downloadGGUFModel(id: .lfm2P5Thinking)).path()
-        )
-        let generation = try await generateReasoning(using: engine)
+    #if HuggingFaceTokenizers && Llama && canImport(CLlama) && !os(WASI)
+      @Suite
+      struct `LFM2P5LlamaModelEngine tests` {
+        @Test
+        func `Llama Completes Tool Turn Snapshot`() async throws {
+          let engine = try LFM2P5LlamaModelEngine(
+            modelPath: (try await downloadGGUFModel(id: .lfm2P5)).path(),
+            modelParameters: llamaTestModelParameters()
+          )
+          let transcript = try await completeWeatherTurn(using: engine)
 
-        withKnownIssue { assertSnapshot(of: generation, as: .dump, record: .all) }
+          withKnownIssue { assertSnapshot(of: transcript, as: .dump, record: .all) }
+        }
+
+        @Test
+        func `Llama Thinking Model Generates Reasoning Snapshot`() async throws {
+          let engine = try LFM2P5LlamaModelEngine(
+            modelPath: (try await downloadGGUFModel(id: .lfm2P5Thinking)).path(),
+            modelParameters: llamaTestModelParameters()
+          )
+          let generation = try await generateReasoning(using: engine)
+
+          withKnownIssue { assertSnapshot(of: generation, as: .dump, record: .all) }
+        }
       }
-    }
-  #endif
+    #endif
+  }
 }

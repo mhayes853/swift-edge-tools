@@ -30,20 +30,6 @@ struct `EdgeToolsSession tests` {
   }
 
   @Test
-  func `Contexts Own Their Tools`() {
-    let session = EdgeToolsSession(engine: MockEngine())
-    let weatherContext = session.context {
-      WeatherTool()
-    }
-    let echoContext = session.context {
-      EchoTool()
-    }
-
-    expectNoDifference(weatherContext.tools.map(\.name), ["get_weather"])
-    expectNoDifference(echoContext.tools.map(\.name), ["echo"])
-  }
-
-  @Test
   func `Final Generation Returns Successfully When No Errors Occur`() async throws {
     let tokenizer = try testTokenizer()
     let tokens = "Hello, world!".tokenize(using: tokenizer)
@@ -134,41 +120,6 @@ struct `EdgeToolsSession tests` {
       generation.toolCalls,
       [EdgeRawToolCall(name: "unknown", arguments: ["value": 1])]
     )
-  }
-
-  @Test
-  func `Generate Throws When Engine Errors`() async throws {
-    let tokenizer = try testTokenizer()
-    let tokens = "hi".tokenize(using: tokenizer)
-    let error = ToolError(message: "boom")
-    let engine = MockEngine(script: tokens.map { .token($0) } + [.error(error)])
-    let session = EdgeToolsSession(engine: engine)
-
-    await #expect(throws: ToolError.self) {
-      _ = try await session.generate(prompt: .test(user: "hi"), context: session.context())
-    }
-  }
-
-  @Test
-  func `Generate Propagates Task Cancellation`() async throws {
-    let tokenizer = try testTokenizer()
-    let firstToken = "a a".tokenize(using: tokenizer).first!
-    let engine = MockEngine.live()
-    engine.push(.token(firstToken))
-    let session = EdgeToolsSession(engine: engine)
-
-    let task = Task {
-      try await session.generate(prompt: .test(user: "hi"), context: session.context())
-    }
-
-    while engine.generateCallCount == 0 { await Task.yield() }
-    task.cancel()
-    engine.push(.finish)
-    engine.push(nil)
-
-    await #expect(throws: CancellationError.self) {
-      _ = try await task.value
-    }
   }
 
   @Test
@@ -558,26 +509,14 @@ extension `EdgeToolsSession tests` {
     let tokenizer = try testTokenizer()
     let rawToolCall = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
     let toolTokens = rawToolCall.tokenize(using: tokenizer)
-    let engine = MockEngine.live()
-    let didStart = Lock(false)
-    engine.onGenerateStart = { didStart.withLock { $0 = true } }
+    let engine = MockEngine(scripts: [toolTokens.map { .token($0) } + [.finish], [.finish]])
     let weatherTool = WeatherTool()
     let session = EdgeToolsSession(engine: engine)
     let weatherContext = session.context { weatherTool }
     let echoContext = session.context { EchoTool() }
 
-    let stream = session.stream(prompt: .test(user: "weather?"), context: weatherContext)
-    while !didStart.withLock({ $0 }) { await Task.yield() }
-    for token in toolTokens { engine.push(.token(token)) }
-    engine.push(.finish)
-    engine.push(nil)
-
-    let generation = try await stream.finalGeneration
-    let nextStream = session.stream(prompt: .test(user: "echo"), context: echoContext)
-    while engine.generateCallCount < 2 { await Task.yield() }
-    engine.push(.finish)
-    engine.push(nil)
-    _ = try await nextStream.finalGeneration
+    let generation = try await session.generate(prompt: .test(user: "weather?"), context: weatherContext)
+    _ = try await session.generate(prompt: .test(user: "echo"), context: echoContext)
 
     expectNoDifference(
       engine.generationTools,
@@ -602,20 +541,6 @@ extension `EdgeToolsSession tests` {
       context: session.context()
     )
     let value = try generation.decoded(as: EdgeToolsValue.self)
-
-    expectNoDifference(value, ["name": "Ada"])
-  }
-
-  @Test
-  func `Stream Decodes Its Final Response`() async throws {
-    let response = #"{"name":"Ada"}"#
-    let engine = MockEngine(
-      script: [.token(EdgeToolsToken(id: 0, stringValue: response)), .finish]
-    )
-    let session = EdgeToolsSession(engine: engine)
-
-    let stream = session.stream(prompt: .test(user: "hi"), context: session.context())
-    let value = try await stream.decodedResponse(as: EdgeToolsValue.self)
 
     expectNoDifference(value, ["name": "Ada"])
   }

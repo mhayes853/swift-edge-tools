@@ -6,23 +6,22 @@ import Testing
 struct `AnyGenerationTask tests` {
   @Test
   func `Stopper Observes A Running Stop`() async throws {
-    let didStop = Lock(false)
     let started = AsyncStream<Void>.makeStream()
+    let resume = AsyncStream<Void>.makeStream()
     let task = AnyGenerationTask { stopper in
       started.continuation.yield()
-      while !stopper.isStopped {
-        await Task.yield()
-      }
-      didStop.withLock { $0 = true }
-      return .empty
+      var iterator = resume.stream.makeAsyncIterator()
+      await iterator.next()
+      return EdgeToolsEngineGeneration(wasStopped: stopper.isStopped, tokens: [], response: "")
     }
     var iterator = started.stream.makeAsyncIterator()
     await iterator.next()
 
     task.stop()
-    _ = try await task.value
+    resume.continuation.yield()
+    let generation = try await task.value
 
-    expectNoDifference(didStop.withLock { $0 }, true)
+    expectNoDifference(generation.wasStopped, true)
   }
 
   @Test

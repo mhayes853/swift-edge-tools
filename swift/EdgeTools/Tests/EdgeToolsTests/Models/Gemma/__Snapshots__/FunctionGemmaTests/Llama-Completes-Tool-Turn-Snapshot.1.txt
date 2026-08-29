@@ -40,7 +40,7 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 35 elements
+        ▿ parts: 21 elements
           ▿ EdgeToolsGenerationPart
             - text: "The"
           ▿ EdgeToolsGenerationPart
@@ -54,47 +54,23 @@
           ▿ EdgeToolsGenerationPart
             - text: ":"
           ▿ EdgeToolsGenerationPart
-            - text: "\n\n"
-          ▿ EdgeToolsGenerationPart
-            - text: "{"
-          ▿ EdgeToolsGenerationPart
-            - text: "\n"
-          ▿ EdgeToolsGenerationPart
-            - text: "  "
-          ▿ EdgeToolsGenerationPart
-            - text: "\""
+            - text: " {\""
           ▿ EdgeToolsGenerationPart
             - text: "location"
           ▿ EdgeToolsGenerationPart
-            - text: "\":"
-          ▿ EdgeToolsGenerationPart
-            - text: " \""
+            - text: "\":\""
           ▿ EdgeToolsGenerationPart
             - text: "Paris"
           ▿ EdgeToolsGenerationPart
-            - text: "\","
-          ▿ EdgeToolsGenerationPart
-            - text: "\n"
-          ▿ EdgeToolsGenerationPart
-            - text: "  "
-          ▿ EdgeToolsGenerationPart
-            - text: "\""
+            - text: "\",\""
           ▿ EdgeToolsGenerationPart
             - text: "condition"
           ▿ EdgeToolsGenerationPart
-            - text: "\":"
-          ▿ EdgeToolsGenerationPart
-            - text: " \""
+            - text: "\":\""
           ▿ EdgeToolsGenerationPart
             - text: "sunny"
           ▿ EdgeToolsGenerationPart
-            - text: "\","
-          ▿ EdgeToolsGenerationPart
-            - text: "\n"
-          ▿ EdgeToolsGenerationPart
-            - text: "  "
-          ▿ EdgeToolsGenerationPart
-            - text: "\""
+            - text: "\",\""
           ▿ EdgeToolsGenerationPart
             - text: "temperature"
           ▿ EdgeToolsGenerationPart
@@ -102,14 +78,8 @@
           ▿ EdgeToolsGenerationPart
             - text: "\":"
           ▿ EdgeToolsGenerationPart
-            - text: " "
-          ▿ EdgeToolsGenerationPart
             - text: "2"
           ▿ EdgeToolsGenerationPart
             - text: "1"
           ▿ EdgeToolsGenerationPart
-            - text: "\n"
-          ▿ EdgeToolsGenerationPart
             - text: "}"
-  ▿ reasoningEffort: EdgeToolsReasoningEffort
-    - rawValue: "default"

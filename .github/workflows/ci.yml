@@ -16,9 +16,9 @@ permissions:
 
 jobs:
   linux:
-    name: Linux Build
+    name: Linux Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     container:
       image: swift:6.3.2-jammy
     defaults:
@@ -29,28 +29,36 @@ jobs:
         with:
           persist-credentials: false
           submodules: recursive
-      # Needle 2 links libc++, which the Swift image does not ship, and the JavaScript target's
-      # BridgeJS plugin shells out to Node even when the JS trait is disabled.
+      # Needle 2 links libc++, which the Swift image does not ship, and its static libraries call
+      # `std::__1::__hash_memory`, which only libc++ 21 and newer export. The JavaScript target's
+      # BridgeJS plugin also shells out to Node even when the JS trait is disabled.
       - name: Install build dependencies
         run: |
           set -euo pipefail
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            ca-certificates curl gnupg libc++-dev libc++abi-dev
+            ca-certificates curl gnupg
+          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key \
+            | gpg --dearmor -o /usr/share/keyrings/llvm.gpg
+          echo "deb [signed-by=/usr/share/keyrings/llvm.gpg]" \
+            "http://apt.llvm.org/jammy/ llvm-toolchain-jammy-21 main" \
+            > /etc/apt/sources.list.d/llvm.list
           curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource.sh
           bash /tmp/nodesource.sh
-          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs
-          library_path="$(dirname "$(find /usr/lib/llvm-* -name libc++.so -print -quit)")"
-          echo "LIBRARY_PATH=$library_path${LIBRARY_PATH:+:$LIBRARY_PATH}" >> "$GITHUB_ENV"
-      - name: Build Swift package
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            libc++-21-dev libc++abi-21-dev nodejs
+          echo "LIBRARY_PATH=/usr/lib/llvm-21/lib" >> "$GITHUB_ENV"
+      - name: Test Swift package
         run: >
-          swift build --disable-experimental-prebuilts
+          swift test --disable-experimental-prebuilts
           --traits Foundation,FoundationEssentials,XGrammar,Needle2,ChatTemplates,HuggingFaceTokenizers,FoundationModels,Llama
+          --skip 'Model tests'
 
   windows:
-    name: Windows Build
+    name: Windows Tests
     runs-on: windows-2022
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -63,33 +71,37 @@ jobs:
           swift-version: swift-6.3-release
           swift-build: 6.3-RELEASE
       # PowerShell splits a bare comma-separated token into separate arguments.
-      - name: Build Swift package
+      - name: Test Swift package
         run: >
-          swift build --disable-experimental-prebuilts
-          --traits "Foundation,FoundationEssentials,XGrammar,Needle2,ChatTemplates,HuggingFaceTokenizers,FoundationModels"
+          swift test --disable-experimental-prebuilts
+          --traits "Foundation,FoundationEssentials,XGrammar,Needle2,ChatTemplates,FoundationModels"
 
   android:
     name: Android Build
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
           submodules: recursive
+      # Building the suites needs test discovery, which reads an index store that the cross build
+      # leaves incomplete, so Android stays a build-only job.
       - name: Build Swift package for Android
         uses: "swift-android-sdk/swift-android-action@\
           2044b79660f201ccef8cbce62877e4ec5409f9c8"
         with:
-          swift-version: 6.3
+          swift-version: "6.3"
           swift-build-flags: >-
             --disable-experimental-prebuilts
+            --force-resolved-versions
             --traits Foundation,FoundationEssentials,XGrammar,Needle2,ChatTemplates,HuggingFaceTokenizers,FoundationModels
           build-tests: false
           run-tests: false
+          free-disk-space: true
 
   wasm:
-    name: WASM Build
+    name: WASM Tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
     container:
@@ -108,7 +120,9 @@ jobs:
           set -euo pipefail
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            ca-certificates curl gnupg
+            ca-certificates curl git-lfs gnupg
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git lfs pull --include="ts/needle2/assets/*"
           curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource.sh
           bash /tmp/nodesource.sh
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nodejs
@@ -117,15 +131,13 @@ jobs:
           swift sdk install
           "https://download.swift.org/swift-6.3.2-release/wasm-sdk/swift-6.3.2-RELEASE/swift-6.3.2-RELEASE_wasm.artifactbundle.tar.gz"
           --checksum a61f0584c93283589f8b2f42db05c1f9a182b506c2957271402992655591dd7c
-      - name: Build Swift package
-        run: >
-          swift build --disable-experimental-prebuilts
-          --swift-sdk swift-6.3.2-RELEASE_wasm --traits Needle2,JS
+      - name: Test Swift package
+        run: scripts/test-wasm.sh
 
   macos:
-    name: macOS Build
+    name: macOS Tests
     runs-on: macos-26
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -133,10 +145,33 @@ jobs:
           submodules: recursive
       - name: Select Xcode 26.4
         run: sudo xcode-select -s /Applications/Xcode_26.4.app
-      - name: Build Swift package
+      - name: Test Swift package
         run: >
+          swift test --disable-experimental-prebuilts
+          --traits Foundation,FoundationEssentials,XGrammar,Needle2,ChatTemplates,HuggingFaceTokenizers,FoundationModels,Llama
+          --skip 'Model tests'
+      # The runner's GPU is paravirtual and reports no simdgroup matrix multiply, so llama.cpp
+      # falls back to scalar Metal kernels and a single snapshot can decode for half an hour. Its
+      # vision path segfaults outright. Pinning the engine to the CPU picks up the NEON repack
+      # kernels instead, and the suite stays on the GPU everywhere else.
+      - name: Smoke test llama inference
+        env:
+          EDGE_TOOLS_DISABLE_LLAMA_GPU: "1"
+        run: >
+          swift test --disable-experimental-prebuilts
+          --traits Foundation,FoundationEssentials,XGrammar,Needle2,ChatTemplates,HuggingFaceTokenizers,FoundationModels,Llama
+          --filter 'LlamaEngine tests|LlamaTokenizer tests|FunctionGemma tests'
+      - name: Test CLI package
+        working-directory: swift/CLI
+        run: |
+          set -euo pipefail
           swift build --disable-experimental-prebuilts
-          --traits Foundation,FoundationEssentials,XGrammar,Needle2,ChatTemplates,HuggingFaceTokenizers,FoundationModels,MLX,Llama
+          metal_library="$(../../scripts/mlx-metallib.sh .)"
+          ln -s "$metal_library" default.metallib
+          trap 'unlink default.metallib' EXIT
+          swift test --disable-experimental-prebuilts
+      - name: Test MLX inference
+        run: scripts/test-mlx.sh
 
   embedded:
     name: Embedded Swift Smoke Test

@@ -182,7 +182,8 @@ std::string formatted_utc(std::time_t instant, const std::string &format) {
   return out.str();
 }
 
-std::shared_ptr<minja::TemplateNode> parsed_template(const std::string &source) {
+std::string render_template(
+    const std::string &source, const std::shared_ptr<minja::Context> &context) {
   constexpr size_t max_cached_templates = 4;
   static std::vector<std::pair<std::string, std::shared_ptr<minja::TemplateNode>>> cache;
 
@@ -195,14 +196,14 @@ std::shared_ptr<minja::TemplateNode> parsed_template(const std::string &source) 
   });
   if (cached != cache.end()) {
     std::rotate(cache.begin(), cached, cached + 1);
-    return cache.front().second;
+    return cache.front().second->render(context);
   }
   auto root = minja::Parser::parse(source, { true, true, false});
   cache.insert(cache.begin(), { source, root });
   if (cache.size() > max_cached_templates) {
     cache.pop_back();
   }
-  return root;
+  return root->render(context);
 }
 
 std::string render(const std::string &source, const std::string &context_json) {
@@ -212,7 +213,6 @@ std::string render(const std::string &source, const std::string &context_json) {
   }
   auto instant = rendering_instant(context_values);
 
-  auto root = parsed_template(source);
   auto context = minja::Context::make(minja::Value(context_values));
   context->set(
       "strftime_now",
@@ -234,7 +234,7 @@ std::string render(const std::string &source, const std::string &context_json) {
                                 minja::ArgumentsValue &args) {
         return extremum_value("max", /* wantsMinimum= */ false, args);
       }));
-  return root->render(context);
+  return render_template(source, context);
 }
 
 size_t write_string(const std::string &value, char *text, size_t text_capacity) {

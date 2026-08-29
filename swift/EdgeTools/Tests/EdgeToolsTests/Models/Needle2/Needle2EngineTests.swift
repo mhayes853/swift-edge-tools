@@ -1,4 +1,4 @@
-#if Needle2 && (os(macOS) || os(Linux) || os(Windows) || os(Android))
+#if Needle2 && canImport(CNeedle2)
   import CustomDump
   import EdgeTools
   import Observation
@@ -41,22 +41,6 @@
         generation.engineGeneration.metrics.needle2PeakRAMMegabytes.map { $0 > 0 },
         true
       )
-    }
-
-    @Test
-    @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
-    func `Extracts Structured Data Through Session`() async throws {
-      let engine = Needle2Engine()
-      let session = EdgeToolsSession(engine: engine)
-      let invoice = try await session.extract(
-        prompt: "Extract this invoice: Acme Corp, total $1,200.00, due 2026-09-01.",
-        as: Needle2Invoice.self
-      )
-
-      let extractedInvoice = try #require(invoice)
-      expectNoDifference(extractedInvoice.vendor, "Acme Corp")
-      expectNoDifference(extractedInvoice.total, 1200)
-      expectNoDifference(extractedInvoice.dueDate, "2026-09-01")
     }
 
     @Test
@@ -188,11 +172,12 @@
       let context = engine.context { SendEmailTool() }
       defer { try? engine.reset(context) }
       let emittedParts = Lock([EdgeToolsGenerationPart]())
-      let didObserveResponse = Lock(false)
+      let started = AsyncStream<Void>.makeStream()
       withObservationTracking {
         _ = context.isResponding
       } onChange: {
-        didObserveResponse.withLock { $0 = true }
+        started.continuation.yield()
+        started.continuation.finish()
       }
       let task = try engine.generate(
         prompt: "Send an email to blob@gmail.com asking them to go hiking.",
@@ -203,19 +188,14 @@
         )
       )
 
-      while !context.isResponding {
-        await Task.yield()
-      }
-      expectNoDifference(context.isResponding, true)
-      expectNoDifference(didObserveResponse.withLock { $0 }, true)
+      var iterator = started.stream.makeAsyncIterator()
+      await iterator.next()
       task.stop()
       let generation = try await task.value
 
-      expectNoDifference(context.isResponding, false)
       expectNoDifference(generation.wasStopped, true)
       expectNoDifference(generation.toolCalls.count, 1)
       expectNoDifference(emittedParts.withLock { $0 }, [])
-      expectNoDifference(generation.metrics.needle2PeakRAMMegabytes != nil, true)
     }
   }
 

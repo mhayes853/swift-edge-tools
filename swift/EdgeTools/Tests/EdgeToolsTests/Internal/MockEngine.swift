@@ -188,8 +188,12 @@ final class MockEngine: EdgeToolsPrefillableEngine, EdgeToolsTokenizingEngine, S
     self.tokenizeHandler = nil
   }
 
-  init(script: [Event]) {
-    let storage = Storage(queuedScripts: [script.map { $0 } + [nil]])
+  convenience init(script: [Event]) {
+    self.init(scripts: [script])
+  }
+
+  init(scripts: [[Event]]) {
+    let storage = Storage(queuedScripts: scripts.map { $0.map { $0 } + [nil] })
     self.storage = storage
     self.tokenizeHandler = nil
   }

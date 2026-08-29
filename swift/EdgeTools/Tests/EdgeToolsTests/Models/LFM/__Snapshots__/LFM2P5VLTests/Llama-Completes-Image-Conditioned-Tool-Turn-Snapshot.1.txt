@@ -7,5 +7,5 @@
           ▿ (2 elements)
             - key: "color"
             ▿ value: EdgeToolsValue
-              - string: "orange"
+              - string: "red"
       - name: "reportColor"

@@ -560,6 +560,8 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: ","
           ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
             - reasoning: " condition"
           ▿ EdgeToolsGenerationPart
             - reasoning: " as"
@@ -570,9 +572,15 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " and"
           ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
             - reasoning: " temperature"
           ▿ EdgeToolsGenerationPart
+            - reasoning: " in"
+          ▿ EdgeToolsGenerationPart
             - reasoning: " Celsius"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " as"
           ▿ EdgeToolsGenerationPart
             - reasoning: " "
           ▿ EdgeToolsGenerationPart
@@ -596,6 +604,8 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " information"
           ▿ EdgeToolsGenerationPart
+            - reasoning: " clearly"
+          ▿ EdgeToolsGenerationPart
             - reasoning: " for"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
@@ -613,15 +623,3 @@
             - reasoning: " should"
           ▿ EdgeToolsGenerationPart
             - reasoning: " mention"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " the"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " city"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " and"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " the"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " condition"
-  ▿ reasoningEffort: EdgeToolsReasoningEffort
-    - rawValue: "default"

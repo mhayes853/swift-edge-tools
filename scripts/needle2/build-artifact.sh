@@ -67,6 +67,11 @@ if ! (cd "$bundle" && shasum --algorithm 256 --check "$checksum_file"); then
   exit 1
 fi
 
+# The MSVC linker resolves the `-lneedle` flag SwiftPM derives for the variant to `needle.lib`.
+for platform in "$bundle"/windows-*; do
+  mv "$platform/libneedle.a" "$platform/needle.lib"
+done
+
 VARIANTS="$(printf '%s\n' "${variants[@]}")" \
   BUNDLE="$bundle" \
   VERSION="$version" \
@@ -78,8 +83,9 @@ from pathlib import Path
 variants = []
 for entry in os.environ["VARIANTS"].splitlines():
     path, triples = entry.split("|", 1)
+    library = "needle.lib" if path.startswith("windows-") else "libneedle.a"
     variants.append({
-        "path": f"{path}/libneedle.a",
+        "path": f"{path}/{library}",
         "staticLibraryMetadata": {"headerPaths": ["include"]},
         "supportedTriples": triples.split(","),
     })
