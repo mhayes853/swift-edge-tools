@@ -94,6 +94,7 @@ jobs:
           swift-version: "6.3"
           swift-build-flags: >-
             --disable-experimental-prebuilts
+            --force-resolved-versions
             --traits Foundation,FoundationEssentials,XGrammar,Needle2,ChatTemplates,HuggingFaceTokenizers,FoundationModels
           build-tests: false
           run-tests: false
