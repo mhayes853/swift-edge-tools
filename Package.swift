@@ -136,7 +136,14 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-collections", from: "1.2.1"),
     .package(url: "https://github.com/apple/swift-atomics", from: "1.3.0"),
     .package(url: "https://github.com/swiftwasm/JavaScriptKit", from: "0.58.0"),
-    .package(url: "https://github.com/mhayes853/swift-operation", branch: "main")
+    // NB: The latest release predates Swift 6.3, so this tracks main. A branch requirement makes
+    // SwiftPM refetch the whole graph on every resolve, which redownloads the binary artifacts and
+    // crashes the Android job in FoundationNetworking's redirect handling, so main is pinned by
+    // revision instead.
+    .package(
+      url: "https://github.com/mhayes853/swift-operation",
+      revision: "849966fd4f0181095723ff501bd3047e5495bc17"
+    )
   ],
   targets: [
     .target(
