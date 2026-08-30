@@ -69,11 +69,10 @@ struct `EdgeToolsSession tests` {
   }
 
   @Test
-  func `Extracts A Typed Value Without Invoking Tools`() async throws {
+  func `Extracts A Typed Value With Structured Generation`() async throws {
     let tokenizer = try testTokenizer()
-    let rawToolCall = #"<tool_call> [{"name":"weather_args","arguments":{"location":"Seoul"}}]"#
-    let toolTokens = rawToolCall.tokenize(using: tokenizer)
-    let engine = MockEngine(script: toolTokens.map { .token($0) } + [.finish])
+    let responseTokens = #"{"location":"Seoul"}"#.tokenize(using: tokenizer)
+    let engine = MockEngine(script: responseTokens.map { .token($0) } + [.finish])
     let session = EdgeToolsSession(engine: engine)
 
     let value = try await session.extract(
@@ -81,24 +80,25 @@ struct `EdgeToolsSession tests` {
       as: WeatherArgs.self
     )
 
-    expectNoDifference(value?.location, "Seoul")
+    expectNoDifference(value.location, "Seoul")
+    expectNoDifference(engine.generationTools, [[]])
     expectNoDifference(
-      engine.generationTools,
-      [[WeatherArgs.extractionToolDefinition]]
+      engine.generationConstraints,
+      [MockEngine.GenerationConstraint(schema: WeatherArgs.edgeToolsGenerationSchema)]
     )
   }
 
   @Test
-  func `Extraction Returns Nil Without A Tool Call`() async throws {
+  func `Extraction Throws Without A Structured Response`() async {
     let engine = MockEngine(script: [.finish])
     let session = EdgeToolsSession(engine: engine)
 
-    let value = try await session.extract(
-      prompt: .test(user: "not structured"),
-      as: WeatherArgs.self
-    )
-
-    expectNoDifference(value, nil)
+    await #expect(throws: EdgeToolsError.self) {
+      try await session.extract(
+        prompt: .test(user: "not structured"),
+        as: WeatherArgs.self
+      )
+    }
   }
 
   @Test

@@ -42,9 +42,25 @@ final class MockEngine: EdgeToolsPrefillableEngine, EdgeToolsTokenizingEngine, S
     }
   }
 
-  struct GenerateParameters: EdgeToolsEngineGenerateParameters {
+  struct GenerationConstraint: EdgeToolsSchemaGenerationConstraint, Hashable {
+    typealias Grammar = Void
+    typealias Context = Void
+
+    var schema: EdgeToolsGenerationSchema?
+
+    var toolCallRange: GrammarToolCallRange? { nil }
+
+    static func schema(_ schema: EdgeToolsGenerationSchema) -> Self {
+      Self(schema: schema)
+    }
+
+    func grammar(toolCallGrammar: consuming Void?, context: Void) {}
+  }
+
+  struct GenerateParameters: EdgeToolsConstrainedGenerateParameters {
     static let `default` = GenerateParameters()
 
+    var constraint = GenerationConstraint(schema: nil)
     var maxTokens: Int? { nil }
   }
 
@@ -157,6 +173,7 @@ final class MockEngine: EdgeToolsPrefillableEngine, EdgeToolsTokenizingEngine, S
 
   private let storage: Storage
   private let _generateCallCount = Lock(0)
+  private let _generationConstraints = Lock([GenerationConstraint]())
   private let _generationTools = Lock([[EdgeToolDefinition]]())
   private let tokenizeHandler: (@Sendable (TestPrompt, [EdgeToolDefinition]) -> [EdgeToolsToken])?
   private let _prefillHandler =
@@ -180,6 +197,10 @@ final class MockEngine: EdgeToolsPrefillableEngine, EdgeToolsTokenizingEngine, S
 
   var generationTools: [[EdgeToolDefinition]] {
     self._generationTools.withLock { $0 }
+  }
+
+  var generationConstraints: [GenerationConstraint] {
+    self._generationConstraints.withLock { $0 }
   }
 
   init() {
@@ -258,6 +279,7 @@ final class MockEngine: EdgeToolsPrefillableEngine, EdgeToolsTokenizingEngine, S
   ) throws -> GenerationTask {
     let tools = context.tools.map(\.definition)
     self._generateCallCount.withLock { $0 += 1 }
+    self._generationConstraints.withLock { $0.append(parameters.constraint) }
     self._generationTools.withLock { $0.append(tools) }
     let (id, generationStorage) = self.storage.makeGeneration()
     let onStart = self._onGenerateStart.withLock { $0 }

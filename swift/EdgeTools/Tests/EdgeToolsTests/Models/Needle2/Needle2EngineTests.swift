@@ -47,24 +47,27 @@
     @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
     func `Extracts Structured Data Through Needle 2`() async throws {
       let engine = Needle2Engine()
-      let context = engine.context { DefinitionTool(Needle2Invoice.definition) }
-      defer { try? engine.reset(context) }
-      let task = try engine.generate(
-        prompt: "Extract this invoice: Acme Corp, total $1,200.00, due 2026-09-01.",
-        parameters: .default,
-        context: context,
-        channel: EdgeToolsGenerationChannel()
-      )
-      let generation = try await task.value
+      let session = EdgeToolsSession(engine: engine)
 
-      expectNoDifference(generation.wasStopped, false)
-      expectNoDifference(generation.toolCalls.count, 1)
-      expectNoDifference(
-        generation.toolCalls.first?.name,
-        Needle2Invoice.extractionToolDefinition.name
+      let invoice = try await session.extract(
+        prompt: "Extract this invoice: Acme Corp, total $1,200.00, due 2026-09-01.",
+        as: Needle2Invoice.self
       )
-      withKnownIssue {
-        assertSnapshot(of: generation.parts, as: .dump, record: .all)
+
+      expectNoDifference(invoice.vendor, "Acme Corp")
+      expectNoDifference(invoice.total, 1_200)
+      expectNoDifference(invoice.dueDate, "2026-09-01")
+    }
+
+    @Test
+    func `Extraction Throws When Needle 2 Does Not Call The Extraction Tool`() async {
+      let session = EdgeToolsSession(engine: MissingExtractionNeedle2Engine())
+
+      await #expect(throws: Needle2Error.self) {
+        try await session.extract(
+          prompt: "Not an extraction.",
+          as: Needle2Invoice.self
+        )
       }
     }
 
@@ -258,7 +261,36 @@
       .description("The due date on the invoice.")
     )
     var dueDate: String
+  }
 
-    static var definition: EdgeToolDefinition { Self.extractionToolDefinition }
+  private struct MissingExtractionNeedle2Engine: Needle2SessionEngine {
+    struct Context: EdgeToolsEngineContext {
+      let id = 0
+      let tools: [any EdgeTool]
+    }
+
+    typealias Prompt = Needle2Prompt
+    typealias GenerateParameters = Needle2GenerateParameters
+
+    func context(_ parameters: Void, tools: [any EdgeTool]) -> Context {
+      Context(tools: tools)
+    }
+
+    func generate(
+      prompt: Needle2Prompt,
+      parameters: Needle2GenerateParameters,
+      context: Context,
+      channel: sending EdgeToolsGenerationChannel
+    ) throws -> AnyGenerationTask {
+      AnyGenerationTask { _ in
+        EdgeToolsEngineGeneration(
+          wasStopped: false,
+          tokens: [],
+          response: ""
+        )
+      }
+    }
+
+    func reset(_ context: Context) async {}
   }
 #endif

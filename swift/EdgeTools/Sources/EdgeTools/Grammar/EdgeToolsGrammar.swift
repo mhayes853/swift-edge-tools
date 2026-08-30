@@ -35,6 +35,19 @@ public protocol EdgeToolsGenerationConstraint: Sendable {
   func grammar(toolCallGrammar: consuming Grammar?, context: Context) throws -> Grammar
 }
 
+// MARK: - EdgeToolsSchemaGenerationConstraint
+
+public protocol EdgeToolsSchemaGenerationConstraint: EdgeToolsGenerationConstraint {
+  static func schema(_ schema: EdgeToolsGenerationSchema) -> Self
+}
+
+
+extension EdgeToolsSchemaGenerationConstraint {
+  public static func schema(_ type: (some EdgeToolsGenerable).Type) -> Self {
+    .schema(type.edgeToolsGenerationSchema)
+  }
+}
+
 // MARK: - EdgeToolsTurnGenerationConstraint
 
 public protocol EdgeToolsTurnGenerationConstraint: EdgeToolsGenerationConstraint {

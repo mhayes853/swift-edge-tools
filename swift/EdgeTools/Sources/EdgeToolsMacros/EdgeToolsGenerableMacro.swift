@@ -18,14 +18,6 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
 
     if let structDecl = declaration.as(StructDeclSyntax.self) {
       let properties = Self.storedProperties(in: structDecl, context: context)
-      if !Self.hasExistingExtractionToolDefinition(in: declaration) {
-        members.append(
-          Self.extractionToolDefinition(
-            name: Self.snakeCased(structDecl.name.text),
-            modifierPrefix: modifierPrefix
-          )
-        )
-      }
       if !Self.hasExistingEdgeToolsGenerationSchema(in: declaration) {
         members.append(
           Self.generationSchemaProperty(
@@ -45,14 +37,6 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
       }
     } else if let enumDecl = declaration.as(EnumDeclSyntax.self) {
       let cases = try Self.enumCases(in: enumDecl)
-      if !Self.hasExistingExtractionToolDefinition(in: declaration) {
-        members.append(
-          Self.extractionToolDefinition(
-            name: Self.snakeCased(enumDecl.name.text),
-            modifierPrefix: modifierPrefix
-          )
-        )
-      }
       if !Self.hasExistingEdgeToolsGenerationSchema(in: declaration) {
         members.append(
           Self.enumGenerationSchemaProperty(
@@ -150,21 +134,6 @@ extension EdgeToolsGenerableMacro {
           return false
         }
         return identifierPattern.identifier.text == "edgeToolsGenerationSchema"
-      }
-    }
-  }
-
-  private static func hasExistingExtractionToolDefinition(
-    in declaration: some DeclGroupSyntax
-  ) -> Bool {
-    declaration.memberBlock.members.contains { member in
-      guard let variableDecl = member.decl.as(VariableDeclSyntax.self) else { return false }
-      guard Self.isStatic(variableDecl) else { return false }
-      return variableDecl.bindings.contains { binding in
-        guard let identifierPattern = binding.pattern.as(IdentifierPatternSyntax.self) else {
-          return false
-        }
-        return identifierPattern.identifier.text == "extractionToolDefinition"
       }
     }
   }
@@ -332,22 +301,6 @@ extension EdgeToolsGenerableMacro {
     guard !guideSelection.schemaFragments.isEmpty else { return baseExpression }
     let fragments = ([baseExpression] + guideSelection.schemaFragments).joined(separator: ", ")
     return "EdgeToolsGenerationSchema(\(fragments))"
-  }
-
-  private static func extractionToolDefinition(
-    name: String,
-    modifierPrefix: String
-  ) -> DeclSyntax {
-    """
-      \(raw: modifierPrefix)static var extractionToolDefinition: EdgeToolDefinition {
-        EdgeToolDefinition(
-          name: \(raw: Self.quotedStringLiteral(name)),
-          description: edgeToolsGenerationSchema.objectValue?[.description]?.string
-            ?? "Extract structured data from the input.",
-          arguments: edgeToolsGenerationSchema
-        )
-      }
-      """
   }
 
   private static func enumCases(
@@ -732,36 +685,6 @@ extension EdgeToolsGenerableMacro {
       return "Optional<\(String(trimmed.dropLast()))>"
     }
     return trimmed
-  }
-
-  private static func snakeCased(_ value: String) -> String {
-    guard !value.isEmpty else { return value }
-
-    var words = [Range<String.Index>]()
-    var wordStart = value.startIndex
-    var searchRange = wordStart..<value.endIndex
-
-    while let upperCaseIndex = value[searchRange].firstIndex(where: { $0.isUppercase }) {
-      words.append(wordStart..<upperCaseIndex)
-      searchRange = upperCaseIndex..<searchRange.upperBound
-      guard let lowerCaseIndex = value[searchRange].firstIndex(where: { $0.isLowercase }) else {
-        wordStart = searchRange.lowerBound
-        break
-      }
-
-      let nextCharacterAfterCapital = value.index(after: upperCaseIndex)
-      if lowerCaseIndex == nextCharacterAfterCapital {
-        wordStart = upperCaseIndex
-      } else {
-        let beforeLowerIndex = value.index(before: lowerCaseIndex)
-        words.append(upperCaseIndex..<beforeLowerIndex)
-        wordStart = beforeLowerIndex
-      }
-      searchRange = value.index(after: lowerCaseIndex)..<searchRange.upperBound
-    }
-    words.append(wordStart..<searchRange.upperBound)
-    let snakeCased = words.map { value[$0].lowercased() }.joined(separator: "_")
-    return snakeCased.starts(with: "_") ? String(snakeCased.dropFirst()) : snakeCased
   }
 
   private static func quotedStringLiteral(_ value: String) -> String {

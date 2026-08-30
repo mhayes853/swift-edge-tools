@@ -5,23 +5,6 @@ import Testing
 
 @Suite
 struct `EdgeToolsEncoding tests` {
-  @Test
-  func `Generable Types Expose Extraction Tool Definitions`() {
-    expectNoDifference(MacroEncodingUser.extractionToolDefinition.name, "macro_encoding_user")
-    expectNoDifference(MacroEncodingAddress.extractionToolDefinition.name, "macro_encoding_address")
-    expectNoDifference(String.extractionToolDefinition.name, "string")
-    expectNoDifference([String].extractionToolDefinition.name, "array")
-    expectNoDifference(CustomExtractionName.extractionToolDefinition.name, "receipt")
-    expectNoDifference(
-      CustomExtractionName.extractionToolDefinition.description,
-      "Extract a receipt."
-    )
-    expectNoDifference(
-      CustomExtractionName.extractionToolDefinition.includesSchemaInInstructions,
-      false
-    )
-  }
-
 #if FoundationEssentials
   @Test
   func `Data Encodes To UTF8 String Value`() {
@@ -460,18 +443,6 @@ struct `SchemaComposition tests` {
     let encoder = JSONEncoder()
     return encoder
   }()
-}
-
-@EdgeToolsGenerable
-private struct CustomExtractionName {
-  static let extractionToolDefinition = EdgeToolDefinition(
-    name: "receipt",
-    description: "Extract a receipt.",
-    arguments: Self.edgeToolsGenerationSchema,
-    includesSchemaInInstructions: false
-  )
-
-  var value: String
 }
 
 @EdgeToolsGenerable

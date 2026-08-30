@@ -26,7 +26,9 @@
     }
   }
 
-  public protocol Needle2SessionEngine: EdgeToolsEngine where Prompt == Needle2Prompt {}
+  public protocol Needle2SessionEngine: EdgeToolsEngine where Prompt == Needle2Prompt {
+    func reset(_ context: Context) async throws
+  }
 
   // MARK: - Needle2Response
 
