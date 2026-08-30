@@ -190,10 +190,6 @@
     public static func schema(_ schema: EdgeToolsGenerationSchema) -> Self {
       Self.grammar(.schema(schema))
     }
-
-    public static func schema(_ type: (some EdgeToolsGenerable).Type) -> Self {
-      Self.schema(type.edgeToolsGenerationSchema)
-    }
   }
 
   extension XGRGenerationConstraint: EdgeToolsSchemaGenerationConstraint {

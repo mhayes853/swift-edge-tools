@@ -41,6 +41,13 @@ public protocol EdgeToolsSchemaGenerationConstraint: EdgeToolsGenerationConstrai
   static func schema(_ schema: EdgeToolsGenerationSchema) -> Self
 }
 
+
+extension EdgeToolsSchemaGenerationConstraint {
+  public static func schema(_ type: (some EdgeToolsGenerable).Type) -> Self {
+    .schema(type.edgeToolsGenerationSchema)
+  }
+}
+
 // MARK: - EdgeToolsTurnGenerationConstraint
 
 public protocol EdgeToolsTurnGenerationConstraint: EdgeToolsGenerationConstraint {
