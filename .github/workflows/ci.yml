@@ -134,8 +134,91 @@ jobs:
       - name: Test Swift package
         run: scripts/test-wasm.sh
 
-  macos:
-    name: macOS Tests
+  macos_changes:
+    name: Detect macOS engine changes
+    runs-on: ubuntu-latest
+    outputs:
+      llama: ${{ steps.filter.outputs.llama }}
+      mlx: ${{ steps.filter.outputs.mlx }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: recursive
+      - name: Detect changed engine paths
+        id: filter
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+          PULL_REQUEST_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PULL_REQUEST_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            base_sha="$PULL_REQUEST_BASE_SHA"
+            head_sha="$PULL_REQUEST_HEAD_SHA"
+          else
+            base_sha="$BEFORE_SHA"
+            head_sha="$AFTER_SHA"
+          fi
+
+          if [[ "$base_sha" =~ ^0+$ ]]; then
+            changed_files="$(git ls-tree -r --name-only "$head_sha")"
+          else
+            changed_files="$(git diff --name-only "$base_sha" "$head_sha")"
+          fi
+
+          llama=false
+          mlx=false
+          while IFS= read -r path; do
+            case "$path" in
+              .github/workflows/ci.yml \
+              | Package.swift \
+              | Package.resolved \
+              | swift/EdgeTools/Sources/EdgeTools/EdgeTools*.swift \
+              | swift/EdgeTools/Sources/EdgeTools/Engines/EdgeTools*.swift \
+              | swift/EdgeTools/Sources/EdgeTools/Models/* \
+              | swift/EdgeTools/Tests/EdgeToolsTests/Models/* \
+              | swift/EdgeTools/Tests/EdgeToolsTests/Internal/GenerationTestSupport.swift \
+              | swift/EdgeTools/Tests/EdgeToolsTests/Internal/ModelDownloading.swift \
+              | swift/EdgeTools/Tests/EdgeToolsTests/Internal/MultimodalTestTrait.swift \
+              | swift/EdgeTools/Tests/EdgeToolsTests/Internal/SharedTools.swift \
+              | swift/EdgeTools/Tests/EdgeToolsTests/Internal/TranscriptContextTestSupport.swift \
+              | swift/EdgeTools/Plugins/PatchPlugin/plugin.swift)
+                llama=true
+                mlx=true
+                ;;
+              swift/EdgeTools/Sources/EdgeTools/Engines/Llama/* \
+              | swift/EdgeTools/Sources/EdgeToolsLlama/* \
+              | swift/EdgeTools/Sources/EdgeToolsTokenizers/Llama* \
+              | swift/EdgeTools/Tests/EdgeToolsTests/Engines/Llama* \
+              | swift/EdgeTools/Tests/EdgeToolsTests/Internal/Llama* \
+              | swift/EdgeTools/Tests/EdgeToolsLlamaTests/* \
+              | patches/Llama/* \
+              | scripts/llama/* \
+              | bin/llama-*)
+                llama=true
+                ;;
+              swift/EdgeTools/Sources/EdgeTools/Engines/MLX/* \
+              | swift/EdgeTools/Tests/EdgeToolsTests/Engines/MLX* \
+              | swift/EdgeTools/Tests/EdgeToolsTests/Internal/MLX* \
+              | swift/EdgeTools/Tests/EdgeToolsTests/MLX* \
+              | swift/EdgeTools/Tests/EdgeToolsTests/Grammar/GrammarBitmaskTests.swift \
+              | scripts/test-mlx.sh \
+              | scripts/mlx-metallib.sh)
+                mlx=true
+                ;;
+            esac
+          done <<< "$changed_files"
+
+          echo "llama=$llama" >> "$GITHUB_OUTPUT"
+          echo "mlx=$mlx" >> "$GITHUB_OUTPUT"
+
+  macos_general:
+    name: macOS General Tests
     runs-on: macos-26
     timeout-minutes: 120
     steps:
@@ -150,6 +233,29 @@ jobs:
           swift test --disable-experimental-prebuilts
           --traits Foundation,FoundationEssentials,XGrammar,Needle2,ChatTemplates,HuggingFaceTokenizers,FoundationModels,Llama
           --skip 'Model tests'
+      - name: Test CLI package
+        working-directory: swift/CLI
+        run: |
+          set -euo pipefail
+          swift build --disable-experimental-prebuilts
+          metal_library="$(../../scripts/mlx-metallib.sh .)"
+          ln -s "$metal_library" default.metallib
+          trap 'unlink default.metallib' EXIT
+          swift test --disable-experimental-prebuilts
+
+  macos_llama:
+    name: macOS Llama Inference
+    if: needs.macos_changes.outputs.llama == 'true'
+    needs: macos_changes
+    runs-on: macos-26
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - name: Select Xcode 26.4
+        run: sudo xcode-select -s /Applications/Xcode_26.4.app
       # The runner's GPU is paravirtual and reports no simdgroup matrix multiply, so llama.cpp
       # falls back to scalar Metal kernels and a single snapshot can decode for half an hour. Its
       # vision path segfaults outright. Pinning the engine to the CPU picks up the NEON repack
@@ -161,17 +267,40 @@ jobs:
           swift test --disable-experimental-prebuilts
           --traits Foundation,FoundationEssentials,XGrammar,Needle2,ChatTemplates,HuggingFaceTokenizers,FoundationModels,Llama
           --filter 'LlamaEngine tests|LlamaTokenizer tests|FunctionGemma tests'
-      - name: Test CLI package
-        working-directory: swift/CLI
-        run: |
-          set -euo pipefail
-          swift build --disable-experimental-prebuilts
-          metal_library="$(../../scripts/mlx-metallib.sh .)"
-          ln -s "$metal_library" default.metallib
-          trap 'unlink default.metallib' EXIT
-          swift test --disable-experimental-prebuilts
+
+  macos_mlx:
+    name: macOS MLX Inference
+    if: needs.macos_changes.outputs.mlx == 'true'
+    needs: macos_changes
+    runs-on: macos-26
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - name: Select Xcode 26.4
+        run: sudo xcode-select -s /Applications/Xcode_26.4.app
       - name: Test MLX inference
         run: scripts/test-mlx.sh
+
+  macos:
+    name: macOS Tests
+    if: always()
+    needs: [macos_changes, macos_general, macos_llama, macos_mlx]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if a macOS check failed
+        if: >-
+          needs.macos_changes.result != 'success' ||
+          needs.macos_general.result != 'success' ||
+          needs.macos_llama.result == 'failure' ||
+          needs.macos_llama.result == 'cancelled' ||
+          needs.macos_mlx.result == 'failure' ||
+          needs.macos_mlx.result == 'cancelled'
+        run: |
+          echo "A macOS check failed."
+          exit 1
 
   embedded:
     name: Embedded Swift Smoke Test
