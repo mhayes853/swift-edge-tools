@@ -47,6 +47,41 @@
     case unsupportedTurnCount(Int)
   }
 
+  // MARK: - Extraction
+
+  extension EdgeToolsSession where Engine: Needle2SessionEngine {
+    @concurrent
+    public func extract<Response: EdgeToolsGenerable>(
+      prompt: Engine.Prompt,
+      as type: Response.Type,
+      parameters: sending Engine.GenerateParameters = .default
+    ) async throws -> Response {
+      let tool = Needle2ExtractionTool<Response>()
+      let context = self.engine.context(tools: [tool])
+      do {
+        let task = try self.engine.generate(
+          prompt: prompt,
+          parameters: parameters,
+          context: context,
+          channel: EdgeToolsGenerationChannel()
+        )
+        let generation = try await task.value
+        guard let call = generation.toolCalls.first(where: { $0.name == tool.name }) else {
+          throw Needle2Error(
+            code: .invalidResponse,
+            message: "Needle 2 did not produce the required extraction tool call."
+          )
+        }
+        let response = try type.init(edgeToolsValue: call.arguments)
+        try await self.engine.reset(context)
+        return response
+      } catch {
+        try? await self.engine.reset(context)
+        throw error
+      }
+    }
+  }
+
   // MARK: - Loop
 
   extension EdgeToolsSession where Engine: Needle2SessionEngine {
@@ -99,6 +134,19 @@
   }
 
   // MARK: - Helpers
+
+  private struct Needle2ExtractionTool<Response: EdgeToolsGenerable>: EdgeTool {
+    let name = "extract"
+
+    var description: String {
+      Response.edgeToolsGenerationSchema.objectValue?[.description]?.string
+        ?? "Extract structured data from the input."
+    }
+
+    func invoke(input: Response) async -> Response {
+      input
+    }
+  }
 
   private func needle2LoopTerminationCause(
     for generation: EdgeToolsSessionGeneration

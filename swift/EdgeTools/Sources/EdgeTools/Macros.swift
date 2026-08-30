@@ -11,7 +11,8 @@ import OrderedCollections
 @attached(extension, conformances: EdgeToolsGenerable)
 @attached(
   member,
-  names: named(edgeToolsGenerationSchema), named(extractionToolDefinition), named(init),
+  names: named(edgeToolsGenerationSchema),
+  named(init),
   named(edgeToolsValue)
 )
 public macro EdgeToolsGenerable(

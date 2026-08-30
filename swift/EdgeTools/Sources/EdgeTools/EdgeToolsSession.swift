@@ -84,39 +84,27 @@ extension EdgeToolsSession where Engine: EdgeToolsTokenizingEngine {
 
 // MARK: - Extraction
 
-extension EdgeToolsSession {
+extension EdgeToolsSession
+where
+  Engine.GenerateParameters: EdgeToolsConstrainedGenerateParameters,
+  Engine.GenerateParameters.Constraint: EdgeToolsSchemaGenerationConstraint
+{
   @concurrent
   public func extract<Response: EdgeToolsGenerable>(
     prompt: Engine.Prompt,
     as type: Response.Type,
     parameters: sending Engine.GenerateParameters = .default
-  ) async throws -> Response? {
-    let definition = Response.extractionToolDefinition
-    let context = self.engine.context(tools: [EdgeToolsExtractionTool<Response>()])
+  ) async throws -> Response {
+    var parameters = parameters
+    parameters.constraint = .schema(type.edgeToolsGenerationSchema)
     let task = try self.engine.generate(
       prompt: prompt,
       parameters: parameters,
-      context: context,
+      context: self.engine.context(),
       channel: EdgeToolsGenerationChannel()
     )
     let generation = try await task.value
-    let call = generation.toolCalls.first { $0.name == definition.name }
-    guard let call else {
-      return nil
-    }
-    return try Response(edgeToolsValue: call.arguments)
-  }
-}
-
-private struct EdgeToolsExtractionTool<Response: EdgeToolsGenerable>: EdgeTool {
-  private let extractionDefinition = Response.extractionToolDefinition
-
-  var name: String { self.extractionDefinition.name }
-  var description: String { self.extractionDefinition.description }
-  var arguments: EdgeToolsGenerationSchema { self.extractionDefinition.arguments }
-
-  func invoke(input: Response) async -> Response {
-    input
+    return try Response(edgeToolsValue: EdgeToolsValue(json: generation.text))
   }
 }
 

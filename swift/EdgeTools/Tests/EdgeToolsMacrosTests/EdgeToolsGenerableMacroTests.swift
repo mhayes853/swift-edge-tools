@@ -21,15 +21,6 @@ extension `EdgeToolsMacros tests` {
           case move(Double, Double)
           case search(query: String, limit: Int?)
 
-          static var extractionToolDefinition: EdgeToolDefinition {
-            EdgeToolDefinition(
-              name: "action",
-              description: edgeToolsGenerationSchema.objectValue? [.description]?.string
-                ?? "Extract structured data from the input.",
-              arguments: edgeToolsGenerationSchema
-            )
-          }
-
           static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
             EdgeToolsGenerationSchema(
               .anyOf([
@@ -188,15 +179,6 @@ extension `EdgeToolsMacros tests` {
         struct Person {
           var name: String
 
-          static var extractionToolDefinition: EdgeToolDefinition {
-            EdgeToolDefinition(
-              name: "person",
-              description: edgeToolsGenerationSchema.objectValue? [.description]?.string
-                ?? "Extract structured data from the input.",
-              arguments: edgeToolsGenerationSchema
-            )
-          }
-
           static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
             EdgeToolsGenerationSchema(
               .type(.object),
@@ -240,15 +222,6 @@ extension `EdgeToolsMacros tests` {
         """
         struct Person {
           var firstName: String
-
-          static var extractionToolDefinition: EdgeToolDefinition {
-            EdgeToolDefinition(
-              name: "person",
-              description: edgeToolsGenerationSchema.objectValue? [.description]?.string
-                ?? "Extract structured data from the input.",
-              arguments: edgeToolsGenerationSchema
-            )
-          }
 
           static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
             EdgeToolsGenerationSchema(
@@ -298,15 +271,6 @@ extension `EdgeToolsMacros tests` {
           @EdgeTools.EdgeToolsIgnored
           package var cache: Int = 0
 
-          package static var extractionToolDefinition: EdgeToolDefinition {
-            EdgeToolDefinition(
-              name: "payload",
-              description: edgeToolsGenerationSchema.objectValue? [.description]?.string
-                ?? "Extract structured data from the input.",
-              arguments: edgeToolsGenerationSchema
-            )
-          }
-
           package static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
             EdgeToolsGenerationSchema(
               .type(.object),
@@ -353,15 +317,6 @@ extension `EdgeToolsMacros tests` {
             didSet {}
           }
 
-          static var extractionToolDefinition: EdgeToolDefinition {
-            EdgeToolDefinition(
-              name: "person",
-              description: edgeToolsGenerationSchema.objectValue? [.description]?.string
-                ?? "Extract structured data from the input.",
-              arguments: edgeToolsGenerationSchema
-            )
-          }
-
           static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
             EdgeToolsGenerationSchema(
               .type(.object),
@@ -404,15 +359,6 @@ extension `EdgeToolsMacros tests` {
         struct Payload {
           var title: String?
 
-          static var extractionToolDefinition: EdgeToolDefinition {
-            EdgeToolDefinition(
-              name: "payload",
-              description: edgeToolsGenerationSchema.objectValue? [.description]?.string
-                ?? "Extract structured data from the input.",
-              arguments: edgeToolsGenerationSchema
-            )
-          }
-
           static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
             EdgeToolsGenerationSchema(
               .type(.object),
@@ -454,15 +400,6 @@ extension `EdgeToolsMacros tests` {
         """
         struct Payload {
           var internalID: String?
-
-          static var extractionToolDefinition: EdgeToolDefinition {
-            EdgeToolDefinition(
-              name: "payload",
-              description: edgeToolsGenerationSchema.objectValue? [.description]?.string
-                ?? "Extract structured data from the input.",
-              arguments: edgeToolsGenerationSchema
-            )
-          }
 
           static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
             EdgeToolsGenerationSchema(
@@ -513,15 +450,6 @@ extension `EdgeToolsMacros tests` {
         }
         struct Person {
           var address: Address
-
-          static var extractionToolDefinition: EdgeToolDefinition {
-            EdgeToolDefinition(
-              name: "person",
-              description: edgeToolsGenerationSchema.objectValue? [.description]?.string
-                ?? "Extract structured data from the input.",
-              arguments: edgeToolsGenerationSchema
-            )
-          }
 
           static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
             EdgeToolsGenerationSchema(
@@ -578,15 +506,6 @@ extension `EdgeToolsMacros tests` {
         }
         struct Person {
           var addresses: [Address]
-
-          static var extractionToolDefinition: EdgeToolDefinition {
-            EdgeToolDefinition(
-              name: "person",
-              description: edgeToolsGenerationSchema.objectValue? [.description]?.string
-                ?? "Extract structured data from the input.",
-              arguments: edgeToolsGenerationSchema
-            )
-          }
 
           static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
             EdgeToolsGenerationSchema(

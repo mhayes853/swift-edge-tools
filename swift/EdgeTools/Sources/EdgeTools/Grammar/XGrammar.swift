@@ -187,12 +187,16 @@
       )
     }
 
+    public static func schema(_ schema: EdgeToolsGenerationSchema) -> Self {
+      Self.grammar(.schema(schema))
+    }
+
     public static func schema(_ type: (some EdgeToolsGenerable).Type) -> Self {
-      Self.grammar(.schema(type))
+      Self.schema(type.edgeToolsGenerationSchema)
     }
   }
 
-  extension XGRGenerationConstraint: EdgeToolsGenerationConstraint {
+  extension XGRGenerationConstraint: EdgeToolsSchemaGenerationConstraint {
     public typealias Context = XGrammarEngine
 
     public var toolCallRange: GrammarToolCallRange? {

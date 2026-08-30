@@ -15,9 +15,6 @@ import OrderedCollections
 public protocol EdgeToolsGenerable: ConvertibleFromEdgeToolsValue, ConvertibleToEdgeToolsValue {
   /// The generation schema describing this type.
   static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema { get }
-
-  /// The tool definition used when this type is exposed as an extraction tool.
-  static var extractionToolDefinition: EdgeToolDefinition { get }
 }
 
 // MARK: - ConvertibleFromEdgeToolsValue
@@ -59,19 +56,12 @@ extension EdgeToolsValue: EdgeToolsGenerable {
   /// The universal generation schema: a JSON Schema `true`, which accepts any
   /// well-formed ``EdgeToolsValue``.
   public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema { .universal }
-
-  public static var extractionToolDefinition: EdgeToolDefinition {
-    edgeToolsExtractionToolDefinition(name: "edge_tools_value", arguments: .universal)
-  }
 }
 
 // MARK: - Scalar Types
 
 extension String: EdgeToolsGenerable {
   public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema { .string }
-  public static var extractionToolDefinition: EdgeToolDefinition {
-    edgeToolsExtractionToolDefinition(name: "string", arguments: .string)
-  }
 
   public init(edgeToolsValue: EdgeToolsValue) throws {
     guard case .string(let string) = edgeToolsValue else {
@@ -85,9 +75,6 @@ extension String: EdgeToolsGenerable {
 
 extension Bool: EdgeToolsGenerable {
   public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema { .boolean }
-  public static var extractionToolDefinition: EdgeToolDefinition {
-    edgeToolsExtractionToolDefinition(name: "bool", arguments: .boolean)
-  }
 
   public init(edgeToolsValue: EdgeToolsValue) throws {
     guard case .boolean(let boolean) = edgeToolsValue else {
@@ -101,9 +88,6 @@ extension Bool: EdgeToolsGenerable {
 
 extension Double: EdgeToolsGenerable {
   public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema { .number }
-  public static var extractionToolDefinition: EdgeToolDefinition {
-    edgeToolsExtractionToolDefinition(name: "double", arguments: .number)
-  }
 
   public init(edgeToolsValue: EdgeToolsValue) throws {
     switch edgeToolsValue {
@@ -121,9 +105,6 @@ extension Double: EdgeToolsGenerable {
 
 extension Float: EdgeToolsGenerable {
   public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema { .number }
-  public static var extractionToolDefinition: EdgeToolDefinition {
-    edgeToolsExtractionToolDefinition(name: "float", arguments: .number)
-  }
 
   public init(edgeToolsValue: EdgeToolsValue) throws {
     switch edgeToolsValue {
@@ -168,79 +149,28 @@ extension EdgeToolsGenerable where Self: FixedWidthInteger, Self: UnsignedIntege
   }
 }
 
-extension Int8: EdgeToolsGenerable {
-  public static var extractionToolDefinition: EdgeToolDefinition {
-    edgeToolsExtractionToolDefinition(name: "int8", arguments: .integer)
-  }
-}
-extension Int16: EdgeToolsGenerable {
-  public static var extractionToolDefinition: EdgeToolDefinition {
-    edgeToolsExtractionToolDefinition(name: "int16", arguments: .integer)
-  }
-}
-extension Int32: EdgeToolsGenerable {
-  public static var extractionToolDefinition: EdgeToolDefinition {
-    edgeToolsExtractionToolDefinition(name: "int32", arguments: .integer)
-  }
-}
-extension Int64: EdgeToolsGenerable {
-  public static var extractionToolDefinition: EdgeToolDefinition {
-    edgeToolsExtractionToolDefinition(name: "int64", arguments: .integer)
-  }
-}
-extension Int: EdgeToolsGenerable {
-  public static var extractionToolDefinition: EdgeToolDefinition {
-    edgeToolsExtractionToolDefinition(name: "int", arguments: .integer)
-  }
-}
-extension UInt8: EdgeToolsGenerable {
-  public static var extractionToolDefinition: EdgeToolDefinition {
-    edgeToolsExtractionToolDefinition(name: "uint8", arguments: Self.edgeToolsGenerationSchema)
-  }
-}
-extension UInt16: EdgeToolsGenerable {
-  public static var extractionToolDefinition: EdgeToolDefinition {
-    edgeToolsExtractionToolDefinition(name: "uint16", arguments: Self.edgeToolsGenerationSchema)
-  }
-}
-extension UInt32: EdgeToolsGenerable {
-  public static var extractionToolDefinition: EdgeToolDefinition {
-    edgeToolsExtractionToolDefinition(name: "uint32", arguments: Self.edgeToolsGenerationSchema)
-  }
-}
-extension UInt64: EdgeToolsGenerable {
-  public static var extractionToolDefinition: EdgeToolDefinition {
-    edgeToolsExtractionToolDefinition(name: "uint64", arguments: Self.edgeToolsGenerationSchema)
-  }
-}
-extension UInt: EdgeToolsGenerable {
-  public static var extractionToolDefinition: EdgeToolDefinition {
-    edgeToolsExtractionToolDefinition(name: "uint", arguments: Self.edgeToolsGenerationSchema)
-  }
-}
+extension Int8: EdgeToolsGenerable {}
+extension Int16: EdgeToolsGenerable {}
+extension Int32: EdgeToolsGenerable {}
+extension Int64: EdgeToolsGenerable {}
+extension Int: EdgeToolsGenerable {}
+extension UInt8: EdgeToolsGenerable {}
+extension UInt16: EdgeToolsGenerable {}
+extension UInt32: EdgeToolsGenerable {}
+extension UInt64: EdgeToolsGenerable {}
+extension UInt: EdgeToolsGenerable {}
 
 @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-extension Int128: EdgeToolsGenerable {
-  public static var extractionToolDefinition: EdgeToolDefinition {
-    edgeToolsExtractionToolDefinition(name: "int128", arguments: Self.edgeToolsGenerationSchema)
-  }
-}
+extension Int128: EdgeToolsGenerable {}
 
 @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-extension UInt128: EdgeToolsGenerable {
-  public static var extractionToolDefinition: EdgeToolDefinition {
-    edgeToolsExtractionToolDefinition(name: "uint128", arguments: Self.edgeToolsGenerationSchema)
-  }
-}
+extension UInt128: EdgeToolsGenerable {}
 
 // MARK: - Foundation
 
 #if FoundationEssentials
   extension Data: EdgeToolsGenerable {
     public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema { .string }
-    public static var extractionToolDefinition: EdgeToolDefinition {
-      edgeToolsExtractionToolDefinition(name: "data", arguments: .string)
-    }
 
     public init(edgeToolsValue: EdgeToolsValue) throws {
       guard case .string(let string) = edgeToolsValue else {
@@ -256,9 +186,6 @@ extension UInt128: EdgeToolsGenerable {
 
   extension Decimal: EdgeToolsGenerable {
     public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema { .number }
-    public static var extractionToolDefinition: EdgeToolDefinition {
-      edgeToolsExtractionToolDefinition(name: "decimal", arguments: .number)
-    }
 
     public init(edgeToolsValue: EdgeToolsValue) throws {
       switch edgeToolsValue {
@@ -267,7 +194,8 @@ extension UInt128: EdgeToolsGenerable {
       case .integer(let integer):
         self = Decimal(integer)
       case .string(let string):
-        guard let decimal = Decimal(string: string, locale: Locale(identifier: "en_US_POSIX")) else {
+        guard let decimal = Decimal(string: string, locale: Locale(identifier: "en_US_POSIX"))
+        else {
           throw EdgeToolsValueTypeError(expected: .number, received: .string)
         }
         self = decimal
@@ -287,10 +215,6 @@ extension UInt128: EdgeToolsGenerable {
 extension Array: EdgeToolsGenerable where Element: EdgeToolsGenerable {
   public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
     EdgeToolsGenerationSchema(.type(.array), .items(Element.edgeToolsGenerationSchema))
-  }
-
-  public static var extractionToolDefinition: EdgeToolDefinition {
-    edgeToolsExtractionToolDefinition(name: "array", arguments: Self.edgeToolsGenerationSchema)
   }
 }
 
@@ -315,13 +239,6 @@ where Key == String, Value: EdgeToolsGenerable {
     EdgeToolsGenerationSchema(
       .type(.object),
       .additionalProperties(Value.edgeToolsGenerationSchema)
-    )
-  }
-
-  public static var extractionToolDefinition: EdgeToolDefinition {
-    edgeToolsExtractionToolDefinition(
-      name: "dictionary",
-      arguments: Self.edgeToolsGenerationSchema
     )
   }
 }
@@ -355,10 +272,6 @@ extension Optional: EdgeToolsGenerable where Wrapped: EdgeToolsGenerable {
   public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
     Wrapped.edgeToolsGenerationSchema.nullable()
   }
-
-  public static var extractionToolDefinition: EdgeToolDefinition {
-    edgeToolsExtractionToolDefinition(name: "optional", arguments: Self.edgeToolsGenerationSchema)
-  }
 }
 
 extension Optional: ConvertibleFromEdgeToolsValue where Wrapped: ConvertibleFromEdgeToolsValue {
@@ -384,9 +297,6 @@ extension Optional: ConvertibleToEdgeToolsValue where Wrapped: ConvertibleToEdge
 #if canImport(CoreGraphics)
   extension CGFloat: EdgeToolsGenerable {
     public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema { .number }
-    public static var extractionToolDefinition: EdgeToolDefinition {
-      edgeToolsExtractionToolDefinition(name: "cg_float", arguments: .number)
-    }
 
     public init(edgeToolsValue: EdgeToolsValue) throws {
       switch edgeToolsValue {
@@ -430,16 +340,4 @@ extension FixedWidthInteger {
     }
     return value
   }
-}
-
-private func edgeToolsExtractionToolDefinition(
-  name: String,
-  arguments: EdgeToolsGenerationSchema
-) -> EdgeToolDefinition {
-  EdgeToolDefinition(
-    name: name,
-    description: arguments.objectValue?[.description]?.string
-      ?? "Extract structured data from the input.",
-    arguments: arguments
-  )
 }
