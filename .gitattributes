@@ -2,7 +2,6 @@ swift/EdgeTools/Sources/CXGrammar/include/dlpack/** linguist-vendored
 swift/EdgeTools/Sources/CXGrammar/include/picojson/** linguist-vendored
 swift/EdgeTools/Sources/CMinja/minja/** linguist-vendored
 swift/EdgeTools/Sources/CMinja/nlohmann/** linguist-vendored
-bin/*.artifactbundle.zip filter=lfs diff=lfs merge=lfs -text
 patches/**/*.patch text eol=lf
 ts/needle2/vendor/needle.mjs linguist-vendored text eol=lf
 ts/needle2/assets/*.wasm filter=lfs diff=lfs merge=lfs -text

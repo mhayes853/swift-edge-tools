@@ -198,8 +198,7 @@ jobs:
               | swift/EdgeTools/Tests/EdgeToolsTests/Internal/Llama* \
               | swift/EdgeTools/Tests/EdgeToolsLlamaTests/* \
               | patches/Llama/* \
-              | scripts/llama/* \
-              | bin/llama-*)
+              | scripts/llama/*)
                 llama=true
                 ;;
               swift/EdgeTools/Sources/EdgeTools/Engines/MLX/* \

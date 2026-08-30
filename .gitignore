@@ -2,6 +2,7 @@
 /.build
 /.artifacts
 /bin/.build/
+/bin/*.artifactbundle.zip
 /bin/*.artifactbundleindex
 /bin/*-apple.artifactbundle.zip
 /bin/*-linux.artifactbundle.zip
