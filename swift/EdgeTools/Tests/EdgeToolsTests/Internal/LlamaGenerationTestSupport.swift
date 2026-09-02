@@ -4,8 +4,7 @@
 
   func completeWeatherTurn<Profile: LlamaModelProfile>(
     using engine: LlamaEngine<Profile>
-  ) async throws -> EdgeToolsTranscript
-  where Profile.GenerateParameters == LlamaGenerateParameters {
+  ) async throws -> EdgeToolsTranscript {
     let turn = try splitUserMessage(from: .weatherTest)
     let context = engine.context(
       turn.transcript,
@@ -41,8 +40,7 @@
 
   func generateReasoning<Profile: LlamaModelProfile>(
     using engine: LlamaEngine<Profile>
-  ) async throws -> EdgeToolsEngineGeneration
-  where Profile.GenerateParameters == LlamaGenerateParameters {
+  ) async throws -> EdgeToolsEngineGeneration {
     try await reasoningGeneration(
       from: try engine.generate(
         prompt: .user(.reasoningTest),
@@ -63,8 +61,7 @@
 
   func describeRedImage<Profile: LlamaModelProfile>(
     using engine: LlamaEngine<Profile>
-  ) async throws -> String
-  where Profile.GenerateParameters == LlamaGenerateParameters {
+  ) async throws -> String {
     let task = try engine.generate(
       prompt: .user(
         "What is the dominant color in this image? Answer briefly.",
@@ -79,8 +76,7 @@
 
   func completeImageColorTurn<Profile: LlamaModelProfile>(
     using engine: LlamaEngine<Profile>
-  ) async throws -> LlamaVLMToolTurnSnapshot
-  where Profile.GenerateParameters == LlamaGenerateParameters {
+  ) async throws -> LlamaVLMToolTurnSnapshot {
     let turn = try splitUserMessage(
       from: EdgeToolsTranscript(messages: [
         .system(
@@ -123,8 +119,7 @@
 
   func completeAudioToneTurn<Profile: LlamaModelProfile>(
     using engine: LlamaEngine<Profile>
-  ) async throws -> LlamaVLMToolTurnSnapshot
-  where Profile.GenerateParameters == LlamaGenerateParameters {
+  ) async throws -> LlamaVLMToolTurnSnapshot {
     let turn = try splitUserMessage(
       from: EdgeToolsTranscript(messages: [
         .system(

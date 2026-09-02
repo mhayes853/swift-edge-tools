@@ -18,10 +18,7 @@
   func completeWeatherTurn<Profile: MLXModelProfile>(
     using engine: MLXEngine<Profile>
   ) async throws -> EdgeToolsTranscript
-  where
-    Profile.Prompt == EdgeToolsTranscript,
-    Profile.GenerateParameters == MLXGenerateParameters
-  {
+  where Profile.Prompt == EdgeToolsTranscript {
     try await completeToolTurn(
       using: engine,
       prompt: .weatherTest,
@@ -35,10 +32,7 @@
   func generateReasoning<Profile: MLXModelProfile>(
     using engine: MLXEngine<Profile>
   ) async throws -> EdgeToolsEngineGeneration
-  where
-    Profile.Prompt == EdgeToolsTranscript,
-    Profile.GenerateParameters == MLXGenerateParameters
-  {
+  where Profile.Prompt == EdgeToolsTranscript {
     try await reasoningGeneration(
       from: try engine.generate(
         prompt: .user(.reasoningTest),
@@ -61,10 +55,7 @@
     using session: EdgeToolsSession<MLXEngine<Profile>>,
     sampling parameters: EdgeToolsFusedSamplingParameters
   ) async throws -> SessionWeatherTurnSnapshot
-  where
-    Profile.Prompt == EdgeToolsTranscript,
-    Profile.GenerateParameters == MLXGenerateParameters
-  {
+  where Profile.Prompt == EdgeToolsTranscript {
     let turn = try splitUserMessage(from: .weatherTest)
     let context = session.context(
       MLXContextParameters(
@@ -153,10 +144,7 @@
   func describeRedImage<Profile: MLXModelProfile>(
     using engine: MLXEngine<Profile>
   ) async throws -> String
-  where
-    Profile.Prompt == EdgeToolsTranscript,
-    Profile.GenerateParameters == MLXGenerateParameters
-  {
+  where Profile.Prompt == EdgeToolsTranscript {
     let task = try engine.generate(
       prompt: .user(
         "What is the dominant color in this image? Answer briefly.",
@@ -172,10 +160,7 @@
   func completeImageColorTurn<Profile: MLXModelProfile>(
     using engine: MLXEngine<Profile>
   ) async throws -> VLMToolTurnSnapshot
-  where
-    Profile.Prompt == EdgeToolsTranscript,
-    Profile.GenerateParameters == MLXGenerateParameters
-  {
+  where Profile.Prompt == EdgeToolsTranscript {
     let turn = try await completeToolTurn(
       using: engine,
       prompt: EdgeToolsTranscript(messages: [
@@ -198,10 +183,7 @@
     toolResponse: EdgeToolsValue,
     toolMaxTokens: Int
   ) async throws -> ToolTurnSnapshot
-  where
-    Profile.Prompt == EdgeToolsTranscript,
-    Profile.GenerateParameters == MLXGenerateParameters
-  {
+  where Profile.Prompt == EdgeToolsTranscript {
     let turn = try splitUserMessage(from: prompt)
     let context = engine.context(
       MLXContextParameters(transcript: turn.transcript),
@@ -237,10 +219,7 @@
   func describeRedVideo<Profile: MLXModelProfile>(
     using engine: MLXEngine<Profile>
   ) async throws -> String
-  where
-    Profile.Prompt == EdgeToolsTranscript,
-    Profile.GenerateParameters == MLXGenerateParameters
-  {
+  where Profile.Prompt == EdgeToolsTranscript {
     let video = try await redVideoAsset()
     defer { video.remove() }
     let prompt = EdgeToolsTranscript.UserMessage(
@@ -259,10 +238,7 @@
   func describeRedImageAndVideo<Profile: MLXModelProfile>(
     using engine: MLXEngine<Profile>
   ) async throws -> String
-  where
-    Profile.Prompt == EdgeToolsTranscript,
-    Profile.GenerateParameters == MLXGenerateParameters
-  {
+  where Profile.Prompt == EdgeToolsTranscript {
     let video = try await redVideoAsset()
     defer { video.remove() }
     let prompt = EdgeToolsTranscript.UserMessage(
@@ -282,10 +258,7 @@
   func completeVideoColorTurn<Profile: MLXModelProfile>(
     using engine: MLXEngine<Profile>
   ) async throws -> VLMToolTurnSnapshot
-  where
-    Profile.Prompt == EdgeToolsTranscript,
-    Profile.GenerateParameters == MLXGenerateParameters
-  {
+  where Profile.Prompt == EdgeToolsTranscript {
     let video = try await redVideoAsset()
     defer { video.remove() }
     let turn = try await completeToolTurn(

@@ -1,62 +1,46 @@
 #if XGrammar
+  import EdgeToolsCore
   import EdgeToolsXGrammar
+
+  // MARK: - FunctionGemma Model
+
+  public struct FunctionGemmaProfile: EdgeToolsModelProfile {
+    public typealias Prompt = EdgeToolsTranscript
+    public typealias GenerationParser = FunctionGemmaGenerationParser
+    public typealias GrammarEngine = XGrammarEngine
+    public typealias Constraint = XGRGenerationConstraint
+
+    public static func grammar(
+      prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
+      tools: [EdgeToolDefinition],
+      constraint: XGRGenerationConstraint,
+      grammarEngine: borrowing XGrammarEngine
+    ) throws -> XGRGrammar {
+      try Self.constrainedGrammar(
+        tools: tools,
+        constraint: constraint,
+        grammarEngine: grammarEngine
+      ) {
+        try .functionGemma(tools: tools, range: $0)
+      }
+    }
+  }
 #endif
 
 #if MLX && canImport(MLX)
-  import EdgeToolsCore
+  extension FunctionGemmaProfile: MLXLLMModelProfile {}
 
-  public struct FunctionGemmaMLXProfile: MLXLLMModelProfile {
-    public typealias Prompt = EdgeToolsTranscript
-    public typealias GenerationParser = FunctionGemmaGenerationParser
-    public typealias GrammarEngine = XGrammarEngine
-
-    public static func grammar(
-      prompt: EdgeToolsTranscript,
-      reasoningEffort: EdgeToolsReasoningEffort,
-      tools: [EdgeToolDefinition],
-      parameters: MLXGenerateParameters,
-      grammarEngine: borrowing XGrammarEngine
-    ) throws -> XGRGrammar {
-      try Self.constrainedGrammar(
-        tools: tools,
-        parameters: parameters,
-        grammarEngine: grammarEngine
-      ) {
-        try .functionGemma(tools: tools, range: $0)
-      }
-    }
-  }
-
-  public typealias FunctionGemmaMLXModelEngine = MLXEngine<FunctionGemmaMLXProfile>
+  public typealias FunctionGemmaMLXModelEngine = MLXEngine<FunctionGemmaProfile>
 #endif
 
 #if Llama && canImport(CLlama)
-  import EdgeToolsCore
+  extension FunctionGemmaProfile: LlamaModelProfile {}
 
-  public struct FunctionGemmaLlamaProfile: LlamaModelProfile {
-    public typealias Prompt = EdgeToolsTranscript
-    public typealias GenerationParser = FunctionGemmaGenerationParser
-    public typealias GrammarEngine = XGrammarEngine
-
-    public static func grammar(
-      prompt: EdgeToolsTranscript,
-      reasoningEffort: EdgeToolsReasoningEffort,
-      tools: [EdgeToolDefinition],
-      parameters: LlamaGenerateParameters,
-      grammarEngine: borrowing XGrammarEngine
-    ) throws -> XGRGrammar {
-      try Self.constrainedGrammar(
-        tools: tools,
-        parameters: parameters,
-        grammarEngine: grammarEngine
-      ) {
-        try .functionGemma(tools: tools, range: $0)
-      }
-    }
-  }
-
-  public typealias FunctionGemmaLlamaModelEngine = LlamaEngine<FunctionGemmaLlamaProfile>
+  public typealias FunctionGemmaLlamaModelEngine = LlamaEngine<FunctionGemmaProfile>
 #endif
+
+// MARK: - FunctionGemma Tool Call Parsing
 
 public struct FunctionGemmaGenerationParser: EdgeToolsGenerationParser, Sendable {
   private var base = DelimitedGenerationParser(

@@ -11,15 +11,13 @@ extension `Model tests` {
     #if MLX && canImport(MLX) && !os(WASI)
       @Test
       func `Default Sampling Follows The Reasoning Effort`() {
-        let thinking = Qwen3P5MLXProfile.defaultSampling(
+        let thinking = Qwen3P5Profile.defaultSampling(
           prompt: EdgeToolsTranscript(messages: [.user("hi")]),
-          reasoningEffort: .high,
-          parameters: MLXGenerateParameters()
+          reasoningEffort: .high
         )
-        let nonThinking = Qwen3P5MLXProfile.defaultSampling(
+        let nonThinking = Qwen3P5Profile.defaultSampling(
           prompt: EdgeToolsTranscript(messages: [.user("hi")]),
-          reasoningEffort: .none,
-          parameters: MLXGenerateParameters()
+          reasoningEffort: .none
         )
 
         expectNoDifference(thinking?.topP, 0.95)

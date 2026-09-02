@@ -33,7 +33,7 @@
       prompt: EdgeToolsTranscript,
       reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
-      parameters: Profile.GenerateParameters,
+      parameters: MLXGenerateParameters,
       configuredSampling: EdgeToolsFusedSamplingParameters?,
       generationLoop: EdgeToolsGenerationLoop,
       grammarEngine: Profile.GrammarEngine,
@@ -60,8 +60,7 @@
       let defaultSampling =
         Profile.defaultSampling(
           prompt: transaction.transcript,
-          reasoningEffort: reasoningEffort,
-          parameters: parameters
+          reasoningEffort: reasoningEffort
         )
         ?? configuredSampling
         ?? EdgeToolsFusedSamplingParameters()
@@ -91,7 +90,7 @@
             prompt: $0.transcript,
             reasoningEffort: $0.reasoningEffort,
             tools: tools,
-            parameters: parameters,
+            constraint: parameters.constraint,
             grammarEngine: grammarEngine
           )
         },

@@ -40,11 +40,9 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 15 elements
+        ▿ parts: 14 elements
           ▿ EdgeToolsGenerationPart
             - text: "The"
-          ▿ EdgeToolsGenerationPart
-            - text: " current"
           ▿ EdgeToolsGenerationPart
             - text: " weather"
           ▿ EdgeToolsGenerationPart

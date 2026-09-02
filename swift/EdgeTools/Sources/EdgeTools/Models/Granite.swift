@@ -1,77 +1,48 @@
 #if XGrammar
-  import EdgeToolsXGrammar
-#endif
-
-#if MLX && canImport(MLX)
   import EdgeToolsCore
+  import EdgeToolsXGrammar
 
   // MARK: - Granite Model
 
-  public struct GraniteMLXProfile: MLXLLMModelProfile {
+  public struct GraniteProfile: EdgeToolsModelProfile {
     public typealias Prompt = EdgeToolsTranscript
     public typealias GenerationParser = GraniteGenerationParser
     public typealias GrammarEngine = XGrammarEngine
+    public typealias Constraint = XGRGenerationConstraint
 
     public static func grammar(
       prompt: EdgeToolsTranscript,
       reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
-      parameters: MLXGenerateParameters,
+      constraint: XGRGenerationConstraint,
       grammarEngine: borrowing XGrammarEngine
     ) throws -> XGRGrammar {
-      try Self.constrainedGrammar(tools: tools, parameters: parameters, grammarEngine: grammarEngine) {
+      try Self.constrainedGrammar(
+        tools: tools,
+        constraint: constraint,
+        grammarEngine: grammarEngine
+      ) {
         try .granite(tools: tools, range: $0)
       }
     }
   }
-
-  public typealias GraniteMLXModelEngine = MLXEngine<GraniteMLXProfile>
 
   // MARK: - GraniteMoeHybrid Model
 
-  public struct GraniteMoeHybridMLXProfile: MLXLLMModelProfile {
-    public typealias Prompt = EdgeToolsTranscript
-    public typealias GenerationParser = GraniteGenerationParser
-    public typealias GrammarEngine = XGrammarEngine
+  public typealias GraniteMoeHybridProfile = GraniteProfile
+#endif
 
-    public static func grammar(
-      prompt: EdgeToolsTranscript,
-      reasoningEffort: EdgeToolsReasoningEffort,
-      tools: [EdgeToolDefinition],
-      parameters: MLXGenerateParameters,
-      grammarEngine: borrowing XGrammarEngine
-    ) throws -> XGRGrammar {
-      try Self.constrainedGrammar(tools: tools, parameters: parameters, grammarEngine: grammarEngine) {
-        try XGRGrammar.granite(tools: tools, range: $0)
-      }
-    }
-  }
+#if MLX && canImport(MLX)
+  extension GraniteProfile: MLXLLMModelProfile {}
 
-  public typealias GraniteMoeHybridMLXModelEngine = MLXEngine<GraniteMoeHybridMLXProfile>
+  public typealias GraniteMLXModelEngine = MLXEngine<GraniteProfile>
+  public typealias GraniteMoeHybridMLXModelEngine = MLXEngine<GraniteMoeHybridProfile>
 #endif
 
 #if Llama && canImport(CLlama)
-  import EdgeToolsCore
+  extension GraniteProfile: LlamaModelProfile {}
 
-  public struct GraniteLlamaProfile: LlamaModelProfile {
-    public typealias Prompt = EdgeToolsTranscript
-    public typealias GenerationParser = GraniteGenerationParser
-    public typealias GrammarEngine = XGrammarEngine
-
-    public static func grammar(
-      prompt: EdgeToolsTranscript,
-      reasoningEffort: EdgeToolsReasoningEffort,
-      tools: [EdgeToolDefinition],
-      parameters: LlamaGenerateParameters,
-      grammarEngine: borrowing XGrammarEngine
-    ) throws -> XGRGrammar {
-      try Self.constrainedGrammar(tools: tools, parameters: parameters, grammarEngine: grammarEngine) {
-        try .granite(tools: tools, range: $0)
-      }
-    }
-  }
-
-  public typealias GraniteLlamaModelEngine = LlamaEngine<GraniteLlamaProfile>
+  public typealias GraniteLlamaModelEngine = LlamaEngine<GraniteProfile>
 #endif
 
 // MARK: - Granite Tool Call Parsing

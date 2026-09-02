@@ -1,5 +1,5 @@
 ▿ LlamaVLMToolTurnSnapshot
-  - response: "Based on the image analysis, the dominant color is red."
+  - response: "<think>\nThe tool returned the color \"red\" as the dominant color in the image. I should now provide a summary of this result.\n</think>\n\nBased on the image analysis, the dominant color is red."
   ▿ toolCalls: 2 elements
     ▿ EdgeRawToolCall
       ▿ arguments: EdgeToolsValue

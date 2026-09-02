@@ -10,7 +10,7 @@
   // MARK: - MLXModelProfile
 
   public protocol MLXModelProfile: EdgeToolsModelProfile
-  where GenerateParameters == MLXGenerateParameters {
+  where Constraint == XGRGenerationConstraint {
     static nonisolated(nonsending) func input(
       prompt: Prompt,
       reasoningEffort: EdgeToolsReasoningEffort,

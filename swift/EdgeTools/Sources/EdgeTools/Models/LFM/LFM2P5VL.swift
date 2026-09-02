@@ -1,19 +1,13 @@
-#if MLX && canImport(CoreImage) && canImport(MLX) && canImport(MLXVLM)
+#if XGrammar
   import EdgeToolsCore
-  import EdgeToolsTokenizers
-  import Foundation
-  import MLXLMCommon
-  import MLXVLM
   import EdgeToolsXGrammar
 
   // MARK: - LFM2P5VL Model
 
-  public struct LFM2P5VLMLXProfile:
-    MLXVLMModelProfile,
-    EdgeToolsMultimodalModelProfile {
-    public typealias Prompt = EdgeToolsTranscript
+  public struct LFM2P5VLProfile: EdgeToolsMultimodalModelProfile {
     public typealias GenerationParser = LFM2P5GenerationParser
     public typealias GrammarEngine = XGrammarEngine
+    public typealias Constraint = XGRGenerationConstraint
 
     public static func multimodalContent(
       for message: EdgeToolsTranscript.UserMessage
@@ -25,14 +19,29 @@
       prompt: EdgeToolsTranscript,
       reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
-      parameters: MLXGenerateParameters,
+      constraint: XGRGenerationConstraint,
       grammarEngine: borrowing XGrammarEngine
     ) throws -> XGRGrammar {
-      try Self.constrainedGrammar(tools: tools, parameters: parameters, grammarEngine: grammarEngine) {
+      try Self.constrainedGrammar(
+        tools: tools,
+        constraint: constraint,
+        grammarEngine: grammarEngine
+      ) {
         try .lfm2P5(tools: tools, range: $0)
       }
     }
+  }
+#endif
 
+#if MLX && canImport(CoreImage) && canImport(MLX) && canImport(MLXVLM)
+  import EdgeToolsTokenizers
+  import Foundation
+  import MLXLMCommon
+  import MLXVLM
+
+  // MARK: - LFM2P5VL MLX Model
+
+  extension LFM2P5VLProfile: MLXVLMModelProfile {
     public static nonisolated(nonsending) func input(
       prompt: EdgeToolsTranscript,
       reasoningEffort: EdgeToolsReasoningEffort,
@@ -60,10 +69,10 @@
     }
   }
 
-  public typealias LFM2P5VLMLXModelEngine = MLXEngine<LFM2P5VLMLXProfile>
+  public typealias LFM2P5VLMLXModelEngine = MLXEngine<LFM2P5VLProfile>
 
   #if HuggingFaceTokenizers && canImport(CTokenizers)
-    extension MLXEngine where Profile == LFM2P5VLMLXProfile {
+    extension MLXEngine where Profile == LFM2P5VLProfile {
       public convenience init(from directoryURL: URL) async throws {
         try await self.init(from: MLXModelDirectory(url: directoryURL))
       }
@@ -82,7 +91,19 @@
       }
     }
   #endif
+#endif
 
+#if Llama && canImport(CLlama)
+  // MARK: - LFM2P5VL Llama Model
+
+  extension LFM2P5VLProfile: LlamaModelProfile {}
+
+  public typealias LFM2P5VLLlamaModelEngine = LlamaEngine<LFM2P5VLProfile>
+#endif
+
+// MARK: - LFM2P5VL MLX Input
+
+#if MLX && canImport(CoreImage) && canImport(MLX) && canImport(MLXVLM)
   extension EdgeToolsTranscript {
     fileprivate func lfm2P5VLUserInput(
       tools: [EdgeToolDefinition],
@@ -98,43 +119,9 @@
         guard !message.images.isEmpty else { return ["role": "user", "content": message.content] }
         return [
           "role": "user",
-          "content": LFM2P5VLMLXProfile.multimodalContent(for: message).map(\.mlxMessage)
+          "content": LFM2P5VLProfile.multimodalContent(for: message).map(\.mlxMessage)
         ]
       }
     }
   }
-#endif
-
-#if Llama && canImport(CLlama)
-  import EdgeToolsXGrammar
-
-  // MARK: - LFM2P5VL Llama Model
-
-  public struct LFM2P5VLLlamaProfile:
-    LlamaModelProfile,
-    EdgeToolsMultimodalModelProfile {
-    public typealias Prompt = EdgeToolsTranscript
-    public typealias GenerationParser = LFM2P5GenerationParser
-    public typealias GrammarEngine = XGrammarEngine
-
-    public static func multimodalContent(
-      for message: EdgeToolsTranscript.UserMessage
-    ) -> [EdgeToolsMultimodalContent] {
-      [.text(message.content)] + message.images.map(EdgeToolsMultimodalContent.image)
-    }
-
-    public static func grammar(
-      prompt: EdgeToolsTranscript,
-      reasoningEffort: EdgeToolsReasoningEffort,
-      tools: [EdgeToolDefinition],
-      parameters: LlamaGenerateParameters,
-      grammarEngine: borrowing XGrammarEngine
-    ) throws -> XGRGrammar {
-      try Self.constrainedGrammar(tools: tools, parameters: parameters, grammarEngine: grammarEngine) {
-        try .lfm2P5(tools: tools, range: $0)
-      }
-    }
-  }
-
-  public typealias LFM2P5VLLlamaModelEngine = LlamaEngine<LFM2P5VLLlamaProfile>
 #endif

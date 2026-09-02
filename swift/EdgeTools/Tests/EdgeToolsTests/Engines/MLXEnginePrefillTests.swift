@@ -273,14 +273,13 @@
   private struct LLMPrefillTestProfile: MLXLLMModelProfile {
     typealias Prompt = EdgeToolsTranscript
     typealias GenerationParser = TestGenerationParser
-    typealias GenerateParameters = MLXGenerateParameters
     typealias GrammarEngine = XGrammarEngine
 
     static func grammar(
       prompt: EdgeToolsTranscript,
       reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
-      parameters: MLXGenerateParameters,
+      constraint: XGRGenerationConstraint,
       grammarEngine: borrowing XGrammarEngine
     ) throws -> XGRGrammar {
       .universal
@@ -317,14 +316,13 @@
     private struct VLMPrefillTestProfile: MLXVLMModelProfile {
       typealias Prompt = EdgeToolsTranscript
       typealias GenerationParser = TestGenerationParser
-      typealias GenerateParameters = MLXGenerateParameters
       typealias GrammarEngine = XGrammarEngine
 
       static func grammar(
         prompt: EdgeToolsTranscript,
         reasoningEffort: EdgeToolsReasoningEffort,
         tools: [EdgeToolDefinition],
-        parameters: MLXGenerateParameters,
+        constraint: XGRGenerationConstraint,
         grammarEngine: borrowing XGrammarEngine
       ) throws -> XGRGrammar {
         .universal
@@ -572,10 +570,7 @@
     using engine: MLXEngine<Profile>,
     context: MLXContext
   ) async throws -> EdgeToolsEngineGeneration
-  where
-    Profile.Prompt == EdgeToolsTranscript,
-    Profile.GenerateParameters == MLXGenerateParameters
-  {
+  where Profile.Prompt == EdgeToolsTranscript {
     let task = try engine.generate(
       prompt: EdgeToolsTranscript.Prompt(messages: []),
       parameters: MLXGenerateParameters(
