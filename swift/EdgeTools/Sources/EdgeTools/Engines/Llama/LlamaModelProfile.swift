@@ -6,7 +6,7 @@
   // MARK: - LlamaModelProfile
 
   public protocol LlamaModelProfile: EdgeToolsModelProfile
-  where GenerateParameters == LlamaGenerateParameters, Prompt == EdgeToolsTranscript {
+  where Constraint == XGRGenerationConstraint, Prompt == EdgeToolsTranscript {
     static func tokenIds(
       prompt: EdgeToolsTranscript,
       reasoningEffort: EdgeToolsReasoningEffort,

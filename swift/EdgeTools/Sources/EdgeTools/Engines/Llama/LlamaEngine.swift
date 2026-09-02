@@ -18,7 +18,7 @@
     public typealias Context = LlamaContext
     public typealias ContextParameters = EdgeToolsTranscript
     public typealias Prompt = EdgeToolsTranscript.Prompt
-    public typealias GenerateParameters = Profile.GenerateParameters
+    public typealias GenerateParameters = LlamaGenerateParameters
     typealias ModelGenerationState = LlamaGenerationTransaction
 
     private let model: LlamaModelBox
@@ -184,7 +184,7 @@
 
     public func generate(
       prompt: EdgeToolsTranscript.Prompt,
-      parameters: sending Profile.GenerateParameters,
+      parameters: sending LlamaGenerateParameters,
       context: LlamaContext,
       channel: sending EdgeToolsGenerationChannel
     ) throws -> AnyGenerationTask {
@@ -239,7 +239,7 @@
 
     private func generationTask(
       tools: [EdgeToolDefinition],
-      parameters: sending Profile.GenerateParameters,
+      parameters: sending LlamaGenerateParameters,
       context: LlamaContext,
       channel: sending EdgeToolsGenerationChannel,
       makeState: @escaping @Sendable () throws -> ModelGenerationState
@@ -260,7 +260,7 @@
                   prompt: $0.transcript,
                   reasoningEffort: $0.reasoningEffort,
                   tools: tools,
-                  parameters: parameters,
+                  constraint: parameters.constraint,
                   grammarEngine: self.grammarEngine
                 )
               },
@@ -280,7 +280,7 @@
     private func prepare(
       parser: inout Profile.GenerationParser,
       tools: [EdgeToolDefinition],
-      parameters: Profile.GenerateParameters,
+      parameters: LlamaGenerateParameters,
       state: inout ModelGenerationState
     ) async throws -> EdgeToolsGenerationLoop.Preparation {
       Profile.prepare(
@@ -311,8 +311,7 @@
       let defaultSampling =
         Profile.defaultSampling(
           prompt: state.transcript,
-          reasoningEffort: state.reasoningEffort,
-          parameters: parameters
+          reasoningEffort: state.reasoningEffort
         )
         ?? contextState.configuredSampling
         ?? EdgeToolsFusedSamplingParameters()

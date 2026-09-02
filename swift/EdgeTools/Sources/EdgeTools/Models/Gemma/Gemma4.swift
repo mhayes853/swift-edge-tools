@@ -1,19 +1,13 @@
 #if XGrammar
-  import EdgeToolsXGrammar
-#endif
-
-#if MLX && canImport(CoreImage) && canImport(MLX) && canImport(MLXVLM)
   import EdgeToolsCore
-  import EdgeToolsTokenizers
-  import Foundation
-  import MLXLMCommon
-  import MLXNN
-  import MLXVLM
+  import EdgeToolsXGrammar
 
-  public struct Gemma4MLXProfile: MLXVLMModelProfile, EdgeToolsMultimodalModelProfile {
-    public typealias Prompt = EdgeToolsTranscript
+  // MARK: - Gemma4 Model
+
+  public struct Gemma4Profile: EdgeToolsMultimodalModelProfile {
     public typealias GenerationParser = Gemma4GenerationParser
     public typealias GrammarEngine = XGrammarEngine
+    public typealias Constraint = XGRGenerationConstraint
 
     public static var extraStopTokens: Set<String> { ["<|tool_response>"] }
 
@@ -21,12 +15,12 @@
       prompt: EdgeToolsTranscript,
       reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
-      parameters: MLXGenerateParameters,
+      constraint: XGRGenerationConstraint,
       grammarEngine: borrowing XGrammarEngine
     ) throws -> XGRGrammar {
       let grammar = try Self.constrainedGrammar(
         tools: tools,
-        parameters: parameters,
+        constraint: constraint,
         grammarEngine: grammarEngine
       ) {
         try XGRGrammar.gemma4(tools: tools, range: $0)
@@ -45,7 +39,19 @@
     ) {
       prompt = prompt.gemma4PreparedForReasoning(reasoningEffort: reasoningEffort)
     }
+  }
+#endif
 
+#if MLX && canImport(CoreImage) && canImport(MLX) && canImport(MLXVLM)
+  import EdgeToolsTokenizers
+  import Foundation
+  import MLXLMCommon
+  import MLXNN
+  import MLXVLM
+
+  // MARK: - Gemma4 MLX Model
+
+  extension Gemma4Profile: MLXVLMModelProfile {
     public static nonisolated(nonsending) func input(
       prompt: EdgeToolsTranscript,
       reasoningEffort: EdgeToolsReasoningEffort,
@@ -81,9 +87,9 @@
     }
   }
 
-  public typealias Gemma4MLXModelEngine = MLXEngine<Gemma4MLXProfile>
+  public typealias Gemma4MLXModelEngine = MLXEngine<Gemma4Profile>
 
-  extension MLXEngine where Profile == Gemma4MLXProfile {
+  extension MLXEngine where Profile == Gemma4Profile {
     public convenience init(from directoryURL: URL) async throws {
       try await self.init(from: MLXModelDirectory(url: directoryURL))
     }
@@ -112,37 +118,17 @@
       }
     }
   }
-
-  extension EdgeToolsTranscript {
-    fileprivate func gemma4UserInput(
-      reasoningEffort: EdgeToolsReasoningEffort,
-      tools: [EdgeToolDefinition],
-      addGenerationPrompt: Bool
-    ) throws -> UserInput {
-      try self.gemma4PreparedForReasoning(reasoningEffort: reasoningEffort).mlxUserInput(
-        tools: tools,
-        additionalContext: ["add_generation_prompt": .boolean(addGenerationPrompt)]
-      ) { message in
-        switch message {
-        case .system:
-          return try message.mlxMessage()
-        case .user(let message):
-          return [
-            "role": "user",
-            "content": Gemma4MLXProfile.multimodalContent(for: message).map(\.mlxMessage)
-          ]
-        case .assistant, .tool:
-          var result = try message.mlxMessage()
-          if let text = result["content"] as? String {
-            result["content"] = [["type": "text", "text": text]] as [MLXLMCommon.Message]
-          }
-          return result
-        }
-      }
-    }
-  }
-
 #endif
+
+#if Llama && canImport(CLlama)
+  // MARK: - Gemma4 Llama Model
+
+  extension Gemma4Profile: LlamaModelProfile {}
+
+  public typealias Gemma4LlamaModelEngine = LlamaEngine<Gemma4Profile>
+#endif
+
+// MARK: - Gemma4 Grammar
 
 #if XGrammar
   extension XGRGrammar {
@@ -152,49 +138,6 @@
       return try thought.concatenate(Self.literal("<channel|>"))
     }
   }
-#endif
-
-#if Llama && canImport(CLlama)
-  public struct Gemma4LlamaProfile:
-    LlamaModelProfile,
-    EdgeToolsMultimodalModelProfile {
-    public typealias Prompt = EdgeToolsTranscript
-    public typealias GenerationParser = Gemma4GenerationParser
-    public typealias GrammarEngine = XGrammarEngine
-
-    public static var extraStopTokens: Set<String> { ["<|tool_response>"] }
-
-    public static func grammar(
-      prompt: EdgeToolsTranscript,
-      reasoningEffort: EdgeToolsReasoningEffort,
-      tools: [EdgeToolDefinition],
-      parameters: LlamaGenerateParameters,
-      grammarEngine: borrowing XGrammarEngine
-    ) throws -> XGRGrammar {
-      try Self.constrainedGrammar(
-        tools: tools,
-        parameters: parameters,
-        grammarEngine: grammarEngine
-      ) { range in
-        let toolCalls = try XGRGrammar.gemma4(tools: tools, range: range)
-        guard reasoningEffort != .default, reasoningEffort.isEnabled else {
-          return toolCalls
-        }
-        return try XGRGrammar.gemma4Reasoning().concatenate(toolCalls)
-      }
-    }
-
-    public static func prepare(
-      prompt: inout EdgeToolsTranscript,
-      reasoningEffort: EdgeToolsReasoningEffort,
-      tools: [EdgeToolDefinition],
-      parser: inout Gemma4GenerationParser
-    ) {
-      prompt = prompt.gemma4PreparedForReasoning(reasoningEffort: reasoningEffort)
-    }
-  }
-
-  public typealias Gemma4LlamaModelEngine = LlamaEngine<Gemma4LlamaProfile>
 #endif
 
 // MARK: - Gemma4 Reasoning Preparation
@@ -219,3 +162,36 @@ extension EdgeToolsTranscript {
     return prompt
   }
 }
+
+// MARK: - Gemma4 MLX Input
+
+#if MLX && canImport(CoreImage) && canImport(MLX) && canImport(MLXVLM)
+  extension EdgeToolsTranscript {
+    fileprivate func gemma4UserInput(
+      reasoningEffort: EdgeToolsReasoningEffort,
+      tools: [EdgeToolDefinition],
+      addGenerationPrompt: Bool
+    ) throws -> UserInput {
+      try self.gemma4PreparedForReasoning(reasoningEffort: reasoningEffort).mlxUserInput(
+        tools: tools,
+        additionalContext: ["add_generation_prompt": .boolean(addGenerationPrompt)]
+      ) { message in
+        switch message {
+        case .system:
+          return try message.mlxMessage()
+        case .user(let message):
+          return [
+            "role": "user",
+            "content": Gemma4Profile.multimodalContent(for: message).map(\.mlxMessage)
+          ]
+        case .assistant, .tool:
+          var result = try message.mlxMessage()
+          if let text = result["content"] as? String {
+            result["content"] = [["type": "text", "text": text]] as [MLXLMCommon.Message]
+          }
+          return result
+        }
+      }
+    }
+  }
+#endif

@@ -410,43 +410,99 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 33 elements
+        ▿ parts: 64 elements
           ▿ EdgeToolsGenerationPart
-            - reasoning: "The"
+            - reasoning: "<think>"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "\n\n"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "I"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " was"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " able"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " to"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " retrieve"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " specific"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " current"
           ▿ EdgeToolsGenerationPart
             - reasoning: " weather"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " in"
+            - reasoning: " information"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " for"
           ▿ EdgeToolsGenerationPart
             - reasoning: " Paris"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " is"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " currently"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " **"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "s"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "unny"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "**."
+            - reasoning: "."
           ▿ EdgeToolsGenerationPart
             - reasoning: " The"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " forecast"
+            - reasoning: " result"
           ▿ EdgeToolsGenerationPart
             - reasoning: " shows"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " a"
+            - reasoning: ":"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " pleasant"
+            - reasoning: "\n\n"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " temperature"
+            - reasoning: "**"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " of"
+            - reasoning: "Current"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " Weather"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " Conditions"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: ":**"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "\n"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "*"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "  "
           ▿ EdgeToolsGenerationPart
             - reasoning: " **"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "Location"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: ":**"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " Paris"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "\n"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "*"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "  "
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " **"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "Condition"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: ":**"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " Sunny"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "\n"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "*"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "  "
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " **"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "Temperature"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: ":**"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " "
           ▿ EdgeToolsGenerationPart
             - reasoning: "2"
           ▿ EdgeToolsGenerationPart
@@ -454,19 +510,19 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: "°C"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "**,"
+            - reasoning: "\n\n"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " with"
+            - reasoning: "The"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " clear"
+            - reasoning: " weather"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " skies"
+            - reasoning: " today"
           ▿ EdgeToolsGenerationPart
-            - reasoning: ","
+            - reasoning: " is"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " making"
+            - reasoning: " pleasant"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " it"
+            - reasoning: " and"
           ▿ EdgeToolsGenerationPart
             - reasoning: " ideal"
           ▿ EdgeToolsGenerationPart
@@ -476,4 +532,10 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " activities"
           ▿ EdgeToolsGenerationPart
-            - reasoning: "."
+            - reasoning: ","
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " with"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " clear"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " skies"

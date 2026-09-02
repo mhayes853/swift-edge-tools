@@ -3,26 +3,25 @@ import OrderedCollections
 
 #if XGrammar
   import EdgeToolsXGrammar
-#endif
 
-#if MLX && canImport(MLX)
   // MARK: - MiniCPM5 Model
 
-  public struct MiniCPM5MLXProfile: MLXLLMModelProfile {
+  public struct MiniCPM5Profile: EdgeToolsModelProfile {
     public typealias Prompt = EdgeToolsTranscript
     public typealias GenerationParser = MiniCPM5GenerationParser
     public typealias GrammarEngine = XGrammarEngine
+    public typealias Constraint = XGRGenerationConstraint
 
     public static func grammar(
       prompt: EdgeToolsTranscript,
       reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
-      parameters: MLXGenerateParameters,
+      constraint: XGRGenerationConstraint,
       grammarEngine: borrowing XGrammarEngine
     ) throws -> XGRGrammar {
       let grammar = try Self.constrainedGrammar(
         tools: tools,
-        parameters: parameters,
+        constraint: constraint,
         grammarEngine: grammarEngine
       ) {
         try XGRGrammar.miniCPM5(tools: tools, range: $0)
@@ -49,54 +48,18 @@ import OrderedCollections
       _ = parser.accept(token: EdgeToolsToken(id: -1, stringValue: prefix))
     }
   }
+#endif
 
-  public typealias MiniCPM5MLXModelEngine = MLXEngine<MiniCPM5MLXProfile>
+#if MLX && canImport(MLX)
+  extension MiniCPM5Profile: MLXLLMModelProfile {}
+
+  public typealias MiniCPM5MLXModelEngine = MLXEngine<MiniCPM5Profile>
 #endif
 
 #if Llama && canImport(CLlama)
-  public struct MiniCPM5LlamaProfile: LlamaModelProfile {
-    public typealias Prompt = EdgeToolsTranscript
-    public typealias GenerationParser = MiniCPM5GenerationParser
-    public typealias GrammarEngine = XGrammarEngine
+  extension MiniCPM5Profile: LlamaModelProfile {}
 
-    public static func grammar(
-      prompt: EdgeToolsTranscript,
-      reasoningEffort: EdgeToolsReasoningEffort,
-      tools: [EdgeToolDefinition],
-      parameters: LlamaGenerateParameters,
-      grammarEngine: borrowing XGrammarEngine
-    ) throws -> XGRGrammar {
-      try Self.constrainedGrammar(
-        tools: tools,
-        parameters: parameters,
-        grammarEngine: grammarEngine
-      ) { range in
-        let toolCalls = try XGRGrammar.miniCPM5(tools: tools, range: range)
-        guard reasoningEffort.isEnabled else { return toolCalls }
-        return try .qwenReasoning().concatenate(toolCalls)
-      }
-    }
-
-    public static func templateContext(
-      prompt: EdgeToolsTranscript,
-      reasoningEffort: EdgeToolsReasoningEffort
-    ) -> [String: EdgeToolsValue]? {
-      guard reasoningEffort != .default else { return nil }
-      return ["enable_thinking": .boolean(reasoningEffort.isEnabled)]
-    }
-
-    public static func prepare(
-      prompt: inout EdgeToolsTranscript,
-      reasoningEffort: EdgeToolsReasoningEffort,
-      tools: [EdgeToolDefinition],
-      parser: inout MiniCPM5GenerationParser
-    ) {
-      let prefix = reasoningEffort.isEnabled ? "<think>\n" : "<think>\n\n</think>\n\n"
-      _ = parser.accept(token: EdgeToolsToken(id: -1, stringValue: prefix))
-    }
-  }
-
-  public typealias MiniCPM5LlamaModelEngine = LlamaEngine<MiniCPM5LlamaProfile>
+  public typealias MiniCPM5LlamaModelEngine = LlamaEngine<MiniCPM5Profile>
 #endif
 
 // MARK: - MiniCPM5 Tool Call Parsing

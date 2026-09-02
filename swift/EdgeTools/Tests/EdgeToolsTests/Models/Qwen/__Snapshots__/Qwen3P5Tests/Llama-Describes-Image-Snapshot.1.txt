@@ -1,1 +1,5 @@
- red
+<think>
+
+</think>
+
+ Red

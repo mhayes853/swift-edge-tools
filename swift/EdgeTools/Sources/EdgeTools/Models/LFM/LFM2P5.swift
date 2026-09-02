@@ -1,47 +1,40 @@
-#if MLX && canImport(MLX)
+#if XGrammar
   import EdgeToolsXGrammar
 
-  public struct LFM2P5MLXProfile: MLXLLMModelProfile {
+  // MARK: - LFM2P5 Model
+
+  public struct LFM2P5Profile: EdgeToolsModelProfile {
     public typealias Prompt = EdgeToolsTranscript
     public typealias GenerationParser = LFM2P5GenerationParser
     public typealias GrammarEngine = XGrammarEngine
+    public typealias Constraint = XGRGenerationConstraint
 
     public static func grammar(
       prompt: EdgeToolsTranscript,
       reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
-      parameters: MLXGenerateParameters,
+      constraint: XGRGenerationConstraint,
       grammarEngine: borrowing XGrammarEngine
     ) throws -> XGRGrammar {
-      try Self.constrainedGrammar(tools: tools, parameters: parameters, grammarEngine: grammarEngine) {
+      try Self.constrainedGrammar(
+        tools: tools,
+        constraint: constraint,
+        grammarEngine: grammarEngine
+      ) {
         try .lfm2P5(tools: tools, range: $0)
       }
     }
   }
+#endif
 
-  public typealias LFM2P5MLXModelEngine = MLXEngine<LFM2P5MLXProfile>
+#if MLX && canImport(MLX)
+  extension LFM2P5Profile: MLXLLMModelProfile {}
+
+  public typealias LFM2P5MLXModelEngine = MLXEngine<LFM2P5Profile>
 #endif
 
 #if Llama && canImport(CLlama)
-  import EdgeToolsXGrammar
+  extension LFM2P5Profile: LlamaModelProfile {}
 
-  public struct LFM2P5LlamaProfile: LlamaModelProfile {
-    public typealias Prompt = EdgeToolsTranscript
-    public typealias GenerationParser = LFM2P5GenerationParser
-    public typealias GrammarEngine = XGrammarEngine
-
-    public static func grammar(
-      prompt: EdgeToolsTranscript,
-      reasoningEffort: EdgeToolsReasoningEffort,
-      tools: [EdgeToolDefinition],
-      parameters: LlamaGenerateParameters,
-      grammarEngine: borrowing XGrammarEngine
-    ) throws -> XGRGrammar {
-      try Self.constrainedGrammar(tools: tools, parameters: parameters, grammarEngine: grammarEngine) {
-        try .lfm2P5(tools: tools, range: $0)
-      }
-    }
-  }
-
-  public typealias LFM2P5LlamaModelEngine = LlamaEngine<LFM2P5LlamaProfile>
+  public typealias LFM2P5LlamaModelEngine = LlamaEngine<LFM2P5Profile>
 #endif

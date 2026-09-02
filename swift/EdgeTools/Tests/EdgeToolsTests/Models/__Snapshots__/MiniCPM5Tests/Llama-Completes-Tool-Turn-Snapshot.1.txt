@@ -254,7 +254,7 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 43 elements
+        ▿ parts: 56 elements
           ▿ EdgeToolsGenerationPart
             - reasoning: "<think>"
           ▿ EdgeToolsGenerationPart
@@ -262,13 +262,15 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: "I"
           ▿ EdgeToolsGenerationPart
+            - reasoning: " have"
+          ▿ EdgeToolsGenerationPart
             - reasoning: " received"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
             - reasoning: " weather"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " data"
+            - reasoning: " information"
           ▿ EdgeToolsGenerationPart
             - reasoning: " from"
           ▿ EdgeToolsGenerationPart
@@ -282,13 +284,19 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " The"
           ▿ EdgeToolsGenerationPart
+            - reasoning: " function"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " returned"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
             - reasoning: " weather"
           ▿ EdgeToolsGenerationPart
             - reasoning: " in"
           ▿ EdgeToolsGenerationPart
             - reasoning: " Paris"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " is"
+            - reasoning: ":"
           ▿ EdgeToolsGenerationPart
             - reasoning: " sunny"
           ▿ EdgeToolsGenerationPart
@@ -307,6 +315,24 @@
             - reasoning: " degrees"
           ▿ EdgeToolsGenerationPart
             - reasoning: " Celsius"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "."
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " I"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " should"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " summarize"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " this"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " information"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " for"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " user"
           ▿ EdgeToolsGenerationPart
             - reasoning: ".\n"
           ▿ EdgeToolsGenerationPart

@@ -526,7 +526,7 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " I"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " called"
+            - reasoning: " used"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
@@ -604,8 +604,6 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " information"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " clearly"
-          ▿ EdgeToolsGenerationPart
             - reasoning: " for"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
@@ -623,3 +621,5 @@
             - reasoning: " should"
           ▿ EdgeToolsGenerationPart
             - reasoning: " mention"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"

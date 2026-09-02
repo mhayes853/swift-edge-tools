@@ -40,7 +40,7 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 16 elements
+        ▿ parts: 15 elements
           ▿ EdgeToolsGenerationPart
             - text: "The"
           ▿ EdgeToolsGenerationPart
@@ -51,8 +51,6 @@
             - text: " Paris"
           ▿ EdgeToolsGenerationPart
             - text: " is"
-          ▿ EdgeToolsGenerationPart
-            - text: " currently"
           ▿ EdgeToolsGenerationPart
             - text: " sunny"
           ▿ EdgeToolsGenerationPart

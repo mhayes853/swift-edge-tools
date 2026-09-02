@@ -9,9 +9,10 @@ import EdgeToolsTokenizers
 
 public protocol EdgeToolsModelProfile: SendableMetatype {
   associatedtype Prompt: Sendable
-  associatedtype GenerateParameters: EdgeToolsEngineGenerateParameters
   associatedtype GenerationParser: EdgeToolsGenerationParser
   associatedtype GrammarEngine: EdgeToolsGrammarEngine
+  associatedtype Constraint: EdgeToolsGenerationConstraint
+  where Constraint.Grammar == GrammarEngine.Grammar, Constraint.Context == GrammarEngine
 
   static var extraStopTokens: Set<String> { get }
 
@@ -25,7 +26,7 @@ public protocol EdgeToolsModelProfile: SendableMetatype {
     prompt: Prompt,
     reasoningEffort: EdgeToolsReasoningEffort,
     tools: [EdgeToolDefinition],
-    parameters: GenerateParameters,
+    constraint: Constraint,
     grammarEngine: borrowing GrammarEngine
   ) throws -> GrammarEngine.Grammar
 
@@ -43,8 +44,7 @@ public protocol EdgeToolsModelProfile: SendableMetatype {
 
   static func defaultSampling(
     prompt: Prompt,
-    reasoningEffort: EdgeToolsReasoningEffort,
-    parameters: GenerateParameters
+    reasoningEffort: EdgeToolsReasoningEffort
   ) -> EdgeToolsFusedSamplingParameters?
 }
 
@@ -76,19 +76,13 @@ extension EdgeToolsMultimodalModelProfile {
   }
 }
 
-extension EdgeToolsModelProfile
-where
-  GenerateParameters: EdgeToolsConstrainedGenerateParameters,
-  GenerateParameters.Constraint.Grammar == GrammarEngine.Grammar,
-  GenerateParameters.Constraint.Context == GrammarEngine
-{
+extension EdgeToolsModelProfile {
   public static func constrainedGrammar(
     tools: [EdgeToolDefinition],
-    parameters: GenerateParameters,
+    constraint: Constraint,
     grammarEngine: borrowing GrammarEngine,
     toolCallGrammar: (GrammarToolCallRange) throws -> GrammarEngine.Grammar
   ) throws -> GrammarEngine.Grammar {
-    let constraint = parameters.constraint
     let grammar = try (!tools.isEmpty ? constraint.toolCallRange : nil).map(toolCallGrammar)
     return try constraint.grammar(toolCallGrammar: grammar, context: grammarEngine)
   }
@@ -99,8 +93,7 @@ extension EdgeToolsModelProfile {
 
   public static func defaultSampling(
     prompt: Prompt,
-    reasoningEffort: EdgeToolsReasoningEffort,
-    parameters: GenerateParameters
+    reasoningEffort: EdgeToolsReasoningEffort
   ) -> EdgeToolsFusedSamplingParameters? {
     nil
   }

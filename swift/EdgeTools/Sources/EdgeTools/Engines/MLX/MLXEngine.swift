@@ -151,7 +151,7 @@
     public typealias Context = MLXContext
     public typealias ContextParameters = MLXContextParameters
     public typealias Prompt = EdgeToolsTranscript.Prompt
-    public typealias GenerateParameters = Profile.GenerateParameters
+    public typealias GenerateParameters = MLXGenerateParameters
     public typealias GenerationParser = Profile.GenerationParser
     public typealias GrammarEngine = Profile.GrammarEngine
 
@@ -226,7 +226,7 @@
 
     public func generate(
       prompt: EdgeToolsTranscript.Prompt,
-      parameters: sending Profile.GenerateParameters,
+      parameters: sending MLXGenerateParameters,
       context: MLXContext,
       channel: sending EdgeToolsGenerationChannel
     ) throws -> AnyGenerationTask {
@@ -254,7 +254,7 @@
 
     private func generationTask(
       tools: [EdgeToolDefinition],
-      parameters: sending Profile.GenerateParameters,
+      parameters: sending MLXGenerateParameters,
       context: MLXContext,
       channel: sending EdgeToolsGenerationChannel,
       snapshot: @escaping @Sendable () throws -> MLXContext.Snapshot

@@ -196,7 +196,7 @@
     for wordCount in 1...512 {
       let prompt = String(repeating: " word", count: wordCount)
       let tokenCount =
-        try Qwen3LlamaProfile.tokenIds(
+        try Qwen3Profile.tokenIds(
           prompt: EdgeToolsTranscript(messages: [.user(prompt)]),
           reasoningEffort: .default,
           tools: [],

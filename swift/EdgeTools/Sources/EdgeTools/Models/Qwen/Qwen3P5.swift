@@ -3,58 +3,62 @@ import OrderedCollections
 
 #if XGrammar
   import EdgeToolsXGrammar
-#endif
 
-#if MLX && canImport(MLX)
-  import EdgeToolsTokenizers
+  // MARK: - Qwen3P5ModelProfile
+
+  /// Shared behaviour for the Qwen3.5 family, whose text and vision variants differ only in their
+  /// default sampling and in how the MLX engine builds model input.
+  public protocol Qwen3P5ModelProfile: EdgeToolsMultimodalModelProfile
+  where
+    GenerationParser == Qwen3P5GenerationParser,
+    GrammarEngine == XGrammarEngine,
+    Constraint == XGRGenerationConstraint
+  {}
+
+  extension Qwen3P5ModelProfile {
+    public static func grammar(
+      prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
+      tools: [EdgeToolDefinition],
+      constraint: XGRGenerationConstraint,
+      grammarEngine: borrowing XGrammarEngine
+    ) throws -> XGRGrammar {
+      let grammar = try Self.constrainedGrammar(
+        tools: tools,
+        constraint: constraint,
+        grammarEngine: grammarEngine
+      ) {
+        try XGRGrammar.qwen3P5(tools: tools, range: $0)
+      }
+      guard reasoningEffort.isEnabled else { return grammar }
+      return try XGRGrammar.qwenReasoning().concatenate(grammar)
+    }
+
+    public static func templateContext(
+      prompt: EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort
+    ) -> [String: EdgeToolsValue]? {
+      guard reasoningEffort != .default else { return nil }
+      return ["enable_thinking": .boolean(reasoningEffort.isEnabled)]
+    }
+
+    public static func prepare(
+      prompt: inout EdgeToolsTranscript,
+      reasoningEffort: EdgeToolsReasoningEffort,
+      tools: [EdgeToolDefinition],
+      parser: inout Qwen3P5GenerationParser
+    ) {
+      let prefix = reasoningEffort.isEnabled ? "<think>\n" : "<think>\n\n</think>\n\n"
+      _ = parser.accept(token: EdgeToolsToken(id: -1, stringValue: prefix))
+    }
+  }
 
   // MARK: - Qwen3P5 Model
 
-  public struct Qwen3P5MLXProfile: MLXLLMModelProfile {
-    public typealias Prompt = EdgeToolsTranscript
-    public typealias GenerationParser = Qwen3P5GenerationParser
-    public typealias GrammarEngine = XGrammarEngine
-
-    public static func grammar(
-      prompt: EdgeToolsTranscript,
-      reasoningEffort: EdgeToolsReasoningEffort,
-      tools: [EdgeToolDefinition],
-      parameters: MLXGenerateParameters,
-      grammarEngine: borrowing XGrammarEngine
-    ) throws -> XGRGrammar {
-      let grammar = try Self.constrainedGrammar(
-        tools: tools,
-        parameters: parameters,
-        grammarEngine: grammarEngine
-      ) {
-        try XGRGrammar.qwen3P5(tools: tools, range: $0)
-      }
-      guard reasoningEffort.isEnabled else { return grammar }
-      return try XGRGrammar.qwenReasoning().concatenate(grammar)
-    }
-
-    public static func templateContext(
-      prompt: EdgeToolsTranscript,
-      reasoningEffort: EdgeToolsReasoningEffort
-    ) -> [String: EdgeToolsValue]? {
-      guard reasoningEffort != .default else { return nil }
-      return ["enable_thinking": .boolean(reasoningEffort.isEnabled)]
-    }
-
-    public static func prepare(
-      prompt: inout EdgeToolsTranscript,
-      reasoningEffort: EdgeToolsReasoningEffort,
-      tools: [EdgeToolDefinition],
-      parser: inout Qwen3P5GenerationParser
-    ) {
-      let prefix = reasoningEffort.isEnabled ? "<think>\n" : "<think>\n\n</think>\n\n"
-      _ = parser.accept(token: EdgeToolsToken(id: -1, stringValue: prefix))
-    }
-
+  public struct Qwen3P5Profile: Qwen3P5ModelProfile {
     public static func defaultSampling(
       prompt: EdgeToolsTranscript,
-      reasoningEffort: EdgeToolsReasoningEffort,
-      parameters: MLXGenerateParameters
+      reasoningEffort: EdgeToolsReasoningEffort
     ) -> EdgeToolsFusedSamplingParameters? {
       reasoningEffort.isEnabled
         ? EdgeToolsFusedSamplingParameters(
@@ -67,133 +71,12 @@ import OrderedCollections
     }
   }
 
-  public typealias Qwen3P5MLXModelEngine = MLXEngine<Qwen3P5MLXProfile>
-#endif
+  // MARK: - Qwen3P5VL Model
 
-#if Llama && canImport(CLlama)
-  public struct Qwen3P5LlamaProfile:
-    LlamaModelProfile,
-    EdgeToolsMultimodalModelProfile {
-    public typealias Prompt = EdgeToolsTranscript
-    public typealias GenerationParser = Qwen3P5GenerationParser
-    public typealias GrammarEngine = XGrammarEngine
-
-    public static func grammar(
-      prompt: EdgeToolsTranscript,
-      reasoningEffort: EdgeToolsReasoningEffort,
-      tools: [EdgeToolDefinition],
-      parameters: LlamaGenerateParameters,
-      grammarEngine: borrowing XGrammarEngine
-    ) throws -> XGRGrammar {
-      try Self.constrainedGrammar(
-        tools: tools,
-        parameters: parameters,
-        grammarEngine: grammarEngine
-      ) { range in
-        let toolCalls = try XGRGrammar.qwen3P5(tools: tools, range: range)
-        guard reasoningEffort.isEnabled else { return toolCalls }
-        return try XGRGrammar.qwenReasoning().concatenate(toolCalls)
-      }
-    }
-
-    public static func templateContext(
-      prompt: EdgeToolsTranscript,
-      reasoningEffort: EdgeToolsReasoningEffort
-    ) -> [String: EdgeToolsValue]? {
-      guard reasoningEffort != .default else { return nil }
-      return ["enable_thinking": .boolean(reasoningEffort.isEnabled)]
-    }
-
-    public static func prepare(
-      prompt: inout EdgeToolsTranscript,
-      reasoningEffort: EdgeToolsReasoningEffort,
-      tools: [EdgeToolDefinition],
-      parser: inout Qwen3P5GenerationParser
-    ) {
-      let prefix = reasoningEffort.isEnabled ? "<think>\n" : "<think>\n\n</think>\n\n"
-      _ = parser.accept(token: EdgeToolsToken(id: -1, stringValue: prefix))
-    }
-
+  public struct Qwen3P5VLProfile: Qwen3P5ModelProfile {
     public static func defaultSampling(
       prompt: EdgeToolsTranscript,
-      reasoningEffort: EdgeToolsReasoningEffort,
-      parameters: LlamaGenerateParameters
-    ) -> EdgeToolsFusedSamplingParameters? {
-      reasoningEffort.isEnabled
-        ? EdgeToolsFusedSamplingParameters(
-          temperature: 1,
-          topK: 20,
-          topP: 0.95,
-          presencePenalty: 1.5
-        )
-        : EdgeToolsFusedSamplingParameters(temperature: 1, topK: 20, presencePenalty: 2)
-    }
-  }
-
-  public typealias Qwen3P5LlamaModelEngine = LlamaEngine<Qwen3P5LlamaProfile>
-
-  // MARK: - Qwen3P5 VLM Llama Model
-
-  // Qwen3.5 is one GGUF architecture whether or not a projector is loaded, so the vision
-  // variant is the same profile under the name that mirrors the MLX side.
-  public typealias Qwen3P5VLLlamaProfile = Qwen3P5LlamaProfile
-  public typealias Qwen3P5VLLlamaModelEngine = LlamaEngine<Qwen3P5VLLlamaProfile>
-#endif
-
-#if MLX && canImport(CoreImage) && canImport(MLX) && canImport(MLXVLM)
-  import Foundation
-  import MLXLMCommon
-  import MLXVLM
-
-  // MARK: - Qwen3P5 VLM Model
-
-  public struct Qwen3P5VLMLXProfile:
-    MLXVLMModelProfile,
-    EdgeToolsMultimodalModelProfile {
-    public typealias Prompt = EdgeToolsTranscript
-    public typealias GenerationParser = Qwen3P5GenerationParser
-    public typealias GrammarEngine = XGrammarEngine
-
-    public static func grammar(
-      prompt: EdgeToolsTranscript,
-      reasoningEffort: EdgeToolsReasoningEffort,
-      tools: [EdgeToolDefinition],
-      parameters: MLXGenerateParameters,
-      grammarEngine: borrowing XGrammarEngine
-    ) throws -> XGRGrammar {
-      let grammar = try Self.constrainedGrammar(
-        tools: tools,
-        parameters: parameters,
-        grammarEngine: grammarEngine
-      ) {
-        try XGRGrammar.qwen3P5(tools: tools, range: $0)
-      }
-      guard reasoningEffort.isEnabled else { return grammar }
-      return try XGRGrammar.qwenReasoning().concatenate(grammar)
-    }
-
-    public static func templateContext(
-      prompt: EdgeToolsTranscript,
       reasoningEffort: EdgeToolsReasoningEffort
-    ) -> [String: EdgeToolsValue]? {
-      guard reasoningEffort != .default else { return nil }
-      return ["enable_thinking": .boolean(reasoningEffort.isEnabled)]
-    }
-
-    public static func prepare(
-      prompt: inout EdgeToolsTranscript,
-      reasoningEffort: EdgeToolsReasoningEffort,
-      tools: [EdgeToolDefinition],
-      parser: inout Qwen3P5GenerationParser
-    ) {
-      let prefix = reasoningEffort.isEnabled ? "<think>\n" : "<think>\n\n</think>\n\n"
-      _ = parser.accept(token: EdgeToolsToken(id: -1, stringValue: prefix))
-    }
-
-    public static func defaultSampling(
-      prompt: EdgeToolsTranscript,
-      reasoningEffort: EdgeToolsReasoningEffort,
-      parameters: MLXGenerateParameters
     ) -> EdgeToolsFusedSamplingParameters? {
       reasoningEffort.isEnabled
         ? EdgeToolsFusedSamplingParameters(temperature: 0.6, topK: 20, topP: 0.95)
@@ -204,7 +87,25 @@ import OrderedCollections
           presencePenalty: 1.5
         )
     }
+  }
+#endif
 
+#if MLX && canImport(MLX)
+  // MARK: - Qwen3P5 MLX Model
+
+  extension Qwen3P5Profile: MLXLLMModelProfile {}
+
+  public typealias Qwen3P5MLXModelEngine = MLXEngine<Qwen3P5Profile>
+#endif
+
+#if MLX && canImport(CoreImage) && canImport(MLX) && canImport(MLXVLM)
+  import EdgeToolsTokenizers
+  import MLXLMCommon
+  import MLXVLM
+
+  // MARK: - Qwen3P5VL MLX Model
+
+  extension Qwen3P5VLProfile: MLXVLMModelProfile {
     public static nonisolated(nonsending) func input(
       prompt: EdgeToolsTranscript,
       reasoningEffort: EdgeToolsReasoningEffort,
@@ -268,7 +169,17 @@ import OrderedCollections
     }
   }
 
-  public typealias Qwen3P5VLMLXModelEngine = MLXEngine<Qwen3P5VLMLXProfile>
+  public typealias Qwen3P5VLMLXModelEngine = MLXEngine<Qwen3P5VLProfile>
+#endif
+
+#if Llama && canImport(CLlama)
+  // MARK: - Qwen3P5 Llama Model
+
+  extension Qwen3P5Profile: LlamaModelProfile {}
+  extension Qwen3P5VLProfile: LlamaModelProfile {}
+
+  public typealias Qwen3P5LlamaModelEngine = LlamaEngine<Qwen3P5Profile>
+  public typealias Qwen3P5VLLlamaModelEngine = LlamaEngine<Qwen3P5VLProfile>
 #endif
 
 // MARK: - Qwen3P5 Tool Call Parsing
