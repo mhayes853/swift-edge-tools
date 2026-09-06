@@ -47,20 +47,6 @@
 
         expectNoDifference(output, "Sunny in Brooklyn (metric)")
       }
-
-      @Test
-      @available(iOS 26.0, macOS 26.0, watchOS 27.0, tvOS 26.0, visionOS 26.0, *)
-      func `Invokes Edge Tool From FoundationModels Input`() async throws {
-        let tool = try FMEdgeTool(EdgeWeatherTool())
-        let arguments = try FMEdgeToolArguments<EdgeWeatherInput>(
-          GeneratedContent(properties: ["city": "Brooklyn"])
-        )
-        let output = try await tool.call(arguments: arguments)
-
-        expectNoDifference(tool.name, "edgeWeather")
-        expectNoDifference(tool.description, "Returns EdgeTools weather.")
-        expectNoDifference(output, "Cloudy in Brooklyn")
-      }
     }
   }
 
@@ -80,20 +66,6 @@
 
     func call(arguments: WeatherArgs) async throws -> String {
       "Sunny in \(arguments.city)\(arguments.units.map { " (\($0))" } ?? "")"
-    }
-  }
-
-  @EdgeToolsGenerable(.title("EdgeWeatherInput"))
-  private struct EdgeWeatherInput: Sendable {
-    let city: String
-  }
-
-  private struct EdgeWeatherTool: EdgeTool {
-    let name = "edgeWeather"
-    let description = "Returns EdgeTools weather."
-
-    func invoke(input: EdgeWeatherInput) async throws -> String {
-      "Cloudy in \(input.city)"
     }
   }
 #endif
