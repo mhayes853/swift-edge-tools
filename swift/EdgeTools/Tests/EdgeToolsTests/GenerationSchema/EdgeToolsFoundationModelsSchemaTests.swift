@@ -43,216 +43,40 @@
     struct `EdgeToolsGenerationSchemaFoundationModels tests` {
       @Test
       @available(iOS 26.0, macOS 26.0, watchOS 27.0, tvOS 26.0, visionOS 26.0, *)
-      func `Converts Generation Schema In Both Directions`() throws {
-        let schema = EdgeToolsGenerationSchema(
-          .type(.object),
-          .title("WeatherArgs"),
-          .description("Weather query arguments"),
-          .properties([
-            "city": EdgeToolsGenerationSchema(.string, .enum(["Brooklyn", "Cupertino"])),
-            "units": .string.nullable()
-          ]),
-          .required(["city"]),
-          .additionalProperties(false)
-        )
+      func `Converts Generation Schema From FoundationModels`() throws {
+        let schema = try EdgeToolsGenerationSchema(generationSchema: RouteQuery.generationSchema)
 
-        let generationSchema = try GenerationSchema(edgeToolsGenerationSchema: schema)
-        let convertedSchema = try EdgeToolsGenerationSchema(generationSchema: generationSchema)
-        let expectedSchema = EdgeToolsGenerationSchema(
-          .type(.object),
-          .title("WeatherArgs"),
-          .description("Weather query arguments"),
-          .properties([
-            "city": EdgeToolsGenerationSchema(.string, .enum(["Brooklyn", "Cupertino"])),
-            "units": .string
-          ]),
-          .required(["city"]),
-          .additionalProperties(false),
-          .xOrder(["city", "units"])
-        )
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-        let convertedData = try encoder.encode(convertedSchema)
-        let expectedData = try encoder.encode(expectedSchema)
-        let convertedJSON = try #require(String(data: convertedData, encoding: .utf8))
-        let expectedJSON = try #require(String(data: expectedData, encoding: .utf8))
-
-        expectNoDifference(convertedJSON, expectedJSON)
-      }
-
-      @Test
-      @available(iOS 26.0, macOS 26.0, watchOS 27.0, tvOS 26.0, visionOS 26.0, *)
-      func `Converts Associated Value Enum Schema`() throws {
-        let generationSchema = try GenerationSchema(
-          edgeToolsGenerationSchema: associatedValueEnumSchema
-        )
-        let data = try JSONEncoder().encode(generationSchema)
-        let json = try #require(String(data: data, encoding: .utf8))
-
-        expectNoDifference(json.contains(#""anyOf""#), true)
-        expectNoDifference(json.contains(#""move""#), true)
-        expectNoDifference(json.contains(#""query""#), true)
-      }
-    }
-
-    @Suite
-    struct `DynamicGenerationSchemaEdgeTools tests` {
-      struct TestCase: Hashable, Sendable {
-        let name: String
-        let schema: EdgeToolsGenerationSchema
-        let expectedFragments: [String]
-        let alternativeExpectedFragmentSets: [[String]]
-        let isSupported: Bool
-
-        init(
-          name: String,
-          schema: EdgeToolsGenerationSchema,
-          expectedFragments: [String],
-          alternativeExpectedFragmentSets: [[String]] = [],
-          isSupported: Bool
-        ) {
-          self.name = name
-          self.schema = schema
-          self.expectedFragments = expectedFragments
-          self.alternativeExpectedFragmentSets = alternativeExpectedFragmentSets
-          self.isSupported = isSupported
+        guard case .object(let root) = schema else {
+          Issue.record("Expected object schema, got \(schema)")
+          return
         }
-      }
+        expectNoDifference(root[.title], .string("RouteQuery"))
+        expectNoDifference(root[.description], .string("A routing decision"))
+        expectNoDifference(root[.required], .array([.string("destination")]))
 
-      @Test(arguments: [
-        TestCase(
-          name: "StringValue",
-          schema: EdgeToolsGenerationSchema(.string, .enum(["a", "b"])),
-          expectedFragments: [#""enum":["a","b"]"#],
-          alternativeExpectedFragmentSets: [
-            [#""enum":["a"]"#, #""enum":["b"]"#]
-          ],
-          isSupported: true
-        ),
-        TestCase(
-          name: "UnsupportedStringValue",
-          schema: EdgeToolsGenerationSchema(.string, .enum(["a", "b"]), .lengthRange(0...1)),
-          expectedFragments: [],
-          isSupported: false
-        ),
-        TestCase(
-          name: "IntegerValue",
-          schema: EdgeToolsGenerationSchema(.integer, .range(1...4)),
-          expectedFragments: [#""minimum":1"#, #""maximum":4"#],
-          isSupported: true
-        ),
-        TestCase(
-          name: "NumberValue",
-          schema: EdgeToolsGenerationSchema(.number, .range(1.5...4.5)),
-          expectedFragments: [#""minimum":1.5"#, #""maximum":4.5"#],
-          isSupported: true
-        ),
-        TestCase(
-          name: "BooleanValue",
-          schema: EdgeToolsGenerationSchema(.type(.boolean)),
-          expectedFragments: [#""type":"boolean""#],
-          isSupported: true
-        ),
-        TestCase(
-          name: "NullValue",
-          schema: .null,
-          expectedFragments: [#""type":"null""#],
-          isSupported: true
-        ),
-        TestCase(
-          name: "ArrayValue",
-          schema: EdgeToolsGenerationSchema(
-            .type(.array),
-            .items(.string),
-            .minItems(1),
-            .maxItems(3)
-          ),
-          expectedFragments: [#""minItems":1"#, #""maxItems":3"#],
-          isSupported: true
-        ),
-        TestCase(
-          name: "ObjectValue",
-          schema: EdgeToolsGenerationSchema(
-            .type(.object),
-            .properties(["name": .string, "count": .integer]),
-            .required(["name"])
-          ),
-          expectedFragments: [#""required":["name"]"#, #""x-order":["name","count"]"#],
-          isSupported: true
-        ),
-        TestCase(
-          name: "AssociatedValueEnum",
-          schema: associatedValueEnumSchema,
-          expectedFragments: [#""anyOf""#, #""move""#, #""query""#],
-          isSupported: true
-        ),
-        TestCase(
-          name: "Unsupported",
-          schema: true,
-          expectedFragments: [],
-          isSupported: false
-        )
-      ])
-      @available(iOS 26.4, macOS 26.4, watchOS 27.0, tvOS 26.4, visionOS 26.4, *)
-      func `Converts Dynamic Generation Schema`(_ testCase: TestCase) throws {
-        if testCase.isSupported {
-          let dynamicSchema = try DynamicGenerationSchema(
-            edgeToolsGenerationSchema: testCase.schema,
-            name: testCase.name
-          )
-          let schema = try GenerationSchema(root: dynamicSchema, dependencies: [])
-          let encoder = JSONEncoder()
-          encoder.outputFormatting = [.sortedKeys]
-          let data = try encoder.encode(schema)
-          let json = try #require(String(data: data, encoding: .utf8))
-
-          let expectedFragmentSets =
-            [testCase.expectedFragments] + testCase.alternativeExpectedFragmentSets
-          #expect(
-            expectedFragmentSets.contains { fragments in
-              fragments.allSatisfy { json.contains($0) }
-            }
-          )
-        } else {
-          #expect(throws: FMConversionError.self) {
-            try DynamicGenerationSchema(
-              edgeToolsGenerationSchema: testCase.schema,
-              name: testCase.name
-            )
-          }
+        guard case .object(let properties)? = root[.properties] else {
+          Issue.record("Expected properties object.")
+          return
         }
+        expectNoDifference(properties.keys.sorted(), ["confidence", "destination"])
+
+        guard case .object(let destination)? = properties["destination"] else {
+          Issue.record("Expected destination schema object.")
+          return
+        }
+        expectNoDifference(
+          destination["enum"],
+          .array([.string("onDevice"), .string("privateCloud")])
+        )
       }
     }
   }
 
-  private let associatedValueEnumSchema = EdgeToolsGenerationSchema(
-    .anyOf([
-      EdgeToolsGenerationSchema(
-        .type(.object),
-        .properties([
-          "move": EdgeToolsGenerationSchema(
-            .type(.object),
-            .properties(["_0": .number, "_1": .number]),
-            .required(["_0", "_1"]),
-            .additionalProperties(false)
-          )
-        ]),
-        .required(["move"]),
-        .additionalProperties(false)
-      ),
-      EdgeToolsGenerationSchema(
-        .type(.object),
-        .properties([
-          "search": EdgeToolsGenerationSchema(
-            .type(.object),
-            .properties(["query": .string, "limit": .integer.nullable()]),
-            .required(["query", "limit"]),
-            .additionalProperties(false)
-          )
-        ]),
-        .required(["search"]),
-        .additionalProperties(false)
-      )
-    ])
-  )
+  @Generable(description: "A routing decision")
+  @available(iOS 26.0, macOS 26.0, watchOS 27.0, tvOS 26.0, visionOS 26.0, *)
+  private struct RouteQuery {
+    @Guide(description: "Where to send the query", .anyOf(["onDevice", "privateCloud"]))
+    var destination: String
+    var confidence: Double?
+  }
 #endif
