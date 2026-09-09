@@ -15,7 +15,7 @@
       tool: .weatherTest,
       toolResponse: .weatherTestResponse,
       generatingToolCall: {
-        try engine.generate(
+        try engine.generationTask(
           prompt: .user(turn.userMessage),
           parameters: LlamaGenerateParameters(
             sampling: .greedy,
@@ -27,7 +27,7 @@
         )
       },
       generatingResponse: { toolMessage in
-        try engine.generate(
+        try engine.generationTask(
           prompt: .tools([toolMessage]),
           parameters: LlamaGenerateParameters(maxTokens: 64),
           context: context,
@@ -42,7 +42,7 @@
     using engine: LlamaEngine<Profile>
   ) async throws -> EdgeToolsEngineGeneration {
     try await reasoningGeneration(
-      from: try engine.generate(
+      from: try engine.generationTask(
         prompt: .user(.reasoningTest),
         parameters: LlamaGenerateParameters(maxTokens: 512),
         context: engine.context(
@@ -62,7 +62,7 @@
   func describeRedImage<Profile: LlamaModelProfile>(
     using engine: LlamaEngine<Profile>
   ) async throws -> String {
-    let task = try engine.generate(
+    let task = try engine.generationTask(
       prompt: .user(
         "What is the dominant color in this image? Answer briefly.",
         images: [try llamaRedImageAsset()]
@@ -94,7 +94,7 @@
       tool: .llamaColorTest,
       toolResponse: ["color": "red"],
       generatingToolCall: {
-        try engine.generate(
+        try engine.generationTask(
           prompt: .user(turn.userMessage),
           parameters: LlamaGenerateParameters(
             sampling: .greedy,
@@ -106,7 +106,7 @@
         )
       },
       generatingResponse: { toolMessage in
-        try engine.generate(
+        try engine.generationTask(
           prompt: .tools([toolMessage]),
           parameters: LlamaGenerateParameters(sampling: .greedy, maxTokens: 64),
           context: context,
@@ -137,7 +137,7 @@
       tool: .llamaAudioTest,
       toolResponse: ["kind": "tone"],
       generatingToolCall: {
-        try engine.generate(
+        try engine.generationTask(
           prompt: .user(turn.userMessage),
           parameters: LlamaGenerateParameters(
             sampling: .greedy,
@@ -149,7 +149,7 @@
         )
       },
       generatingResponse: { toolMessage in
-        try engine.generate(
+        try engine.generationTask(
           prompt: .tools([toolMessage]),
           parameters: LlamaGenerateParameters(sampling: .greedy, maxTokens: 64),
           context: context,

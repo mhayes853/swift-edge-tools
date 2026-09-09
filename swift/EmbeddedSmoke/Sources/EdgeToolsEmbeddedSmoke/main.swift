@@ -18,6 +18,7 @@ struct EchoTool: EdgeTool {
 final class MockEngine: EdgeToolsEngine {
   final class Context: EdgeToolsEngineContext {
     let tools: [any EdgeTool]
+    let isResponding = false
 
     init(tools: [any EdgeTool]) {
       self.tools = tools
@@ -49,7 +50,7 @@ final class MockEngine: EdgeToolsEngine {
     Context(tools: tools)
   }
 
-  func generate(
+  func generationTask(
     prompt: Prompt,
     parameters: GenerateParameters,
     context: Context,
@@ -80,9 +81,9 @@ func runSmoke() async throws {
     throw SmokeError.unexpectedGenerationTaskResult
   }
 
-  let session = EdgeToolsSession(engine: MockEngine())
-  let context = session.context { EchoTool() }
-  let generation = try await session.generate(prompt: MockEngine.Prompt(), context: context)
+  let engine = MockEngine()
+  let context = engine.context { EchoTool() }
+  let generation = try await engine.generate(prompt: MockEngine.Prompt(), context: context)
 
   guard generation.toolCalls.count == 1 else { throw SmokeError.unexpectedToolCallCount }
   let call = generation.toolCalls[0]

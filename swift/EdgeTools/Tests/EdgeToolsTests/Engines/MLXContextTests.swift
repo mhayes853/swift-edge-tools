@@ -11,8 +11,8 @@
   struct `MLXContext tests` {
     @Test
     func `Reasoning Effort And Tools Belong To The Context`() throws {
-      let session = EdgeToolsSession(engine: try contextTestEngine())
-      let context = session.context(
+      let engine = try contextTestEngine()
+      let context = engine.context(
         systemPrompt: "System",
         reasoningEffort: .high
       ) {
@@ -40,22 +40,21 @@
     func `In Flight Transcript Mutation Does Not Change The Generation Snapshot`() async throws {
       await ContextTestProfile.gate.pauseNextCapture()
       let engine = try contextTestEngine()
-      let session = EdgeToolsSession(engine: engine)
-      let context = session.context(
+      let context = engine.context(
         MLXContextParameters(
           transcript: EdgeToolsTranscript(messages: [.system("System")])
         )
       )
 
       let generation = Task {
-        try await session.generate(
+        try await engine.generate(
           prompt: .user("Question"),
           context: context,
           parameters: MLXGenerateParameters(maxTokens: 1)
         )
       }
       let capturedTranscript = await ContextTestProfile.gate.waitForCapture()
-      _ = try await session.tokenize(prompt: .user("Tokenize"), context: context)
+      _ = try await engine.tokenize(prompt: .user("Tokenize"), context: context)
       expectNoDifference(context.isResponding, true)
       context.transcript.messages.append(.system("Injected while generating"))
       await ContextTestProfile.gate.resume()
@@ -90,8 +89,7 @@
         tokenizer: tokenizer,
         vocabularySize: TestTokenizer.vocabularySize
       )
-      let session = EdgeToolsSession(engine: engine)
-      let context = session.context(
+      let context = engine.context(
         MLXContextParameters(
           transcript: EdgeToolsTranscript(messages: [.system("System")])
         )
@@ -104,7 +102,7 @@
 
       let idleFork = context.fork()
       expectNoDifference(copyCounter.count, 0)
-      _ = try await session.generate(
+      _ = try await engine.generate(
         prompt: .user("Idle fork"),
         context: idleFork,
         parameters: MLXGenerateParameters(maxTokens: 1)
@@ -113,7 +111,7 @@
 
       await ContextTestProfile.gate.pauseNextCapture()
       let generation = Task {
-        try await session.generate(
+        try await engine.generate(
           prompt: .user("Question"),
           context: context,
           parameters: MLXGenerateParameters(maxTokens: 1)
@@ -130,7 +128,7 @@
       _ = try await generation.value
       expectNoDifference(copyCounter.count, 2)
 
-      _ = try await session.generate(
+      _ = try await engine.generate(
         prompt: .user("Responding fork"),
         context: fork,
         parameters: MLXGenerateParameters(maxTokens: 1)

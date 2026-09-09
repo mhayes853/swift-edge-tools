@@ -4,6 +4,7 @@ import EdgeToolsCore
 
 public protocol EdgeToolsEngineContext: Identifiable, Sendable {
   var tools: [any EdgeTool] { get }
+  var isResponding: Bool { get }
 }
 
 // MARK: - EdgeToolsEngine
@@ -18,7 +19,7 @@ public protocol EdgeToolsEngine: Sendable {
   func context(tools: [any EdgeTool]) -> Context
   func context(_ parameters: ContextParameters, tools: [any EdgeTool]) -> Context
 
-  func generate(
+  func generationTask(
     prompt: Prompt,
     parameters: sending GenerateParameters,
     context: Context,

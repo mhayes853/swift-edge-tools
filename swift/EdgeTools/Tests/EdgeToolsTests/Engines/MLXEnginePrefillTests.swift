@@ -157,7 +157,7 @@
       )
       let context = engine.context()
 
-      let generation = try await engine.generate(
+      let generation = try await engine.generationTask(
         prompt: EdgeToolsTranscript.Prompt(
           messages: EdgeToolsTranscript.tokens([1]).messages
         ),
@@ -194,7 +194,7 @@
         tokenizer: tokenizer,
         vocabularySize: TestTokenizer.vocabularySize
       )
-      let generation = try await engine.generate(
+      let generation = try await engine.generationTask(
         prompt: EdgeToolsTranscript.Prompt(
           messages: EdgeToolsTranscript.tokens([1]).messages
         ),
@@ -571,7 +571,7 @@
     context: MLXContext
   ) async throws -> EdgeToolsEngineGeneration
   where Profile.Prompt == EdgeToolsTranscript {
-    let task = try engine.generate(
+    let task = try engine.generationTask(
       prompt: EdgeToolsTranscript.Prompt(messages: []),
       parameters: MLXGenerateParameters(
         sampler: { ArgMaxSampler() },

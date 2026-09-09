@@ -26,10 +26,9 @@ struct `Needle2JSEngine tests` {
   func `Generates Real Tool Calls Across Context Reset`() async throws {
     let createRuntime = try #require(JSObject.global["edgeToolsNeedle2Runtime"].object)
     let engine = try await Needle2JSEngine(createRuntime: createRuntime)
-    let session = EdgeToolsSession(engine: engine)
-    let context = session.context { Needle2SendEmailTool() }
+    let context = engine.context { Needle2SendEmailTool() }
 
-    let generation = try await session.generate(
+    let generation = try await engine.generate(
       prompt: "Send an email to blob@gmail.com asking them to go hiking.",
       context: context,
       shouldInvokeTools: { _ in false }
@@ -52,8 +51,8 @@ struct `Needle2JSEngine tests` {
     #expect(input.body.lowercased().contains("hiking"))
 
     try await engine.reset(context)
-    let thermostatContext = session.context { Needle2SetThermostatTool() }
-    let thermostatGeneration = try await session.generate(
+    let thermostatContext = engine.context { Needle2SetThermostatTool() }
+    let thermostatGeneration = try await engine.generate(
       prompt: "Set the thermostat to 21 degrees.",
       context: thermostatContext,
       shouldInvokeTools: { _ in false }

@@ -28,16 +28,16 @@ The `swift` side may contain patch files that are applied through a custom build
 
 ## Framework Basics
 
-On the Swift side, `EdgeToolsSession` is currently the primary way to interact with a model. It manages active generation streams from its underlying engine, but unlike other frameworks it manages multiple contexts windows at once. This provides more flexibility to the engine for underlying inference tasks. The session conforms to `Observable`, and so does the streams and contexts it manages which makes consumption in UI frameworks ideal.
+On the Swift side, `EdgeToolsEngine` is the primary way to interact with a model. It is the underlying protocol for handling generation, and unlike other frameworks a single engine drives multiple context windows at once. This provides more flexibility to the engine for underlying inference tasks. The streams and contexts an engine vends conform to `Observable`, which makes consumption in UI frameworks ideal.
 
-The session consumes a generic `EdgeToolsEngine`, which is the underlying protocol for handling generation.
+Convenience APIs on top of the engine (`stream`, `generate`, `extract`, `respond`) live in `EdgeToolsEngine` extensions, so a user picks the level of abstraction they want. `generationTask` is the raw protocol requirement that the conveniences are built from; it returns a task rather than a finished generation.
 
 Engines generally handle the following responsibilities:
 - Executing inference tasks.
 - Grammar constraints, and managing grammar schema compilation.
   - This is typically through XGrammar, but some engines (eg. Needle2) may have this built in.
 - Tool call parsing.
-  - Tool call parsing is done incrementally, meaning that the moment enough tokens have been emitted to parse the information for a single tool call, we immediately publish it through the generation channel. This allows decoding to continue while the tool call is invoked by the session in the background.
+  - Tool call parsing is done incrementally, meaning that the moment enough tokens have been emitted to parse the information for a single tool call, we immediately publish it through the generation channel. This allows decoding to continue while the tool call is invoked by the stream in the background.
 - The full generation loop, including the ability to control when it starts and stops.
 - Updating contexts per-inference task.
 - Context creation.
@@ -45,14 +45,14 @@ Engines generally handle the following responsibilities:
 Contexts are generally reference types created by the engine that hold state for a sequential set of inference tasks. An instance of a context generally consists of:
 - The KV Cache/Prefill state.
 - The conversational state if the underlying model supports multi-turn conversations (ie. Everything except for Needle 2).
-- An indicator for whether or not the context is being used.
+- An indicator for whether or not the context is being used (`isResponding`, required by `EdgeToolsEngineContext`).
 - Any tools that the model can invoke.
 
 The contexts for the MLX and llama engines are also forkable. An example use case is creating a context to prefill the system prompt, and then subsequently creating forks of that context for future tasks. This avoids prefilling the system prompt for the forked contexts, which can massively reduce latency. Forked contexts also implement a copy-on-write mechanism, so no KV vectors are actually copied until an inference task needs to write to the forked context.
 
-The session invokes the engine with a context in order to perform an inference task. Under the hood, the engine manages any state updates, including updating KV Cache states, the transcript, and any responding indicators. Each
+The engine is invoked with a context in order to perform an inference task. Under the hood, the engine manages any state updates, including updating KV Cache states, the transcript, and any responding indicators.
 
-The session represents generally collects tool calls into an `EdgeToolsToolCallCollection`. This collection contains individual `AnyEdgeToolCall` instances that represent the active response state of the tool call, and this can be further casted down a strongly typed `EdgeToolCall`. One must `await` the `output` of a tool call since the tool may or may not be actively responding. Multiple calls to `output` are deduplicated. This gives flexibility at the cost of convenience, and existing convenience APIs like multi-turn responses are built on top of this more general mechanism.
+`EdgeToolsGenerationStream` is what the engine's `stream` convenience vends. It resolves the raw tool calls an engine emits into strongly typed calls against the context's tools, optionally invokes them, and exposes the generation as subscriptions or an `AsyncSequence`. It generally collects tool calls into an `EdgeToolsToolCallCollection`. This collection contains individual `AnyEdgeToolCall` instances that represent the active response state of the tool call, and this can be further casted down a strongly typed `EdgeToolCall`. One must `await` the `output` of a tool call since the tool may or may not be actively responding. Multiple calls to `output` are deduplicated. This gives flexibility at the cost of convenience, and existing convenience APIs like multi-turn responses are built on top of this more general mechanism.
 
 Grammar constraints and tool argument parsing are generally represented through the `EdgeToolsGenerationSchema` struct and associated conversion protocols. The schema struct represents a valid JSON schema object under the hood. Generally, a user doesn't need to create generation schema's by hand because the `@EdgeToolsGenerable` macro can be applied to any struct. This macro will create a schema for the type, and conform the type to various protocols that use the schema.
 
@@ -100,7 +100,7 @@ Do not test obvious functionallity like "member-wise initializers init properly"
 
 Test suite names must use the `PascalCase tests` convention, with no spaces within the PascalCase portion (for example, `MySuite tests`). Do not use "Consolidated" in test suite names.
 
-The highest levels of the framework (eg. `EdgeToolsSession`, etc.) should be tested in a manner that is not tied to any specific engine or model. This ensures the framework itself works no matter what engine is powering the session.
+The highest levels of the framework (eg. `EdgeToolsGenerationStream`, the agent loop, etc.) should be tested in a manner that is not tied to any specific engine or model. This ensures the framework itself works no matter what engine is powering it.
 
 The most important tests besides the general framework tests are the engine generation tests and the snapshots they produce. Everything else is trivial by comparison. Most engine generation tests record snapshots with `withKnownIssue`, this makes them robust to non-deterministic model outputs, but requires manual validation of the snapshot. As an agent, you should be able to perform such validation yourself.
 

@@ -5,7 +5,7 @@ import Observation
 import Testing
 
 @Suite(.serialized)
-struct `EdgeToolsSession tests` {
+struct `EdgeToolsGenerationStream tests` {
   @Test
   func `Tokenize Forwards Prompt To The Engine`() async throws {
     let expectedTokens = (0..<6).map { EdgeToolsToken(id: $0, stringValue: "t\($0)") }
@@ -16,10 +16,9 @@ struct `EdgeToolsSession tests` {
       captured.withLock { $0 = (prompt, tools) }
       return expectedTokens
     }
-    let session = EdgeToolsSession(engine: engine)
-    let context = session.context { tool }
+    let context = engine.context { tool }
 
-    let tokens = try await session.tokenize(prompt: prompt, context: context)
+    let tokens = try await engine.tokenize(prompt: prompt, context: context)
 
     expectNoDifference(tokens, expectedTokens)
 
@@ -34,9 +33,8 @@ struct `EdgeToolsSession tests` {
     let tokenizer = try testTokenizer()
     let tokens = "Hello, world!".tokenize(using: tokenizer)
     let engine = MockEngine(script: tokens.map { .token($0) } + [.finish])
-    let session = EdgeToolsSession(engine: engine)
 
-    let stream = session.stream(prompt: .test(user: "hi"), context: session.context())
+    let stream = engine.stream(prompt: .test(user: "hi"), context: engine.context())
     let generation = try await stream.finalGeneration
 
     expectNoDifference(generation.engineGeneration.tokens, tokens)
@@ -50,10 +48,9 @@ struct `EdgeToolsSession tests` {
     let rawToolCall = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
     let toolTokens = rawToolCall.tokenize(using: tokenizer)
     let engine = MockEngine(script: toolTokens.map { .token($0) } + [.finish])
-    let session = EdgeToolsSession(engine: engine)
-    let context = session.context { WeatherTool() }
+    let context = engine.context { WeatherTool() }
 
-    let generation = try await session.generate(prompt: .test(user: "weather?"), context: context)
+    let generation = try await engine.generate(prompt: .test(user: "weather?"), context: context)
 
     expectNoDifference(generation.engineGeneration.tokens, toolTokens)
     expectNoDifference(generation.engineGeneration.wasStopped, false)
@@ -73,9 +70,8 @@ struct `EdgeToolsSession tests` {
     let tokenizer = try testTokenizer()
     let responseTokens = #"{"location":"Seoul"}"#.tokenize(using: tokenizer)
     let engine = MockEngine(script: responseTokens.map { .token($0) } + [.finish])
-    let session = EdgeToolsSession(engine: engine)
 
-    let value = try await session.extract(
+    let value = try await engine.extract(
       prompt: .test(user: "weather?"),
       as: WeatherArgs.self
     )
@@ -91,10 +87,9 @@ struct `EdgeToolsSession tests` {
   @Test
   func `Extraction Throws Without A Structured Response`() async {
     let engine = MockEngine(script: [.finish])
-    let session = EdgeToolsSession(engine: engine)
 
     await #expect(throws: EdgeToolsError.self) {
-      try await session.extract(
+      try await engine.extract(
         prompt: .test(user: "not structured"),
         as: WeatherArgs.self
       )
@@ -108,7 +103,7 @@ struct `EdgeToolsSession tests` {
     let toolTokens = rawToolCall.tokenize(using: tokenizer)
     let engine = MockEngine(script: toolTokens.map { .token($0) } + [.finish])
 
-    let task = try engine.generate(
+    let task = try engine.generationTask(
       prompt: .test(user: "call it"),
       parameters: .default,
       context: engine.context(tools: [DefinitionTool(.sendEmail)]),
@@ -128,9 +123,8 @@ struct `EdgeToolsSession tests` {
     let tokens = "hi".tokenize(using: tokenizer)
     let error = ToolError(message: "boom")
     let engine = MockEngine(script: tokens.map { .token($0) } + [.error(error)])
-    let session = EdgeToolsSession(engine: engine)
 
-    let stream = session.stream(prompt: .test(user: "hi"), context: session.context())
+    let stream = engine.stream(prompt: .test(user: "hi"), context: engine.context())
 
     await #expect(throws: ToolError.self) {
       _ = try await stream.finalGeneration
@@ -148,10 +142,9 @@ struct `EdgeToolsSession tests` {
       #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}},{"name":"get_weather","arguments":{"location":"Paris"}}]"#
     let toolTokens = rawToolCalls.tokenize(using: tokenizer)
     let engine = MockEngine(script: toolTokens.map { .token($0) } + [.finish])
-    let session = EdgeToolsSession(engine: engine)
-    let context = session.context { WeatherTool() }
+    let context = engine.context { WeatherTool() }
 
-    let stream = session.stream(prompt: .test(user: "weather?"), context: context)
+    let stream = engine.stream(prompt: .test(user: "weather?"), context: context)
 
     var collected = EdgeToolCallCollection()
     for try await call in stream {
@@ -175,10 +168,9 @@ struct `EdgeToolsSession tests` {
     let rawToolCall = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
     let toolTokens = rawToolCall.tokenize(using: tokenizer)
     let engine = MockEngine(script: toolTokens.map { .token($0) } + [.finish])
-    let session = EdgeToolsSession(engine: engine)
-    let context = session.context { WeatherTool() }
+    let context = engine.context { WeatherTool() }
 
-    let stream = session.stream(prompt: .test(user: "weather?"), context: context)
+    let stream = engine.stream(prompt: .test(user: "weather?"), context: context)
 
     let tokens = Lock([EdgeToolsToken]())
     let names = Lock([String]())
@@ -202,9 +194,8 @@ struct `EdgeToolsSession tests` {
     let tokenizer = try testTokenizer()
     let tokens = "abc".tokenize(using: tokenizer)
     let engine = MockEngine(script: tokens.map { .token($0) } + [.finish])
-    let session = EdgeToolsSession(engine: engine)
 
-    let stream = session.stream(prompt: .test(user: "hi"), context: session.context())
+    let stream = engine.stream(prompt: .test(user: "hi"), context: engine.context())
     _ = try await stream.finalGeneration
 
     let replayed = Lock([EdgeToolsToken]())
@@ -219,10 +210,9 @@ struct `EdgeToolsSession tests` {
     let firstToken = EdgeToolsToken(id: 1, stringValue: "first")
     let secondToken = EdgeToolsToken(id: 2, stringValue: "second")
     let engine = ReentrantMockEngine()
-    let session = EdgeToolsSession(engine: engine)
-    let stream = session.stream(
+    let stream = engine.stream(
       prompt: ReentrantMockEngine.Prompt(),
-      context: session.context()
+      context: engine.context()
     )
     await engine.waitUntilReady()
 
@@ -260,9 +250,8 @@ struct `EdgeToolsSession tests` {
     let tokenizer = try testTokenizer()
     let tokens = "abc".tokenize(using: tokenizer)
     let engine = MockEngine(script: tokens.map { .token($0) } + [.finish])
-    let session = EdgeToolsSession(engine: engine)
 
-    let stream = session.stream(prompt: .test(user: "hi"), context: session.context())
+    let stream = engine.stream(prompt: .test(user: "hi"), context: engine.context())
 
     let collected = Lock([EdgeToolsToken]())
     let subscription = stream.onToken { token in collected.withLock { $0.append(token) } }
@@ -278,9 +267,8 @@ struct `EdgeToolsSession tests` {
     let tokenizer = try testTokenizer()
     let tokens = "abc".tokenize(using: tokenizer)
     let engine = MockEngine(script: tokens.map { .token($0) } + [.finish])
-    let session = EdgeToolsSession(engine: engine)
 
-    let stream = session.stream(prompt: .test(user: "hi"), context: session.context())
+    let stream = engine.stream(prompt: .test(user: "hi"), context: engine.context())
 
     var collected = [EdgeToolsToken]()
     for try await token in stream.tokens {
@@ -295,8 +283,7 @@ struct `EdgeToolsSession tests` {
     let tokenizer = try testTokenizer()
     let tokens = "abc".tokenize(using: tokenizer)
     let engine = MockEngine(script: tokens.map { .token($0) } + [.finish])
-    let session = EdgeToolsSession(engine: engine)
-    let streamedTokens = try await self.tokensFromCompletedStream(session: session)
+    let streamedTokens = try await self.tokensFromCompletedStream(engine: engine)
 
     var collected = [EdgeToolsToken]()
     for try await token in streamedTokens {
@@ -307,9 +294,9 @@ struct `EdgeToolsSession tests` {
   }
 
   private func tokensFromCompletedStream(
-    session: EdgeToolsSession<MockEngine>
-  ) async throws -> EdgeToolsSessionTokens {
-    let stream = session.stream(prompt: .test(user: "hi"), context: session.context())
+    engine: MockEngine
+  ) async throws -> EdgeToolsGenerationTokens {
+    let stream = engine.stream(prompt: .test(user: "hi"), context: engine.context())
     _ = try await stream.finalGeneration
     return stream.tokens
   }
@@ -321,9 +308,8 @@ struct `EdgeToolsSession tests` {
     let secondToken = "b b".tokenize(using: tokenizer).first!
     let engine = MockEngine.live()
     engine.push(.token(firstToken))
-    let session = EdgeToolsSession(engine: engine)
 
-    let stream = session.stream(prompt: .test(user: "hi"), context: session.context())
+    let stream = engine.stream(prompt: .test(user: "hi"), context: engine.context())
 
     let generationTask = Task {
       try await stream.finalGeneration
@@ -343,9 +329,8 @@ struct `EdgeToolsSession tests` {
   @Test
   func `Stopping Before Generation Starts Returns An Empty Stopped Generation`() async throws {
     let engine = MockEngine.live()
-    let session = EdgeToolsSession(engine: engine)
 
-    let stream = session.stream(prompt: .test(user: "hi"), context: session.context())
+    let stream = engine.stream(prompt: .test(user: "hi"), context: engine.context())
     stream.stop()
 
     let generation = try await stream.finalGeneration
@@ -357,9 +342,8 @@ struct `EdgeToolsSession tests` {
   @Test
   func `Stopping Before Generation Starts Updates Status Observation`() async throws {
     let engine = MockEngine.live()
-    let session = EdgeToolsSession(engine: engine)
 
-    let stream = session.stream(prompt: .test(user: "hi"), context: session.context())
+    let stream = engine.stream(prompt: .test(user: "hi"), context: engine.context())
 
     let didChange = Lock(false)
     withObservationTracking {
@@ -375,7 +359,7 @@ struct `EdgeToolsSession tests` {
   }
 }
 
-extension `EdgeToolsSession tests` {
+extension `EdgeToolsGenerationStream tests` {
   @Test
   func `Tools Are Parsed Incremental Without Waiting For Model Stop`() async throws {
     let tokenizer = try testTokenizer()
@@ -385,10 +369,9 @@ extension `EdgeToolsSession tests` {
     let engine = MockEngine(
       script: toolTokens.map { .token($0) } + trailing.map { .token($0) } + [.finish]
     )
-    let session = EdgeToolsSession(engine: engine)
-    let context = session.context { WeatherTool() }
+    let context = engine.context { WeatherTool() }
 
-    let stream = session.stream(prompt: .test(user: "weather?"), context: context)
+    let stream = engine.stream(prompt: .test(user: "weather?"), context: context)
 
     var firstYielded: AnyEdgeToolCall?
     for try await call in stream {
@@ -405,9 +388,8 @@ extension `EdgeToolsSession tests` {
     let firstToken = "a a".tokenize(using: tokenizer).first!
     let engine = MockEngine.live()
     engine.push(.token(firstToken))
-    let session = EdgeToolsSession(engine: engine)
 
-    let stream = session.stream(prompt: .test(user: "hi"), context: session.context())
+    let stream = engine.stream(prompt: .test(user: "hi"), context: engine.context())
 
     let task = Task {
       try await stream.finalGeneration
@@ -428,9 +410,8 @@ extension `EdgeToolsSession tests` {
     let tokenizer = try testTokenizer()
     let tokens = "hi".tokenize(using: tokenizer)
     let engine = MockEngine(script: tokens.map { .token($0) } + [.finish])
-    let session = EdgeToolsSession(engine: engine)
 
-    let stream = session.stream(prompt: .test(user: "hi"), context: session.context())
+    let stream = engine.stream(prompt: .test(user: "hi"), context: engine.context())
 
     let didChange = Lock(false)
     withObservationTracking {
@@ -449,10 +430,9 @@ extension `EdgeToolsSession tests` {
     let rawToolCall = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
     let toolTokens = rawToolCall.tokenize(using: tokenizer)
     let engine = MockEngine(script: toolTokens.map { .token($0) } + [.finish])
-    let session = EdgeToolsSession(engine: engine)
-    let context = session.context { WeatherTool() }
+    let context = engine.context { WeatherTool() }
 
-    let stream = session.stream(prompt: .test(user: "weather?"), context: context)
+    let stream = engine.stream(prompt: .test(user: "weather?"), context: context)
 
     let didChange = Lock(false)
     withObservationTracking {
@@ -466,36 +446,15 @@ extension `EdgeToolsSession tests` {
   }
 
   @Test
-  func `Active Streams Are Observable`() async throws {
-    let tokenizer = try testTokenizer()
-    let tokens = "hi".tokenize(using: tokenizer)
-    let engine = MockEngine(script: tokens.map { .token($0) } + [.finish])
-    let session = EdgeToolsSession(engine: engine)
-
-    let didChange = Lock(false)
-    withObservationTracking {
-      _ = session.activeStreams
-    } onChange: {
-      didChange.withLock { $0 = true }
-    }
-
-    let stream = session.stream(prompt: .test(user: "hi"), context: session.context())
-    didChange.withLock { expectNoDifference($0, true) }
-
-    _ = try await stream.finalGeneration
-  }
-
-  @Test
   func `Tool Call Parsed When Tool Name Differs From Snake Cased`() async throws {
     let tokenizer = try testTokenizer()
     let rawToolCall =
       #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
     let toolTokens = rawToolCall.tokenize(using: tokenizer)
     let engine = MockEngine(script: toolTokens.map { .token($0) } + [.finish])
-    let session = EdgeToolsSession(engine: engine)
-    let context = session.context { CamelCaseWeatherTool() }
+    let context = engine.context { CamelCaseWeatherTool() }
 
-    let generation = try await session.generate(prompt: .test(user: "weather?"), context: context)
+    let generation = try await engine.generate(prompt: .test(user: "weather?"), context: context)
 
     expectNoDifference(generation.toolCalls.count, 1)
     expectNoDifference(generation.toolCalls[0].tool.name, "getWeather")
@@ -511,12 +470,11 @@ extension `EdgeToolsSession tests` {
     let toolTokens = rawToolCall.tokenize(using: tokenizer)
     let engine = MockEngine(scripts: [toolTokens.map { .token($0) } + [.finish], [.finish]])
     let weatherTool = WeatherTool()
-    let session = EdgeToolsSession(engine: engine)
-    let weatherContext = session.context { weatherTool }
-    let echoContext = session.context { EchoTool() }
+    let weatherContext = engine.context { weatherTool }
+    let echoContext = engine.context { EchoTool() }
 
-    let generation = try await session.generate(prompt: .test(user: "weather?"), context: weatherContext)
-    _ = try await session.generate(prompt: .test(user: "echo"), context: echoContext)
+    let generation = try await engine.generate(prompt: .test(user: "weather?"), context: weatherContext)
+    _ = try await engine.generate(prompt: .test(user: "echo"), context: echoContext)
 
     expectNoDifference(
       engine.generationTools,
@@ -534,46 +492,14 @@ extension `EdgeToolsSession tests` {
     let engine = MockEngine(
       script: [.token(EdgeToolsToken(id: 0, stringValue: response)), .finish]
     )
-    let session = EdgeToolsSession(engine: engine)
 
-    let generation = try await session.generate(
+    let generation = try await engine.generate(
       prompt: .test(user: "hi"),
-      context: session.context()
+      context: engine.context()
     )
     let value = try generation.decoded(as: EdgeToolsValue.self)
 
     expectNoDifference(value, ["name": "Ada"])
-  }
-
-  @Test
-  func `Active Streams Track Concurrent Streams And Remove On Finish`() async throws {
-    let engine = MockEngine.live()
-    let session = EdgeToolsSession(engine: engine)
-
-    let stream1 = session.stream(prompt: .test(user: "hi"), context: session.context())
-    try await Task.sleep(for: .milliseconds(50))
-
-    let stream2 = session.stream(prompt: .test(user: "hi"), context: session.context())
-
-    let activeStreams = session.activeStreams
-    expectNoDifference(activeStreams.count, 2)
-    expectNoDifference(activeStreams.contains { $0 === stream1 }, true)
-    expectNoDifference(activeStreams.contains { $0 === stream2 }, true)
-
-    engine.push(.finish)
-    engine.push(nil)
-    _ = try await stream1.finalGeneration
-
-    let activeStreamsAfterFirst = session.activeStreams
-    expectNoDifference(activeStreamsAfterFirst.count, 1)
-    expectNoDifference(activeStreamsAfterFirst.contains { $0 === stream1 }, false)
-    expectNoDifference(activeStreamsAfterFirst.contains { $0 === stream2 }, true)
-
-    engine.push(.finish)
-    engine.push(nil)
-    _ = try await stream2.finalGeneration
-
-    expectNoDifference(session.activeStreams.isEmpty, true)
   }
 
   @Test
@@ -582,9 +508,8 @@ extension `EdgeToolsSession tests` {
     let firstToken = "a a".tokenize(using: tokenizer).first!
     let engine = MockEngine.live()
     engine.push(.token(firstToken))
-    let session = EdgeToolsSession(engine: engine)
 
-    let stream = session.stream(prompt: .test(user: "hi"), context: session.context())
+    let stream = engine.stream(prompt: .test(user: "hi"), context: engine.context())
 
     try await Task.sleep(for: .milliseconds(50))
     expectNoDifference(stream.isGenerating, true)
@@ -599,9 +524,8 @@ extension `EdgeToolsSession tests` {
     let tokenizer = try testTokenizer()
     let tokens = "hi".tokenize(using: tokenizer)
     let engine = MockEngine(script: tokens.map { .token($0) } + [.finish])
-    let session = EdgeToolsSession(engine: engine)
 
-    let stream = session.stream(prompt: .test(user: "hi"), context: session.context())
+    let stream = engine.stream(prompt: .test(user: "hi"), context: engine.context())
     let generation = try await stream.finalGeneration
 
     expectNoDifference(stream.isFinished, true)
@@ -620,9 +544,8 @@ extension `EdgeToolsSession tests` {
     let tokens = "hi".tokenize(using: tokenizer)
     let error = ToolError(message: "boom")
     let engine = MockEngine(script: tokens.map { .token($0) } + [.error(error)])
-    let session = EdgeToolsSession(engine: engine)
 
-    let stream = session.stream(prompt: .test(user: "hi"), context: session.context())
+    let stream = engine.stream(prompt: .test(user: "hi"), context: engine.context())
 
     await #expect(throws: ToolError.self) {
       _ = try await stream.finalGeneration
@@ -641,10 +564,9 @@ extension `EdgeToolsSession tests` {
     let rawToolCall = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
     let toolTokens = rawToolCall.tokenize(using: tokenizer)
     let engine = MockEngine(script: toolTokens.map { .token($0) } + [.finish])
-    let session = EdgeToolsSession(engine: engine)
-    let context = session.context { WeatherTool() }
+    let context = engine.context { WeatherTool() }
 
-    let stream = session.stream(
+    let stream = engine.stream(
       prompt: .test(user: "weather?"),
       context: context,
       shouldInvokeTools: { _ in false }
@@ -665,10 +587,9 @@ extension `EdgeToolsSession tests` {
     let rawToolCall = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
     let toolTokens = rawToolCall.tokenize(using: tokenizer)
     let engine = MockEngine(script: toolTokens.map { .token($0) } + [.finish])
-    let session = EdgeToolsSession(engine: engine)
-    let context = session.context { BlockingWeatherTool() }
+    let context = engine.context { BlockingWeatherTool() }
 
-    let stream = session.stream(
+    let stream = engine.stream(
       prompt: .test(user: "weather?"),
       context: context,
       shouldInvokeTools: { _ in true }
@@ -689,12 +610,12 @@ extension `EdgeToolsSession tests` {
     @Test
     func `Stream With Duplicate Tool Names Causes Precondition Failure`() async {
       await #expect(processExitsWith: .failure) {
-        let session = EdgeToolsSession(engine: MockEngine())
-        let context = session.context {
+        let engine = MockEngine()
+        let context = engine.context {
           CamelCaseWeatherTool()
           GetWeatherTool()
         }
-        _ = session.stream(prompt: .test(user: "hi"), context: context)
+        _ = engine.stream(prompt: .test(user: "hi"), context: context)
       }
     }
   #endif
@@ -791,6 +712,7 @@ private struct GetWeatherTool: EdgeTool {
 private final class ReentrantMockEngine: EdgeToolsEngine, EdgeToolsTokenizingEngine {
   final class Context: EdgeToolsEngineContext {
     let tools: [any EdgeTool]
+    let isResponding = false
 
     init(tools: [any EdgeTool]) {
       self.tools = tools
@@ -847,7 +769,7 @@ private final class ReentrantMockEngine: EdgeToolsEngine, EdgeToolsTokenizingEng
     []
   }
 
-  func generate(
+  func generationTask(
     prompt: Prompt,
     parameters: GenerateParameters,
     context: Context,

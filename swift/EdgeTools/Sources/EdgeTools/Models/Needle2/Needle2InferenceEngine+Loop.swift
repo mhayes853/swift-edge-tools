@@ -1,5 +1,6 @@
 #if Needle2
   import EdgeToolsCore
+  import OrderedCollections
   import _Concurrency
 
   // MARK: - Needle2LoopResponse
@@ -20,11 +21,11 @@
   // MARK: - Needle2LoopStep
 
   public struct Needle2LoopStep: Sendable {
-    public let generation: EdgeToolsSessionGeneration
+    public let generation: EdgeToolsGeneration
     public let toolResponses: [EdgeToolsValue]
 
     public init(
-      generation: EdgeToolsSessionGeneration,
+      generation: EdgeToolsGeneration,
       toolResponses: [EdgeToolsValue]
     ) {
       self.generation = generation
@@ -49,17 +50,17 @@
 
   // MARK: - Extraction
 
-  extension EdgeToolsSession where Engine: Needle2SessionEngine {
+  extension Needle2InferenceEngine {
     @concurrent
     public func extract<Response: EdgeToolsGenerable>(
-      prompt: Engine.Prompt,
+      prompt: Prompt,
       as type: Response.Type,
-      parameters: sending Engine.GenerateParameters = .default
+      parameters: sending GenerateParameters = .default
     ) async throws -> Response {
       let tool = Needle2ExtractionTool<Response>()
-      let context = self.engine.context(tools: [tool])
+      let context = self.context(tools: [tool])
       do {
-        let task = try self.engine.generate(
+        let task = try self.generationTask(
           prompt: prompt,
           parameters: parameters,
           context: context,
@@ -73,10 +74,10 @@
           )
         }
         let response = try type.init(edgeToolsValue: call.arguments)
-        try await self.engine.reset(context)
+        try await self.reset(context)
         return response
       } catch {
-        try? await self.engine.reset(context)
+        try? await self.reset(context)
         throw error
       }
     }
@@ -84,13 +85,13 @@
 
   // MARK: - Loop
 
-  extension EdgeToolsSession where Engine: Needle2SessionEngine {
+  extension Needle2InferenceEngine {
     @concurrent
     public func runLoop(
       prompt: String,
-      context: Engine.Context,
+      context: Context,
       maximumTurns: Int = 8,
-      parameters: @escaping @Sendable (Int) -> Engine.GenerateParameters = { _ in .default },
+      parameters: @escaping @Sendable (Int) -> GenerateParameters = { _ in .default },
       shouldInvokeTools: @escaping @Sendable (AnyEdgeToolCall) -> Bool = { _ in true }
     ) async throws -> Needle2LoopResponse {
       guard (1...8).contains(maximumTurns) else {
@@ -149,7 +150,7 @@
   }
 
   private func needle2LoopTerminationCause(
-    for generation: EdgeToolsSessionGeneration
+    for generation: EdgeToolsGeneration
   ) -> Needle2LoopTerminationCause {
     switch generation.engineGeneration.metrics.needle2ResponseType {
     case "respond": .responded

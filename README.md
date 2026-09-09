@@ -25,14 +25,13 @@ struct GetWeather: EdgeTool {
 }
 
 let engine = try await Gemma4MLXModelEngine(from: modelURL)
-let session = EdgeToolsSession(engine: engine)
 
-let context = session.context(
+let context = engine.context(
   systemPrompt: "You are an assistant who can fetch the weather."
 ) {
   GetWeather()
 }
-let response = try await session.respond(
+let response = try await engine.respond(
   to: .user("What is the weather in San Francisco?"),
   as: String.self,
   context: context

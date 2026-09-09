@@ -34,7 +34,7 @@
   ) async throws -> EdgeToolsEngineGeneration
   where Profile.Prompt == EdgeToolsTranscript {
     try await reasoningGeneration(
-      from: try engine.generate(
+      from: try engine.generationTask(
         prompt: .user(.reasoningTest),
         parameters: MLXGenerateParameters(maxTokens: 512),
         context: engine.context(
@@ -45,19 +45,19 @@
     )
   }
 
-  struct SessionWeatherTurnSnapshot: Hashable, Sendable {
+  struct WeatherTurnSnapshot: Hashable, Sendable {
     var toolCalls: [EdgeRawToolCall]
     var toolOutput: String
     var response: String
   }
 
   func completeWeatherTurn<Profile: MLXModelProfile>(
-    using session: EdgeToolsSession<MLXEngine<Profile>>,
+    using engine: MLXEngine<Profile>,
     sampling parameters: EdgeToolsFusedSamplingParameters
-  ) async throws -> SessionWeatherTurnSnapshot
+  ) async throws -> WeatherTurnSnapshot
   where Profile.Prompt == EdgeToolsTranscript {
     let turn = try splitUserMessage(from: .weatherTest)
-    let context = session.context(
+    let context = engine.context(
       MLXContextParameters(
         transcript: turn.transcript,
         reasoningEffort: .none
@@ -65,7 +65,7 @@
     ) {
       WeatherTestTool()
     }
-    let toolGeneration = try await session.generate(
+    let toolGeneration = try await engine.generate(
       prompt: .user(turn.userMessage),
       context: context,
       parameters: MLXGenerateParameters(
@@ -82,7 +82,7 @@
     }
 
     context.transcript.messages.append(.tool(name: "getWeather", response: .string(toolOutput)))
-    let responseTask = try session.engine.generate(
+    let responseTask = try engine.generationTask(
       prompt: EdgeToolsTranscript.Prompt(messages: []),
       parameters: MLXGenerateParameters(
         sampler: { MLXFusedSampler(parameters: parameters) },
@@ -94,7 +94,7 @@
     )
     let response = try await responseTask.value.response
     guard !response.isEmpty else { throw GenerationTestError.missingFinalResponse }
-    return SessionWeatherTurnSnapshot(
+    return WeatherTurnSnapshot(
       toolCalls: toolGeneration.engineGeneration.toolCalls,
       toolOutput: toolOutput,
       response: response
@@ -145,7 +145,7 @@
     using engine: MLXEngine<Profile>
   ) async throws -> String
   where Profile.Prompt == EdgeToolsTranscript {
-    let task = try engine.generate(
+    let task = try engine.generationTask(
       prompt: .user(
         "What is the dominant color in this image? Answer briefly.",
         images: [try redImageAsset()]
@@ -194,7 +194,7 @@
       tool: tool,
       toolResponse: toolResponse,
       generatingToolCall: {
-        try engine.generate(
+        try engine.generationTask(
           prompt: .user(turn.userMessage),
           parameters: MLXGenerateParameters(
             sampler: { ArgMaxSampler() },
@@ -206,7 +206,7 @@
         )
       },
       generatingResponse: { toolMessage in
-        try engine.generate(
+        try engine.generationTask(
           prompt: .tools([toolMessage]),
           parameters: MLXGenerateParameters(maxTokens: 64),
           context: context,
@@ -226,7 +226,7 @@
       "What is the dominant color in this video? Answer briefly.",
       videos: [video.asset]
     )
-    let task = try engine.generate(
+    let task = try engine.generationTask(
       prompt: .user(prompt),
       parameters: MLXGenerateParameters(maxTokens: 64),
       context: engine.context(),
@@ -246,7 +246,7 @@
       images: [try redImageAsset()],
       videos: [video.asset]
     )
-    let task = try engine.generate(
+    let task = try engine.generationTask(
       prompt: .user(prompt),
       parameters: MLXGenerateParameters(maxTokens: 64),
       context: engine.context(),

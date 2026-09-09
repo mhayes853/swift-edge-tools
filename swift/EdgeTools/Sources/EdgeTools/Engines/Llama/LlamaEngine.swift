@@ -182,7 +182,7 @@
       return self.tokenizer.tokens(forIds: input.units.tokenIds).compactMap { $0 }
     }
 
-    public func generate(
+    public func generationTask(
       prompt: EdgeToolsTranscript.Prompt,
       parameters: sending LlamaGenerateParameters,
       context: LlamaContext,
@@ -519,49 +519,37 @@
     }
   #endif
 
-  // MARK: - EdgeToolsSession + Llama
+  // MARK: - Contexts
 
-  extension EdgeToolsSession {
-    public func context<Profile>(
-      transcript: EdgeToolsTranscript = EdgeToolsTranscript(),
-      reasoningEffort: EdgeToolsReasoningEffort = .default
-    ) -> LlamaContext where Engine == LlamaEngine<Profile> {
-      self.engine.context(
-        transcript: transcript,
-        reasoningEffort: reasoningEffort,
-        tools: []
-      )
-    }
-
-    public func context<Profile>(
+  extension LlamaEngine {
+    public func context(
       transcript: EdgeToolsTranscript = EdgeToolsTranscript(),
       reasoningEffort: EdgeToolsReasoningEffort = .default,
       @EdgeToolsToolBuilder tools: () -> [any EdgeTool]
-    ) -> LlamaContext where Engine == LlamaEngine<Profile> {
-      self.engine.context(
+    ) -> LlamaContext {
+      self.context(
         transcript: transcript,
         reasoningEffort: reasoningEffort,
         tools: tools()
       )
     }
 
-    public func context<Profile>(
+    public func context(
       systemPrompt: String,
       reasoningEffort: EdgeToolsReasoningEffort = .default
-    ) -> LlamaContext where Engine == LlamaEngine<Profile> {
-      self.engine.context(
+    ) -> LlamaContext {
+      self.context(
         transcript: EdgeToolsTranscript(messages: [.system(systemPrompt)]),
-        reasoningEffort: reasoningEffort,
-        tools: []
+        reasoningEffort: reasoningEffort
       )
     }
 
-    public func context<Profile>(
+    public func context(
       systemPrompt: String,
       reasoningEffort: EdgeToolsReasoningEffort = .default,
       @EdgeToolsToolBuilder tools: () -> [any EdgeTool]
-    ) -> LlamaContext where Engine == LlamaEngine<Profile> {
-      self.engine.context(
+    ) -> LlamaContext {
+      self.context(
         transcript: EdgeToolsTranscript(messages: [.system(systemPrompt)]),
         reasoningEffort: reasoningEffort,
         tools: tools()
@@ -575,14 +563,6 @@
     extension LlamaEngine where Profile.GrammarEngine == XGrammarEngine {
       public func clearCaches() {
         self.grammarEngine.clearCaches()
-      }
-    }
-
-    extension EdgeToolsSession {
-      public func clearCaches<Profile>()
-      where Engine == LlamaEngine<Profile>, Profile.GrammarEngine == XGrammarEngine
-      {
-        self.engine.clearCaches()
       }
     }
   #endif

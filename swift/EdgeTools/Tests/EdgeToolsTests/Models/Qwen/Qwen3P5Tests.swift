@@ -40,11 +40,10 @@ extension `Model tests` {
         }
 
         @Test
-        func `Completes A Session Tool Turn With The Fused Sampler Snapshot`() async throws {
+        func `Completes A Tool Turn With The Fused Sampler Snapshot`() async throws {
           let engine = try await Qwen3P5MLXModelEngine(from: downloadQwen3P5())
-          let session = EdgeToolsSession(engine: engine)
           let turn = try await completeWeatherTurn(
-            using: session,
+            using: engine,
             sampling: EdgeToolsFusedSamplingParameters(
               temperature: 0.7,
               topK: 40,
@@ -307,7 +306,7 @@ extension `Model tests` {
     prompt: EdgeToolsTranscript.UserMessage,
     context: MLXContext
   ) async throws -> EdgeToolsEngineGeneration {
-    let task = try engine.generate(
+    let task = try engine.generationTask(
       prompt: .user(prompt),
       parameters: MLXGenerateParameters(
         sampling: .greedy,
@@ -336,7 +335,7 @@ extension `Model tests` {
     prompt: EdgeToolsTranscript.UserMessage,
     context: LlamaContext
   ) async throws -> EdgeToolsEngineGeneration {
-    let task = try engine.generate(
+    let task = try engine.generationTask(
       prompt: .user(prompt),
       parameters: LlamaGenerateParameters(sampling: .greedy, maxTokens: 1),
       context: context,

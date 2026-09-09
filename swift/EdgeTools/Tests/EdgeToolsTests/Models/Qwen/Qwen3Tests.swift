@@ -44,7 +44,7 @@ extension `Model tests` {
             context: context
           )
 
-          let forkedTask = try engine.generate(
+          let forkedTask = try engine.generationTask(
             prompt: .user("Say hello in one word."),
             parameters: MLXGenerateParameters(
               maxTokens: 1,
@@ -55,7 +55,7 @@ extension `Model tests` {
           )
           let forked = try await forkedTask.value
 
-          let freshTask = try engine.generate(
+          let freshTask = try engine.generationTask(
             prompt: .user("Say hello in one word."),
             parameters: MLXGenerateParameters(
               maxTokens: 1,
@@ -122,7 +122,7 @@ extension `Model tests` {
             context: context
           )
 
-          let forkedTask = try engine.generate(
+          let forkedTask = try engine.generationTask(
             prompt: .user("Say hello in one word."),
             parameters: LlamaGenerateParameters(maxTokens: 1),
             context: context.fork(),
@@ -130,7 +130,7 @@ extension `Model tests` {
           )
           let forked = try await forkedTask.value
 
-          let freshTask = try engine.generate(
+          let freshTask = try engine.generationTask(
             prompt: .user("Say hello in one word."),
             parameters: LlamaGenerateParameters(maxTokens: 1),
             context: engine.context(transcript: parameters, reasoningEffort: .none),

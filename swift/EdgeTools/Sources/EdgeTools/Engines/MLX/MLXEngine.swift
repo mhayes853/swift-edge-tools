@@ -224,7 +224,7 @@
       return self.tokenizer.tokens(forIds: tokenIds).compactMap { $0 }
     }
 
-    public func generate(
+    public func generationTask(
       prompt: EdgeToolsTranscript.Prompt,
       parameters: sending MLXGenerateParameters,
       context: MLXContext,
@@ -315,58 +315,48 @@
     }
   }
 
-  // MARK: - EdgeToolsSession + MLX
+  // MARK: - Contexts
 
-  extension EdgeToolsSession {
-    public func context<Profile>(
+  extension MLXEngine {
+    public func context(
       transcript: EdgeToolsTranscript = EdgeToolsTranscript(),
       reasoningEffort: EdgeToolsReasoningEffort = .default
-    ) -> MLXContext where Engine == MLXEngine<Profile> {
+    ) -> MLXContext {
       self.context(
-        MLXContextParameters(
-          transcript: transcript,
-          reasoningEffort: reasoningEffort
-        )
+        MLXContextParameters(transcript: transcript, reasoningEffort: reasoningEffort)
       )
     }
 
-    public func context<Profile>(
+    public func context(
       transcript: EdgeToolsTranscript = EdgeToolsTranscript(),
       reasoningEffort: EdgeToolsReasoningEffort = .default,
       @EdgeToolsToolBuilder tools: () -> [any EdgeTool]
-    ) -> MLXContext where Engine == MLXEngine<Profile> {
-      self.engine.context(
-        MLXContextParameters(
-          transcript: transcript,
-          reasoningEffort: reasoningEffort
-        ),
+    ) -> MLXContext {
+      self.context(
+        MLXContextParameters(transcript: transcript, reasoningEffort: reasoningEffort),
         tools: tools()
       )
     }
 
-    public func context<Profile>(
+    public func context(
       systemPrompt: String,
       reasoningEffort: EdgeToolsReasoningEffort = .default
-    ) -> MLXContext where Engine == MLXEngine<Profile> {
+    ) -> MLXContext {
       self.context(
-        MLXContextParameters(
-          transcript: EdgeToolsTranscript(messages: [.system(systemPrompt)]),
-          reasoningEffort: reasoningEffort
-        )
+        transcript: EdgeToolsTranscript(messages: [.system(systemPrompt)]),
+        reasoningEffort: reasoningEffort
       )
     }
 
-    public func context<Profile>(
+    public func context(
       systemPrompt: String,
       reasoningEffort: EdgeToolsReasoningEffort = .default,
       @EdgeToolsToolBuilder tools: () -> [any EdgeTool]
-    ) -> MLXContext where Engine == MLXEngine<Profile> {
-      self.engine.context(
-        MLXContextParameters(
-          transcript: EdgeToolsTranscript(messages: [.system(systemPrompt)]),
-          reasoningEffort: reasoningEffort
-        ),
-        tools: tools()
+    ) -> MLXContext {
+      self.context(
+        transcript: EdgeToolsTranscript(messages: [.system(systemPrompt)]),
+        reasoningEffort: reasoningEffort,
+        tools: tools
       )
     }
   }
@@ -377,16 +367,6 @@
     extension MLXEngine where Profile.GrammarEngine == XGrammarEngine {
       public func clearCaches() {
         self.grammarEngine.clearCaches()
-      }
-    }
-
-    extension EdgeToolsSession {
-      public func clearCaches<Profile>()
-      where
-        Engine == MLXEngine<Profile>,
-        Profile.GrammarEngine == XGrammarEngine
-      {
-        self.engine.clearCaches()
       }
     }
   #endif
