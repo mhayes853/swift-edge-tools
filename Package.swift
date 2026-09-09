@@ -134,7 +134,6 @@ let package = Package(
       traits: ["noIncrementalReader", "noUtilities", "noFastFloatingPoint", "strictStandardJSON"]
     ),
     .package(url: "https://github.com/apple/swift-collections", from: "1.2.1"),
-    .package(url: "https://github.com/apple/swift-atomics", from: "1.3.0"),
     .package(url: "https://github.com/swiftwasm/JavaScriptKit", from: "0.58.0"),
     // NB: The latest release predates Swift 6.3, so this tracks main. A branch requirement makes
     // SwiftPM refetch the whole graph on every resolve, which redownloads the binary artifacts and
@@ -156,7 +155,6 @@ let package = Package(
         ),
         .product(name: "HeapModule", package: "swift-collections"),
         .product(name: "OrderedCollections", package: "swift-collections"),
-        .product(name: "Atomics", package: "swift-atomics"),
         .product(
           name: "JavaScriptKit",
           package: "JavaScriptKit",
