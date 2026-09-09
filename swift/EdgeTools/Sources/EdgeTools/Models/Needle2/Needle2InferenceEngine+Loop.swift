@@ -1,5 +1,6 @@
 #if Needle2
   import EdgeToolsCore
+  import OrderedCollections
   import _Concurrency
 
   // MARK: - Needle2LoopResponse
