@@ -1,22 +1,21 @@
-import Atomics
 import _Concurrency
 
 // MARK: - AnyGenerationTask
 
 public final class AnyGenerationTask: EdgeToolsEngineGenerationTask {
   public struct Stopper: Sendable {
-    fileprivate let stopped: ManagedAtomic<Bool>
+    fileprivate let state: StopperState
 
     public var isStopped: Bool {
-      self.stopped.load(ordering: .relaxed)
+      self.state.isStopped
     }
 
-    fileprivate init(stopped: ManagedAtomic<Bool>) {
-      self.stopped = stopped
+    fileprivate init(state: StopperState) {
+      self.state = state
     }
 
     public func stop() {
-      self.stopped.store(true, ordering: .relaxed)
+      self.state.stop()
     }
   }
 
@@ -26,7 +25,7 @@ public final class AnyGenerationTask: EdgeToolsEngineGenerationTask {
   public init(
     operation: sending @escaping (Stopper) async throws -> EdgeToolsEngineGeneration
   ) {
-    let stopper = Stopper(stopped: ManagedAtomic(false))
+    let stopper = Stopper(state: StopperState())
     self.stopper = stopper
     self.task = Task {
       guard !stopper.isStopped else { return .empty }
@@ -40,5 +39,19 @@ public final class AnyGenerationTask: EdgeToolsEngineGenerationTask {
 
   public func stop() {
     self.stopper.stop()
+  }
+}
+
+// MARK: - StopperState
+
+private final class StopperState: Sendable {
+  private let stopped = Lock(false)
+
+  var isStopped: Bool {
+    self.stopped.withLock { $0 }
+  }
+
+  func stop() {
+    self.stopped.withLock { $0 = true }
   }
 }
