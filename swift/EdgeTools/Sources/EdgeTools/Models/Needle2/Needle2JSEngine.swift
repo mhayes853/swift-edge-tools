@@ -95,7 +95,7 @@
       Context(parameters: parameters, tools: tools)
     }
 
-    public func generate(
+    public func generationTask(
       prompt: Prompt,
       parameters: sending GenerateParameters,
       context: Context,
@@ -183,7 +183,7 @@
     }
   }
 
-  extension Needle2JSEngine: Needle2SessionEngine {}
+  extension Needle2JSEngine: Needle2InferenceEngine {}
 
   // MARK: - JavaScript Bridge
 

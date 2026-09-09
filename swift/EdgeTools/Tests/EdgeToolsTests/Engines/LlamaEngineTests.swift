@@ -10,8 +10,8 @@
     struct `LlamaEngine tests` {
       @Test
       func `Reasoning Effort And Tools Belong To The Context`() async throws {
-        let session = EdgeToolsSession(engine: try await qwen3LlamaEngine())
-        let context = session.context(
+        let engine = try await qwen3LlamaEngine()
+        let context = engine.context(
           systemPrompt: "System",
           reasoningEffort: .high
         ) {
@@ -67,7 +67,7 @@
           )
         )
         let emittedTokenCount = Lock(0)
-        let task = try engine.generate(
+        let task = try engine.generationTask(
           prompt: .user(filledContext.prompt),
           parameters: LlamaGenerateParameters(sampling: .greedy, maxTokens: 1),
           context: engine.context(),
@@ -218,7 +218,7 @@
     using engine: Qwen3LlamaModelEngine,
     context: LlamaContext
   ) async throws -> EdgeToolsEngineGeneration {
-    let task = try engine.generate(
+    let task = try engine.generationTask(
       prompt: .user(llamaUserPrompt),
       parameters: LlamaGenerateParameters(sampling: .greedy, maxTokens: 1),
       context: context,

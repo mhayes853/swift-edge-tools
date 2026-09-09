@@ -1,4 +1,4 @@
-▿ SessionWeatherTurnSnapshot
+▿ WeatherTurnSnapshot
   - response: "Paris is currently sunny, with a temperature of 21 degrees Celsius."
   ▿ toolCalls: 1 element
     ▿ EdgeRawToolCall

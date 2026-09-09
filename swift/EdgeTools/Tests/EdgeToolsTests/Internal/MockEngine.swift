@@ -8,6 +8,7 @@ final class MockEngine: EdgeToolsPrefillableEngine, EdgeToolsTokenizingEngine, S
   typealias Prompt = TestPrompt
 
   final class Context: EdgeToolsEngineContext {
+    private let respondingCount = Lock(0)
     let tools: [any EdgeTool]
 
     init(tools: [any EdgeTool]) {
@@ -16,6 +17,18 @@ final class MockEngine: EdgeToolsPrefillableEngine, EdgeToolsTokenizingEngine, S
 
     var id: ObjectIdentifier {
       ObjectIdentifier(self)
+    }
+
+    var isResponding: Bool {
+      self.respondingCount.withLock { $0 > 0 }
+    }
+
+    fileprivate func beginResponding() {
+      self.respondingCount.withLock { $0 += 1 }
+    }
+
+    fileprivate func endResponding() {
+      self.respondingCount.withLock { $0 -= 1 }
     }
   }
 
@@ -271,7 +284,7 @@ final class MockEngine: EdgeToolsPrefillableEngine, EdgeToolsTokenizingEngine, S
       ?? EdgeToolsEnginePrefill(metrics: [:])
   }
 
-  func generate(
+  func generationTask(
     prompt: TestPrompt,
     parameters: GenerateParameters,
     context: Context,
@@ -284,11 +297,13 @@ final class MockEngine: EdgeToolsPrefillableEngine, EdgeToolsTokenizingEngine, S
     let (id, generationStorage) = self.storage.makeGeneration()
     let onStart = self._onGenerateStart.withLock { $0 }
     let onEnd = self._onGenerateEnd.withLock { $0 }
+    context.beginResponding()
     let task = Task {
       var parser = TestGenerationParser()
       onStart?()
       defer {
         onEnd?()
+        context.endResponding()
         self.storage.finishGeneration(id: id)
       }
       var emittedTokens = [EdgeToolsToken]()

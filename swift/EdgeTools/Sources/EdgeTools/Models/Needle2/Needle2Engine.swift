@@ -221,7 +221,7 @@
       Context(parameters: parameters, tools: tools)
     }
 
-    public func generate(
+    public func generationTask(
       prompt: Prompt,
       parameters: sending GenerateParameters,
       context: Context,
@@ -323,7 +323,7 @@
   }
 
   @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)
-  extension Needle2Engine: Needle2SessionEngine {}
+  extension Needle2Engine: Needle2InferenceEngine {}
 
   #if FoundationEssentials
     @available(macOS 26, iOS 26, tvOS 26, watchOS 26, *)

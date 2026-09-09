@@ -117,7 +117,7 @@ extension EngineRunner {
       metricsExtractor: metricsExtractor,
       generation: { request, channel in
         let context = engine.context(tools: definitionTools(request.tools))
-        let task = try engine.generate(
+        let task = try engine.generationTask(
           prompt: prompt(request),
           parameters: try parameters(request),
           context: context,
@@ -392,7 +392,7 @@ extension EngineRunner {
           Needle2ContextParameters(system: try needle2System(from: request.system)),
           tools: definitionTools(request.tools)
         )
-        let task = try engine.generate(
+        let task = try engine.generationTask(
           prompt: .user(request.user),
           parameters: Needle2GenerateParameters(maxTokens: request.maxTokens),
           context: context,
@@ -461,7 +461,7 @@ extension EngineRunner {
       capabilities: [.customGrammar, .sampling],
       generation: { request, channel in
         let context = llamaContext(engine: engine, cache: cachedContext, request: request)
-        let task = try engine.generate(
+        let task = try engine.generationTask(
           prompt: .user(request.user, images: request.images, audio: request.audio),
           parameters: LlamaGenerateParameters(
             sampling: request.sampling,
@@ -522,7 +522,7 @@ extension EngineRunner {
             ),
             tools: definitionTools(request.tools)
           )
-          let task = try engine.generate(
+          let task = try engine.generationTask(
             prompt: .user(
               request.user,
               images: request.images,

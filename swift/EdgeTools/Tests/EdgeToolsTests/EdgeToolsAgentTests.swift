@@ -17,13 +17,12 @@ struct `EdgeToolsAgent tests` {
         .response(#""done""#),
       ]
     )
-    let session = EdgeToolsSession(engine: engine)
-    let context = session.context {
+    let context = engine.context {
       first
       second
     }
 
-    let result = try await session.respond(
+    let result = try await engine.respond(
       to: .user("Run both tools."),
       as: String.self,
       context: context
@@ -47,12 +46,11 @@ struct `EdgeToolsAgent tests` {
   @Test
   func agentConfiguresConstraintForEachTurn() async throws {
     let engine = AgentScriptEngine(generations: [.response(#""done""#)])
-    let session = EdgeToolsSession(engine: engine)
 
-    _ = try await session.respond(
+    _ = try await engine.respond(
       to: .user("Respond."),
       as: String.self,
-      context: session.context(),
+      context: engine.context(),
       constraint: { response, turn in
         .toolCallsOrResponse(response, toolCallRange: .exact(turn.index + 2))
       }
@@ -84,6 +82,7 @@ private final class AgentScriptEngine: EdgeToolsEngine {
   final class Context: EdgeToolsEngineContext {
     private let _prompts = Lock([EdgeToolsTranscript.Prompt]())
     let tools: [any EdgeTool]
+    let isResponding = false
 
     init(tools: [any EdgeTool]) {
       self.tools = tools
@@ -131,7 +130,7 @@ private final class AgentScriptEngine: EdgeToolsEngine {
     Context(tools: tools)
   }
 
-  func generate(
+  func generationTask(
     prompt: Prompt,
     parameters: sending GenerateParameters,
     context: Context,

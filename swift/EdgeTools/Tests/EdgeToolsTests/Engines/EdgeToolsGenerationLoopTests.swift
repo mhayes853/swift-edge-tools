@@ -11,7 +11,7 @@
       let responseTokenIds = encodedGrammarText("hello", tokenizer: tokenizer)
       let eosTokenId = try requiredTestEOSToken(tokenizer: tokenizer)
       let engine = try TestEngine(tokenizer: tokenizer)
-      let task = try engine.generate(
+      let task = try engine.generationTask(
         prompt: TestPrompt(system: "", user: "Prompt"),
         parameters: TestEngine.Parameters(tokenIds: responseTokenIds + [eosTokenId]),
         context: engine.context(),
@@ -40,7 +40,7 @@
         tokenizer: tokenizer,
         extraStopTokenIds: [alternateStopTokenId, stopTokenId]
       )
-      let task = try engine.generate(
+      let task = try engine.generationTask(
         prompt: TestPrompt(system: "", user: "Prompt"),
         parameters: TestEngine.Parameters(
           tokenIds: responseTokenIds + [stopTokenId, eosTokenId]
@@ -69,7 +69,7 @@
           return try toolsGrammar.copy()
         }
       )
-      let task = try engine.generate(
+      let task = try engine.generationTask(
         prompt: TestPrompt(system: "", user: "Prompt"),
         parameters: TestEngine.Parameters(
           tokenIds: [eosTokenId],
@@ -96,13 +96,13 @@
         tokenIds: [eosTokenId],
         preparationDelay: .milliseconds(50)
       )
-      let first = try engine.generate(
+      let first = try engine.generationTask(
         prompt: TestPrompt(system: "", user: "First"),
         parameters: parameters,
         context: engine.context(),
         channel: EdgeToolsGenerationChannel()
       )
-      let second = try engine.generate(
+      let second = try engine.generationTask(
         prompt: TestPrompt(system: "", user: "Second"),
         parameters: parameters,
         context: engine.context(),
@@ -190,6 +190,7 @@
 
     private let runtime = Runtime()
     let tools: [any EdgeTool]
+    let isResponding = false
 
     init(tools: [any EdgeTool]) {
       self.tools = tools
@@ -291,7 +292,7 @@
       try await context.takeState()
     }
 
-    func generate(
+    func generationTask(
       prompt: TestPrompt,
       parameters: sending Parameters,
       context: TestContext,
