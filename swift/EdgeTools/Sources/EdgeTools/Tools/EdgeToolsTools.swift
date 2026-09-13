@@ -315,8 +315,10 @@ public final class AnyEdgeToolCall: Sendable, Identifiable {
     get async throws { try await self.base.erasedOutput }
   }
 
-  public func outputValue() async throws -> EdgeToolsValue {
-    return try await encodeOutput()
+  public var outputValue: EdgeToolsValue {
+    get async throws {
+      try await self.encodeOutput()
+    }
   }
 
   private let base: any _AnyEdgeToolCall
