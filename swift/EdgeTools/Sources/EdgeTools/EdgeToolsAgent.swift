@@ -114,7 +114,7 @@ extension EdgeToolCallOutcome {
       return edgeToolErrorResponse("invalid arguments for tool: \(self.name)")
     case .resolved(let call):
       do {
-        return try await call.outputValue()
+        return try await call.outputValue
       } catch {
         return edgeToolErrorResponse(edgeToolErrorDescription(error))
       }
