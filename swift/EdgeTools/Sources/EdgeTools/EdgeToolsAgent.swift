@@ -8,16 +8,6 @@ public struct EdgeToolsAgentTurn<Context: EdgeToolsEngineContext>: Sendable {
   public let index: Int
   public let context: Context
   public let prompt: EdgeToolsTranscript.Prompt
-
-  init(
-    index: Int,
-    context: sending Context,
-    prompt: EdgeToolsTranscript.Prompt
-  ) {
-    self.index = index
-    self.context = context
-    self.prompt = prompt
-  }
 }
 
 // MARK: - EdgeToolsAgentResult
@@ -26,16 +16,6 @@ public struct EdgeToolsAgentResult<Result: Sendable>: Sendable {
   public let output: Result
   public let generations: [EdgeToolsGeneration]
   public let toolCalls: EdgeToolCallCollection
-
-  init(
-    output: sending Result,
-    generations: [EdgeToolsGeneration],
-    toolCalls: EdgeToolCallCollection
-  ) {
-    self.output = output
-    self.generations = generations
-    self.toolCalls = toolCalls
-  }
 }
 
 // MARK: - EdgeToolsAgentError
@@ -80,8 +60,7 @@ where
       let generation = try await self.generate(
         prompt: prompt,
         context: context,
-        parameters: generationParameters,
-        shouldInvokeTools: { _ in false }
+        parameters: generationParameters
       )
       generations.append(generation)
       toolCalls.append(contentsOf: generation.toolCalls)
