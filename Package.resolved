@@ -1,5 +1,5 @@
 {
-  "originHash" : "a1532070c65590295b1a25c139ef7156160290e204ba998600a4e5db20944b0d",
+  "originHash" : "8359bf5d4a97bae4a8d15ca1769df2b74e6ce21adb1c582c40b3c808ba85e453",
   "pins" : [
     {
       "identity" : "combine-schedulers",
@@ -150,7 +150,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/mhayes853/swift-operation",
       "state" : {
-        "revision" : "849966fd4f0181095723ff501bd3047e5495bc17"
+        "revision" : "400af2f2952b7f0ad2ea60460525753d625a57ba",
+        "version" : "0.7.0"
       }
     },
     {
