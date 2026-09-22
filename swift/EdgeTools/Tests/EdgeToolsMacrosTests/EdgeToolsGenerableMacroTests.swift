@@ -204,7 +204,7 @@ extension `EdgeToolsMacros tests` {
 
         extension Person: EdgeToolsGenerable, StreamParsingCore.StreamParseable {
           struct Partial: StreamParsingCore.StreamParseable,
-            StreamParsingCore.StreamParseableObject, Sendable , EdgeToolsGenerable {
+            StreamParsingCore.StreamParseableObject, Sendable, EdgeToolsGenerable {
             typealias Partial = Self
 
 
@@ -351,14 +351,15 @@ extension `EdgeToolsMacros tests` {
                 fields: Self.streamFields
               )
 
+
             static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
-              EdgeToolsGenerationSchema(
-                .type(.object),
-                      .properties([
-                            "name": String.Partial?.edgeToolsGenerationSchema
-                          ])
-              )
-            }
+                EdgeToolsGenerationSchema(
+                  .type(.object),
+                        .properties([
+                              "name": String.Partial?.edgeToolsGenerationSchema
+                            ])
+                )
+              }
             init(edgeToolsValue: EdgeToolsValue) throws {
               let object = try _edgeToolsRequireObjectValue(edgeToolsValue)
               self.name = try Optional<String.Partial>(edgeToolsValue: _edgeToolsValue(object, forKey: "name"))
@@ -368,6 +369,7 @@ extension `EdgeToolsMacros tests` {
                 (key: "name", value: self.name?.edgeToolsValue)
               )
             }
+
           }
           var streamPartialValue: Partial {
             Partial(
@@ -442,7 +444,7 @@ extension `EdgeToolsMacros tests` {
 
         extension Person: EdgeToolsGenerable, StreamParsingCore.StreamParseable {
           struct Partial: StreamParsingCore.StreamParseable,
-            StreamParsingCore.StreamParseableObject, Sendable , EdgeToolsGenerable {
+            StreamParsingCore.StreamParseableObject, Sendable, EdgeToolsGenerable {
             typealias Partial = Self
 
 
@@ -589,14 +591,15 @@ extension `EdgeToolsMacros tests` {
                 fields: Self.streamFields
               )
 
+
             static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
-              EdgeToolsGenerationSchema(
-                .type(.object),
-                      .properties([
-                            "first_name": EdgeToolsGenerationSchema(String.Partial?.edgeToolsGenerationSchema, .minLength(1), .description("Given name"), .examples(["Ada"]))
-                          ])
-              )
-            }
+                EdgeToolsGenerationSchema(
+                  .type(.object),
+                        .properties([
+                              "first_name": EdgeToolsGenerationSchema(String.Partial?.edgeToolsGenerationSchema, .minLength(1), .description("Given name"), .examples(["Ada"]))
+                            ])
+                )
+              }
             init(edgeToolsValue: EdgeToolsValue) throws {
               let object = try _edgeToolsRequireObjectValue(edgeToolsValue)
               self.firstName = try Optional<String.Partial>(edgeToolsValue: _edgeToolsValue(object, forKey: "first_name"))
@@ -606,6 +609,7 @@ extension `EdgeToolsMacros tests` {
                 (key: "first_name", value: self.firstName?.edgeToolsValue)
               )
             }
+
           }
           var streamPartialValue: Partial {
             Partial(
@@ -685,7 +689,7 @@ extension `EdgeToolsMacros tests` {
 
         extension Payload: EdgeToolsGenerable, StreamParsingCore.StreamParseable {
           package struct Partial: StreamParsingCore.StreamParseable,
-            StreamParsingCore.StreamParseableObject, Sendable , EdgeToolsGenerable {
+            StreamParsingCore.StreamParseableObject, Sendable, EdgeToolsGenerable {
             package typealias Partial = Self
 
 
@@ -834,14 +838,15 @@ extension `EdgeToolsMacros tests` {
                 fields: Self.streamFields
               )
 
+
             package static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
-              EdgeToolsGenerationSchema(
-                .type(.object),
-                      .properties([
-                            "renamed": String.Partial?.edgeToolsGenerationSchema
-                          ])
-              )
-            }
+                EdgeToolsGenerationSchema(
+                  .type(.object),
+                        .properties([
+                              "renamed": String.Partial?.edgeToolsGenerationSchema
+                            ])
+                )
+              }
             package init(edgeToolsValue: EdgeToolsValue) throws {
               let object = try _edgeToolsRequireObjectValue(edgeToolsValue)
               self.value = try Optional<String.Partial>(edgeToolsValue: _edgeToolsValue(object, forKey: "renamed"))
@@ -851,6 +856,7 @@ extension `EdgeToolsMacros tests` {
                 (key: "renamed", value: self.value?.edgeToolsValue)
               )
             }
+
           }
           package var streamPartialValue: Partial {
             Partial(
@@ -928,7 +934,7 @@ extension `EdgeToolsMacros tests` {
 
         extension Person: EdgeToolsGenerable, StreamParsingCore.StreamParseable {
           struct Partial: StreamParsingCore.StreamParseable,
-            StreamParsingCore.StreamParseableObject, Sendable , EdgeToolsGenerable {
+            StreamParsingCore.StreamParseableObject, Sendable, EdgeToolsGenerable {
             typealias Partial = Self
 
 
@@ -1075,14 +1081,15 @@ extension `EdgeToolsMacros tests` {
                 fields: Self.streamFields
               )
 
+
             static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
-              EdgeToolsGenerationSchema(
-                .type(.object),
-                      .properties([
-                            "name": String.Partial?.edgeToolsGenerationSchema
-                          ])
-              )
-            }
+                EdgeToolsGenerationSchema(
+                  .type(.object),
+                        .properties([
+                              "name": String.Partial?.edgeToolsGenerationSchema
+                            ])
+                )
+              }
             init(edgeToolsValue: EdgeToolsValue) throws {
               let object = try _edgeToolsRequireObjectValue(edgeToolsValue)
               self.name = try Optional<String.Partial>(edgeToolsValue: _edgeToolsValue(object, forKey: "name"))
@@ -1092,6 +1099,7 @@ extension `EdgeToolsMacros tests` {
                 (key: "name", value: self.name?.edgeToolsValue)
               )
             }
+
           }
           var streamPartialValue: Partial {
             Partial(
@@ -1164,7 +1172,7 @@ extension `EdgeToolsMacros tests` {
 
         extension Payload: EdgeToolsGenerable, StreamParsingCore.StreamParseable {
           struct Partial: StreamParsingCore.StreamParseable,
-            StreamParsingCore.StreamParseableObject, Sendable , EdgeToolsGenerable {
+            StreamParsingCore.StreamParseableObject, Sendable, EdgeToolsGenerable {
             typealias Partial = Self
 
 
@@ -1311,14 +1319,15 @@ extension `EdgeToolsMacros tests` {
                 fields: Self.streamFields
               )
 
+
             static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
-              EdgeToolsGenerationSchema(
-                .type(.object),
-                      .properties([
-                            "title": String.Partial?.edgeToolsGenerationSchema
-                          ])
-              )
-            }
+                EdgeToolsGenerationSchema(
+                  .type(.object),
+                        .properties([
+                              "title": String.Partial?.edgeToolsGenerationSchema
+                            ])
+                )
+              }
             init(edgeToolsValue: EdgeToolsValue) throws {
               let object = try _edgeToolsRequireObjectValue(edgeToolsValue)
               self.title = try Optional<String.Partial>(edgeToolsValue: _edgeToolsValue(object, forKey: "title"))
@@ -1328,6 +1337,7 @@ extension `EdgeToolsMacros tests` {
                 (key: "title", value: self.title?.edgeToolsValue)
               )
             }
+
           }
           var streamPartialValue: Partial {
             Partial(
@@ -1396,7 +1406,7 @@ extension `EdgeToolsMacros tests` {
 
         extension Payload: EdgeToolsGenerable, StreamParsingCore.StreamParseable {
           struct Partial: StreamParsingCore.StreamParseable,
-            StreamParsingCore.StreamParseableObject, Sendable , EdgeToolsGenerable {
+            StreamParsingCore.StreamParseableObject, Sendable, EdgeToolsGenerable {
             typealias Partial = Self
 
 
@@ -1512,17 +1522,19 @@ extension `EdgeToolsMacros tests` {
                 fields: Self.streamFields
               )
 
+
             static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
-              EdgeToolsGenerationSchema(
-                .type(.object)
-              )
-            }
+                EdgeToolsGenerationSchema(
+                  .type(.object)
+                )
+              }
             init(edgeToolsValue: EdgeToolsValue) throws {
               _ = try _edgeToolsRequireObjectValue(edgeToolsValue)
             }
             var edgeToolsValue: EdgeToolsValue {
               _edgeToolsBuildObjectValue()
             }
+
           }
           var streamPartialValue: Partial {
             Partial()
@@ -1600,7 +1612,7 @@ extension `EdgeToolsMacros tests` {
 
         extension Person: EdgeToolsGenerable, StreamParsingCore.StreamParseable {
           struct Partial: StreamParsingCore.StreamParseable,
-            StreamParsingCore.StreamParseableObject, Sendable , EdgeToolsGenerable {
+            StreamParsingCore.StreamParseableObject, Sendable, EdgeToolsGenerable {
             typealias Partial = Self
 
 
@@ -1747,14 +1759,15 @@ extension `EdgeToolsMacros tests` {
                 fields: Self.streamFields
               )
 
+
             static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
-              EdgeToolsGenerationSchema(
-                .type(.object),
-                      .properties([
-                            "address": Address.Partial?.edgeToolsGenerationSchema
-                          ])
-              )
-            }
+                EdgeToolsGenerationSchema(
+                  .type(.object),
+                        .properties([
+                              "address": Address.Partial?.edgeToolsGenerationSchema
+                            ])
+                )
+              }
             init(edgeToolsValue: EdgeToolsValue) throws {
               let object = try _edgeToolsRequireObjectValue(edgeToolsValue)
               self.address = try Optional<Address.Partial>(edgeToolsValue: _edgeToolsValue(object, forKey: "address"))
@@ -1764,6 +1777,7 @@ extension `EdgeToolsMacros tests` {
                 (key: "address", value: self.address?.edgeToolsValue)
               )
             }
+
           }
           var streamPartialValue: Partial {
             Partial(
@@ -1851,7 +1865,7 @@ extension `EdgeToolsMacros tests` {
 
         extension Person: EdgeToolsGenerable, StreamParsingCore.StreamParseable {
           struct Partial: StreamParsingCore.StreamParseable,
-            StreamParsingCore.StreamParseableObject, Sendable , EdgeToolsGenerable {
+            StreamParsingCore.StreamParseableObject, Sendable, EdgeToolsGenerable {
             typealias Partial = Self
 
 
@@ -1992,14 +2006,15 @@ extension `EdgeToolsMacros tests` {
                 fields: Self.streamFields
               )
 
+
             static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
-              EdgeToolsGenerationSchema(
-                .type(.object),
-                      .properties([
-                            "addresses": [Address].Partial?.edgeToolsGenerationSchema
-                          ])
-              )
-            }
+                EdgeToolsGenerationSchema(
+                  .type(.object),
+                        .properties([
+                              "addresses": [Address].Partial?.edgeToolsGenerationSchema
+                            ])
+                )
+              }
             init(edgeToolsValue: EdgeToolsValue) throws {
               let object = try _edgeToolsRequireObjectValue(edgeToolsValue)
               self.addresses = try Optional<[Address].Partial>(edgeToolsValue: _edgeToolsValue(object, forKey: "addresses"))
@@ -2009,6 +2024,7 @@ extension `EdgeToolsMacros tests` {
                 (key: "addresses", value: self.addresses?.edgeToolsValue)
               )
             }
+
           }
           var streamPartialValue: Partial {
             Partial(

@@ -114,10 +114,14 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
         from: properties,
         accessModifier: Self.accessModifier(for: declaration)
       )
-      let partial = Self.generablePartial(
+      let partialCustomization = Self.generablePartialCustomization(
         try generation.structDeclarationSyntax(in: context),
         from: properties,
         context: context
+      )
+      let partial = try generation.structDeclarationSyntax(
+        in: context,
+        partialCustomization: partialCustomization
       )
       let unparsedMembers = properties.filter { $0.isIgnored && !$0.hasDefaultValue }
         .map { StreamUnparsedMember(name: .identifier($0.name)) }
@@ -158,11 +162,32 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
       )
     )
     let partialMembers = try generation.partialSyntax(in: context)
-    let rewriter = PartialRewriter { partial in
-      Self.generablePartial(partial, from: [], context: context)
+    guard let partial = partialMembers.compactMap({ $0.decl.as(StructDeclSyntax.self) }).first else {
+      throw MacroExpansionErrorMessage("Stream parsing did not generate an enum Partial.")
     }
-    let generablePartials = rewriter.rewrite(Syntax(partialMembers))
-      .cast(MemberBlockItemListSyntax.self)
+    let accessModifier = Self.accessModifier(for: declaration)
+    let generablePartials = try generation.partialSyntax(
+      in: context,
+      partialCustomization: Self.generablePartialCustomization(
+        partial,
+        from: [],
+        context: context
+      ),
+      payloadCustomization: { payload in
+        let payloadGeneration = try StreamObjectGeneration(
+          fields: payload.fields,
+          configuration: Self.streamGenerationConfiguration(accessModifier: accessModifier)
+        )
+        let payloadPartial = try payloadGeneration.structDeclarationSyntax(in: context)
+        return .generated(
+          partial: Self.generablePartialCustomization(
+            payloadPartial,
+            from: [],
+            context: context
+          )
+        )
+      }
+    )
     let conversions = generation.conversionsSyntax(partialValueInlining: .never)
     return [
       try ExtensionDeclSyntax(
@@ -800,22 +825,6 @@ private struct SimpleDiagnostic: DiagnosticMessage {
   }
 }
 
-private final class PartialRewriter: SyntaxRewriter {
-  private let transform: (StructDeclSyntax) -> StructDeclSyntax
-
-  init(transform: @escaping (StructDeclSyntax) -> StructDeclSyntax) {
-    self.transform = transform
-  }
-
-  override func visit(_ node: StructDeclSyntax) -> DeclSyntax {
-    let declaration = super.visit(node).cast(StructDeclSyntax.self)
-    guard declaration.name.text == "Partial" else {
-      return DeclSyntax(declaration)
-    }
-    return DeclSyntax(self.transform(declaration))
-  }
-}
-
 // MARK: - Stream Parsing Synthesis
 
 extension EdgeToolsGenerableMacro {
@@ -874,12 +883,11 @@ extension EdgeToolsGenerableMacro {
     return defaults[0]
   }
 
-  private static func generablePartial(
+  private static func generablePartialCustomization(
     _ declaration: StructDeclSyntax,
     from properties: [StoredProperty],
     context: some MacroExpansionContext
-  ) -> StructDeclSyntax {
-    var declaration = declaration
+  ) -> StreamPartialCustomization {
     let generatedProperties = Self.storedProperties(in: declaration, context: context)
       .map { property in
         let source = properties.first { $0.name == property.name }
@@ -900,42 +908,31 @@ extension EdgeToolsGenerableMacro {
           schemaFragments: fragments
         )
       }
-    if var inheritance = declaration.inheritanceClause {
-      if let lastIndex = inheritance.inheritedTypes.indices.last {
-        inheritance.inheritedTypes[lastIndex].trailingComma = .commaToken(trailingTrivia: .space)
-      }
-      inheritance.inheritedTypes.append(
-        InheritedTypeSyntax(type: TypeSyntax("EdgeToolsGenerable"))
-      )
-      declaration.inheritanceClause = inheritance
-    }
     let modifierPrefix = Self.modifierPrefix(for: Self.accessModifier(for: declaration))
-    declaration.memberBlock.members.append(
-      MemberBlockItemSyntax(
-        decl: Self.generationSchemaProperty(
-          from: generatedProperties,
-          modifierPrefix: modifierPrefix,
-          schemaFragments: []
+    return StreamPartialCustomization(
+      conformances: [TypeSyntax("EdgeToolsGenerable")],
+      members: MemberBlockItemListSyntax([
+        MemberBlockItemSyntax(
+          decl: Self.generationSchemaProperty(
+            from: generatedProperties,
+            modifierPrefix: modifierPrefix,
+            schemaFragments: []
+          )
+        ),
+        MemberBlockItemSyntax(
+          decl: Self.valueInitializer(
+            from: generatedProperties,
+            modifierPrefix: modifierPrefix
+          )
+        ),
+        MemberBlockItemSyntax(
+          decl: Self.valueProperty(
+            from: generatedProperties,
+            modifierPrefix: modifierPrefix
+          )
         )
-      )
+      ])
     )
-    declaration.memberBlock.members.append(
-      MemberBlockItemSyntax(
-        decl: Self.valueInitializer(
-          from: generatedProperties,
-          modifierPrefix: modifierPrefix
-        )
-      )
-    )
-    declaration.memberBlock.members.append(
-      MemberBlockItemSyntax(
-        decl: Self.valueProperty(
-          from: generatedProperties,
-          modifierPrefix: modifierPrefix
-        )
-      )
-    )
-    return declaration
   }
 
 }

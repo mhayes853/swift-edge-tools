@@ -139,7 +139,7 @@ let package = Package(
     .package(url: "https://github.com/mhayes853/swift-operation", from: "0.7.0"),
     .package(
       url: "https://github.com/mhayes853/swift-stream-parsing",
-      revision: "142d19b0f7065a6eb63ed6c9cc7981033e4176da",
+      revision: "6e525e1444f584ec9924b7906e08489425da1f32",
       traits: []
     )
   ],
@@ -446,11 +446,7 @@ let package = Package(
       name: "EdgeToolsMacrosTests",
       dependencies: [
         "EdgeToolsMacros",
-        .product(name: "MacroTesting", package: "swift-macro-testing"),
-        .product(name: "SwiftParser", package: "swift-syntax"),
-        .product(name: "SwiftSyntax", package: "swift-syntax"),
-        .product(name: "SwiftSyntaxMacroExpansion", package: "swift-syntax"),
-        .product(name: "SwiftSyntaxMacros", package: "swift-syntax")
+        .product(name: "MacroTesting", package: "swift-macro-testing")
       ],
       path: "swift/EdgeTools/Tests/EdgeToolsMacrosTests"
     ),
