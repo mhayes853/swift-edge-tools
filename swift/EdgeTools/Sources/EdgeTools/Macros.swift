@@ -1,5 +1,6 @@
 import EdgeToolsCore
 import OrderedCollections
+import StreamParsing
 
 // MARK: - Macros
 
@@ -8,16 +9,19 @@ import OrderedCollections
 /// Enum values use an externally tagged object representation. Every case payload is an object;
 /// labeled associated values use their labels as keys and unlabeled values use positional keys
 /// such as `_0` and `_1`.
-@attached(extension, conformances: EdgeToolsGenerable)
+///
+/// Also generates a stream-parseable `Partial` for nongeneric structs and enums with one
+/// `@StreamParseableDefault` case. A nested user-declared `Partial` leaves stream parsing
+/// to a manually provided conformance.
+@attached(extension, conformances: EdgeToolsGenerable, StreamParseable, names: arbitrary)
 @attached(
   member,
   names: named(edgeToolsGenerationSchema),
   named(init),
   named(edgeToolsValue)
 )
-public macro EdgeToolsGenerable(
-  _ schema: EdgeToolsGenerationSchema...
-) = #externalMacro(module: "EdgeToolsMacros", type: "EdgeToolsGenerableMacro")
+public macro EdgeToolsGenerable(_ schema: EdgeToolsGenerationSchema...) =
+  #externalMacro(module: "EdgeToolsMacros", type: "EdgeToolsGenerableMacro")
 
 /// Marks a stored property as ignored for ``EdgeToolsGenerationSchema`` schema synthesis.
 @attached(peer)

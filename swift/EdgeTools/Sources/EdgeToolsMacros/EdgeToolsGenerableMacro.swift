@@ -1,4 +1,5 @@
 import Foundation
+import StreamParsingMacroSupport
 import SwiftDiagnostics
 import SwiftSyntax
 import SwiftSyntaxBuilder
@@ -82,12 +83,94 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
       )
     }
     let typeName = type.trimmedDescription
+    let hasCustomPartial = declaration.memberBlock.members.contains { member in
+      member.decl.as(StructDeclSyntax.self)?.name.text == "Partial"
+        || member.decl.as(TypeAliasDeclSyntax.self)?.name.text == "Partial"
+        || member.decl.as(EnumDeclSyntax.self)?.name.text == "Partial"
+    }
+    let isGeneric = declaration.as(StructDeclSyntax.self)?.genericParameterClause != nil
+      || declaration.as(EnumDeclSyntax.self)?.genericParameterClause != nil
+    let hasDefaultCase = declaration.as(EnumDeclSyntax.self)?.memberBlock.members.contains { member in
+      guard let caseDecl = member.decl.as(EnumCaseDeclSyntax.self) else { return false }
+      return caseDecl.attributes.contains { element in
+        guard let attribute = element.as(AttributeSyntax.self) else { return false }
+        return ["StreamParseableDefault", "StreamParsing.StreamParseableDefault"]
+          .contains(attribute.attributeName.trimmedDescription)
+      }
+    } ?? true
+    guard !hasCustomPartial && !isGeneric && hasDefaultCase else {
+      return [
+        try ExtensionDeclSyntax(
+          """
+          extension \(raw: typeName): EdgeToolsGenerable {}
+          """
+        )
+      ]
+    }
+
+    if let structDecl = declaration.as(StructDeclSyntax.self) {
+      let properties = Self.storedProperties(in: structDecl, context: context)
+      let generation = try Self.streamObjectGeneration(
+        from: properties,
+        accessModifier: Self.accessModifier(for: declaration)
+      )
+      let partial = Self.generablePartial(
+        try generation.structDeclarationSyntax(in: context),
+        from: properties,
+        context: context
+      )
+      let unparsedMembers = properties.filter { $0.isIgnored && !$0.hasDefaultValue }
+        .map { StreamUnparsedMember(name: .identifier($0.name)) }
+      let conversions = try generation.conversionsSyntax(
+        unparsedMembers: unparsedMembers,
+        partialValueInlining: .never
+      )
+      return [
+        try ExtensionDeclSyntax(
+          "extension \(raw: typeName): EdgeToolsGenerable, StreamParsingCore.StreamParseable"
+        ) {
+          partial
+          conversions
+        }
+      ]
+    }
+
+    let enumDecl = declaration.as(EnumDeclSyntax.self)!
+    let cases = try Self.enumCases(in: enumDecl)
+    let defaultCase = try Self.streamDefaultCase(in: enumDecl)
+    let generation = try StreamEnumGeneration(
+      cases: cases.map { enumCase in
+        StreamParseableEnumCase(
+          name: enumCase.sourceToken,
+          associatedValues: enumCase.associatedValues.map { value in
+            StreamParseableField(
+              name: value.sourceToken ?? .wildcardToken(),
+              type: TypeSyntax("\(raw: value.typeName)"),
+              keys: [value.schemaKey]
+            )
+          }
+        )
+      },
+      representation: .caseKeyedObject,
+      defaultCase: defaultCase,
+      configuration: Self.streamGenerationConfiguration(
+        accessModifier: Self.accessModifier(for: declaration)
+      )
+    )
+    let partialMembers = try generation.partialSyntax(in: context)
+    let rewriter = PartialRewriter { partial in
+      Self.generablePartial(partial, from: [], context: context)
+    }
+    let generablePartials = rewriter.rewrite(Syntax(partialMembers))
+      .cast(MemberBlockItemListSyntax.self)
+    let conversions = generation.conversionsSyntax(partialValueInlining: .never)
     return [
       try ExtensionDeclSyntax(
-        """
-        extension \(raw: typeName): EdgeToolsGenerable {}
-        """
-      )
+        "extension \(raw: typeName): EdgeToolsGenerable, StreamParsingCore.StreamParseable"
+      ) {
+        generablePartials
+        conversions
+      }
     ]
   }
 }
@@ -102,6 +185,7 @@ extension EdgeToolsGenerableMacro {
     let isOptional: Bool
     let hasDefaultValue: Bool
     let schemaExpression: String
+    let schemaFragments: [String]
   }
 
   private struct EdgeToolsGuideSelection {
@@ -111,6 +195,7 @@ extension EdgeToolsGenerableMacro {
 
   private struct AssociatedValue {
     let sourceLabel: String?
+    let sourceToken: TokenSyntax?
     let schemaKey: String
     let typeName: String
     let isOptional: Bool
@@ -120,6 +205,7 @@ extension EdgeToolsGenerableMacro {
   private struct EnumCase {
     let name: String
     let sourceName: String
+    let sourceToken: TokenSyntax
     let associatedValues: [AssociatedValue]
   }
 
@@ -287,7 +373,8 @@ extension EdgeToolsGenerableMacro {
         isIgnored: isIgnored,
         isOptional: isOptional,
         hasDefaultValue: hasDefaultValue,
-        schemaExpression: schemaExpression
+        schemaExpression: schemaExpression,
+        schemaFragments: guideSelection?.schemaFragments ?? []
       )
     }
   }
@@ -341,6 +428,7 @@ extension EdgeToolsGenerableMacro {
         }
         return AssociatedValue(
           sourceLabel: label == nil ? nil : parameter.firstName?.trimmedDescription,
+          sourceToken: label == nil ? nil : parameter.firstName,
           schemaKey: schemaKey,
           typeName: parameter.type.trimmedDescription,
           isOptional: Self.isOptionalTypeName(parameter.type.trimmedDescription),
@@ -351,6 +439,7 @@ extension EdgeToolsGenerableMacro {
       return EnumCase(
         name: name,
         sourceName: element.name.trimmedDescription,
+        sourceToken: element.name,
         associatedValues: associatedValues
       )
     }
@@ -709,4 +798,144 @@ private struct SimpleDiagnostic: DiagnosticMessage {
   init(_ message: String) {
     self.message = message
   }
+}
+
+private final class PartialRewriter: SyntaxRewriter {
+  private let transform: (StructDeclSyntax) -> StructDeclSyntax
+
+  init(transform: @escaping (StructDeclSyntax) -> StructDeclSyntax) {
+    self.transform = transform
+  }
+
+  override func visit(_ node: StructDeclSyntax) -> DeclSyntax {
+    let declaration = super.visit(node).cast(StructDeclSyntax.self)
+    guard declaration.name.text == "Partial" else {
+      return DeclSyntax(declaration)
+    }
+    return DeclSyntax(self.transform(declaration))
+  }
+}
+
+// MARK: - Stream Parsing Synthesis
+
+extension EdgeToolsGenerableMacro {
+  private static func streamObjectGeneration(
+    from properties: [StoredProperty],
+    accessModifier: String?
+  ) throws -> StreamObjectGeneration {
+    return try StreamObjectGeneration(
+      fields: properties.filter { !$0.isIgnored }
+        .map { property in
+          StreamParseableField(
+            name: .identifier(property.name),
+            type: TypeSyntax("\(raw: property.typeName)"),
+            keys: [property.schemaKey]
+          )
+        },
+      configuration: Self.streamGenerationConfiguration(accessModifier: accessModifier)
+    )
+  }
+
+  private static func streamGenerationConfiguration(
+    accessModifier: String?
+  ) -> StreamGenerationConfiguration {
+    let accessLevel: StreamGeneratedAccessLevel =
+      switch accessModifier {
+      case "public": .public
+      case "package": .package
+      case "fileprivate": .fileprivate
+      default: .internal
+      }
+    return StreamGenerationConfiguration(viewMode: .unsafe, accessLevel: accessLevel)
+  }
+
+  private static func streamDefaultCase(in declaration: EnumDeclSyntax) throws -> TokenSyntax {
+    var defaults = [TokenSyntax]()
+    for member in declaration.memberBlock.members {
+      guard let caseDecl = member.decl.as(EnumCaseDeclSyntax.self) else { continue }
+      let isDefault = caseDecl.attributes.contains { element in
+        guard let attribute = element.as(AttributeSyntax.self) else { return false }
+        return ["StreamParseableDefault", "StreamParsing.StreamParseableDefault"]
+          .contains(attribute.attributeName.trimmedDescription)
+      }
+      guard isDefault else { continue }
+      guard caseDecl.elements.count == 1, let name = caseDecl.elements.first?.name else {
+        throw MacroExpansionErrorMessage(
+          "@StreamParseableDefault must mark a declaration with one enum case."
+        )
+      }
+      defaults.append(name)
+    }
+    guard defaults.count == 1 else {
+      throw MacroExpansionErrorMessage(
+        "Stream parsing synthesis for an enum requires exactly one @StreamParseableDefault case."
+      )
+    }
+    return defaults[0]
+  }
+
+  private static func generablePartial(
+    _ declaration: StructDeclSyntax,
+    from properties: [StoredProperty],
+    context: some MacroExpansionContext
+  ) -> StructDeclSyntax {
+    var declaration = declaration
+    let generatedProperties = Self.storedProperties(in: declaration, context: context)
+      .map { property in
+        let source = properties.first { $0.name == property.name }
+        let key = source?.schemaKey ?? property.name
+        let fragments = source?.schemaFragments ?? []
+        return StoredProperty(
+          name: property.name,
+          schemaKey: key,
+          typeName: property.typeName,
+          initializerTypeName: property.initializerTypeName,
+          isIgnored: false,
+          isOptional: property.isOptional,
+          hasDefaultValue: false,
+          schemaExpression: Self.schemaExpression(
+            typeName: property.typeName,
+            guideSelection: EdgeToolsGuideSelection(key: nil, schemaFragments: fragments)
+          ),
+          schemaFragments: fragments
+        )
+      }
+    if var inheritance = declaration.inheritanceClause {
+      if let lastIndex = inheritance.inheritedTypes.indices.last {
+        inheritance.inheritedTypes[lastIndex].trailingComma = .commaToken(trailingTrivia: .space)
+      }
+      inheritance.inheritedTypes.append(
+        InheritedTypeSyntax(type: TypeSyntax("EdgeToolsGenerable"))
+      )
+      declaration.inheritanceClause = inheritance
+    }
+    let modifierPrefix = Self.modifierPrefix(for: Self.accessModifier(for: declaration))
+    declaration.memberBlock.members.append(
+      MemberBlockItemSyntax(
+        decl: Self.generationSchemaProperty(
+          from: generatedProperties,
+          modifierPrefix: modifierPrefix,
+          schemaFragments: []
+        )
+      )
+    )
+    declaration.memberBlock.members.append(
+      MemberBlockItemSyntax(
+        decl: Self.valueInitializer(
+          from: generatedProperties,
+          modifierPrefix: modifierPrefix
+        )
+      )
+    )
+    declaration.memberBlock.members.append(
+      MemberBlockItemSyntax(
+        decl: Self.valueProperty(
+          from: generatedProperties,
+          modifierPrefix: modifierPrefix
+        )
+      )
+    )
+    return declaration
+  }
+
 }
