@@ -1,5 +1,5 @@
 {
-  "originHash" : "23c55f3a0f040cdfea51ba96858a2efeb0949e314878ab254b752961ea45e880",
+  "originHash" : "3f29b33bcc78d77ca530a042da3215f8bb383158064fec9b8de4d3703fac5ad5",
   "pins" : [
     {
       "identity" : "javascriptkit",
@@ -51,7 +51,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/mhayes853/swift-stream-parsing",
       "state" : {
-        "revision" : "6e525e1444f584ec9924b7906e08489425da1f32"
+        "revision" : "34cc4e8220be9274f4dfe251ec01990ce5750488"
       }
     },
     {

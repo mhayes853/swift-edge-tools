@@ -115,9 +115,9 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
         accessModifier: Self.accessModifier(for: declaration)
       )
       let partialCustomization = Self.generablePartialCustomization(
-        try generation.structDeclarationSyntax(in: context),
+        fields: generation.partialFields,
         from: properties,
-        context: context
+        accessModifier: Self.accessModifier(for: declaration)
       )
       let partial = try generation.structDeclarationSyntax(
         in: context,
@@ -161,29 +161,23 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
         accessModifier: Self.accessModifier(for: declaration)
       )
     )
-    let partialMembers = try generation.partialSyntax(in: context)
-    guard let partial = partialMembers.compactMap({ $0.decl.as(StructDeclSyntax.self) }).first else {
-      throw MacroExpansionErrorMessage("Stream parsing did not generate an enum Partial.")
+    guard let partialFields = generation.partialFields else {
+      throw MacroExpansionErrorMessage("Stream parsing did not plan an enum Partial.")
     }
     let accessModifier = Self.accessModifier(for: declaration)
     let generablePartials = try generation.partialSyntax(
       in: context,
       partialCustomization: Self.generablePartialCustomization(
-        partial,
+        fields: partialFields,
         from: [],
-        context: context
+        accessModifier: accessModifier
       ),
       payloadCustomization: { payload in
-        let payloadGeneration = try StreamObjectGeneration(
-          fields: payload.fields,
-          configuration: Self.streamGenerationConfiguration(accessModifier: accessModifier)
-        )
-        let payloadPartial = try payloadGeneration.structDeclarationSyntax(in: context)
         return .generated(
           partial: Self.generablePartialCustomization(
-            payloadPartial,
+            fields: payload.partialFields,
             from: [],
-            context: context
+            accessModifier: accessModifier
           )
         )
       }
@@ -884,31 +878,34 @@ extension EdgeToolsGenerableMacro {
   }
 
   private static func generablePartialCustomization(
-    _ declaration: StructDeclSyntax,
+    fields: [StreamPartialFieldDescriptor],
     from properties: [StoredProperty],
-    context: some MacroExpansionContext
+    accessModifier: String?
   ) -> StreamPartialCustomization {
-    let generatedProperties = Self.storedProperties(in: declaration, context: context)
-      .map { property in
-        let source = properties.first { $0.name == property.name }
-        let key = source?.schemaKey ?? property.name
-        let fragments = source?.schemaFragments ?? []
-        return StoredProperty(
-          name: property.name,
-          schemaKey: key,
-          typeName: property.typeName,
-          initializerTypeName: property.initializerTypeName,
-          isIgnored: false,
-          isOptional: property.isOptional,
-          hasDefaultValue: false,
-          schemaExpression: Self.schemaExpression(
-            typeName: property.typeName,
-            guideSelection: EdgeToolsGuideSelection(key: nil, schemaFragments: fragments)
-          ),
-          schemaFragments: fragments
-        )
+    let generatedProperties = fields.map { field in
+      let name = field.memberName.trimmedDescription
+      let typeName = field.storageType.trimmedDescription
+      let source = properties.first {
+        $0.name == field.unescapedName || $0.name == name
       }
-    let modifierPrefix = Self.modifierPrefix(for: Self.accessModifier(for: declaration))
+      let key = source?.schemaKey ?? field.keys.first ?? field.unescapedName
+      let fragments = source?.schemaFragments ?? []
+      return StoredProperty(
+        name: name,
+        schemaKey: key,
+        typeName: typeName,
+        initializerTypeName: Self.initializerTypeName(for: typeName),
+        isIgnored: false,
+        isOptional: Self.isOptionalTypeName(typeName),
+        hasDefaultValue: false,
+        schemaExpression: Self.schemaExpression(
+          typeName: typeName,
+          guideSelection: EdgeToolsGuideSelection(key: nil, schemaFragments: fragments)
+        ),
+        schemaFragments: fragments
+      )
+    }
+    let modifierPrefix = Self.modifierPrefix(for: accessModifier)
     return StreamPartialCustomization(
       conformances: [TypeSyntax("EdgeToolsGenerable")],
       members: MemberBlockItemListSyntax([
