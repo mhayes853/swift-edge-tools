@@ -5,6 +5,12 @@ import Testing
 @Suite
 struct `EdgeToolsStreamGenerable tests` {
   @Test
+  func `Private Nested Type Supports Stream Parsing`() throws {
+    let partial = try PrivateStreamContainer.Input.Partial(edgeToolsValue: ["value": "hello"])
+    expectNoDifference(partial.value.map(String.init), "hello")
+  }
+
+  @Test
   func `Public Partial Uses An Optional Field Schema`() throws {
     let partial = try PublicStreamPayload.Partial(edgeToolsValue: [:])
     expectNoDifference(partial.text == nil, true)
@@ -79,6 +85,13 @@ struct `EdgeToolsStreamGenerable tests` {
     expectNoDifference(action, .search(query: "abc", limit: nil))
   }
 
+}
+
+private struct PrivateStreamContainer {
+  @EdgeToolsGenerable
+  struct Input {
+    var value: String
+  }
 }
 
 @EdgeToolsGenerable

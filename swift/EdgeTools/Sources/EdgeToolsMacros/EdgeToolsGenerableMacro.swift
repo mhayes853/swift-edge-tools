@@ -83,6 +83,7 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
       )
     }
     let typeName = type.trimmedDescription
+    let accessModifier = Self.streamAccessModifier(for: declaration, in: context)
     let hasCustomPartial = declaration.memberBlock.members.contains { member in
       member.decl.as(StructDeclSyntax.self)?.name.text == "Partial"
         || member.decl.as(TypeAliasDeclSyntax.self)?.name.text == "Partial"
@@ -90,34 +91,23 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
     }
     let isGeneric = declaration.as(StructDeclSyntax.self)?.genericParameterClause != nil
       || declaration.as(EnumDeclSyntax.self)?.genericParameterClause != nil
-    let hasDefaultCase = declaration.as(EnumDeclSyntax.self)?.memberBlock.members.contains { member in
-      guard let caseDecl = member.decl.as(EnumCaseDeclSyntax.self) else { return false }
-      return caseDecl.attributes.contains { element in
-        guard let attribute = element.as(AttributeSyntax.self) else { return false }
-        return ["StreamParseableDefault", "StreamParsing.StreamParseableDefault"]
-          .contains(attribute.attributeName.trimmedDescription)
-      }
-    } ?? true
-    guard !hasCustomPartial && !isGeneric && hasDefaultCase else {
-      return [
-        try ExtensionDeclSyntax(
-          """
-          extension \(raw: typeName): EdgeToolsGenerable {}
-          """
-        )
-      ]
+    let basicExtension = try ExtensionDeclSyntax(
+      "extension \(raw: typeName): EdgeToolsGenerable {}"
+    )
+    guard !hasCustomPartial && !isGeneric else {
+      return [basicExtension]
     }
 
     if let structDecl = declaration.as(StructDeclSyntax.self) {
       let properties = Self.storedProperties(in: structDecl, context: context)
       let generation = try Self.streamObjectGeneration(
         from: properties,
-        accessModifier: Self.accessModifier(for: declaration)
+        accessModifier: accessModifier
       )
       let partialCustomization = Self.generablePartialCustomization(
         fields: generation.partialFields,
         from: properties,
-        accessModifier: Self.accessModifier(for: declaration)
+        accessModifier: accessModifier
       )
       let partial = try generation.structDeclarationSyntax(
         in: context,
@@ -140,8 +130,10 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
     }
 
     let enumDecl = declaration.as(EnumDeclSyntax.self)!
+    guard let defaultCase = try Self.streamDefaultCase(in: enumDecl) else {
+      return [basicExtension]
+    }
     let cases = try Self.enumCases(in: enumDecl)
-    let defaultCase = try Self.streamDefaultCase(in: enumDecl)
     let generation = try StreamEnumGeneration(
       cases: cases.map { enumCase in
         StreamParseableEnumCase(
@@ -158,13 +150,12 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
       representation: .caseKeyedObject,
       defaultCase: defaultCase,
       configuration: Self.streamGenerationConfiguration(
-        accessModifier: Self.accessModifier(for: declaration)
+        accessModifier: accessModifier
       )
     )
     guard let partialFields = generation.partialFields else {
       throw MacroExpansionErrorMessage("Stream parsing did not plan an enum Partial.")
     }
-    let accessModifier = Self.accessModifier(for: declaration)
     let generablePartials = try generation.partialSyntax(
       in: context,
       partialCustomization: Self.generablePartialCustomization(
@@ -822,6 +813,23 @@ private struct SimpleDiagnostic: DiagnosticMessage {
 // MARK: - Stream Parsing Synthesis
 
 extension EdgeToolsGenerableMacro {
+  private static func streamAccessModifier(
+    for declaration: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) -> String? {
+    let isFileRestricted: (DeclModifierSyntax) -> Bool = {
+      $0.name.tokenKind == .keyword(.private) || $0.name.tokenKind == .keyword(.fileprivate)
+    }
+    if declaration.modifiers.contains(where: isFileRestricted)
+      || context.lexicalContext.contains(where: {
+        $0.asProtocol(DeclGroupSyntax.self)?.modifiers.contains(where: isFileRestricted) ?? false
+      })
+    {
+      return "fileprivate"
+    }
+    return Self.accessModifier(for: declaration)
+  }
+
   private static func streamObjectGeneration(
     from properties: [StoredProperty],
     accessModifier: String?
@@ -852,7 +860,7 @@ extension EdgeToolsGenerableMacro {
     return StreamGenerationConfiguration(viewMode: .unsafe, accessLevel: accessLevel)
   }
 
-  private static func streamDefaultCase(in declaration: EnumDeclSyntax) throws -> TokenSyntax {
+  private static func streamDefaultCase(in declaration: EnumDeclSyntax) throws -> TokenSyntax? {
     var defaults = [TokenSyntax]()
     for member in declaration.memberBlock.members {
       guard let caseDecl = member.decl.as(EnumCaseDeclSyntax.self) else { continue }
@@ -869,6 +877,7 @@ extension EdgeToolsGenerableMacro {
       }
       defaults.append(name)
     }
+    guard !defaults.isEmpty else { return nil }
     guard defaults.count == 1 else {
       throw MacroExpansionErrorMessage(
         "Stream parsing synthesis for an enum requires exactly one @StreamParseableDefault case."
