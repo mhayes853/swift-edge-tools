@@ -397,8 +397,6 @@ extension `EdgeToolsGenerationStream tests` {
 
     await Task.yield()
     task.cancel()
-    engine.push(.finish)
-    engine.push(nil)
 
     await #expect(throws: CancellationError.self) {
       _ = try await task.value
