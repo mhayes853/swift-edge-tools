@@ -66,12 +66,14 @@ public final class EdgeToolsGenerationStream: Sendable, Identifiable {
   public var finalGeneration: EdgeToolsGeneration {
     get async throws {
       let task = self.state.withLock { $0.task! }
-      return try await withTaskCancellationHandler {
+      let generation = try await withTaskCancellationHandler {
         try await task.value
       } onCancel: {
         self.stop()
         task.cancel()
       }
+      try Task.checkCancellation()
+      return generation
     }
   }
 
