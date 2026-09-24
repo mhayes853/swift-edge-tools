@@ -23,7 +23,7 @@ public protocol EdgeToolsEngine: Sendable {
     prompt: Prompt,
     parameters: sending GenerateParameters,
     context: Context,
-    channel: sending EdgeToolsGenerationChannel
+    continuation: sending EdgeToolsGenerationStream.Continuation
   ) throws -> GenerationTask
 }
 

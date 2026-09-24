@@ -64,7 +64,7 @@
           prompt: prompt,
           parameters: parameters,
           context: context,
-          channel: EdgeToolsGenerationChannel()
+          continuation: .discarding
         )
         let generation = try await task.value
         guard let call = generation.toolCalls.first(where: { $0.name == tool.name }) else {

@@ -228,14 +228,14 @@
       prompt: EdgeToolsTranscript.Prompt,
       parameters: sending MLXGenerateParameters,
       context: MLXContext,
-      channel: sending EdgeToolsGenerationChannel
+      continuation: sending EdgeToolsGenerationStream.Continuation
     ) throws -> AnyGenerationTask {
       try self.validate(context)
       return self.generationTask(
         tools: context.tools.map { $0.definition },
         parameters: parameters,
         context: context,
-        channel: channel,
+        continuation: continuation,
         snapshot: { try context.storage.begin(appending: prompt) }
       )
     }
@@ -256,7 +256,7 @@
       tools: [EdgeToolDefinition],
       parameters: sending MLXGenerateParameters,
       context: MLXContext,
-      channel: sending EdgeToolsGenerationChannel,
+      continuation: sending EdgeToolsGenerationStream.Continuation,
       snapshot: @escaping @Sendable () throws -> MLXContext.Snapshot
     ) -> AnyGenerationTask {
       return AnyGenerationTask { stopper in
@@ -272,7 +272,7 @@
             generationLoop: self.generationLoop,
             grammarEngine: self.grammarEngine,
             stopper: stopper,
-            channel: channel,
+            continuation: continuation,
             checkpoint: model.checkpoint,
             policy: model.policy
           )

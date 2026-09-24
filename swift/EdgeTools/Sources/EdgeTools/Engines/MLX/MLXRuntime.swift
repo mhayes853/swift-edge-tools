@@ -38,7 +38,7 @@
       generationLoop: EdgeToolsGenerationLoop,
       grammarEngine: Profile.GrammarEngine,
       stopper: AnyGenerationTask.Stopper,
-      channel: EdgeToolsGenerationChannel,
+      continuation: EdgeToolsGenerationStream.Continuation,
       checkpoint: MLXPrefixCacheHandle?,
       policy: MLXCachePolicy
     ) async throws -> MLXGenerationResult {
@@ -82,7 +82,7 @@
         parser: &parser,
         preparation: EdgeToolsGenerationLoop.Preparation(metrics: prepared.metrics),
         stopper: stopper,
-        channel: channel,
+        continuation: continuation,
         grammarEngine: grammarEngine,
         maximumTokenCount: parameters.maxTokens,
         grammar: {
@@ -314,11 +314,12 @@
       }
       guard
         let checkpoint,
-        let snapshot = self.checkpoints[checkpoint.id]?.state(
-          continuingWith: tokenIds,
-          input: input,
-          context: context
-        )
+        let snapshot = self.checkpoints[checkpoint.id]?
+          .state(
+            continuingWith: tokenIds,
+            input: input,
+            context: context
+          )
       else {
         let parameters = policy.maxKVSize.map { MLXLMCommon.GenerateParameters(maxKVSize: $0) }
         var cache = self.languageModel.newCache(parameters: parameters)

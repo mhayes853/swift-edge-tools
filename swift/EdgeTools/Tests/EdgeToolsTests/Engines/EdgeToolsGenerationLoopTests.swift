@@ -15,7 +15,7 @@
         prompt: TestPrompt(system: "", user: "Prompt"),
         parameters: TestEngine.Parameters(tokenIds: responseTokenIds + [eosTokenId]),
         context: engine.context(),
-        channel: EdgeToolsGenerationChannel()
+        continuation: .discarding
       )
 
       let generation = try await task.value
@@ -46,7 +46,7 @@
           tokenIds: responseTokenIds + [stopTokenId, eosTokenId]
         ),
         context: engine.context(),
-        channel: EdgeToolsGenerationChannel()
+        continuation: .discarding
       )
 
       let generation = try await task.value
@@ -76,7 +76,7 @@
           constraint: constraint
         ),
         context: engine.context(),
-        channel: EdgeToolsGenerationChannel()
+        continuation: .discarding
       )
 
       _ = try await task.value
@@ -100,13 +100,13 @@
         prompt: TestPrompt(system: "", user: "First"),
         parameters: parameters,
         context: engine.context(),
-        channel: EdgeToolsGenerationChannel()
+        continuation: .discarding
       )
       let second = try engine.generationTask(
         prompt: TestPrompt(system: "", user: "Second"),
         parameters: parameters,
         context: engine.context(),
-        channel: EdgeToolsGenerationChannel()
+        continuation: .discarding
       )
 
       async let firstGeneration = first.value
@@ -296,7 +296,7 @@
       prompt: TestPrompt,
       parameters: sending Parameters,
       context: TestContext,
-      channel: sending EdgeToolsGenerationChannel
+      continuation: sending EdgeToolsGenerationStream.Continuation
     ) throws -> AnyGenerationTask {
       let tools = context.tools.map { $0.definition }
       return AnyGenerationTask { stopper in
@@ -308,7 +308,7 @@
             try await self.generationLoop.run(
               state: &state,
               stopper: stopper,
-              channel: channel,
+              continuation: continuation,
               grammarEngine: self.grammarEngine,
               maximumTokenCount: parameters.maxTokens,
               grammar: { state in

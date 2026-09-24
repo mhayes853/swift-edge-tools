@@ -14,7 +14,8 @@
   // MARK: - LlamaEngine
 
   public final class LlamaEngine<Profile: LlamaModelProfile>:
-    EdgeToolsEngine, EdgeToolsPrefillableEngine, EdgeToolsTokenizingEngine {
+    EdgeToolsEngine, EdgeToolsPrefillableEngine, EdgeToolsTokenizingEngine
+  {
     public typealias Context = LlamaContext
     public typealias ContextParameters = EdgeToolsTranscript
     public typealias Prompt = EdgeToolsTranscript.Prompt
@@ -186,14 +187,14 @@
       prompt: EdgeToolsTranscript.Prompt,
       parameters: sending LlamaGenerateParameters,
       context: LlamaContext,
-      channel: sending EdgeToolsGenerationChannel
+      continuation: sending EdgeToolsGenerationStream.Continuation
     ) throws -> AnyGenerationTask {
       try self.validate(context)
       return self.generationTask(
         tools: context.tools.map { $0.definition },
         parameters: parameters,
         context: context,
-        channel: channel,
+        continuation: continuation,
         makeState: { self.generationState(from: try context.storage.begin(appending: prompt)) }
       )
     }
@@ -241,7 +242,7 @@
       tools: [EdgeToolDefinition],
       parameters: sending LlamaGenerateParameters,
       context: LlamaContext,
-      channel: sending EdgeToolsGenerationChannel,
+      continuation: sending EdgeToolsGenerationStream.Continuation,
       makeState: @escaping @Sendable () throws -> ModelGenerationState
     ) -> AnyGenerationTask {
       AnyGenerationTask { stopper in
@@ -252,7 +253,7 @@
             try await self.generationLoop.run(
               state: &state,
               stopper: stopper,
-              channel: channel,
+              continuation: continuation,
               grammarEngine: self.grammarEngine,
               maximumTokenCount: parameters.maxTokens,
               grammar: {
@@ -265,7 +266,12 @@
                 )
               },
               prepare: {
-                try await self.prepare(parser: &$0, tools: tools, parameters: parameters, state: &$1)
+                try await self.prepare(
+                  parser: &$0,
+                  tools: tools,
+                  parameters: parameters,
+                  state: &$1
+                )
               },
               decode: { try self.decode(bitmask: $0, state: &$1) }
             )

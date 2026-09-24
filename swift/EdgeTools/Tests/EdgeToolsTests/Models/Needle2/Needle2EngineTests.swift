@@ -175,19 +175,17 @@
         started.continuation.yield()
         started.continuation.finish()
       }
-      let task = try engine.generationTask(
+      let stream = engine.stream(
         prompt: "Send an email to blob@gmail.com asking them to go hiking.",
-        parameters: .default,
-        context: context,
-        channel: EdgeToolsGenerationChannel(
-          onPart: { part in emittedParts.withLock { $0.append(part) } }
-        )
+        context: context
       )
+      let subscription = stream.onPart { part in emittedParts.withLock { $0.append(part) } }
+      defer { subscription.cancel() }
 
       var iterator = started.stream.makeAsyncIterator()
       await iterator.next()
-      task.stop()
-      let generation = try await task.value
+      stream.stop()
+      let generation = try await stream.finalGeneration.engineGeneration
 
       expectNoDifference(generation.wasStopped, true)
       expectNoDifference(generation.toolCalls.count, 1)
@@ -274,7 +272,7 @@
       prompt: Needle2Prompt,
       parameters: Needle2GenerateParameters,
       context: Context,
-      channel: sending EdgeToolsGenerationChannel
+      continuation: sending EdgeToolsGenerationStream.Continuation
     ) throws -> AnyGenerationTask {
       AnyGenerationTask { _ in
         EdgeToolsEngineGeneration(

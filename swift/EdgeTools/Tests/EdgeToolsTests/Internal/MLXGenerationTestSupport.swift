@@ -40,7 +40,7 @@
         context: engine.context(
           MLXContextParameters(reasoningEffort: .high)
         ),
-        channel: EdgeToolsGenerationChannel()
+        continuation: .discarding
       )
     )
   }
@@ -90,7 +90,7 @@
         maxTokens: 64
       ),
       context: context,
-      channel: EdgeToolsGenerationChannel()
+      continuation: .discarding
     )
     let response = try await responseTask.value.response
     guard !response.isEmpty else { throw GenerationTestError.missingFinalResponse }
@@ -152,7 +152,7 @@
       ),
       parameters: MLXGenerateParameters(maxTokens: 64),
       context: engine.context(),
-      channel: EdgeToolsGenerationChannel()
+      continuation: .discarding
     )
     return try await task.value.response
   }
@@ -202,7 +202,7 @@
             maxTokens: toolMaxTokens
           ),
           context: context,
-          channel: EdgeToolsGenerationChannel()
+          continuation: .discarding
         )
       },
       generatingResponse: { toolMessage in
@@ -210,7 +210,7 @@
           prompt: .tools([toolMessage]),
           parameters: MLXGenerateParameters(maxTokens: 64),
           context: context,
-          channel: EdgeToolsGenerationChannel()
+          continuation: .discarding
         )
       }
     )
@@ -230,7 +230,7 @@
       prompt: .user(prompt),
       parameters: MLXGenerateParameters(maxTokens: 64),
       context: engine.context(),
-      channel: EdgeToolsGenerationChannel()
+      continuation: .discarding
     )
     return try await task.value.response
   }
@@ -250,7 +250,7 @@
       prompt: .user(prompt),
       parameters: MLXGenerateParameters(maxTokens: 64),
       context: engine.context(),
-      channel: EdgeToolsGenerationChannel()
+      continuation: .discarding
     )
     return try await task.value.response
   }

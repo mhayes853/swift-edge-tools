@@ -99,7 +99,7 @@
       prompt: Prompt,
       parameters: sending GenerateParameters,
       context: Context,
-      channel: sending EdgeToolsGenerationChannel
+      continuation: sending EdgeToolsGenerationStream.Continuation
     ) throws -> AnyGenerationTask {
       let maximumTokenCount = parameters.maxTokens ?? 256
       return AnyGenerationTask { stopper in
@@ -134,7 +134,7 @@
         let stopped = stopper.isStopped
         if !stopped {
           for part in response.parts {
-            channel.emit(part: part)
+            continuation.yield(part: part)
           }
         }
         return response.generation(

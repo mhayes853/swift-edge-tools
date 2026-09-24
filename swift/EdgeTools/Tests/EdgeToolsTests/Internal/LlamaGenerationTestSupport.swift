@@ -23,7 +23,7 @@
             maxTokens: 256
           ),
           context: context,
-          channel: EdgeToolsGenerationChannel()
+          continuation: .discarding
         )
       },
       generatingResponse: { toolMessage in
@@ -31,7 +31,7 @@
           prompt: .tools([toolMessage]),
           parameters: LlamaGenerateParameters(maxTokens: 64),
           context: context,
-          channel: EdgeToolsGenerationChannel()
+          continuation: .discarding
         )
       }
     )
@@ -49,7 +49,7 @@
           transcript: EdgeToolsTranscript(),
           reasoningEffort: .high
         ),
-        channel: EdgeToolsGenerationChannel()
+        continuation: .discarding
       )
     )
   }
@@ -69,7 +69,7 @@
       ),
       parameters: LlamaGenerateParameters(sampling: .greedy, maxTokens: 64),
       context: engine.context(),
-      channel: EdgeToolsGenerationChannel()
+      continuation: .discarding
     )
     return try await task.value.response
   }
@@ -102,7 +102,7 @@
             maxTokens: 128
           ),
           context: context,
-          channel: EdgeToolsGenerationChannel()
+          continuation: .discarding
         )
       },
       generatingResponse: { toolMessage in
@@ -110,7 +110,7 @@
           prompt: .tools([toolMessage]),
           parameters: LlamaGenerateParameters(sampling: .greedy, maxTokens: 64),
           context: context,
-          channel: EdgeToolsGenerationChannel()
+          continuation: .discarding
         )
       }
     )
@@ -145,7 +145,7 @@
             maxTokens: 128
           ),
           context: context,
-          channel: EdgeToolsGenerationChannel()
+          continuation: .discarding
         )
       },
       generatingResponse: { toolMessage in
@@ -153,7 +153,7 @@
           prompt: .tools([toolMessage]),
           parameters: LlamaGenerateParameters(sampling: .greedy, maxTokens: 64),
           context: context,
-          channel: EdgeToolsGenerationChannel()
+          continuation: .discarding
         )
       }
     )

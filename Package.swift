@@ -136,13 +136,19 @@ let package = Package(
     ),
     .package(url: "https://github.com/apple/swift-collections", from: "1.2.1"),
     .package(url: "https://github.com/swiftwasm/JavaScriptKit", from: "0.58.0"),
-    .package(url: "https://github.com/mhayes853/swift-operation", from: "0.7.0")
+    .package(url: "https://github.com/mhayes853/swift-operation", from: "0.7.0"),
+    .package(
+      url: "https://github.com/mhayes853/swift-stream-parsing",
+      revision: "34cc4e8220be9274f4dfe251ec01990ce5750488",
+      traits: []
+    )
   ],
   targets: [
     .target(
       name: "EdgeTools",
       dependencies: [
         "EdgeToolsMacros",
+        .product(name: "StreamParsing", package: "swift-stream-parsing"),
         .target(
           name: "_EdgeToolsFoundation",
           condition: .when(traits: ["FoundationEssentials"])
@@ -427,6 +433,7 @@ let package = Package(
     .macro(
       name: "EdgeToolsMacros",
       dependencies: [
+        .product(name: "StreamParsingMacroSupport", package: "swift-stream-parsing"),
         .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
         .product(name: "SwiftSyntax", package: "swift-syntax"),
         .product(name: "SwiftSyntaxBuilder", package: "swift-syntax"),
@@ -438,7 +445,8 @@ let package = Package(
     .testTarget(
       name: "EdgeToolsMacrosTests",
       dependencies: [
-        "EdgeToolsMacros", .product(name: "MacroTesting", package: "swift-macro-testing")
+        "EdgeToolsMacros",
+        .product(name: "MacroTesting", package: "swift-macro-testing")
       ],
       path: "swift/EdgeTools/Tests/EdgeToolsMacrosTests"
     ),

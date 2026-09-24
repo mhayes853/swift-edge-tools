@@ -123,14 +123,14 @@ extension EngineRunner {
       engine: .mlx,
       capabilities: capabilities,
       metricsExtractor: metricsExtractor,
-      generation: { request, channel in
+      generation: { request, onToken, onPart in
         onGenerate(request)
         for (index, token) in tokens.enumerated() {
-          channel.emit(token: EdgeToolsToken(id: index, stringValue: token))
-          channel.emit(part: .text(token))
+          onToken?(EdgeToolsToken(id: index, stringValue: token))
+          onPart?(.text(token))
         }
         for call in toolCalls {
-          channel.emit(part: .toolCall(call))
+          onPart?(.toolCall(call))
         }
         var metrics = metadata
         metrics.prefillTokens = 10
@@ -155,7 +155,7 @@ extension EngineRunner {
     Self(
       engine: .mlx,
       capabilities: [.customGrammar, .sampling],
-      generation: { _, _ in throw error }
+      generation: { _, _, _ in throw error }
     )
   }
 }
