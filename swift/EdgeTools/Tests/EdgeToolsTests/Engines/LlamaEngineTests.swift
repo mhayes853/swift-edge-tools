@@ -67,17 +67,16 @@
           )
         )
         let emittedTokenCount = Lock(0)
-        let task = try engine.generationTask(
+        let stream = engine.stream(
           prompt: .user(filledContext.prompt),
-          parameters: LlamaGenerateParameters(sampling: .greedy, maxTokens: 1),
           context: engine.context(),
-          continuation: EdgeToolsGenerationStream.Continuation(
-            onToken: { _ in emittedTokenCount.withLock { $0 += 1 } }
-          )
+          parameters: LlamaGenerateParameters(sampling: .greedy, maxTokens: 1)
         )
+        let subscription = stream.onToken { _ in emittedTokenCount.withLock { $0 += 1 } }
+        defer { subscription.cancel() }
 
         await #expect(throws: LlamaRuntimeError.self) {
-          try await task.value
+          try await stream.finalGeneration
         }
         expectNoDifference(emittedTokenCount.withLock { $0 }, 1)
       }

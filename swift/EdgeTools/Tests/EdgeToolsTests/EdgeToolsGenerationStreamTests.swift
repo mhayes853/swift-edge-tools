@@ -323,9 +323,25 @@ struct `EdgeToolsGenerationStream tests` {
     expectNoDifference(collected, tokens)
   }
 
+  @Test
+  func `Events Sequence Replays The Finish Event After Generation`() async throws {
+    let engine = MockEngine(script: [.finish])
+    let stream = engine.stream(prompt: .test(user: "hi"), context: engine.context())
+    _ = try await stream.finalResult
+
+    var finished = false
+    for await event in stream.events {
+      if case .finish(.success) = event {
+        finished = true
+      }
+    }
+
+    expectNoDifference(finished, true)
+  }
+
   private func tokensFromCompletedStream(
     engine: MockEngine
-  ) async throws -> AsyncThrowingStream<EdgeToolsToken, any Error> {
+  ) async throws -> EdgeToolsTokenSequence {
     let stream = engine.stream(prompt: .test(user: "hi"), context: engine.context())
     _ = try await stream.finalGeneration
     return stream.tokens

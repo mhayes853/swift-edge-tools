@@ -238,6 +238,34 @@ struct `EdgeToolsAgent tests` {
   }
 
   @Test
+  func `Typed Sequences Replay Tokens And The Finish Event`() async throws {
+    let token = EdgeToolsToken(id: 1, stringValue: "hello")
+    let stream = EdgeToolsTypedStream<String> { continuation in
+      continuation.yield(token: token, turn: 0)
+      return EdgeToolsTypedResult(
+        output: "hello",
+        generations: [],
+        toolCalls: EdgeToolCallCollection()
+      )
+    }
+    _ = try await stream.finalResult
+
+    var tokens = [EdgeToolsToken]()
+    for try await value in stream.tokens {
+      tokens.append(value)
+    }
+    var finished = false
+    for await event in stream.events {
+      if case .finish(.success) = event {
+        finished = true
+      }
+    }
+
+    expectNoDifference(tokens, [token])
+    expectNoDifference(finished, true)
+  }
+
+  @Test
   func `Public Typed Continuation Receives Stop Requests`() async throws {
     let release = PartRelease()
     let stopped = Lock(false)

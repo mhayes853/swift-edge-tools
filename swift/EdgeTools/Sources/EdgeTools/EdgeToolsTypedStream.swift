@@ -502,7 +502,16 @@ where Output: StreamParseable & Sendable, Output.Partial: Sendable {
     }
 
     /// A nonthrowing event sequence whose final event contains the completion result.
-    public var events: AsyncStream<Event> {
+    public var events: EdgeToolsEventSequence<Event> {
+      EdgeToolsEventSequence(iterator: { self.eventIterator() })
+    }
+
+    /// The tokens emitted across all turns.
+    public var tokens: EdgeToolsTokenSequence {
+      EdgeToolsTokenSequence(iterator: { self.tokenIterator() })
+    }
+
+    private func eventIterator() -> EdgeToolsEventSequence<Event>.AsyncIterator {
       let (events, continuation) = AsyncStream<Event>.makeStream()
       let subscription = self.onEvent { event in
         continuation.yield(event)
@@ -511,11 +520,10 @@ where Output: StreamParseable & Sendable, Output.Partial: Sendable {
         }
       }
       continuation.onTermination = { _ in subscription.cancel() }
-      return events
+      return EdgeToolsEventSequence<Event>.AsyncIterator(base: events.makeAsyncIterator())
     }
 
-    /// The tokens emitted across all turns.
-    public var tokens: AsyncThrowingStream<EdgeToolsToken, any Error> {
+    private func tokenIterator() -> EdgeToolsTokenSequence.AsyncIterator {
       let (tokens, continuation) = AsyncThrowingStream<EdgeToolsToken, any Error>.makeStream()
       let subscription = self.onEvent { event in
         switch event {
@@ -529,7 +537,7 @@ where Output: StreamParseable & Sendable, Output.Partial: Sendable {
         }
       }
       continuation.onTermination = { _ in subscription.cancel() }
-      return tokens
+      return EdgeToolsTokenSequence.AsyncIterator(base: tokens.makeAsyncIterator())
     }
 
     public func makeAsyncIterator() -> AsyncIterator {

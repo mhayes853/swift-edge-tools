@@ -20,7 +20,7 @@ public final class EdgeToolsGenerationStream: Sendable, Identifiable {
       Self()
     }
 
-    public init(
+    init(
       onToken: (@Sendable (EdgeToolsToken) -> Void)? = nil,
       onPart: (@Sendable (EdgeToolsGenerationPart) -> Void)? = nil
     ) {
@@ -480,7 +480,16 @@ extension EdgeToolsGenerationStream {
       }
     }
 
-    public var tokens: AsyncThrowingStream<EdgeToolsToken, any Error> {
+    public var tokens: EdgeToolsTokenSequence {
+      EdgeToolsTokenSequence(iterator: { self.tokenIterator() })
+    }
+
+    /// An event sequence available for the whole generation.
+    public var events: EdgeToolsEventSequence<Event> {
+      EdgeToolsEventSequence(iterator: { self.eventIterator() })
+    }
+
+    private func tokenIterator() -> EdgeToolsTokenSequence.AsyncIterator {
       let (stream, continuation) = AsyncThrowingStream<EdgeToolsToken, any Error>.makeStream()
       let subscription = self.onEvent { event in
         switch event {
@@ -495,11 +504,10 @@ extension EdgeToolsGenerationStream {
         }
       }
       continuation.onTermination = { _ in subscription.cancel() }
-      return stream
+      return EdgeToolsTokenSequence.AsyncIterator(base: stream.makeAsyncIterator())
     }
 
-    /// An event sequence available for the whole generation.
-    public var events: AsyncStream<Event> {
+    private func eventIterator() -> EdgeToolsEventSequence<Event>.AsyncIterator {
       let (stream, continuation) = AsyncStream<Event>.makeStream()
       let subscription = self.onEvent { event in
         continuation.yield(event)
@@ -508,7 +516,7 @@ extension EdgeToolsGenerationStream {
         }
       }
       continuation.onTermination = { _ in subscription.cancel() }
-      return stream
+      return EdgeToolsEventSequence<Event>.AsyncIterator(base: stream.makeAsyncIterator())
     }
 
     public func makeAsyncIterator() -> AsyncIterator {

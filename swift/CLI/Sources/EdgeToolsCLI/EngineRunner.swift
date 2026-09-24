@@ -53,8 +53,11 @@ public struct EngineRunner: Sendable {
 
   private let metricsExtractor: any GenerationMetricsExtractor
   private let generation:
-    @Sendable (GenerationRequest, sending EdgeToolsGenerationStream.Continuation) async throws ->
-      EdgeToolsEngineGeneration
+    @Sendable (
+      GenerationRequest,
+      (@Sendable (EdgeToolsToken) -> Void)?,
+      (@Sendable (EdgeToolsGenerationPart) -> Void)?
+    ) async throws -> EdgeToolsEngineGeneration
   private let modelResetting: @Sendable () async -> Void
   private let modelWarmingUp: @Sendable (GenerationRequest) async throws -> Void
 
@@ -64,7 +67,9 @@ public struct EngineRunner: Sendable {
     metricsExtractor: any GenerationMetricsExtractor = StandardGenerationMetricsExtractor(),
     generation:
       @escaping @Sendable (
-        GenerationRequest, sending EdgeToolsGenerationStream.Continuation
+        GenerationRequest,
+        (@Sendable (EdgeToolsToken) -> Void)?,
+        (@Sendable (EdgeToolsGenerationPart) -> Void)?
       ) async throws -> EdgeToolsEngineGeneration,
     modelResetting: @escaping @Sendable () async -> Void = {},
     modelWarmingUp: @escaping @Sendable (GenerationRequest) async throws -> Void = { _ in }
@@ -79,9 +84,10 @@ public struct EngineRunner: Sendable {
 
   public func generate(
     _ request: GenerationRequest,
-    continuation: sending EdgeToolsGenerationStream.Continuation = .discarding
+    onToken: (@Sendable (EdgeToolsToken) -> Void)? = nil,
+    onPart: (@Sendable (EdgeToolsGenerationPart) -> Void)? = nil
   ) async throws -> EdgeToolsEngineGeneration {
-    try await self.generation(request, continuation)
+    try await self.generation(request, onToken, onPart)
   }
 
   public func reset() async {
@@ -115,15 +121,16 @@ extension EngineRunner {
       engine: engineKind,
       capabilities: capabilities,
       metricsExtractor: metricsExtractor,
-      generation: { request, continuation in
+      generation: { request, onToken, onPart in
         let context = engine.context(tools: definitionTools(request.tools))
-        let task = try engine.generationTask(
+        return try await streamGeneration(
+          engine: engine,
           prompt: prompt(request),
-          parameters: try parameters(request),
           context: context,
-          continuation: continuation
+          parameters: try parameters(request),
+          onToken: onToken,
+          onPart: onPart
         )
-        return try await task.value
       },
       modelResetting: modelResetting
     )
@@ -387,18 +394,19 @@ extension EngineRunner {
     return Self(
       engine: .needle2,
       metricsExtractor: Needle2GenerationMetricsExtractor(),
-      generation: { request, continuation in
+      generation: { request, onToken, onPart in
         let context = engine.context(
           Needle2ContextParameters(system: try needle2System(from: request.system)),
           tools: definitionTools(request.tools)
         )
-        let task = try engine.generationTask(
+        return try await streamGeneration(
+          engine: engine,
           prompt: .user(request.user),
-          parameters: Needle2GenerateParameters(maxTokens: request.maxTokens),
           context: context,
-          continuation: continuation
+          parameters: Needle2GenerateParameters(maxTokens: request.maxTokens),
+          onToken: onToken,
+          onPart: onPart
         )
-        return try await task.value
       }
     )
   }
@@ -459,19 +467,20 @@ extension EngineRunner {
     return Self(
       engine: .llama,
       capabilities: [.customGrammar, .sampling],
-      generation: { request, continuation in
+      generation: { request, onToken, onPart in
         let context = llamaContext(engine: engine, cache: cachedContext, request: request)
-        let task = try engine.generationTask(
+        return try await streamGeneration(
+          engine: engine,
           prompt: .user(request.user, images: request.images, audio: request.audio),
+          context: context,
           parameters: LlamaGenerateParameters(
             sampling: request.sampling,
             constraint: try request.grammar.constraint(toolCallRange: request.toolCallRange),
             maxTokens: request.maxTokens
           ),
-          context: context,
-          continuation: continuation
+          onToken: onToken,
+          onPart: onPart
         )
-        return try await task.value
       },
       modelResetting: { cachedContext.withLock { $0 = nil } },
       modelWarmingUp: { request in
@@ -512,7 +521,7 @@ extension EngineRunner {
       return Self(
         engine: .mlx,
         capabilities: [.customGrammar, .sampling],
-        generation: { request, continuation in
+        generation: { request, onToken, onPart in
           let context = engine.context(
             MLXContextParameters(
               transcript: EdgeToolsTranscript(
@@ -522,12 +531,14 @@ extension EngineRunner {
             ),
             tools: definitionTools(request.tools)
           )
-          let task = try engine.generationTask(
+          return try await streamGeneration(
+            engine: engine,
             prompt: .user(
               request.user,
               images: request.images,
               audio: request.audio
             ),
+            context: context,
             parameters: MLXGenerateParameters(
               sampling: request.sampling,
               constraint: try request.grammar.constraint(
@@ -535,10 +546,9 @@ extension EngineRunner {
               ),
               maxTokens: request.maxTokens
             ),
-            context: context,
-            continuation: continuation
+            onToken: onToken,
+            onPart: onPart
           )
-          return try await task.value
         },
         modelResetting: {}
       )
@@ -670,4 +680,29 @@ extension EngineRunner {
       modelWarmingUp: self.modelWarmingUp
     )
   }
+}
+
+// MARK: - Streaming Generation
+
+private func streamGeneration<Engine: EdgeToolsEngine>(
+  engine: Engine,
+  prompt: Engine.Prompt,
+  context: Engine.Context,
+  parameters: sending Engine.GenerateParameters,
+  onToken: (@Sendable (EdgeToolsToken) -> Void)?,
+  onPart: (@Sendable (EdgeToolsGenerationPart) -> Void)?
+) async throws -> EdgeToolsEngineGeneration {
+  let stream = engine.stream(
+    prompt: prompt,
+    context: context,
+    parameters: parameters,
+    shouldInvokeTools: { _ in false }
+  )
+  let tokenSubscription = onToken.map { stream.onToken($0) }
+  let partSubscription = onPart.map { stream.onPart($0) }
+  defer {
+    tokenSubscription?.cancel()
+    partSubscription?.cancel()
+  }
+  return try await stream.finalGeneration.engineGeneration
 }

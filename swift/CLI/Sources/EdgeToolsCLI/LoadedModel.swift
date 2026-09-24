@@ -58,13 +58,15 @@ extension LoadedModel {
       return try await self.hardwareUnit.withDefaultDevice {
         try await self.runner.generate(
           request,
-          continuation: EdgeToolsGenerationStream.Continuation(onToken: onToken, onPart: onPart)
+          onToken: onToken,
+          onPart: onPart
         )
       }
     }
     return try await self.runner.generate(
       request,
-      continuation: EdgeToolsGenerationStream.Continuation(onToken: onToken, onPart: onPart)
+      onToken: onToken,
+      onPart: onPart
     )
   }
 }
