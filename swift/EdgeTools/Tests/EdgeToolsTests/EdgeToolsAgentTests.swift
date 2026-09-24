@@ -95,13 +95,12 @@ struct `EdgeToolsAgent tests` {
     )
     let stream = engine.streamExtract(prompt: .user("Say hello."), as: String.self)
     var iterator = stream.makeAsyncIterator()
-    _ = try await iterator.next()
-    let event = try await iterator.next()
-    let partial: String?
-    if case .partial(_, let value) = event {
-      partial = String(value)
-    } else {
-      partial = nil
+    var partial: String?
+    while let event = try await iterator.next() {
+      if case .partial(_, let value) = event {
+        partial = String(value)
+        break
+      }
     }
     expectNoDifference(partial, "hel")
 
