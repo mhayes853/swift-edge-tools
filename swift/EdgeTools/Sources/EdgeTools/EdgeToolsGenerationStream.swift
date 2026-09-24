@@ -12,28 +12,28 @@ public final class EdgeToolsGenerationStream: Sendable, Identifiable {
 
   /// Publishes engine tokens and parts into a generation stream.
   public struct Continuation: Sendable {
-    private let onToken: @Sendable (EdgeToolsToken) -> Void
-    private let onPart: @Sendable (EdgeToolsGenerationPart) -> Void
+    private let onToken: (@Sendable (EdgeToolsToken) -> Void)?
+    private let onPart: (@Sendable (EdgeToolsGenerationPart) -> Void)?
 
     /// A continuation that discards engine events.
     public static var discarding: Self {
-      Self(onToken: { _ in }, onPart: { _ in })
+      Self()
     }
 
     public init(
-      onToken: @escaping @Sendable (EdgeToolsToken) -> Void = { _ in },
-      onPart: @escaping @Sendable (EdgeToolsGenerationPart) -> Void = { _ in }
+      onToken: (@Sendable (EdgeToolsToken) -> Void)? = nil,
+      onPart: (@Sendable (EdgeToolsGenerationPart) -> Void)? = nil
     ) {
       self.onToken = onToken
       self.onPart = onPart
     }
 
     public func yield(token: EdgeToolsToken) {
-      self.onToken(token)
+      self.onToken?(token)
     }
 
     public func yield(part: EdgeToolsGenerationPart) {
-      self.onPart(part)
+      self.onPart?(part)
     }
   }
 
