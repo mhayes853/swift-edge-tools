@@ -71,7 +71,7 @@
           prompt: .user(filledContext.prompt),
           parameters: LlamaGenerateParameters(sampling: .greedy, maxTokens: 1),
           context: engine.context(),
-          channel: EdgeToolsGenerationChannel(
+          continuation: EdgeToolsGenerationStream.Continuation(
             onToken: { _ in emittedTokenCount.withLock { $0 += 1 } }
           )
         )
@@ -222,7 +222,7 @@
       prompt: .user(llamaUserPrompt),
       parameters: LlamaGenerateParameters(sampling: .greedy, maxTokens: 1),
       context: context,
-      channel: EdgeToolsGenerationChannel()
+      continuation: .discarding
     )
     return try await task.value
   }

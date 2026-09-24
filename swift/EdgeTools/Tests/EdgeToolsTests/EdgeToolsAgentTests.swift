@@ -12,9 +12,9 @@ struct `EdgeToolsAgent tests` {
       generations: [
         .toolCalls([
           EdgeRawToolCall(name: first.name, arguments: .string("")),
-          EdgeRawToolCall(name: second.name, arguments: .string("")),
+          EdgeRawToolCall(name: second.name, arguments: .string(""))
         ]),
-        .response(#""done""#),
+        .response(#""done""#)
       ]
     )
     let context = engine.context {
@@ -37,8 +37,8 @@ struct `EdgeToolsAgent tests` {
         .user("Run both tools."),
         .tools([
           EdgeToolsTranscript.ToolMessage(name: first.name, response: .string("first:true")),
-          EdgeToolsTranscript.ToolMessage(name: second.name, response: .string("second:true")),
-        ]),
+          EdgeToolsTranscript.ToolMessage(name: second.name, response: .string("second:true"))
+        ])
       ]
     )
   }
@@ -73,7 +73,7 @@ struct `EdgeToolsAgent tests` {
       switch event {
       case .partial(_, let partial):
         partials.append(String(partial))
-      case .finished(let result):
+      case .finish(.success(let result)):
         finished = result.output
       default: break
       }
@@ -81,7 +81,7 @@ struct `EdgeToolsAgent tests` {
 
     expectNoDifference(partials, ["hel", "hello"])
     expectNoDifference(finished, "hello")
-    let result = try await stream.result
+    let result = try await stream.finalResult
     expectNoDifference(result.output, "hello")
   }
 
@@ -106,7 +106,7 @@ struct `EdgeToolsAgent tests` {
     expectNoDifference(partial, "hel")
 
     release.resume()
-    let result = try await stream.result
+    let result = try await stream.finalResult
     expectNoDifference(result.output, "hello")
   }
 
@@ -117,7 +117,7 @@ struct `EdgeToolsAgent tests` {
     let finished = Lock<String?>(nil)
 
     let result = try await stream.consume { event in
-      if case .finished(let output) = event {
+      if case .finish(.success(let output)) = event {
         finished.withLock { $0 = output.output }
       }
     }
@@ -132,7 +132,7 @@ struct `EdgeToolsAgent tests` {
     let engine = AgentScriptEngine(
       generations: [
         .toolCalls([EdgeRawToolCall(name: tool.name, arguments: .string(""))]),
-        .responseChunks(["\"do", "ne\""]),
+        .responseChunks(["\"do", "ne\""])
       ]
     )
     let context = engine.context { tool }
@@ -150,19 +150,116 @@ struct `EdgeToolsAgent tests` {
         toolNames.append(outcome.name)
       case .partial(_, let partial):
         partials.append(String(partial))
-      case .finished(let result):
+      case .finish(.success(let result)):
         finished = result.output
-      case .turnFinished: break
+      default: break
       }
     }
 
-    let result = try await stream.result
+    let result = try await stream.finalResult
     expectNoDifference(turns, [0, 1])
     expectNoDifference(toolNames, ["lookup"])
     expectNoDifference(partials, ["do", "done"])
     expectNoDifference(finished, "done")
     expectNoDifference(result.generations.count, 2)
     expectNoDifference(result.toolCalls.count, 1)
+  }
+
+  @Test
+  func `Typed Stream Shares Generation Callbacks And Tool State`() async throws {
+    let tool = ParallelTool(name: "lookup", tracker: ParallelInvocationTracker())
+    let engine = AgentScriptEngine(
+      generations: [
+        .toolCalls([EdgeRawToolCall(name: tool.name, arguments: .string(""))]),
+        .responseChunks(["\"done\""])
+      ]
+    )
+    let stream = engine.streamRespond(
+      to: .user("Look it up."),
+      as: String.self,
+      context: engine.context { tool }
+    )
+    let parts = Lock([EdgeToolsGenerationPart]())
+    let outcomes = Lock([String]())
+    let calls = Lock([String]())
+    let partSubscription = stream.onPart { part in parts.withLock { $0.append(part) } }
+    let outcomeSubscription = stream.onToolCallOutcome { outcome in
+      outcomes.withLock { $0.append(outcome.name) }
+    }
+    let callSubscription = stream.onToolCall { call in
+      calls.withLock { $0.append(call.tool.name) }
+    }
+    defer {
+      partSubscription.cancel()
+      outcomeSubscription.cancel()
+      callSubscription.cancel()
+    }
+
+    let result = try await stream.finalResult
+
+    expectNoDifference(parts.withLock { $0.count }, 2)
+    expectNoDifference(outcomes.withLock { $0 }, ["lookup"])
+    expectNoDifference(calls.withLock { $0 }, ["lookup"])
+    expectNoDifference(stream.toolCalls.count, 1)
+    expectNoDifference(stream.toolCallOutcomes.count, 1)
+    expectNoDifference(result.toolCallOutcomes.count, 1)
+    expectNoDifference(stream.isFinished, true)
+    expectNoDifference(try stream.result?.get().output, "done")
+  }
+
+  @Test
+  func `Public Typed Continuation Publishes Custom Events`() async throws {
+    let token = EdgeToolsToken(id: 1, stringValue: "hello")
+    let stream = EdgeToolsTypedStream<String> { continuation in
+      continuation.beginTurn(0)
+      continuation.yield(token: token, turn: 0)
+      continuation.yield(part: .text("hello"), turn: 0)
+      continuation.yield(partial: "hello".streamPartialValue, turn: 0)
+      return EdgeToolsTypedResult(
+        output: "hello",
+        generations: [],
+        toolCalls: EdgeToolCallCollection()
+      )
+    }
+
+    let events = Lock([String]())
+    let result = try await stream.consume { event in
+      switch event {
+      case .turnStarted: events.withLock { $0.append("start") }
+      case .token: events.withLock { $0.append("token") }
+      case .part: events.withLock { $0.append("part") }
+      case .partial: events.withLock { $0.append("partial") }
+      case .finish(.success): events.withLock { $0.append("finish") }
+      default: break
+      }
+    }
+
+    expectNoDifference(result.output, "hello")
+    expectNoDifference(events.withLock { $0 }, ["start", "token", "part", "partial", "finish"])
+  }
+
+  @Test
+  func `Public Typed Continuation Receives Stop Requests`() async throws {
+    let release = PartRelease()
+    let stopped = Lock(false)
+    let stream = EdgeToolsTypedStream<String> { continuation in
+      continuation.onStop {
+        stopped.withLock { $0 = true }
+        release.resume()
+      }
+      await release.wait()
+      return EdgeToolsTypedResult(
+        output: "unreachable",
+        generations: [],
+        toolCalls: EdgeToolCallCollection()
+      )
+    }
+
+    stream.stop()
+    await #expect(throws: CancellationError.self) {
+      _ = try await stream.finalResult
+    }
+    expectNoDifference(stopped.withLock { $0 }, true)
   }
 
   @Test
@@ -174,7 +271,7 @@ struct `EdgeToolsAgent tests` {
     )
 
     await #expect(throws: EdgeToolsTypedStreamError.self) {
-      _ = try await stream.result
+      _ = try await stream.finalResult
     }
     await #expect(throws: EdgeToolsTypedStreamError.self) {
       for try await event in stream {
@@ -193,7 +290,7 @@ struct `EdgeToolsAgent tests` {
       as: RequiredPayload.self
     )
 
-    let result = try await stream.result
+    let result = try await stream.finalResult
     expectNoDifference(result.output.value, "hello")
 
     var partials = [String]()
@@ -221,7 +318,7 @@ struct `EdgeToolsAgent tests` {
     stream.stop()
     release.resume()
     await #expect(throws: CancellationError.self) {
-      _ = try await stream.result
+      _ = try await stream.finalResult
     }
   }
 }
@@ -313,14 +410,14 @@ private final class AgentScriptEngine: EdgeToolsEngine {
     prompt: Prompt,
     parameters: sending GenerateParameters,
     context: Context,
-    channel: sending EdgeToolsGenerationChannel
+    continuation: sending EdgeToolsGenerationStream.Continuation
   ) throws -> AnyGenerationTask {
     context.append(prompt)
     self._constraints.withLock { $0.append(parameters.constraint) }
     let generation = self.generations.withLock { $0.removeFirst() }
     return AnyGenerationTask { _ in
       for (index, part) in generation.parts.enumerated() {
-        channel.emit(part: part)
+        continuation.yield(part: part)
         if index == 0 {
           await self.pauseAfterFirstPart?.wait()
         }

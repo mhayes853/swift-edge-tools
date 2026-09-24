@@ -107,7 +107,7 @@ struct `EdgeToolsGenerationStream tests` {
       prompt: .test(user: "call it"),
       parameters: .default,
       context: engine.context(tools: [DefinitionTool(.sendEmail)]),
-      channel: EdgeToolsGenerationChannel()
+      continuation: .discarding
     )
     let generation = try await task.value
 
@@ -190,6 +190,35 @@ struct `EdgeToolsGenerationStream tests` {
   }
 
   @Test
+  func `Raw Stream Consumes Events Including Unknown Tool Outcomes`() async throws {
+    let tokenizer = try testTokenizer()
+    let rawToolCall = #"<tool_call> [{"name":"unknown","arguments":{}}]"#
+    let toolTokens = rawToolCall.tokenize(using: tokenizer)
+    let engine = MockEngine(script: toolTokens.map { .token($0) } + [.finish])
+    let stream = engine.stream(prompt: .test(user: "call it"), context: engine.context())
+    let outcomes = Lock([String]())
+    let subscription = stream.onToolCallOutcome { outcome in
+      outcomes.withLock { $0.append(outcome.name) }
+    }
+    defer { subscription.cancel() }
+
+    let observed = Lock([String]())
+    let generation = try await stream.consume { event in
+      switch event {
+      case .toolCall(let outcome): observed.withLock { $0.append(outcome.name) }
+      case .finish(.success): observed.withLock { $0.append("finish") }
+      default: break
+      }
+    }
+
+    expectNoDifference(outcomes.withLock { $0 }, ["unknown"])
+    expectNoDifference(observed.withLock { $0 }, ["unknown", "finish"])
+    expectNoDifference(stream.toolCalls.count, 0)
+    expectNoDifference(stream.toolCallOutcomes.count, 1)
+    expectNoDifference(generation.toolCallOutcomes.count, 1)
+  }
+
+  @Test
   func `Subscribing After The Stream Finishes Replays Its Tokens And Tool Calls`() async throws {
     let tokenizer = try testTokenizer()
     let tokens = "abc".tokenize(using: tokenizer)
@@ -232,6 +261,7 @@ struct `EdgeToolsGenerationStream tests` {
           tokenWasDeliveredDuringReplay.withLock { $0 = !replayFinished.withLock { $0 } }
         }
       case .part: break
+      case .toolCall: break
       case .finish: events.withLock { $0.append("finish") }
       @unknown default: break
       }
@@ -295,7 +325,7 @@ struct `EdgeToolsGenerationStream tests` {
 
   private func tokensFromCompletedStream(
     engine: MockEngine
-  ) async throws -> EdgeToolsGenerationTokens {
+  ) async throws -> AsyncThrowingStream<EdgeToolsToken, any Error> {
     let stream = engine.stream(prompt: .test(user: "hi"), context: engine.context())
     _ = try await stream.finalGeneration
     return stream.tokens
@@ -471,7 +501,10 @@ extension `EdgeToolsGenerationStream tests` {
     let weatherContext = engine.context { weatherTool }
     let echoContext = engine.context { EchoTool() }
 
-    let generation = try await engine.generate(prompt: .test(user: "weather?"), context: weatherContext)
+    let generation = try await engine.generate(
+      prompt: .test(user: "weather?"),
+      context: weatherContext
+    )
     _ = try await engine.generate(prompt: .test(user: "echo"), context: echoContext)
 
     expectNoDifference(
@@ -752,7 +785,7 @@ private final class ReentrantMockEngine: EdgeToolsEngine, EdgeToolsTokenizingEng
     }
   }
 
-  private let channel = Lock<ReentrantChannelStorage?>(nil)
+  private let continuation = Lock<ReentrantChannelStorage?>(nil)
   private let task = GenerationTask()
   private let ready = AsyncStream<Void>.makeStream()
 
@@ -771,21 +804,21 @@ private final class ReentrantMockEngine: EdgeToolsEngine, EdgeToolsTokenizingEng
     prompt: Prompt,
     parameters: GenerateParameters,
     context: Context,
-    channel: sending EdgeToolsGenerationChannel
+    continuation: sending EdgeToolsGenerationStream.Continuation
   ) throws -> GenerationTask {
-    let channelStorage = ReentrantChannelStorage(channel: channel)
-    self.channel.withLock { $0 = channelStorage }
+    let channelStorage = ReentrantChannelStorage(continuation: continuation)
+    self.continuation.withLock { $0 = channelStorage }
     self.ready.continuation.yield()
     self.ready.continuation.finish()
     return self.task
   }
 
   func emit(_ token: EdgeToolsToken) {
-    self.channel.withLock { $0?.emit(token: token) }
+    self.continuation.withLock { $0?.emit(token: token) }
   }
 
   func finish() {
-    self.channel.withLock { storage in
+    self.continuation.withLock { storage in
       storage?.finish()
       storage = nil
     }
@@ -800,18 +833,18 @@ private final class ReentrantMockEngine: EdgeToolsEngine, EdgeToolsTokenizingEng
 // MARK: - Reentrant Channel Storage
 
 private final class ReentrantChannelStorage: Sendable {
-  private let channel: Lock<EdgeToolsGenerationChannel?>
+  private let continuation: Lock<EdgeToolsGenerationStream.Continuation?>
 
-  init(channel: sending EdgeToolsGenerationChannel) {
-    self.channel = Lock(channel)
+  init(continuation: sending EdgeToolsGenerationStream.Continuation) {
+    self.continuation = Lock(continuation)
   }
 
   func emit(token: EdgeToolsToken) {
-    self.channel.withLock { $0?.emit(token: token) }
+    self.continuation.withLock { $0?.yield(token: token) }
   }
 
   func finish() {
-    self.channel.withLock { $0 = nil }
+    self.continuation.withLock { $0 = nil }
   }
 }
 

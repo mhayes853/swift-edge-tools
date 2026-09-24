@@ -2,6 +2,10 @@ import EdgeToolsCore
 import StreamParsing
 import _Concurrency
 
+#if !$Embedded
+  import Observation
+#endif
+
 // MARK: - EdgeToolsTypedResult
 
 /// A completed typed output with every generation and tool call that produced it.
@@ -12,6 +16,11 @@ public struct EdgeToolsTypedResult<Output: Sendable>: Sendable {
   public let generations: [EdgeToolsGeneration]
   /// Resolved tool calls across all turns.
   public let toolCalls: EdgeToolCallCollection
+
+  /// All tool-call outcomes, including unknown tools and invalid arguments.
+  public var toolCallOutcomes: [EdgeToolCallOutcome] {
+    self.generations.flatMap(\.toolCallOutcomes)
+  }
 
   public init(
     output: Output,
@@ -36,11 +45,15 @@ public enum EdgeToolsTypedStreamError: Error, Sendable {
 
 /// Publishes partial output and tool activity while extracting or responding.
 public final class EdgeToolsTypedStream<Output>: Sendable
-where Output: EdgeToolsGenerable & StreamParseable & Sendable, Output.Partial: Sendable {
+where Output: StreamParseable & Sendable, Output.Partial: Sendable {
   @nonexhaustive
   public enum Event: Sendable {
     /// A generation turn has begun. Extraction uses turn zero.
     case turnStarted(Int)
+    /// A token emitted during a generation turn.
+    case token(turn: Int, value: EdgeToolsToken)
+    /// A generation part emitted during a turn.
+    case part(turn: Int, value: EdgeToolsGenerationPart)
     /// A snapshot of the current turn's parsed output. A tool-call turn's
     /// snapshots are provisional and are replaced when the next turn begins.
     case partial(turn: Int, value: Output.Partial)
@@ -48,8 +61,56 @@ where Output: EdgeToolsGenerable & StreamParseable & Sendable, Output.Partial: S
     case toolCall(turn: Int, outcome: EdgeToolCallOutcome)
     /// The generation turn has completed.
     case turnFinished(Int, EdgeToolsGeneration)
-    /// The final response was converted into the requested output type.
-    case finished(EdgeToolsTypedResult<Output>)
+    /// The stream completed with a typed result or an error.
+    case finish(Result<EdgeToolsTypedResult<Output>, any Error>)
+  }
+
+  /// Publishes typed stream activity from a custom producer.
+  public struct Continuation: Sendable {
+    private let stream: EdgeToolsTypedStream<Output>
+
+    fileprivate init(stream: EdgeToolsTypedStream<Output>) {
+      self.stream = stream
+    }
+
+    public func beginTurn(_ turn: Int) {
+      self.stream.emit(.turnStarted(turn))
+    }
+
+    public func yield(token: EdgeToolsToken, turn: Int) {
+      self.stream.emit(.token(turn: turn, value: token))
+    }
+
+    public func yield(part: EdgeToolsGenerationPart, turn: Int) {
+      self.stream.emit(.part(turn: turn, value: part))
+    }
+
+    public func yield(partial: Output.Partial, turn: Int) {
+      self.stream.emit(.partial(turn: turn, value: partial))
+    }
+
+    public func yield(toolCall: EdgeToolCallOutcome, turn: Int) {
+      self.stream.emit(.toolCall(turn: turn, outcome: toolCall))
+    }
+
+    public func finishTurn(_ generation: EdgeToolsGeneration, turn: Int) {
+      self.stream.emit(.turnFinished(turn, generation))
+    }
+
+    public func onStop(_ handler: @escaping @Sendable () -> Void) {
+      self.stream.setStopHandler(handler)
+    }
+
+    public var isStopped: Bool {
+      self.stream.state.withLock { $0.stopRequested }
+    }
+
+    func generation(
+      _ raw: EdgeToolsGenerationStream,
+      turn: Int
+    ) async throws -> (EdgeToolsGeneration, EdgeToolsTypedTurnParser<Output>) {
+      try await self.stream.generation(raw, turn: turn)
+    }
   }
 
   private enum Delivery: Sendable {
@@ -60,22 +121,50 @@ where Output: EdgeToolsGenerable & StreamParseable & Sendable, Output.Partial: S
   private struct StopAction {
     let task: Task<EdgeToolsTypedResult<Output>, any Error>?
     let generation: EdgeToolsGenerationStream?
+    let handler: (@Sendable () -> Void)?
   }
 
   private struct State {
     var task: Task<EdgeToolsTypedResult<Output>, any Error>?
     var result: Result<EdgeToolsTypedResult<Output>, any Error>?
     var activeGeneration: EdgeToolsGenerationStream?
+    var stopHandler: (@Sendable () -> Void)?
     var stopRequested = false
+    var toolCallOutcomes = [EdgeToolCallOutcome]()
     var deliveries = [Delivery]()
     var subscribers = [Int: @Sendable (Delivery) -> Void]()
     var nextID = 0
   }
 
   private let state = Lock(State())
+  private let registrar = _ObservationRegistrar()
+
+  public var isGenerating: Bool { self.result == nil }
+
+  public var isFinished: Bool { self.result != nil }
+
+  /// Resolved tool calls received across all turns.
+  public var toolCalls: EdgeToolCallCollection {
+    self.access(.toolCalls)
+    return self.state.withLock {
+      EdgeToolCallCollection($0.toolCallOutcomes.compactMap(\.call))
+    }
+  }
+
+  /// Tool-call outcomes received across all turns.
+  public var toolCallOutcomes: [EdgeToolCallOutcome] {
+    self.access(.toolCalls)
+    return self.state.withLock { $0.toolCallOutcomes }
+  }
+
+  /// The current completion, if the stream has finished.
+  public var result: Result<EdgeToolsTypedResult<Output>, any Error>? {
+    self.access(.result)
+    return self.state.withLock { $0.result }
+  }
 
   /// The completed output and generation history, available without iterating events.
-  public var result: EdgeToolsTypedResult<Output> {
+  public var finalResult: EdgeToolsTypedResult<Output> {
     get async throws {
       let task = self.state.withLock { $0.task! }
       let result = try await withTaskCancellationHandler {
@@ -91,18 +180,23 @@ where Output: EdgeToolsGenerable & StreamParseable & Sendable, Output.Partial: S
   /// Stops the active generation and prevents further turns.
   public func stop() {
     let action: StopAction = self.state.withLock { state in
-      guard state.result == nil else {
-        return StopAction(task: nil, generation: nil)
+      guard state.result == nil, !state.stopRequested else {
+        return StopAction(task: nil, generation: nil, handler: nil)
       }
       state.stopRequested = true
-      return StopAction(task: state.task, generation: state.activeGeneration)
+      return StopAction(
+        task: state.task,
+        generation: state.activeGeneration,
+        handler: state.stopHandler
+      )
     }
     action.generation?.stop()
+    action.handler?()
     action.task?.cancel()
   }
 
   /// Receives events in order, including events published before subscribing.
-  /// Errors are reported by ``result`` or by async iteration.
+  /// Errors are also reported by ``finalResult`` or by async iteration.
   public func onEvent(
     _ body: @escaping @Sendable (Event) -> Void
   ) -> EdgeToolsSubscription {
@@ -112,14 +206,76 @@ where Output: EdgeToolsGenerable & StreamParseable & Sendable, Output.Partial: S
     }
   }
 
-  init(
-    operation:
-      @escaping @Sendable (EdgeToolsTypedStream<Output>) async throws ->
-      EdgeToolsTypedResult<Output>
+  public func onToken(
+    _ body: @escaping @Sendable (EdgeToolsToken) -> Void
+  ) -> EdgeToolsSubscription {
+    self.onEvent {
+      guard case .token(_, let token) = $0 else { return }
+      body(token)
+    }
+  }
+
+  public func onPart(
+    _ body: @escaping @Sendable (EdgeToolsGenerationPart) -> Void
+  ) -> EdgeToolsSubscription {
+    self.onEvent {
+      guard case .part(_, let part) = $0 else { return }
+      body(part)
+    }
+  }
+
+  public func onReasoning(
+    _ body: @escaping @Sendable (String) -> Void
+  ) -> EdgeToolsSubscription {
+    self.onPart {
+      guard case .reasoning(let reasoning) = $0 else { return }
+      body(reasoning)
+    }
+  }
+
+  public func onPartial(
+    _ body: @escaping @Sendable (Output.Partial) -> Void
+  ) -> EdgeToolsSubscription {
+    self.onEvent {
+      guard case .partial(_, let partial) = $0 else { return }
+      body(partial)
+    }
+  }
+
+  public func onToolCall(
+    _ body: @escaping @Sendable (AnyEdgeToolCall) -> Void
+  ) -> EdgeToolsSubscription {
+    self.onToolCallOutcome { outcome in
+      if let call = outcome.call {
+        body(call)
+      }
+    }
+  }
+
+  public func onToolCallOutcome(
+    _ body: @escaping @Sendable (EdgeToolCallOutcome) -> Void
+  ) -> EdgeToolsSubscription {
+    self.onEvent {
+      guard case .toolCall(_, let outcome) = $0 else { return }
+      body(outcome)
+    }
+  }
+
+  public func onFinish(
+    _ body: @escaping @Sendable (Result<EdgeToolsTypedResult<Output>, any Error>) -> Void
+  ) -> EdgeToolsSubscription {
+    self.onEvent {
+      guard case .finish(let result) = $0 else { return }
+      body(result)
+    }
+  }
+
+  public init(
+    operation: @escaping @Sendable (Continuation) async throws -> EdgeToolsTypedResult<Output>
   ) {
     let task = Task {
       do {
-        let result = try await operation(self)
+        let result = try await operation(Continuation(stream: self))
         try Task.checkCancellation()
         guard self.finishSuccessfully(with: result) else {
           throw CancellationError()
@@ -134,11 +290,22 @@ where Output: EdgeToolsGenerable & StreamParseable & Sendable, Output.Partial: S
   }
 
   func emit(_ event: Event) {
-    let subscribers = self.state.withLock { state in
-      guard state.result == nil else { return [@Sendable (Delivery) -> Void]() }
-      let delivery = Delivery.event(event)
-      state.deliveries.append(delivery)
-      return Array(state.subscribers.values)
+    let append = {
+      self.state.withLock { state in
+        guard state.result == nil else { return [@Sendable (Delivery) -> Void]() }
+        if case .toolCall(_, let outcome) = event {
+          state.toolCallOutcomes.append(outcome)
+        }
+        let delivery = Delivery.event(event)
+        state.deliveries.append(delivery)
+        return Array(state.subscribers.values)
+      }
+    }
+    let subscribers: [@Sendable (Delivery) -> Void]
+    if case .toolCall = event {
+      subscribers = self.withMutation(of: .toolCalls, append)
+    } else {
+      subscribers = append()
     }
     for subscriber in subscribers {
       subscriber(.event(event))
@@ -151,17 +318,18 @@ where Output: EdgeToolsGenerable & StreamParseable & Sendable, Output.Partial: S
   ) async throws -> (EdgeToolsGeneration, EdgeToolsTypedTurnParser<Output>) {
     self.setActiveGeneration(raw)
     let parser = EdgeToolsTypedTurnParser<Output>()
-    let subscription = raw.onPart { part in
-      switch part {
-      case .text(let text):
-        if let partial = parser.append(text) {
+    let subscription = raw.onEvent { event in
+      switch event {
+      case .token(let token):
+        self.emit(.token(turn: turn, value: token))
+      case .toolCall(let outcome):
+        self.emit(.toolCall(turn: turn, outcome: outcome))
+      case .part(let part):
+        self.emit(.part(turn: turn, value: part))
+        if case .text(let text) = part, let partial = parser.append(text) {
           self.emit(.partial(turn: turn, value: partial))
         }
-      case .toolCall:
-        if let outcome = parser.nextToolCallOutcome(in: raw) {
-          self.emit(.toolCall(turn: turn, outcome: outcome))
-        }
-      case .reasoning: break
+      case .finish: break
       @unknown default: break
       }
     }
@@ -188,18 +356,30 @@ where Output: EdgeToolsGenerable & StreamParseable & Sendable, Output.Partial: S
     self.state.withLock { $0.activeGeneration = nil }
   }
 
+  private func setStopHandler(_ handler: @escaping @Sendable () -> Void) {
+    let shouldStop = self.state.withLock { state in
+      state.stopHandler = handler
+      return state.stopRequested
+    }
+    if shouldStop {
+      handler()
+    }
+  }
+
   private func finishSuccessfully(with result: EdgeToolsTypedResult<Output>) -> Bool {
-    let event = Delivery.event(.finished(result))
+    let event = Delivery.event(.finish(.success(result)))
     let completion = Delivery.completion(.success(result))
-    let subscribers: [@Sendable (Delivery) -> Void]? = self.state.withLock { state in
-      guard !state.stopRequested else { return nil }
-      state.result = .success(result)
-      state.activeGeneration = nil
-      state.deliveries.append(event)
-      state.deliveries.append(completion)
-      let subscribers = Array(state.subscribers.values)
-      state.subscribers.removeAll()
-      return subscribers
+    let subscribers: [@Sendable (Delivery) -> Void]? = self.withMutation(of: .result) {
+      self.state.withLock { state in
+        guard !state.stopRequested else { return nil }
+        state.result = .success(result)
+        state.activeGeneration = nil
+        state.deliveries.append(event)
+        state.deliveries.append(completion)
+        let subscribers = Array(state.subscribers.values)
+        state.subscribers.removeAll()
+        return subscribers
+      }
     }
     guard let subscribers else { return false }
     for subscriber in subscribers {
@@ -210,17 +390,22 @@ where Output: EdgeToolsGenerable & StreamParseable & Sendable, Output.Partial: S
   }
 
   private func finishWithError(_ error: any Error) {
+    let event = Delivery.event(.finish(.failure(error)))
     let completion = Delivery.completion(.failure(error))
-    let subscribers: [@Sendable (Delivery) -> Void]? = self.state.withLock { state in
-      guard state.result == nil else { return nil }
-      state.result = .failure(error)
-      state.activeGeneration = nil
-      state.deliveries.append(completion)
-      let subscribers = Array(state.subscribers.values)
-      state.subscribers.removeAll()
-      return subscribers
+    let subscribers: [@Sendable (Delivery) -> Void]? = self.withMutation(of: .result) {
+      self.state.withLock { state in
+        guard state.result == nil else { return nil }
+        state.result = .failure(error)
+        state.activeGeneration = nil
+        state.deliveries.append(event)
+        state.deliveries.append(completion)
+        let subscribers = Array(state.subscribers.values)
+        state.subscribers.removeAll()
+        return subscribers
+      }
     }
     for subscriber in subscribers ?? [] {
+      subscriber(event)
       subscriber(completion)
     }
   }
@@ -316,6 +501,37 @@ where Output: EdgeToolsGenerable & StreamParseable & Sendable, Output.Partial: S
       }
     }
 
+    /// A nonthrowing event sequence whose final event contains the completion result.
+    public var events: AsyncStream<Event> {
+      let (events, continuation) = AsyncStream<Event>.makeStream()
+      let subscription = self.onEvent { event in
+        continuation.yield(event)
+        if case .finish = event {
+          continuation.finish()
+        }
+      }
+      continuation.onTermination = { _ in subscription.cancel() }
+      return events
+    }
+
+    /// The tokens emitted across all turns.
+    public var tokens: AsyncThrowingStream<EdgeToolsToken, any Error> {
+      let (tokens, continuation) = AsyncThrowingStream<EdgeToolsToken, any Error>.makeStream()
+      let subscription = self.onEvent { event in
+        switch event {
+        case .token(_, let token): continuation.yield(token)
+        case .finish(let result):
+          switch result {
+          case .success: continuation.finish()
+          case .failure(let error): continuation.finish(throwing: error)
+          }
+        default: break
+        }
+      }
+      continuation.onTermination = { _ in subscription.cancel() }
+      return tokens
+    }
+
     public func makeAsyncIterator() -> AsyncIterator {
       let (events, continuation) = AsyncThrowingStream<Event, any Error>.makeStream()
       let subscription = self.subscribe { delivery in
@@ -332,33 +548,84 @@ where Output: EdgeToolsGenerable & StreamParseable & Sendable, Output.Partial: S
       return AsyncIterator(base: events.makeAsyncIterator())
     }
 
-    /// Consumes events in order and returns the completed result.
-    /// Stops generation if `body` throws or the consuming task is cancelled.
-    public func consume(
-      _ body: @Sendable (Event) async throws -> Void
-    ) async throws -> EdgeToolsTypedResult<Output> {
-      do {
-        for try await event in self {
+  }
+#endif
+
+// MARK: - Consuming Events
+
+extension EdgeToolsTypedStream {
+  /// Consumes events in order and returns the completed result on every platform.
+  public func consume(
+    _ body: @Sendable (Event) async throws -> Void
+  ) async throws -> EdgeToolsTypedResult<Output> {
+    let queue = EdgeToolsEventQueue<Event>()
+    let subscription = self.onEvent { queue.append($0) }
+    defer { subscription.cancel() }
+    do {
+      return try await withTaskCancellationHandler {
+        while true {
+          let event = try await queue.next()
+          try Task.checkCancellation()
           try await body(event)
+          if case .finish(let result) = event {
+            return try result.get()
+          }
         }
-        return try await self.result
-      } catch {
+      } onCancel: {
+        queue.cancel()
         self.stop()
-        throw error
       }
+    } catch {
+      self.stop()
+      throw error
     }
   }
+}
+
+// MARK: - Observation
+
+extension EdgeToolsTypedStream {
+  fileprivate enum ObservedProperty {
+    case toolCalls
+    case result
+  }
+
+  fileprivate func access(_ property: ObservedProperty) {
+    #if !$Embedded
+      switch property {
+      case .toolCalls: self.registrar.access(self, keyPath: \.toolCalls)
+      case .result: self.registrar.access(self, keyPath: \.result)
+      }
+    #endif
+  }
+
+  fileprivate func withMutation<Result>(
+    of property: ObservedProperty,
+    _ body: () -> Result
+  ) -> Result {
+    #if !$Embedded
+      switch property {
+      case .toolCalls: self.registrar.withMutation(of: self, keyPath: \.toolCalls, body)
+      case .result: self.registrar.withMutation(of: self, keyPath: \.result, body)
+      }
+    #else
+      body()
+    #endif
+  }
+}
+
+#if !$Embedded
+  extension EdgeToolsTypedStream: Observable {}
 #endif
 
 // MARK: - EdgeToolsTypedTurnParser
 
 final class EdgeToolsTypedTurnParser<Output>: Sendable
-where Output: EdgeToolsGenerable & StreamParseable & Sendable, Output.Partial: Sendable {
+where Output: StreamParseable & Sendable, Output.Partial: Sendable {
   private struct State: ~Copyable {
     var parser: PartialsStream<Output.Partial>
     var error: (any Error)?
     var sawText = false
-    var nextToolCallIndex = 0
   }
 
   private let state = Lock(State(parser: PartialsStream(from: .json())))
@@ -374,15 +641,6 @@ where Output: EdgeToolsGenerable & StreamParseable & Sendable, Output.Partial: S
         state.error = error
         return nil
       }
-    }
-  }
-
-  func nextToolCallOutcome(in generation: EdgeToolsGenerationStream) -> EdgeToolCallOutcome? {
-    self.state.withLock { state in
-      let outcomes = generation.toolCallOutcomes
-      guard state.nextToolCallIndex < outcomes.count else { return nil }
-      defer { state.nextToolCallIndex += 1 }
-      return outcomes[state.nextToolCallIndex]
     }
   }
 

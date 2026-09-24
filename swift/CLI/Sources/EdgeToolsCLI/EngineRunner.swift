@@ -53,7 +53,7 @@ public struct EngineRunner: Sendable {
 
   private let metricsExtractor: any GenerationMetricsExtractor
   private let generation:
-    @Sendable (GenerationRequest, sending EdgeToolsGenerationChannel) async throws ->
+    @Sendable (GenerationRequest, sending EdgeToolsGenerationStream.Continuation) async throws ->
       EdgeToolsEngineGeneration
   private let modelResetting: @Sendable () async -> Void
   private let modelWarmingUp: @Sendable (GenerationRequest) async throws -> Void
@@ -64,7 +64,7 @@ public struct EngineRunner: Sendable {
     metricsExtractor: any GenerationMetricsExtractor = StandardGenerationMetricsExtractor(),
     generation:
       @escaping @Sendable (
-        GenerationRequest, sending EdgeToolsGenerationChannel
+        GenerationRequest, sending EdgeToolsGenerationStream.Continuation
       ) async throws -> EdgeToolsEngineGeneration,
     modelResetting: @escaping @Sendable () async -> Void = {},
     modelWarmingUp: @escaping @Sendable (GenerationRequest) async throws -> Void = { _ in }
@@ -79,9 +79,9 @@ public struct EngineRunner: Sendable {
 
   public func generate(
     _ request: GenerationRequest,
-    channel: sending EdgeToolsGenerationChannel = EdgeToolsGenerationChannel()
+    continuation: sending EdgeToolsGenerationStream.Continuation = .discarding
   ) async throws -> EdgeToolsEngineGeneration {
-    try await self.generation(request, channel)
+    try await self.generation(request, continuation)
   }
 
   public func reset() async {
@@ -115,13 +115,13 @@ extension EngineRunner {
       engine: engineKind,
       capabilities: capabilities,
       metricsExtractor: metricsExtractor,
-      generation: { request, channel in
+      generation: { request, continuation in
         let context = engine.context(tools: definitionTools(request.tools))
         let task = try engine.generationTask(
           prompt: prompt(request),
           parameters: try parameters(request),
           context: context,
-          channel: channel
+          continuation: continuation
         )
         return try await task.value
       },
@@ -387,7 +387,7 @@ extension EngineRunner {
     return Self(
       engine: .needle2,
       metricsExtractor: Needle2GenerationMetricsExtractor(),
-      generation: { request, channel in
+      generation: { request, continuation in
         let context = engine.context(
           Needle2ContextParameters(system: try needle2System(from: request.system)),
           tools: definitionTools(request.tools)
@@ -396,7 +396,7 @@ extension EngineRunner {
           prompt: .user(request.user),
           parameters: Needle2GenerateParameters(maxTokens: request.maxTokens),
           context: context,
-          channel: channel
+          continuation: continuation
         )
         return try await task.value
       }
@@ -459,7 +459,7 @@ extension EngineRunner {
     return Self(
       engine: .llama,
       capabilities: [.customGrammar, .sampling],
-      generation: { request, channel in
+      generation: { request, continuation in
         let context = llamaContext(engine: engine, cache: cachedContext, request: request)
         let task = try engine.generationTask(
           prompt: .user(request.user, images: request.images, audio: request.audio),
@@ -469,7 +469,7 @@ extension EngineRunner {
             maxTokens: request.maxTokens
           ),
           context: context,
-          channel: channel
+          continuation: continuation
         )
         return try await task.value
       },
@@ -512,7 +512,7 @@ extension EngineRunner {
       return Self(
         engine: .mlx,
         capabilities: [.customGrammar, .sampling],
-        generation: { request, channel in
+        generation: { request, continuation in
           let context = engine.context(
             MLXContextParameters(
               transcript: EdgeToolsTranscript(
@@ -536,7 +536,7 @@ extension EngineRunner {
               maxTokens: request.maxTokens
             ),
             context: context,
-            channel: channel
+            continuation: continuation
           )
           return try await task.value
         },

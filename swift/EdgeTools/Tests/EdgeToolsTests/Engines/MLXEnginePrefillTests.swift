@@ -157,21 +157,23 @@
       )
       let context = engine.context()
 
-      let generation = try await engine.generationTask(
-        prompt: EdgeToolsTranscript.Prompt(
-          messages: EdgeToolsTranscript.tokens([1]).messages
-        ),
-        parameters: MLXGenerateParameters(
-          sampling: EdgeToolsFusedSamplingParameters(
-            temperature: 0,
-            repetitionPenalty: 2
+      let generation =
+        try await engine.generationTask(
+          prompt: EdgeToolsTranscript.Prompt(
+            messages: EdgeToolsTranscript.tokens([1]).messages
           ),
-          maxTokens: 1,
-          synchronizeStreamForMemorySnapshots: false
-        ),
-        context: context,
-        channel: EdgeToolsGenerationChannel()
-      ).value
+          parameters: MLXGenerateParameters(
+            sampling: EdgeToolsFusedSamplingParameters(
+              temperature: 0,
+              repetitionPenalty: 2
+            ),
+            maxTokens: 1,
+            synchronizeStreamForMemorySnapshots: false
+          ),
+          context: context,
+          continuation: .discarding
+        )
+        .value
 
       expectNoDifference(generation.tokens.map(\.id), [2])
     }
@@ -194,19 +196,21 @@
         tokenizer: tokenizer,
         vocabularySize: TestTokenizer.vocabularySize
       )
-      let generation = try await engine.generationTask(
-        prompt: EdgeToolsTranscript.Prompt(
-          messages: EdgeToolsTranscript.tokens([1]).messages
-        ),
-        parameters: MLXGenerateParameters(
-          sampler: { ArgMaxSampler() },
-          confidence: confidence,
-          maxTokens: 1,
-          synchronizeStreamForMemorySnapshots: false
-        ),
-        context: engine.context(),
-        channel: EdgeToolsGenerationChannel()
-      ).value
+      let generation =
+        try await engine.generationTask(
+          prompt: EdgeToolsTranscript.Prompt(
+            messages: EdgeToolsTranscript.tokens([1]).messages
+          ),
+          parameters: MLXGenerateParameters(
+            sampler: { ArgMaxSampler() },
+            confidence: confidence,
+            maxTokens: 1,
+            synchronizeStreamForMemorySnapshots: false
+          ),
+          context: engine.context(),
+          continuation: .discarding
+        )
+        .value
 
       expectNoDifference(
         generation.metrics.generationConfidence != nil,
@@ -579,7 +583,7 @@
         synchronizeStreamForMemorySnapshots: false
       ),
       context: context,
-      channel: EdgeToolsGenerationChannel()
+      continuation: .discarding
     )
     return try await task.value
   }

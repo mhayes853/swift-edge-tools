@@ -42,12 +42,14 @@ where
     parameters: @escaping @Sendable (EdgeToolsAgentTurn<Context>) -> GenerateParameters = {
       _ in .default
     },
-    constraint: @escaping @Sendable (
-      Result.Type,
-      EdgeToolsAgentTurn<Context>
-    ) -> GenerateParameters.Constraint = {
-      type, _ in .toolCallsOrResponse(type, toolCallRange: .unbounded(minimum: 1))
-    }
+    constraint:
+      @escaping @Sendable (
+        Result.Type,
+        EdgeToolsAgentTurn<Context>
+      ) -> GenerateParameters.Constraint = {
+        type,
+        _ in .toolCallsOrResponse(type, toolCallRange: .unbounded(minimum: 1))
+      }
   ) async throws -> EdgeToolsAgentResult<Result> {
     var prompt = initialPrompt
     var generations = [EdgeToolsGeneration]()
@@ -99,15 +101,17 @@ where
     parameters: @escaping @Sendable (EdgeToolsAgentTurn<Context>) -> GenerateParameters = {
       _ in .default
     },
-    constraint: @escaping @Sendable (
-      Output.Type,
-      EdgeToolsAgentTurn<Context>
-    ) -> GenerateParameters.Constraint = {
-      type, _ in .toolCallsOrResponse(type, toolCallRange: .unbounded(minimum: 1))
-    }
+    constraint:
+      @escaping @Sendable (
+        Output.Type,
+        EdgeToolsAgentTurn<Context>
+      ) -> GenerateParameters.Constraint = {
+        type,
+        _ in .toolCallsOrResponse(type, toolCallRange: .unbounded(minimum: 1))
+      }
   ) -> EdgeToolsTypedStream<Output>
   where Output: EdgeToolsGenerable & StreamParseable & Sendable, Output.Partial: Sendable {
-    EdgeToolsTypedStream { stream in
+    EdgeToolsTypedStream { continuation in
       var prompt = initialPrompt
       var generations = [EdgeToolsGeneration]()
       var toolCalls = EdgeToolCallCollection()
@@ -115,7 +119,7 @@ where
 
       while maximumTurns.map({ index < $0 }) ?? true {
         try Task.checkCancellation()
-        stream.emit(.turnStarted(index))
+        continuation.beginTurn(index)
         let turn = EdgeToolsAgentTurn(index: index, context: context, prompt: prompt)
         var generationParameters = parameters(turn)
         generationParameters.constraint = constraint(type, turn)
@@ -124,10 +128,10 @@ where
           context: context,
           parameters: generationParameters
         )
-        let (generation, parser) = try await stream.generation(raw, turn: index)
+        let (generation, parser) = try await continuation.generation(raw, turn: index)
         generations.append(generation)
         toolCalls.append(contentsOf: generation.toolCalls)
-        stream.emit(.turnFinished(index, generation))
+        continuation.finishTurn(generation, turn: index)
 
         guard !generation.toolCalls.isEmpty else {
           return EdgeToolsTypedResult(
@@ -159,7 +163,7 @@ func agentToolResponses(
       }
     }
 
-    var responses = Array<EdgeToolsTranscript.ToolMessage?>(
+    var responses = [EdgeToolsTranscript.ToolMessage?](
       repeating: nil,
       count: outcomes.count
     )

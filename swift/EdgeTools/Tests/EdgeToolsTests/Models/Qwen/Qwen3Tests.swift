@@ -51,7 +51,7 @@ extension `Model tests` {
               synchronizeStreamForMemorySnapshots: false
             ),
             context: context.fork(),
-            channel: EdgeToolsGenerationChannel()
+            continuation: .discarding
           )
           let forked = try await forkedTask.value
 
@@ -69,7 +69,7 @@ extension `Model tests` {
                 reasoningEffort: .none
               )
             ),
-            channel: EdgeToolsGenerationChannel()
+            continuation: .discarding
           )
           let fresh = try await freshTask.value
 
@@ -126,7 +126,7 @@ extension `Model tests` {
             prompt: .user("Say hello in one word."),
             parameters: LlamaGenerateParameters(maxTokens: 1),
             context: context.fork(),
-            channel: EdgeToolsGenerationChannel()
+            continuation: .discarding
           )
           let forked = try await forkedTask.value
 
@@ -134,7 +134,7 @@ extension `Model tests` {
             prompt: .user("Say hello in one word."),
             parameters: LlamaGenerateParameters(maxTokens: 1),
             context: engine.context(transcript: parameters, reasoningEffort: .none),
-            channel: EdgeToolsGenerationChannel()
+            continuation: .discarding
           )
           let fresh = try await freshTask.value
 

@@ -288,7 +288,7 @@ final class MockEngine: EdgeToolsPrefillableEngine, EdgeToolsTokenizingEngine, S
     prompt: TestPrompt,
     parameters: GenerateParameters,
     context: Context,
-    channel: sending EdgeToolsGenerationChannel
+    continuation: sending EdgeToolsGenerationStream.Continuation
   ) throws -> GenerationTask {
     let tools = context.tools.map(\.definition)
     self._generateCallCount.withLock { $0 += 1 }
@@ -316,10 +316,10 @@ final class MockEngine: EdgeToolsPrefillableEngine, EdgeToolsTokenizingEngine, S
           try Task.checkCancellation()
           switch event {
           case .token(let token):
-            channel.emit(token: token)
+            continuation.yield(token: token)
             for part in parser.accept(token: token) {
               parts.append(part)
-              channel.emit(part: part)
+              continuation.yield(part: part)
             }
             emittedTokens.append(token)
           case .stop:
@@ -338,7 +338,7 @@ final class MockEngine: EdgeToolsPrefillableEngine, EdgeToolsTokenizingEngine, S
       if let error = thrownError { throw error }
       for part in parser.finish() {
         parts.append(part)
-        channel.emit(part: part)
+        continuation.yield(part: part)
       }
       let response = emittedTokens.map(\.stringValue).joined()
       var metrics = EdgeToolsMetrics()

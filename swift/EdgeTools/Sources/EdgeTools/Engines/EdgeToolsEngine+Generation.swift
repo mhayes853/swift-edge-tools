@@ -60,7 +60,7 @@ where
       prompt: prompt,
       parameters: parameters,
       context: self.context(),
-      channel: EdgeToolsGenerationChannel()
+      continuation: .discarding
     )
     let generation = try await task.value
     return try Response(edgeToolsValue: EdgeToolsValue(json: generation.text))
@@ -90,10 +90,10 @@ where
       parameters: parameters,
       shouldInvokeTools: { _ in false }
     )
-    return EdgeToolsTypedStream { stream in
-      stream.emit(.turnStarted(0))
-      let (completed, parser) = try await stream.generation(generation, turn: 0)
-      stream.emit(.turnFinished(0, completed))
+    return EdgeToolsTypedStream { continuation in
+      continuation.beginTurn(0)
+      let (completed, parser) = try await continuation.generation(generation, turn: 0)
+      continuation.finishTurn(completed, turn: 0)
       return EdgeToolsTypedResult(
         output: try parser.complete(fallbackText: completed.text),
         generations: [completed],

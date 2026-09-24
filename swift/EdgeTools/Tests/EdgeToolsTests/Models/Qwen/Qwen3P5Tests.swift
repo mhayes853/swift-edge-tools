@@ -314,7 +314,7 @@ extension `Model tests` {
         synchronizeStreamForMemorySnapshots: false
       ),
       context: context,
-      channel: EdgeToolsGenerationChannel()
+      continuation: .discarding
     )
     return try await task.value
   }
@@ -339,7 +339,7 @@ extension `Model tests` {
       prompt: .user(prompt),
       parameters: LlamaGenerateParameters(sampling: .greedy, maxTokens: 1),
       context: context,
-      channel: EdgeToolsGenerationChannel()
+      continuation: .discarding
     )
     return try await task.value
   }

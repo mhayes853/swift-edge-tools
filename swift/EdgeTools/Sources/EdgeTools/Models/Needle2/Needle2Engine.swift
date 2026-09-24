@@ -225,7 +225,7 @@
       prompt: Prompt,
       parameters: sending GenerateParameters,
       context: Context,
-      channel: sending EdgeToolsGenerationChannel
+      continuation: sending EdgeToolsGenerationStream.Continuation
     ) throws -> some EdgeToolsEngineGenerationTask {
       let maximumTokenCount = parameters.maxTokens ?? 256
       guard maximumTokenCount > 0, let maximumTokenCount = Int32(exactly: maximumTokenCount)
@@ -261,7 +261,7 @@
         return try await self.runNeedle2Generation(
           request: request,
           contextIdentifier: context.identifier,
-          channel: channel,
+          continuation: continuation,
           wasStopped: { stopper.isStopped }
         )
       }
@@ -270,7 +270,7 @@
     private func runNeedle2Generation(
       request: Needle2Request,
       contextIdentifier: UInt64,
-      channel: EdgeToolsGenerationChannel,
+      continuation: EdgeToolsGenerationStream.Continuation,
       wasStopped: @Sendable () -> Bool
     ) async throws -> EdgeToolsEngineGeneration {
       let nativeResult = try Needle2Runtime.shared.complete(
@@ -289,7 +289,7 @@
       let stopped = wasStopped()
       if !stopped {
         for part in parts {
-          channel.emit(part: part)
+          continuation.yield(part: part)
         }
       }
 
@@ -362,7 +362,8 @@
         {
           throw Needle2Error(
             code: .activeContext,
-            message: "Another Needle 2 context has an active conversation. Reset it before using this context."
+            message:
+              "Another Needle 2 context has an active conversation. Reset it before using this context."
           )
         }
         if state.activeContextIdentifier == contextIdentifier,
@@ -370,7 +371,8 @@
         {
           throw Needle2Error(
             code: .initializationChanged,
-            message: "Reset the Needle 2 context before changing its tools, system facts, or tool index."
+            message:
+              "Reset the Needle 2 context before changing its tools, system facts, or tool index."
           )
         }
         if state.activeContextIdentifier == nil {

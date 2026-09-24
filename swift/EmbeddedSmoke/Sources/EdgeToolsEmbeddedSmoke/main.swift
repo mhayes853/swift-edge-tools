@@ -54,13 +54,13 @@ final class MockEngine: EdgeToolsEngine {
     prompt: Prompt,
     parameters: GenerateParameters,
     context: Context,
-    channel: sending EdgeToolsGenerationChannel
+    continuation: sending EdgeToolsGenerationStream.Continuation
   ) throws -> GenerationTask {
     let token = EdgeToolsToken(id: 0, stringValue: "calling")
     let arguments = EdgeToolsValue.object(["message": .string("hello embedded")])
     let toolCall = EdgeRawToolCall(name: "echo", arguments: arguments)
-    channel.emit(token: token)
-    channel.emit(part: .toolCall(toolCall))
+    continuation.yield(token: token)
+    continuation.yield(part: .toolCall(toolCall))
     return GenerationTask(
       generation: EdgeToolsEngineGeneration(
         wasStopped: false,
@@ -93,6 +93,24 @@ func runSmoke() async throws {
   }
   guard try await call.output as? String == "hello embedded" else {
     throw SmokeError.unexpectedToolOutput
+  }
+
+  let rawStream = engine.stream(prompt: MockEngine.Prompt(), context: context)
+  let streamedGeneration = try await rawStream.consume { _ in }
+  guard streamedGeneration.toolCallOutcomes.count == 1 else {
+    throw SmokeError.unexpectedToolCallCount
+  }
+
+  let typedStream = EdgeToolsTypedStream<String> { continuation in
+    continuation.yield(partial: "embedded".streamPartialValue, turn: 0)
+    return EdgeToolsTypedResult(
+      output: "embedded",
+      generations: [],
+      toolCalls: EdgeToolCallCollection()
+    )
+  }
+  guard try await typedStream.consume({ _ in }).output == "embedded" else {
+    throw SmokeError.unexpectedDecodedValue
   }
 
   let schema = EchoTool.Input.edgeToolsGenerationSchema

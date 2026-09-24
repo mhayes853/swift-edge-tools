@@ -31,7 +31,7 @@ struct EdgeToolsGenerationLoop: Sendable {
   func run<State, Parser, GrammarEngine>(
     state: inout State,
     stopper: AnyGenerationTask.Stopper,
-    channel: EdgeToolsGenerationChannel,
+    continuation: EdgeToolsGenerationStream.Continuation,
     grammarEngine: GrammarEngine,
     maximumTokenCount: Int? = nil,
     grammar: (State) throws -> GrammarEngine.Grammar,
@@ -74,7 +74,7 @@ struct EdgeToolsGenerationLoop: Sendable {
         generatedTokens: &generatedTokens,
         parser: &parser,
         parts: &parts,
-        channel: channel
+        continuation: continuation
       )
     }
 
@@ -88,7 +88,7 @@ struct EdgeToolsGenerationLoop: Sendable {
       detokenizer: detokenizer,
       generatedTokens: generatedTokens,
       parts: &parts,
-      channel: channel
+      continuation: continuation
     )
   }
 
@@ -97,7 +97,7 @@ struct EdgeToolsGenerationLoop: Sendable {
     parser: inout Parser,
     preparation: Preparation,
     stopper: AnyGenerationTask.Stopper,
-    channel: EdgeToolsGenerationChannel,
+    continuation: EdgeToolsGenerationStream.Continuation,
     grammarEngine: GrammarEngine,
     maximumTokenCount: Int? = nil,
     grammar: (State) throws -> GrammarEngine.Grammar,
@@ -137,7 +137,7 @@ struct EdgeToolsGenerationLoop: Sendable {
         generatedTokens: &generatedTokens,
         parser: &parser,
         parts: &parts,
-        channel: channel
+        continuation: continuation
       )
     }
 
@@ -151,7 +151,7 @@ struct EdgeToolsGenerationLoop: Sendable {
       detokenizer: detokenizer,
       generatedTokens: generatedTokens,
       parts: &parts,
-      channel: channel
+      continuation: continuation
     )
   }
 
@@ -162,7 +162,7 @@ struct EdgeToolsGenerationLoop: Sendable {
     generatedTokens: inout [EdgeToolsToken],
     parser: inout Parser,
     parts: inout [EdgeToolsGenerationPart],
-    channel: EdgeToolsGenerationChannel
+    continuation: EdgeToolsGenerationStream.Continuation
   ) throws
   where Parser: EdgeToolsGenerationParser, Matcher: EdgeToolsGrammarMatcher {
     let tokenString = detokenizer.decode(tokenId: tokenId, using: self.tokenizer)
@@ -172,14 +172,14 @@ struct EdgeToolsGenerationLoop: Sendable {
       throw EdgeToolsError.grammarRejectedToken(token: token)
     }
 
-    channel.emit(token: token)
+    continuation.yield(token: token)
     let parsedParts =
       self.stopTokenIds.contains(token.id)
       ? []
       : parser.accept(token: token)
     for part in parsedParts {
       parts.append(part)
-      channel.emit(part: part)
+      continuation.yield(part: part)
     }
   }
 
@@ -193,12 +193,12 @@ struct EdgeToolsGenerationLoop: Sendable {
     detokenizer: StreamingDetokenizer,
     generatedTokens: [EdgeToolsToken],
     parts: inout [EdgeToolsGenerationPart],
-    channel: EdgeToolsGenerationChannel
+    continuation: EdgeToolsGenerationStream.Continuation
   ) -> EdgeToolsEngineGeneration
   where Parser: EdgeToolsGenerationParser {
     for part in parser.finish() {
       parts.append(part)
-      channel.emit(part: part)
+      continuation.yield(part: part)
     }
 
     let finalDurationToFirstToken = durationToFirstToken ?? .zero

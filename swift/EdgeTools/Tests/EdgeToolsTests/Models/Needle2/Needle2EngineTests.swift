@@ -179,7 +179,7 @@
         prompt: "Send an email to blob@gmail.com asking them to go hiking.",
         parameters: .default,
         context: context,
-        channel: EdgeToolsGenerationChannel(
+        continuation: EdgeToolsGenerationStream.Continuation(
           onPart: { part in emittedParts.withLock { $0.append(part) } }
         )
       )
@@ -274,7 +274,7 @@
       prompt: Needle2Prompt,
       parameters: Needle2GenerateParameters,
       context: Context,
-      channel: sending EdgeToolsGenerationChannel
+      continuation: sending EdgeToolsGenerationStream.Continuation
     ) throws -> AnyGenerationTask {
       AnyGenerationTask { _ in
         EdgeToolsEngineGeneration(
