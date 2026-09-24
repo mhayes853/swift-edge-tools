@@ -1,5 +1,6 @@
 import EdgeToolsCore
 import OrderedCollections
+import StreamParsing
 import _Concurrency
 
 // MARK: - EdgeToolsAgentTurn
@@ -78,6 +79,70 @@ where
     }
 
     throw EdgeToolsAgentError.maximumTurnsExceeded(maximumTurns!)
+  }
+}
+
+// MARK: - Streaming Agent Generation
+
+extension EdgeToolsEngine
+where
+  Prompt == EdgeToolsTranscript.Prompt,
+  GenerateParameters: EdgeToolsConstrainedGenerateParameters,
+  GenerateParameters.Constraint: EdgeToolsTurnGenerationConstraint
+{
+  /// Streams partial output and tool activity across an agent response.
+  public func streamRespond<Output>(
+    to initialPrompt: Prompt,
+    as type: Output.Type,
+    context: Context,
+    maximumTurns: Int? = nil,
+    parameters: @escaping @Sendable (EdgeToolsAgentTurn<Context>) -> GenerateParameters = {
+      _ in .default
+    },
+    constraint: @escaping @Sendable (
+      Output.Type,
+      EdgeToolsAgentTurn<Context>
+    ) -> GenerateParameters.Constraint = {
+      type, _ in .toolCallsOrResponse(type, toolCallRange: .unbounded(minimum: 1))
+    }
+  ) -> EdgeToolsTypedStream<Output>
+  where Output: EdgeToolsGenerable & StreamParseable & Sendable, Output.Partial: Sendable {
+    EdgeToolsTypedStream { stream in
+      var prompt = initialPrompt
+      var generations = [EdgeToolsGeneration]()
+      var toolCalls = EdgeToolCallCollection()
+      var index = 0
+
+      while maximumTurns.map({ index < $0 }) ?? true {
+        try Task.checkCancellation()
+        stream.emit(.turnStarted(index))
+        let turn = EdgeToolsAgentTurn(index: index, context: context, prompt: prompt)
+        var generationParameters = parameters(turn)
+        generationParameters.constraint = constraint(type, turn)
+        let raw = self.stream(
+          prompt: prompt,
+          context: context,
+          parameters: generationParameters
+        )
+        let (generation, parser) = try await stream.generation(raw, turn: index)
+        generations.append(generation)
+        toolCalls.append(contentsOf: generation.toolCalls)
+        stream.emit(.turnFinished(index, generation))
+
+        guard !generation.toolCalls.isEmpty else {
+          return EdgeToolsTypedResult(
+            output: try parser.complete(fallbackText: generation.text),
+            generations: generations,
+            toolCalls: toolCalls
+          )
+        }
+
+        prompt = .tools(await agentToolResponses(for: generation.toolCallOutcomes))
+        index += 1
+      }
+
+      throw EdgeToolsAgentError.maximumTurnsExceeded(maximumTurns!)
+    }
   }
 }
 

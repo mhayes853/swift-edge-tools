@@ -1,4 +1,5 @@
 import EdgeToolsCore
+import StreamParsing
 import _Concurrency
 
 // MARK: - Streaming
@@ -63,5 +64,56 @@ where
     )
     let generation = try await task.value
     return try Response(edgeToolsValue: EdgeToolsValue(json: generation.text))
+  }
+}
+
+// MARK: - Streaming Extraction
+
+extension EdgeToolsEngine
+where
+  GenerateParameters: EdgeToolsConstrainedGenerateParameters,
+  GenerateParameters.Constraint: EdgeToolsSchemaGenerationConstraint
+{
+  /// Streams partial values from one schema-constrained generation.
+  public func streamExtract<Output>(
+    prompt: Prompt,
+    as type: Output.Type,
+    context: Context,
+    parameters: sending GenerateParameters = .default
+  ) -> EdgeToolsTypedStream<Output>
+  where Output: EdgeToolsGenerable & StreamParseable & Sendable, Output.Partial: Sendable {
+    var parameters = parameters
+    parameters.constraint = .schema(type.edgeToolsGenerationSchema)
+    let generation = self.stream(
+      prompt: prompt,
+      context: context,
+      parameters: parameters,
+      shouldInvokeTools: { _ in false }
+    )
+    return EdgeToolsTypedStream { stream in
+      stream.emit(.turnStarted(0))
+      let (completed, parser) = try await stream.generation(generation, turn: 0)
+      stream.emit(.turnFinished(0, completed))
+      return EdgeToolsTypedResult(
+        output: try parser.complete(fallbackText: completed.text),
+        generations: [completed],
+        toolCalls: completed.toolCalls
+      )
+    }
+  }
+
+  /// Streams partial values using a new context.
+  public func streamExtract<Output>(
+    prompt: Prompt,
+    as type: Output.Type,
+    parameters: sending GenerateParameters = .default
+  ) -> EdgeToolsTypedStream<Output>
+  where Output: EdgeToolsGenerable & StreamParseable & Sendable, Output.Partial: Sendable {
+    self.streamExtract(
+      prompt: prompt,
+      as: type,
+      context: self.context(),
+      parameters: parameters
+    )
   }
 }
