@@ -273,7 +273,7 @@
                   state: &$1
                 )
               },
-              decode: { try self.decode(bitmask: $0, grammarSampling: $1, state: &$2) }
+              decode: { try self.decode(guidance: $0, state: &$1) }
             )
           )
         } catch {
@@ -334,19 +334,18 @@
     }
 
     private func decode(
-      bitmask: GrammarBitmask?,
-      grammarSampling: EdgeToolsFusedSamplingParameters,
+      guidance: EdgeToolsGrammarGuidance,
       state: inout ModelGenerationState
     ) throws -> EdgeToolsToken.ID {
       guard var decoder = state.decoder else { throw EdgeToolsError.modelNotPrepared }
-      decoder.sampler.parameters = decoder.sampling(grammar: grammarSampling)
+      decoder.sampler.parameters = decoder.sampling(grammar: guidance.sampling)
       let contextState = state.contextState
       let sample = try contextState.runtime.sequences.withLogits(
         sequenceId: contextState.sequence.sequenceId,
         appending: decoder.pendingTokenId,
         vocabularySize: contextState.vocabularySizeValue
       ) {
-        decoder.sampler.sample(logits: &$0, bitmask: bitmask)
+        decoder.sampler.sample(logits: &$0, bitmask: guidance.bitmask)
       }
       decoder.add(confidence: sample.confidence)
       decoder.pendingTokenId = sample.tokenId

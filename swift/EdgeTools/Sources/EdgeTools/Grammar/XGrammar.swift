@@ -44,8 +44,11 @@
   }
 
   extension XGRMatcher: EdgeToolsGrammarMatcher {
-    public var sampling: EdgeToolsFusedSamplingParameters {
-      EdgeToolsFusedSamplingParameters(temperature: self.temperature)
+    public func nextTokenGuidance() -> EdgeToolsGrammarGuidance {
+      EdgeToolsGrammarGuidance(
+        bitmask: self.grammarBitmask(),
+        sampling: EdgeToolsFusedSamplingParameters(temperature: self.temperature)
+      )
     }
   }
 

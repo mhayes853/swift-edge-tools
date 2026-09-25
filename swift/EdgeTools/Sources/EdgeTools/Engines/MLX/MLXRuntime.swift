@@ -96,14 +96,13 @@
             grammarEngine: grammarEngine
           )
         },
-        decode: { bitmask, grammarSampling, transaction in
+        decode: { guidance, transaction in
           guard var generation = transaction.generation else {
             throw EdgeToolsError.modelNotPrepared
           }
           let tokenId = try self.decode(
             &generation,
-            bitmask: bitmask,
-            grammarSampling: grammarSampling,
+            guidance: guidance,
             policy: policy
           )
           transaction.generation = generation
@@ -220,8 +219,7 @@
 
     private func decode(
       _ generation: inout MLXGeneration,
-      bitmask: GrammarBitmask?,
-      grammarSampling: EdgeToolsFusedSamplingParameters,
+      guidance: EdgeToolsGrammarGuidance,
       policy: MLXCachePolicy
     ) throws -> EdgeToolsToken.ID {
       if let pendingTokenId = generation.decoder.pendingTokenId {
@@ -230,10 +228,10 @@
       var stepLogits = generation.prefix.output.logits[0..., -1, 0...]
       stepLogits = generation.processor?.process(logits: stepLogits) ?? stepLogits
       let maskedLogits =
-        bitmask.map { applyBitmaskMLX(logits: stepLogits, mask: $0) }
+        guidance.bitmask.map { applyBitmaskMLX(logits: stepLogits, mask: $0) }
         ?? stepLogits
       (generation.decoder.sampler as? MLXFusedSampler)?.parameters =
-        generation.decoder.sampling(grammar: grammarSampling)
+        generation.decoder.sampling(grammar: guidance.sampling)
       let token = generation.decoder.sampler.sample(logits: maskedLogits)
       if generation.decoder.tracksTokenConfidence {
         let confidenceValues = top(maskedLogits.flattened(), k: 2)

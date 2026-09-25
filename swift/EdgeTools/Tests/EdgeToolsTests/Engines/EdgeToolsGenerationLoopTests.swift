@@ -364,10 +364,9 @@
                   state: &state
                 )
               },
-              decode: { bitmask, grammarSampling, state in
+              decode: { guidance, state in
                 try await self.decode(
-                  bitmask: bitmask,
-                  grammarSampling: grammarSampling,
+                  guidance: guidance,
                   parameters: parameters,
                   state: &state
                 )
@@ -399,12 +398,11 @@
     }
 
     func decode(
-      bitmask: GrammarBitmask?,
-      grammarSampling: EdgeToolsFusedSamplingParameters,
+      guidance: EdgeToolsGrammarGuidance,
       parameters: Parameters,
       state: inout TestGenerationState
     ) async throws -> EdgeToolsToken.ID {
-      state.grammarSamplings.append(grammarSampling)
+      state.grammarSamplings.append(guidance.sampling)
       let tokenId = parameters.tokenIds[state.index]
       state.index += 1
       return tokenId
