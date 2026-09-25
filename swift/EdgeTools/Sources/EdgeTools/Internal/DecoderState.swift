@@ -3,12 +3,25 @@
 struct DecoderState<Sampler> {
   var pendingTokenId: EdgeToolsToken.ID?
   let sampler: Sampler
+  let requestedSampling: EdgeToolsFusedSamplingParameters
+  let defaultSampling: EdgeToolsFusedSamplingParameters
   let confidenceOptions: EdgeToolsConfidenceOptions
   private var confidence = ConfidenceState()
 
-  init(sampler: Sampler, confidenceOptions: EdgeToolsConfidenceOptions) {
+  init(
+    sampler: Sampler,
+    requestedSampling: EdgeToolsFusedSamplingParameters,
+    defaultSampling: EdgeToolsFusedSamplingParameters,
+    confidenceOptions: EdgeToolsConfidenceOptions
+  ) {
     self.sampler = sampler
+    self.requestedSampling = requestedSampling
+    self.defaultSampling = defaultSampling
     self.confidenceOptions = confidenceOptions
+  }
+
+  func sampling(grammar: EdgeToolsFusedSamplingParameters) -> EdgeToolsFusedSamplingParameters {
+    self.requestedSampling.applying(to: grammar.applying(to: self.defaultSampling))
   }
 
   var tracksTokenConfidence: Bool {

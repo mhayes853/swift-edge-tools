@@ -87,7 +87,7 @@
     }
 
     @Test
-    func `Decodes With The Grammar Temperature Of Each Step`() async throws {
+    func `Decodes With The Grammar Sampling Of Each Step`() async throws {
       let tokenizer = try testTokenizer()
       let eosTokenId = try requiredTestEOSToken(tokenizer: tokenizer)
       let engine = try TestEngine(tokenizer: tokenizer)
@@ -111,7 +111,14 @@
       _ = try await task.value
       let state = try await context.takeState()
 
-      expectNoDifference(state.temperatures, [nil, 0.25, nil])
+      expectNoDifference(
+        state.grammarSamplings,
+        [
+          EdgeToolsFusedSamplingParameters(),
+          EdgeToolsFusedSamplingParameters(temperature: 0.25),
+          EdgeToolsFusedSamplingParameters()
+        ]
+      )
     }
 
     @Test
@@ -198,7 +205,7 @@
 
   private struct TestGenerationState: Sendable {
     var index = 0
-    var temperatures = [Float?]()
+    var grammarSamplings = [EdgeToolsFusedSamplingParameters]()
   }
 
   private final class TestContext: EdgeToolsEngineContext {
@@ -357,10 +364,10 @@
                   state: &state
                 )
               },
-              decode: { bitmask, temperature, state in
+              decode: { bitmask, grammarSampling, state in
                 try await self.decode(
                   bitmask: bitmask,
-                  temperature: temperature,
+                  grammarSampling: grammarSampling,
                   parameters: parameters,
                   state: &state
                 )
@@ -393,11 +400,11 @@
 
     func decode(
       bitmask: GrammarBitmask?,
-      temperature: Float?,
+      grammarSampling: EdgeToolsFusedSamplingParameters,
       parameters: Parameters,
       state: inout TestGenerationState
     ) async throws -> EdgeToolsToken.ID {
-      state.temperatures.append(temperature)
+      state.grammarSamplings.append(grammarSampling)
       let tokenId = parameters.tokenIds[state.index]
       state.index += 1
       return tokenId

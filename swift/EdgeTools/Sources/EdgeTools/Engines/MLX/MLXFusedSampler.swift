@@ -7,11 +7,14 @@
   // MARK: - MLXFusedSampler
 
   public final class MLXFusedSampler: LogitSampler {
-    public let parameters: EdgeToolsFusedSamplingParameters
+    /// The parameters used for the next sample.
+    ///
+    /// The seed and repetition context size are only read when the sampler is created.
+    public var parameters: EdgeToolsFusedSamplingParameters
     public let history: MLXTokenHistory
 
     private var prngKey: MLXArray
-    private var graphs = [Float?: MLXFusedSamplerGraph]()
+    private var graphs = [EdgeToolsFusedSamplingParameters: MLXFusedSamplerGraph]()
 
     public convenience init(parameters: EdgeToolsFusedSamplingParameters) {
       self.init(
@@ -24,26 +27,12 @@
       self.parameters = parameters
       self.history = history
       self.prngKey = MLXRandom.key(parameters.seed ?? UInt64.random(in: 0...UInt64.max))
-      self.graphs[parameters.temperature] = MLXFusedSamplerGraph(parameters: parameters)
     }
 
     public func sample(logits: MLXArray) -> MLXArray {
-      self.sample(logits: logits, temperature: nil)
-    }
-
-    /// Samples a token from `logits`.
-    ///
-    /// - Parameters:
-    ///   - logits: The logits to sample from.
-    ///   - temperature: A temperature that overrides the ``parameters`` temperature for this
-    ///     sample.
-    /// - Returns: The sampled token.
-    public func sample(logits: MLXArray, temperature: Float?) -> MLXArray {
-      var parameters = self.parameters
-      parameters.temperature = temperature ?? parameters.temperature
-      let graph = self.graph(for: parameters)
-      let isPenalized = parameters.penalizesHistory
-      let prngKey = self.nextPRNGKey(isGreedy: parameters.isGreedy)
+      let graph = self.graph()
+      let isPenalized = self.parameters.penalizesHistory
+      let prngKey = self.nextPRNGKey()
       let token =
         (isPenalized ? self.history.tokens : nil)
         .map { graph.penalized(logits, $0, prngKey) } ?? graph.unpenalized(logits, prngKey)
@@ -53,17 +42,17 @@
       return token
     }
 
-    private func graph(for parameters: EdgeToolsFusedSamplingParameters) -> MLXFusedSamplerGraph {
-      if let graph = self.graphs[parameters.temperature] {
+    private func graph() -> MLXFusedSamplerGraph {
+      if let graph = self.graphs[self.parameters] {
         return graph
       }
-      let graph = MLXFusedSamplerGraph(parameters: parameters)
-      self.graphs[parameters.temperature] = graph
+      let graph = MLXFusedSamplerGraph(parameters: self.parameters)
+      self.graphs[self.parameters] = graph
       return graph
     }
 
-    private func nextPRNGKey(isGreedy: Bool) -> MLXArray {
-      guard !isGreedy else { return self.prngKey }
+    private func nextPRNGKey() -> MLXArray {
+      guard !self.parameters.isGreedy else { return self.prngKey }
       let (next, subkey) = MLXRandom.split(key: self.prngKey)
       self.prngKey = next
       return subkey

@@ -70,6 +70,8 @@
         tools: tools,
         sampler: parameters.sampler?()
           ?? MLXFusedSampler(parameters: parameters.sampling.applying(to: defaultSampling)),
+        requestedSampling: parameters.sampling,
+        defaultSampling: defaultSampling,
         processor: parameters.processor?(),
         confidenceOptions: parameters.confidence,
         synchronizeMemorySnapshots: parameters.synchronizeStreamForMemorySnapshots,
@@ -94,14 +96,14 @@
             grammarEngine: grammarEngine
           )
         },
-        decode: { bitmask, temperature, transaction in
+        decode: { bitmask, grammarSampling, transaction in
           guard var generation = transaction.generation else {
             throw EdgeToolsError.modelNotPrepared
           }
           let tokenId = try self.decode(
             &generation,
             bitmask: bitmask,
-            temperature: parameters.sampling.temperature == nil ? temperature : nil,
+            grammarSampling: grammarSampling,
             policy: policy
           )
           transaction.generation = generation
@@ -168,6 +170,8 @@
       reasoningEffort: EdgeToolsReasoningEffort,
       tools: [EdgeToolDefinition],
       sampler: any LogitSampler,
+      requestedSampling: EdgeToolsFusedSamplingParameters,
+      defaultSampling: EdgeToolsFusedSamplingParameters,
       processor: (any LogitProcessor)?,
       confidenceOptions: EdgeToolsConfidenceOptions,
       synchronizeMemorySnapshots: Bool,
@@ -200,7 +204,12 @@
       metrics.prefillDuration = start.duration(to: clock.now)
       let generation = MLXGeneration(
         prefix: prepared.state,
-        decoder: DecoderState(sampler: sampler, confidenceOptions: confidenceOptions),
+        decoder: DecoderState(
+          sampler: sampler,
+          requestedSampling: requestedSampling,
+          defaultSampling: defaultSampling,
+          confidenceOptions: confidenceOptions
+        ),
         processor: processor,
         synchronizeStreamForMemorySnapshots: synchronizeMemorySnapshots,
         generationStartSnapshot: generationStartSnapshot,
@@ -212,7 +221,7 @@
     private func decode(
       _ generation: inout MLXGeneration,
       bitmask: GrammarBitmask?,
-      temperature: Float?,
+      grammarSampling: EdgeToolsFusedSamplingParameters,
       policy: MLXCachePolicy
     ) throws -> EdgeToolsToken.ID {
       if let pendingTokenId = generation.decoder.pendingTokenId {
@@ -223,10 +232,9 @@
       let maskedLogits =
         bitmask.map { applyBitmaskMLX(logits: stepLogits, mask: $0) }
         ?? stepLogits
-      let sampler = generation.decoder.sampler
-      let token =
-        (sampler as? MLXFusedSampler)?.sample(logits: maskedLogits, temperature: temperature)
-        ?? sampler.sample(logits: maskedLogits)
+      (generation.decoder.sampler as? MLXFusedSampler)?.parameters =
+        generation.decoder.sampling(grammar: grammarSampling)
+      let token = generation.decoder.sampler.sample(logits: maskedLogits)
       if generation.decoder.tracksTokenConfidence {
         let confidenceValues = top(maskedLogits.flattened(), k: 2)
         eval(confidenceValues, token)

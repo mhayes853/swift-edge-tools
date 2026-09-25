@@ -36,7 +36,7 @@ struct EdgeToolsGenerationLoop: Sendable {
     maximumTokenCount: Int? = nil,
     grammar: (State) throws -> GrammarEngine.Grammar,
     prepare: (inout Parser, inout State) async throws -> Preparation,
-    decode: (GrammarBitmask?, Float?, inout State) async throws -> EdgeToolsToken.ID
+    decode: (GrammarBitmask?, EdgeToolsFusedSamplingParameters, inout State) async throws -> EdgeToolsToken.ID
   ) async throws -> EdgeToolsEngineGeneration
   where Parser: EdgeToolsGenerationParser, GrammarEngine: EdgeToolsGrammarEngine {
     try Task.checkCancellation()
@@ -64,7 +64,7 @@ struct EdgeToolsGenerationLoop: Sendable {
       generatedTokens.last.map({ !self.stopTokenIds.contains($0.id) }) ?? true
     {
       try Task.checkCancellation()
-      let tokenId = try await decode(matcher.grammarBitmask(), matcher.temperature, &state)
+      let tokenId = try await decode(matcher.grammarBitmask(), matcher.sampling, &state)
       durationToFirstToken = durationToFirstToken ?? clock.duration(since: generateStart)
 
       try self.process(
@@ -101,7 +101,7 @@ struct EdgeToolsGenerationLoop: Sendable {
     grammarEngine: GrammarEngine,
     maximumTokenCount: Int? = nil,
     grammar: (State) throws -> GrammarEngine.Grammar,
-    decode: (GrammarBitmask?, Float?, inout State) throws -> EdgeToolsToken.ID
+    decode: (GrammarBitmask?, EdgeToolsFusedSamplingParameters, inout State) throws -> EdgeToolsToken.ID
   ) throws -> EdgeToolsEngineGeneration
   where Parser: EdgeToolsGenerationParser, GrammarEngine: EdgeToolsGrammarEngine {
     try Task.checkCancellation()
@@ -127,7 +127,7 @@ struct EdgeToolsGenerationLoop: Sendable {
       generatedTokens.last.map({ !self.stopTokenIds.contains($0.id) }) ?? true
     {
       try Task.checkCancellation()
-      let tokenId = try decode(matcher.grammarBitmask(), matcher.temperature, &state)
+      let tokenId = try decode(matcher.grammarBitmask(), matcher.sampling, &state)
       durationToFirstToken = durationToFirstToken ?? clock.duration(since: generateStart)
 
       try self.process(

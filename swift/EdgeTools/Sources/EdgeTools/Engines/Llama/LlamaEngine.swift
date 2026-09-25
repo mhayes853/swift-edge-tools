@@ -273,13 +273,7 @@
                   state: &$1
                 )
               },
-              decode: {
-                try self.decode(
-                  bitmask: $0,
-                  temperature: parameters.sampling.temperature == nil ? $1 : nil,
-                  state: &$2
-                )
-              }
+              decode: { try self.decode(bitmask: $0, grammarSampling: $1, state: &$2) }
             )
           )
         } catch {
@@ -328,11 +322,12 @@
         ?? contextState.configuredSampling
         ?? EdgeToolsFusedSamplingParameters()
 
-      let sampler = EdgeToolsCPUFusedSampler(
-        parameters: parameters.sampling.applying(to: defaultSampling)
-      )
       state.decoder = ModelGenerationState.Decoder(
-        sampler: sampler,
+        sampler: EdgeToolsCPUFusedSampler(
+          parameters: parameters.sampling.applying(to: defaultSampling)
+        ),
+        requestedSampling: parameters.sampling,
+        defaultSampling: defaultSampling,
         confidenceOptions: parameters.confidence
       )
       return EdgeToolsGenerationLoop.Preparation(metrics: metrics)
@@ -340,17 +335,18 @@
 
     private func decode(
       bitmask: GrammarBitmask?,
-      temperature: Float?,
+      grammarSampling: EdgeToolsFusedSamplingParameters,
       state: inout ModelGenerationState
     ) throws -> EdgeToolsToken.ID {
       guard var decoder = state.decoder else { throw EdgeToolsError.modelNotPrepared }
+      decoder.sampler.parameters = decoder.sampling(grammar: grammarSampling)
       let contextState = state.contextState
       let sample = try contextState.runtime.sequences.withLogits(
         sequenceId: contextState.sequence.sequenceId,
         appending: decoder.pendingTokenId,
         vocabularySize: contextState.vocabularySizeValue
       ) {
-        decoder.sampler.sample(logits: &$0, bitmask: bitmask, temperature: temperature)
+        decoder.sampler.sample(logits: &$0, bitmask: bitmask)
       }
       decoder.add(confidence: sample.confidence)
       decoder.pendingTokenId = sample.tokenId

@@ -73,7 +73,10 @@ public final class EdgeToolsCPUTokenHistory {
 // MARK: - EdgeToolsCPUFusedSampler
 
 public final class EdgeToolsCPUFusedSampler {
-  public let parameters: EdgeToolsFusedSamplingParameters
+  /// The parameters used for the next sample.
+  ///
+  /// The seed and repetition context size are only read when the sampler is created.
+  public var parameters: EdgeToolsFusedSamplingParameters
   public let history: EdgeToolsCPUTokenHistory
 
   private var rngState: UInt64
@@ -99,45 +102,23 @@ public final class EdgeToolsCPUFusedSampler {
     #endif
   }
 
-  /// Samples a token from `logits`.
-  ///
-  /// - Parameters:
-  ///   - logits: The logits to sample from.
-  ///   - bitmask: A grammar constraint on the tokens that can be sampled.
-  ///   - temperature: A temperature that overrides the ``parameters`` temperature for this sample.
-  /// - Returns: The sampled token.
   public func sample(
     logits: inout MutableSpan<Float>,
-    bitmask: GrammarBitmask? = nil,
-    temperature: Float? = nil
+    bitmask: GrammarBitmask? = nil
   ) -> EdgeToolsCPUSample {
-    logits.withUnsafeMutableBufferPointer {
-      self.sample(logits: $0, bitmask: bitmask, temperature: temperature)
-    }
+    logits.withUnsafeMutableBufferPointer { self.sample(logits: $0, bitmask: bitmask) }
   }
 
-  /// Samples a token from `logits`.
-  ///
-  /// - Parameters:
-  ///   - logits: The logits to sample from.
-  ///   - bitmask: A grammar constraint on the tokens that can be sampled.
-  ///   - temperature: A temperature that overrides the ``parameters`` temperature for this sample.
-  /// - Returns: The sampled token.
   public func sample(
     logits: UnsafeMutableBufferPointer<Float>,
-    bitmask: GrammarBitmask? = nil,
-    temperature: Float? = nil
+    bitmask: GrammarBitmask? = nil
   ) -> EdgeToolsCPUSample {
     precondition(!logits.isEmpty, "Cannot sample from empty logits.")
     let penalizesHistory = self.parameters.penalizesHistory
     if penalizesHistory {
       self.applyHistoryPenalties(logits: logits)
     }
-    let sample = self.constrainedSample(
-      logits: logits,
-      bitmask: bitmask,
-      temperature: temperature ?? self.parameters.temperature
-    )
+    let sample = self.constrainedSample(logits: logits, bitmask: bitmask)
     if penalizesHistory {
       self.history.append(sample.tokenId)
     }
@@ -146,23 +127,21 @@ public final class EdgeToolsCPUFusedSampler {
 
   private func constrainedSample(
     logits: UnsafeMutableBufferPointer<Float>,
-    bitmask: GrammarBitmask?,
-    temperature: Float?
+    bitmask: GrammarBitmask?
   ) -> EdgeToolsCPUSample {
     guard let bitmask else {
-      return self.sample(logits: UnsafeBufferPointer(logits), ids: nil, temperature: temperature)
+      return self.sample(logits: UnsafeBufferPointer(logits), ids: nil)
     }
     guard let count = self.gatherPermitted(logits: UnsafeBufferPointer(logits), mask: bitmask)
     else {
       applyBitmaskCPU(logits: logits, mask: bitmask)
-      return self.sample(logits: UnsafeBufferPointer(logits), ids: nil, temperature: temperature)
+      return self.sample(logits: UnsafeBufferPointer(logits), ids: nil)
     }
     return self.gatheredLogits.withUnsafeBufferPointer { values in
       self.gatheredIds.withUnsafeBufferPointer { ids in
         self.sample(
           logits: UnsafeBufferPointer(rebasing: values[..<count]),
-          ids: UnsafeBufferPointer(rebasing: ids[..<count]),
-          temperature: temperature
+          ids: UnsafeBufferPointer(rebasing: ids[..<count])
         )
       }
     }
@@ -170,11 +149,10 @@ public final class EdgeToolsCPUFusedSampler {
 
   private func sample(
     logits: UnsafeBufferPointer<Float>,
-    ids: UnsafeBufferPointer<EdgeToolsToken.ID>?,
-    temperature: Float?
+    ids: UnsafeBufferPointer<EdgeToolsToken.ID>?
   ) -> EdgeToolsCPUSample {
     let extremes = logitExtremes(logits)
-    let index = self.sampledTokenId(logits: logits, extremes: extremes, temperature: temperature)
+    let index = self.sampledTokenId(logits: logits, extremes: extremes)
     return EdgeToolsCPUSample(
       tokenId: ids.map { $0[index] } ?? index,
       confidence: tokenConfidence(top1: extremes.top1, top2: extremes.top2)
@@ -246,11 +224,10 @@ public final class EdgeToolsCPUFusedSampler {
 
   private func sampledTokenId(
     logits: UnsafeBufferPointer<Float>,
-    extremes: LogitExtremes,
-    temperature: Float?
+    extremes: LogitExtremes
   ) -> EdgeToolsToken.ID {
-    guard temperature != 0 else { return extremes.top1Index }
-    let invTemperature = 1 / (temperature ?? 0.6)
+    guard !self.parameters.isGreedy else { return extremes.top1Index }
+    let invTemperature = 1 / (self.parameters.temperature ?? 0.6)
     let maxLogit = extremes.top1
     let topK = self.parameters.topK.flatMap { $0 > 0 && $0 < logits.count ? $0 : nil }
     let topP = self.parameters.topP.flatMap { $0 < 1 ? $0 : nil }

@@ -43,7 +43,11 @@
     }
   }
 
-  extension XGRMatcher: EdgeToolsGrammarMatcher {}
+  extension XGRMatcher: EdgeToolsGrammarMatcher {
+    public var sampling: EdgeToolsFusedSamplingParameters {
+      EdgeToolsFusedSamplingParameters(temperature: self.temperature)
+    }
+  }
 
   // MARK: - XGrammarEngine
 
