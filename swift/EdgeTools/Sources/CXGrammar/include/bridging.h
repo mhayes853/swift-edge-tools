@@ -112,7 +112,7 @@ void xgrammar_grammar_destroy(xgrammar_grammar_t grammar);
 xgrammar_compiled_grammar_t xgrammar_compiler_compile_grammar(
     xgrammar_compiler_t compiler, xgrammar_grammar_t grammar
 );
-xgrammar_grammar_t xgrammar_compiled_grammar_grammar(xgrammar_compiled_grammar_t compiled_grammar);
+xgrammar_grammar_t xgrammar_grammar_from_compiled(xgrammar_compiled_grammar_t compiled_grammar);
 xgrammar_tokenizer_info_t xgrammar_compiled_grammar_tokenizer_info(
     xgrammar_compiled_grammar_t compiled_grammar
 );
@@ -136,7 +136,8 @@ xgrammar_matcher_t xgrammar_matcher_init(
     const int32_t* override_stop_token_ids,
     size_t override_stop_token_id_count,
     int terminate_without_stop_token,
-    int32_t max_rollback_tokens
+    int32_t max_rollback_tokens,
+    float default_temperature
 );
 xgrammar_matcher_t xgrammar_matcher_fork(xgrammar_matcher_t matcher);
 size_t xgrammar_matcher_bit_count(xgrammar_matcher_t matcher);
@@ -147,6 +148,13 @@ int xgrammar_matcher_is_completed(xgrammar_matcher_t matcher);
 int xgrammar_matcher_is_terminated(xgrammar_matcher_t matcher);
 void xgrammar_matcher_rollback(xgrammar_matcher_t matcher, int num_tokens);
 void xgrammar_matcher_reset(xgrammar_matcher_t matcher);
+float xgrammar_matcher_temperature(xgrammar_matcher_t matcher);
+void xgrammar_matcher_captures(
+    xgrammar_matcher_t matcher,
+    int deduplicate,
+    void* context,
+    void (*body)(void* context, const char* name, const char* value, size_t value_length)
+);
 void xgrammar_matcher_destroy(xgrammar_matcher_t matcher);
 
 #ifdef __cplusplus

@@ -181,6 +181,10 @@ private struct CPUFusedSamplerDriver: FusedSamplerDriver {
     self.sampler.pick(from: logits)
   }
 
+  func update(parameters: EdgeToolsFusedSamplingParameters) {
+    self.sampler.parameters = parameters
+  }
+
   func resetHistory() {
     self.sampler.history.reset()
   }
@@ -196,11 +200,13 @@ enum FusedSamplerBehavior: CaseIterable, Sendable {
   case topP
   case minP
   case deterministicSeed
+  case parameterUpdates
 }
 
 protocol FusedSamplerDriver {
   init(parameters: EdgeToolsFusedSamplingParameters, seededWith tokenIds: [Int])
   func pick(from logits: [Float]) -> Int
+  func update(parameters: EdgeToolsFusedSamplingParameters)
   func resetHistory()
 }
 
@@ -269,6 +275,16 @@ func expectFusedSamplerBehavior<Driver: FusedSamplerDriver>(
       return (0..<16).map { _ in sampler.pick(from: logits) }
     }
     expectNoDifference(run(), run())
+  case .parameterUpdates:
+    let sampler = Driver(
+      parameters: EdgeToolsFusedSamplingParameters(temperature: 0, topK: 2, seed: 7),
+      seededWith: []
+    )
+    expectNoDifference(picks(using: sampler, from: logits), [1])
+    sampler.update(parameters: EdgeToolsFusedSamplingParameters(temperature: 2, topK: 2, seed: 7))
+    expectNoDifference(picks(using: sampler, from: logits), [1, 2])
+    sampler.update(parameters: EdgeToolsFusedSamplingParameters(temperature: 0, topK: 2, seed: 7))
+    expectNoDifference(picks(using: sampler, from: logits), [1])
   }
 }
 

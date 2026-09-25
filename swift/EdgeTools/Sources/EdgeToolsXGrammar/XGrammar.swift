@@ -705,7 +705,7 @@ public struct XGRCompiledGrammar: ~Copyable, @unchecked Sendable {
 
   /// The grammar used to produce this compiled grammar.
   public var grammar: XGRGrammar {
-    XGRGrammar(handle: xgrammar_compiled_grammar_grammar(self.handle)!)
+    XGRGrammar(handle: xgrammar_grammar_from_compiled(self.handle)!)
   }
 
   /// The tokenizer metadata used during compilation.
@@ -825,6 +825,25 @@ public struct XGRCompiler: ~Copyable, @unchecked Sendable {
 /// after selecting a token. A matcher can be reset, rolled back, or forked to manage generation
 /// branches.
 public struct XGRMatcher: ~Copyable, @unchecked Sendable {
+  /// A span of input matched by a grammar rule marked with the `capture` option.
+  public struct Capture: Hashable, Sendable {
+    /// The name of the capture.
+    public let name: String
+
+    /// The input bytes matched by the captured rule.
+    public let bytes: [UInt8]
+
+    /// Creates a capture.
+    ///
+    /// - Parameters:
+    ///   - name: The name of the capture.
+    ///   - bytes: The input bytes matched by the captured rule.
+    public init(name: String, bytes: [UInt8]) {
+      self.name = name
+      self.bytes = bytes
+    }
+  }
+
   /// The underlying matcher pointer.
   public let handle: xgrammar_matcher_t
 
@@ -836,15 +855,17 @@ public struct XGRMatcher: ~Copyable, @unchecked Sendable {
   ///     An empty array uses the stop tokens from the compiled grammar’s tokenizer info.
   ///   - terminateWithoutStopToken: Whether the matcher may terminate after a complete match
   ///     without requiring a stop token.
-  ///   - maxRollbackTokens: The maximum number of accepted tokens retained for rollback. Use a
-  ///     negative value for XGrammar’s unlimited rollback behavior.
+  ///   - defaultTemperature: The sampling ``temperature`` used when no active grammar rule
+  ///     specifies one. Must be finite and non-negative.
   public init(
     compiledGrammar: borrowing XGRCompiledGrammar,
     overrideStopTokenIDs: [Int] = [],
     terminateWithoutStopToken: Bool = false,
-    maxRollbackTokens: Int = -1
+    defaultTemperature: Float? = nil
   ) throws {
-    let maxRollbackTokens = try Int32(maxRollbackTokens, error: .invalidMatcherConfiguration)
+    guard defaultTemperature.map({ $0.isFinite && $0 >= 0 }) ?? true else {
+      throw XGRError.invalidMatcherConfiguration
+    }
     let overrideStopTokenIDs = try overrideStopTokenIDs.map {
       try Int32($0, error: .invalidMatcherConfiguration)
     }
@@ -856,7 +877,8 @@ public struct XGRMatcher: ~Copyable, @unchecked Sendable {
           $0.baseAddress,
           $0.count,
           terminateWithoutStopToken.intValue,
-          maxRollbackTokens
+          -1,
+          defaultTemperature ?? -1
         )
       )
     }
@@ -880,6 +902,42 @@ public struct XGRMatcher: ~Copyable, @unchecked Sendable {
   /// Indicates whether generation has been terminated by the matcher.
   public var isTerminated: Bool {
     xgrammar_matcher_is_terminated(self.handle) != 0
+  }
+
+  /// The effective sampling temperature for the next token.
+  ///
+  /// This is the temperature of the innermost active grammar rule that specifies the
+  /// `temperature` option, falling back to the matcher's default temperature. It is `nil` when
+  /// neither applies.
+  public var temperature: Float? {
+    let temperature = xgrammar_matcher_temperature(self.handle)
+    return temperature < 0 ? nil : temperature
+  }
+
+  /// Returns the capture groups recorded so far, ordered by completion position.
+  ///
+  /// Captures are recorded for grammar rules marked with the `capture` option when tokens or
+  /// strings are accepted, and are rolled back alongside ``rollback(_:)``.
+  ///
+  /// - Parameters:
+  ///   - deduplicate: Whether to keep only the longest completion of each captured occurrence.
+  ///     The matcher explores multiple parses at once, so a single occurrence may complete at
+  ///     several candidate positions. Pass `false` to receive every raw completion.
+  /// - Returns: The recorded ``Capture`` values.
+  public func captures(deduplicate: Bool = true) -> [Capture] {
+    var captures = [Capture]()
+    withUnsafeMutablePointer(to: &captures) { captures in
+      xgrammar_matcher_captures(self.handle, deduplicate.intValue, captures) {
+        context, name, value, length in
+        context!.assumingMemoryBound(to: [Capture].self).pointee.append(
+          Capture(
+            name: String(cString: name!),
+            bytes: Array(UnsafeRawBufferPointer(start: value, count: length))
+          )
+        )
+      }
+    }
+    return captures
   }
 
   /// Returns the vocabulary acceptance mask for the current matcher state.
@@ -923,8 +981,6 @@ public struct XGRMatcher: ~Copyable, @unchecked Sendable {
   }
 
   /// Rewinds the matcher by the specified number of accepted tokens.
-  ///
-  /// Rollback is limited by ``init(compiledGrammar:overrideStopTokenIDs:terminateWithoutStopToken:maxRollbackTokens:)``.
   ///
   /// - Parameters:
   ///   - tokenCount: The number of most recently accepted tokens to remove.

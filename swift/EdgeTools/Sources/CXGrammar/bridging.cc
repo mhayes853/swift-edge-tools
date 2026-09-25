@@ -617,7 +617,7 @@ xgrammar_compiled_grammar_t xgrammar_compiler_compile_grammar(
     });
 }
 
-xgrammar_grammar_t xgrammar_compiled_grammar_grammar(xgrammar_compiled_grammar_t compiled_grammar) {
+xgrammar_grammar_t xgrammar_grammar_from_compiled(xgrammar_compiled_grammar_t compiled_grammar) {
     return invoke([&] {
         if (!compiled_grammar) {
             return fail<XGrammarGrammarHandle*>("Expected a compiled grammar.");
@@ -691,7 +691,8 @@ xgrammar_matcher_t xgrammar_matcher_init(
     const int32_t* override_stop_token_ids,
     size_t override_stop_token_id_count,
     int terminate_without_stop_token,
-    int32_t max_rollback_tokens
+    int32_t max_rollback_tokens,
+    float default_temperature
 ) {
     return invoke([&] {
         if (!compiled_grammar || (override_stop_token_id_count > 0 && !override_stop_token_ids)) {
@@ -701,9 +702,13 @@ xgrammar_matcher_t xgrammar_matcher_init(
         const auto stop_tokens = override_stop_token_id_count == 0
             ? std::optional<std::vector<int>>{}
             : std::optional<std::vector<int>>{std::vector<int>(override_stop_token_ids, override_stop_token_ids + override_stop_token_id_count)};
+        const auto temperature = default_temperature < 0
+            ? std::optional<float>{} : std::optional<float>{default_temperature};
         const auto bitmask_word_count = xgrammar::GetBitmaskSize(compiled.GetTokenizerInfo().GetVocabSize());
         return new XGrammarMatcherHandle{
-            xgrammar::GrammarMatcher(compiled, stop_tokens, terminate_without_stop_token != 0, max_rollback_tokens),
+            xgrammar::GrammarMatcher(
+                compiled, stop_tokens, terminate_without_stop_token != 0, max_rollback_tokens, temperature
+            ),
             compiled,
             bitmask_word_count
         };
@@ -761,6 +766,25 @@ void xgrammar_matcher_rollback(xgrammar_matcher_t matcher, int num_tokens) {
 
 void xgrammar_matcher_reset(xgrammar_matcher_t matcher) {
     if (matcher) static_cast<XGrammarMatcherHandle*>(matcher)->matcher.Reset();
+}
+
+float xgrammar_matcher_temperature(xgrammar_matcher_t matcher) {
+    return matcher
+        ? static_cast<XGrammarMatcherHandle*>(matcher)->matcher.GetTemperature().value_or(-1.0f)
+        : -1.0f;
+}
+
+void xgrammar_matcher_captures(
+    xgrammar_matcher_t matcher,
+    int deduplicate,
+    void* context,
+    void (*body)(void* context, const char* name, const char* value, size_t value_length)
+) {
+    if (!matcher || !body) return;
+    const auto captures = static_cast<XGrammarMatcherHandle*>(matcher)->matcher.GetCaptures(deduplicate != 0);
+    for (const auto& [name, value] : captures) {
+        body(context, name.c_str(), value.data(), value.size());
+    }
 }
 
 void xgrammar_matcher_destroy(xgrammar_matcher_t matcher) {

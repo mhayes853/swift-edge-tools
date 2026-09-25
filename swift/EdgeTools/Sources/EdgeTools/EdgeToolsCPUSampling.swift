@@ -73,7 +73,10 @@ public final class EdgeToolsCPUTokenHistory {
 // MARK: - EdgeToolsCPUFusedSampler
 
 public final class EdgeToolsCPUFusedSampler {
-  public let parameters: EdgeToolsFusedSamplingParameters
+  /// The parameters used for the next sample.
+  ///
+  /// The seed and repetition context size are only read when the sampler is created.
+  public var parameters: EdgeToolsFusedSamplingParameters
   public let history: EdgeToolsCPUTokenHistory
 
   private var rngState: UInt64

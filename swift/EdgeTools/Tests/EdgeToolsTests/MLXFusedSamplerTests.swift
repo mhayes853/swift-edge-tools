@@ -67,6 +67,10 @@
       Int(self.sampler.sample(logits: MLXArray(logits)[.newAxis, 0...]).item(Int32.self))
     }
 
+    func update(parameters: EdgeToolsFusedSamplingParameters) {
+      self.sampler.parameters = parameters
+    }
+
     func resetHistory() {
       self.sampler.history.reset()
     }

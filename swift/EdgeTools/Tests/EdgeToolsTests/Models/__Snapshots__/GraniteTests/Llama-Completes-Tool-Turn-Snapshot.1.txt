@@ -66,6 +66,6 @@
           ▿ EdgeToolsGenerationPart
             - text: "21"
           ▿ EdgeToolsGenerationPart
-            - text: "°C"
+            - text: " degrees"
           ▿ EdgeToolsGenerationPart
             - text: "."

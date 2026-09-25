@@ -1,12 +1,34 @@
 import EdgeToolsCore
 
+// MARK: - EdgeToolsGrammarGuidance
+
+/// How a grammar guides the decoding of the next token.
+public struct EdgeToolsGrammarGuidance: Hashable, Sendable {
+  /// The tokens the grammar accepts next, or `nil` when every token is accepted.
+  public var bitmask: GrammarBitmask?
+
+  /// The sampling parameters the grammar prefers for the next token.
+  ///
+  /// Engines apply these on top of their default sampling, and parameters requested for a
+  /// generation take precedence over them.
+  public var sampling: EdgeToolsFusedSamplingParameters
+
+  public init(
+    bitmask: GrammarBitmask? = nil,
+    sampling: EdgeToolsFusedSamplingParameters = EdgeToolsFusedSamplingParameters()
+  ) {
+    self.bitmask = bitmask
+    self.sampling = sampling
+  }
+}
+
 // MARK: - EdgeToolsGrammarMatcher
 
 public protocol EdgeToolsGrammarMatcher: ~Copyable {
   var isTerminated: Bool { get }
 
-  /// Returns the current vocabulary constraint, or `nil` when every token is accepted.
-  mutating func grammarBitmask() -> GrammarBitmask?
+  /// Returns how the grammar guides the next token.
+  mutating func nextTokenGuidance() -> EdgeToolsGrammarGuidance
 
   @discardableResult
   mutating func accept(tokenId: EdgeToolsToken.ID) -> Bool

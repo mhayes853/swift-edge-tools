@@ -87,6 +87,41 @@
     }
 
     @Test
+    func `Decodes With The Grammar Sampling Of Each Step`() async throws {
+      let tokenizer = try testTokenizer()
+      let eosTokenId = try requiredTestEOSToken(tokenizer: tokenizer)
+      let engine = try TestEngine(tokenizer: tokenizer)
+      let context = engine.context()
+      let grammar = try XGRGrammar.ebnf(
+        """
+        root ::= "a" value
+        value[temperature=0.25] ::= [0-9]
+        """
+      )
+      let task = try engine.generationTask(
+        prompt: TestPrompt(system: "", user: "Prompt"),
+        parameters: TestEngine.Parameters(
+          tokenIds: encodedGrammarText("a1", tokenizer: tokenizer) + [eosTokenId],
+          constraint: .grammar(grammar)
+        ),
+        context: context,
+        continuation: .discarding
+      )
+
+      _ = try await task.value
+      let state = try await context.takeState()
+
+      expectNoDifference(
+        state.grammarSamplings,
+        [
+          EdgeToolsFusedSamplingParameters(),
+          EdgeToolsFusedSamplingParameters(temperature: 0.25),
+          EdgeToolsFusedSamplingParameters()
+        ]
+      )
+    }
+
+    @Test
     func `Runs Different Contexts Concurrently`() async throws {
       let tokenizer = try testTokenizer()
       let eosTokenId = try requiredTestEOSToken(tokenizer: tokenizer)
@@ -170,6 +205,7 @@
 
   private struct TestGenerationState: Sendable {
     var index = 0
+    var grammarSamplings = [EdgeToolsFusedSamplingParameters]()
   }
 
   private final class TestContext: EdgeToolsEngineContext {
@@ -328,9 +364,9 @@
                   state: &state
                 )
               },
-              decode: { bitmask, state in
+              decode: { guidance, state in
                 try await self.decode(
-                  bitmask: bitmask,
+                  guidance: guidance,
                   parameters: parameters,
                   state: &state
                 )
@@ -362,10 +398,11 @@
     }
 
     func decode(
-      bitmask: GrammarBitmask?,
+      guidance: EdgeToolsGrammarGuidance,
       parameters: Parameters,
       state: inout TestGenerationState
     ) async throws -> EdgeToolsToken.ID {
+      state.grammarSamplings.append(guidance.sampling)
       let tokenId = parameters.tokenIds[state.index]
       state.index += 1
       return tokenId

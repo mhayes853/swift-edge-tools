@@ -1,16 +1,56 @@
-diff --git a/cpp/lark_converter.cc b/cpp/lark_converter.cc
-index 706393d..b86cdc2 100644
---- a/cpp/lark_converter.cc
-+++ b/cpp/lark_converter.cc
-@@ -9,6 +9,7 @@
+diff --git i/cpp/grammar_parser.cc w/cpp/grammar_parser.cc
+index 1d00ec4..b848290 100644
+--- i/cpp/grammar_parser.cc
++++ w/cpp/grammar_parser.cc
+@@ -8,8 +8,10 @@
+ #include <picojson.h>
+ 
+ #include <algorithm>
++#include <cerrno>
+ #include <cmath>
+ #include <cstdint>
++#include <cstdlib>
+ #include <cstring>
+ #include <limits>
+ #include <string>
+@@ -252,13 +254,13 @@ EBNFLexer::Token EBNFLexer::Impl::ParseIdentifierOrBooleanToken() {
+       if (text.empty()) {
+         return false;
+       }
+-      try {
+-        *value = std::stod(text);
+-      } catch (const std::out_of_range&) {
+-        *value = std::numeric_limits<double>::infinity();
+-      } catch (const std::exception&) {
++      char* parsed_end = nullptr;
++      errno = 0;
++      const double parsed = std::strtod(text.c_str(), &parsed_end);
++      if (parsed_end == text.c_str()) {
+         return false;
+       }
++      *value = errno == ERANGE ? std::numeric_limits<double>::infinity() : parsed;
+       return true;
+     };
+     // Parse a comma-separated attribute list. Each attribute may appear at most once.
+diff --git i/cpp/lark_converter.cc w/cpp/lark_converter.cc
+index e4408d4..67b7c65 100644
+--- i/cpp/lark_converter.cc
++++ w/cpp/lark_converter.cc
+@@ -9,7 +9,10 @@
  #include <xgrammar/exception.h>
  
  #include <algorithm>
 +#include <charconv>
  #include <cctype>
++#include <cerrno>
++#include <cstdlib>
+ #include <cmath>
  #include <cstdint>
  #include <limits>
-@@ -37,3 +37,6 @@ struct Location {
+@@ -39,7 +42,10 @@ struct Location {
+   int column = 1;
+ };
+ 
 -[[noreturn]] void RaiseLarkError(
 +#if !defined(__wasi__)
 +[[noreturn]]
@@ -18,7 +58,8 @@ index 706393d..b86cdc2 100644
 +void RaiseLarkError(
      const std::string& source, const Location& location, const std::string& message
  ) {
-@@ -59,7 +62,19 @@ struct Location {
+   size_t line_start = 0;
+@@ -63,7 +69,19 @@ struct Location {
    if (!line_text.empty()) {
      os << "\n" << line_text << "\n" << std::string(std::max(0, location.column - 1), ' ') << "^";
    }
@@ -38,7 +79,59 @@ index 706393d..b86cdc2 100644
  }
  
  enum class TokenType {
-@@ -786,16 +799,17 @@ class LarkParser {
+@@ -364,6 +382,7 @@ class LarkLexer {
+       Advance();
+     }
+     RaiseLarkError(source_, location, "unterminated string literal");
++    return {};
+   }
+ 
+   Token LexRegex() {
+@@ -395,6 +414,7 @@ class LarkLexer {
+       Advance();
+     }
+     RaiseLarkError(source_, location, "unterminated regular expression");
++    return {};
+   }
+ 
+   Token LexSpecialToken() {
+@@ -680,6 +700,7 @@ class LarkParser {
+         "expected string literal, regular expression, or uppercase terminal name after " +
+             attribute_name + "="
+     );
++    return {};
+   }
+ 
+   void ParseImport(Document* document) {
+@@ -858,21 +879,16 @@ class LarkParser {
+               source_, key.location, "temperature attribute is specified more than once"
+           );
+         }
+-        try {
+-          size_t parsed_length = 0;
+-          float temperature = std::stof(value.text, &parsed_length);
+-          if (parsed_length != value.text.size() || !std::isfinite(temperature) ||
+-              temperature < 0) {
+-            RaiseLarkError(
+-                source_, value.location, "temperature must be a finite non-negative number"
+-            );
+-          }
+-          definition->temperature = temperature;
+-        } catch (const std::exception&) {
++        char* parsed_end = nullptr;
++        errno = 0;
++        float temperature = std::strtof(value.text.c_str(), &parsed_end);
++        if (errno == ERANGE || parsed_end != value.text.c_str() + value.text.size() ||
++            !std::isfinite(temperature) || temperature < 0) {
+           RaiseLarkError(
+               source_, value.location, "temperature must be a finite non-negative number"
+           );
+         }
++        definition->temperature = temperature;
+       } else {
+         RaiseLarkError(
+             source_,
+@@ -957,16 +973,17 @@ class LarkParser {
  
    int32_t ParseInteger() {
      Token token = Consume(TokenType::kNumber, "expected integer");
@@ -64,7 +157,41 @@ index 706393d..b86cdc2 100644
    }
  
    Node ParseExpr() {
-@@ -1458,6 +1472,17 @@ class LarkCompiler {
+@@ -1141,6 +1158,7 @@ class LarkParser {
+       RaiseLarkError(source_, token.location, "directive " + token.text + " is not supported");
+     }
+     RaiseLarkError(source_, token.location, "expected grammar expression");
++    return {};
+   }
+ 
+   Node ParseStringNode(const Token& token) {
+@@ -1471,6 +1489,9 @@ class LarkCompiler {
+         body->kind == Node::Kind::kGrammarRef) {
+       return CompileNode(*body, definition.name, false, false);
+     }
++#if defined(__wasi__)
++    return CompileNode(definition.body, definition.name, true, false);
++#else
+     try {
+       return CompileNode(definition.body, definition.name, true, false);
+     } catch (const std::exception& error) {
+@@ -1480,6 +1501,7 @@ class LarkCompiler {
+           std::string(error.what()) + "; temperature is only supported on terminals and subgrammars"
+       );
+     }
++#endif
+   }
+ 
+   void ExpandImports() {
+@@ -1862,6 +1884,7 @@ class LarkCompiler {
+         );
+     }
+     RaiseLarkError(source_, node.location, "unsupported terminal node");
++    return {};
+   }
+ 
+   std::vector<std::string> ParseStructuredRegexChunks(const Node& node) const {
+@@ -1971,6 +1994,16 @@ class LarkCompiler {
      }
  
      named_grammars_.active.push_back(name);
@@ -73,8 +200,7 @@ index 706393d..b86cdc2 100644
 +    auto tokens = LarkLexer(named_source).Tokenize();
 +    auto document = LarkParser(named_source, std::move(tokens)).Parse();
 +    Grammar compiled =
-+        LarkCompiler(named_source, std::move(document), tokenizer_info_, named_grammars_)
-+            .Compile();
++        LarkCompiler(named_source, std::move(document), tokenizer_info_, named_grammars_).Compile();
 +    auto inserted_it = named_grammars_.compiled.emplace(name, std::move(compiled)).first;
 +    named_grammars_.active.pop_back();
 +    return inserted_it->second;
@@ -82,27 +208,27 @@ index 706393d..b86cdc2 100644
      try {
        const std::string& named_source = std::get<std::string>(input_it->second);
        auto tokens = LarkLexer(named_source).Tokenize();
-@@ -1476,6 +1501,7 @@ class LarkCompiler {
+@@ -1989,6 +2022,7 @@ class LarkCompiler {
            "failed to compile named grammar '@" + name + "': " + std::string(error.what())
        );
      }
 +#endif
    }
  
-   int32_t CompileNode(const Node& node, const std::string& rule_hint, bool terminal_mode) {
-@@ -1537,6 +1563,11 @@ class LarkCompiler {
-       }
-       case Node::Kind::kRegex: {
-         std::string pattern = PrepareRegexPattern(node);
+   int32_t CompileNode(
+@@ -2077,6 +2111,11 @@ class LarkCompiler {
+           int32_t result = builder_.AddRuleRef(regex_rule_id);
+           return terminal_mode || !append_skip ? result : AppendSkip(result);
+         }
 +#if defined(__wasi__)
 +        int32_t root = SubGrammarAdder::Apply(&builder_, Grammar::FromRegex(pattern));
 +        int32_t result = builder_.AddRuleRef(root);
-+        return terminal_mode ? result : AppendSkip(result);
++        return terminal_mode || !append_skip ? result : AppendSkip(result);
 +#else
          try {
            int32_t root = SubGrammarAdder::Apply(&builder_, Grammar::FromRegex(pattern));
            int32_t result = builder_.AddRuleRef(root);
-@@ -1548,11 +1579,17 @@ class LarkCompiler {
+@@ -2088,11 +2127,17 @@ class LarkCompiler {
                "failed to compile regular expression: " + std::string(error.what())
            );
          }
@@ -115,12 +241,12 @@ index 706393d..b86cdc2 100644
 +#if defined(__wasi__)
 +        int32_t root = SubGrammarAdder::Apply(&builder_, Grammar::FromJSONSchema(node.text));
 +        int32_t result = builder_.AddRuleRef(root);
-+        return terminal_mode ? result : AppendSkip(result);
++        return terminal_mode || !append_skip ? result : AppendSkip(result);
 +#else
          try {
            int32_t root = SubGrammarAdder::Apply(&builder_, Grammar::FromJSONSchema(node.text));
            int32_t result = builder_.AddRuleRef(root);
-@@ -1564,11 +1601,18 @@ class LarkCompiler {
+@@ -2104,11 +2149,18 @@ class LarkCompiler {
                "failed to compile inline JSON schema: " + std::string(error.what())
            );
          }
@@ -134,12 +260,12 @@ index 706393d..b86cdc2 100644
 +        LarkCompiler compiler(source_, *node.nested, tokenizer_info_, named_grammars_);
 +        int32_t root = SubGrammarAdder::Apply(&builder_, compiler.Compile());
 +        int32_t result = builder_.AddRuleRef(root);
-+        return terminal_mode ? result : AppendSkip(result);
++        return terminal_mode || !append_skip ? result : AppendSkip(result);
 +#else
          try {
            LarkCompiler compiler(source_, *node.nested, tokenizer_info_, named_grammars_);
            int32_t root = SubGrammarAdder::Apply(&builder_, compiler.Compile());
-@@ -1581,6 +1625,7 @@ class LarkCompiler {
+@@ -2121,6 +2173,7 @@ class LarkCompiler {
                "failed to compile nested Lark grammar: " + std::string(error.what())
            );
          }
@@ -147,7 +273,15 @@ index 706393d..b86cdc2 100644
        }
        case Node::Kind::kSpecialToken: {
          if (terminal_mode) {
-@@ -1656,25 +1701,29 @@ class LarkCompiler {
+@@ -2155,6 +2208,7 @@ class LarkCompiler {
+         );
+     }
+     RaiseLarkError(source_, node.location, "unsupported grammar node");
++    return {};
+   }
+ 
+   int32_t AppendSkip(int32_t expression) {
+@@ -2214,25 +2268,29 @@ class LarkCompiler {
                  source_, location, "invalid numeric special-token range '" + range + "'"
              );
            }
@@ -192,7 +326,7 @@ index 706393d..b86cdc2 100644
            if (first < 0 || last < first || last > std::numeric_limits<int32_t>::max()) {
              RaiseLarkError(
                  source_, location, "invalid numeric special-token range '" + range + "'"
-@@ -2056,18 +2105,18 @@ Grammar LarkToGrammar(
+@@ -2691,18 +2749,18 @@ Grammar LarkToGrammar(
    NamedGrammarRegistry named_grammar_registry;
    for (const auto& [name, grammar_or_source] : named_grammars) {
      if (name.empty()) {
@@ -214,37 +348,32 @@ index 706393d..b86cdc2 100644
      }
    }
    auto tokens = LarkLexer(lark_string).Tokenize();
-@@ -378,3 +378,4 @@ class LarkLexer {
-     }
-     RaiseLarkError(source_, location, "unterminated string literal");
-+    return {};
+diff --git i/cpp/support/json_parse.h w/cpp/support/json_parse.h
+index 3deba69..f9b78fb 100644
+--- i/cpp/support/json_parse.h
++++ w/cpp/support/json_parse.h
+@@ -94,12 +94,16 @@ template <typename Iter>
+ inline Iter ParseJSON(picojson::value& out, Iter begin, Iter end, std::string* err) {
+   int depth = 0;
+   detail::DepthGuardedParseContext ctx(&out, &depth);
++#if defined(__wasi__)
++  return picojson::_parse(ctx, begin, end, err);
++#else
+   try {
+     return picojson::_parse(ctx, begin, end, err);
+   } catch (const LogFatalError& error) {
+     *err = error.what();
+     return begin;
    }
-@@ -409,3 +410,4 @@ class LarkLexer {
-     }
-     RaiseLarkError(source_, location, "unterminated regular expression");
-+    return {};
-   }
-@@ -972,3 +974,4 @@ class LarkParser {
-     }
-     RaiseLarkError(source_, token.location, "expected grammar expression");
-+    return {};
-   }
-@@ -1448,4 +1451,5 @@ class LarkCompiler {
-     RaiseLarkError(
-         source_, node.location, "only the regular-expression flag 's' is currently supported"
-     );
-+    return {};
-   }
-@@ -1661,3 +1665,4 @@ class LarkCompiler {
-     }
-     RaiseLarkError(source_, node.location, "unsupported grammar node");
-+    return {};
-   }
-diff --git a/cpp/support/no_exceptions.h b/cpp/support/no_exceptions.h
++#endif
+ }
+ 
+ /*!
+diff --git i/cpp/support/no_exceptions.h w/cpp/support/no_exceptions.h
 new file mode 100644
-index 0000000..f234813
+index 0000000..1879b82
 --- /dev/null
-+++ b/cpp/support/no_exceptions.h
++++ w/cpp/support/no_exceptions.h
 @@ -0,0 +1,37 @@
 +/*!
 + * Copyright (c) 2026 by Contributors
@@ -283,3 +412,52 @@ index 0000000..f234813
 +}  // namespace xgrammar
 +
 +#endif  // XGRAMMAR_SUPPORT_NO_EXCEPTIONS_H_
+diff --git i/cpp/support/thread_pool.h w/cpp/support/thread_pool.h
+index fcca4b9..cea12fc 100644
+--- i/cpp/support/thread_pool.h
++++ w/cpp/support/thread_pool.h
+@@ -60,6 +60,9 @@ class ThreadPool {
+             task = std::move(task_queue_.front());
+             task_queue_.pop();
+           }
++#if defined(__wasi__)
++          task();
++#else
+           try {
+             task();
+           } catch (...) {
+@@ -68,6 +71,7 @@ class ThreadPool {
+               first_exception_ = std::current_exception();
+             }
+           }
++#endif
+           TaskComplete();
+         }
+       });
+@@ -180,6 +184,7 @@ class ThreadPool {
+   }
+ 
+   void RethrowTaskException() {
++#if !defined(__wasi__)
+     std::exception_ptr exception;
+     {
+       std::unique_lock<std::mutex> lock(queue_mutex_);
+@@ -188,6 +193,7 @@ class ThreadPool {
+     if (exception) {
+       std::rethrow_exception(exception);
+     }
++#endif
+   }
+ 
+   void TaskComplete() {
+@@ -212,8 +218,10 @@ class ThreadPool {
+   bool shutdown_ = false;
+   /*! \brief Number of unfinished tasks */
+   int unfinished_task_count_ = 0;
++#if !defined(__wasi__)
+   /*! \brief The first exception thrown by a task, rethrown by Wait() or Join() */
+   std::exception_ptr first_exception_ = nullptr;
++#endif
+ };
+ 
+ inline void ParallelFor(int low, int high, int num_threads, std::function<void(int)> f) {

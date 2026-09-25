@@ -1,8 +1,8 @@
-diff --git a/cpp/grammar_compiler.cc b/cpp/grammar_compiler.cc
-index 5cf140d..e3b23a7 100644
---- a/cpp/grammar_compiler.cc
-+++ b/cpp/grammar_compiler.cc
-@@ -1001,7 +1001,11 @@ class GrammarCompilerSub {
+diff --git c/cpp/grammar_compiler.cc i/cpp/grammar_compiler.cc
+index dcd6264..a8ae0a6 100644
+--- c/cpp/grammar_compiler.cc
++++ i/cpp/grammar_compiler.cc
+@@ -1019,7 +1019,11 @@ class GrammarCompilerSub {
        std::optional<RuleLevelCache> rule_level_cache
    )
        : tokenizer_info_(tokenizer_info),
@@ -14,7 +14,7 @@ index 5cf140d..e3b23a7 100644
          rule_level_cache_(rule_level_cache) {}
  
    CompiledGrammar CompileBuiltinJSONGrammar();
-@@ -1066,15 +1070,14 @@ CompiledGrammar GrammarCompilerSub::MultiThreadCompileGrammar(Grammar grammar_un
+@@ -1112,15 +1116,14 @@ CompiledGrammar GrammarCompilerSub::MultiThreadCompileGrammar(Grammar grammar_un
    // 2. All byte strings (with element_in_string=0, 1, 2, ...)
    // since other positions will be expanded to the above positions
  
@@ -32,8 +32,8 @@ index 5cf140d..e3b23a7 100644
  
    auto add_adaptive_token_mask = [&](const ParserState& state, bool is_root_rule) {
      auto grammar_matcher = GrammarMatcherForTokenMaskCache(
-@@ -1086,16 +1089,20 @@ CompiledGrammar GrammarCompilerSub::MultiThreadCompileGrammar(Grammar grammar_un
-         false
+@@ -1131,16 +1134,20 @@ CompiledGrammar GrammarCompilerSub::MultiThreadCompileGrammar(Grammar grammar_un
+         rule_level_cache_
      );
      auto cur_adaptive_token_mask_cache = grammar_matcher.GetAdaptiveTokenMask(is_root_rule);
 +#if XGRAMMAR_ENABLE_THREADING
@@ -54,7 +54,7 @@ index 5cf140d..e3b23a7 100644
      if (max_threads_ > 1) {
        thread_pool->Execute([add_adaptive_token_mask, state, is_root_rule]() {
          add_adaptive_token_mask(state, is_root_rule);
-@@ -1103,6 +1110,9 @@ CompiledGrammar GrammarCompilerSub::MultiThreadCompileGrammar(Grammar grammar_un
+@@ -1148,6 +1155,9 @@ CompiledGrammar GrammarCompilerSub::MultiThreadCompileGrammar(Grammar grammar_un
      } else {
        add_adaptive_token_mask(state, is_root_rule);
      }
@@ -64,7 +64,7 @@ index 5cf140d..e3b23a7 100644
    };
  
    auto root_rule_id = compiled_grammar_impl->grammar->GetRootRuleId();
-@@ -1125,9 +1135,11 @@ CompiledGrammar GrammarCompilerSub::MultiThreadCompileGrammar(Grammar grammar_un
+@@ -1170,9 +1180,11 @@ CompiledGrammar GrammarCompilerSub::MultiThreadCompileGrammar(Grammar grammar_un
      }
    }
  
@@ -76,10 +76,10 @@ index 5cf140d..e3b23a7 100644
  
    return CompiledGrammar(compiled_grammar_impl);
  }
-diff --git a/cpp/grammar_functor.cc b/cpp/grammar_functor.cc
-index 49911d8..41c4135 100644
---- a/cpp/grammar_functor.cc
-+++ b/cpp/grammar_functor.cc
+diff --git c/cpp/grammar_functor.cc i/cpp/grammar_functor.cc
+index d014bdc..80ab4cf 100644
+--- c/cpp/grammar_functor.cc
++++ i/cpp/grammar_functor.cc
 @@ -12,7 +12,6 @@
  #include <cstdint>
  #include <map>
@@ -88,7 +88,7 @@ index 49911d8..41c4135 100644
  #include <queue>
  #include <set>
  #include <stack>
-@@ -28,8 +27,13 @@
+@@ -29,8 +28,13 @@
  #include "support/container.h"
  #include "support/encoding.h"
  #include "support/logging.h"
@@ -102,7 +102,7 @@ index 49911d8..41c4135 100644
  namespace xgrammar {
  
  using GrammarExpr = Grammar::Impl::GrammarExpr;
-@@ -2609,7 +2613,9 @@ class RuleLevelCache::Impl {
+@@ -3737,7 +3741,9 @@ class RuleLevelCache::Impl {
    static constexpr size_t kNumShards = 16;
  
    struct Shard {
@@ -112,7 +112,7 @@ index 49911d8..41c4135 100644
      int64_t current_cache_memory_size = 0;
      // The cache map: (fsm_hash, node_id, ...) -> index in cache_list
      List<NodeType> cache_list;
-@@ -2672,7 +2678,9 @@ std::optional<AdaptiveTokenMask> RuleLevelCache::Impl::GetCache(
+@@ -3800,7 +3806,9 @@ std::optional<AdaptiveTokenMask> RuleLevelCache::Impl::GetCache(
    // Find in the cache.
    NodeKey key = std::make_tuple(fsm_hash, fsm_new_node_id, state_cnt, edge_cnt);
    Shard& shard = GetShard(key);
@@ -122,7 +122,7 @@ index 49911d8..41c4135 100644
    auto it = shard.cache.find(key);
    if (it == shard.cache.end()) {
      return std::nullopt;
-@@ -2704,7 +2712,9 @@ bool RuleLevelCache::Impl::AddCache(
+@@ -3832,7 +3840,9 @@ bool RuleLevelCache::Impl::AddCache(
    NodeKey key = std::make_tuple(fsm_hash, fsm_new_node_id, state_cnt, edge_cnt);
    Shard& shard = GetShard(key);
    const size_t shard_max_size = ShardMaxSize();
@@ -132,7 +132,7 @@ index 49911d8..41c4135 100644
    if (shard_max_size != kUnlimitedSize && MemorySize(token_mask) > shard_max_size) {
      // The token mask is too large to be cached.
      return false;
-@@ -2743,7 +2753,9 @@ RuleLevelCache::RuleLevelCache(size_t max_cache_memory_size)
+@@ -3871,7 +3881,9 @@ RuleLevelCache::RuleLevelCache(size_t max_cache_memory_size)
  
  void RuleLevelCache::Impl::ClearCache() {
    for (auto& shard : shards_) {
@@ -142,27 +142,27 @@ index 49911d8..41c4135 100644
      shard.cache_list.Clear();
      shard.cache.clear();
      shard.current_cache_memory_size = 0;
-diff --git a/cpp/grammar_matcher.cc b/cpp/grammar_matcher.cc
-index d68479f..973b784 100644
---- a/cpp/grammar_matcher.cc
-+++ b/cpp/grammar_matcher.cc
-@@ -13,7 +13,6 @@
- #include <chrono>
- #include <cstdint>
+diff --git c/cpp/grammar_matcher.cc i/cpp/grammar_matcher.cc
+index b31ec0c..7574b95 100644
+--- c/cpp/grammar_matcher.cc
++++ i/cpp/grammar_matcher.cc
+@@ -16,7 +16,6 @@
+ #include <limits>
  #include <optional>
+ #include <string>
 -#include <thread>
+ #include <unordered_map>
+ #include <unordered_set>
  #include <utility>
- #include <variant>
- #include <vector>
-@@ -26,6 +25,7 @@
+@@ -31,6 +30,7 @@
  #include "support/int_set.h"
  #include "support/logging.h"
  #include "support/thread_pool.h"
 +#include "support/threading.h"
  #include "testing.h"
+ #include "tokenizer_info_impl.h"
  
- namespace xgrammar {
-@@ -537,6 +537,7 @@ class GrammarMatcher::Impl : public EarleyParser {
+@@ -777,6 +777,7 @@ class GrammarMatcher::Impl : public EarleyParser {
  class BatchGrammarMatcher::Impl {
   public:
    Impl(std::variant<std::string, int32_t> max_threads) {
@@ -170,7 +170,7 @@ index d68479f..973b784 100644
      if (std::holds_alternative<int32_t>(max_threads)) {
        int32_t num_threads = std::get<int32_t>(max_threads);
        XGRAMMAR_CHECK(num_threads >= 1)
-@@ -556,6 +557,15 @@ class BatchGrammarMatcher::Impl {
+@@ -796,6 +797,15 @@ class BatchGrammarMatcher::Impl {
        XGRAMMAR_CHECK(str == "auto");
        max_threads_ = std::thread::hardware_concurrency() / 2;
      }
@@ -186,23 +186,24 @@ index d68479f..973b784 100644
    }
  
    void BatchFillNextTokenBitmask(
-diff --git a/cpp/support/thread_pool.h b/cpp/support/thread_pool.h
-index 0e7064b..3400205 100644
---- a/cpp/support/thread_pool.h
-+++ b/cpp/support/thread_pool.h
-@@ -6,19 +6,27 @@
+diff --git c/cpp/support/thread_pool.h i/cpp/support/thread_pool.h
+index 6bbec3c..fcca4b9 100644
+--- c/cpp/support/thread_pool.h
++++ i/cpp/support/thread_pool.h
+@@ -6,20 +6,28 @@
  #ifndef XGRAMMAR_SUPPORT_THREAD_POOL_H_
  #define XGRAMMAR_SUPPORT_THREAD_POOL_H_
  
--#include <condition_variable>
- #include <functional>
++#include <functional>
 +#include <type_traits>
 +#include <utility>
 +
 +#include "threading.h"
 +
 +#if XGRAMMAR_ENABLE_THREADING
-+#include <condition_variable>
+ #include <condition_variable>
+ #include <exception>
+-#include <functional>
  #include <future>
  #include <mutex>
  #include <queue>
@@ -220,7 +221,7 @@ index 0e7064b..3400205 100644
  /*!
   * \brief A thread pool implementation for parallel task execution.
   *
-@@ -68,8 +76,8 @@ class ThreadPool {
+@@ -76,8 +84,8 @@ class ThreadPool {
     * \note Tasks are executed in FIFO order but may complete in any order.
     */
    template <class F, class... Args>
@@ -231,7 +232,7 @@ index 0e7064b..3400205 100644
  
      // Package the task with its arguments into a shared pointer
      auto task = std::make_shared<std::packaged_task<return_type()>>(
-@@ -198,6 +206,23 @@ inline void ParallelFor(int low, int high, int num_threads, std::function<void(i
+@@ -234,6 +242,23 @@ inline void ParallelFor(int low, int high, int num_threads, std::function<void(i
    pool.Join();
  }
  
@@ -255,10 +256,10 @@ index 0e7064b..3400205 100644
  }  // namespace xgrammar
  
  #endif  // XGRAMMAR_SUPPORT_THREAD_POOL_H_
-diff --git a/cpp/support/thread_safe_cache.h b/cpp/support/thread_safe_cache.h
+diff --git c/cpp/support/thread_safe_cache.h i/cpp/support/thread_safe_cache.h
 index 28859db..5f1b6aa 100644
---- a/cpp/support/thread_safe_cache.h
-+++ b/cpp/support/thread_safe_cache.h
+--- c/cpp/support/thread_safe_cache.h
++++ i/cpp/support/thread_safe_cache.h
 @@ -6,18 +6,22 @@
  #ifndef XGRAMMAR_SUPPORT_THREAD_SAFE_CACHE_H_
  #define XGRAMMAR_SUPPORT_THREAD_SAFE_CACHE_H_
@@ -502,11 +503,11 @@ index 28859db..5f1b6aa 100644
  };
  
  }  // namespace xgrammar
-diff --git a/cpp/support/threading.h b/cpp/support/threading.h
+diff --git c/cpp/support/threading.h i/cpp/support/threading.h
 new file mode 100644
 index 0000000..16dfe6d
 --- /dev/null
-+++ b/cpp/support/threading.h
++++ i/cpp/support/threading.h
 @@ -0,0 +1,17 @@
 +/*!
 + * Copyright (c) 2026 by Contributors

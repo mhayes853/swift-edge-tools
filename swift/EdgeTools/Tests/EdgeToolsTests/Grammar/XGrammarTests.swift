@@ -334,6 +334,78 @@
       }
 
       @Test
+      func `Matcher Temperature Follows Active Rule`() throws {
+        let tokenizerInfo = try XGRTokenizerInfo(
+          encodedVocabulary: ["a", "1", ""],
+          vocabularyType: .raw,
+          stopTokenIDs: [2]
+        )
+        let compiler = try XGRCompiler(tokenizerInfo: tokenizerInfo)
+        let grammar = try XGRGrammar.ebnf(
+          """
+          root ::= "a" value
+          value[temperature=0.25] ::= [0-9]+
+          """
+        )
+        let matcher = try XGRMatcher(
+          compiledGrammar: try compiler.compile(grammar),
+          defaultTemperature: 0.75
+        )
+
+        expectNoDifference(matcher.temperature, 0.75)
+        expectNoDifference(matcher.accept(string: "a"), true)
+        expectNoDifference(matcher.temperature, 0.25)
+
+        let defaultlessMatcher = try XGRMatcher(compiledGrammar: try compiler.compile(grammar))
+        expectNoDifference(defaultlessMatcher.temperature, nil)
+      }
+
+      @Test(arguments: [-1, Float.infinity, Float.nan])
+      func `Matcher Rejects Invalid Default Temperature`(temperature: Float) throws {
+        let tokenizerInfo = try XGRTokenizerInfo(encodedVocabulary: ["a", ""], vocabularyType: .raw)
+        let compiler = try XGRCompiler(tokenizerInfo: tokenizerInfo)
+        let compiledGrammar = try compiler.compile(try XGRGrammar.literal("a"))
+        #expect(throws: XGRError.self) {
+          try XGRMatcher(compiledGrammar: compiledGrammar, defaultTemperature: temperature)
+        }
+      }
+
+      @Test
+      func `Matcher Records Captures And Rolls Them Back`() throws {
+        let tokenizerInfo = try XGRTokenizerInfo(
+          encodedVocabulary: ["1", "22", ",", ""],
+          vocabularyType: .raw,
+          stopTokenIDs: [3]
+        )
+        let compiler = try XGRCompiler(tokenizerInfo: tokenizerInfo)
+        let grammar = try XGRGrammar.lark(
+          """
+          start: item ("," item)*
+          item[capture="number"]: /[0-9]+/
+          """
+        )
+        let matcher = try XGRMatcher(compiledGrammar: try compiler.compile(grammar))
+
+        expectNoDifference(matcher.accept(tokenId: 0), true)
+        expectNoDifference(matcher.accept(tokenId: 2), true)
+        expectNoDifference(matcher.accept(tokenId: 1), true)
+        expectNoDifference(matcher.accept(tokenId: 2), true)
+        expectNoDifference(
+          matcher.captures(),
+          [
+            XGRMatcher.Capture(name: "number", bytes: Array("1".utf8)),
+            XGRMatcher.Capture(name: "number", bytes: Array("22".utf8))
+          ]
+        )
+
+        matcher.rollback(2)
+        expectNoDifference(
+          matcher.captures(),
+          [XGRMatcher.Capture(name: "number", bytes: Array("1".utf8))]
+        )
+      }
+
+      @Test
       func `Structural Tag Resolves Token References`() throws {
         let tokenizerInfo = try XGRTokenizerInfo(
           encodedVocabulary: ["<tool>", "hello", "<end>", ""],
