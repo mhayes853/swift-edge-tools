@@ -322,6 +322,30 @@
       }
     }
 
+    mutating func mergeAdjacentLiterals(
+      where shouldMerge: (_ lhs: String, _ rhs: String) -> Bool
+    ) {
+      for index in self.rules.indices {
+        let body = self.rules[index].body
+        let literals = body.ebnfTokens.filter { $0.kind == .literal }
+        var output = ""
+        var outputStart = body.startIndex
+        for (lhs, rhs) in zip(literals, literals.dropFirst()) {
+          let lhsValue = Self.decodeLiteral(body[lhs.range].dropFirst().dropLast())
+          let rhsValue = Self.decodeLiteral(body[rhs.range].dropFirst().dropLast())
+          guard lhs.range.lowerBound >= outputStart,
+            body[lhs.range.upperBound..<rhs.range.lowerBound].allSatisfy(\.isWhitespace),
+            shouldMerge(lhsValue, rhsValue)
+          else { continue }
+          output.append(contentsOf: body[outputStart..<lhs.range.lowerBound])
+          output.append("\"\(Self.escapeLiteral(lhsValue + rhsValue))\"")
+          outputStart = rhs.range.upperBound
+        }
+        output.append(contentsOf: body[outputStart...])
+        self.rules[index].body = output
+      }
+    }
+
     mutating func mapRuleReferences(
       _ transform: (_ ruleName: String, _ reference: String) -> String
     ) {

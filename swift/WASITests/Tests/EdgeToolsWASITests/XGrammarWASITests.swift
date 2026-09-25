@@ -73,6 +73,44 @@ struct `XGrammarWASI tests` {
   }
 
   @Test
+  func `Compiles Lark Grammar With Rule Temperature And Captures`() throws {
+    let compiler = try self.testCompiler()
+    let compiledGrammar = try compiler.compileLark(
+      """
+      start: "n=" number
+      number[capture, temperature=0.5]: /[0-9]{1,2}/
+      """
+    )
+    let matcher = try XGRMatcher(
+      compiledGrammar: compiledGrammar,
+      terminateWithoutStopToken: true
+    )
+
+    let acceptedPrefix = matcher.accept(string: "n=")
+    let temperature = matcher.temperature
+    let acceptedNumber = matcher.accept(string: "42")
+    let captures = try matcher.captures()
+
+    #expect(acceptedPrefix)
+    #expect(temperature == 0.5)
+    #expect(acceptedNumber)
+    #expect(captures == [XGRMatcher.Capture(name: "number", bytes: Array("42".utf8))])
+  }
+
+  @Test
+  func `Invalid Lark Rule Temperature Throws`() throws {
+    let compiler = try self.testCompiler()
+    #expect(throws: XGRError.self) {
+      _ = try compiler.compileLark(
+        """
+        start: number
+        number[temperature=1e999]: /[0-9]+/
+        """
+      )
+    }
+  }
+
+  @Test
   func `Compiles Query Grammar With Logical And Comparison Operators`() throws {
     let grammar = try XGRGrammar.ebnf(
       #"""

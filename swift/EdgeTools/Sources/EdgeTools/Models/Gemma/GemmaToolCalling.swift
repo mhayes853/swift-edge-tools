@@ -194,6 +194,7 @@ private struct GemmaCallReader: ToolCallValueReader {
     ) throws -> XGRGrammar {
       let xmlArguments = Self.xmlToolArguments(for: tool)
       var document = try XGREBNFDocument(xmlArguments.ebnf)
+      document.mergeAdjacentLiterals { lhs, rhs in lhs.hasPrefix("<parameter=") && rhs == ">" }
       try document.mapLiterals { ruleName, value, suffix in
         if value == "</parameter>" {
           if ruleName.hasPrefix("xml_string") {

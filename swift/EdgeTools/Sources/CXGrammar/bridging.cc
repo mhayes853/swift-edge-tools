@@ -133,6 +133,10 @@ struct XGrammarGrammarHandle {
     xgrammar::Grammar grammar;
 };
 
+struct XGrammarCapturesHandle {
+    std::vector<std::pair<std::string, std::string>> captures;
+};
+
 template <typename Value, typename Error>
 std::optional<Value> value_or_error(std::variant<Value, Error> result) {
     if (auto* value = std::get_if<Value>(&result)) {
@@ -224,6 +228,47 @@ std::optional<std::vector<xgrammar::Grammar>> grammar_vector(
         result.push_back(handle->grammar);
     }
     return result;
+}
+
+std::optional<std::vector<xgrammar::NamedGrammar>> named_grammar_vector(
+    const xgrammar_named_grammar_t* descriptors,
+    size_t descriptor_count
+) {
+    if (descriptor_count > 0 && !descriptors) {
+        set_error_message("Expected named grammar data.");
+        return std::nullopt;
+    }
+    std::vector<xgrammar::NamedGrammar> named_grammars;
+    named_grammars.reserve(descriptor_count);
+    for (size_t index = 0; index < descriptor_count; ++index) {
+        const auto& descriptor = descriptors[index];
+        if (!descriptor.name) {
+            set_error_message("Expected a named grammar name.");
+            return std::nullopt;
+        }
+        xgrammar::NamedGrammar named_grammar{descriptor.name, std::string()};
+        switch (descriptor.kind) {
+        case xgrammar_named_grammar_handle:
+            if (!descriptor.grammar) {
+                set_error_message("Expected a named grammar handle.");
+                return std::nullopt;
+            }
+            named_grammar.grammar = static_cast<XGrammarGrammarHandle*>(descriptor.grammar)->grammar;
+            break;
+        case xgrammar_named_grammar_lark:
+            if (!descriptor.lark_source) {
+                set_error_message("Expected a named Lark grammar.");
+                return std::nullopt;
+            }
+            named_grammar.grammar = descriptor.lark_source;
+            break;
+        default:
+            set_error_message("Unknown named grammar kind.");
+            return std::nullopt;
+        }
+        named_grammars.push_back(std::move(named_grammar));
+    }
+    return named_grammars;
 }
 
 }  // namespace
@@ -452,45 +497,15 @@ xgrammar_grammar_t xgrammar_grammar_init_lark(
 ) {
     return invoke([&] {
         if (!lark) return fail<XGrammarGrammarHandle*>("Expected a Lark grammar.");
-        if (named_grammar_count > 0 && !named_grammar_descriptors) {
-            return fail<XGrammarGrammarHandle*>("Expected named grammar data.");
-        }
-
-        std::vector<xgrammar::NamedGrammar> named_grammars;
-        named_grammars.reserve(named_grammar_count);
-        for (size_t index = 0; index < named_grammar_count; ++index) {
-            const auto& descriptor = named_grammar_descriptors[index];
-            if (!descriptor.name) {
-                return fail<XGrammarGrammarHandle*>("Expected a named grammar name.");
-            }
-            xgrammar::NamedGrammar named_grammar{"", std::string()};
-            named_grammar.name = descriptor.name;
-            switch (descriptor.kind) {
-            case xgrammar_named_grammar_handle:
-                if (!descriptor.grammar) {
-                    return fail<XGrammarGrammarHandle*>("Expected a named grammar handle.");
-                }
-                named_grammar.grammar =
-                    static_cast<XGrammarGrammarHandle*>(descriptor.grammar)->grammar;
-                break;
-            case xgrammar_named_grammar_lark:
-                if (!descriptor.lark_source) {
-                    return fail<XGrammarGrammarHandle*>("Expected a named Lark grammar.");
-                }
-                named_grammar.grammar = descriptor.lark_source;
-                break;
-            default:
-                return fail<XGrammarGrammarHandle*>("Unknown named grammar kind.");
-            }
-            named_grammars.push_back(named_grammar);
-        }
+        auto named_grammars = named_grammar_vector(named_grammar_descriptors, named_grammar_count);
+        if (!named_grammars) return static_cast<XGrammarGrammarHandle*>(nullptr);
 
         const std::optional<xgrammar::TokenizerInfo> tokenizer = tokenizer_info
             ? std::optional<xgrammar::TokenizerInfo>(
                   static_cast<XGrammarTokenizerInfoHandle*>(tokenizer_info)->tokenizer_info)
             : std::nullopt;
         return new XGrammarGrammarHandle{
-            xgrammar::Grammar::FromLark(lark, tokenizer, named_grammars)
+            xgrammar::Grammar::FromLark(lark, tokenizer, *named_grammars)
         };
     });
 }
@@ -617,6 +632,23 @@ xgrammar_compiled_grammar_t xgrammar_compiler_compile_grammar(
     });
 }
 
+xgrammar_compiled_grammar_t xgrammar_compiler_compile_lark(
+    xgrammar_compiler_t compiler,
+    const char* lark,
+    const xgrammar_named_grammar_t* named_grammar_descriptors,
+    size_t named_grammar_count
+) {
+    return invoke([&] {
+        if (!compiler || !lark) {
+            return fail<XGrammarCompiledGrammarHandle*>("Expected a compiler and Lark grammar.");
+        }
+        auto named_grammars = named_grammar_vector(named_grammar_descriptors, named_grammar_count);
+        if (!named_grammars) return static_cast<XGrammarCompiledGrammarHandle*>(nullptr);
+        const auto compiler_handle = static_cast<XGrammarCompilerHandle*>(compiler);
+        return new XGrammarCompiledGrammarHandle{compiler_handle->compiler.CompileLark(lark, *named_grammars)};
+    });
+}
+
 xgrammar_grammar_t xgrammar_compiled_grammar_grammar(xgrammar_compiled_grammar_t compiled_grammar) {
     return invoke([&] {
         if (!compiled_grammar) {
@@ -691,7 +723,8 @@ xgrammar_matcher_t xgrammar_matcher_init(
     const int32_t* override_stop_token_ids,
     size_t override_stop_token_id_count,
     int terminate_without_stop_token,
-    int32_t max_rollback_tokens
+    int32_t max_rollback_tokens,
+    float default_temperature
 ) {
     return invoke([&] {
         if (!compiled_grammar || (override_stop_token_id_count > 0 && !override_stop_token_ids)) {
@@ -701,9 +734,13 @@ xgrammar_matcher_t xgrammar_matcher_init(
         const auto stop_tokens = override_stop_token_id_count == 0
             ? std::optional<std::vector<int>>{}
             : std::optional<std::vector<int>>{std::vector<int>(override_stop_token_ids, override_stop_token_ids + override_stop_token_id_count)};
+        const auto temperature = default_temperature < 0
+            ? std::optional<float>{} : std::optional<float>{default_temperature};
         const auto bitmask_word_count = xgrammar::GetBitmaskSize(compiled.GetTokenizerInfo().GetVocabSize());
         return new XGrammarMatcherHandle{
-            xgrammar::GrammarMatcher(compiled, stop_tokens, terminate_without_stop_token != 0, max_rollback_tokens),
+            xgrammar::GrammarMatcher(
+                compiled, stop_tokens, terminate_without_stop_token != 0, max_rollback_tokens, temperature
+            ),
             compiled,
             bitmask_word_count
         };
@@ -763,8 +800,41 @@ void xgrammar_matcher_reset(xgrammar_matcher_t matcher) {
     if (matcher) static_cast<XGrammarMatcherHandle*>(matcher)->matcher.Reset();
 }
 
+float xgrammar_matcher_temperature(xgrammar_matcher_t matcher) {
+    return matcher
+        ? static_cast<XGrammarMatcherHandle*>(matcher)->matcher.GetTemperature().value_or(-1.0f)
+        : -1.0f;
+}
+
+xgrammar_captures_t xgrammar_matcher_captures(xgrammar_matcher_t matcher, int deduplicate) {
+    return invoke([&] {
+        if (!matcher) return fail<XGrammarCapturesHandle*>("Expected a matcher.");
+        return new XGrammarCapturesHandle{
+            static_cast<XGrammarMatcherHandle*>(matcher)->matcher.GetCaptures(deduplicate != 0)
+        };
+    });
+}
+
 void xgrammar_matcher_destroy(xgrammar_matcher_t matcher) {
     delete static_cast<XGrammarMatcherHandle*>(matcher);
+}
+
+size_t xgrammar_captures_count(xgrammar_captures_t captures) {
+    return captures ? static_cast<XGrammarCapturesHandle*>(captures)->captures.size() : 0;
+}
+
+const char* xgrammar_captures_name(xgrammar_captures_t captures, size_t index) {
+    return static_cast<XGrammarCapturesHandle*>(captures)->captures[index].first.c_str();
+}
+
+const char* xgrammar_captures_value(xgrammar_captures_t captures, size_t index, size_t* length) {
+    const auto& value = static_cast<XGrammarCapturesHandle*>(captures)->captures[index].second;
+    *length = value.size();
+    return value.data();
+}
+
+void xgrammar_captures_destroy(xgrammar_captures_t captures) {
+    delete static_cast<XGrammarCapturesHandle*>(captures);
 }
 
 }

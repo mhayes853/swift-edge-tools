@@ -84,6 +84,9 @@ if [ -n "$prepend_include" ]; then
 			cpp/support)
 				include_path=${prepend_include#cpp/support/}
 				;;
+			cpp/converter_ext)
+				include_path=../${prepend_include#cpp/}
+				;;
 			*)
 				echo "error: unsupported source directory for prepended include: $source_directory" >&2
 				exit 65
