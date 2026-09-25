@@ -349,16 +349,30 @@ public struct XGRGrammar: ~Copyable, @unchecked Sendable {
     tokenizerInfo: XGRTokenizerInfo? = nil,
     namedGrammars: [XGRNamedGrammar] = []
   ) throws -> XGRGrammar {
-    let handle = try withNamedGrammarDescriptors(namedGrammars) { descriptors in
-      try lark.withCString {
-        try require(
-          xgrammar_grammar_init_lark(
-            $0,
-            tokenizerInfo?.handle,
-            descriptors.baseAddress,
-            descriptors.count
-          )
-        )
+    let names = namedGrammars.map { $0.name }
+    let sources = namedGrammars.map { namedGrammar in
+      if case .lark(let source) = namedGrammar.grammar { source } else { "" }
+    }
+    let descriptors = namedGrammars.map { $0.rawValue }
+    let handle = try withCopiedCStringPointerBuffer(names) { names in
+      try withCopiedCStringPointerBuffer(sources) { sources in
+        var descriptors = descriptors
+        for index in descriptors.indices {
+          descriptors[index].name = names[index]
+          descriptors[index].lark_source = sources[index]
+        }
+        return try descriptors.withUnsafeBufferPointer { descriptors in
+          try lark.withCString {
+            try require(
+              xgrammar_grammar_init_lark(
+                $0,
+                tokenizerInfo?.handle,
+                descriptors.baseAddress,
+                descriptors.count
+              )
+            )
+          }
+        }
       }
     }
     return Self(handle: handle)
@@ -691,7 +705,7 @@ public struct XGRCompiledGrammar: ~Copyable, @unchecked Sendable {
 
   /// The grammar used to produce this compiled grammar.
   public var grammar: XGRGrammar {
-    XGRGrammar(handle: xgrammar_compiled_grammar_grammar(self.handle)!)
+    XGRGrammar(handle: xgrammar_grammar_from_compiled(self.handle)!)
   }
 
   /// The tokenizer metadata used during compilation.
@@ -801,35 +815,6 @@ public struct XGRCompiler: ~Copyable, @unchecked Sendable {
     let handle = try require(xgrammar_compiler_compile_grammar(self.handle, grammar.handle))
     return XGRCompiledGrammar(handle: handle)
   }
-
-  /// Parses and compiles a Lark grammar for this compiler’s tokenizer vocabulary.
-  ///
-  /// Unlike compiling the result of ``XGRGrammar/lark(_:tokenizerInfo:namedGrammars:)``, the
-  /// compiler may return a cached result without reparsing when it has already compiled the same
-  /// Lark source.
-  ///
-  /// - Parameters:
-  ///   - lark: The Lark syntax. The root rule must be named `start`.
-  ///   - namedGrammars: Any ``XGRNamedGrammar`` instances the lark syntax references.
-  /// - Returns: A compiled grammar ready to create an ``XGRMatcher``.
-  public func compileLark(
-    _ lark: String,
-    namedGrammars: [XGRNamedGrammar] = []
-  ) throws -> XGRCompiledGrammar {
-    let handle = try withNamedGrammarDescriptors(namedGrammars) { descriptors in
-      try lark.withCString {
-        try require(
-          xgrammar_compiler_compile_lark(
-            self.handle,
-            $0,
-            descriptors.baseAddress,
-            descriptors.count
-          )
-        )
-      }
-    }
-    return XGRCompiledGrammar(handle: handle)
-  }
 }
 
 // MARK: - XGRMatcher
@@ -899,29 +884,6 @@ public struct XGRMatcher: ~Copyable, @unchecked Sendable {
     }
   }
 
-  /// Creates a matcher for a compiled grammar.
-  ///
-  /// - Parameters:
-  ///   - compiledGrammar: The grammar and tokenizer vocabulary to constrain generation against.
-  ///   - overrideStopTokenIDs: Token IDs that override the tokenizer’s configured stop tokens.
-  ///     An empty array uses the stop tokens from the compiled grammar’s tokenizer info.
-  ///   - terminateWithoutStopToken: Whether the matcher may terminate after a complete match
-  ///     without requiring a stop token.
-  ///   - maxRollbackTokens: Unused.
-  @available(*, deprecated, message: "XGrammar no longer limits rollback.")
-  public init(
-    compiledGrammar: borrowing XGRCompiledGrammar,
-    overrideStopTokenIDs: [Int] = [],
-    terminateWithoutStopToken: Bool = false,
-    maxRollbackTokens: Int
-  ) throws {
-    try self.init(
-      compiledGrammar: compiledGrammar,
-      overrideStopTokenIDs: overrideStopTokenIDs,
-      terminateWithoutStopToken: terminateWithoutStopToken
-    )
-  }
-
   /// Creates a matcher from a raw pointer.
   ///
   /// - Parameters:
@@ -962,17 +924,20 @@ public struct XGRMatcher: ~Copyable, @unchecked Sendable {
   ///     The matcher explores multiple parses at once, so a single occurrence may complete at
   ///     several candidate positions. Pass `false` to receive every raw completion.
   /// - Returns: The recorded ``Capture`` values.
-  public func captures(deduplicate: Bool = true) throws -> [Capture] {
-    let captures = try require(xgrammar_matcher_captures(self.handle, deduplicate.intValue))
-    defer { xgrammar_captures_destroy(captures) }
-    return (0..<xgrammar_captures_count(captures)).map { index in
-      var length = 0
-      let value = xgrammar_captures_value(captures, index, &length)
-      return Capture(
-        name: String(cString: xgrammar_captures_name(captures, index)),
-        bytes: UnsafeRawBufferPointer(start: value, count: length).map { $0 }
-      )
+  public func captures(deduplicate: Bool = true) -> [Capture] {
+    var captures = [Capture]()
+    withUnsafeMutablePointer(to: &captures) { captures in
+      xgrammar_matcher_captures(self.handle, deduplicate.intValue, captures) {
+        context, name, value, length in
+        context!.assumingMemoryBound(to: [Capture].self).pointee.append(
+          Capture(
+            name: String(cString: name!),
+            bytes: Array(UnsafeRawBufferPointer(start: value, count: length))
+          )
+        )
+      }
     }
+    return captures
   }
 
   /// Returns the vocabulary acceptance mask for the current matcher state.
@@ -1130,27 +1095,6 @@ public func repeatGrammar(
 }
 
 // MARK: - Helpers
-
-private func withNamedGrammarDescriptors<Result>(
-  _ namedGrammars: [XGRNamedGrammar],
-  _ body: (UnsafeBufferPointer<xgrammar_named_grammar_t>) throws -> Result
-) rethrows -> Result {
-  let names = namedGrammars.map { $0.name }
-  let sources = namedGrammars.map { namedGrammar in
-    if case .lark(let source) = namedGrammar.grammar { source } else { "" }
-  }
-  return try withCopiedCStringPointerBuffer(names) { names in
-    try withCopiedCStringPointerBuffer(sources) { sources in
-      let descriptors = namedGrammars.indices.map { index in
-        var descriptor = namedGrammars[index].rawValue
-        descriptor.name = names[index]
-        descriptor.lark_source = sources[index]
-        return descriptor
-      }
-      return try descriptors.withUnsafeBufferPointer { try body($0) }
-    }
-  }
-}
 
 private func withCopiedCStringPointerBuffer<Result>(
   _ strings: [String],

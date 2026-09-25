@@ -334,37 +334,6 @@
       }
 
       @Test
-      func `Compiler Compiles Lark Grammar With Named Grammars`() throws {
-        let tokenizerInfo = try XGRTokenizerInfo(
-          encodedVocabulary: ["[", "x", "]", ""],
-          vocabularyType: .raw,
-          stopTokenIDs: [3]
-        )
-        let compiler = try XGRCompiler(tokenizerInfo: tokenizerInfo)
-        let compiledGrammar = try compiler.compileLark(
-          "start: \"[\" @item \"]\"",
-          namedGrammars: [XGRNamedGrammar(name: "item", grammar: .lark("start: \"x\""))]
-        )
-        let matcher = try XGRMatcher(
-          compiledGrammar: compiledGrammar,
-          terminateWithoutStopToken: true
-        )
-
-        expectNoDifference(matcher.accept(string: "[y]"), false)
-        expectNoDifference(matcher.accept(string: "[x]"), true)
-        expectNoDifference(matcher.isTerminated, true)
-      }
-
-      @Test
-      func `Compiler Throws For Invalid Lark Grammar`() throws {
-        let tokenizerInfo = try XGRTokenizerInfo(encodedVocabulary: ["a", ""], vocabularyType: .raw)
-        let compiler = try XGRCompiler(tokenizerInfo: tokenizerInfo)
-        #expect(throws: XGRError.self) {
-          try compiler.compileLark("start: \"a")
-        }
-      }
-
-      @Test
       func `Matcher Temperature Follows Active Rule`() throws {
         let tokenizerInfo = try XGRTokenizerInfo(
           encodedVocabulary: ["a", "1", ""],
@@ -422,7 +391,7 @@
         expectNoDifference(matcher.accept(tokenId: 1), true)
         expectNoDifference(matcher.accept(tokenId: 2), true)
         expectNoDifference(
-          try matcher.captures(),
+          matcher.captures(),
           [
             XGRMatcher.Capture(name: "number", bytes: Array("1".utf8)),
             XGRMatcher.Capture(name: "number", bytes: Array("22".utf8))
@@ -431,7 +400,7 @@
 
         matcher.rollback(2)
         expectNoDifference(
-          try matcher.captures(),
+          matcher.captures(),
           [XGRMatcher.Capture(name: "number", bytes: Array("1".utf8))]
         )
       }

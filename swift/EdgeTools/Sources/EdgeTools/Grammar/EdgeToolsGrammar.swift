@@ -5,6 +5,10 @@ import EdgeToolsCore
 public protocol EdgeToolsGrammarMatcher: ~Copyable {
   var isTerminated: Bool { get }
 
+  /// The sampling temperature the grammar specifies for the next token, or `nil` when the grammar
+  /// does not specify one.
+  var temperature: Float? { get }
+
   /// Returns the current vocabulary constraint, or `nil` when every token is accepted.
   mutating func grammarBitmask() -> GrammarBitmask?
 

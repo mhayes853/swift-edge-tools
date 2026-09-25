@@ -154,17 +154,18 @@ extension [Float] {
 extension EdgeToolsCPUFusedSampler {
   fileprivate func sample(
     logits: inout [Float],
-    bitmask: GrammarBitmask? = nil
+    bitmask: GrammarBitmask? = nil,
+    temperature: Float? = nil
   ) -> EdgeToolsCPUSample {
     logits.withUnsafeMutableBufferPointer { logits in
       var span = MutableSpan<Float>(_unsafeElements: logits)
-      return self.sample(logits: &span, bitmask: bitmask)
+      return self.sample(logits: &span, bitmask: bitmask, temperature: temperature)
     }
   }
 
-  fileprivate func pick(from logits: [Float]) -> Int {
+  fileprivate func pick(from logits: [Float], temperature: Float? = nil) -> Int {
     var logits = logits
-    return self.sample(logits: &logits).tokenId
+    return self.sample(logits: &logits, temperature: temperature).tokenId
   }
 }
 
@@ -177,8 +178,8 @@ private struct CPUFusedSamplerDriver: FusedSamplerDriver {
     self.sampler = EdgeToolsCPUFusedSampler(parameters: parameters, history: history)
   }
 
-  func pick(from logits: [Float]) -> Int {
-    self.sampler.pick(from: logits)
+  func pick(from logits: [Float], temperature: Float?) -> Int {
+    self.sampler.pick(from: logits, temperature: temperature)
   }
 
   func resetHistory() {
@@ -196,12 +197,19 @@ enum FusedSamplerBehavior: CaseIterable, Sendable {
   case topP
   case minP
   case deterministicSeed
+  case temperatureOverride
 }
 
 protocol FusedSamplerDriver {
   init(parameters: EdgeToolsFusedSamplingParameters, seededWith tokenIds: [Int])
-  func pick(from logits: [Float]) -> Int
+  func pick(from logits: [Float], temperature: Float?) -> Int
   func resetHistory()
+}
+
+extension FusedSamplerDriver {
+  func pick(from logits: [Float]) -> Int {
+    self.pick(from: logits, temperature: nil)
+  }
 }
 
 func expectFusedSamplerBehavior<Driver: FusedSamplerDriver>(
@@ -269,12 +277,24 @@ func expectFusedSamplerBehavior<Driver: FusedSamplerDriver>(
       return (0..<16).map { _ in sampler.pick(from: logits) }
     }
     expectNoDifference(run(), run())
+  case .temperatureOverride:
+    let greedySampler = Driver(
+      parameters: EdgeToolsFusedSamplingParameters(temperature: 0, topK: 2, seed: 7),
+      seededWith: []
+    )
+    let sampler = Driver(
+      parameters: EdgeToolsFusedSamplingParameters(temperature: 2, topK: 2, seed: 7),
+      seededWith: []
+    )
+    expectNoDifference(picks(using: greedySampler, from: logits, temperature: 2), [1, 2])
+    expectNoDifference(picks(using: sampler, from: logits, temperature: 0), [1])
   }
 }
 
 private func picks<Driver: FusedSamplerDriver>(
   using sampler: Driver,
-  from logits: [Float]
+  from logits: [Float],
+  temperature: Float? = nil
 ) -> [Int] {
-  Set((0..<64).map { _ in sampler.pick(from: logits) }).sorted()
+  Set((0..<64).map { _ in sampler.pick(from: logits, temperature: temperature) }).sorted()
 }

@@ -21,7 +21,6 @@ typedef void* xgrammar_compiler_t;
 typedef void* xgrammar_compiled_grammar_t;
 typedef void* xgrammar_matcher_t;
 typedef void* xgrammar_grammar_t;
-typedef void* xgrammar_captures_t;
 
 typedef enum {
   xgrammar_named_grammar_lark = 0,
@@ -113,13 +112,7 @@ void xgrammar_grammar_destroy(xgrammar_grammar_t grammar);
 xgrammar_compiled_grammar_t xgrammar_compiler_compile_grammar(
     xgrammar_compiler_t compiler, xgrammar_grammar_t grammar
 );
-xgrammar_compiled_grammar_t xgrammar_compiler_compile_lark(
-    xgrammar_compiler_t compiler,
-    const char* lark,
-    const xgrammar_named_grammar_t* named_grammars,
-    size_t named_grammar_count
-);
-xgrammar_grammar_t xgrammar_compiled_grammar_grammar(xgrammar_compiled_grammar_t compiled_grammar);
+xgrammar_grammar_t xgrammar_grammar_from_compiled(xgrammar_compiled_grammar_t compiled_grammar);
 xgrammar_tokenizer_info_t xgrammar_compiled_grammar_tokenizer_info(
     xgrammar_compiled_grammar_t compiled_grammar
 );
@@ -156,13 +149,13 @@ int xgrammar_matcher_is_terminated(xgrammar_matcher_t matcher);
 void xgrammar_matcher_rollback(xgrammar_matcher_t matcher, int num_tokens);
 void xgrammar_matcher_reset(xgrammar_matcher_t matcher);
 float xgrammar_matcher_temperature(xgrammar_matcher_t matcher);
-xgrammar_captures_t xgrammar_matcher_captures(xgrammar_matcher_t matcher, int deduplicate);
+void xgrammar_matcher_captures(
+    xgrammar_matcher_t matcher,
+    int deduplicate,
+    void* context,
+    void (*body)(void* context, const char* name, const char* value, size_t value_length)
+);
 void xgrammar_matcher_destroy(xgrammar_matcher_t matcher);
-
-size_t xgrammar_captures_count(xgrammar_captures_t captures);
-const char* xgrammar_captures_name(xgrammar_captures_t captures, size_t index);
-const char* xgrammar_captures_value(xgrammar_captures_t captures, size_t index, size_t* length);
-void xgrammar_captures_destroy(xgrammar_captures_t captures);
 
 #ifdef __cplusplus
 }

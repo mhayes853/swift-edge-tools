@@ -254,13 +254,15 @@
                 - integer: 21
     ▿ Message
       ▿ assistant: AssistantMessage
-        ▿ parts: 50 elements
+        ▿ parts: 51 elements
           ▿ EdgeToolsGenerationPart
             - reasoning: "<think>"
           ▿ EdgeToolsGenerationPart
             - reasoning: "\n"
           ▿ EdgeToolsGenerationPart
             - reasoning: "I"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "\'ve"
           ▿ EdgeToolsGenerationPart
             - reasoning: " called"
           ▿ EdgeToolsGenerationPart
@@ -272,13 +274,21 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " function"
           ▿ EdgeToolsGenerationPart
+            - reasoning: " multiple"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " times"
+          ▿ EdgeToolsGenerationPart
             - reasoning: " for"
           ▿ EdgeToolsGenerationPart
             - reasoning: " Paris"
           ▿ EdgeToolsGenerationPart
             - reasoning: "."
           ▿ EdgeToolsGenerationPart
-            - reasoning: " It"
+            - reasoning: " The"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " first"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " call"
           ▿ EdgeToolsGenerationPart
             - reasoning: " returned"
           ▿ EdgeToolsGenerationPart
@@ -286,25 +296,11 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " weather"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " conditions"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: ":"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " sunny"
+            - reasoning: " information"
           ▿ EdgeToolsGenerationPart
             - reasoning: ","
           ▿ EdgeToolsGenerationPart
-            - reasoning: " temperature"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " "
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "21"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " degrees"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " Celsius"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: "."
+            - reasoning: " and"
           ▿ EdgeToolsGenerationPart
             - reasoning: " I"
           ▿ EdgeToolsGenerationPart
@@ -312,17 +308,23 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " now"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " summarize"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " this"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " information"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " for"
+            - reasoning: " answer"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
             - reasoning: " user"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: "\'s"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " question"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " based"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " on"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " result"
           ▿ EdgeToolsGenerationPart
             - reasoning: ".\n"
           ▿ EdgeToolsGenerationPart

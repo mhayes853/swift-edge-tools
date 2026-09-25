@@ -273,7 +273,13 @@
                   state: &$1
                 )
               },
-              decode: { try self.decode(bitmask: $0, state: &$1) }
+              decode: {
+                try self.decode(
+                  bitmask: $0,
+                  temperature: parameters.sampling.temperature == nil ? $1 : nil,
+                  state: &$2
+                )
+              }
             )
           )
         } catch {
@@ -334,6 +340,7 @@
 
     private func decode(
       bitmask: GrammarBitmask?,
+      temperature: Float?,
       state: inout ModelGenerationState
     ) throws -> EdgeToolsToken.ID {
       guard var decoder = state.decoder else { throw EdgeToolsError.modelNotPrepared }
@@ -343,7 +350,7 @@
         appending: decoder.pendingTokenId,
         vocabularySize: contextState.vocabularySizeValue
       ) {
-        decoder.sampler.sample(logits: &$0, bitmask: bitmask)
+        decoder.sampler.sample(logits: &$0, bitmask: bitmask, temperature: temperature)
       }
       decoder.add(confidence: sample.confidence)
       decoder.pendingTokenId = sample.tokenId

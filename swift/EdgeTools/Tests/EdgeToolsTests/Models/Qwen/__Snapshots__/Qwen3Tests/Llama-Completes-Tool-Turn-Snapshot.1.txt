@@ -508,7 +508,7 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " asked"
           ▿ EdgeToolsGenerationPart
-            - reasoning: " about"
+            - reasoning: " for"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
           ▿ EdgeToolsGenerationPart
@@ -602,6 +602,12 @@
           ▿ EdgeToolsGenerationPart
             - reasoning: " information"
           ▿ EdgeToolsGenerationPart
+            - reasoning: " for"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " the"
+          ▿ EdgeToolsGenerationPart
+            - reasoning: " user"
+          ▿ EdgeToolsGenerationPart
             - reasoning: ".\n\n"
           ▿ EdgeToolsGenerationPart
             - reasoning: "First"
@@ -615,9 +621,3 @@
             - reasoning: " mention"
           ▿ EdgeToolsGenerationPart
             - reasoning: " the"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " location"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: " again"
-          ▿ EdgeToolsGenerationPart
-            - reasoning: ","

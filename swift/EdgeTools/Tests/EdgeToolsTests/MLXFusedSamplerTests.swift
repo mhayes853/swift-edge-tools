@@ -63,8 +63,9 @@
       self.sampler = MLXFusedSampler(parameters: parameters, history: history)
     }
 
-    func pick(from logits: [Float]) -> Int {
-      Int(self.sampler.sample(logits: MLXArray(logits)[.newAxis, 0...]).item(Int32.self))
+    func pick(from logits: [Float], temperature: Float?) -> Int {
+      let logits = MLXArray(logits)[.newAxis, 0...]
+      return Int(self.sampler.sample(logits: logits, temperature: temperature).item(Int32.self))
     }
 
     func resetHistory() {
