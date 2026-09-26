@@ -407,6 +407,140 @@ struct `EdgeToolsGenerationStream tests` {
 
 extension `EdgeToolsGenerationStream tests` {
   @Test
+  func `Text Emission Counts Tokens And Exposes Pending Events`() async throws {
+    let engine = ReentrantMockEngine()
+    let snapshots = Lock([(String, String?, Int, [String])]())
+    let stream = engine.stream(
+      prompt: ReentrantMockEngine.Prompt(),
+      context: engine.context(),
+      textEmission: EdgeToolsTextEmission { pending in
+        let events = pending.events.map { event in
+          switch event {
+          case .token(let token): "token:\(token.stringValue)"
+          case .part(.text(let text)): "text:\(text)"
+          default: "other"
+          }
+        }
+        snapshots.withLock {
+          $0.append((pending.payload, pending.latestToken?.stringValue, pending.tokenCount, events))
+        }
+        return pending.tokenCount >= 2
+      }
+    )
+    await engine.waitUntilReady()
+
+    engine.emit(EdgeToolsToken(id: 1, stringValue: "a"))
+    engine.emit(part: .text("a"))
+    engine.emit(EdgeToolsToken(id: 2, stringValue: "b"))
+    engine.emit(part: .text("b"))
+    engine.emit(EdgeToolsToken(id: 3, stringValue: "c"))
+    engine.emit(part: .text("c"))
+    engine.finish()
+    _ = try await stream.finalGeneration
+
+    var text = [String]()
+    var tokens = [String]()
+    for await event in stream.events {
+      switch event {
+      case .token(let token): tokens.append(token.stringValue)
+      case .part(.text(let part)): text.append(part)
+      default: break
+      }
+    }
+
+    expectNoDifference(text, ["ab", "c"])
+    expectNoDifference(tokens, ["a", "b", "c"])
+    let observed = snapshots.withLock { $0 }
+    expectNoDifference(observed.map(\.0), ["a", "ab", "c"])
+    expectNoDifference(observed.map(\.1), ["a", "b", "c"])
+    expectNoDifference(observed.map(\.2), [1, 2, 1])
+    expectNoDifference(observed[1].3, ["token:a", "text:a", "token:b", "text:b"])
+    expectNoDifference(observed[2].3, ["token:c", "text:c"])
+  }
+
+  @Test
+  func `Every Token Count Emits At The Requested Interval`() async throws {
+    let engine = ReentrantMockEngine()
+    let stream = engine.stream(
+      prompt: ReentrantMockEngine.Prompt(),
+      context: engine.context(),
+      textEmission: .every(tokenCount: 2)
+    )
+    await engine.waitUntilReady()
+
+    for index in 1...3 {
+      let value = String(index)
+      engine.emit(EdgeToolsToken(id: index, stringValue: value))
+      engine.emit(part: .text(value))
+    }
+    engine.finish()
+    _ = try await stream.finalGeneration
+
+    var parts = [String]()
+    for await event in stream.events {
+      if case .part(.text(let text)) = event {
+        parts.append(text)
+      }
+    }
+    expectNoDifference(parts, ["12", "3"])
+  }
+
+  @Test
+  func `Text Emission Flushes Before Tool Calls`() async throws {
+    let engine = ReentrantMockEngine()
+    let stream = engine.stream(
+      prompt: ReentrantMockEngine.Prompt(),
+      context: engine.context(),
+      textEmission: EdgeToolsTextEmission { _ in false }
+    )
+    await engine.waitUntilReady()
+
+    engine.emit(part: .text("before"))
+    engine.emit(part: .toolCall(EdgeRawToolCall(name: "unknown", arguments: [:])))
+    engine.emit(part: .text("after"))
+    engine.finish()
+    _ = try await stream.finalGeneration
+
+    var events = [String]()
+    for await event in stream.events {
+      switch event {
+      case .part(.text(let text)): events.append("text:\(text)")
+      case .toolCall(let outcome): events.append("tool:\(outcome.name)")
+      case .part(.toolCall): events.append("part:tool")
+      case .finish: events.append("finish")
+      default: break
+      }
+    }
+    expectNoDifference(events, ["text:before", "tool:unknown", "part:tool", "text:after", "finish"])
+  }
+
+  @Test
+  func `Newline Emission Publishes The Whole Pending Text`() async throws {
+    let engine = ReentrantMockEngine()
+    let stream = engine.stream(
+      prompt: ReentrantMockEngine.Prompt(),
+      context: engine.context(),
+      textEmission: .onNewline
+    )
+    await engine.waitUntilReady()
+
+    engine.emit(part: .text("a"))
+    engine.emit(part: .text("b\nc"))
+    engine.emit(part: .text("d"))
+    engine.finish()
+    _ = try await stream.finalGeneration
+
+    let parts = Lock([String]())
+    let subscription = stream.onPart { part in
+      if case .text(let text) = part {
+        parts.withLock { $0.append(text) }
+      }
+    }
+    defer { subscription.cancel() }
+    expectNoDifference(parts.withLock { $0 }, ["ab\nc", "d"])
+  }
+
+  @Test
   func `Tools Are Parsed Incremental Without Waiting For Model Stop`() async throws {
     let tokenizer = try testTokenizer()
     let rawToolCall = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
@@ -833,6 +967,10 @@ private final class ReentrantMockEngine: EdgeToolsEngine, EdgeToolsTokenizingEng
     self.continuation.withLock { $0?.emit(token: token) }
   }
 
+  func emit(part: EdgeToolsGenerationPart) {
+    self.continuation.withLock { $0?.emit(part: part) }
+  }
+
   func finish() {
     self.continuation.withLock { storage in
       storage?.finish()
@@ -857,6 +995,10 @@ private final class ReentrantChannelStorage: Sendable {
 
   func emit(token: EdgeToolsToken) {
     self.continuation.withLock { $0?.yield(token: token) }
+  }
+
+  func emit(part: EdgeToolsGenerationPart) {
+    self.continuation.withLock { $0?.yield(part: part) }
   }
 
   func finish() {

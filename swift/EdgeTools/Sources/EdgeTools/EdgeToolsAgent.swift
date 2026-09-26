@@ -98,6 +98,7 @@ where
     as type: Output.Type,
     context: Context,
     maximumTurns: Int? = nil,
+    textEmission: EdgeToolsTextEmission = .everyToken,
     parameters: @escaping @Sendable (EdgeToolsAgentTurn<Context>) -> GenerateParameters = {
       _ in .default
     },
@@ -126,7 +127,8 @@ where
         let raw = self.stream(
           prompt: prompt,
           context: context,
-          parameters: generationParameters
+          parameters: generationParameters,
+          textEmission: textEmission
         )
         let (generation, parser) = try await continuation.generation(raw, turn: index)
         generations.append(generation)
