@@ -57,9 +57,25 @@ public final class EdgeToolsGenerationStream: Sendable, Identifiable {
     var nextID = 0
   }
 
+  private struct TextState {
+    var payload = ""
+    var latestToken: EdgeToolsToken?
+    var tokenCount = 0
+    var events = [Event]()
+    var hasTextPart = false
+
+    mutating func drain() -> String? {
+      let payload = self.hasTextPart ? self.payload : nil
+      self = Self()
+      return payload
+    }
+  }
+
   private let state = Lock(State())
+  private let textState = Lock(TextState())
   private let registrar = _ObservationRegistrar()
   private let toolsByName: [String: any EdgeTool]
+  private let textEmission: EdgeToolsTextEmission
   private let shouldInvokeTools: @Sendable (AnyEdgeToolCall) -> Bool
 
   public var isGenerating: Bool {
@@ -112,6 +128,7 @@ public final class EdgeToolsGenerationStream: Sendable, Identifiable {
 
   init(
     tools: [any EdgeTool],
+    textEmission: EdgeToolsTextEmission,
     shouldInvokeTools: @escaping @Sendable (AnyEdgeToolCall) -> Bool
   ) {
     if let message = duplicateToolNameError(tools.map { $0.name }) {
@@ -121,6 +138,7 @@ public final class EdgeToolsGenerationStream: Sendable, Identifiable {
       tools.map { ($0.name.snakeCased(), $0) },
       uniquingKeysWith: { _, tool in tool }
     )
+    self.textEmission = textEmission
     self.shouldInvokeTools = shouldInvokeTools
   }
 }
@@ -396,6 +414,11 @@ extension EdgeToolsGenerationStream {
   }
 
   private func emit(token: EdgeToolsToken) {
+    self.textState.withLock { state in
+      state.latestToken = token
+      state.tokenCount += 1
+      state.events.append(.token(token))
+    }
     self.emit(.token(token))
   }
 
@@ -417,10 +440,35 @@ extension EdgeToolsGenerationStream {
   }
 
   private func emit(part: EdgeToolsGenerationPart) {
+    if case .text(let text) = part {
+      let pending = self.textState.withLock { state in
+        state.payload += text
+        state.hasTextPart = true
+        state.events.append(.part(part))
+        return EdgeToolsTextEmission.Pending(
+          payload: state.payload,
+          latestToken: state.latestToken,
+          tokenCount: state.tokenCount,
+          events: state.events
+        )
+      }
+      if self.textEmission.shouldEmit(pending) {
+        self.flushPendingText()
+      }
+      return
+    }
+
+    self.flushPendingText()
     if case .toolCall(let rawCall) = part {
       self.emit(rawCall: rawCall)
     }
     self.emit(.part(part))
+  }
+
+  private func flushPendingText() {
+    if let payload = self.textState.withLock({ $0.drain() }) {
+      self.emit(.part(.text(payload)))
+    }
   }
 
   private func emit(_ event: Event) {
@@ -435,6 +483,7 @@ extension EdgeToolsGenerationStream {
   }
 
   private func finish(with result: Result<EdgeToolsGeneration, any Error>) {
+    self.flushPendingText()
     let event = Event.finish(result)
     let subscribers = self.withMutation(of: .result) {
       self.state.withLock { state in
