@@ -9,10 +9,12 @@ extension EdgeToolsEngine {
     prompt: Prompt,
     context: Context,
     parameters: sending GenerateParameters = .default,
+    textEmission: EdgeToolsTextEmission = .everyToken,
     shouldInvokeTools: @escaping @Sendable (AnyEdgeToolCall) -> Bool = { _ in true }
   ) -> EdgeToolsGenerationStream {
     let stream = EdgeToolsGenerationStream(
       tools: context.tools,
+      textEmission: textEmission,
       shouldInvokeTools: shouldInvokeTools
     )
     stream.start(
@@ -79,7 +81,8 @@ where
     prompt: Prompt,
     as type: Output.Type,
     context: Context,
-    parameters: sending GenerateParameters = .default
+    parameters: sending GenerateParameters = .default,
+    textEmission: EdgeToolsTextEmission = .everyToken
   ) -> EdgeToolsTypedStream<Output>
   where Output: EdgeToolsGenerable & StreamParseable & Sendable, Output.Partial: Sendable {
     var parameters = parameters
@@ -88,6 +91,7 @@ where
       prompt: prompt,
       context: context,
       parameters: parameters,
+      textEmission: textEmission,
       shouldInvokeTools: { _ in false }
     )
     return EdgeToolsTypedStream { continuation in
@@ -106,14 +110,16 @@ where
   public func streamExtract<Output>(
     prompt: Prompt,
     as type: Output.Type,
-    parameters: sending GenerateParameters = .default
+    parameters: sending GenerateParameters = .default,
+    textEmission: EdgeToolsTextEmission = .everyToken
   ) -> EdgeToolsTypedStream<Output>
   where Output: EdgeToolsGenerable & StreamParseable & Sendable, Output.Partial: Sendable {
     self.streamExtract(
       prompt: prompt,
       as: type,
       context: self.context(),
-      parameters: parameters
+      parameters: parameters,
+      textEmission: textEmission
     )
   }
 }

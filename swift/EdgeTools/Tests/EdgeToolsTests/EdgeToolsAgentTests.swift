@@ -64,7 +64,8 @@ struct `EdgeToolsAgent tests` {
     let engine = AgentScriptEngine(generations: [.responseChunks(["\"hel", "lo\""])])
     let stream = engine.streamExtract(
       prompt: .user("Say hello."),
-      as: String.self
+      as: String.self,
+      textEmission: .every(tokenCount: 1)
     )
 
     var partials = [String]()
@@ -83,6 +84,27 @@ struct `EdgeToolsAgent tests` {
     expectNoDifference(finished, "hello")
     let result = try await stream.finalResult
     expectNoDifference(result.output, "hello")
+  }
+
+  @Test
+  func `Typed Extraction Uses Configured Text Emission`() async throws {
+    let engine = AgentScriptEngine(generations: [.responseChunks(["\"hel", "lo\""])])
+    let stream = engine.streamExtract(
+      prompt: .user("Say hello."),
+      as: String.self,
+      textEmission: EdgeToolsTextEmission { $0.events.count >= 2 }
+    )
+
+    let result = try await stream.finalResult
+    var partials = [String]()
+    for try await event in stream {
+      if case .partial(_, let partial) = event {
+        partials.append(String(partial))
+      }
+    }
+
+    expectNoDifference(result.output, "hello")
+    expectNoDifference(partials, ["hello"])
   }
 
   @Test
@@ -162,6 +184,34 @@ struct `EdgeToolsAgent tests` {
     expectNoDifference(finished, "done")
     expectNoDifference(result.generations.count, 2)
     expectNoDifference(result.toolCalls.count, 1)
+  }
+
+  @Test
+  func `Typed Response Uses Text Emission Across Turns`() async throws {
+    let tool = ParallelTool(name: "lookup", tracker: ParallelInvocationTracker())
+    let engine = AgentScriptEngine(
+      generations: [
+        .toolCalls([EdgeRawToolCall(name: tool.name, arguments: .string(""))]),
+        .responseChunks(["\"do", "ne\""])
+      ]
+    )
+    let stream = engine.streamRespond(
+      to: .user("Respond."),
+      as: String.self,
+      context: engine.context { tool },
+      textEmission: EdgeToolsTextEmission { $0.events.count >= 2 }
+    )
+
+    let result = try await stream.finalResult
+    var partials = [String]()
+    for try await event in stream {
+      if case .partial(_, let partial) = event {
+        partials.append(String(partial))
+      }
+    }
+
+    expectNoDifference(result.output, "done")
+    expectNoDifference(partials, ["done"])
   }
 
   @Test
