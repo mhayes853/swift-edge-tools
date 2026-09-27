@@ -3,7 +3,7 @@ import EdgeToolsCore
 /// Controls when a generation stream publishes accumulated text parts.
 public struct EdgeToolsTextEmission: Sendable {
   /// The input available when deciding whether to publish pending text.
-  public struct Pending: Sendable {
+  public struct Context: Sendable {
     /// Text accumulated since the previous text emission.
     public let payload: String
     /// The most recent token since the previous emission, when the engine publishes tokens.
@@ -14,10 +14,10 @@ public struct EdgeToolsTextEmission: Sendable {
     public let events: [EdgeToolsGenerationStream.Event]
   }
 
-  private let predicate: @Sendable (Pending) -> Bool
+  private let predicate: @Sendable (Context) -> Bool
 
   /// Creates a policy that publishes the whole pending payload when the predicate succeeds.
-  public init(shouldEmit: @escaping @Sendable (Pending) -> Bool) {
+  public init(shouldEmit: @escaping @Sendable (Context) -> Bool) {
     self.predicate = shouldEmit
   }
 
@@ -40,7 +40,7 @@ public struct EdgeToolsTextEmission: Sendable {
   /// Publishes the whole pending payload when it contains a blank line.
   public static let onParagraphBreak = Self { $0.payload.contains("\n\n") }
 
-  func shouldEmit(_ pending: Pending) -> Bool {
-    self.predicate(pending)
+  func shouldEmit(_ context: Context) -> Bool {
+    self.predicate(context)
   }
 }

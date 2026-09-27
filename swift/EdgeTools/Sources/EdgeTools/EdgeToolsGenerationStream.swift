@@ -445,7 +445,7 @@ extension EdgeToolsGenerationStream {
         state.payload += text
         state.hasTextPart = true
         state.events.append(.part(part))
-        return EdgeToolsTextEmission.Pending(
+        return EdgeToolsTextEmission.Context(
           payload: state.payload,
           latestToken: state.latestToken,
           tokenCount: state.tokenCount,
