@@ -35,10 +35,15 @@ public struct EdgeToolsTextEmission: Sendable {
   }
 
   /// Publishes the whole pending payload when it contains a newline.
-  public static let onNewline = Self { $0.payload.contains("\n") }
+  public static let onNewline = Self { $0.payload.utf8.contains(UInt8.newline) }
 
   /// Publishes the whole pending payload when it contains a blank line.
-  public static let onParagraphBreak = Self { $0.payload.contains("\n\n") }
+  public static let onParagraphBreak = Self {
+    let bytes = $0.payload.utf8
+    return zip(bytes, bytes.dropFirst()).contains {
+      $0.0 == UInt8.newline && $0.1 == UInt8.newline
+    }
+  }
 
   func shouldEmit(_ context: Context) -> Bool {
     self.predicate(context)

@@ -541,6 +541,31 @@ extension `EdgeToolsGenerationStream tests` {
   }
 
   @Test
+  func `Paragraph Emission Publishes On A Blank Line`() async throws {
+    let engine = ReentrantMockEngine()
+    let stream = engine.stream(
+      prompt: ReentrantMockEngine.Prompt(),
+      context: engine.context(),
+      textEmission: .onParagraphBreak
+    )
+    await engine.waitUntilReady()
+
+    engine.emit(part: .text("first\n"))
+    engine.emit(part: .text("\nsecond"))
+    engine.emit(part: .text("third"))
+    engine.finish()
+    _ = try await stream.finalGeneration
+
+    var parts = [String]()
+    for await event in stream.events {
+      if case .part(.text(let text)) = event {
+        parts.append(text)
+      }
+    }
+    expectNoDifference(parts, ["first\n\nsecond", "third"])
+  }
+
+  @Test
   func `Tools Are Parsed Incremental Without Waiting For Model Stop`() async throws {
     let tokenizer = try testTokenizer()
     let rawToolCall = #"<tool_call> [{"name":"get_weather","arguments":{"location":"Seoul"}}]"#
