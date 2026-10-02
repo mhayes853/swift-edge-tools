@@ -229,7 +229,12 @@ extension EdgeToolsGenerableMacro {
     }
     var isOptional: Bool { self.streamField.type.streamIsOptional }
     var schemaExpression: String {
-      let base = "\(self.typeName).edgeToolsGenerationSchema"
+      let base: String
+      if let conversion = self.streamField.completedConversion {
+        base = "\(conversion).Source.edgeToolsGenerationSchema" + (self.isOptional ? ".nullable()" : "")
+      } else {
+        base = "\(self.typeName).edgeToolsGenerationSchema"
+      }
       return self.schemaFragments.isEmpty
         ? base
         : "EdgeToolsGenerationSchema(\(([base] + self.schemaFragments).joined(separator: ", ")))"
@@ -241,6 +246,7 @@ extension EdgeToolsGenerableMacro {
     var schemaFragments = [String]()
     var initialCapacity: ExprSyntax?
     var partialStrings: StreamPartialStrings?
+    var completedConversion: TypeSyntax?
   }
 
   private struct AssociatedValue {
@@ -430,7 +436,10 @@ extension EdgeToolsGenerableMacro {
         keys: [guideSelection?.key ?? propertyName],
         convertsKeys: guideSelection?.key == nil,
         initialCapacity: guideSelection?.initialCapacity,
-        partialStrings: guideSelection?.partialStrings ?? partialStrings
+        completedConversion: guideSelection?.completedConversion,
+        partialStrings: guideSelection?.partialStrings
+          ?? (guideSelection?.completedConversion == nil ? partialStrings : .streamString),
+        defaultValue: binding.initializer?.value
       )
       return StoredProperty(
         streamField: field,
@@ -540,6 +549,15 @@ extension EdgeToolsGenerableMacro {
           guide.initialCapacity = ExprSyntax("\(raw: String(capacity))")
         case "partialStrings" where !argument.expression.is(NilLiteralExprSyntax.self):
           guide.partialStrings = try Self.partialStrings(from: argument.expression)
+        case "completedConversion":
+          guard let member = argument.expression.as(MemberAccessExprSyntax.self),
+            member.declName.baseName.text == "self", let base = member.base
+          else {
+            throw MacroExpansionErrorMessage(
+              "completedConversion requires a strategy type followed by .self."
+            )
+          }
+          guide.completedConversion = TypeSyntax("\(raw: base.trimmedDescription)")
         case nil:
           guide.schemaFragments.append(argument.expression.trimmedDescription)
         default:
@@ -674,8 +692,13 @@ extension EdgeToolsGenerableMacro {
           }
           return "self.\(property.name) = nil"
         }
-        return
-          "self.\(property.name) = try \(property.initializerTypeName)(edgeToolsValue: _edgeToolsValue(object, forKey: \(property.keyExpression)))"
+        let value = "_edgeToolsValue(object, forKey: \(property.keyExpression))"
+        if let conversion = property.streamField.completedConversion {
+          let converted = "try \(conversion).value(edgeToolsValue: \(value))"
+          let expression = property.isOptional ? "\(value) == .null ? nil : \(converted)" : converted
+          return "self.\(property.name) = \(expression)"
+        }
+        return "self.\(property.name) = try \(property.initializerTypeName)(edgeToolsValue: \(value))"
       }
       .joined(separator: "\n")
 
@@ -742,10 +765,16 @@ extension EdgeToolsGenerableMacro {
     let entries =
       properties.compactMap { property -> String? in
         guard !property.isIgnored else { return nil }
-        let valueExpression =
-          property.isOptional
-          ? "self.\(property.name)?.edgeToolsValue"
-          : "self.\(property.name).edgeToolsValue"
+        let valueExpression: String
+        if let conversion = property.streamField.completedConversion {
+          valueExpression = property.isOptional
+            ? "self.\(property.name).map { \(conversion).convertFromValue($0).edgeToolsValue }"
+            : "\(conversion).convertFromValue(self.\(property.name)).edgeToolsValue"
+        } else {
+          valueExpression = property.isOptional
+            ? "self.\(property.name)?.edgeToolsValue"
+            : "self.\(property.name).edgeToolsValue"
+        }
         return
           "(key: \(property.keyExpression), value: \(valueExpression))"
       }

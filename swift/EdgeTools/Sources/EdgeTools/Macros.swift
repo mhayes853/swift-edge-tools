@@ -53,6 +53,22 @@ public macro EdgeToolsGuide(
   _ schema: EdgeToolsGenerationSchema...
 ) = #externalMacro(module: "EdgeToolsMacros", type: "EdgeToolsGuideMacro")
 
+/// Converts a property's JSON source representation after its value finishes parsing.
+///
+/// The strategy's `Value` must match the property's unwrapped type. Its `Source` supplies the
+/// generation schema and value representation; schema fragments constrain that source.
+/// The generated partial stores `ConvertedPartial<Conversion>`, exposing the incremental
+/// `source`, cached `value`, and `conversionError`. Nonoptional properties require a default
+/// for `init(orInitial:)`. Capacity and string storage overrides are unavailable because the
+/// strategy defines its source storage.
+@attached(peer)
+public macro EdgeToolsGuide<Conversion: StreamCompletedValueConversion>(
+  key: Swift.String? = nil,
+  completedConversion: Conversion.Type,
+  _ schema: EdgeToolsGenerationSchema...
+) = #externalMacro(module: "EdgeToolsMacros", type: "EdgeToolsGuideMacro")
+where Conversion.Source: EdgeToolsGenerable
+
 @inlinable
 @inline(always)
 public func _edgeToolsRequireObjectValue(
