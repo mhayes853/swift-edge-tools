@@ -15,13 +15,14 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
     let schemaFragments = Self.schemaFragments(from: node, context: context)
     let accessModifier = Self.accessModifier(for: declaration)
     let modifierPrefix = Self.modifierPrefix(for: accessModifier)
+    let partialStrings = try Self.partialStrings(from: node)
     var members = [DeclSyntax]()
 
     if let structDecl = declaration.as(StructDeclSyntax.self) {
       let properties = Self.storedProperties(
         in: structDecl,
         configuration: Self.streamGenerationConfiguration(accessModifier: nil, from: node),
-        partialStrings: try Self.partialStrings(from: node),
+        partialStrings: partialStrings,
         context: context
       )
       if !Self.hasExistingEdgeToolsGenerationSchema(in: declaration) {
@@ -90,6 +91,7 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
         "@EdgeToolsGenerable can only be applied to struct or enum declarations."
       )
     }
+    let partialStrings = try Self.partialStrings(from: node)
     let typeName = type.trimmedDescription
     let accessModifier = Self.streamAccessModifier(for: declaration, in: context)
     let hasCustomPartial = declaration.memberBlock.members.contains { member in
@@ -111,7 +113,7 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
       let properties = Self.storedProperties(
         in: structDecl,
         configuration: Self.streamGenerationConfiguration(accessModifier: nil, from: node),
-        partialStrings: try Self.partialStrings(from: node),
+        partialStrings: partialStrings,
         context: context
       )
       let generation = try Self.streamObjectGeneration(
@@ -153,16 +155,16 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
       configuration: Self.streamGenerationConfiguration(accessModifier: nil, from: node)
     )
     let generation = try StreamEnumGeneration(
-      cases: try cases.map { enumCase in
+      cases: cases.map { enumCase in
         StreamParseableEnumCase(
           name: enumCase.sourceToken,
-          associatedValues: try enumCase.associatedValues.map { value in
+          associatedValues: enumCase.associatedValues.map { value in
             StreamParseableField(
               name: value.sourceToken ?? .wildcardToken(),
               type: TypeSyntax("\(raw: value.typeName)"),
               keys: [value.schemaKey],
               convertsKeys: value.sourceLabel != nil,
-              partialStrings: try Self.partialStrings(from: node)
+              partialStrings: partialStrings
             )
           }
         )
@@ -567,7 +569,7 @@ extension EdgeToolsGenerableMacro {
             )
             continue
           }
-          initialCapacity = argument.expression
+          initialCapacity = ExprSyntax("\(raw: String(capacity))")
         case "partialStrings":
           if argument.expression.is(NilLiteralExprSyntax.self) {
             continue
@@ -578,7 +580,9 @@ extension EdgeToolsGenerableMacro {
             context.diagnose(
               Diagnostic(
                 node: Syntax(argument),
-                message: SimpleDiagnostic(String(describing: error))
+                message: SimpleDiagnostic(
+                  (error as? MacroExpansionErrorMessage)?.message ?? String(describing: error)
+                )
               )
             )
           }
