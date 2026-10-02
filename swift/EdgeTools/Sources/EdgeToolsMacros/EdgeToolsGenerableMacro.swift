@@ -16,12 +16,16 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
     let accessModifier = Self.accessModifier(for: declaration)
     let modifierPrefix = Self.modifierPrefix(for: accessModifier)
     let partialStrings = try Self.partialStrings(from: node)
+    let configuration = Self.streamGenerationConfiguration(
+      accessModifier: accessModifier,
+      from: node
+    )
     var members = [DeclSyntax]()
 
     if let structDecl = declaration.as(StructDeclSyntax.self) {
       let properties = Self.storedProperties(
         in: structDecl,
-        configuration: Self.streamGenerationConfiguration(accessModifier: nil, from: node),
+        configuration: configuration,
         partialStrings: partialStrings,
         context: context
       )
@@ -45,7 +49,8 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
     } else if let enumDecl = declaration.as(EnumDeclSyntax.self) {
       let cases = try Self.enumCases(
         in: enumDecl,
-        configuration: Self.streamGenerationConfiguration(accessModifier: nil, from: node)
+        configuration: configuration,
+        partialStrings: partialStrings
       )
       if !Self.hasExistingEdgeToolsGenerationSchema(in: declaration) {
         members.append(
@@ -94,6 +99,10 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
     let partialStrings = try Self.partialStrings(from: node)
     let typeName = type.trimmedDescription
     let accessModifier = Self.streamAccessModifier(for: declaration, in: context)
+    let configuration = Self.streamGenerationConfiguration(
+      accessModifier: accessModifier,
+      from: node
+    )
     let hasCustomPartial = declaration.memberBlock.members.contains { member in
       member.decl.as(StructDeclSyntax.self)?.name.text == "Partial"
         || member.decl.as(TypeAliasDeclSyntax.self)?.name.text == "Partial"
@@ -112,18 +121,19 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
     if let structDecl = declaration.as(StructDeclSyntax.self) {
       let properties = Self.storedProperties(
         in: structDecl,
-        configuration: Self.streamGenerationConfiguration(accessModifier: nil, from: node),
+        configuration: configuration,
         partialStrings: partialStrings,
         context: context
       )
-      let generation = try Self.streamObjectGeneration(
-        from: properties,
-        accessModifier: accessModifier,
-        attribute: node
+      let parsedProperties = properties.filter { !$0.isIgnored }
+      let generation = try StreamObjectGeneration(
+        fields: parsedProperties.map(\.streamField),
+        configuration: configuration
       )
       let partialCustomization = Self.generablePartialCustomization(
         fields: generation.partialFields,
-        from: properties,
+        keyExpressions: parsedProperties.map(\.keyExpression),
+        schemaFragments: parsedProperties.map(\.schemaFragments),
         accessModifier: accessModifier
       )
       let partial = try generation.structDeclarationSyntax(
@@ -152,29 +162,19 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
     }
     let cases = try Self.enumCases(
       in: enumDecl,
-      configuration: Self.streamGenerationConfiguration(accessModifier: nil, from: node)
+      configuration: configuration,
+      partialStrings: partialStrings
     )
     let generation = try StreamEnumGeneration(
       cases: cases.map { enumCase in
         StreamParseableEnumCase(
           name: enumCase.sourceToken,
-          associatedValues: enumCase.associatedValues.map { value in
-            StreamParseableField(
-              name: value.sourceToken ?? .wildcardToken(),
-              type: TypeSyntax("\(raw: value.typeName)"),
-              keys: [value.schemaKey],
-              convertsKeys: value.sourceLabel != nil,
-              partialStrings: partialStrings
-            )
-          }
+          associatedValues: enumCase.associatedValues.map(\.streamField)
         )
       },
       representation: .caseKeyedObject,
       defaultCase: defaultCase,
-      configuration: Self.streamGenerationConfiguration(
-        accessModifier: accessModifier,
-        from: node
-      )
+      configuration: configuration
     )
     guard let partialFields = generation.partialFields else {
       throw MacroExpansionErrorMessage("Stream parsing did not plan an enum Partial.")
@@ -183,22 +183,17 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
       in: context,
       partialCustomization: Self.generablePartialCustomization(
         fields: partialFields,
-        from: [],
-        accessModifier: accessModifier,
-        keyExpressions: Dictionary(uniqueKeysWithValues: cases.map { ($0.name, $0.keyExpression) })
+        keyExpressions: cases.map(\.keyExpression),
+        accessModifier: accessModifier
       ),
       payloadCustomization: { payload in
-        let values = cases.first { $0.name == payload.caseName.text }!.associatedValues
-        return .generated(
+        .generated(
           partial: Self.generablePartialCustomization(
             fields: payload.partialFields,
-            from: [],
-            accessModifier: accessModifier,
-            keyExpressions: Dictionary(
-              uniqueKeysWithValues: values.map {
-                ($0.sourceToken?.text ?? $0.schemaKey, $0.keyExpression)
-              }
-            )
+            keyExpressions: payload.fields.map {
+              Self.schemaKeyExpression(for: $0, configuration: configuration)
+            },
+            accessModifier: accessModifier
           )
         )
       }
@@ -217,19 +212,24 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
 
 extension EdgeToolsGenerableMacro {
   private struct StoredProperty {
-    let name: String
-    let schemaKey: String
+    let streamField: StreamParseableField
     let keyExpression: String
-    let convertsKeys: Bool
-    let typeName: String
-    let initializerTypeName: String
-    let isIgnored: Bool
-    let isOptional: Bool
-    let hasDefaultValue: Bool
-    let schemaExpression: String
-    let schemaFragments: [String]
-    let initialCapacity: ExprSyntax?
-    let partialStrings: StreamPartialStrings
+    var isIgnored = false
+    var hasDefaultValue = false
+    var schemaFragments = [String]()
+
+    var name: String { self.streamField.name.text }
+    var typeName: String { self.streamField.type.trimmedDescription }
+    var initializerTypeName: String {
+      EdgeToolsGenerableMacro.initializerTypeName(for: self.typeName)
+    }
+    var isOptional: Bool { self.streamField.type.streamIsOptional }
+    var schemaExpression: String {
+      let base = "\(self.typeName).edgeToolsGenerationSchema"
+      return self.schemaFragments.isEmpty
+        ? base
+        : "EdgeToolsGenerationSchema(\(([base] + self.schemaFragments).joined(separator: ", ")))"
+    }
   }
 
   private struct EdgeToolsGuideSelection {
@@ -240,21 +240,24 @@ extension EdgeToolsGenerableMacro {
   }
 
   private struct AssociatedValue {
-    let sourceLabel: String?
-    let sourceToken: TokenSyntax?
-    let schemaKey: String
+    let streamField: StreamParseableField
     let keyExpression: String
-    let typeName: String
-    let isOptional: Bool
     let bindingName: String
+
+    var sourceLabel: String? {
+      self.streamField.name.tokenKind == .wildcard ? nil : self.streamField.name.trimmedDescription
+    }
+    var typeName: String { self.streamField.type.trimmedDescription }
+    var isOptional: Bool { self.streamField.type.streamIsOptional }
   }
 
   private struct EnumCase {
-    let name: String
-    let sourceName: String
-    let keyExpression: String
     let sourceToken: TokenSyntax
+    let keyExpression: String
     let associatedValues: [AssociatedValue]
+
+    var name: String { self.sourceToken.text }
+    var sourceName: String { self.sourceToken.trimmedDescription }
   }
 
   private static func hasExistingEdgeToolsGenerationSchema(
@@ -374,7 +377,6 @@ extension EdgeToolsGenerableMacro {
         return nil
       }
       let propertyName = identifierPattern.identifier.text
-      let typeName = type.trimmedDescription
       let guideAttributes = Self.guideAttributes(in: variableDecl)
       if guideAttributes.count > 1 {
         context.diagnose(
@@ -392,7 +394,7 @@ extension EdgeToolsGenerableMacro {
       let ignoredAttribute = Self.ignoredAttribute(in: variableDecl)
       var isIgnored = ignoredAttribute != nil
       let hasDefaultValue = binding.initializer != nil
-      let isOptional = Self.isOptionalTypeName(typeName)
+      let isOptional = type.streamIsOptional
 
       if isIgnored && guideSelection != nil {
         context.diagnose(
@@ -418,45 +420,28 @@ extension EdgeToolsGenerableMacro {
         isIgnored = false
       }
 
-      let schemaKey = guideSelection?.key ?? propertyName
-      let schemaExpression = Self.schemaExpression(
-        typeName: typeName,
-        guideSelection: guideSelection
-      )
-
-      return StoredProperty(
-        name: propertyName,
-        schemaKey: schemaKey,
-        keyExpression: guideSelection?.key.map(Self.quotedStringLiteral)
-          ?? Self.schemaKeyExpression(for: schemaKey, configuration: configuration),
+      let field = StreamParseableField(
+        name: identifierPattern.identifier,
+        type: type,
+        keys: [guideSelection?.key ?? propertyName],
         convertsKeys: guideSelection?.key == nil,
-        typeName: typeName,
-        initializerTypeName: Self.initializerTypeName(for: typeName),
-        isIgnored: isIgnored,
-        isOptional: isOptional,
-        hasDefaultValue: hasDefaultValue,
-        schemaExpression: schemaExpression,
-        schemaFragments: guideSelection?.schemaFragments ?? [],
         initialCapacity: guideSelection?.initialCapacity,
         partialStrings: guideSelection?.partialStrings ?? partialStrings
+      )
+      return StoredProperty(
+        streamField: field,
+        keyExpression: Self.schemaKeyExpression(for: field, configuration: configuration),
+        isIgnored: isIgnored,
+        hasDefaultValue: hasDefaultValue,
+        schemaFragments: guideSelection?.schemaFragments ?? []
       )
     }
   }
 
-  private static func schemaExpression(
-    typeName: String,
-    guideSelection: EdgeToolsGuideSelection?
-  ) -> String {
-    let baseExpression = "\(typeName).edgeToolsGenerationSchema"
-    guard let guideSelection else { return baseExpression }
-    guard !guideSelection.schemaFragments.isEmpty else { return baseExpression }
-    let fragments = ([baseExpression] + guideSelection.schemaFragments).joined(separator: ", ")
-    return "EdgeToolsGenerationSchema(\(fragments))"
-  }
-
   private static func enumCases(
     in declaration: EnumDeclSyntax,
-    configuration: StreamGenerationConfiguration
+    configuration: StreamGenerationConfiguration,
+    partialStrings: StreamPartialStrings
   ) throws -> [EnumCase] {
     let elements = declaration.memberBlock.members.flatMap { member -> [EnumCaseElementSyntax] in
       member.decl.as(EnumCaseDeclSyntax.self).map { Array($0.elements) } ?? []
@@ -492,24 +477,23 @@ extension EdgeToolsGenerableMacro {
               "Enum case '\(name)' has multiple associated values represented by the key '\(schemaKey)'."
             )
           }
+          let field = StreamParseableField(
+            name: label == nil ? .wildcardToken() : parameter.firstName!,
+            type: parameter.type,
+            keys: [schemaKey],
+            convertsKeys: label != nil,
+            partialStrings: partialStrings
+          )
           return AssociatedValue(
-            sourceLabel: label == nil ? nil : parameter.firstName?.trimmedDescription,
-            sourceToken: label == nil ? nil : parameter.firstName,
-            schemaKey: schemaKey,
-            keyExpression: label == nil
-              ? Self.quotedStringLiteral(schemaKey)
-              : Self.schemaKeyExpression(for: schemaKey, configuration: configuration),
-            typeName: parameter.type.trimmedDescription,
-            isOptional: Self.isOptionalTypeName(parameter.type.trimmedDescription),
+            streamField: field,
+            keyExpression: Self.schemaKeyExpression(for: field, configuration: configuration),
             bindingName: "value\(index)"
           )
         }
 
       return EnumCase(
-        name: name,
-        sourceName: element.name.trimmedDescription,
-        keyExpression: Self.schemaKeyExpression(for: name, configuration: configuration),
         sourceToken: element.name,
+        keyExpression: Self.schemaKeyExpression(for: name, configuration: configuration),
         associatedValues: associatedValues
       )
     }
@@ -880,11 +864,6 @@ extension EdgeToolsGenerableMacro {
     }
   }
 
-  private static func isOptionalTypeName(_ typeName: String) -> Bool {
-    typeName.hasSuffix("?") || typeName.hasPrefix("Optional<")
-      || typeName.hasPrefix("Swift.Optional<")
-  }
-
   private static func initializerTypeName(for typeName: String) -> String {
     let trimmed = typeName.replacingOccurrences(of: " ", with: "")
     if trimmed.hasSuffix("?") {
@@ -937,30 +916,6 @@ extension EdgeToolsGenerableMacro {
     return Self.accessModifier(for: declaration)
   }
 
-  private static func streamObjectGeneration(
-    from properties: [StoredProperty],
-    accessModifier: String?,
-    attribute: AttributeSyntax
-  ) throws -> StreamObjectGeneration {
-    return try StreamObjectGeneration(
-      fields: properties.filter { !$0.isIgnored }
-        .map { property in
-          StreamParseableField(
-            name: .identifier(property.name),
-            type: TypeSyntax("\(raw: property.typeName)"),
-            keys: [property.schemaKey],
-            convertsKeys: property.convertsKeys,
-            initialCapacity: property.initialCapacity,
-            partialStrings: property.partialStrings
-          )
-        },
-      configuration: Self.streamGenerationConfiguration(
-        accessModifier: accessModifier,
-        from: attribute
-      )
-    )
-  }
-
   private static func streamGenerationConfiguration(
     accessModifier: String?,
     from attribute: AttributeSyntax
@@ -1008,38 +963,23 @@ extension EdgeToolsGenerableMacro {
 
   private static func generablePartialCustomization(
     fields: [StreamPartialFieldDescriptor],
-    from properties: [StoredProperty],
-    accessModifier: String?,
-    keyExpressions: [String: String] = [:]
+    keyExpressions: [String],
+    schemaFragments: [[String]] = [],
+    accessModifier: String?
   ) -> StreamPartialCustomization {
-    let generatedProperties = fields.map { field in
-      let name = field.memberName.trimmedDescription
-      let typeName = field.storageType.trimmedDescription
-      let source = properties.first {
-        $0.name == field.unescapedName || $0.name == name
+    let generatedProperties = zip(fields, keyExpressions).enumerated()
+      .map { index, pair in
+        let (field, keyExpression) = pair
+        return StoredProperty(
+          streamField: StreamParseableField(
+            name: field.memberName,
+            type: field.storageType,
+            keys: field.keys
+          ),
+          keyExpression: keyExpression,
+          schemaFragments: schemaFragments.isEmpty ? [] : schemaFragments[index]
+        )
       }
-      let key = source?.schemaKey ?? field.keys.first ?? field.unescapedName
-      let fragments = source?.schemaFragments ?? []
-      return StoredProperty(
-        name: name,
-        schemaKey: key,
-        keyExpression: source?.keyExpression ?? keyExpressions[field.unescapedName]
-          ?? Self.quotedStringLiteral(key),
-        convertsKeys: false,
-        typeName: typeName,
-        initializerTypeName: Self.initializerTypeName(for: typeName),
-        isIgnored: false,
-        isOptional: Self.isOptionalTypeName(typeName),
-        hasDefaultValue: false,
-        schemaExpression: Self.schemaExpression(
-          typeName: typeName,
-          guideSelection: EdgeToolsGuideSelection(key: nil, schemaFragments: fragments)
-        ),
-        schemaFragments: fragments,
-        initialCapacity: nil,
-        partialStrings: .streamString
-      )
-    }
     let modifierPrefix = Self.modifierPrefix(for: accessModifier)
     return StreamPartialCustomization(
       conformances: [TypeSyntax("EdgeToolsGenerable")],
@@ -1096,6 +1036,16 @@ extension EdgeToolsGenerableMacro {
     default:
       throw MacroExpansionErrorMessage("partialStrings requires .streamString or .string.")
     }
+  }
+
+  private static func schemaKeyExpression(
+    for field: StreamParseableField,
+    configuration: StreamGenerationConfiguration
+  ) -> String {
+    let key = field.keys[0]
+    return field.convertsKeys
+      ? Self.schemaKeyExpression(for: key, configuration: configuration)
+      : Self.quotedStringLiteral(key)
   }
 
   private static func schemaKeyExpression(
