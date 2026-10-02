@@ -139,7 +139,7 @@ let package = Package(
     .package(url: "https://github.com/mhayes853/swift-operation", from: "0.7.0"),
     .package(
       url: "https://github.com/mhayes853/swift-stream-parsing",
-      revision: "34cc4e8220be9274f4dfe251ec01990ce5750488",
+      revision: "5e89ec817e045c6be7a862302321cf625324eff1",
       traits: []
     )
   ],
