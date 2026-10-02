@@ -122,10 +122,10 @@ let package = Package(
     .default(enabledTraits: ["Foundation"])
   ],
   dependencies: [
-    .package(url: "https://github.com/ml-explore/mlx-swift-lm", from: "3.31.4"),
+    .package(url: "https://github.com/ml-explore/mlx-swift-lm", .upToNextMinor(from: "3.31.4")),
     .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.18.7"),
     .package(url: "https://github.com/pointfreeco/swift-custom-dump", from: "1.6.1"),
-    .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.31.3"),
+    .package(url: "https://github.com/ml-explore/mlx-swift", .upToNextMinor(from: "0.31.3")),
     .package(url: "https://github.com/pointfreeco/swift-macro-testing", from: "0.6.5"),
     .package(url: "https://github.com/swiftlang/swift-syntax", "600.0.0"..<"603.0.0"),
     .package(url: "https://github.com/huggingface/swift-transformers", from: "1.3.0"),
