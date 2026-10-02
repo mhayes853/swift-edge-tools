@@ -5,6 +5,99 @@ extension `EdgeToolsMacros tests` {
   @Suite
   struct `EdgeToolsGenerableOptionsMacro tests` {
     @Test
+    func `Diagnoses A Conversion Without A Metatype Literal`() {
+      assertMacro {
+        """
+        @EdgeToolsGenerable
+        struct Message {
+          @EdgeToolsGuide(completedConversion: converter)
+          var text: String = ""
+        }
+        """
+      } diagnostics: {
+        """
+        @EdgeToolsGenerable
+        struct Message {
+          @EdgeToolsGuide(completedConversion: converter)
+                          ┬─────────────────────────────
+                          ├─ 🛑 completedConversion requires a strategy type followed by .self.
+                          ╰─ 🛑 completedConversion requires a strategy type followed by .self.
+          var text: String = ""
+        }
+        """
+      }
+    }
+
+    @Test
+    func `Diagnoses A Converted Property Without A Default`() {
+      assertMacro {
+        """
+        @EdgeToolsGenerable
+        struct Message {
+          @EdgeToolsGuide(completedConversion: TextConversion.self)
+          var text: String
+        }
+        """
+      } diagnostics: {
+        """
+        @EdgeToolsGenerable
+        ┬──────────────────
+        ╰─ 🛑 The nonoptional converted stream field 'text' requires a defaultValue for init(orInitial:).
+        struct Message {
+          @EdgeToolsGuide(completedConversion: TextConversion.self)
+          var text: String
+        }
+        """
+      }
+    }
+
+    @Test
+    func `Diagnoses Capacity On A Converted Property`() {
+      assertMacro {
+        """
+        @EdgeToolsGenerable
+        struct Message {
+          @EdgeToolsGuide(initialCapacity: 32, completedConversion: TextConversion.self)
+          var text: String = ""
+        }
+        """
+      } diagnostics: {
+        """
+        @EdgeToolsGenerable
+        ┬──────────────────
+        ╰─ 🛑 The stream field 'text' cannot combine initialCapacity with completedConversion.
+        struct Message {
+          @EdgeToolsGuide(initialCapacity: 32, completedConversion: TextConversion.self)
+          var text: String = ""
+        }
+        """
+      }
+    }
+
+    @Test
+    func `Diagnoses String Storage On A Converted Property`() {
+      assertMacro {
+        """
+        @EdgeToolsGenerable
+        struct Message {
+          @EdgeToolsGuide(partialStrings: .string, completedConversion: TextConversion.self)
+          var text: String = ""
+        }
+        """
+      } diagnostics: {
+        """
+        @EdgeToolsGenerable
+        ┬──────────────────
+        ╰─ 🛑 The stream field 'text' cannot combine String storage with completedConversion.
+        struct Message {
+          @EdgeToolsGuide(partialStrings: .string, completedConversion: TextConversion.self)
+          var text: String = ""
+        }
+        """
+      }
+    }
+
+    @Test
     func `Diagnoses Unsupported Type String Storage`() {
       assertMacro {
         """

@@ -22,7 +22,8 @@ extension ConvertedPartial: EdgeToolsGenerable where Strategy.Source: EdgeToolsG
 
 extension ConvertedPartial: ConvertibleFromEdgeToolsValue
 where Strategy.Source: EdgeToolsGenerable {
-  /// Restores the source as completed JSON, caching its conversion and preserving its spelling.
+  /// Restores the source as completed JSON, caching its conversion and preserving its representation.
+  /// A value snapshot carries no completion state, so restoring an unfinished source can fail conversion.
   public init(edgeToolsValue: EdgeToolsValue) throws {
     var stream = PartialsStream(initialValue: Self(), from: .json())
     do {
