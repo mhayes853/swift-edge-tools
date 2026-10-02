@@ -13,6 +13,13 @@ import StreamParsing
 /// Also generates a stream-parseable `Partial` for nongeneric structs and enums with one
 /// `@StreamParseableDefault` case. A nested user-declared `Partial` leaves stream parsing
 /// to a manually provided conformance.
+///
+/// `partialStrings` selects `StreamString` or Swift `String` storage for string leaves in the
+/// generated partial. Nested generable types select their own storage. `keyDecodingStrategy`
+/// derives property, enum case, and associated value keys for both generation and parsing;
+/// explicit `@EdgeToolsGuide(key:)` keys are preserved. Custom strategies must return stable keys.
+/// `schemaCache` selects the cache for streaming schemas. Cache and custom strategy expressions
+/// are evaluated inside the generated `Partial`, so qualify references rather than using `Self`.
 @attached(extension, conformances: EdgeToolsGenerable, StreamParseable, names: arbitrary)
 @attached(
   member,
@@ -20,7 +27,12 @@ import StreamParsing
   named(init),
   named(edgeToolsValue)
 )
-public macro EdgeToolsGenerable(_ schema: EdgeToolsGenerationSchema...) =
+public macro EdgeToolsGenerable(
+  _ schema: EdgeToolsGenerationSchema...,
+  partialStrings: PartialStringStorage = .streamString,
+  keyDecodingStrategy: StreamKeyDecodingStrategy = .useDefaultKeys,
+  schemaCache: StreamSchemaCache = .shared
+) =
   #externalMacro(module: "EdgeToolsMacros", type: "EdgeToolsGenerableMacro")
 
 /// Marks a stored property as ignored for ``EdgeToolsGenerationSchema`` schema synthesis.
@@ -28,10 +40,16 @@ public macro EdgeToolsGenerable(_ schema: EdgeToolsGenerationSchema...) =
 public macro EdgeToolsIgnored() =
   #externalMacro(module: "EdgeToolsMacros", type: "EdgeToolsIgnoredMacro")
 
-/// Overrides schema synthesis for a stored property.
+/// Overrides schema synthesis and streaming storage for a stored property.
+///
+/// `partialStrings` overrides the enclosing type's string storage choice. `initialCapacity`
+/// reserves storage for strings, arrays, or dictionaries when parsing begins; it is a
+/// nonnegative integer literal hint, measured in decoded UTF-8 bytes or container elements.
 @attached(peer)
 public macro EdgeToolsGuide(
   key: Swift.String? = nil,
+  initialCapacity: Swift.Int? = nil,
+  partialStrings: PartialStringStorage? = nil,
   _ schema: EdgeToolsGenerationSchema...
 ) = #externalMacro(module: "EdgeToolsMacros", type: "EdgeToolsGuideMacro")
 

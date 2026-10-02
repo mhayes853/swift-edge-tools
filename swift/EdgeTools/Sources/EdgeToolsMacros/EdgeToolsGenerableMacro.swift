@@ -18,7 +18,12 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
     var members = [DeclSyntax]()
 
     if let structDecl = declaration.as(StructDeclSyntax.self) {
-      let properties = Self.storedProperties(in: structDecl, context: context)
+      let properties = Self.storedProperties(
+        in: structDecl,
+        configuration: Self.streamGenerationConfiguration(accessModifier: nil, from: node),
+        partialStrings: try Self.partialStrings(from: node),
+        context: context
+      )
       if !Self.hasExistingEdgeToolsGenerationSchema(in: declaration) {
         members.append(
           Self.generationSchemaProperty(
@@ -37,7 +42,10 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
         members.append(Self.valueProperty(from: properties, modifierPrefix: modifierPrefix))
       }
     } else if let enumDecl = declaration.as(EnumDeclSyntax.self) {
-      let cases = try Self.enumCases(in: enumDecl)
+      let cases = try Self.enumCases(
+        in: enumDecl,
+        configuration: Self.streamGenerationConfiguration(accessModifier: nil, from: node)
+      )
       if !Self.hasExistingEdgeToolsGenerationSchema(in: declaration) {
         members.append(
           Self.enumGenerationSchemaProperty(
@@ -89,7 +97,8 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
         || member.decl.as(TypeAliasDeclSyntax.self)?.name.text == "Partial"
         || member.decl.as(EnumDeclSyntax.self)?.name.text == "Partial"
     }
-    let isGeneric = declaration.as(StructDeclSyntax.self)?.genericParameterClause != nil
+    let isGeneric =
+      declaration.as(StructDeclSyntax.self)?.genericParameterClause != nil
       || declaration.as(EnumDeclSyntax.self)?.genericParameterClause != nil
     let basicExtension = try ExtensionDeclSyntax(
       "extension \(raw: typeName): EdgeToolsGenerable {}"
@@ -99,10 +108,16 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
     }
 
     if let structDecl = declaration.as(StructDeclSyntax.self) {
-      let properties = Self.storedProperties(in: structDecl, context: context)
+      let properties = Self.storedProperties(
+        in: structDecl,
+        configuration: Self.streamGenerationConfiguration(accessModifier: nil, from: node),
+        partialStrings: try Self.partialStrings(from: node),
+        context: context
+      )
       let generation = try Self.streamObjectGeneration(
         from: properties,
-        accessModifier: accessModifier
+        accessModifier: accessModifier,
+        attribute: node
       )
       let partialCustomization = Self.generablePartialCustomization(
         fields: generation.partialFields,
@@ -133,16 +148,21 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
     guard let defaultCase = try Self.streamDefaultCase(in: enumDecl) else {
       return [basicExtension]
     }
-    let cases = try Self.enumCases(in: enumDecl)
+    let cases = try Self.enumCases(
+      in: enumDecl,
+      configuration: Self.streamGenerationConfiguration(accessModifier: nil, from: node)
+    )
     let generation = try StreamEnumGeneration(
-      cases: cases.map { enumCase in
+      cases: try cases.map { enumCase in
         StreamParseableEnumCase(
           name: enumCase.sourceToken,
-          associatedValues: enumCase.associatedValues.map { value in
+          associatedValues: try enumCase.associatedValues.map { value in
             StreamParseableField(
               name: value.sourceToken ?? .wildcardToken(),
               type: TypeSyntax("\(raw: value.typeName)"),
-              keys: [value.schemaKey]
+              keys: [value.schemaKey],
+              convertsKeys: value.sourceLabel != nil,
+              partialStrings: try Self.partialStrings(from: node)
             )
           }
         )
@@ -150,7 +170,8 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
       representation: .caseKeyedObject,
       defaultCase: defaultCase,
       configuration: Self.streamGenerationConfiguration(
-        accessModifier: accessModifier
+        accessModifier: accessModifier,
+        from: node
       )
     )
     guard let partialFields = generation.partialFields else {
@@ -161,14 +182,21 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
       partialCustomization: Self.generablePartialCustomization(
         fields: partialFields,
         from: [],
-        accessModifier: accessModifier
+        accessModifier: accessModifier,
+        keyExpressions: Dictionary(uniqueKeysWithValues: cases.map { ($0.name, $0.keyExpression) })
       ),
       payloadCustomization: { payload in
+        let values = cases.first { $0.name == payload.caseName.text }!.associatedValues
         return .generated(
           partial: Self.generablePartialCustomization(
             fields: payload.partialFields,
             from: [],
-            accessModifier: accessModifier
+            accessModifier: accessModifier,
+            keyExpressions: Dictionary(
+              uniqueKeysWithValues: values.map {
+                ($0.sourceToken?.text ?? $0.schemaKey, $0.keyExpression)
+              }
+            )
           )
         )
       }
@@ -189,6 +217,8 @@ extension EdgeToolsGenerableMacro {
   private struct StoredProperty {
     let name: String
     let schemaKey: String
+    let keyExpression: String
+    let convertsKeys: Bool
     let typeName: String
     let initializerTypeName: String
     let isIgnored: Bool
@@ -196,17 +226,22 @@ extension EdgeToolsGenerableMacro {
     let hasDefaultValue: Bool
     let schemaExpression: String
     let schemaFragments: [String]
+    let initialCapacity: ExprSyntax?
+    let partialStrings: StreamPartialStrings
   }
 
   private struct EdgeToolsGuideSelection {
     let key: String?
     let schemaFragments: [String]
+    var initialCapacity: ExprSyntax? = nil
+    var partialStrings: StreamPartialStrings? = nil
   }
 
   private struct AssociatedValue {
     let sourceLabel: String?
     let sourceToken: TokenSyntax?
     let schemaKey: String
+    let keyExpression: String
     let typeName: String
     let isOptional: Bool
     let bindingName: String
@@ -215,6 +250,7 @@ extension EdgeToolsGenerableMacro {
   private struct EnumCase {
     let name: String
     let sourceName: String
+    let keyExpression: String
     let sourceToken: TokenSyntax
     let associatedValues: [AssociatedValue]
   }
@@ -297,17 +333,28 @@ extension EdgeToolsGenerableMacro {
 
   private static func storedProperties(
     in declaration: StructDeclSyntax,
+    configuration: StreamGenerationConfiguration,
+    partialStrings: StreamPartialStrings,
     context: some MacroExpansionContext
   ) -> [StoredProperty] {
     declaration.memberBlock.members.reduce(into: [StoredProperty]()) { properties, member in
       guard let variableDecl = member.decl.as(VariableDeclSyntax.self) else { return }
       guard !Self.isStatic(variableDecl) else { return }
-      properties.append(contentsOf: Self.storedProperties(from: variableDecl, context: context))
+      properties.append(
+        contentsOf: Self.storedProperties(
+          from: variableDecl,
+          configuration: configuration,
+          partialStrings: partialStrings,
+          context: context
+        )
+      )
     }
   }
 
   private static func storedProperties(
     from variableDecl: VariableDeclSyntax,
+    configuration: StreamGenerationConfiguration,
+    partialStrings: StreamPartialStrings,
     context: some MacroExpansionContext
   ) -> [StoredProperty] {
     variableDecl.bindings.compactMap { binding in
@@ -378,13 +425,18 @@ extension EdgeToolsGenerableMacro {
       return StoredProperty(
         name: propertyName,
         schemaKey: schemaKey,
+        keyExpression: guideSelection?.key.map(Self.quotedStringLiteral)
+          ?? Self.schemaKeyExpression(for: schemaKey, configuration: configuration),
+        convertsKeys: guideSelection?.key == nil,
         typeName: typeName,
         initializerTypeName: Self.initializerTypeName(for: typeName),
         isIgnored: isIgnored,
         isOptional: isOptional,
         hasDefaultValue: hasDefaultValue,
         schemaExpression: schemaExpression,
-        schemaFragments: guideSelection?.schemaFragments ?? []
+        schemaFragments: guideSelection?.schemaFragments ?? [],
+        initialCapacity: guideSelection?.initialCapacity,
+        partialStrings: guideSelection?.partialStrings ?? partialStrings
       )
     }
   }
@@ -401,7 +453,8 @@ extension EdgeToolsGenerableMacro {
   }
 
   private static func enumCases(
-    in declaration: EnumDeclSyntax
+    in declaration: EnumDeclSyntax,
+    configuration: StreamGenerationConfiguration
   ) throws -> [EnumCase] {
     let elements = declaration.memberBlock.members.flatMap { member -> [EnumCaseElementSyntax] in
       member.decl.as(EnumCaseDeclSyntax.self).map { Array($0.elements) } ?? []
@@ -427,28 +480,33 @@ extension EdgeToolsGenerableMacro {
       }
 
       var schemaKeys = Set<String>()
-      let associatedValues = try parameters.enumerated().map { index, parameter in
-        let rawLabel = parameter.firstName?.text
-        let label = rawLabel == "_" ? nil : rawLabel
-        let schemaKey = label ?? "_\(index)"
-        guard schemaKeys.insert(schemaKey).inserted else {
-          throw MacroExpansionErrorMessage(
-            "Enum case '\(name)' has multiple associated values represented by the key '\(schemaKey)'."
+      let associatedValues = try parameters.enumerated()
+        .map { index, parameter in
+          let rawLabel = parameter.firstName?.text
+          let label = rawLabel == "_" ? nil : rawLabel
+          let schemaKey = label ?? "_\(index)"
+          guard schemaKeys.insert(schemaKey).inserted else {
+            throw MacroExpansionErrorMessage(
+              "Enum case '\(name)' has multiple associated values represented by the key '\(schemaKey)'."
+            )
+          }
+          return AssociatedValue(
+            sourceLabel: label == nil ? nil : parameter.firstName?.trimmedDescription,
+            sourceToken: label == nil ? nil : parameter.firstName,
+            schemaKey: schemaKey,
+            keyExpression: label == nil
+              ? Self.quotedStringLiteral(schemaKey)
+              : Self.schemaKeyExpression(for: schemaKey, configuration: configuration),
+            typeName: parameter.type.trimmedDescription,
+            isOptional: Self.isOptionalTypeName(parameter.type.trimmedDescription),
+            bindingName: "value\(index)"
           )
         }
-        return AssociatedValue(
-          sourceLabel: label == nil ? nil : parameter.firstName?.trimmedDescription,
-          sourceToken: label == nil ? nil : parameter.firstName,
-          schemaKey: schemaKey,
-          typeName: parameter.type.trimmedDescription,
-          isOptional: Self.isOptionalTypeName(parameter.type.trimmedDescription),
-          bindingName: "value\(index)"
-        )
-      }
 
       return EnumCase(
         name: name,
         sourceName: element.name.trimmedDescription,
+        keyExpression: Self.schemaKeyExpression(for: name, configuration: configuration),
         sourceToken: element.name,
         associatedValues: associatedValues
       )
@@ -476,6 +534,8 @@ extension EdgeToolsGenerableMacro {
 
     var key: String?
     var fragments = [String]()
+    var initialCapacity: ExprSyntax?
+    var partialStrings: StreamPartialStrings?
 
     for argument in arguments {
       if let label = argument.label?.text {
@@ -491,6 +551,37 @@ extension EdgeToolsGenerableMacro {
             continue
           }
           key = value
+        case "initialCapacity":
+          if argument.expression.is(NilLiteralExprSyntax.self) {
+            continue
+          }
+          guard let literal = argument.expression.as(IntegerLiteralExprSyntax.self),
+            let capacity = Int(literal.literal.text.replacingOccurrences(of: "_", with: "")),
+            capacity >= 0
+          else {
+            context.diagnose(
+              Diagnostic(
+                node: Syntax(argument),
+                message: SimpleDiagnostic("initialCapacity must be a nonnegative integer literal.")
+              )
+            )
+            continue
+          }
+          initialCapacity = argument.expression
+        case "partialStrings":
+          if argument.expression.is(NilLiteralExprSyntax.self) {
+            continue
+          }
+          do {
+            partialStrings = try Self.partialStrings(from: attribute)
+          } catch {
+            context.diagnose(
+              Diagnostic(
+                node: Syntax(argument),
+                message: SimpleDiagnostic(String(describing: error))
+              )
+            )
+          }
         default:
           continue
         }
@@ -499,7 +590,12 @@ extension EdgeToolsGenerableMacro {
       }
     }
 
-    return EdgeToolsGuideSelection(key: key, schemaFragments: fragments)
+    return EdgeToolsGuideSelection(
+      key: key,
+      schemaFragments: fragments,
+      initialCapacity: initialCapacity,
+      partialStrings: partialStrings
+    )
   }
 
   private static func generationSchemaProperty(
@@ -510,12 +606,12 @@ extension EdgeToolsGenerableMacro {
     let activeProperties = properties.filter { !$0.isIgnored }
     let propertyPairs =
       activeProperties.map { property in
-        "\(Self.quotedStringLiteral(property.schemaKey)): \(property.schemaExpression)"
+        "\(property.keyExpression): \(property.schemaExpression)"
       }
       .joined(separator: ",\n          ")
     let requiredProperties = activeProperties.filter { !$0.isOptional }
       .map { property in
-        Self.quotedStringLiteral(property.schemaKey)
+        property.keyExpression
       }
       .joined(separator: ", ")
 
@@ -553,19 +649,20 @@ extension EdgeToolsGenerableMacro {
     schemaFragments: [String]
   ) -> DeclSyntax {
     let choices = cases.map { enumCase in
-      let propertyPairs = enumCase.associatedValues.map { value in
-        "\(Self.quotedStringLiteral(value.schemaKey)): \(value.typeName).edgeToolsGenerationSchema"
-      }
-      .joined(separator: ",\n                      ")
+      let propertyPairs = enumCase.associatedValues
+        .map { value in
+          "\(value.keyExpression): \(value.typeName).edgeToolsGenerationSchema"
+        }
+        .joined(separator: ",\n                      ")
       let required = enumCase.associatedValues.filter { !$0.isOptional }
-        .map { Self.quotedStringLiteral($0.schemaKey) }
+        .map { $0.keyExpression }
         .joined(separator: ", ")
       if required.isEmpty {
         return """
           EdgeToolsGenerationSchema(
             .type(.object),
             .properties([
-              \(Self.quotedStringLiteral(enumCase.name)): EdgeToolsGenerationSchema(
+              \(enumCase.keyExpression): EdgeToolsGenerationSchema(
                 .type(.object),
                 .properties([
                   \(propertyPairs)
@@ -573,7 +670,7 @@ extension EdgeToolsGenerableMacro {
                 .additionalProperties(false)
               )
             ]),
-            .required([\(Self.quotedStringLiteral(enumCase.name))]),
+            .required([\(enumCase.keyExpression)]),
             .additionalProperties(false)
           )
           """
@@ -582,7 +679,7 @@ extension EdgeToolsGenerableMacro {
         EdgeToolsGenerationSchema(
           .type(.object),
           .properties([
-            \(Self.quotedStringLiteral(enumCase.name)): EdgeToolsGenerationSchema(
+            \(enumCase.keyExpression): EdgeToolsGenerationSchema(
               .type(.object),
               .properties([
                 \(propertyPairs)
@@ -591,12 +688,14 @@ extension EdgeToolsGenerableMacro {
               .additionalProperties(false)
             )
           ]),
-          .required([\(Self.quotedStringLiteral(enumCase.name))]),
+          .required([\(enumCase.keyExpression)]),
           .additionalProperties(false)
         )
         """
     }
-    var fragments = [".anyOf([\n            \(choices.joined(separator: ",\n            "))\n          ])"]
+    var fragments = [
+      ".anyOf([\n            \(choices.joined(separator: ",\n            "))\n          ])"
+    ]
     fragments.append(contentsOf: schemaFragments)
     return """
       \(raw: modifierPrefix)static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
@@ -620,7 +719,7 @@ extension EdgeToolsGenerableMacro {
           return "self.\(property.name) = nil"
         }
         return
-          "self.\(property.name) = try \(property.initializerTypeName)(edgeToolsValue: _edgeToolsValue(object, forKey: \(Self.quotedStringLiteral(property.schemaKey))))"
+          "self.\(property.name) = try \(property.initializerTypeName)(edgeToolsValue: _edgeToolsValue(object, forKey: \(property.keyExpression)))"
       }
       .joined(separator: "\n")
 
@@ -645,27 +744,29 @@ extension EdgeToolsGenerableMacro {
     cases: [EnumCase],
     modifierPrefix: String
   ) -> DeclSyntax {
-    let caseInitializers = cases.map { enumCase in
-      let keys = enumCase.associatedValues.filter { !$0.isOptional }
-        .map { Self.quotedStringLiteral($0.schemaKey) }
-        .joined(separator: ", ")
-      let arguments = enumCase.associatedValues.map { value in
-        let expression =
-          "try \(Self.initializerTypeName(for: value.typeName))(edgeToolsValue: _edgeToolsValue(payload, forKey: \(Self.quotedStringLiteral(value.schemaKey))))"
-        return value.sourceLabel.map { "\($0): \(expression)" } ?? expression
+    let caseInitializers =
+      cases.map { enumCase in
+        let keys = enumCase.associatedValues.filter { !$0.isOptional }
+          .map { $0.keyExpression }
+          .joined(separator: ", ")
+        let arguments = enumCase.associatedValues
+          .map { value in
+            let expression =
+              "try \(Self.initializerTypeName(for: value.typeName))(edgeToolsValue: _edgeToolsValue(payload, forKey: \(value.keyExpression)))"
+            return value.sourceLabel.map { "\($0): \(expression)" } ?? expression
+          }
+          .joined(separator: ",\n          ")
+        return """
+          if let value = object[\(enumCase.keyExpression)] {
+            let payload = try _edgeToolsRequireObjectValue(value, keys: [\(keys)])
+            self = .\(enumCase.sourceName)(
+              \(arguments)
+            )
+            return
+          }
+          """
       }
-      .joined(separator: ",\n          ")
-      return """
-        if let value = object[\(Self.quotedStringLiteral(enumCase.name))] {
-          let payload = try _edgeToolsRequireObjectValue(value, keys: [\(keys)])
-          self = .\(enumCase.sourceName)(
-            \(arguments)
-          )
-          return
-        }
-        """
-    }
-    .joined(separator: "\n")
+      .joined(separator: "\n")
     return """
       \(raw: modifierPrefix)init(edgeToolsValue: EdgeToolsValue) throws {
         let object = try _edgeToolsRequireObjectValue(edgeToolsValue)
@@ -690,7 +791,7 @@ extension EdgeToolsGenerableMacro {
           ? "self.\(property.name)?.edgeToolsValue"
           : "self.\(property.name).edgeToolsValue"
         return
-          "(key: \(Self.quotedStringLiteral(property.schemaKey)), value: \(valueExpression))"
+          "(key: \(property.keyExpression), value: \(valueExpression))"
       }
 
     if entries.isEmpty {
@@ -714,22 +815,24 @@ extension EdgeToolsGenerableMacro {
     from cases: [EnumCase],
     modifierPrefix: String
   ) -> DeclSyntax {
-    let switchCases = cases.map { enumCase in
-      let bindings = enumCase.associatedValues.map { "let \($0.bindingName)" }
-        .joined(separator: ", ")
-      let entries = enumCase.associatedValues.map { value in
-        "(key: \(Self.quotedStringLiteral(value.schemaKey)), value: \(value.bindingName).edgeToolsValue)"
+    let switchCases =
+      cases.map { enumCase in
+        let bindings = enumCase.associatedValues.map { "let \($0.bindingName)" }
+          .joined(separator: ", ")
+        let entries = enumCase.associatedValues
+          .map { value in
+            "(key: \(value.keyExpression), value: \(value.bindingName).edgeToolsValue)"
+          }
+          .joined(separator: ",\n            ")
+        return """
+          case .\(enumCase.sourceName)(\(bindings)):
+            _edgeToolsBuildObjectValue(
+              (key: \(enumCase.keyExpression), value: _edgeToolsBuildObjectValue(
+                \(entries)
+              )))
+          """
       }
-      .joined(separator: ",\n            ")
-      return """
-        case .\(enumCase.sourceName)(\(bindings)):
-          _edgeToolsBuildObjectValue(
-            (key: \(Self.quotedStringLiteral(enumCase.name)), value: _edgeToolsBuildObjectValue(
-              \(entries)
-            )))
-        """
-    }
-    .joined(separator: "\n")
+      .joined(separator: "\n")
     return """
       \(raw: modifierPrefix)var edgeToolsValue: EdgeToolsValue {
         switch self {
@@ -832,7 +935,8 @@ extension EdgeToolsGenerableMacro {
 
   private static func streamObjectGeneration(
     from properties: [StoredProperty],
-    accessModifier: String?
+    accessModifier: String?,
+    attribute: AttributeSyntax
   ) throws -> StreamObjectGeneration {
     return try StreamObjectGeneration(
       fields: properties.filter { !$0.isIgnored }
@@ -840,15 +944,22 @@ extension EdgeToolsGenerableMacro {
           StreamParseableField(
             name: .identifier(property.name),
             type: TypeSyntax("\(raw: property.typeName)"),
-            keys: [property.schemaKey]
+            keys: [property.schemaKey],
+            convertsKeys: property.convertsKeys,
+            initialCapacity: property.initialCapacity,
+            partialStrings: property.partialStrings
           )
         },
-      configuration: Self.streamGenerationConfiguration(accessModifier: accessModifier)
+      configuration: Self.streamGenerationConfiguration(
+        accessModifier: accessModifier,
+        from: attribute
+      )
     )
   }
 
   private static func streamGenerationConfiguration(
-    accessModifier: String?
+    accessModifier: String?,
+    from attribute: AttributeSyntax
   ) -> StreamGenerationConfiguration {
     let accessLevel: StreamGeneratedAccessLevel =
       switch accessModifier {
@@ -857,7 +968,12 @@ extension EdgeToolsGenerableMacro {
       case "fileprivate": .fileprivate
       default: .internal
       }
-    return StreamGenerationConfiguration(viewMode: .unsafe, accessLevel: accessLevel)
+    return StreamGenerationConfiguration(
+      viewMode: .unsafe,
+      accessLevel: accessLevel,
+      schemaCache: Self.argument(named: "schemaCache", in: attribute),
+      keyDecodingStrategy: Self.argument(named: "keyDecodingStrategy", in: attribute)
+    )
   }
 
   private static func streamDefaultCase(in declaration: EnumDeclSyntax) throws -> TokenSyntax? {
@@ -889,7 +1005,8 @@ extension EdgeToolsGenerableMacro {
   private static func generablePartialCustomization(
     fields: [StreamPartialFieldDescriptor],
     from properties: [StoredProperty],
-    accessModifier: String?
+    accessModifier: String?,
+    keyExpressions: [String: String] = [:]
   ) -> StreamPartialCustomization {
     let generatedProperties = fields.map { field in
       let name = field.memberName.trimmedDescription
@@ -902,6 +1019,9 @@ extension EdgeToolsGenerableMacro {
       return StoredProperty(
         name: name,
         schemaKey: key,
+        keyExpression: source?.keyExpression ?? keyExpressions[field.unescapedName]
+          ?? Self.quotedStringLiteral(key),
+        convertsKeys: false,
         typeName: typeName,
         initializerTypeName: Self.initializerTypeName(for: typeName),
         isIgnored: false,
@@ -911,7 +1031,9 @@ extension EdgeToolsGenerableMacro {
           typeName: typeName,
           guideSelection: EdgeToolsGuideSelection(key: nil, schemaFragments: fragments)
         ),
-        schemaFragments: fragments
+        schemaFragments: fragments,
+        initialCapacity: nil,
+        partialStrings: .streamString
       )
     }
     let modifierPrefix = Self.modifierPrefix(for: accessModifier)
@@ -941,4 +1063,45 @@ extension EdgeToolsGenerableMacro {
     )
   }
 
+}
+
+// MARK: - Streaming Options
+
+extension EdgeToolsGenerableMacro {
+  private static func argument(named name: String, in attribute: AttributeSyntax) -> ExprSyntax? {
+    guard case .argumentList(let arguments) = attribute.arguments else { return nil }
+    return arguments.first { $0.label?.text == name }?.expression
+  }
+
+  private static func partialStrings(from attribute: AttributeSyntax) throws -> StreamPartialStrings
+  {
+    guard let expression = Self.argument(named: "partialStrings", in: attribute) else {
+      return .streamString
+    }
+    guard let member = expression.as(MemberAccessExprSyntax.self),
+      member.base.map({
+        ["PartialStringStorage", "StreamParsing.PartialStringStorage"]
+          .contains($0.trimmedDescription)
+      }) ?? true
+    else {
+      throw MacroExpansionErrorMessage("partialStrings requires .streamString or .string.")
+    }
+    switch member.declName.baseName.text {
+    case "streamString": return .streamString
+    case "string": return .string
+    default:
+      throw MacroExpansionErrorMessage("partialStrings requires .streamString or .string.")
+    }
+  }
+
+  private static func schemaKeyExpression(
+    for key: String,
+    configuration: StreamGenerationConfiguration
+  ) -> String {
+    if let decoded = configuration.decodedKey(for: key) {
+      return Self.quotedStringLiteral(decoded)
+    }
+    return
+      "(\(configuration.keyDecodingStrategy!.trimmedDescription) as StreamParsing.StreamKeyDecodingStrategy).key(for: \(Self.quotedStringLiteral(key)))"
+  }
 }
