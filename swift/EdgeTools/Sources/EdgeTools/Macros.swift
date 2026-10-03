@@ -10,9 +10,22 @@ import StreamParsing
 /// labeled associated values use their labels as keys and unlabeled values use positional keys
 /// such as `_0` and `_1`.
 ///
-/// Also generates a stream-parseable `Partial` for nongeneric structs and enums with one
-/// `@StreamParseableDefault` case. A nested user-declared `Partial` leaves stream parsing
-/// to a manually provided conformance.
+/// Also generates a stream-parseable `Partial` for structs and nongeneric enums with one
+/// `@StreamParseableDefault` case. Structs may be generic or nested in generic types. Parsed
+/// generic members must conform to `StreamParseable`, with `EdgeToolsGenerable` partials.
+/// A nested user-declared `Partial` leaves stream parsing to a manually provided conformance.
+///
+/// Generic partials do not automatically conform to `Sendable`. Declare that conformance when
+/// their member partials are sendable:
+///
+/// ```swift
+/// @EdgeToolsGenerable
+/// struct Page<Item: EdgeToolsGenerable & StreamParseable & Sendable>: Sendable
+/// where Item.Partial: EdgeToolsGenerable {
+///   var items: [Item]
+/// }
+/// extension Page.Partial: Sendable where Item.Partial: Sendable {}
+/// ```
 ///
 /// `partialStrings` selects `StreamString` or Swift `String` storage for string leaves in the
 /// generated partial. Nested generable types select their own storage. `keyDecodingStrategy`
@@ -103,6 +116,20 @@ public func _edgeToolsValue(
   forKey key: String
 ) -> EdgeToolsValue {
   object[key] ?? .null
+}
+
+/// Decodes partial storage while preserving a nullable root's explicit null and missing fields.
+public func _edgeToolsPartialValue<Partial: EdgeToolsGenerable & StreamParseableRoot>(
+  _ value: EdgeToolsValue?,
+  as type: Partial.Type
+) throws -> Partial? {
+  guard let value else {
+    return nil
+  }
+  if value == .null {
+    return Partial._streamNullValue
+  }
+  return try Partial(edgeToolsValue: value)
 }
 
 @inlinable
