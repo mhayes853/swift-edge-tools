@@ -10,9 +10,29 @@ import StreamParsing
 /// labeled associated values use their labels as keys and unlabeled values use positional keys
 /// such as `_0` and `_1`.
 ///
-/// Also generates a stream-parseable `Partial` for nongeneric structs and enums with one
-/// `@StreamParseableDefault` case. A nested user-declared `Partial` leaves stream parsing
-/// to a manually provided conformance.
+/// Also generates a stream-parseable `Partial` for structs and nongeneric enums with one
+/// `@StreamParseableDefault` case. Structs may be generic or nested in generic types. Generic
+/// members parsed directly must conform to `StreamParseable`, with `EdgeToolsGenerable` partials.
+/// A nested user-declared `Partial` leaves stream parsing to a manually provided conformance.
+///
+/// Generic partials do not automatically conform to `Sendable`. Declare that conformance when
+/// their member partials are sendable:
+///
+/// ```swift
+/// @EdgeToolsGenerable
+/// struct Page<Item: EdgeToolsGenerable & StreamParseable & Sendable>: Sendable
+/// where Item.Partial: EdgeToolsGenerable {
+///   var items: [Item]
+/// }
+/// extension Page.Partial: Sendable where Item.Partial: Sendable {}
+/// ```
+///
+/// `partialStrings` selects `StreamString` or Swift `String` storage for string leaves in the
+/// generated partial. Nested generable types select their own storage. `keyDecodingStrategy`
+/// derives property, enum case, and associated value keys for both generation and parsing;
+/// explicit `@EdgeToolsGuide(key:)` keys are preserved. Custom strategies must return stable keys.
+/// `schemaCache` selects the cache for streaming schemas. Cache and custom strategy expressions
+/// are evaluated inside the generated `Partial`, so qualify references rather than using `Self`.
 @attached(extension, conformances: EdgeToolsGenerable, StreamParseable, names: arbitrary)
 @attached(
   member,
@@ -20,7 +40,12 @@ import StreamParsing
   named(init),
   named(edgeToolsValue)
 )
-public macro EdgeToolsGenerable(_ schema: EdgeToolsGenerationSchema...) =
+public macro EdgeToolsGenerable(
+  _ schema: EdgeToolsGenerationSchema...,
+  partialStrings: PartialStringStorage = .streamString,
+  keyDecodingStrategy: StreamKeyDecodingStrategy = .useDefaultKeys,
+  schemaCache: StreamSchemaCache = .shared
+) =
   #externalMacro(module: "EdgeToolsMacros", type: "EdgeToolsGenerableMacro")
 
 /// Marks a stored property as ignored for ``EdgeToolsGenerationSchema`` schema synthesis.
@@ -28,12 +53,34 @@ public macro EdgeToolsGenerable(_ schema: EdgeToolsGenerationSchema...) =
 public macro EdgeToolsIgnored() =
   #externalMacro(module: "EdgeToolsMacros", type: "EdgeToolsIgnoredMacro")
 
-/// Overrides schema synthesis for a stored property.
+/// Overrides schema synthesis and streaming storage for a stored property.
+///
+/// `partialStrings` overrides the enclosing type's string storage choice. `initialCapacity`
+/// reserves storage for strings, arrays, or dictionaries when parsing begins; it is a
+/// nonnegative integer literal hint, measured in decoded UTF-8 bytes or container elements.
 @attached(peer)
 public macro EdgeToolsGuide(
   key: Swift.String? = nil,
+  initialCapacity: Swift.Int? = nil,
+  partialStrings: PartialStringStorage? = nil,
   _ schema: EdgeToolsGenerationSchema...
 ) = #externalMacro(module: "EdgeToolsMacros", type: "EdgeToolsGuideMacro")
+
+/// Converts a property's JSON source representation after its value finishes parsing.
+///
+/// The strategy's `Value` must match the property's unwrapped type. Its `Source` supplies the
+/// generation schema and value representation; schema fragments constrain that source.
+/// The generated partial stores `ConvertedPartial<Conversion>`, exposing the incremental
+/// `source`, cached `value`, and `conversionError`. Nonoptional properties require a default
+/// for `init(orInitial:)`. Capacity and string storage overrides are unavailable because the
+/// strategy defines its source storage.
+@attached(peer)
+public macro EdgeToolsGuide<Conversion: StreamCompletedValueConversion>(
+  key: Swift.String? = nil,
+  completedConversion: Conversion.Type,
+  _ schema: EdgeToolsGenerationSchema...
+) = #externalMacro(module: "EdgeToolsMacros", type: "EdgeToolsGuideMacro")
+where Conversion.Source: EdgeToolsGenerable
 
 @inlinable
 @inline(always)
@@ -69,6 +116,20 @@ public func _edgeToolsValue(
   forKey key: String
 ) -> EdgeToolsValue {
   object[key] ?? .null
+}
+
+/// Decodes partial storage while preserving a nullable root's explicit null and missing fields.
+public func _edgeToolsPartialValue<Partial: EdgeToolsGenerable & StreamParseableRoot>(
+  _ value: EdgeToolsValue?,
+  as type: Partial.Type
+) throws -> Partial? {
+  guard let value else {
+    return nil
+  }
+  if value == .null {
+    return Partial._streamNullValue
+  }
+  return try Partial(edgeToolsValue: value)
 }
 
 @inlinable

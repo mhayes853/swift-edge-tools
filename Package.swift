@@ -122,10 +122,10 @@ let package = Package(
     .default(enabledTraits: ["Foundation"])
   ],
   dependencies: [
-    .package(url: "https://github.com/ml-explore/mlx-swift-lm", from: "3.31.4"),
+    .package(url: "https://github.com/ml-explore/mlx-swift-lm", .upToNextMinor(from: "3.31.4")),
     .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.18.7"),
     .package(url: "https://github.com/pointfreeco/swift-custom-dump", from: "1.6.1"),
-    .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.31.3"),
+    .package(url: "https://github.com/ml-explore/mlx-swift", .upToNextMinor(from: "0.31.3")),
     .package(url: "https://github.com/pointfreeco/swift-macro-testing", from: "0.6.5"),
     .package(url: "https://github.com/swiftlang/swift-syntax", "600.0.0"..<"603.0.0"),
     .package(url: "https://github.com/huggingface/swift-transformers", from: "1.3.0"),
@@ -139,7 +139,7 @@ let package = Package(
     .package(url: "https://github.com/mhayes853/swift-operation", from: "0.7.0"),
     .package(
       url: "https://github.com/mhayes853/swift-stream-parsing",
-      revision: "34cc4e8220be9274f4dfe251ec01990ce5750488",
+      revision: "5e89ec817e045c6be7a862302321cf625324eff1",
       traits: []
     )
   ],
