@@ -11,8 +11,8 @@ import StreamParsing
 /// such as `_0` and `_1`.
 ///
 /// Also generates a stream-parseable `Partial` for structs and nongeneric enums with one
-/// `@StreamParseableDefault` case. Structs may be generic or nested in generic types. Parsed
-/// generic members must conform to `StreamParseable`, with `EdgeToolsGenerable` partials.
+/// `@StreamParseableDefault` case. Structs may be generic or nested in generic types. Generic
+/// members parsed directly must conform to `StreamParseable`, with `EdgeToolsGenerable` partials.
 /// A nested user-declared `Partial` leaves stream parsing to a manually provided conformance.
 ///
 /// Generic partials do not automatically conform to `Sendable`. Declare that conformance when
