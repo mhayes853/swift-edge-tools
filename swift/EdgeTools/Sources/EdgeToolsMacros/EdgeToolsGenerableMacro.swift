@@ -103,8 +103,9 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
       .map { try Self.partialStrings(from: $0) } ?? .streamString
     let typeName = type.trimmedDescription
     let accessModifier = Self.streamAccessModifier(for: declaration, in: context)
-    var configuration = Self.streamGenerationConfiguration(
+    let configuration = Self.streamGenerationConfiguration(
       accessModifier: accessModifier,
+      genericParameters: Self.genericParameters(in: declaration, context: context),
       from: node
     )
     let hasCustomPartial = declaration.memberBlock.members.contains { member in
@@ -112,10 +113,6 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
         || member.decl.as(TypeAliasDeclSyntax.self)?.name.text == "Partial"
         || member.decl.as(EnumDeclSyntax.self)?.name.text == "Partial"
     }
-    configuration.genericParameters = Self.genericParameters(
-      in: declaration,
-      context: context
-    )
     let isGeneric = !configuration.genericParameters.isEmpty
     let basicExtension = try ExtensionDeclSyntax(
       "extension \(raw: typeName): EdgeToolsGenerable {}"
@@ -222,8 +219,6 @@ extension EdgeToolsGenerableMacro {
     let streamField: StreamParseableField
     let keyExpression: String
     var isIgnored = false
-    var hasDefaultValue = false
-    var preservesStreamNull = false
     var schemaFragments = [String]()
 
     var name: String { self.streamField.name.text }
@@ -232,6 +227,7 @@ extension EdgeToolsGenerableMacro {
       EdgeToolsGenerableMacro.initializerTypeName(for: self.typeName)
     }
     var isOptional: Bool { self.streamField.type.streamIsOptional }
+    var hasDefaultValue: Bool { self.streamField.defaultValue != nil }
     var schemaExpression: String {
       let base: String
       if let conversion = self.streamField.completedConversion {
@@ -356,16 +352,17 @@ extension EdgeToolsGenerableMacro {
     partialStrings: StreamPartialStrings,
     context: some MacroExpansionContext
   ) -> [StoredProperty] {
-    declaration.memberBlock.members.reduce(into: [StoredProperty]()) { properties, member in
-      guard let variableDecl = member.decl.as(VariableDeclSyntax.self) else { return }
-      guard !Self.isStatic(variableDecl) else { return }
-      properties.append(
-        contentsOf: Self.storedProperties(
-          from: variableDecl,
-          configuration: configuration,
-          partialStrings: partialStrings,
-          context: context
-        )
+    declaration.memberBlock.members.flatMap { member -> [StoredProperty] in
+      guard let variableDecl = member.decl.as(VariableDeclSyntax.self),
+        !Self.isStatic(variableDecl)
+      else {
+        return []
+      }
+      return Self.storedProperties(
+        from: variableDecl,
+        configuration: configuration,
+        partialStrings: partialStrings,
+        context: context
       )
     }
   }
@@ -449,7 +446,6 @@ extension EdgeToolsGenerableMacro {
         streamField: field,
         keyExpression: Self.schemaKeyExpression(for: field, configuration: configuration),
         isIgnored: isIgnored,
-        hasDefaultValue: hasDefaultValue,
         schemaFragments: guideSelection?.schemaFragments ?? []
       )
     }
@@ -686,17 +682,15 @@ extension EdgeToolsGenerableMacro {
 
   private static func valueInitializer(
     from properties: [StoredProperty],
-    modifierPrefix: String
+    modifierPrefix: String,
+    preservesStreamNull: Bool = false
   ) -> DeclSyntax {
     let assignments =
       properties.compactMap { property -> String? in
         if property.isIgnored {
-          if property.hasDefaultValue {
-            return nil
-          }
-          return "self.\(property.name) = nil"
+          return property.hasDefaultValue ? nil : "self.\(property.name) = nil"
         }
-        if property.preservesStreamNull {
+        if preservesStreamNull {
           let type = property.streamField.type.streamUnwrappedOptionalType.trimmedDescription
           return "self.\(property.name) = try _edgeToolsPartialValue(object[\(property.keyExpression)], as: \(type).self)"
         }
@@ -917,20 +911,12 @@ extension EdgeToolsGenerableMacro {
       }
       return node
     }
-    return ([Syntax(declaration)] + enclosing).flatMap { node in
-      let clause: GenericParameterClauseSyntax?
-      if let declaration = node.as(StructDeclSyntax.self) {
-        clause = declaration.genericParameterClause
-      } else if let declaration = node.as(EnumDeclSyntax.self) {
-        clause = declaration.genericParameterClause
-      } else if let declaration = node.as(ClassDeclSyntax.self) {
-        clause = declaration.genericParameterClause
-      } else if let declaration = node.as(ActorDeclSyntax.self) {
-        clause = declaration.genericParameterClause
-      } else {
-        clause = nil
+    return ([Syntax(declaration)] + enclosing).flatMap { node -> [TokenSyntax] in
+      guard node.isProtocol(DeclGroupSyntax.self) else {
+        return []
       }
-      return clause?.parameters.map(\.name.trimmed) ?? []
+      return node.asProtocol(WithGenericParametersSyntax.self)?
+        .genericParameterClause?.parameters.map(\.name.trimmed) ?? []
     }
   }
 
@@ -953,6 +939,7 @@ extension EdgeToolsGenerableMacro {
 
   private static func streamGenerationConfiguration(
     accessModifier: String?,
+    genericParameters: [TokenSyntax] = [],
     from attribute: AttributeSyntax
   ) -> StreamGenerationConfiguration {
     let accessLevel: StreamGeneratedAccessLevel =
@@ -965,6 +952,7 @@ extension EdgeToolsGenerableMacro {
     return StreamGenerationConfiguration(
       viewMode: .unsafe,
       accessLevel: accessLevel,
+      genericParameters: genericParameters,
       schemaCache: Self.argument(named: "schemaCache", in: attribute),
       keyDecodingStrategy: Self.argument(named: "keyDecodingStrategy", in: attribute)
     )
@@ -1013,7 +1001,6 @@ extension EdgeToolsGenerableMacro {
             keys: field.keys
           ),
           keyExpression: keyExpression,
-          preservesStreamNull: preservesStreamNull,
           schemaFragments: schemaFragments.isEmpty ? [] : schemaFragments[index]
         )
       }
@@ -1031,7 +1018,8 @@ extension EdgeToolsGenerableMacro {
         MemberBlockItemSyntax(
           decl: Self.valueInitializer(
             from: generatedProperties,
-            modifierPrefix: modifierPrefix
+            modifierPrefix: modifierPrefix,
+            preservesStreamNull: preservesStreamNull
           )
         ),
         MemberBlockItemSyntax(

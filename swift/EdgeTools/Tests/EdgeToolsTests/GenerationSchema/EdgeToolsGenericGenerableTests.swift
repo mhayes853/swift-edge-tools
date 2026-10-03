@@ -148,8 +148,7 @@ where Value.Partial: EdgeToolsGenerable {
   public var value: Value
 }
 
-extension GenericBox.Partial: Sendable
-where Value: StreamParseable, Value.Partial: EdgeToolsGenerable & Sendable {}
+extension GenericBox.Partial: Sendable where Value.Partial: Sendable {}
 
 @EdgeToolsGenerable(keyDecodingStrategy: .convertFromSnakeCase)
 private struct GenericPage<Item: EdgeToolsGenerable & StreamParseable & SendableMetatype>
