@@ -31,8 +31,9 @@ import StreamParsing
 /// generated partial. Nested generable types select their own storage. `keyDecodingStrategy`
 /// derives property, enum case, and associated value keys for both generation and parsing;
 /// explicit `@EdgeToolsGuide(key:)` keys are preserved. Custom strategies must return stable keys.
-/// `schemaCache` selects the cache for streaming schemas. Cache and custom strategy expressions
-/// are evaluated inside the generated `Partial`, so qualify references rather than using `Self`.
+/// `schemaCache` selects the cache for streaming schemas and is evaluated inside the generated
+/// `Partial`. Custom key strategies are evaluated wherever keys are needed, in both the completed
+/// type and its partials. Qualify cache and strategy references rather than using `Self`.
 @attached(extension, conformances: EdgeToolsGenerable, StreamParseable, names: arbitrary)
 @attached(
   member,
@@ -55,9 +56,11 @@ public macro EdgeToolsIgnored() =
 
 /// Overrides schema synthesis and streaming storage for a stored property.
 ///
+/// `key` is a nonempty string literal, used as written without applying the key decoding strategy.
 /// `partialStrings` overrides the enclosing type's string storage choice. `initialCapacity`
 /// reserves storage for strings, arrays, or dictionaries when parsing begins; it is a
-/// nonnegative integer literal hint, measured in decoded UTF-8 bytes or container elements.
+/// nonnegative integer literal hint in any radix, measured in decoded UTF-8 bytes or container
+/// elements. Explicit `nil` options use their defaults.
 @attached(peer)
 public macro EdgeToolsGuide(
   key: Swift.String? = nil,

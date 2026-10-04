@@ -15,12 +15,12 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
     let schemaFragments = Self.schemaFragments(from: node)
     let accessModifier = Self.accessModifier(for: declaration)
     let modifierPrefix = Self.modifierPrefix(for: accessModifier)
-    let partialStrings =
-      try Self.argument(named: "partialStrings", in: node)
-      .map { try Self.partialStrings(from: $0) } ?? .streamString
+    let arguments = StreamMacroArguments(parsing: node)
+    arguments.errors.forEach { context.diagnose($0.diagnostic) }
+    let partialStrings = arguments.partialStrings ?? .streamString
     let configuration = Self.streamGenerationConfiguration(
       accessModifier: accessModifier,
-      from: node
+      from: arguments
     )
     var members = [DeclSyntax]()
 
@@ -29,7 +29,7 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
         in: structDecl,
         configuration: configuration,
         partialStrings: partialStrings,
-        context: context
+        diagnose: { context.diagnose($0) }
       )
       if !Self.hasExistingEdgeToolsGenerationSchema(in: declaration) {
         members.append(
@@ -98,15 +98,14 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
         "@EdgeToolsGenerable can only be applied to struct or enum declarations."
       )
     }
-    let partialStrings =
-      try Self.argument(named: "partialStrings", in: node)
-      .map { try Self.partialStrings(from: $0) } ?? .streamString
+    let arguments = StreamMacroArguments(parsing: node)
+    let partialStrings = arguments.partialStrings ?? .streamString
     let typeName = type.trimmedDescription
     let accessModifier = Self.streamAccessModifier(for: declaration, in: context)
     let configuration = Self.streamGenerationConfiguration(
       accessModifier: accessModifier,
       genericParameters: Self.genericParameters(in: declaration, context: context),
-      from: node
+      from: arguments
     )
     let hasCustomPartial = declaration.memberBlock.members.contains { member in
       member.decl.as(StructDeclSyntax.self)?.name.text == "Partial"
@@ -126,7 +125,7 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
         in: structDecl,
         configuration: configuration,
         partialStrings: partialStrings,
-        context: context
+        diagnose: { _ in }
       )
       let parsedProperties = properties.filter { !$0.isIgnored }
       let generation = try StreamObjectGeneration(
@@ -236,14 +235,6 @@ extension EdgeToolsGenerableMacro {
     }
   }
 
-  private struct EdgeToolsGuideSelection {
-    var key: String?
-    var schemaFragments = [String]()
-    var initialCapacity: ExprSyntax?
-    var partialStrings: StreamPartialStrings?
-    var completedConversion: TypeSyntax?
-  }
-
   private struct AssociatedValue {
     let streamField: StreamParseableField
     let keyExpression: String
@@ -345,7 +336,7 @@ extension EdgeToolsGenerableMacro {
     in declaration: StructDeclSyntax,
     configuration: StreamGenerationConfiguration,
     partialStrings: StreamPartialStrings,
-    context: some MacroExpansionContext
+    diagnose: (Diagnostic) -> Void
   ) -> [StoredProperty] {
     declaration.memberBlock.members.flatMap { member -> [StoredProperty] in
       guard let variableDecl = member.decl.as(VariableDeclSyntax.self),
@@ -357,7 +348,7 @@ extension EdgeToolsGenerableMacro {
         from: variableDecl,
         configuration: configuration,
         partialStrings: partialStrings,
-        context: context
+        diagnose: diagnose
       )
     }
   }
@@ -366,7 +357,7 @@ extension EdgeToolsGenerableMacro {
     from variableDecl: VariableDeclSyntax,
     configuration: StreamGenerationConfiguration,
     partialStrings: StreamPartialStrings,
-    context: some MacroExpansionContext
+    diagnose: (Diagnostic) -> Void
   ) -> [StoredProperty] {
     variableDecl.bindings.compactMap { binding in
       guard Self.isStoredProperty(binding) else { return nil }
@@ -374,7 +365,7 @@ extension EdgeToolsGenerableMacro {
         return nil
       }
       guard let type = binding.typeAnnotation?.type else {
-        context.diagnose(
+        diagnose(
           Diagnostic(
             node: Syntax(binding),
             message: SimpleDiagnostic("Stored properties must declare an explicit type.")
@@ -384,7 +375,7 @@ extension EdgeToolsGenerableMacro {
       }
       let guideAttributes = Self.guideAttributes(in: variableDecl)
       if guideAttributes.count > 1 {
-        context.diagnose(
+        diagnose(
           Diagnostic(
             node: Syntax(variableDecl),
             message: SimpleDiagnostic(
@@ -393,16 +384,15 @@ extension EdgeToolsGenerableMacro {
           )
         )
       }
-      let guideSelection = guideAttributes.first.map { attribute in
-        Self.parseEdgeToolsGuide(in: attribute, context: context)
-      }
+      let guideSelection = guideAttributes.first.map(StreamMacroArguments.init(parsing:))
+      guideSelection?.errors.forEach { diagnose($0.diagnostic) }
       let ignoredAttribute = Self.ignoredAttribute(in: variableDecl)
       var isIgnored = ignoredAttribute != nil
       let hasDefaultValue = binding.initializer != nil
       let isOptional = type.streamIsOptional
 
       if isIgnored && guideSelection != nil {
-        context.diagnose(
+        diagnose(
           Diagnostic(
             node: Syntax(variableDecl),
             message: SimpleDiagnostic(
@@ -414,7 +404,7 @@ extension EdgeToolsGenerableMacro {
       }
 
       if isIgnored && !isOptional && !hasDefaultValue {
-        context.diagnose(
+        diagnose(
           Diagnostic(
             node: Syntax(variableDecl),
             message: SimpleDiagnostic(
@@ -428,8 +418,8 @@ extension EdgeToolsGenerableMacro {
       let field = StreamParseableField(
         name: identifierPattern.identifier,
         type: type,
-        explicitKeys: guideSelection?.key.map { [$0] },
-        initialCapacity: guideSelection?.initialCapacity,
+        explicitKeys: guideSelection?.explicitKeys,
+        initialCapacity: guideSelection?.initialCapacity.map { ExprSyntax("\(raw: String($0))") },
         completedConversion: guideSelection?.completedConversion,
         partialStrings: guideSelection?.partialStrings
           ?? (guideSelection?.completedConversion == nil ? partialStrings : .streamString),
@@ -439,7 +429,7 @@ extension EdgeToolsGenerableMacro {
         streamField: field,
         keyExpression: configuration.decodedKeys(for: field)[0].expression.trimmedDescription,
         isIgnored: isIgnored,
-        schemaFragments: guideSelection?.schemaFragments ?? []
+        schemaFragments: guideAttributes.first.map(Self.schemaFragments(from:)) ?? []
       )
     }
   }
@@ -513,56 +503,6 @@ extension EdgeToolsGenerableMacro {
       guard argument.label == nil else { return nil }
       return argument.expression.trimmedDescription
     }
-  }
-
-  private static func parseEdgeToolsGuide(
-    in attribute: AttributeSyntax,
-    context: some MacroExpansionContext
-  ) -> EdgeToolsGuideSelection {
-    var guide = EdgeToolsGuideSelection()
-    guard case .argumentList(let arguments) = attribute.arguments else { return guide }
-
-    for argument in arguments {
-      do throws(MacroExpansionErrorMessage) {
-        switch argument.label?.text {
-        case "key":
-          guard let key = Self.stringLiteralValue(from: argument.expression) else {
-            throw MacroExpansionErrorMessage("key must be a string literal.")
-          }
-          guide.key = key
-        case "initialCapacity" where !argument.expression.is(NilLiteralExprSyntax.self):
-          guard let literal = argument.expression.as(IntegerLiteralExprSyntax.self),
-            let capacity = Int(literal.literal.text.replacingOccurrences(of: "_", with: "")),
-            capacity >= 0
-          else {
-            throw MacroExpansionErrorMessage(
-              "initialCapacity must be a nonnegative integer literal."
-            )
-          }
-          guide.initialCapacity = ExprSyntax("\(raw: String(capacity))")
-        case "partialStrings" where !argument.expression.is(NilLiteralExprSyntax.self):
-          guide.partialStrings = try Self.partialStrings(from: argument.expression)
-        case "completedConversion":
-          guard let member = argument.expression.as(MemberAccessExprSyntax.self),
-            member.declName.baseName.text == "self", let base = member.base
-          else {
-            throw MacroExpansionErrorMessage(
-              "completedConversion requires a strategy type followed by .self."
-            )
-          }
-          guide.completedConversion = TypeSyntax("\(raw: base.trimmedDescription)")
-        case nil:
-          guide.schemaFragments.append(argument.expression.trimmedDescription)
-        default:
-          break
-        }
-      } catch {
-        context.diagnose(
-          Diagnostic(node: Syntax(argument), message: SimpleDiagnostic(error.message))
-        )
-      }
-    }
-    return guide
   }
 
   private static func generationSchemaProperty(
@@ -873,9 +813,6 @@ extension EdgeToolsGenerableMacro {
     return "\"\(escaped)\""
   }
 
-  private static func stringLiteralValue(from expression: ExprSyntax) -> String? {
-    expression.as(StringLiteralExprSyntax.self)?.representedLiteralValue
-  }
 }
 
 private struct SimpleDiagnostic: DiagnosticMessage {
@@ -933,7 +870,7 @@ extension EdgeToolsGenerableMacro {
   private static func streamGenerationConfiguration(
     accessModifier: String?,
     genericParameters: [TokenSyntax] = [],
-    from attribute: AttributeSyntax
+    from arguments: StreamMacroArguments
   ) -> StreamGenerationConfiguration {
     let accessLevel: StreamGeneratedAccessLevel =
       switch accessModifier {
@@ -946,8 +883,8 @@ extension EdgeToolsGenerableMacro {
       viewMode: .unsafe,
       accessLevel: accessLevel,
       genericParameters: genericParameters,
-      schemaCache: Self.argument(named: "schemaCache", in: attribute),
-      keyDecodingStrategy: Self.argument(named: "keyDecodingStrategy", in: attribute)
+      schemaCache: arguments.schemaCache,
+      keyDecodingStrategy: arguments.keyDecodingStrategy
     )
   }
 
@@ -1020,35 +957,6 @@ extension EdgeToolsGenerableMacro {
         )
       ])
     )
-  }
-
-}
-
-// MARK: - Streaming Options
-
-extension EdgeToolsGenerableMacro {
-  private static func argument(named name: String, in attribute: AttributeSyntax) -> ExprSyntax? {
-    guard case .argumentList(let arguments) = attribute.arguments else { return nil }
-    return arguments.first { $0.label?.text == name }?.expression
-  }
-
-  private static func partialStrings(
-    from expression: ExprSyntax
-  ) throws(MacroExpansionErrorMessage) -> StreamPartialStrings {
-    guard let member = expression.as(MemberAccessExprSyntax.self),
-      member.base.map({
-        ["PartialStringStorage", "StreamParsing.PartialStringStorage"]
-          .contains($0.trimmedDescription)
-      }) ?? true
-    else {
-      throw MacroExpansionErrorMessage("partialStrings requires .streamString or .string.")
-    }
-    switch member.declName.baseName.text {
-    case "streamString": return .streamString
-    case "string": return .string
-    default:
-      throw MacroExpansionErrorMessage("partialStrings requires .streamString or .string.")
-    }
   }
 
 }
