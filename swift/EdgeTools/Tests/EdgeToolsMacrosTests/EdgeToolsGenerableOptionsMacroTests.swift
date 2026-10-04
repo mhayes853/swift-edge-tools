@@ -5,6 +5,75 @@ extension `EdgeToolsMacros tests` {
   @Suite
   struct `EdgeToolsGenerableOptionsMacro tests` {
     @Test
+    func `Diagnoses Empty Guide Keys`() {
+      assertMacro {
+        """
+        @EdgeToolsGenerable
+        struct Message {
+          @EdgeToolsGuide(key: "")
+          var text: String
+        }
+        """
+      } diagnostics: {
+        """
+        @EdgeToolsGenerable
+        struct Message {
+          @EdgeToolsGuide(key: "")
+                               ┬─
+                               ╰─ 🛑 @EdgeToolsGuide(key:) must not be empty.
+          var text: String
+        }
+        """
+      }
+    }
+
+    @Test
+    func `Diagnoses Interpolated Guide Keys`() {
+      assertMacro {
+        #"""
+        @EdgeToolsGenerable
+        struct Message {
+          @EdgeToolsGuide(key: "prefix\(1)")
+          var text: String
+        }
+        """#
+      } diagnostics: {
+        #"""
+        @EdgeToolsGenerable
+        struct Message {
+          @EdgeToolsGuide(key: "prefix\(1)")
+                               ┬───────────
+                               ╰─ 🛑 @EdgeToolsGuide(key:) requires a string literal.
+          var text: String
+        }
+        """#
+      }
+    }
+
+    @Test
+    func `Diagnoses Capacity Overflow`() {
+      assertMacro {
+        """
+        @EdgeToolsGenerable
+        struct Message {
+          @EdgeToolsGuide(initialCapacity: 0xFFFF_FFFF_FFFF_FFFF)
+          var text: String
+        }
+        """
+      } diagnostics: {
+        """
+        @EdgeToolsGenerable
+        struct Message {
+          @EdgeToolsGuide(initialCapacity: 0xFFFF_FFFF_FFFF_FFFF)
+                                           ┬────────────────────
+                                           ╰─ 🛑 @EdgeToolsGuide(initialCapacity:) requires a nonnegative integer literal.
+          var text: String
+        }
+        """
+      }
+    }
+
+    @Test
     func `Diagnoses A Conversion Without A Metatype Literal`() {
       assertMacro {
         """
@@ -19,9 +88,8 @@ extension `EdgeToolsMacros tests` {
         @EdgeToolsGenerable
         struct Message {
           @EdgeToolsGuide(completedConversion: converter)
-                          ┬─────────────────────────────
-                          ├─ 🛑 completedConversion requires a strategy type followed by .self.
-                          ╰─ 🛑 completedConversion requires a strategy type followed by .self.
+                                               ┬────────
+                                               ╰─ 🛑 @EdgeToolsGuide(completedConversion:) requires a strategy type followed by .self.
           var text: String = ""
         }
         """
@@ -109,9 +177,8 @@ extension `EdgeToolsMacros tests` {
       } diagnostics: {
         """
         @EdgeToolsGenerable(partialStrings: .other)
-        ┬──────────────────────────────────────────
-        ├─ 🛑 partialStrings requires .streamString or .string.
-        ╰─ 🛑 partialStrings requires .streamString or .string.
+                                            ┬─────
+                                            ╰─ 🛑 @EdgeToolsGenerable(partialStrings:) requires .streamString or .string.
         struct Message {
           var text: String
         }
@@ -134,9 +201,8 @@ extension `EdgeToolsMacros tests` {
         @EdgeToolsGenerable
         struct Message {
           @EdgeToolsGuide(partialStrings: .other)
-                          ┬─────────────────────
-                          ├─ 🛑 partialStrings requires .streamString or .string.
-                          ╰─ 🛑 partialStrings requires .streamString or .string.
+                                          ┬─────
+                                          ╰─ 🛑 @EdgeToolsGuide(partialStrings:) requires .streamString or .string.
           var text: String
         }
         """
@@ -158,9 +224,8 @@ extension `EdgeToolsMacros tests` {
         @EdgeToolsGenerable
         struct Message {
           @EdgeToolsGuide(initialCapacity: -1)
-                          ┬──────────────────
-                          ├─ 🛑 initialCapacity must be a nonnegative integer literal.
-                          ╰─ 🛑 initialCapacity must be a nonnegative integer literal.
+                                           ┬─
+                                           ╰─ 🛑 @EdgeToolsGuide(initialCapacity:) requires a nonnegative integer literal.
           var text: String
         }
         """

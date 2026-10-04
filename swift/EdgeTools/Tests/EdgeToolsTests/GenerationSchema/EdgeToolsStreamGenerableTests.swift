@@ -127,6 +127,43 @@ struct `EdgeToolsStreamGenerable tests` {
   }
 
   @Test
+  func `Literal Options Support Radices Qualified Storage And Nil Defaults`() throws {
+    let expected: EdgeToolsValue = [
+      "text": "héllo", "values": [1, 2], "tags": ["a"], "other": "world"
+    ]
+    var parser = PartialsStream(initialValue: LiteralOptionsRequest.Partial(), from: .json())
+    try parser.next(expected.orderedJSONString().utf8)
+    let partial = try parser.finish()
+    let text: String? = partial.text
+    let other: StreamString? = partial.other
+    expectNoDifference(text, "héllo")
+    expectNoDifference(other.map(String.init), "world")
+    expectNoDifference(partial.edgeToolsValue, expected)
+    expectNoDifference(LiteralOptionsRequest(partial)?.edgeToolsValue, expected)
+    expectNoDifference(try LiteralOptionsRequest(edgeToolsValue: expected).edgeToolsValue, expected)
+  }
+
+  @Test
+  func `Escaped Guide Keys Agree Across Schemas Values And Streaming`() throws {
+    let key = "line\n\"quoted\"\\tab\t"
+    let expected: EdgeToolsValue = .object([key: "hello"])
+    expectNoDifference(
+      EscapedKeyRequest.edgeToolsGenerationSchema.objectValue?[.required],
+      .array([.string(key)])
+    )
+    expectNoDifference(try EscapedKeyRequest(edgeToolsValue: expected).edgeToolsValue, expected)
+    var parser = PartialsStream(initialValue: EscapedKeyRequest.Partial(), from: .json())
+    try parser.next(expected.orderedJSONString().utf8)
+    let partial = try parser.finish()
+    expectNoDifference(partial.text.map(String.init), "hello")
+    expectNoDifference(partial.edgeToolsValue, expected)
+    expectNoDifference(
+      try EscapedKeyRequest.Partial(edgeToolsValue: expected).edgeToolsValue,
+      expected
+    )
+  }
+
+  @Test
   func `Key Strategies Agree Across Schemas Values And Streaming`() throws {
     let expected: EdgeToolsValue = ["user_id": 7, "display_name": "hello", "ExactName": "fixed"]
     let value = try SnakeCaseRequest(edgeToolsValue: expected)
@@ -266,6 +303,24 @@ public struct PublicStreamPayload {
 }
 
 // MARK: - Configured Streaming Models
+
+@EdgeToolsGenerable
+private struct LiteralOptionsRequest {
+  @EdgeToolsGuide(key: nil, initialCapacity: 0x40, partialStrings: PartialStringStorage.string)
+  var text: String
+  @EdgeToolsGuide(initialCapacity: 0o100)
+  var values: [Int]
+  @EdgeToolsGuide(initialCapacity: 0b100_0000)
+  var tags: [String]
+  @EdgeToolsGuide(key: nil, initialCapacity: nil, partialStrings: nil)
+  var other: String
+}
+
+@EdgeToolsGenerable(keyDecodingStrategy: CustomKeys.strategy)
+private struct EscapedKeyRequest {
+  @EdgeToolsGuide(key: "line\n\"quoted\"\\tab\t")
+  var text: String
+}
 
 @EdgeToolsGenerable(.additionalProperties(false), partialStrings: .string)
 private struct StringStorageRequest {
