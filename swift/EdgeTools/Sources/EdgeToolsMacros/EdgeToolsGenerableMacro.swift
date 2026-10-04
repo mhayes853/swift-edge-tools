@@ -135,7 +135,6 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
       )
       let partialCustomization = Self.generablePartialCustomization(
         fields: generation.partialFields,
-        keyExpressions: parsedProperties.map(\.keyExpression),
         schemaFragments: parsedProperties.map(\.schemaFragments),
         preservesStreamNull: isGeneric,
         accessModifier: accessModifier
@@ -187,16 +186,12 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
       in: context,
       partialCustomization: Self.generablePartialCustomization(
         fields: partialFields,
-        keyExpressions: cases.map(\.keyExpression),
         accessModifier: accessModifier
       ),
       payloadCustomization: { payload in
         .generated(
           partial: Self.generablePartialCustomization(
             fields: payload.partialFields,
-            keyExpressions: payload.fields.map {
-              Self.schemaKeyExpression(for: $0, configuration: configuration)
-            },
             accessModifier: accessModifier
           )
         )
@@ -387,7 +382,6 @@ extension EdgeToolsGenerableMacro {
         )
         return nil
       }
-      let propertyName = identifierPattern.identifier.text
       let guideAttributes = Self.guideAttributes(in: variableDecl)
       if guideAttributes.count > 1 {
         context.diagnose(
@@ -434,8 +428,7 @@ extension EdgeToolsGenerableMacro {
       let field = StreamParseableField(
         name: identifierPattern.identifier,
         type: type,
-        keys: [guideSelection?.key ?? propertyName],
-        convertsKeys: guideSelection?.key == nil,
+        explicitKeys: guideSelection?.key.map { [$0] },
         initialCapacity: guideSelection?.initialCapacity,
         completedConversion: guideSelection?.completedConversion,
         partialStrings: guideSelection?.partialStrings
@@ -444,7 +437,7 @@ extension EdgeToolsGenerableMacro {
       )
       return StoredProperty(
         streamField: field,
-        keyExpression: Self.schemaKeyExpression(for: field, configuration: configuration),
+        keyExpression: configuration.decodedKeys(for: field)[0].expression.trimmedDescription,
         isIgnored: isIgnored,
         schemaFragments: guideSelection?.schemaFragments ?? []
       )
@@ -493,20 +486,20 @@ extension EdgeToolsGenerableMacro {
           let field = StreamParseableField(
             name: label == nil ? .wildcardToken() : parameter.firstName!,
             type: parameter.type,
-            keys: [schemaKey],
-            convertsKeys: label != nil,
+            explicitKeys: label == nil ? [schemaKey] : nil,
             partialStrings: partialStrings
           )
           return AssociatedValue(
             streamField: field,
-            keyExpression: Self.schemaKeyExpression(for: field, configuration: configuration),
+            keyExpression: configuration.decodedKeys(for: field)[0].expression.trimmedDescription,
             bindingName: "value\(index)"
           )
         }
 
       return EnumCase(
         sourceToken: element.name,
-        keyExpression: Self.schemaKeyExpression(for: name, configuration: configuration),
+        keyExpression: StreamDecodedKey(converting: name, by: configuration.keyDecodingStrategy)
+          .expression.trimmedDescription,
         associatedValues: associatedValues
       )
     }
@@ -986,21 +979,18 @@ extension EdgeToolsGenerableMacro {
 
   private static func generablePartialCustomization(
     fields: [StreamPartialFieldDescriptor],
-    keyExpressions: [String],
     schemaFragments: [[String]] = [],
     preservesStreamNull: Bool = false,
     accessModifier: String?
   ) -> StreamPartialCustomization {
-    let generatedProperties = zip(fields, keyExpressions).enumerated()
-      .map { index, pair in
-        let (field, keyExpression) = pair
+    let generatedProperties = fields.enumerated()
+      .map { index, field in
         return StoredProperty(
           streamField: StreamParseableField(
             name: field.memberName,
-            type: field.storageType,
-            keys: field.keys
+            type: field.storageType
           ),
-          keyExpression: keyExpression,
+          keyExpression: field.keys[0].expression.trimmedDescription,
           schemaFragments: schemaFragments.isEmpty ? [] : schemaFragments[index]
         )
       }
@@ -1061,24 +1051,4 @@ extension EdgeToolsGenerableMacro {
     }
   }
 
-  private static func schemaKeyExpression(
-    for field: StreamParseableField,
-    configuration: StreamGenerationConfiguration
-  ) -> String {
-    let key = field.keys[0]
-    return field.convertsKeys
-      ? Self.schemaKeyExpression(for: key, configuration: configuration)
-      : Self.quotedStringLiteral(key)
-  }
-
-  private static func schemaKeyExpression(
-    for key: String,
-    configuration: StreamGenerationConfiguration
-  ) -> String {
-    if let decoded = configuration.decodedKey(for: key) {
-      return Self.quotedStringLiteral(decoded)
-    }
-    return
-      "(\(configuration.keyDecodingStrategy!.trimmedDescription) as StreamParsing.StreamKeyDecodingStrategy).key(for: \(Self.quotedStringLiteral(key)))"
-  }
 }
