@@ -58,9 +58,11 @@ public macro EdgeToolsIgnored() =
 ///
 /// `key` is a nonempty string literal, used as written without applying the key decoding strategy.
 /// Alternatively, `keyNames` is a nonempty array of nonempty string literals. Its first key is
-/// used for schemas and encoding; every key is accepted when decoding or streaming. If several
-/// keys are present, the last matching object entry wins, including null. These keys are used as
-/// written, without applying the key decoding strategy. Supply either `key` or `keyNames`.
+/// used for schemas and encoding; every key is accepted when decoding or streaming. Value
+/// decoding selects the last matching object entry, including null. Streaming uses Stream
+/// Parsing's repeated-field behavior, which can append string values; use one key per field in
+/// streamed input. These keys are used as written without applying the key decoding strategy.
+/// Supply either `key` or `keyNames`.
 /// `partialStrings` overrides the enclosing type's string storage choice. `initialCapacity`
 /// reserves storage for strings, arrays, or dictionaries when parsing begins; it is a
 /// nonnegative integer literal hint in any radix, measured in decoded UTF-8 bytes or container
