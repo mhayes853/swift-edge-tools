@@ -211,11 +211,17 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
 extension EdgeToolsGenerableMacro {
   private struct StoredProperty {
     let streamField: StreamParseableField
-    let keyExpression: String
+    let keys: [StreamDecodedKey]
     var isIgnored = false
     var schemaFragments = [String]()
 
     var name: String { self.streamField.name.text }
+    var keyExpression: String { self.keys[0].expression.trimmedDescription }
+    var lookupExpression: String {
+      self.keys.count == 1
+        ? "object[\(self.keyExpression)]"
+        : "_edgeToolsValue(object, forKeys: [\(self.keys.map { $0.expression.trimmedDescription }.joined(separator: ", "))])"
+    }
     var typeName: String { self.streamField.type.trimmedDescription }
     var initializerTypeName: String {
       EdgeToolsGenerableMacro.initializerTypeName(for: self.typeName)
@@ -427,7 +433,7 @@ extension EdgeToolsGenerableMacro {
       )
       return StoredProperty(
         streamField: field,
-        keyExpression: configuration.decodedKeys(for: field)[0].expression.trimmedDescription,
+        keys: configuration.decodedKeys(for: field),
         isIgnored: isIgnored,
         schemaFragments: guideAttributes.first.map(Self.schemaFragments(from:)) ?? []
       )
@@ -625,9 +631,11 @@ extension EdgeToolsGenerableMacro {
         }
         if preservesStreamNull {
           let type = property.streamField.type.streamUnwrappedOptionalType.trimmedDescription
-          return "self.\(property.name) = try _edgeToolsPartialValue(object[\(property.keyExpression)], as: \(type).self)"
+          return "self.\(property.name) = try _edgeToolsPartialValue(\(property.lookupExpression), as: \(type).self)"
         }
-        let value = "_edgeToolsValue(object, forKey: \(property.keyExpression))"
+        let value = property.keys.count == 1
+          ? "_edgeToolsValue(object, forKey: \(property.keyExpression))"
+          : "(\(property.lookupExpression) ?? .null)"
         if let conversion = property.streamField.completedConversion {
           let converted = "try \(conversion).value(edgeToolsValue: \(value))"
           let expression = property.isOptional ? "\(value) == .null ? nil : \(converted)" : converted
@@ -927,7 +935,7 @@ extension EdgeToolsGenerableMacro {
             name: field.memberName,
             type: field.storageType
           ),
-          keyExpression: field.keys[0].expression.trimmedDescription,
+          keys: field.keys,
           schemaFragments: schemaFragments.isEmpty ? [] : schemaFragments[index]
         )
       }
