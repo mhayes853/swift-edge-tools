@@ -31,7 +31,7 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
         partialStrings: partialStrings,
         diagnose: { context.diagnose($0) }
       )
-      if !Self.hasExistingEdgeToolsGenerationSchema(in: declaration) {
+      if !Self.hasProperty("edgeToolsGenerationSchema", isStatic: true, in: declaration) {
         members.append(
           Self.generationSchemaProperty(
             from: properties,
@@ -45,7 +45,7 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
         members.append(Self.valueInitializer(from: properties, modifierPrefix: modifierPrefix))
       }
 
-      if !Self.hasExistingEdgeToolsValueProperty(in: declaration) {
+      if !Self.hasProperty("edgeToolsValue", isStatic: false, in: declaration) {
         members.append(Self.valueProperty(from: properties, modifierPrefix: modifierPrefix))
       }
     } else if let enumDecl = declaration.as(EnumDeclSyntax.self) {
@@ -54,7 +54,7 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
         configuration: configuration,
         partialStrings: partialStrings
       )
-      if !Self.hasExistingEdgeToolsGenerationSchema(in: declaration) {
+      if !Self.hasProperty("edgeToolsGenerationSchema", isStatic: true, in: declaration) {
         members.append(
           Self.enumGenerationSchemaProperty(
             from: cases,
@@ -74,7 +74,7 @@ public enum EdgeToolsGenerableMacro: ExtensionMacro, MemberMacro {
         )
       }
 
-      if !Self.hasExistingEdgeToolsValueProperty(in: declaration) {
+      if !Self.hasProperty("edgeToolsValue", isStatic: false, in: declaration) {
         members.append(Self.enumValueProperty(from: cases, modifierPrefix: modifierPrefix))
       }
     } else {
@@ -217,11 +217,6 @@ extension EdgeToolsGenerableMacro {
 
     var name: String { self.streamField.name.text }
     var keyExpression: String { self.keys[0].expression.trimmedDescription }
-    var lookupExpression: String {
-      self.keys.count == 1
-        ? "object[\(self.keyExpression)]"
-        : "_edgeToolsValue(object, forKeys: [\(self.keys.map { $0.expression.trimmedDescription }.joined(separator: ", "))])"
-    }
     var typeName: String { self.streamField.type.trimmedDescription }
     var initializerTypeName: String {
       EdgeToolsGenerableMacro.initializerTypeName(for: self.typeName)
@@ -238,6 +233,17 @@ extension EdgeToolsGenerableMacro {
       return self.schemaFragments.isEmpty
         ? base
         : "EdgeToolsGenerationSchema(\(([base] + self.schemaFragments).joined(separator: ", ")))"
+    }
+
+    func valueExpression(preservingNull: Bool = false) -> String {
+      if self.keys.count == 1 {
+        return preservingNull
+          ? "object[\(self.keyExpression)]"
+          : "_edgeToolsValue(object, forKey: \(self.keyExpression))"
+      }
+      let keys = self.keys.map { $0.expression.trimmedDescription }.joined(separator: ", ")
+      let lookup = "_edgeToolsValue(object, forKeys: [\(keys)])"
+      return preservingNull ? lookup : "(\(lookup) ?? .null)"
     }
   }
 
@@ -262,17 +268,17 @@ extension EdgeToolsGenerableMacro {
     var sourceName: String { self.sourceToken.trimmedDescription }
   }
 
-  private static func hasExistingEdgeToolsGenerationSchema(
+  private static func hasProperty(
+    _ name: String,
+    isStatic: Bool,
     in declaration: some DeclGroupSyntax
   ) -> Bool {
     declaration.memberBlock.members.contains { member in
-      guard let variableDecl = member.decl.as(VariableDeclSyntax.self) else { return false }
-      guard Self.isStatic(variableDecl) else { return false }
-      return variableDecl.bindings.contains { binding in
-        guard let identifierPattern = binding.pattern.as(IdentifierPatternSyntax.self) else {
-          return false
-        }
-        return identifierPattern.identifier.text == "edgeToolsGenerationSchema"
+      guard let variableDecl = member.decl.as(VariableDeclSyntax.self),
+        Self.isStatic(variableDecl) == isStatic
+      else { return false }
+      return variableDecl.bindings.contains {
+        $0.pattern.as(IdentifierPatternSyntax.self)?.identifier.text == name
       }
     }
   }
@@ -285,21 +291,6 @@ extension EdgeToolsGenerableMacro {
       let parameters = initializer.signature.parameterClause.parameters
       guard parameters.count == 1, let parameter = parameters.first else { return false }
       return parameter.firstName.text == "edgeToolsValue"
-    }
-  }
-
-  private static func hasExistingEdgeToolsValueProperty(
-    in declaration: some DeclGroupSyntax
-  ) -> Bool {
-    declaration.memberBlock.members.contains { member in
-      guard let variableDecl = member.decl.as(VariableDeclSyntax.self) else { return false }
-      guard !Self.isStatic(variableDecl) else { return false }
-      return variableDecl.bindings.contains { binding in
-        guard let identifierPattern = binding.pattern.as(IdentifierPatternSyntax.self) else {
-          return false
-        }
-        return identifierPattern.identifier.text == "edgeToolsValue"
-      }
     }
   }
 
@@ -317,21 +308,7 @@ extension EdgeToolsGenerableMacro {
           false
         }
       }
-      .map { modifier in
-        switch modifier.name.tokenKind {
-        case .keyword(.public):
-          "public"
-        case .keyword(.package):
-          "package"
-        case .keyword(.fileprivate):
-          "fileprivate"
-        case .keyword(.private):
-          ""
-        default:
-          ""
-        }
-      }
-      .flatMap { $0.isEmpty ? nil : $0 }
+      .flatMap { $0.name.tokenKind == .keyword(.private) ? nil : $0.name.text }
   }
 
   private static func modifierPrefix(for accessModifier: String?) -> String {
@@ -631,11 +608,9 @@ extension EdgeToolsGenerableMacro {
         }
         if preservesStreamNull {
           let type = property.streamField.type.streamUnwrappedOptionalType.trimmedDescription
-          return "self.\(property.name) = try _edgeToolsPartialValue(\(property.lookupExpression), as: \(type).self)"
+          return "self.\(property.name) = try _edgeToolsPartialValue(\(property.valueExpression(preservingNull: true)), as: \(type).self)"
         }
-        let value = property.keys.count == 1
-          ? "_edgeToolsValue(object, forKey: \(property.keyExpression))"
-          : "(\(property.lookupExpression) ?? .null)"
+        let value = property.valueExpression()
         if let conversion = property.streamField.completedConversion {
           let converted = "try \(conversion).value(edgeToolsValue: \(value))"
           let expression = property.isOptional ? "\(value) == .null ? nil : \(converted)" : converted
@@ -694,7 +669,7 @@ extension EdgeToolsGenerableMacro {
         let object = try _edgeToolsRequireObjectValue(edgeToolsValue)
         \(raw: caseInitializers)
         throw EdgeToolsUnknownEnumCaseError(
-          typeName: \(raw: Self.quotedStringLiteral(typeName)),
+          typeName: \(StringLiteralExprSyntax(content: typeName)),
           caseName: object.keys.first ?? ""
         )
       }
@@ -810,15 +785,6 @@ extension EdgeToolsGenerableMacro {
       return "Optional<\(String(trimmed.dropLast()))>"
     }
     return trimmed
-  }
-
-  private static func quotedStringLiteral(_ value: String) -> String {
-    let escaped =
-      value
-      .replacingOccurrences(of: "\\", with: "\\\\")
-      .replacingOccurrences(of: "\"", with: "\\\"")
-      .replacingOccurrences(of: "\n", with: "\\n")
-    return "\"\(escaped)\""
   }
 
 }
