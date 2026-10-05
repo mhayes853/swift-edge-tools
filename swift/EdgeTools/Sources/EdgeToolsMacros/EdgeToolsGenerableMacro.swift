@@ -500,13 +500,10 @@ extension EdgeToolsGenerableMacro {
       }
       .joined(separator: ",\n          ")
     let requiredProperties = activeProperties.filter { !$0.isOptional }
-      .map { property in
-        property.keyExpression
-      }
+      .map(\.keyExpression)
       .joined(separator: ", ")
 
-    var fragments = [".type(.object)"]
-    fragments.append(contentsOf: schemaFragments)
+    var fragments = [".type(.object)"] + schemaFragments
     if activeProperties.isEmpty {
       return """
         \(raw: modifierPrefix)static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
@@ -547,24 +544,7 @@ extension EdgeToolsGenerableMacro {
       let required = enumCase.associatedValues.filter { !$0.isOptional }
         .map { $0.keyExpression }
         .joined(separator: ", ")
-      if required.isEmpty {
-        return """
-          EdgeToolsGenerationSchema(
-            .type(.object),
-            .properties([
-              \(enumCase.keyExpression): EdgeToolsGenerationSchema(
-                .type(.object),
-                .properties([
-                  \(propertyPairs)
-                ]),
-                .additionalProperties(false)
-              )
-            ]),
-            .required([\(enumCase.keyExpression)]),
-            .additionalProperties(false)
-          )
-          """
-      }
+      let requiredClause = required.isEmpty ? "" : ".required([\(required)]),\n      "
       return """
         EdgeToolsGenerationSchema(
           .type(.object),
@@ -574,8 +554,7 @@ extension EdgeToolsGenerableMacro {
               .properties([
                 \(propertyPairs)
               ]),
-              .required([\(required)]),
-              .additionalProperties(false)
+              \(requiredClause).additionalProperties(false)
             )
           ]),
           .required([\(enumCase.keyExpression)]),
@@ -583,10 +562,9 @@ extension EdgeToolsGenerableMacro {
         )
         """
     }
-    var fragments = [
+    let fragments = [
       ".anyOf([\n            \(choices.joined(separator: ",\n            "))\n          ])"
-    ]
-    fragments.append(contentsOf: schemaFragments)
+    ] + schemaFragments
     return """
       \(raw: modifierPrefix)static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
         EdgeToolsGenerationSchema(
@@ -863,29 +841,27 @@ extension EdgeToolsGenerableMacro {
   }
 
   private static func streamDefaultCase(in declaration: EnumDeclSyntax) throws -> TokenSyntax? {
-    var defaults = [TokenSyntax]()
-    for member in declaration.memberBlock.members {
-      guard let caseDecl = member.decl.as(EnumCaseDeclSyntax.self) else { continue }
+    let defaults = try declaration.memberBlock.members.compactMap { member -> TokenSyntax? in
+      guard let caseDecl = member.decl.as(EnumCaseDeclSyntax.self) else { return nil }
       let isDefault = caseDecl.attributes.contains { element in
         guard let attribute = element.as(AttributeSyntax.self) else { return false }
         return ["StreamParseableDefault", "StreamParsing.StreamParseableDefault"]
           .contains(attribute.attributeName.trimmedDescription)
       }
-      guard isDefault else { continue }
+      guard isDefault else { return nil }
       guard caseDecl.elements.count == 1, let name = caseDecl.elements.first?.name else {
         throw MacroExpansionErrorMessage(
           "@StreamParseableDefault must mark a declaration with one enum case."
         )
       }
-      defaults.append(name)
+      return name
     }
-    guard !defaults.isEmpty else { return nil }
-    guard defaults.count == 1 else {
+    guard defaults.count <= 1 else {
       throw MacroExpansionErrorMessage(
         "Stream parsing synthesis for an enum requires exactly one @StreamParseableDefault case."
       )
     }
-    return defaults[0]
+    return defaults.first
   }
 
   private static func generablePartialCustomization(
