@@ -1,5 +1,5 @@
 {
-  "originHash" : "3f29b33bcc78d77ca530a042da3215f8bb383158064fec9b8de4d3703fac5ad5",
+  "originHash" : "d82b86ca66542aaac17707e1d4a863e1cf0ad3e9ed2cf6f49fc1b731694832d2",
   "pins" : [
     {
       "identity" : "combine-schedulers",
@@ -186,7 +186,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/mhayes853/swift-stream-parsing",
       "state" : {
-        "revision" : "34cc4e8220be9274f4dfe251ec01990ce5750488"
+        "revision" : "7785ec7a59e41281027d0f5aec3449e882e84b8e"
       }
     },
     {

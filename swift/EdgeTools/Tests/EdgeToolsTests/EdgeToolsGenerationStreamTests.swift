@@ -277,19 +277,24 @@ struct `EdgeToolsGenerationStream tests` {
 
   @Test
   func `Cancelled Subscriptions Stop Receiving Tokens`() async throws {
-    let tokenizer = try testTokenizer()
-    let tokens = "abc".tokenize(using: tokenizer)
-    let engine = MockEngine(script: tokens.map { .token($0) } + [.finish])
-
-    let stream = engine.stream(prompt: .test(user: "hi"), context: engine.context())
+    let engine = ReentrantMockEngine()
+    let stream = engine.stream(
+      prompt: ReentrantMockEngine.Prompt(),
+      context: engine.context()
+    )
+    await engine.waitUntilReady()
 
     let collected = Lock([EdgeToolsToken]())
     let subscription = stream.onToken { token in collected.withLock { $0.append(token) } }
+    let firstToken = EdgeToolsToken(id: 1, stringValue: "a")
+    engine.emit(firstToken)
     subscription.cancel()
+    engine.emit(EdgeToolsToken(id: 2, stringValue: "b"))
+    engine.finish()
 
     _ = try await stream.finalGeneration
 
-    collected.withLock { expectNoDifference($0.isEmpty, true) }
+    collected.withLock { expectNoDifference($0, [firstToken]) }
   }
 
   @Test

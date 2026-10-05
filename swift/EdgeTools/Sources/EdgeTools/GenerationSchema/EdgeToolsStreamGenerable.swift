@@ -2,6 +2,38 @@ import EdgeToolsCore
 import OrderedCollections
 import StreamParsing
 
+// MARK: - Completed Conversions
+
+extension StreamCompletedValueConversion where Source: EdgeToolsGenerable {
+  /// Decodes and converts a completed source value, propagating decoding and conversion errors.
+  public static func value(edgeToolsValue: EdgeToolsValue) throws -> Value {
+    try Self.value(fromCompletedSource: Source(edgeToolsValue: edgeToolsValue))
+  }
+}
+
+extension ConvertedPartial: EdgeToolsGenerable where Strategy.Source: EdgeToolsGenerable {
+  public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
+    Strategy.Source.edgeToolsGenerationSchema
+  }
+}
+
+extension ConvertedPartial: ConvertibleFromEdgeToolsValue
+where Strategy.Source: EdgeToolsGenerable {
+  /// Restores a completed source, caching its conversion and preserving its representation.
+  /// A value snapshot carries no completion state, so restoring an unfinished source can fail conversion.
+  public init(edgeToolsValue: EdgeToolsValue) throws {
+    self.init(completedSource: try Strategy.Source(edgeToolsValue: edgeToolsValue))
+    if let error = self.conversionError {
+      throw error
+    }
+  }
+}
+
+extension ConvertedPartial: ConvertibleToEdgeToolsValue
+where Strategy.Source: ConvertibleToEdgeToolsValue {
+  public var edgeToolsValue: EdgeToolsValue { self.source.edgeToolsValue }
+}
+
 // MARK: - Stream Scalars
 
 extension StreamString: EdgeToolsGenerable {
