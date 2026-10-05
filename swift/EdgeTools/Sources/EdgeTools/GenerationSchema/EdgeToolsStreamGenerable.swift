@@ -7,10 +7,7 @@ import StreamParsing
 extension StreamCompletedValueConversion where Source: EdgeToolsGenerable {
   /// Decodes and converts a completed source value, propagating decoding and conversion errors.
   public static func value(edgeToolsValue: EdgeToolsValue) throws -> Value {
-    var source = try Source(edgeToolsValue: edgeToolsValue)
-    return try withUnsafeMutablePointer(to: &source) { pointer in
-      try Self.convertToValue(Source.streamView(UnsafeMutableRawPointer(pointer)))
-    }
+    try Self.value(fromCompletedSource: Source(edgeToolsValue: edgeToolsValue))
   }
 }
 
@@ -22,17 +19,11 @@ extension ConvertedPartial: EdgeToolsGenerable where Strategy.Source: EdgeToolsG
 
 extension ConvertedPartial: ConvertibleFromEdgeToolsValue
 where Strategy.Source: EdgeToolsGenerable {
-  /// Restores the source as completed JSON, caching its conversion and preserving its representation.
+  /// Restores a completed source, caching its conversion and preserving its representation.
   /// A value snapshot carries no completion state, so restoring an unfinished source can fail conversion.
   public init(edgeToolsValue: EdgeToolsValue) throws {
-    var stream = PartialsStream(initialValue: Self(), from: .json())
-    do {
-      try stream.next(edgeToolsValue.orderedJSONString().utf8)
-      self = try stream.finish()
-    } catch {
-      if let conversionError = stream.current.conversionError {
-        throw conversionError
-      }
+    self.init(completedSource: try Strategy.Source(edgeToolsValue: edgeToolsValue))
+    if let error = self.conversionError {
       throw error
     }
   }

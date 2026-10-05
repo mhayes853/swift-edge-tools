@@ -21,6 +21,13 @@ struct `EdgeToolsCompletedConversion tests` {
     expectNoDifference(CountingRequest(reversed)?.token, first.token)
     expectNoDifference(CountingConversion.calls.withLock { $0.to }, 1)
     expectNoDifference(CountingConversion.calls.withLock { $0.from }, 1)
+
+    CountingConversion.calls.withLock { $0 = (0, 0) }
+    let restored = try CountingRequest.Partial(edgeToolsValue: ["token": "HeLLo"])
+    expectNoDifference(restored.edgeToolsValue, ["token": "HeLLo"])
+    expectNoDifference(CountingRequest(restored)?.token.text, "HeLLo")
+    expectNoDifference(CountingConversion.calls.withLock { $0.to }, 1)
+    expectNoDifference(CountingConversion.calls.withLock { $0.from }, 0)
   }
 
   @Test
@@ -145,6 +152,9 @@ struct `EdgeToolsCompletedConversion tests` {
     }
     #expect(throws: EdgeToolsValueTypeError.self) {
       try ConvertedRequest(edgeToolsValue: ["wire_token": 1, "pair": [1, 2]])
+    }
+    #expect(throws: EdgeToolsValueTypeError.self) {
+      try ConvertedRequest.Partial(edgeToolsValue: ["wire_token": 1])
     }
     #expect(throws: TokenConversionError.invalid) {
       try ConvertedRequest(edgeToolsValue: ["wire_token": "hello", "pair": [1]])
