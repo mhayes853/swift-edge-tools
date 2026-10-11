@@ -17,7 +17,7 @@ struct `EdgeToolsGenericGenerable tests` {
       #"llo"}],"by_name":{"first":{"name":"world"}},"featured":{"name":"chosen"}}"#.utf8
     )
     let partial = try stream.finish()
-    let page = try #require(GenericPage<GenericItem>(partial))
+    let page = try #require(GenericPage<GenericItem>(streamPartial: partial))
     expectNoDifference(page.items.map(\.name), ["hello"])
     expectNoDifference(page.byName["first"]?.name, "world")
     expectNoDifference(page.featured?.name, "chosen")
@@ -36,8 +36,10 @@ struct `EdgeToolsGenericGenerable tests` {
     var flags = PartialsStream(initialValue: GenericBox<Bool>.Partial(), from: .json())
     try integers.next(#"{"value":42}"#.utf8)
     try flags.next(#"{"value":true}"#.utf8)
-    expectNoDifference(GenericBox<Int>(try integers.finish())?.value, 42)
-    expectNoDifference(GenericBox<Bool>(try flags.finish())?.value, true)
+    let integerPartial = try integers.finish()
+    let flagPartial = try flags.finish()
+    expectNoDifference(GenericBox<Int>(streamPartial: integerPartial)?.value, 42)
+    expectNoDifference(GenericBox<Bool>(streamPartial: flagPartial)?.value, true)
     expectNoDifference(GenericSchemas.cache.contains(GenericBox<Int>.Partial.self), true)
     expectNoDifference(GenericSchemas.cache.contains(GenericBox<Bool>.Partial.self), true)
     let fields = try _edgeToolsRequireObjectValue(
@@ -58,22 +60,24 @@ struct `EdgeToolsGenericGenerable tests` {
     var stream = PartialsStream(initialValue: GenericBox<Int?>.Partial(), from: .json())
     try stream.next(#"{"value":null}"#.utf8)
     let partial = try stream.finish()
-    let box = try #require(GenericBox<Int?>(partial))
+    let box = try #require(GenericBox<Int?>(streamPartial: partial))
     expectNoDifference(box.value, nil)
     expectNoDifference(partial.edgeToolsValue, ["value": .null])
-    expectNoDifference(GenericBox<Int?>(GenericBox<Int?>.Partial()) == nil, true)
+    expectNoDifference(GenericBox<Int?>(streamPartial: GenericBox<Int?>.Partial()) == nil, true)
     let restored = try GenericBox<Int?>.Partial(edgeToolsValue: partial.edgeToolsValue)
-    expectNoDifference(GenericBox<Int?>(restored) == nil, false)
+    expectNoDifference(GenericBox<Int?>(streamPartial: restored) == nil, false)
   }
 
   @Test
   func `Nested Generic Contexts And Phantom Parameters Support Streaming`() throws {
     var nested = PartialsStream(initialValue: GenericOuter<String>.Inner.Partial(), from: .json())
     try nested.next(#"{"value":"hello"}"#.utf8)
-    expectNoDifference(GenericOuter<String>.Inner(try nested.finish())?.value, "hello")
+    let nestedPartial = try nested.finish()
+    expectNoDifference(GenericOuter<String>.Inner(streamPartial: nestedPartial)?.value, "hello")
     var phantom = PartialsStream(initialValue: GenericPhantom<PhantomTag>.Partial(), from: .json())
     try phantom.next(#"{"id":7}"#.utf8)
-    expectNoDifference(GenericPhantom<PhantomTag>(try phantom.finish())?.id, 7)
+    let phantomPartial = try phantom.finish()
+    expectNoDifference(GenericPhantom<PhantomTag>(streamPartial: phantomPartial)?.id, 7)
   }
 
   @Test
@@ -84,10 +88,10 @@ struct `EdgeToolsGenericGenerable tests` {
     )
     try stream.next(#"{"value":42}"#.utf8)
     let partial = try stream.finish()
-    expectNoDifference(AssociatedRequest<IntStorage>(partial)?.value, 42)
+    expectNoDifference(AssociatedRequest<IntStorage>(streamPartial: partial)?.value, 42)
     expectNoDifference(partial.edgeToolsValue, ["value": 42])
     let restored = try AssociatedRequest<IntStorage>.Partial(edgeToolsValue: partial.edgeToolsValue)
-    expectNoDifference(AssociatedRequest<IntStorage>(restored)?.value, 42)
+    expectNoDifference(AssociatedRequest<IntStorage>(streamPartial: restored)?.value, 42)
   }
 
   @Test
@@ -98,19 +102,20 @@ struct `EdgeToolsGenericGenerable tests` {
     expectNoDifference(stream.current.values?.source.map { $0 }, [1])
     try stream.next("2]}".utf8)
     let partial = try stream.finish()
-    let value = try #require(GenericConvertedRequest<Int>(partial))
+    let value = try #require(GenericConvertedRequest<Int>(streamPartial: partial))
     expectNoDifference(value.values.values, [1, 2])
     expectNoDifference(value.edgeToolsValue, ["values": [1, 2]])
     expectNoDifference(value.streamPartialValue.edgeToolsValue, partial.edgeToolsValue)
     let restored = try GenericConvertedRequest<Int>.Partial(edgeToolsValue: partial.edgeToolsValue)
-    expectNoDifference(GenericConvertedRequest<Int>(restored)?.values.values, [1, 2])
+    expectNoDifference(GenericConvertedRequest<Int>(streamPartial: restored)?.values.values, [1, 2])
   }
 
   @Test
   func `Ignored Generic Members Require No Parsing Conformance`() throws {
     var stream = PartialsStream(initialValue: IgnoredRequest<PhantomTag>.Partial(), from: .json())
     try stream.next(#"{"id":7,"scratch":"ignored"}"#.utf8)
-    let value = try #require(IgnoredRequest<PhantomTag>(try stream.finish()))
+    let partial = try stream.finish()
+    let value = try #require(IgnoredRequest<PhantomTag>(streamPartial: partial))
     expectNoDifference(value.id, 7)
     expectNoDifference(value.scratch == nil, true)
     expectNoDifference(value.edgeToolsValue, ["id": 7])
@@ -132,7 +137,7 @@ struct `EdgeToolsGenericGenerable tests` {
         return try stream.finish()
       }
       .value
-    expectNoDifference(GenericBox<String>(partial)?.value, "hello")
+    expectNoDifference(GenericBox<String>(streamPartial: partial)?.value, "hello")
   }
 }
 
@@ -206,7 +211,7 @@ private enum GenericAction<Value: EdgeToolsGenerable> {
 }
 
 @EdgeToolsGenerable
-private struct GenericConvertedRequest<Element: EdgeToolsGenerable & StreamParseableRoot & Sendable>
+private struct GenericConvertedRequest<Element: EdgeToolsGenerable & StreamPartial & Sendable>
 {
   @EdgeToolsGuide(completedConversion: GenericArrayConversion<Element>.self)
   var values: ConvertedElements<Element> = ConvertedElements(values: [])
@@ -216,7 +221,7 @@ private struct ConvertedElements<Element: Sendable>: Sendable {
   var values: [Element]
 }
 
-private enum GenericArrayConversion<Element: EdgeToolsGenerable & StreamParseableRoot & Sendable>:
+private enum GenericArrayConversion<Element: EdgeToolsGenerable & StreamPartial & Sendable>:
   StreamCompletedValueConversion
 {
   typealias Source = StreamArray<Element>

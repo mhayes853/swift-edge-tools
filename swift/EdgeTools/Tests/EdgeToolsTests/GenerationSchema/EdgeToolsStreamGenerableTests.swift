@@ -5,6 +5,32 @@ import Testing
 @Suite
 struct `EdgeToolsStreamGenerable tests` {
   @Test
+  func `ModelStreamsFinishIntoCompleteValues`() throws {
+    var stream = PartialsStream<PublicStreamPayload>(from: .json())
+    try stream.next(#"{"text":"hello"}"#.utf8)
+    let value: PublicStreamPayload = try stream.finish()
+    expectNoDifference(value.text, "hello")
+    #expect(throws: StreamParsingError.incompleteValue) {
+      var missing = PartialsStream<PublicStreamPayload>(from: .json())
+      try missing.next("{}".utf8)
+      return try missing.finish()
+    }
+  }
+
+  @Test
+  func `ModelStreamsResetAndFinishPartialsWithMissingFields`() throws {
+    var stream = PartialsStream<PublicStreamPayload>(from: .json())
+    try stream.next(#"{"text":"hello"}"#.utf8)
+    let first = try stream.finishAndReset()
+    expectNoDifference(first.edgeToolsValue, ["text": "hello"])
+    expectNoDifference(stream.current.edgeToolsValue, [:])
+    try stream.next("{}".utf8)
+    let partial = try stream.finishPartial()
+    expectNoDifference(PublicStreamPayload(streamPartial: partial) == nil, true)
+    expectNoDifference(PublicStreamPayload(orInitial: partial).text, "")
+  }
+
+  @Test
   func `Private Nested Type Supports Stream Parsing`() throws {
     let partial = try PrivateStreamContainer.Input.Partial(edgeToolsValue: ["value": "hello"])
     expectNoDifference(partial.value.map(String.init), "hello")
@@ -107,7 +133,7 @@ struct `EdgeToolsStreamGenerable tests` {
     expectNoDifference(body.map(String.init), "text")
     expectNoDifference(city.map(String.init), "Paris")
 
-    let value = try #require(StringStorageRequest(partial))
+    let value = try #require(StringStorageRequest(streamPartial: partial))
     expectNoDifference(value.title, "héllo")
     expectNoDifference(value.streamPartialValue.edgeToolsValue, partial.edgeToolsValue)
     let restored = try StringStorageRequest.Partial(edgeToolsValue: partial.edgeToolsValue)
@@ -123,7 +149,7 @@ struct `EdgeToolsStreamGenerable tests` {
     let other: StreamString? = partial.other
     expectNoDifference(text, "hello")
     expectNoDifference(other.map(String.init), "world")
-    expectNoDifference(MemberStringStorage(partial)?.text, "hello")
+    expectNoDifference(MemberStringStorage(streamPartial: partial)?.text, "hello")
   }
 
   @Test
@@ -139,7 +165,7 @@ struct `EdgeToolsStreamGenerable tests` {
     expectNoDifference(text, "héllo")
     expectNoDifference(other.map(String.init), "world")
     expectNoDifference(partial.edgeToolsValue, expected)
-    expectNoDifference(LiteralOptionsRequest(partial)?.edgeToolsValue, expected)
+    expectNoDifference(LiteralOptionsRequest(streamPartial: partial)?.edgeToolsValue, expected)
     expectNoDifference(try LiteralOptionsRequest(edgeToolsValue: expected).edgeToolsValue, expected)
   }
 
@@ -178,7 +204,7 @@ struct `EdgeToolsStreamGenerable tests` {
     try parser.next(#"{"user_id":7,"display_name":"hello","ExactName":"fixed"}"#.utf8)
     let partial = try parser.finish()
     expectNoDifference(partial.edgeToolsValue, expected)
-    expectNoDifference(SnakeCaseRequest(partial)?.edgeToolsValue, expected)
+    expectNoDifference(SnakeCaseRequest(streamPartial: partial)?.edgeToolsValue, expected)
     expectNoDifference(
       try SnakeCaseRequest.Partial(edgeToolsValue: expected).edgeToolsValue,
       expected
@@ -191,7 +217,7 @@ struct `EdgeToolsStreamGenerable tests` {
     try parser.next(#"{"x_send_message":{"x_body_text":"hi","_1":"there"}}"#.utf8)
     let partial = try parser.finish()
     let expected: EdgeToolsValue = ["x_send_message": ["x_body_text": "hi", "_1": "there"]]
-    let action = try #require(CustomKeyAction(partial))
+    let action = try #require(CustomKeyAction(streamPartial: partial))
     expectNoDifference(action, .sendMessage(bodyText: "hi", "there"))
     expectNoDifference(action.edgeToolsValue, expected)
     expectNoDifference(partial.edgeToolsValue, expected)
@@ -210,7 +236,7 @@ struct `EdgeToolsStreamGenerable tests` {
     let partial = try parser.finish()
     let expected: EdgeToolsValue = ["x_user_id": 3, "fixed": "hello"]
     expectNoDifference(partial.edgeToolsValue, expected)
-    expectNoDifference(CustomKeyRequest(partial)?.edgeToolsValue, expected)
+    expectNoDifference(CustomKeyRequest(streamPartial: partial)?.edgeToolsValue, expected)
     expectNoDifference(
       try CustomKeyRequest.Partial(edgeToolsValue: expected).edgeToolsValue,
       expected
@@ -228,12 +254,14 @@ struct `EdgeToolsStreamGenerable tests` {
     expectNoDifference(ConfiguredSchemas.cache.count, 0)
     var parser = PartialsStream(initialValue: CachedRequest.Partial(), from: .json())
     try parser.next(#"{"text":"hello"}"#.utf8)
-    expectNoDifference(CachedRequest(try parser.finish())?.text, "hello")
+    let partial = try parser.finish()
+    expectNoDifference(CachedRequest(streamPartial: partial)?.text, "hello")
     expectNoDifference(ConfiguredSchemas.cache.contains(CachedRequest.Partial.self), true)
 
     var enumParser = PartialsStream(initialValue: CachedAction.Partial(), from: .json())
     try enumParser.next(#"{"text":{"body":"hi"}}"#.utf8)
-    expectNoDifference(CachedAction(try enumParser.finish()), .text(body: "hi"))
+    let enumPartial = try enumParser.finish()
+    expectNoDifference(CachedAction(streamPartial: enumPartial), .text(body: "hi"))
     expectNoDifference(ConfiguredSchemas.cache.contains(CachedAction.Partial.self), true)
     expectNoDifference(
       ConfiguredSchemas.cache.contains(CachedAction.TextPayload.Partial.self),
@@ -243,7 +271,7 @@ struct `EdgeToolsStreamGenerable tests` {
 
   @Test
   func `Incomplete Partials Have A Total Conversion`() {
-    expectNoDifference(StreamSearchRequest(StreamSearchRequest.Partial()) == nil, true)
+    expectNoDifference(StreamSearchRequest(streamPartial: StreamSearchRequest.Partial()) == nil, true)
     let request = StreamSearchRequest(orInitial: StreamSearchRequest.Partial())
     expectNoDifference(request.query, "")
     expectNoDifference(request.scores, [])

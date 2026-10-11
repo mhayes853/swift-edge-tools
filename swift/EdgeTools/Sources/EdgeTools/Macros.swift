@@ -27,6 +27,11 @@ import StreamParsing
 /// extension Page.Partial: Sendable where Item.Partial: Sendable {}
 /// ```
 ///
+/// `PartialsStream<Model>` exposes `Model.Partial` during parsing. Its consuming `finish()`
+/// returns a complete model or throws `StreamParsingError.incompleteValue`; `finishPartial()`
+/// returns the final partial. Convert snapshots with `init(streamPartial:)`, or use
+/// `init(orInitial:)` to fill missing fields from their initial values.
+///
 /// `partialStrings` selects `StreamString` or Swift `String` storage for string leaves in the
 /// generated partial. Nested generable types select their own storage. `keyDecodingStrategy`
 /// derives property, enum case, and associated value keys for both generation and parsing;
@@ -140,7 +145,7 @@ public func _edgeToolsValue(
 }
 
 /// Decodes partial storage while preserving a nullable root's explicit null and missing fields.
-public func _edgeToolsPartialValue<Partial: EdgeToolsGenerable & StreamParseableRoot>(
+public func _edgeToolsPartialValue<Partial: EdgeToolsGenerable & StreamPartial>(
   _ value: EdgeToolsValue?,
   as type: Partial.Type
 ) throws -> Partial? {

@@ -28,10 +28,11 @@ struct `EdgeToolsKeyAlias tests` {
       expectNoDifference(try AliasedRequest(edgeToolsValue: input).edgeToolsValue, expected)
       let partial = try AliasedRequest.Partial(edgeToolsValue: input)
       expectNoDifference(partial.edgeToolsValue, expected)
-      expectNoDifference(AliasedRequest(partial)?.edgeToolsValue, expected)
+      expectNoDifference(AliasedRequest(streamPartial: partial)?.edgeToolsValue, expected)
       var stream = PartialsStream(initialValue: AliasedRequest.Partial(), from: .json())
       try stream.next(input.orderedJSONString().utf8)
-      expectNoDifference(AliasedRequest(try stream.finish())?.edgeToolsValue, expected)
+      let parsed = try stream.finish()
+      expectNoDifference(AliasedRequest(streamPartial: parsed)?.edgeToolsValue, expected)
     }
   }
 
@@ -61,8 +62,9 @@ struct `EdgeToolsKeyAlias tests` {
     expectNoDifference(snapshot, ["currentName": "hé"])
     expectNoDifference(try AliasedRequest.Partial(edgeToolsValue: snapshot).edgeToolsValue, snapshot)
     try stream.next(#"llo","old_age":7}"#.utf8)
+    let partial = try stream.finish()
     expectNoDifference(
-      AliasedRequest(try stream.finish())?.edgeToolsValue,
+      AliasedRequest(streamPartial: partial)?.edgeToolsValue,
       ["currentName": "héllo", "currentAge": 7]
     )
   }
@@ -70,15 +72,16 @@ struct `EdgeToolsKeyAlias tests` {
   @Test
   func `Generic Aliases Preserve Explicit Null And Missing Fields`() throws {
     let missing = try AliasedBox<Int?>.Partial(edgeToolsValue: [:])
-    expectNoDifference(AliasedBox<Int?>(missing) == nil, true)
+    expectNoDifference(AliasedBox<Int?>(streamPartial: missing) == nil, true)
     let input: EdgeToolsValue = ["value": 7, "old_value": .null]
     let restored = try AliasedBox<Int?>.Partial(edgeToolsValue: input)
     expectNoDifference(restored.edgeToolsValue, ["value": .null])
-    expectNoDifference(try #require(AliasedBox<Int?>(restored)).value, nil)
+    expectNoDifference(try #require(AliasedBox<Int?>(streamPartial: restored)).value, nil)
     expectNoDifference(try AliasedBox<Int?>(edgeToolsValue: input).value, nil)
     var stream = PartialsStream(initialValue: AliasedBox<Int?>.Partial(), from: .json())
     try stream.next(input.orderedJSONString().utf8)
-    expectNoDifference(try stream.finish().edgeToolsValue, ["value": .null])
+    let partial = try stream.finish()
+    expectNoDifference(partial.edgeToolsValue, ["value": .null])
   }
 
   @Test
@@ -97,7 +100,7 @@ struct `EdgeToolsKeyAlias tests` {
       try stream.next(bytes[split...])
       let partial = try stream.finish()
       expectNoDifference(partial.edgeToolsValue, ["token": "Héllo"])
-      expectNoDifference(AliasedConvertedRequest(partial)?.token.text, "HÉLLO")
+      expectNoDifference(AliasedConvertedRequest(streamPartial: partial)?.token.text, "HÉLLO")
     }
   }
 }

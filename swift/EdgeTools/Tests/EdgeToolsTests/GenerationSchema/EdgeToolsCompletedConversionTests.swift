@@ -11,21 +11,21 @@ struct `EdgeToolsCompletedConversion tests` {
     try stream.next(#"{"token":"hello"}"#.utf8)
     expectNoDifference(CountingConversion.calls.withLock { $0.to }, 1)
     let partial = try stream.finish()
-    let first = try #require(CountingRequest(partial))
-    let second = try #require(CountingRequest(partial))
+    let first = try #require(CountingRequest(streamPartial: partial))
+    let second = try #require(CountingRequest(streamPartial: partial))
     expectNoDifference(first.token, second.token)
     expectNoDifference(partial.edgeToolsValue, ["token": "hello"])
     expectNoDifference(CountingConversion.calls.withLock { $0.to }, 1)
     let reversed = first.streamPartialValue
     expectNoDifference(reversed.token?.value, first.token)
-    expectNoDifference(CountingRequest(reversed)?.token, first.token)
+    expectNoDifference(CountingRequest(streamPartial: reversed)?.token, first.token)
     expectNoDifference(CountingConversion.calls.withLock { $0.to }, 1)
     expectNoDifference(CountingConversion.calls.withLock { $0.from }, 1)
 
     CountingConversion.calls.withLock { $0 = (0, 0) }
     let restored = try CountingRequest.Partial(edgeToolsValue: ["token": "HeLLo"])
     expectNoDifference(restored.edgeToolsValue, ["token": "HeLLo"])
-    expectNoDifference(CountingRequest(restored)?.token.text, "HeLLo")
+    expectNoDifference(CountingRequest(streamPartial: restored)?.token.text, "HeLLo")
     expectNoDifference(CountingConversion.calls.withLock { $0.to }, 1)
     expectNoDifference(CountingConversion.calls.withLock { $0.from }, 0)
   }
@@ -38,9 +38,9 @@ struct `EdgeToolsCompletedConversion tests` {
       try stream.next(bytes[..<split])
       try stream.next(bytes[split...])
       let partial = try stream.finish()
-      expectNoDifference(ConvertedRequest(partial)?.token, ConvertedToken(text: "HÉLLO"))
-      expectNoDifference(ConvertedRequest(partial)?.createdAt, ConvertedTimestamp(seconds: 42))
-      expectNoDifference(ConvertedRequest(partial)?.pair, ConvertedPair(first: 3, second: 4))
+      expectNoDifference(ConvertedRequest(streamPartial: partial)?.token, ConvertedToken(text: "HÉLLO"))
+      expectNoDifference(ConvertedRequest(streamPartial: partial)?.createdAt, ConvertedTimestamp(seconds: 42))
+      expectNoDifference(ConvertedRequest(streamPartial: partial)?.pair, ConvertedPair(first: 3, second: 4))
     }
   }
 
@@ -84,7 +84,7 @@ struct `EdgeToolsCompletedConversion tests` {
     let canonical: EdgeToolsValue = ["wire_token": "hello", "created_at": 42, "pair": [3, 4]]
     expectNoDifference(value.edgeToolsValue, canonical)
     expectNoDifference(try ConvertedRequest(edgeToolsValue: canonical), value)
-    expectNoDifference(ConvertedRequest(value.streamPartialValue), value)
+    expectNoDifference(ConvertedRequest(streamPartial: value.streamPartialValue), value)
   }
 
   @Test
@@ -100,10 +100,10 @@ struct `EdgeToolsCompletedConversion tests` {
     expectNoDifference(stream.current.token?.value, ConvertedToken(text: "HELLO"))
     expectNoDifference(stream.current.pair?.source.map { $0 }, [3])
     expectNoDifference(stream.current.pair?.value, nil)
-    expectNoDifference(ConvertedRequest(stream.current), nil)
+    expectNoDifference(ConvertedRequest(streamPartial: stream.current), nil)
     try stream.next("4]}".utf8)
     let partial = try stream.finish()
-    expectNoDifference(ConvertedRequest(partial)?.pair, ConvertedPair(first: 3, second: 4))
+    expectNoDifference(ConvertedRequest(streamPartial: partial)?.pair, ConvertedPair(first: 3, second: 4))
     expectNoDifference(early.token.map { String($0.source) }, "He")
     expectNoDifference(early.token?.value, nil)
   }
@@ -114,7 +114,7 @@ struct `EdgeToolsCompletedConversion tests` {
     let partial = try ConvertedRequest.Partial(edgeToolsValue: input)
     expectNoDifference(partial.edgeToolsValue, input)
     expectNoDifference(partial.token?.value, ConvertedToken(text: "HELLO"))
-    expectNoDifference(ConvertedRequest(partial)?.token, ConvertedToken(text: "HELLO"))
+    expectNoDifference(ConvertedRequest(streamPartial: partial)?.token, ConvertedToken(text: "HELLO"))
     expectNoDifference(try ConvertedRequest.Partial(edgeToolsValue: [:]).token == nil, true)
     expectNoDifference(
       ConvertedRequest(orInitial: ConvertedRequest.Partial()).token.text,
@@ -130,9 +130,10 @@ struct `EdgeToolsCompletedConversion tests` {
   func `Optional Conversions Distinguish Missing Null And Incomplete Values`() throws {
     var stream = PartialsStream(initialValue: OptionalConvertedRequest.Partial(), from: .json())
     try stream.next(#"{"token":"he"#.utf8)
-    expectNoDifference(OptionalConvertedRequest(stream.current), nil)
+    expectNoDifference(OptionalConvertedRequest(streamPartial: stream.current), nil)
     try stream.next(#"llo","token":null}"#.utf8)
-    expectNoDifference(OptionalConvertedRequest(try stream.finish())?.token, nil)
+    let partial = try stream.finish()
+    expectNoDifference(OptionalConvertedRequest(streamPartial: partial)?.token, nil)
     expectNoDifference(try OptionalConvertedRequest(edgeToolsValue: [:]).token, nil)
     expectNoDifference(try OptionalConvertedRequest(edgeToolsValue: ["token": .null]).token, nil)
     expectNoDifference(
@@ -176,7 +177,7 @@ struct `EdgeToolsCompletedConversion tests` {
     expectNoDifference(stream.current.pair?.source["first"], 3)
     try stream.next("}}".utf8)
     let partial = try stream.finish()
-    expectNoDifference(ObjectConvertedRequest(partial)?.pair, ConvertedPair(first: 3, second: 4))
+    expectNoDifference(ObjectConvertedRequest(streamPartial: partial)?.pair, ConvertedPair(first: 3, second: 4))
     let input: EdgeToolsValue = ["pair": ["first": 3, "second": 4]]
     expectNoDifference(try ObjectConvertedRequest(edgeToolsValue: input).edgeToolsValue, input)
     expectNoDifference(
