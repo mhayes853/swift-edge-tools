@@ -631,7 +631,7 @@ extension EdgeToolsTypedStream {
 final class EdgeToolsTypedTurnParser<Output>: Sendable
 where Output: StreamParseable & Sendable, Output.Partial: Sendable {
   private struct State: ~Copyable {
-    var parser: PartialsStream<Output.Partial>
+    var parser: PartialsStream<Output>?
     var error: (any Error)?
     var sawText = false
   }
@@ -643,8 +643,8 @@ where Output: StreamParseable & Sendable, Output.Partial: Sendable {
       guard state.error == nil, !text.isEmpty else { return nil }
       state.sawText = true
       do {
-        try state.parser.next(text.utf8)
-        return state.parser.current
+        try state.parser?.next(text.utf8)
+        return state.parser?.current
       } catch {
         state.error = error
         return nil
@@ -653,18 +653,21 @@ where Output: StreamParseable & Sendable, Output.Partial: Sendable {
   }
 
   func complete(fallbackText: String) throws -> Output {
-    let partial = try self.state.withLock { state in
+    try self.state.withLock { state in
       if let error = state.error {
         throw error
       }
-      if !state.sawText {
-        try state.parser.next(fallbackText.utf8)
+      guard var parser = state.parser.take() else {
+        throw EdgeToolsTypedStreamError.incompleteResponse
       }
-      return try state.parser.finish()
+      if !state.sawText {
+        try parser.next(fallbackText.utf8)
+      }
+      do {
+        return try parser.finish()
+      } catch let error as StreamParsingError where error == .incompleteValue {
+        throw EdgeToolsTypedStreamError.incompleteResponse
+      }
     }
-    guard let output = Output(streamPartial: partial) else {
-      throw EdgeToolsTypedStreamError.incompleteResponse
-    }
-    return output
   }
 }

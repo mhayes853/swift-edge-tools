@@ -2,6 +2,38 @@ import EdgeToolsCore
 import OrderedCollections
 import StreamParsing
 
+// MARK: - Completed Conversions
+
+extension StreamCompletedValueConversion where Source: EdgeToolsGenerable {
+  /// Decodes and converts a completed source value, propagating decoding and conversion errors.
+  public static func value(edgeToolsValue: EdgeToolsValue) throws -> Value {
+    try Self.value(fromCompletedSource: Source(edgeToolsValue: edgeToolsValue))
+  }
+}
+
+extension ConvertedPartial: EdgeToolsGenerable where Strategy.Source: EdgeToolsGenerable {
+  public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
+    Strategy.Source.edgeToolsGenerationSchema
+  }
+}
+
+extension ConvertedPartial: ConvertibleFromEdgeToolsValue
+where Strategy.Source: EdgeToolsGenerable {
+  /// Restores a completed source, caching its conversion and preserving its representation.
+  /// A value snapshot carries no completion state, so restoring an unfinished source can fail conversion.
+  public init(edgeToolsValue: EdgeToolsValue) throws {
+    self.init(completedSource: try Strategy.Source(edgeToolsValue: edgeToolsValue))
+    if let error = self.conversionError {
+      throw error
+    }
+  }
+}
+
+extension ConvertedPartial: ConvertibleToEdgeToolsValue
+where Strategy.Source: ConvertibleToEdgeToolsValue {
+  public var edgeToolsValue: EdgeToolsValue { self.source.edgeToolsValue }
+}
+
 // MARK: - Stream Scalars
 
 extension StreamString: EdgeToolsGenerable {
@@ -12,6 +44,24 @@ extension StreamString: EdgeToolsGenerable {
   }
 
   public var edgeToolsValue: EdgeToolsValue { .string(String(self)) }
+}
+
+extension StreamBase64Data: EdgeToolsGenerable {
+  public static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema { .string }
+
+  public init(edgeToolsValue: EdgeToolsValue) throws {
+    var text = try String(edgeToolsValue: edgeToolsValue)
+    self.init()
+    guard text.withUTF8({ self.streamAppend(utf8: $0.span) }) == .applied else {
+      throw StreamSinkFailure(reason: .conversionFailed)
+    }
+    guard let value = Self(streamPartial: self) else {
+      throw StreamParsingError.incompleteValue
+    }
+    self = value
+  }
+
+  public var edgeToolsValue: EdgeToolsValue { .string(base64EncodedString(self.bytes)) }
 }
 
 extension StreamEmptyObject: EdgeToolsGenerable {

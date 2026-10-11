@@ -100,11 +100,8 @@ extension `EdgeToolsMacros tests` {
               }
 
 
-            private static let streamContainerSchema_query = _streamContainerSchema(for: (String.Partial).self)
-
-
             static func streamMatchField(_ key: Span<UInt8>) -> Int32 {
-                switch key.paddedLeadingWord() {
+                switch key._streamPaddedLeadingWord() {
                 case 0x0000_0000_0000_0071 where key.count == 1:
                 return Self.StreamField.query
                 default:
@@ -120,7 +117,7 @@ extension `EdgeToolsMacros tests` {
                 let p = storage.assumingMemoryBound(to: Self.self)
                 switch field {
                 case Self.StreamField.query:
-                return streamApply(&p.pointee.query, utf8: bytes)
+                return _streamApply(&p.pointee.query, utf8: bytes)
                 default:
                 return .unsupported
                 }
@@ -134,7 +131,7 @@ extension `EdgeToolsMacros tests` {
                 let p = storage.assumingMemoryBound(to: Self.self)
                 switch field {
                 case Self.StreamField.query:
-                return streamApply(&p.pointee.query, bytes: bytes, info: info)
+                return _streamApply(&p.pointee.query, bytes: bytes, info: info)
                 default:
                 return .unsupported
                 }
@@ -147,7 +144,7 @@ extension `EdgeToolsMacros tests` {
                 let p = storage.assumingMemoryBound(to: Self.self)
                 switch field {
                 case Self.StreamField.query:
-                return streamApply(&p.pointee.query, boolean: value)
+                return _streamApply(&p.pointee.query, boolean: value)
                 default:
                 return .unsupported
                 }
@@ -160,35 +157,39 @@ extension `EdgeToolsMacros tests` {
                 let p = storage.assumingMemoryBound(to: Self.self)
                 switch field {
                 case Self.StreamField.query:
-                return StreamParsing.streamApplyNull(&p.pointee.query)
+                return StreamParsing._streamApplyNull(&p.pointee.query)
                 default:
                 return .unsupported
                 }
               }
 
 
-            static let streamFields: [StreamParsingCore.StreamField] = StreamParsingCore._streamFields(
-                of: Self.self, prototype: Self()
-              ) { p in
-                [
-                  StreamParsingCore.StreamField(
-                    key: "q", index: Self.StreamField.query,
-                    route: _streamFieldRoute(&p.pointee.query, schema: Self.streamContainerSchema_query),
-                    offset: StreamParsingCore._streamFieldOffset(&p.pointee.query, in: p)
-                  ),
-                ]
+            private static let streamSchemaEntry = StreamParsingCore.StreamSchemaCache.shared.entry(for: Self.self) {
+                let streamObjectMemberSchema_query = _streamObjectMemberSchema(for: (String.Partial).self)
+                let streamFields = StreamParsingCore._streamFields(of: Self.self, prototype: Self()) { p in
+                  [
+                    StreamParsingCore.StreamField(
+                      key: "q", index: Self.StreamField.query,
+                      route: _streamFieldRoute(&p.pointee.query, schema: streamObjectMemberSchema_query),
+                      offset: StreamParsingCore._streamFieldOffset(&p.pointee.query, in: p)
+                    ),
+                  ]
+                }
+                return StreamParsingCore.StreamSchema(
+                  shape: .object,
+                  matchField: Self.streamMatchField,
+                  applyString: Self.streamApplyString,
+                  applyNumber: Self.streamApplyNumber,
+                  applyBoolean: Self.streamApplyBoolean,
+                  applyNull: Self.streamApplyNull,
+                  fields: streamFields
+                )
               }
 
 
-            static let streamSchema = StreamParsingCore.StreamSchema(
-                shape: .object,
-                matchField: Self.streamMatchField,
-                applyString: Self.streamApplyString,
-                applyNumber: Self.streamApplyNumber,
-                applyBoolean: Self.streamApplyBoolean,
-                applyNull: Self.streamApplyNull,
-                fields: Self.streamFields
-              )
+            static var streamSchema: StreamParsingCore.StreamSchema {
+              Self.streamSchemaEntry.schema
+            }
 
 
             static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
@@ -216,28 +217,20 @@ extension `EdgeToolsMacros tests` {
             )
           }
 
-          init?(_ partial: Partial) {
-            self.init(streamPartial: partial)
-          }
-
           init?(streamPartial partial: Partial) {
             guard
-              let query = Self._streamValue({ $0.query
+              let streamValue_query = Self._streamValue({ $0.query
               }, partial.query)
             else {
               return nil
             }
-            self.query = query
+            self.query = streamValue_query
           }
 
           init(orInitial partial: Partial) {
             self.query = Self._streamValueOrInitial({
                 $0.query
               }, partial.query)
-          }
-
-          static func streamValueOrInitial(from partial: Partial) -> Self {
-            Self(orInitial: partial)
           }
         }
         """#
@@ -442,11 +435,8 @@ extension `EdgeToolsMacros tests` {
               static let search: Int32 = 1
             }
 
-            private static let streamContainerSchema_idle = _streamContainerSchema(for: (IdlePayload.Partial).self)
-            private static let streamContainerSchema_search = _streamContainerSchema(for: (SearchPayload.Partial).self)
-
             static func streamMatchField(_ key: Span<UInt8>) -> Int32 {
-              switch key.paddedLeadingWord() {
+              switch key._streamPaddedLeadingWord() {
               case 0x0000_0000_656C_6469 where key.count == 4:
                 return Self.StreamField.idle
               case 0x0000_6863_7261_6573 where key.count == 6:
@@ -463,9 +453,9 @@ extension `EdgeToolsMacros tests` {
               let p = storage.assumingMemoryBound(to: Self.self)
               switch field {
               case Self.StreamField.idle:
-                return streamApply(&p.pointee.idle, utf8: bytes)
+                return _streamApply(&p.pointee.idle, utf8: bytes)
               case Self.StreamField.search:
-                return streamApply(&p.pointee.search, utf8: bytes)
+                return _streamApply(&p.pointee.search, utf8: bytes)
               default:
                 return .unsupported
               }
@@ -478,9 +468,9 @@ extension `EdgeToolsMacros tests` {
               let p = storage.assumingMemoryBound(to: Self.self)
               switch field {
               case Self.StreamField.idle:
-                return streamApply(&p.pointee.idle, bytes: bytes, info: info)
+                return _streamApply(&p.pointee.idle, bytes: bytes, info: info)
               case Self.StreamField.search:
-                return streamApply(&p.pointee.search, bytes: bytes, info: info)
+                return _streamApply(&p.pointee.search, bytes: bytes, info: info)
               default:
                 return .unsupported
               }
@@ -492,9 +482,9 @@ extension `EdgeToolsMacros tests` {
               let p = storage.assumingMemoryBound(to: Self.self)
               switch field {
               case Self.StreamField.idle:
-                return streamApply(&p.pointee.idle, boolean: value)
+                return _streamApply(&p.pointee.idle, boolean: value)
               case Self.StreamField.search:
-                return streamApply(&p.pointee.search, boolean: value)
+                return _streamApply(&p.pointee.search, boolean: value)
               default:
                 return .unsupported
               }
@@ -506,40 +496,45 @@ extension `EdgeToolsMacros tests` {
               let p = storage.assumingMemoryBound(to: Self.self)
               switch field {
               case Self.StreamField.idle:
-                return StreamParsing.streamApplyNull(&p.pointee.idle)
+                return StreamParsing._streamApplyNull(&p.pointee.idle)
               case Self.StreamField.search:
-                return StreamParsing.streamApplyNull(&p.pointee.search)
+                return StreamParsing._streamApplyNull(&p.pointee.search)
               default:
                 return .unsupported
               }
             }
 
-            static let streamFields: [StreamParsingCore.StreamField] = StreamParsingCore._streamFields(
-              of: Self.self, prototype: Self()
-            ) { p in
-              [
-                StreamParsingCore.StreamField(
-                  key: "idle", index: Self.StreamField.idle,
-                  route: _streamFieldRoute(&p.pointee.idle, schema: Self.streamContainerSchema_idle),
-                  offset: StreamParsingCore._streamFieldOffset(&p.pointee.idle, in: p)
-                ),
-                StreamParsingCore.StreamField(
-                  key: "search", index: Self.StreamField.search,
-                  route: _streamFieldRoute(&p.pointee.search, schema: Self.streamContainerSchema_search),
-                  offset: StreamParsingCore._streamFieldOffset(&p.pointee.search, in: p)
-                ),
-              ]
+            private static let streamSchemaEntry = StreamParsingCore.StreamSchemaCache.shared.entry(for: Self.self) {
+              let streamObjectMemberSchema_idle = _streamObjectMemberSchema(for: (IdlePayload.Partial).self)
+              let streamObjectMemberSchema_search = _streamObjectMemberSchema(for: (SearchPayload.Partial).self)
+              let streamFields = StreamParsingCore._streamFields(of: Self.self, prototype: Self()) { p in
+                [
+                  StreamParsingCore.StreamField(
+                    key: "idle", index: Self.StreamField.idle,
+                    route: _streamFieldRoute(&p.pointee.idle, schema: streamObjectMemberSchema_idle),
+                    offset: StreamParsingCore._streamFieldOffset(&p.pointee.idle, in: p)
+                  ),
+                  StreamParsingCore.StreamField(
+                    key: "search", index: Self.StreamField.search,
+                    route: _streamFieldRoute(&p.pointee.search, schema: streamObjectMemberSchema_search),
+                    offset: StreamParsingCore._streamFieldOffset(&p.pointee.search, in: p)
+                  ),
+                ]
+              }
+              return StreamParsingCore.StreamSchema(
+                shape: .object,
+                matchField: Self.streamMatchField,
+                applyString: Self.streamApplyString,
+                applyNumber: Self.streamApplyNumber,
+                applyBoolean: Self.streamApplyBoolean,
+                applyNull: Self.streamApplyNull,
+                fields: streamFields
+              )
             }
 
-            static let streamSchema = StreamParsingCore.StreamSchema(
-              shape: .object,
-              matchField: Self.streamMatchField,
-              applyString: Self.streamApplyString,
-              applyNumber: Self.streamApplyNumber,
-              applyBoolean: Self.streamApplyBoolean,
-              applyNull: Self.streamApplyNull,
-              fields: Self.streamFields
-            )
+            static var streamSchema: StreamParsingCore.StreamSchema {
+              Self.streamSchemaEntry.schema
+            }
 
             static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
               EdgeToolsGenerationSchema(
@@ -615,10 +610,8 @@ extension `EdgeToolsMacros tests` {
                 static let reason: Int32 = 0
               }
 
-              private static let streamContainerSchema_reason = _streamContainerSchema(for: (String.Partial).self)
-
               static func streamMatchField(_ key: Span<UInt8>) -> Int32 {
-                switch key.paddedLeadingWord() {
+                switch key._streamPaddedLeadingWord() {
                 case 0x0000_6E6F_7361_6572 where key.count == 6:
                   return Self.StreamField.reason
                 default:
@@ -633,7 +626,7 @@ extension `EdgeToolsMacros tests` {
                 let p = storage.assumingMemoryBound(to: Self.self)
                 switch field {
                 case Self.StreamField.reason:
-                  return streamApply(&p.pointee.reason, utf8: bytes)
+                  return _streamApply(&p.pointee.reason, utf8: bytes)
                 default:
                   return .unsupported
                 }
@@ -646,7 +639,7 @@ extension `EdgeToolsMacros tests` {
                 let p = storage.assumingMemoryBound(to: Self.self)
                 switch field {
                 case Self.StreamField.reason:
-                  return streamApply(&p.pointee.reason, bytes: bytes, info: info)
+                  return _streamApply(&p.pointee.reason, bytes: bytes, info: info)
                 default:
                   return .unsupported
                 }
@@ -658,7 +651,7 @@ extension `EdgeToolsMacros tests` {
                 let p = storage.assumingMemoryBound(to: Self.self)
                 switch field {
                 case Self.StreamField.reason:
-                  return streamApply(&p.pointee.reason, boolean: value)
+                  return _streamApply(&p.pointee.reason, boolean: value)
                 default:
                   return .unsupported
                 }
@@ -670,33 +663,37 @@ extension `EdgeToolsMacros tests` {
                 let p = storage.assumingMemoryBound(to: Self.self)
                 switch field {
                 case Self.StreamField.reason:
-                  return StreamParsing.streamApplyNull(&p.pointee.reason)
+                  return StreamParsing._streamApplyNull(&p.pointee.reason)
                 default:
                   return .unsupported
                 }
               }
 
-              static let streamFields: [StreamParsingCore.StreamField] = StreamParsingCore._streamFields(
-                of: Self.self, prototype: Self()
-              ) { p in
-                [
-                  StreamParsingCore.StreamField(
-                    key: "reason", index: Self.StreamField.reason,
-                    route: _streamFieldRoute(&p.pointee.reason, schema: Self.streamContainerSchema_reason),
-                    offset: StreamParsingCore._streamFieldOffset(&p.pointee.reason, in: p)
-                  ),
-                ]
+              private static let streamSchemaEntry = StreamParsingCore.StreamSchemaCache.shared.entry(for: Self.self) {
+                let streamObjectMemberSchema_reason = _streamObjectMemberSchema(for: (String.Partial).self)
+                let streamFields = StreamParsingCore._streamFields(of: Self.self, prototype: Self()) { p in
+                  [
+                    StreamParsingCore.StreamField(
+                      key: "reason", index: Self.StreamField.reason,
+                      route: _streamFieldRoute(&p.pointee.reason, schema: streamObjectMemberSchema_reason),
+                      offset: StreamParsingCore._streamFieldOffset(&p.pointee.reason, in: p)
+                    ),
+                  ]
+                }
+                return StreamParsingCore.StreamSchema(
+                  shape: .object,
+                  matchField: Self.streamMatchField,
+                  applyString: Self.streamApplyString,
+                  applyNumber: Self.streamApplyNumber,
+                  applyBoolean: Self.streamApplyBoolean,
+                  applyNull: Self.streamApplyNull,
+                  fields: streamFields
+                )
               }
 
-              static let streamSchema = StreamParsingCore.StreamSchema(
-                shape: .object,
-                matchField: Self.streamMatchField,
-                applyString: Self.streamApplyString,
-                applyNumber: Self.streamApplyNumber,
-                applyBoolean: Self.streamApplyBoolean,
-                applyNull: Self.streamApplyNull,
-                fields: Self.streamFields
-              )
+              static var streamSchema: StreamParsingCore.StreamSchema {
+                Self.streamSchemaEntry.schema
+              }
 
               static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
                 EdgeToolsGenerationSchema(
@@ -729,28 +726,20 @@ extension `EdgeToolsMacros tests` {
                 )
               }
 
-              init?(_ partial: Partial) {
-                self.init(streamPartial: partial)
-              }
-
               init?(streamPartial partial: Partial) {
                 guard
-                  let reason = Self._streamValue({ $0.reason
+                  let streamValue_reason = Self._streamValue({ $0.reason
                   }, partial.reason)
                 else {
                   return nil
                 }
-                self.reason = reason
+                self.reason = streamValue_reason
               }
 
               init(orInitial partial: Partial) {
                 self.reason = Self._streamValueOrInitial({
                     $0.reason
                   }, partial.reason)
-              }
-
-              static func streamValueOrInitial(from partial: Partial) -> Self {
-                Self(orInitial: partial)
               }
             }
           }
@@ -806,10 +795,8 @@ extension `EdgeToolsMacros tests` {
                 static let query: Int32 = 0
               }
 
-              private static let streamContainerSchema_query = _streamContainerSchema(for: (String.Partial).self)
-
               static func streamMatchField(_ key: Span<UInt8>) -> Int32 {
-                switch key.paddedLeadingWord() {
+                switch key._streamPaddedLeadingWord() {
                 case 0x0000_0079_7265_7571 where key.count == 5:
                   return Self.StreamField.query
                 default:
@@ -824,7 +811,7 @@ extension `EdgeToolsMacros tests` {
                 let p = storage.assumingMemoryBound(to: Self.self)
                 switch field {
                 case Self.StreamField.query:
-                  return streamApply(&p.pointee.query, utf8: bytes)
+                  return _streamApply(&p.pointee.query, utf8: bytes)
                 default:
                   return .unsupported
                 }
@@ -837,7 +824,7 @@ extension `EdgeToolsMacros tests` {
                 let p = storage.assumingMemoryBound(to: Self.self)
                 switch field {
                 case Self.StreamField.query:
-                  return streamApply(&p.pointee.query, bytes: bytes, info: info)
+                  return _streamApply(&p.pointee.query, bytes: bytes, info: info)
                 default:
                   return .unsupported
                 }
@@ -849,7 +836,7 @@ extension `EdgeToolsMacros tests` {
                 let p = storage.assumingMemoryBound(to: Self.self)
                 switch field {
                 case Self.StreamField.query:
-                  return streamApply(&p.pointee.query, boolean: value)
+                  return _streamApply(&p.pointee.query, boolean: value)
                 default:
                   return .unsupported
                 }
@@ -861,33 +848,37 @@ extension `EdgeToolsMacros tests` {
                 let p = storage.assumingMemoryBound(to: Self.self)
                 switch field {
                 case Self.StreamField.query:
-                  return StreamParsing.streamApplyNull(&p.pointee.query)
+                  return StreamParsing._streamApplyNull(&p.pointee.query)
                 default:
                   return .unsupported
                 }
               }
 
-              static let streamFields: [StreamParsingCore.StreamField] = StreamParsingCore._streamFields(
-                of: Self.self, prototype: Self()
-              ) { p in
-                [
-                  StreamParsingCore.StreamField(
-                    key: "query", index: Self.StreamField.query,
-                    route: _streamFieldRoute(&p.pointee.query, schema: Self.streamContainerSchema_query),
-                    offset: StreamParsingCore._streamFieldOffset(&p.pointee.query, in: p)
-                  ),
-                ]
+              private static let streamSchemaEntry = StreamParsingCore.StreamSchemaCache.shared.entry(for: Self.self) {
+                let streamObjectMemberSchema_query = _streamObjectMemberSchema(for: (String.Partial).self)
+                let streamFields = StreamParsingCore._streamFields(of: Self.self, prototype: Self()) { p in
+                  [
+                    StreamParsingCore.StreamField(
+                      key: "query", index: Self.StreamField.query,
+                      route: _streamFieldRoute(&p.pointee.query, schema: streamObjectMemberSchema_query),
+                      offset: StreamParsingCore._streamFieldOffset(&p.pointee.query, in: p)
+                    ),
+                  ]
+                }
+                return StreamParsingCore.StreamSchema(
+                  shape: .object,
+                  matchField: Self.streamMatchField,
+                  applyString: Self.streamApplyString,
+                  applyNumber: Self.streamApplyNumber,
+                  applyBoolean: Self.streamApplyBoolean,
+                  applyNull: Self.streamApplyNull,
+                  fields: streamFields
+                )
               }
 
-              static let streamSchema = StreamParsingCore.StreamSchema(
-                shape: .object,
-                matchField: Self.streamMatchField,
-                applyString: Self.streamApplyString,
-                applyNumber: Self.streamApplyNumber,
-                applyBoolean: Self.streamApplyBoolean,
-                applyNull: Self.streamApplyNull,
-                fields: Self.streamFields
-              )
+              static var streamSchema: StreamParsingCore.StreamSchema {
+                Self.streamSchemaEntry.schema
+              }
 
               static var edgeToolsGenerationSchema: EdgeToolsGenerationSchema {
                 EdgeToolsGenerationSchema(
@@ -920,28 +911,20 @@ extension `EdgeToolsMacros tests` {
                 )
               }
 
-              init?(_ partial: Partial) {
-                self.init(streamPartial: partial)
-              }
-
               init?(streamPartial partial: Partial) {
                 guard
-                  let query = Self._streamValue({ $0.query
+                  let streamValue_query = Self._streamValue({ $0.query
                   }, partial.query)
                 else {
                   return nil
                 }
-                self.query = query
+                self.query = streamValue_query
               }
 
               init(orInitial partial: Partial) {
                 self.query = Self._streamValueOrInitial({
                     $0.query
                   }, partial.query)
-              }
-
-              static func streamValueOrInitial(from partial: Partial) -> Self {
-                Self(orInitial: partial)
               }
             }
           }
@@ -952,10 +935,6 @@ extension `EdgeToolsMacros tests` {
             case .search(let query):
               return Partial(search: SearchPayload.Partial(query: query.streamPartialValue))
             }
-          }
-
-          init?(_ partial: Partial) {
-            self.init(streamPartial: partial)
           }
 
           init?(streamPartial partial: Partial) {
@@ -993,14 +972,10 @@ extension `EdgeToolsMacros tests` {
               self = streamMatched
               return
             }
-            let streamDefaultValue = IdlePayload.Value.streamValueOrInitial(
-              from: partial.idle ?? IdlePayload.Partial.streamInitialValue()
+            let streamDefaultValue = IdlePayload.Value(
+              orInitial: partial.idle ?? IdlePayload.Partial.streamInitialValue()
             )
             self = .idle(reason: streamDefaultValue.reason)
-          }
-
-          static func streamValueOrInitial(from partial: Partial) -> Self {
-            Self(orInitial: partial)
           }
         }
         """#
