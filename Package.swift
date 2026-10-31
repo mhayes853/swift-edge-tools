@@ -82,6 +82,7 @@ let package = Package(
   products: [
     .library(name: "EdgeTools", targets: ["EdgeTools"]),
     .library(name: "EdgeToolsLlama", targets: ["EdgeToolsLlama"]),
+    .library(name: "EdgeToolsTemplateRendering", targets: ["EdgeToolsTemplateRendering"]),
     .library(name: "EdgeToolsTokenizers", targets: ["EdgeToolsTokenizers"]),
     .library(name: "EdgeToolsXGrammar", targets: ["EdgeToolsXGrammar"])
   ],
@@ -337,15 +338,7 @@ let package = Package(
             traits: ["HuggingFaceTokenizers"]
           )
         ),
-        .target(
-          name: "CMinja",
-          condition: .when(
-            platforms: [
-              .macOS, .iOS, .tvOS, .watchOS, .visionOS, .linux, .android, .windows
-            ],
-            traits: ["ChatTemplates"]
-          )
-        )
+        .target(name: "EdgeToolsTemplateRendering", condition: .when(traits: ["ChatTemplates"]))
       ] + cLlamaTraitDependency,
       path: "swift/EdgeTools/Sources/EdgeToolsTokenizers",
       swiftSettings: edgeToolsSwiftSettings,
@@ -382,14 +375,14 @@ let package = Package(
       ]
     ),
     .target(
-      name: "CMinja",
-      path: "swift/EdgeTools/Sources/CMinja",
-      exclude: ["minja/LICENSE", "minja/PIN", "nlohmann/PIN"],
-      sources: ["bridging.cc"],
-      publicHeadersPath: "include",
-      cxxSettings: [
-        .headerSearchPath(".")
-      ]
+      name: "EdgeToolsTemplateRendering",
+      dependencies: [
+        "EdgeToolsCore",
+        .product(name: "OrderedCollections", package: "swift-collections")
+      ],
+      path: "swift/EdgeTools/Sources/EdgeToolsTemplateRendering",
+      exclude: ["LICENSE-minja"],
+      swiftSettings: edgeToolsSwiftSettings
     ),
     .target(
       name: "EdgeToolsXGrammar",
@@ -458,6 +451,15 @@ let package = Package(
         .product(name: "CustomDump", package: "swift-custom-dump")
       ],
       path: "swift/EdgeTools/Tests/EdgeToolsLlamaTests"
+    ),
+    .testTarget(
+      name: "EdgeToolsTemplateRenderingTests",
+      dependencies: [
+        "EdgeToolsTemplateRendering",
+        .product(name: "CustomDump", package: "swift-custom-dump"),
+        .product(name: "OrderedCollections", package: "swift-collections")
+      ],
+      path: "swift/EdgeTools/Tests/EdgeToolsTemplateRenderingTests"
     ),
     .testTarget(
       name: "EdgeToolsTokenizersTests",

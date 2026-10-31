@@ -78,7 +78,8 @@ The framework compiles quite lean without any traits enabled since it doesn't im
 - `Foundation` to enable APIs that support Foundation (this is enabled by default).
 - `FoundationEssentials` to enable APIs that need Foundation support, but not any of the internationalization.
   - This is enabled by `MLX` and `Llama`. 
-- `ChatTemplates` enabled chat template rendering through [Minja](https://github.com/google/minja).
+- `ChatTemplates` enables chat template rendering through `EdgeToolsTemplateRendering`.
+  - `EdgeToolsTemplateRendering` is a standalone target with a native Swift port of [Minja](https://github.com/google/minja), so Jinja templates render anywhere Swift runs.
 - `HuggingFaceTokenizers` integrates the framework with HF's tokenizers crate.
   - This is vendored as an artifact bundle over a minimal C interface to SPM.
 
@@ -92,7 +93,7 @@ The immediate goals over the coming weeks will be to get the shape of the initia
 
 The overall goals of the framework are to make things possible that can _only_ be done on the edge. Often, this means multiple kinds of models working directly together (eg. STT transcribes audio into an LLM prompt for tool calls.), or other kinds of models that primarily do best in low-latency settings.
 
-I would also like many of the existing dependencies (eg. Tokenizers, Chat Templating) to be ported in-house at some point, but this is not a priority for now.
+I would also like many of the existing dependencies (eg. Tokenizers) to be ported in-house at some point, but this is not a priority for now.
 
 Another direction is focusing downwards towards the engine/kernel layer. I think there are enough options that offer solid performance there, and what matters more for this framework is control. That includes being able to plug your own engine into the framework.
 

@@ -1,5 +1,0 @@
-module CMinja {
-    header "bridging.h"
-
-    export *
-}
