@@ -1,3 +1,5 @@
+import OrderedCollections
+
 #if canImport(Darwin)
   import Darwin
 #elseif canImport(Glibc)
@@ -245,11 +247,9 @@ extension TemplateBinaryOperator {
 private func templateTest(_ name: String, _ value: TemplateValue) throws(TemplateFailure) -> Bool {
   switch name {
   case "none": value.isNull
-  case "boolean":
-    if case .boolean = value { true } else { false }
+  case "boolean": value.isBoolean
   case "integer": value.isInteger
-  case "float":
-    if case .number = value { true } else { false }
+  case "float": value.isFloat
   case "number": value.isNumber
   case "string": value.isString
   case "mapping": value.isObject

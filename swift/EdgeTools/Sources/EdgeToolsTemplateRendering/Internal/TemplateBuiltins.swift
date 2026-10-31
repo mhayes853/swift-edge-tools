@@ -257,7 +257,7 @@ private func joined(_ items: TemplateValue, separator: String) throws(TemplateFa
   guard case .array(let array) = items else {
     throw TemplateFailure("object is not iterable: " + items.repr())
   }
-  return .string(array.elements.map(\.displayString).joined(separator: separator))
+  return .string(array.elements.map { $0.displayString }.joined(separator: separator))
 }
 
 private func sortedTemplateValues(_ values: [TemplateValue]) throws(TemplateFailure)

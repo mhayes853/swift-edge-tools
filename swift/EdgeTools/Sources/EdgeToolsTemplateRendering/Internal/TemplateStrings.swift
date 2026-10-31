@@ -93,11 +93,11 @@ func templateIsLess(_ lhs: String, _ rhs: String) -> Bool {
 }
 
 func templateUppercased(_ string: String) -> String {
-  String(decoding: string.utf8.map(\.asciiUppercased), as: UTF8.self)
+  String(decoding: string.utf8.map { $0.asciiUppercased }, as: UTF8.self)
 }
 
 func templateLowercased(_ string: String) -> String {
-  String(decoding: string.utf8.map(\.asciiLowercased), as: UTF8.self)
+  String(decoding: string.utf8.map { $0.asciiLowercased }, as: UTF8.self)
 }
 
 func templateCapitalized(_ string: String) -> String {

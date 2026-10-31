@@ -86,7 +86,7 @@ extension EdgeToolsTemplateFunction {
         named[name] = value.edgeToolsValue
       }
       let arguments = EdgeToolsTemplateArguments(
-        positional: arguments.positional.map(\.edgeToolsValue),
+        positional: arguments.positional.map { $0.edgeToolsValue },
         named: named
       )
       do throws(EdgeToolsTemplateError) {

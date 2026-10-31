@@ -331,11 +331,9 @@ extension TemplateParser {
       let start = index
       let token = tokens[index]
       index += 1
-      func parseBody(closedBy isClosing: (TemplateToken.Kind) -> Bool) throws(TemplateFailure)
-        -> TemplateNode
-      {
+      func parseBody(closedBy closingTag: String) throws(TemplateFailure) -> TemplateNode {
         let body = try self.parseTemplate(tokens, &index)
-        guard index < tokens.count, isClosing(tokens[index].kind) else {
+        guard index < tokens.count, tokens[index].typeName == closingTag else {
           throw tokens[start].unterminated
         }
         index += 1
@@ -379,11 +377,7 @@ extension TemplateParser {
         )
         children.append(TemplateNode(.loop(loop), at: token.position))
       case .generation:
-        children.append(
-          try parseBody {
-            if case .endGeneration = $0 { true } else { false }
-          }
-        )
+        children.append(try parseBody(closedBy: "endgeneration"))
       case .text(let text):
         children.append(self.textNode(text, tokens, start: start, end: index, at: token.position))
       case .expression(let expression):
@@ -393,9 +387,7 @@ extension TemplateParser {
           TemplateNode(.set(namespace: namespace, names: names, value: value), at: token.position)
         )
       case .set(let namespace, let names, nil):
-        let body = try parseBody {
-          if case .endSet = $0 { true } else { false }
-        }
+        let body = try parseBody(closedBy: "endset")
         guard namespace == nil else {
           throw TemplateFailure("Namespaced set not supported in set with template value")
         }
@@ -404,20 +396,14 @@ extension TemplateParser {
         }
         children.append(TemplateNode(.setBlock(name: names[0], body: body), at: token.position))
       case .macro(let name, let parameters):
-        let body = try parseBody {
-          if case .endMacro = $0 { true } else { false }
-        }
+        let body = try parseBody(closedBy: "endmacro")
         let macro = TemplateMacro(name: name, parameters: parameters, body: body)
         children.append(TemplateNode(.macro(macro), at: token.position))
       case .call(let expression):
-        let body = try parseBody {
-          if case .endCall = $0 { true } else { false }
-        }
+        let body = try parseBody(closedBy: "endcall")
         children.append(TemplateNode(.call(expression, body: body), at: token.position))
       case .filter(let filter):
-        let body = try parseBody {
-          if case .endFilter = $0 { true } else { false }
-        }
+        let body = try parseBody(closedBy: "endfilter")
         children.append(TemplateNode(.filter(filter, body: body), at: token.position))
       case .comment:
         break

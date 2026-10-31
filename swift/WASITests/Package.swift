@@ -7,11 +7,11 @@ let needle2Only = ProcessInfo.processInfo.environment["EDGE_TOOLS_WASI_NEEDLE2_O
 let edgeToolsTraits: Set<Package.Dependency.Trait> =
   needle2Only
   ? ["JS", "Needle2"]
-  : ["XGrammar", "JS", "Needle2"]
+  : ["XGrammar", "JS", "Needle2", "ChatTemplates"]
 let testSources = needle2Only ? ["Needle2JSEngineTests.swift"] : nil
 let testExcludes =
   needle2Only
-  ? ["XGrammarWASITests.swift"]
+  ? ["ChatTemplatesWASITests.swift", "XGrammarWASITests.swift"]
   : []
 
 let package = Package(

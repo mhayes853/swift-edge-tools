@@ -164,8 +164,8 @@ extension TemplateValue {
     case .integer(let value): Int(exactly: value).map { .integer($0) } ?? .number(Double(value))
     case .number(let value): .number(value)
     case .string(let value): .string(value)
-    case .array(let array): .array(array.elements.map(\.edgeToolsValue))
-    case .object(let object): .object(object.jsonEntries.mapValues(\.edgeToolsValue))
+    case .array(let array): .array(array.elements.map { $0.edgeToolsValue })
+    case .object(let object): .object(object.jsonEntries.mapValues { $0.edgeToolsValue })
     }
   }
 }
@@ -199,6 +199,20 @@ extension TemplateValue {
 
   var isNull: Bool {
     if case .null = self {
+      return true
+    }
+    return false
+  }
+
+  var isBoolean: Bool {
+    if case .boolean = self {
+      return true
+    }
+    return false
+  }
+
+  var isFloat: Bool {
+    if case .number = self {
       return true
     }
     return false
@@ -288,14 +302,14 @@ extension TemplateValue {
     guard case .object(let object) = self else {
       throw TemplateFailure("Value is not an object: " + self.repr())
     }
-    return object.entries.keys.map(\.value)
+    return object.entries.keys.map { $0.value }
   }
 
   func iterationElements() throws(TemplateFailure) -> [TemplateValue] {
     switch self {
     case .null: throw TemplateFailure("Undefined value or reference")
     case .array(let array): array.elements
-    case .object(let object): object.entries.keys.map(\.value)
+    case .object(let object): object.entries.keys.map { $0.value }
     case .string(let value): value.unicodeScalars.map { .string(String($0)) }
     default: throw TemplateFailure("Value is not iterable: " + self.repr())
     }
