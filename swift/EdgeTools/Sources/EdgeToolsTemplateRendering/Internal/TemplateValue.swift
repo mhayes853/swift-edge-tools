@@ -171,12 +171,19 @@ extension TemplateValue {
 }
 
 extension TemplateObject {
+  var isCallable: Bool {
+    guard case .some = self.function else {
+      return false
+    }
+    return true
+  }
+
   var jsonEntries: OrderedDictionary<String, TemplateValue> {
     var entries = OrderedDictionary<String, TemplateValue>()
     for (key, value) in self.entries {
       entries[key.jsonKey] = value
     }
-    if self.function != nil {
+    if self.isCallable {
       entries["__callable__"] = .boolean(true)
     }
     return entries
@@ -233,10 +240,10 @@ extension TemplateValue {
   }
 
   var isCallable: Bool {
-    if case .object(let object) = self {
-      return object.function != nil
+    guard case .object(let object) = self else {
+      return false
     }
-    return false
+    return object.isCallable
   }
 
   var isIterable: Bool {
