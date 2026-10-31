@@ -82,6 +82,7 @@ let package = Package(
   products: [
     .library(name: "EdgeTools", targets: ["EdgeTools"]),
     .library(name: "EdgeToolsLlama", targets: ["EdgeToolsLlama"]),
+    .library(name: "EdgeToolsTemplateRendering", targets: ["EdgeToolsTemplateRendering"]),
     .library(name: "EdgeToolsTokenizers", targets: ["EdgeToolsTokenizers"]),
     .library(name: "EdgeToolsXGrammar", targets: ["EdgeToolsXGrammar"])
   ],
@@ -382,6 +383,16 @@ let package = Package(
       ]
     ),
     .target(
+      name: "EdgeToolsTemplateRendering",
+      dependencies: [
+        "EdgeToolsCore",
+        .product(name: "OrderedCollections", package: "swift-collections")
+      ],
+      path: "swift/EdgeTools/Sources/EdgeToolsTemplateRendering",
+      exclude: ["LICENSE-minja"],
+      swiftSettings: edgeToolsSwiftSettings
+    ),
+    .target(
       name: "CMinja",
       path: "swift/EdgeTools/Sources/CMinja",
       exclude: ["minja/LICENSE", "minja/PIN", "nlohmann/PIN"],
@@ -458,6 +469,15 @@ let package = Package(
         .product(name: "CustomDump", package: "swift-custom-dump")
       ],
       path: "swift/EdgeTools/Tests/EdgeToolsLlamaTests"
+    ),
+    .testTarget(
+      name: "EdgeToolsTemplateRenderingTests",
+      dependencies: [
+        "EdgeToolsTemplateRendering",
+        .product(name: "CustomDump", package: "swift-custom-dump"),
+        .product(name: "OrderedCollections", package: "swift-collections")
+      ],
+      path: "swift/EdgeTools/Tests/EdgeToolsTemplateRenderingTests"
     ),
     .testTarget(
       name: "EdgeToolsTokenizersTests",
