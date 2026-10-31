@@ -57,17 +57,6 @@ struct TemplateFailure: Error {
   }
 }
 
-func withTemplateLocation<Value>(
-  _ position: Int,
-  _ body: () throws(TemplateFailure) -> Value
-) throws(TemplateFailure) -> Value {
-  do throws(TemplateFailure) {
-    return try body()
-  } catch {
-    throw error.located(at: position)
-  }
-}
-
 // MARK: - Error Location
 
 private func errorLocationSuffix(_ source: [UInt8], _ position: Int) -> String {

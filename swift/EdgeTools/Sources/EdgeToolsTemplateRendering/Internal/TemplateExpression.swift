@@ -25,8 +25,7 @@ struct TemplateExpression: Sendable {
     case literal(TemplatePrimitive)
     case array([TemplateExpression])
     case dictionary([(key: TemplateExpression, value: TemplateExpression)])
-    case slice(start: TemplateExpression?, end: TemplateExpression?, step: TemplateExpression?)
-    case subscripted(TemplateExpression, index: TemplateExpression)
+    case subscripted(TemplateExpression, TemplateSubscript)
     case unary(TemplateUnaryOperator, TemplateExpression)
     case binary(TemplateBinaryOperator, TemplateExpression, TemplateExpression)
     case conditional(
@@ -43,6 +42,11 @@ struct TemplateExpression: Sendable {
     self.position = position
     self.kind = kind
   }
+}
+
+enum TemplateSubscript: Sendable {
+  case key(TemplateExpression)
+  case slice(start: TemplateExpression?, end: TemplateExpression?, step: TemplateExpression?)
 }
 
 enum TemplateUnaryOperator: Sendable {
@@ -92,8 +96,10 @@ extension TemplateExpression {
   }
 
   func evaluate(_ context: TemplateContext) throws(TemplateFailure) -> TemplateValue {
-    try withTemplateLocation(self.position) { () throws(TemplateFailure) in
-      try self.evaluateKind(context)
+    do throws(TemplateFailure) {
+      return try self.evaluateKind(context)
+    } catch {
+      throw error.located(at: self.position)
     }
   }
 
@@ -116,10 +122,10 @@ extension TemplateExpression {
         try object.setElement(try entry.value.evaluate(context), at: key)
       }
       return object
-    case .slice:
-      throw TemplateFailure("SliceExpr not implemented")
-    case .subscripted(let base, let index):
-      return try evaluateSubscript(base, index, context)
+    case .subscripted(let base, .key(let key)):
+      return try element(of: base, at: key, context)
+    case .subscripted(let base, .slice(let start, let end, let step)):
+      return try slice(try base.evaluate(context), start, end, step, context)
     case .unary(let unaryOperator, let operand):
       let value = try operand.evaluate(context)
       switch unaryOperator {
@@ -154,7 +160,7 @@ extension TemplateExpression {
     case .call(let callee, let arguments):
       let function = try callee.evaluate(context)
       guard function.isCallable else {
-        throw TemplateFailure("Object is not callable: " + function.repr(indent: 2))
+        throw TemplateFailure("Object is not callable: " + function.repr())
       }
       return try function.call(context, try arguments.evaluate(context))
     case .filter(let parts):
@@ -245,42 +251,48 @@ extension TemplateBinaryOperator {
 }
 
 private func templateTest(_ name: String, _ value: TemplateValue) throws(TemplateFailure) -> Bool {
-  switch name {
-  case "none": value.isNull
-  case "boolean": value.isBoolean
-  case "integer": value.isInteger
-  case "float": value.isFloat
-  case "number": value.isNumber
-  case "string": value.isString
-  case "mapping": value.isObject
-  case "iterable": value.isIterable
-  case "sequence": value.isArray
-  case "defined": !value.isNull
-  case "true": value.isTruthy
-  case "false": !value.isTruthy
+  switch (name, value) {
+  case ("none", .null), ("boolean", .boolean), ("integer", .integer), ("float", .number),
+    ("string", .string), ("mapping", .object), ("sequence", .array):
+    return true
+  case ("none", _), ("boolean", _), ("integer", _), ("float", _), ("string", _), ("mapping", _),
+    ("sequence", _):
+    return false
+  case ("number", _): return value.isNumber
+  case ("iterable", _): return value.isIterable
+  case ("defined", _): return !value.isNull
+  case ("true", _): return value.isTruthy
+  case ("false", _): return !value.isTruthy
   default: throw TemplateFailure("Unknown type for 'is' operator: " + name)
   }
 }
 
 // MARK: - Subscripts
 
-private func evaluateSubscript(
-  _ base: TemplateExpression,
-  _ index: TemplateExpression,
+private func element(
+  of base: TemplateExpression,
+  at keyExpression: TemplateExpression,
   _ context: TemplateContext
 ) throws(TemplateFailure) -> TemplateValue {
   let target = try base.evaluate(context)
-  guard case .slice(let start, let end, let step) = index.kind else {
-    let key = try index.evaluate(context)
-    guard !target.isNull else {
-      guard let name = base.variableName else {
-        throw TemplateFailure("Trying to access property '\(key.repr())' on null!")
-      }
-      let state = context.value(named: name) == nil ? "not defined" : "null"
-      throw TemplateFailure("'\(name)' is \(state)")
+  let key = try keyExpression.evaluate(context)
+  guard !target.isNull else {
+    guard let name = base.variableName else {
+      throw TemplateFailure("Trying to access property '\(key.repr())' on null!")
     }
-    return try target.element(at: key)
+    let state = context.value(named: name) == nil ? "not defined" : "null"
+    throw TemplateFailure("'\(name)' is \(state)")
   }
+  return try target.element(at: key)
+}
+
+private func slice(
+  _ target: TemplateValue,
+  _ start: TemplateExpression?,
+  _ end: TemplateExpression?,
+  _ step: TemplateExpression?,
+  _ context: TemplateContext
+) throws(TemplateFailure) -> TemplateValue {
   let count = Int64(try target.count())
   let stride = try step?.evaluate(context).integerValue() ?? 1
   guard stride != 0 else {
@@ -409,10 +421,11 @@ private func callStringMethod(
     return .string(templateLowercased(string))
   case "endswith":
     try arguments.expect("endswith method", positional: 1...1, named: 0...0)
-    return .boolean(templateHasSuffix(string, try arguments.positional[0].stringValue()))
+    let suffix = try arguments.positional[0].stringValue()
+    return .boolean(string.utf8.reversed().starts(with: suffix.utf8.reversed()))
   case "startswith":
     try arguments.expect("startswith method", positional: 1...1, named: 0...0)
-    return .boolean(templateHasPrefix(string, try arguments.positional[0].stringValue()))
+    return .boolean(string.utf8.starts(with: try arguments.positional[0].stringValue().utf8))
   case "title":
     try arguments.expect("title method", positional: 0...0, named: 0...0)
     return .string(templateTitleCased(string))

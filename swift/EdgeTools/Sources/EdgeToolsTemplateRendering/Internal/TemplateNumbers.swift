@@ -39,21 +39,30 @@ func templateFixedNotation(_ value: Double) -> String {
   }
   let magnitude = value.magnitude
   let exponent = magnitude.isNormal ? Int(magnitude.exponentBitPattern) - 1075 : -1074
-  var scaled = BigUnsignedInteger(
-    magnitude.significandBitPattern | (magnitude.isNormal ? 1 << 52 : 0)
-  )
-  scaled.multiply(by: 1_000_000)
-  if exponent >= 0 {
-    scaled.shiftLeft(by: exponent)
+  let significand = magnitude.significandBitPattern | (magnitude.isNormal ? 1 << 52 : 0)
+  var limbs = [UInt32(significand % 1_000_000_000), UInt32(significand / 1_000_000_000)]
+  for _ in 0..<exponent.magnitude {
+    multiply(&limbs, by: exponent < 0 ? 5 : 2)
+  }
+  var digits = decimalDigits(limbs)
+  let fractionDigitCount = max(-exponent, 0)
+  if digits.count <= fractionDigitCount {
+    digits.insert(contentsOf: repeatElement(0, count: fractionDigitCount - digits.count + 1), at: 0)
+  }
+  if fractionDigitCount > 6 {
+    let dropped = digits.suffix(fractionDigitCount - 6)
+    digits.removeLast(dropped.count)
+    let roundingDigit = dropped.first ?? 0
+    let isTie = roundingDigit == 5 && !dropped.dropFirst().contains { $0 != 0 }
+    if roundingDigit > 5 || (roundingDigit == 5 && (!isTie || (digits.last ?? 0) % 2 == 1)) {
+      roundUp(&digits)
+    }
   } else {
-    scaled.shiftRightRoundingToEven(by: -exponent)
+    digits += repeatElement(0, count: 6 - fractionDigitCount)
   }
-  var digits = scaled.decimalDigits()
-  if digits.count < 7 {
-    digits.insert(contentsOf: repeatElement(UInt8(ascii: "0"), count: 7 - digits.count), at: 0)
-  }
-  digits.insert(UInt8(ascii: "."), at: digits.count - 6)
-  return (value.sign == .minus ? "-" : "") + String(decoding: digits, as: UTF8.self)
+  let text = digits.map { Character(Unicode.Scalar($0 + 0x30)) }
+  return (value.sign == .minus ? "-" : "") + String(text.dropLast(6)) + "."
+    + String(text.suffix(6))
 }
 
 // MARK: - Integer Conversion
@@ -119,112 +128,37 @@ private func shortestDecimalDigits(_ magnitude: Double) -> (digits: [UInt8], exp
   return (digits, exponent)
 }
 
-private struct BigUnsignedInteger {
-  private var limbs: [UInt32]
-
-  init(_ value: UInt64) {
-    self.limbs = [UInt32(truncatingIfNeeded: value), UInt32(truncatingIfNeeded: value >> 32)]
+private func multiply(_ limbs: inout [UInt32], by factor: UInt64) {
+  var carry: UInt64 = 0
+  for index in limbs.indices {
+    let product = UInt64(limbs[index]) * factor + carry
+    limbs[index] = UInt32(product % 1_000_000_000)
+    carry = product / 1_000_000_000
   }
-
-  mutating func multiply(by factor: UInt32) {
-    var carry: UInt64 = 0
-    for index in self.limbs.indices {
-      let product = UInt64(self.limbs[index]) * UInt64(factor) + carry
-      self.limbs[index] = UInt32(truncatingIfNeeded: product)
-      carry = product >> 32
-    }
-    if carry > 0 {
-      self.limbs.append(UInt32(carry))
-    }
+  if carry > 0 {
+    limbs.append(UInt32(carry))
   }
+}
 
-  mutating func shiftLeft(by bitCount: Int) {
-    let bitShift = bitCount % 32
-    if bitShift > 0 {
-      var carry: UInt32 = 0
-      for index in self.limbs.indices {
-        let limb = self.limbs[index]
-        self.limbs[index] = (limb << bitShift) | carry
-        carry = limb >> (32 - bitShift)
-      }
-      self.limbs.append(carry)
+private func decimalDigits(_ limbs: [UInt32]) -> [UInt8] {
+  let text = limbs.reversed()
+    .map { limb in
+      let digits = "\(limb)"
+      return String(repeating: "0", count: 9 - digits.utf8.count) + digits
     }
-    self.limbs.insert(contentsOf: repeatElement(0, count: bitCount / 32), at: 0)
+    .joined()
+  return text.utf8.drop { $0 == UInt8(ascii: "0") }.map { $0 - UInt8(ascii: "0") }
+}
+
+private func roundUp(_ digits: inout [UInt8]) {
+  var index = digits.count - 1
+  while index >= 0 && digits[index] == 9 {
+    digits[index] = 0
+    index -= 1
   }
-
-  mutating func shiftRightRoundingToEven(by bitCount: Int) {
-    let isAboveHalf = self.bit(at: bitCount - 1)
-    let hasRemainder = self.hasSetBit(below: bitCount - 1)
-    self.shiftRight(by: bitCount)
-    if isAboveHalf && (hasRemainder || self.limbs[0] & 1 == 1) {
-      self.increment()
-    }
-  }
-
-  func decimalDigits() -> [UInt8] {
-    var remaining = self.limbs
-    var chunks = [UInt32]()
-    while remaining.contains(where: { $0 != 0 }) {
-      var remainder: UInt64 = 0
-      for index in remaining.indices.reversed() {
-        let current = (remainder << 32) | UInt64(remaining[index])
-        remaining[index] = UInt32(current / 1_000_000_000)
-        remainder = current % 1_000_000_000
-      }
-      chunks.append(UInt32(remainder))
-    }
-    guard let leading = chunks.popLast() else {
-      return [UInt8(ascii: "0")]
-    }
-    return chunks.reversed()
-      .reduce(into: Array("\(leading)".utf8)) { digits, chunk in
-        let chunkDigits = Array("\(chunk)".utf8)
-        digits += repeatElement(UInt8(ascii: "0"), count: 9 - chunkDigits.count)
-        digits += chunkDigits
-      }
-  }
-
-  private mutating func shiftRight(by bitCount: Int) {
-    guard bitCount / 32 < self.limbs.count else {
-      self.limbs = [0]
-      return
-    }
-    self.limbs.removeFirst(bitCount / 32)
-    let bitShift = bitCount % 32
-    guard bitShift > 0 else {
-      return
-    }
-    for index in self.limbs.indices {
-      let next = index + 1 < self.limbs.count ? self.limbs[index + 1] : 0
-      self.limbs[index] = (self.limbs[index] >> bitShift) | (next << (32 - bitShift))
-    }
-  }
-
-  private mutating func increment() {
-    for index in self.limbs.indices {
-      self.limbs[index] &+= 1
-      if self.limbs[index] != 0 {
-        return
-      }
-    }
-    self.limbs.append(1)
-  }
-
-  private func bit(at index: Int) -> Bool {
-    guard index / 32 < self.limbs.count else {
-      return false
-    }
-    return (self.limbs[index / 32] >> (index % 32)) & 1 == 1
-  }
-
-  private func hasSetBit(below index: Int) -> Bool {
-    let wholeLimbs = min(index / 32, self.limbs.count)
-    if self.limbs.prefix(wholeLimbs).contains(where: { $0 != 0 }) {
-      return true
-    }
-    guard index / 32 < self.limbs.count, index % 32 > 0 else {
-      return false
-    }
-    return self.limbs[index / 32] & ((1 << (index % 32)) - 1) != 0
+  if index >= 0 {
+    digits[index] += 1
+  } else {
+    digits.insert(1, at: 0)
   }
 }

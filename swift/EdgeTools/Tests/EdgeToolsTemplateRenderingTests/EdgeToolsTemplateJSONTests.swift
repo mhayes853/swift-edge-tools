@@ -1,6 +1,5 @@
 import CustomDump
 import EdgeToolsTemplateRendering
-import OrderedCollections
 import Testing
 
 @Suite
@@ -82,11 +81,4 @@ struct `EdgeToolsTemplateJSON tests` {
       true
     )
   }
-}
-
-private func render(
-  _ source: String,
-  _ context: OrderedDictionary<String, EdgeToolsValue> = [:]
-) throws -> String {
-  try EdgeToolsTemplate(source: source).render(context: context)
 }

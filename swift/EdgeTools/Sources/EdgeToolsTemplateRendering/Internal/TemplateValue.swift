@@ -137,7 +137,7 @@ extension TemplateValue {
     case .integer(let value): self = .integer(Int64(value))
     case .number(let value): self = value.isFinite ? .number(value) : .null
     case .string(let value): self = .string(value)
-    case .array(let values): self = .array(TemplateArray(values.map(TemplateValue.init)))
+    case .array(let values): self = .array(values.map(TemplateValue.init))
     case .object(let object):
       self = .object(
         TemplateObject(
@@ -204,29 +204,8 @@ extension TemplateValue {
     return false
   }
 
-  var isBoolean: Bool {
-    if case .boolean = self {
-      return true
-    }
-    return false
-  }
-
-  var isFloat: Bool {
-    if case .number = self {
-      return true
-    }
-    return false
-  }
-
   var isString: Bool {
     if case .string = self {
-      return true
-    }
-    return false
-  }
-
-  var isInteger: Bool {
-    if case .integer = self {
       return true
     }
     return false
@@ -279,16 +258,6 @@ extension TemplateValue {
     }
   }
 
-  func isEmpty() throws(TemplateFailure) -> Bool {
-    switch self {
-    case .null: throw TemplateFailure("Undefined value or reference")
-    case .string(let value): value.isEmpty
-    case .array(let array): array.elements.isEmpty
-    case .object(let object): object.entries.isEmpty
-    default: false
-    }
-  }
-
   func count() throws(TemplateFailure) -> Int {
     switch self {
     case .object(let object): object.entries.count
@@ -305,13 +274,12 @@ extension TemplateValue {
     return object.entries.keys.map { $0.value }
   }
 
-  func iterationElements() throws(TemplateFailure) -> [TemplateValue] {
+  var iterationElements: [TemplateValue]? {
     switch self {
-    case .null: throw TemplateFailure("Undefined value or reference")
     case .array(let array): array.elements
     case .object(let object): object.entries.keys.map { $0.value }
     case .string(let value): value.unicodeScalars.map { .string(String($0)) }
-    default: throw TemplateFailure("Value is not iterable: " + self.repr())
+    default: nil
     }
   }
 }
@@ -390,26 +358,13 @@ extension TemplateValue {
     }
   }
 
-  func repr(indent: Int = -1) -> String {
+  func repr() -> String {
     var output = ""
-    self.appendRepr(to: &output, indent: indent, level: 0)
+    self.appendRepr(to: &output)
     return output
   }
 
-  private func appendRepr(to output: inout String, indent: Int, level: Int) {
-    func appendBreak(_ level: Int) {
-      if indent > 0 {
-        output += "\n" + String(repeating: " ", count: level * indent)
-      }
-    }
-    func appendSeparator() {
-      output += ","
-      if indent < 0 {
-        output += " "
-      } else {
-        appendBreak(level + 1)
-      }
-    }
+  private func appendRepr(to output: inout String) {
     switch self {
     case .null:
       output += "null"
@@ -423,31 +378,23 @@ extension TemplateValue {
       appendPythonString(value, to: &output)
     case .array(let array):
       output += "["
-      appendBreak(level + 1)
       for (index, element) in array.elements.enumerated() {
-        if index > 0 {
-          appendSeparator()
-        }
-        element.appendRepr(to: &output, indent: indent, level: level + 1)
+        output += index > 0 ? ", " : ""
+        element.appendRepr(to: &output)
       }
-      appendBreak(level)
       output += "]"
     case .object(let object):
       output += "{"
-      appendBreak(level + 1)
       for (index, (key, value)) in object.entries.enumerated() {
-        if index > 0 {
-          appendSeparator()
-        }
+        output += index > 0 ? ", " : ""
         if case .string(let key) = key {
           appendPythonString(key, to: &output)
         } else {
           output += "'" + key.jsonKey + "'"
         }
         output += ": "
-        value.appendRepr(to: &output, indent: indent, level: level + 1)
+        value.appendRepr(to: &output)
       }
-      appendBreak(level)
       output += "}"
     }
   }
@@ -557,27 +504,15 @@ extension TemplateValue {
       guard case .integer(let index) = key else {
         return .null
       }
-      return try array.element(at: index)
+      let resolvedIndex = index < 0 ? index + Int64(array.elements.count) : index
+      guard resolvedIndex >= 0 && resolvedIndex < array.elements.count else {
+        throw TemplateFailure("list index out of range")
+      }
+      return array.elements[Int(resolvedIndex)]
     case .object(let object):
       return object.entries[try key.hashableKey()] ?? .null
     default:
       return .null
-    }
-  }
-
-  func element(atIndex index: Int) throws(TemplateFailure) -> TemplateValue {
-    switch self {
-    case .null:
-      throw TemplateFailure("Undefined value or reference")
-    case .array(let array):
-      return try array.element(at: Int64(index))
-    case .object(let object):
-      guard let value = object.entries[.integer(Int64(index))] else {
-        throw TemplateFailure("key not found")
-      }
-      return value
-    default:
-      throw TemplateFailure("Value is not an array or object: " + self.repr())
     }
   }
 
@@ -621,16 +556,6 @@ extension TemplateValue {
       throw TemplateFailure("Value is not callable: " + self.repr())
     }
     return try function(context, arguments)
-  }
-}
-
-extension TemplateArray {
-  func element(at index: Int64) throws(TemplateFailure) -> TemplateValue {
-    let resolved = index < 0 ? index + Int64(self.elements.count) : index
-    guard resolved >= 0 && resolved < self.elements.count else {
-      throw TemplateFailure("list index out of range")
-    }
-    return self.elements[Int(resolved)]
   }
 }
 

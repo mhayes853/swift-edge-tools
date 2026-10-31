@@ -277,13 +277,18 @@ private func mapped(
   let mapsAttribute =
     arguments.named("attribute") != nil && namedCount == 1
     || arguments.named("default") != nil && namedCount == 2
+  guard let items = arguments.positional.first else {
+    throw TemplateFailure("Invalid or unsupported arguments for map")
+  }
+  guard case .array(let array) = items else {
+    throw TemplateFailure("Value is not an array or object: " + items.repr())
+  }
+  var values = [TemplateValue]()
   if arguments.positional.count == 1 && mapsAttribute {
     let attribute = arguments.named("attribute") ?? .null
     let defaultValue = arguments.named("default") ?? .null
-    var values = [TemplateValue]()
-    for index in 0..<(try arguments.positional[0].count()) {
-      let attributeValue = try arguments.positional[0].element(atIndex: index)
-        .element(at: attribute)
+    for item in array.elements {
+      let attributeValue = try item.element(at: attribute)
       values.append(attributeValue.isNull ? defaultValue : attributeValue)
     }
     return .array(values)
@@ -296,9 +301,7 @@ private func mapped(
     throw TemplateFailure("Undefined filter: " + arguments.positional[1].repr())
   }
   let extraArguments = Array(arguments.positional.dropFirst(2))
-  var values = [TemplateValue]()
-  for index in 0..<(try arguments.positional[0].count()) {
-    let item = try arguments.positional[0].element(atIndex: index)
+  for item in array.elements {
     values.append(try function.call(context, TemplateArguments([item] + extraArguments)))
   }
   return .array(values)

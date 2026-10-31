@@ -36,29 +36,21 @@ private struct TemplateToken {
   enum Kind {
     case text([UInt8])
     case expression(TemplateExpression)
+    case comment
     case `if`(TemplateExpression)
     case elif(TemplateExpression)
-    case `else`
-    case endIf
     case `for`(
       names: [String],
       iterable: TemplateExpression,
       condition: TemplateExpression?,
       isRecursive: Bool
     )
-    case endFor
-    case generation
-    case endGeneration
     case set(namespace: String?, names: [String], value: TemplateExpression?)
-    case endSet
-    case comment
     case macro(name: String, parameters: [TemplateMacro.Parameter])
-    case endMacro
     case filter(TemplateExpression)
-    case endFilter
-    case loopControl(TemplateLoopControl)
     case call(TemplateExpression)
-    case endCall
+    case loopControl(TemplateLoopControl)
+    case tag(String)
   }
 
   let position: Int
@@ -70,24 +62,16 @@ private struct TemplateToken {
     switch self.kind {
     case .text: "text"
     case .expression: "expression"
+    case .comment: "comment"
     case .if: "if"
     case .elif: "elif"
-    case .else: "else"
-    case .endIf: "endif"
     case .for: "for"
-    case .endFor: "endfor"
-    case .generation: "generation"
-    case .endGeneration: "endgeneration"
     case .set: "set"
-    case .endSet: "endset"
-    case .comment: "comment"
     case .macro: "macro"
-    case .endMacro: "endmacro"
     case .filter: "filter"
-    case .endFilter: "endfilter"
-    case .loopControl: "break"
     case .call: "call"
-    case .endCall: "endcall"
+    case .loopControl: "break"
+    case .tag(let name): name
     }
   }
 
@@ -172,10 +156,6 @@ extension TemplateParser {
       kind = .if(try self.parseExpression())
     case "elif":
       kind = .elif(try self.parseExpression())
-    case "else":
-      kind = .else
-    case "endif":
-      kind = .endIf
     case "for":
       let names = try self.parseVariableNames()
       guard self.consumeKeyword("in") else {
@@ -189,12 +169,6 @@ extension TemplateParser {
         condition: condition,
         isRecursive: self.consumeKeyword("recursive")
       )
-    case "endfor":
-      kind = .endFor
-    case "generation":
-      kind = .generation
-    case "endgeneration":
-      kind = .endGeneration
     case "set":
       if let (namespace, name) = self.consumeNamespacedName() {
         guard self.consume("=") else {
@@ -206,23 +180,18 @@ extension TemplateParser {
         let value = try self.consume("=") ? self.parseExpression() : nil
         kind = .set(namespace: nil, names: names, value: value)
       }
-    case "endset":
-      kind = .endSet
     case "macro":
       guard let name = self.parseIdentifier()?.variableName else {
         throw TemplateFailure("Expected macro name in macro block")
       }
       kind = .macro(name: name, parameters: try self.parseParameters())
-    case "endmacro":
-      kind = .endMacro
     case "call":
       kind = .call(try self.parseExpression())
-    case "endcall":
-      kind = .endCall
     case "filter":
       kind = .filter(try self.parseExpression())
-    case "endfilter":
-      kind = .endFilter
+    case "else", "endif", "endfor", "generation", "endgeneration", "endset", "endmacro",
+      "endcall", "endfilter":
+      kind = .tag(keyword)
     case "break":
       kind = .loopControl(.break)
     case "continue":
@@ -331,12 +300,18 @@ extension TemplateParser {
       let start = index
       let token = tokens[index]
       index += 1
-      func parseBody(closedBy closingTag: String) throws(TemplateFailure) -> TemplateNode {
-        let body = try self.parseTemplate(tokens, &index)
-        guard index < tokens.count, tokens[index].typeName == closingTag else {
+      func isNext(_ tag: String) -> Bool {
+        index < tokens.count && tokens[index].typeName == tag
+      }
+      func close(_ tag: String) throws(TemplateFailure) {
+        guard isNext(tag) else {
           throw tokens[start].unterminated
         }
         index += 1
+      }
+      func parseBody(closedBy tag: String) throws(TemplateFailure) -> TemplateNode {
+        let body = try self.parseTemplate(tokens, &index)
+        try close(tag)
         return body
       }
       switch token.kind {
@@ -347,26 +322,20 @@ extension TemplateParser {
           index += 1
           branches.append((condition, try self.parseTemplate(tokens, &index)))
         }
-        if index < tokens.count, case .else = tokens[index].kind {
+        if isNext("else") {
           index += 1
           branches.append((nil, try self.parseTemplate(tokens, &index)))
         }
-        guard index < tokens.count, case .endIf = tokens[index].kind else {
-          throw tokens[start].unterminated
-        }
-        index += 1
+        try close("endif")
         children.append(TemplateNode(.conditional(branches), at: token.position))
       case .for(let names, let iterable, let condition, let isRecursive):
         let body = try self.parseTemplate(tokens, &index)
         var elseBody: TemplateNode?
-        if index < tokens.count, case .else = tokens[index].kind {
+        if isNext("else") {
           index += 1
           elseBody = try self.parseTemplate(tokens, &index)
         }
-        guard index < tokens.count, case .endFor = tokens[index].kind else {
-          throw tokens[start].unterminated
-        }
-        index += 1
+        try close("endfor")
         let loop = TemplateLoop(
           names: names,
           iterable: iterable,
@@ -376,7 +345,7 @@ extension TemplateParser {
           elseBody: elseBody
         )
         children.append(TemplateNode(.loop(loop), at: token.position))
-      case .generation:
+      case .tag("generation"):
         children.append(try parseBody(closedBy: "endgeneration"))
       case .text(let text):
         children.append(self.textNode(text, tokens, start: start, end: index, at: token.position))
@@ -409,8 +378,7 @@ extension TemplateParser {
         break
       case .loopControl(let control):
         children.append(TemplateNode(.loopControl(control), at: token.position))
-      case .endFor, .endSet, .endMacro, .endCall, .endFilter, .endIf, .else, .endGeneration,
-        .elif:
+      case .tag, .elif:
         index -= 1
         break parsing
       }
@@ -591,8 +559,8 @@ extension TemplateParser {
     while self.position < self.source.count {
       self.skipSpaces()
       if self.consume("[") {
-        let index = try self.parseSubscriptIndex()
-        value = TemplateExpression(.subscripted(value, index: index), at: value.position)
+        let access = try self.parseSubscript()
+        value = TemplateExpression(.subscripted(value, access), at: value.position)
       } else if self.consume(".") {
         guard let identifier = self.parseIdentifier(), let name = identifier.variableName else {
           throw TemplateFailure("Expected identifier in subscript")
@@ -606,7 +574,7 @@ extension TemplateParser {
           )
         } else {
           let key = TemplateExpression(.literal(.string(name)), at: identifier.position)
-          value = TemplateExpression(.subscripted(value, index: key), at: identifier.position)
+          value = TemplateExpression(.subscripted(value, .key(key)), at: identifier.position)
         }
       } else {
         break
@@ -620,25 +588,21 @@ extension TemplateParser {
     return TemplateExpression(.call(value, try self.parseCallArguments()), at: location)
   }
 
-  private mutating func parseSubscriptIndex() throws(TemplateFailure) -> TemplateExpression {
-    let location = self.position
+  private mutating func parseSubscript() throws(TemplateFailure) -> TemplateSubscript {
     let start = try self.peek(":") ? nil : self.parseExpression()
-    var index = start
+    var access = start.map { TemplateSubscript.key($0) }
     if self.consume(":") {
       let end = try self.peek(":") || self.peek("]") ? nil : self.parseExpression()
-      var step: TemplateExpression?
-      if self.consume(":") && !self.peek("]") {
-        step = try self.parseExpression()
-      }
-      index = TemplateExpression(.slice(start: start, end: end, step: step), at: location)
+      let step = try self.consume(":") && !self.peek("]") ? self.parseExpression() : nil
+      access = .slice(start: start, end: end, step: step)
     }
-    guard let index else {
+    guard let access else {
       throw TemplateFailure("Empty index in subscript")
     }
     guard self.consume("]") else {
       throw TemplateFailure("Expected closing bracket in subscript")
     }
-    return index
+    return access
   }
 
   private mutating func parseValue() throws(TemplateFailure) -> TemplateExpression {

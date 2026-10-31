@@ -80,14 +80,6 @@ func templateContains(_ string: String, _ substring: String) -> Bool {
   templateFind(Array(substring.utf8), in: Array(string.utf8), from: 0) != nil
 }
 
-func templateHasPrefix(_ string: String, _ prefix: String) -> Bool {
-  string.utf8.starts(with: prefix.utf8)
-}
-
-func templateHasSuffix(_ string: String, _ suffix: String) -> Bool {
-  string.utf8.reversed().starts(with: suffix.utf8.reversed())
-}
-
 func templateIsLess(_ lhs: String, _ rhs: String) -> Bool {
   lhs.utf8.lexicographicallyPrecedes(rhs.utf8)
 }

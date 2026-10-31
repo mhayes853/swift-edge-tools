@@ -1,3 +1,5 @@
+import OrderedCollections
+
 // MARK: - TemplateNode
 
 struct TemplateNode: Sendable {
@@ -183,10 +185,10 @@ extension TemplateLoop {
     ) throws(TemplateFailure) -> TemplateLoopSignal? {
       var items = [TemplateValue]()
       if !iterable.isNull {
-        guard iterable.isIterable else {
+        guard let elements = iterable.iterationElements else {
           throw TemplateFailure("For loop iterable must be iterable: " + iterable.repr())
         }
-        for item in try iterable.iterationElements() {
+        for item in elements {
           try templateAssign(self.names, item, in: context)
           if try self.condition?.evaluate(context).isTruthy ?? true {
             items.append(item)
@@ -196,8 +198,8 @@ extension TemplateLoop {
       guard !items.isEmpty else {
         return try self.elseBody?.render(into: &output, context)
       }
-      let loop = self.isRecursive ? TemplateValue.function(callLoop) : .object(TemplateObject())
-      try loop.setElement(.integer(Int64(items.count)), at: .string("length"))
+      let loop = TemplateObject(function: self.isRecursive ? callLoop : nil)
+      loop.entries[.string("length")] = .integer(Int64(items.count))
       var cycleIndex = 0
       let cycle = TemplateValue.function { _, arguments throws(TemplateFailure) in
         guard !arguments.positional.isEmpty && arguments.named.isEmpty else {
@@ -209,9 +211,9 @@ extension TemplateLoop {
         cycleIndex = (cycleIndex + 1) % arguments.positional.count
         return item
       }
-      try loop.setElement(cycle, at: .string("cycle"))
+      loop.entries[.string("cycle")] = cycle
       let loopContext = TemplateContext(parent: context)
-      loopContext.set("loop", loop)
+      loopContext.set("loop", .object(loop))
       for (index, item) in items.enumerated() {
         try templateAssign(self.names, item, in: loopContext)
         let count = Int64(items.count)
@@ -227,7 +229,7 @@ extension TemplateLoop {
           "nextitem": index < items.count - 1 ? items[index + 1] : .null
         ]
         for (name, value) in properties {
-          try loop.setElement(value, at: .string(name))
+          loop.entries[.string(name)] = value
         }
         if try self.body.render(into: &output, loopContext)?.control == .break {
           break

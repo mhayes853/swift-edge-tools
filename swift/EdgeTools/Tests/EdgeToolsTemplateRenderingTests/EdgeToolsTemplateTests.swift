@@ -1,6 +1,5 @@
 import CustomDump
 import EdgeToolsTemplateRendering
-import OrderedCollections
 import Testing
 
 @Suite
@@ -150,11 +149,4 @@ struct `EdgeToolsTemplate tests` {
       Set((1...8).map { count in (0..<count).map(String.init).joined(separator: ",") })
     )
   }
-}
-
-private func render(
-  _ source: String,
-  _ context: OrderedDictionary<String, EdgeToolsValue> = [:]
-) throws -> String {
-  try EdgeToolsTemplate(source: source).render(context: context)
 }

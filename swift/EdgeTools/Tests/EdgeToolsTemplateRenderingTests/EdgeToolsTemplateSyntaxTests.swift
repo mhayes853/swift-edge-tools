@@ -1,6 +1,5 @@
 import CustomDump
 import EdgeToolsTemplateRendering
-import OrderedCollections
 import Testing
 
 @Suite
@@ -677,18 +676,6 @@ struct `EdgeToolsTemplateSyntax tests` {
 private let lstripBlocks = EdgeToolsTemplate.Options(lstripBlocks: true)
 private let trimBlocks = EdgeToolsTemplate.Options(trimBlocks: true)
 private let lstripTrimBlocks = EdgeToolsTemplate.Options(trimBlocks: true, lstripBlocks: true)
-
-private func render(
-  _ source: String,
-  _ context: OrderedDictionary<String, EdgeToolsValue> = [:],
-  options: EdgeToolsTemplate.Options = EdgeToolsTemplate.Options()
-) throws -> String {
-  try EdgeToolsTemplate(source: source, options: options).render(context: context)
-}
-
-private func lines(_ lines: String...) -> String {
-  lines.joined(separator: "\n")
-}
 
 private func expectRenderError(
   _ source: String,
