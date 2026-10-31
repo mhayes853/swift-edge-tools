@@ -338,15 +338,7 @@ let package = Package(
             traits: ["HuggingFaceTokenizers"]
           )
         ),
-        .target(
-          name: "CMinja",
-          condition: .when(
-            platforms: [
-              .macOS, .iOS, .tvOS, .watchOS, .visionOS, .linux, .android, .windows
-            ],
-            traits: ["ChatTemplates"]
-          )
-        )
+        .target(name: "EdgeToolsTemplateRendering", condition: .when(traits: ["ChatTemplates"]))
       ] + cLlamaTraitDependency,
       path: "swift/EdgeTools/Sources/EdgeToolsTokenizers",
       swiftSettings: edgeToolsSwiftSettings,
@@ -391,16 +383,6 @@ let package = Package(
       path: "swift/EdgeTools/Sources/EdgeToolsTemplateRendering",
       exclude: ["LICENSE-minja"],
       swiftSettings: edgeToolsSwiftSettings
-    ),
-    .target(
-      name: "CMinja",
-      path: "swift/EdgeTools/Sources/CMinja",
-      exclude: ["minja/LICENSE", "minja/PIN", "nlohmann/PIN"],
-      sources: ["bridging.cc"],
-      publicHeadersPath: "include",
-      cxxSettings: [
-        .headerSearchPath(".")
-      ]
     ),
     .target(
       name: "EdgeToolsXGrammar",
