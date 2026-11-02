@@ -71,21 +71,22 @@ public struct EdgeToolsTemplate: Sendable {
   ///
   /// - Parameters:
   ///   - context: The variables the template can read.
-  ///   - functions: Functions the template can call or apply as filters, which take precedence
-  ///     over variables of the same name.
+  ///   - functions: Functions the template can call or apply as filters by their name, which
+  ///     take precedence over variables of the same name. When several functions share a name,
+  ///     the last one wins.
   /// - Returns: The rendered text.
   /// - Throws: An ``EdgeToolsTemplateError`` with the ``EdgeToolsTemplateError/Code/renderFailure``
   ///   code when rendering fails.
   public func render(
     context: OrderedDictionary<String, EdgeToolsValue> = [:],
-    functions: [String: EdgeToolsTemplateFunction] = [:]
+    functions: [any EdgeToolsTemplateFunction] = []
   ) throws(EdgeToolsTemplateError) -> String {
     let scope = TemplateContext(parent: .builtins())
     for (name, value) in context {
       scope.set(name, TemplateValue(value))
     }
-    for (name, function) in functions {
-      scope.set(name, .function(function.templateFunction))
+    for function in functions {
+      scope.set(function.name, .function(templateFunction(function)))
     }
     do throws(TemplateFailure) {
       return try self.root.render(scope)

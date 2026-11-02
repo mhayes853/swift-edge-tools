@@ -23,43 +23,57 @@ struct `EdgeToolsTemplate tests` {
   }
 
   @Test
-  func `Calls Custom Functions And Filters`() throws {
-    let greet = EdgeToolsTemplateFunction { arguments in
-      let name = arguments.positional.first?.string ?? "nobody"
-      let punctuation = arguments.named["punctuation"]?.string ?? "."
-      return .string("Hello, \(name)\(punctuation)")
-    }
+  func `Calls Custom Functions And Filters By Name`() throws {
     let template = try EdgeToolsTemplate(
       source: "{{ greet('Ada', punctuation='!') }} {{ name | greet }}"
     )
     expectNoDifference(
-      try template.render(context: ["name": "Grace"], functions: ["greet": greet]),
+      try template.render(context: ["name": "Grace"], functions: [Greet()]),
       "Hello, Ada! Hello, Grace."
     )
   }
 
   @Test
+  func `Later Functions Replace Earlier Functions With The Same Name`() throws {
+    expectNoDifference(
+      try EdgeToolsTemplate(source: "{{ value() }}")
+        .render(
+          context: ["value": "variable"],
+          functions: [
+            Constant(name: "value", value: "first"), Constant(name: "value", value: "last")
+          ]
+        ),
+      "last"
+    )
+  }
+
+  @Test
   func `Passes Template Values To Custom Functions As JSON Values`() throws {
-    let describe = EdgeToolsTemplateFunction { arguments in
-      .string(arguments.positional.map { $0.orderedJSONString() }.joined(separator: " "))
-    }
     expectNoDifference(
       try EdgeToolsTemplate(source: "{{ describe([1, 2.5], {1: none}, 'a', true) }}")
-        .render(functions: ["describe": describe]),
+        .render(functions: [Describe()]),
       #"[1,2.5] {"1":null} "a" true"#
     )
   }
 
   @Test
-  func `Custom Function Errors Fail Rendering`() {
-    let failing = EdgeToolsTemplateFunction { _ in
-      throw EdgeToolsTemplateError(code: .renderFailure, message: "Nope")
-    }
-    let error = #expect(throws: EdgeToolsTemplateError.self) {
-      try EdgeToolsTemplate(source: "{{ fail() }}").render(functions: ["fail": failing])
-    }
-    expectNoDifference(error?.code, .renderFailure)
-    expectNoDifference(error?.message.hasPrefix("Nope at row 1, column 8"), true)
+  func `Custom Function Errors Fail Rendering With Their Description`() {
+    let functions: [any EdgeToolsTemplateFunction] = [
+      TemplateFailing(),
+      DescribableFailing(),
+      UntypedFailing()
+    ]
+    let messages = ["template", "describable", "untyped"]
+      .map { name in
+        #expect(throws: EdgeToolsTemplateError.self) {
+          try EdgeToolsTemplate(source: "{{ \(name)() }}").render(functions: functions)
+        }
+      }
+    expectNoDifference(messages.map { $0?.code }, Array(repeating: .renderFailure, count: 3))
+    expectNoDifference(
+      messages.map { $0?.message.split(separator: " at row").first },
+      ["Nope", "Described failure", #"PlainFailure(reason: "untyped")"#]
+    )
   }
 
   @Test
@@ -149,4 +163,71 @@ struct `EdgeToolsTemplate tests` {
       Set((1...8).map { count in (0..<count).map(String.init).joined(separator: ",") })
     )
   }
+}
+
+private struct Greet: EdgeToolsTemplateFunction {
+  var name: String { "greet" }
+
+  func invoke(
+    arguments: EdgeToolsTemplateArguments
+  ) throws(EdgeToolsTemplateError) -> EdgeToolsValue {
+    let name = arguments.positional.first?.string ?? "nobody"
+    let punctuation = arguments.named["punctuation"]?.string ?? "."
+    return .string("Hello, \(name)\(punctuation)")
+  }
+}
+
+private struct Constant: EdgeToolsTemplateFunction {
+  let name: String
+  let value: EdgeToolsValue
+
+  func invoke(
+    arguments: EdgeToolsTemplateArguments
+  ) throws(EdgeToolsTemplateError) -> EdgeToolsValue {
+    self.value
+  }
+}
+
+private struct Describe: EdgeToolsTemplateFunction {
+  var name: String { "describe" }
+
+  func invoke(
+    arguments: EdgeToolsTemplateArguments
+  ) throws(EdgeToolsTemplateError) -> EdgeToolsValue {
+    .string(arguments.positional.map { $0.orderedJSONString() }.joined(separator: " "))
+  }
+}
+
+private struct TemplateFailing: EdgeToolsTemplateFunction {
+  var name: String { "template" }
+
+  func invoke(
+    arguments: EdgeToolsTemplateArguments
+  ) throws(EdgeToolsTemplateError) -> EdgeToolsValue {
+    throw EdgeToolsTemplateError(code: .invalidSyntax, message: "Nope")
+  }
+}
+
+private struct DescribableFailing: EdgeToolsTemplateFunction {
+  var name: String { "describable" }
+
+  func invoke(arguments: EdgeToolsTemplateArguments) throws(DescribableFailure) -> EdgeToolsValue {
+    throw DescribableFailure()
+  }
+}
+
+private struct UntypedFailing: EdgeToolsTemplateFunction {
+  var name: String { "untyped" }
+
+  func invoke(arguments: EdgeToolsTemplateArguments) throws -> EdgeToolsValue {
+    throw PlainFailure(reason: "untyped")
+  }
+}
+
+private struct DescribableFailure: EdgeToolsDescribableError {
+  var edgeToolsErrorDescription: String { "Described failure" }
+}
+
+private struct PlainFailure: Error {
+  let reason: String
 }

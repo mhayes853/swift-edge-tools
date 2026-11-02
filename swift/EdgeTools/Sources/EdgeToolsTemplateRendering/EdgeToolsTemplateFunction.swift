@@ -9,51 +9,76 @@ import OrderedCollections
 /// filter, the filtered value is the first positional argument.
 ///
 /// ```swift
-/// let shout = EdgeToolsTemplateFunction { arguments in
-///   guard let text = arguments.positional.first?.string else {
-///     throw EdgeToolsTemplateError(code: .renderFailure, message: "shout expects a string")
+/// struct Shout: EdgeToolsTemplateFunction {
+///   var name: String { "shout" }
+///
+///   func invoke(
+///     arguments: EdgeToolsTemplateArguments
+///   ) throws(EdgeToolsTemplateError) -> EdgeToolsValue {
+///     guard let text = arguments.positional.first?.string else {
+///       throw EdgeToolsTemplateError(code: .renderFailure, message: "shout expects a string")
+///     }
+///     return .string(text.uppercased() + "!")
 ///   }
-///   return .string(text.uppercased() + "!")
 /// }
+///
 /// let text = try EdgeToolsTemplate(source: "{{ 'hi' | shout }}")
-///   .render(functions: ["shout": shout])  // "HI!"
+///   .render(functions: [Shout()])  // "HI!"
 /// ```
-public struct EdgeToolsTemplateFunction: Sendable {
-  private let body:
-    @Sendable (EdgeToolsTemplateArguments) throws(EdgeToolsTemplateError) -> EdgeToolsValue
+public protocol EdgeToolsTemplateFunction: Sendable {
+  /// The error that ``invoke(arguments:)`` throws.
+  associatedtype Failure: Error = EdgeToolsTemplateError
 
-  /// Creates a function whose failures render with their `String` description.
-  public init<Failure: Error>(
-    _ body: @escaping @Sendable (EdgeToolsTemplateArguments) throws(Failure) -> EdgeToolsValue
-  ) {
-    self.init(body) { failure in
-      #if $Embedded
-        "unknown error"
-      #else
-        (failure as? any EdgeToolsDescribableError)?.edgeToolsErrorDescription
-          ?? String(describing: failure)
-      #endif
-    }
+  /// The name that templates call this function by.
+  var name: String { get }
+
+  /// Invokes this function.
+  ///
+  /// - Parameter arguments: The arguments the template passed.
+  /// - Returns: The value the call evaluates to.
+  func invoke(arguments: EdgeToolsTemplateArguments) throws(Failure) -> EdgeToolsValue
+
+  /// Describes a failure thrown by ``invoke(arguments:)`` in the rendering error message.
+  ///
+  /// - Parameter failure: The thrown failure.
+  /// - Returns: A description of the failure.
+  func describeFailure(_ failure: Failure) -> String
+
+  /// Invokes this function, converting its failures into an ``EdgeToolsTemplateError``.
+  ///
+  /// The default implementation calls ``invoke(arguments:)`` and describes failures with
+  /// ``describeFailure(_:)``.
+  ///
+  /// - Parameter arguments: The arguments the template passed.
+  /// - Returns: The value the call evaluates to.
+  func templateCall(
+    arguments: EdgeToolsTemplateArguments
+  ) throws(EdgeToolsTemplateError) -> EdgeToolsValue
+}
+
+extension EdgeToolsTemplateFunction {
+  public func describeFailure(_ failure: Failure) -> String {
+    #if $Embedded
+      "unknown error"
+    #else
+      String(describing: failure)
+    #endif
   }
 
-  /// Creates a function whose failures render with their ``EdgeToolsDescribableError`` description.
-  public init<Failure: EdgeToolsDescribableError>(
-    _ body: @escaping @Sendable (EdgeToolsTemplateArguments) throws(Failure) -> EdgeToolsValue
-  ) {
-    self.init(body) { $0.edgeToolsErrorDescription }
-  }
-
-  private init<Failure: Error>(
-    _ body: @escaping @Sendable (EdgeToolsTemplateArguments) throws(Failure) -> EdgeToolsValue,
-    describe: @escaping @Sendable (Failure) -> String
-  ) {
-    self.body = { arguments throws(EdgeToolsTemplateError) in
-      do throws(Failure) {
-        return try body(arguments)
-      } catch {
-        throw EdgeToolsTemplateError(code: .renderFailure, message: describe(error))
-      }
+  public func templateCall(
+    arguments: EdgeToolsTemplateArguments
+  ) throws(EdgeToolsTemplateError) -> EdgeToolsValue {
+    do throws(Failure) {
+      return try self.invoke(arguments: arguments)
+    } catch {
+      throw EdgeToolsTemplateError(code: .renderFailure, message: self.describeFailure(error))
     }
+  }
+}
+
+extension EdgeToolsTemplateFunction where Failure: EdgeToolsDescribableError {
+  public func describeFailure(_ failure: Failure) -> String {
+    failure.edgeToolsErrorDescription
   }
 }
 
@@ -78,22 +103,20 @@ public struct EdgeToolsTemplateArguments: Hashable, Sendable {
 
 // MARK: - Template Functions
 
-extension EdgeToolsTemplateFunction {
-  var templateFunction: TemplateFunction {
-    { _, arguments throws(TemplateFailure) in
-      var named = OrderedDictionary<String, EdgeToolsValue>()
-      for (name, value) in arguments.named {
-        named[name] = value.edgeToolsValue
-      }
-      let arguments = EdgeToolsTemplateArguments(
-        positional: arguments.positional.map { $0.edgeToolsValue },
-        named: named
-      )
-      do throws(EdgeToolsTemplateError) {
-        return TemplateValue(try self.body(arguments))
-      } catch {
-        throw TemplateFailure(error.message)
-      }
+func templateFunction(_ function: any EdgeToolsTemplateFunction) -> TemplateFunction {
+  { _, arguments throws(TemplateFailure) in
+    var named = OrderedDictionary<String, EdgeToolsValue>()
+    for (name, value) in arguments.named {
+      named[name] = value.edgeToolsValue
+    }
+    let arguments = EdgeToolsTemplateArguments(
+      positional: arguments.positional.map { $0.edgeToolsValue },
+      named: named
+    )
+    do throws(EdgeToolsTemplateError) {
+      return TemplateValue(try function.templateCall(arguments: arguments))
+    } catch {
+      throw TemplateFailure(error.message)
     }
   }
 }

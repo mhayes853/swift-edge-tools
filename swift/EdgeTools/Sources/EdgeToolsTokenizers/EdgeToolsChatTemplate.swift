@@ -48,7 +48,7 @@
       let now = try renderingInstant(removingFrom: &values)
       do throws(EdgeToolsTemplateError) {
         return try cachedTemplate(source: self.source)
-          .render(context: values, functions: ["strftime_now": strftimeNow(at: now)])
+          .render(context: values, functions: [StrftimeNow(instant: now)])
       } catch {
         throw EdgeToolsChatTemplateError(code: .renderFailure, message: error.message)
       }
@@ -105,22 +105,28 @@
     return Int64(seconds)
   }
 
-  private func strftimeNow(at instant: Int64) -> EdgeToolsTemplateFunction {
-    EdgeToolsTemplateFunction { arguments throws(EdgeToolsTemplateError) in
+  private struct StrftimeNow: EdgeToolsTemplateFunction {
+    let instant: Int64
+
+    var name: String { "strftime_now" }
+
+    func invoke(
+      arguments: EdgeToolsTemplateArguments
+    ) throws(EdgeToolsTemplateError) -> EdgeToolsValue {
       guard arguments.positional.count == 1, arguments.named.isEmpty else {
         throw EdgeToolsTemplateError(
           code: .renderFailure,
-          message: "strftime_now must have between 1 and 1 positional arguments and between 0 "
+          message: "\(self.name) must have between 1 and 1 positional arguments and between 0 "
             + "and 0 keyword arguments"
         )
       }
       guard case .string(let format) = arguments.positional[0] else {
         throw EdgeToolsTemplateError(
           code: .renderFailure,
-          message: "strftime_now expects a format string"
+          message: "\(self.name) expects a format string"
         )
       }
-      return .string(formattedUTCTime(instant, format: format))
+      return .string(formattedUTCTime(self.instant, format: format))
     }
   }
 #endif
