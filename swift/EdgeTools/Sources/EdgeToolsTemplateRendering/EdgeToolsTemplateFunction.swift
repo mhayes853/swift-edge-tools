@@ -25,12 +25,8 @@ import OrderedCollections
 /// let text = try EdgeToolsTemplate(source: "{{ 'hi' | shout }}")
 ///   .render(functions: [Shout()])  // "HI!"
 /// ```
-public protocol EdgeToolsTemplateFunction: Sendable {
-  /// The error that ``invoke(arguments:)`` throws.
-  associatedtype Failure: Error = EdgeToolsTemplateError
-
-  /// The name that templates call this function by.
-  var name: String { get }
+public protocol EdgeToolsTemplateFunction: EdgeToolsFunction {
+  associatedtype Failure = EdgeToolsTemplateError
 
   /// Invokes this function.
   ///
@@ -38,16 +34,10 @@ public protocol EdgeToolsTemplateFunction: Sendable {
   /// - Returns: The value the call evaluates to.
   func invoke(arguments: EdgeToolsTemplateArguments) throws(Failure) -> EdgeToolsValue
 
-  /// Describes a failure thrown by ``invoke(arguments:)`` in the rendering error message.
-  ///
-  /// - Parameter failure: The thrown failure.
-  /// - Returns: A description of the failure.
-  func describeFailure(_ failure: Failure) -> String
-
   /// Invokes this function, converting its failures into an ``EdgeToolsTemplateError``.
   ///
   /// The default implementation calls ``invoke(arguments:)`` and describes failures with
-  /// ``describeFailure(_:)``.
+  /// ``EdgeToolsFunction/describeFailure(_:)``.
   ///
   /// - Parameter arguments: The arguments the template passed.
   /// - Returns: The value the call evaluates to.
@@ -57,14 +47,6 @@ public protocol EdgeToolsTemplateFunction: Sendable {
 }
 
 extension EdgeToolsTemplateFunction {
-  public func describeFailure(_ failure: Failure) -> String {
-    #if $Embedded
-      "unknown error"
-    #else
-      String(describing: failure)
-    #endif
-  }
-
   public func templateCall(
     arguments: EdgeToolsTemplateArguments
   ) throws(EdgeToolsTemplateError) -> EdgeToolsValue {
@@ -73,12 +55,6 @@ extension EdgeToolsTemplateFunction {
     } catch {
       throw EdgeToolsTemplateError(code: .renderFailure, message: self.describeFailure(error))
     }
-  }
-}
-
-extension EdgeToolsTemplateFunction where Failure: EdgeToolsDescribableError {
-  public func describeFailure(_ failure: Failure) -> String {
-    failure.edgeToolsErrorDescription
   }
 }
 

@@ -29,12 +29,11 @@ public struct EdgeRawToolCall: Hashable, Sendable {
 
 // MARK: - EdgeTool
 
-public protocol EdgeTool<Input, Output>: Sendable {
+public protocol EdgeTool<Input, Output>: EdgeToolsFunction {
   associatedtype Input: ConvertibleFromEdgeToolsValue & Sendable
   associatedtype Output: ConvertibleToEdgeToolsValue & Sendable
   associatedtype Failure: Error & Sendable = any Error & Sendable
 
-  var name: String { get }
   var description: String { get }
   var arguments: EdgeToolsGenerationSchema { get }
   var includesSchemaInInstructions: Bool { get }
@@ -45,8 +44,6 @@ public protocol EdgeTool<Input, Output>: Sendable {
     id: EdgeToolCallID,
     arguments: EdgeToolsValue
   ) throws -> AnyEdgeToolCall
-
-  func describeFailure(_ failure: Failure) -> String
 }
 
 extension EdgeTool where Input: EdgeToolsGenerable {
@@ -78,20 +75,6 @@ extension EdgeTool {
         rawInput: arguments
       )
     )
-  }
-
-  public func describeFailure(_ failure: Failure) -> String {
-    #if $Embedded
-      "unknown error"
-    #else
-      String(describing: failure)
-    #endif
-  }
-}
-
-extension EdgeTool where Failure: EdgeToolsDescribableError {
-  public func describeFailure(_ failure: Failure) -> String {
-    failure.edgeToolsErrorDescription
   }
 }
 
