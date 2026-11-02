@@ -25,7 +25,7 @@ import OrderedCollections
 /// let text = try EdgeToolsTemplate(source: "{{ 'hi' | shout }}")
 ///   .render(functions: [Shout()])  // "HI!"
 /// ```
-public protocol EdgeToolsTemplateFunction: EdgeToolsFunction {
+public protocol EdgeToolsTemplateFunction: EdgeToolsFunctionDescriptor {
   associatedtype Failure = EdgeToolsTemplateError
 
   /// Invokes this function.
@@ -37,7 +37,7 @@ public protocol EdgeToolsTemplateFunction: EdgeToolsFunction {
   /// Invokes this function, converting its failures into an ``EdgeToolsTemplateError``.
   ///
   /// The default implementation calls ``invoke(arguments:)`` and describes failures with
-  /// ``EdgeToolsFunction/describeFailure(_:)``.
+  /// ``EdgeToolsFunctionDescriptor/describeFailure(_:)``.
   ///
   /// - Parameter arguments: The arguments the template passed.
   /// - Returns: The value the call evaluates to.

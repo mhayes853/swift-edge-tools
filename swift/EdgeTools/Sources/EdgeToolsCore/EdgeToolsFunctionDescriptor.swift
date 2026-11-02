@@ -1,4 +1,4 @@
-// MARK: - EdgeToolsFunction
+// MARK: - EdgeToolsFunctionDescriptor
 
 /// A named function whose failures can be described in text.
 ///
@@ -10,7 +10,7 @@
 /// with `String(describing:)`, or as "unknown error" in Embedded Swift. A conforming type that is
 /// generic over its failure always uses the latter default, so implement ``describeFailure(_:)``
 /// directly in that case.
-public protocol EdgeToolsFunction: Sendable {
+public protocol EdgeToolsFunctionDescriptor: Sendable {
   /// The error that calling this function throws.
   associatedtype Failure: Error
 
@@ -24,7 +24,7 @@ public protocol EdgeToolsFunction: Sendable {
   func describeFailure(_ failure: Failure) -> String
 }
 
-extension EdgeToolsFunction {
+extension EdgeToolsFunctionDescriptor {
   public func describeFailure(_ failure: Failure) -> String {
     #if $Embedded
       "unknown error"
@@ -34,7 +34,7 @@ extension EdgeToolsFunction {
   }
 }
 
-extension EdgeToolsFunction where Failure: EdgeToolsDescribableError {
+extension EdgeToolsFunctionDescriptor where Failure: EdgeToolsDescribableError {
   public func describeFailure(_ failure: Failure) -> String {
     failure.edgeToolsErrorDescription
   }

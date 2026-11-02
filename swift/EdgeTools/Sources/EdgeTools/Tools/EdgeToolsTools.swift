@@ -29,7 +29,7 @@ public struct EdgeRawToolCall: Hashable, Sendable {
 
 // MARK: - EdgeTool
 
-public protocol EdgeTool<Input, Output>: EdgeToolsFunction {
+public protocol EdgeTool<Input, Output>: EdgeToolsFunctionDescriptor {
   associatedtype Input: ConvertibleFromEdgeToolsValue & Sendable
   associatedtype Output: ConvertibleToEdgeToolsValue & Sendable
   associatedtype Failure: Error & Sendable = any Error & Sendable
