@@ -37,7 +37,7 @@ public protocol EdgeToolsTemplateFunction: EdgeToolsFunctionDescriptor {
   /// Invokes this function, converting its failures into an ``EdgeToolsTemplateError``.
   ///
   /// The default implementation calls ``invoke(arguments:)`` and describes failures with
-  /// ``EdgeToolsFunctionDescriptor/describeFailure(_:)``.
+  /// ``EdgeToolsFailureDescriber/describeFailure(_:)``.
   ///
   /// - Parameter arguments: The arguments the template passed.
   /// - Returns: The value the call evaluates to.
