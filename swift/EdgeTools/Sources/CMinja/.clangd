@@ -1,5 +1,0 @@
-CompileFlags:
-  Add:
-    - -I.
-    - -Iinclude
-    - -std=c++17

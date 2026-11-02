@@ -1,6 +1,7 @@
-#if ChatTemplates && canImport(CMinja)
-  import CMinja
+#if ChatTemplates
   import EdgeToolsCore
+  import EdgeToolsTemplateRendering
+  import OrderedCollections
 
   // MARK: - EdgeToolsChatTemplateError
 
@@ -13,7 +14,6 @@
       }
 
       public static let renderFailure = Self(rawValue: "render-failure")
-      public static let inconsistentOutput = Self(rawValue: "inconsistent-output")
     }
 
     public let code: Code
@@ -38,39 +38,73 @@
     ///
     /// The context may pin `strftime_now` through an `edge_tools_now` key holding whole
     /// seconds since the Unix epoch; it otherwise reads the current time.
-    public func render(context: EdgeToolsValue) throws -> String {
-      let contextJSON = context.orderedJSONString()
-      let capacity = self.source.utf8.count + contextJSON.utf8.count + 4096
-      return try self.source.withCString { source in
-        try contextJSON.withCString { contextJSON in
-          var storage = [CChar](repeating: 0, count: capacity)
-          let required = storage.withUnsafeMutableBufferPointer {
-            edge_template_render(source, contextJSON, $0.baseAddress, $0.count)
-          }
-          guard required > 0 else {
-            throw EdgeToolsChatTemplateError(code: .renderFailure, message: lastErrorMessage())
-          }
-          guard required > capacity else {
-            return String(cString: storage)
-          }
-          storage = [CChar](repeating: 0, count: required)
-          let refilled = storage.withUnsafeMutableBufferPointer {
-            edge_template_render(source, contextJSON, $0.baseAddress, $0.count)
-          }
-          guard refilled == required else {
-            throw EdgeToolsChatTemplateError(
-              code: .inconsistentOutput,
-              message: "The template renderer reported an inconsistent output size."
-            )
-          }
-          return String(cString: storage)
-        }
+    ///
+    /// - Parameters:
+    ///   - context: The variables the template can read, as a JSON object.
+    ///   - cache: The cache to look up the parsed template in.
+    /// - Returns: The rendered text.
+    public func render(
+      context: EdgeToolsValue,
+      cache: EdgeToolsTemplateCache = .shared
+    ) throws -> String {
+      guard case .object(var values) = context else {
+        throw EdgeToolsChatTemplateError(
+          code: .renderFailure,
+          message: "The template context must be a JSON object."
+        )
+      }
+      let now = try renderingInstant(removingFrom: &values)
+      do throws(EdgeToolsTemplateError) {
+        return try cache.template(source: self.source, options: chatTemplateOptions)
+          .render(context: values, functions: [StrftimeNow(instant: now)])
+      } catch {
+        throw EdgeToolsChatTemplateError(code: .renderFailure, message: error.message)
       }
     }
   }
 
-  private func lastErrorMessage() -> String {
-    edge_template_last_error_message().map { String(cString: $0) }
-      ?? "The template renderer encountered an unexpected failure."
+  // MARK: - Helpers
+
+  private let pinnedNowKey = "edge_tools_now"
+  private let chatTemplateOptions = EdgeToolsTemplate.Options(trimBlocks: true, lstripBlocks: true)
+
+  private func renderingInstant(
+    removingFrom values: inout OrderedDictionary<String, EdgeToolsValue>
+  ) throws(EdgeToolsChatTemplateError) -> Int64 {
+    guard let pinned = values.removeValue(forKey: pinnedNowKey) else {
+      return currentUnixTime()
+    }
+    guard case .integer(let seconds) = pinned else {
+      throw EdgeToolsChatTemplateError(
+        code: .renderFailure,
+        message: "`\(pinnedNowKey)` must be whole seconds since the Unix epoch."
+      )
+    }
+    return Int64(seconds)
+  }
+
+  private struct StrftimeNow: EdgeToolsTemplateFunction {
+    let instant: Int64
+
+    var name: String { "strftime_now" }
+
+    func invoke(
+      arguments: EdgeToolsTemplateArguments
+    ) throws(EdgeToolsTemplateError) -> EdgeToolsValue {
+      guard arguments.positional.count == 1, arguments.named.isEmpty else {
+        throw EdgeToolsTemplateError(
+          code: .renderFailure,
+          message: "\(self.name) must have between 1 and 1 positional arguments and between 0 "
+            + "and 0 keyword arguments"
+        )
+      }
+      guard case .string(let format) = arguments.positional[0] else {
+        throw EdgeToolsTemplateError(
+          code: .renderFailure,
+          message: "\(self.name) expects a format string"
+        )
+      }
+      return .string(formattedUTCTime(self.instant, format: format))
+    }
   }
 #endif
