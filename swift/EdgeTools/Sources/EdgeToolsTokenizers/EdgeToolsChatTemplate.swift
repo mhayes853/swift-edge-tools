@@ -38,7 +38,15 @@
     ///
     /// The context may pin `strftime_now` through an `edge_tools_now` key holding whole
     /// seconds since the Unix epoch; it otherwise reads the current time.
-    public func render(context: EdgeToolsValue) throws -> String {
+    ///
+    /// - Parameters:
+    ///   - context: The variables the template can read, as a JSON object.
+    ///   - cache: The cache to look up the parsed template in.
+    /// - Returns: The rendered text.
+    public func render(
+      context: EdgeToolsValue,
+      cache: EdgeToolsTemplateCache = .shared
+    ) throws -> String {
       guard case .object(var values) = context else {
         throw EdgeToolsChatTemplateError(
           code: .renderFailure,
@@ -47,7 +55,7 @@
       }
       let now = try renderingInstant(removingFrom: &values)
       do throws(EdgeToolsTemplateError) {
-        return try cachedTemplate(source: self.source)
+        return try cache.template(source: self.source, options: chatTemplateOptions)
           .render(context: values, functions: [StrftimeNow(instant: now)])
       } catch {
         throw EdgeToolsChatTemplateError(code: .renderFailure, message: error.message)
@@ -55,40 +63,10 @@
     }
   }
 
-  // MARK: - Template Cache
-
-  private let maxCachedTemplates = 4
-  private let cachedTemplates = Lock([EdgeToolsTemplate]())
-
-  private func cachedTemplate(source: String) throws(EdgeToolsTemplateError) -> EdgeToolsTemplate {
-    let cached = cachedTemplates.withLock { templates -> EdgeToolsTemplate? in
-      guard let index = templates.firstIndex(where: { $0.source == source }) else {
-        return nil
-      }
-      let template = templates.remove(at: index)
-      templates.insert(template, at: 0)
-      return template
-    }
-    if let cached {
-      return cached
-    }
-    let template = try EdgeToolsTemplate(
-      source: source,
-      options: EdgeToolsTemplate.Options(trimBlocks: true, lstripBlocks: true)
-    )
-    cachedTemplates.withLock { templates in
-      templates.removeAll { $0.source == source }
-      templates.insert(template, at: 0)
-      if templates.count > maxCachedTemplates {
-        templates.removeLast()
-      }
-    }
-    return template
-  }
-
   // MARK: - Helpers
 
   private let pinnedNowKey = "edge_tools_now"
+  private let chatTemplateOptions = EdgeToolsTemplate.Options(trimBlocks: true, lstripBlocks: true)
 
   private func renderingInstant(
     removingFrom values: inout OrderedDictionary<String, EdgeToolsValue>

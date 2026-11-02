@@ -43,6 +43,14 @@ public struct EdgeToolsTemplate: Sendable {
   /// The options the template was parsed with.
   public let options: Options
 
+  /// An approximate number of bytes this template holds in memory, including its source.
+  ///
+  /// The estimate scales with the size of the source and the number of syntax nodes it parses
+  /// into. It's meant for budgeting, such as the memory limit of an ``EdgeToolsTemplateCache``,
+  /// so expect it to differ from the true allocation size by up to about 20%, and by more for
+  /// templates under 1 KB.
+  public let estimatedMemorySize: Int
+
   private let parsedSource: [UInt8]
   private let root: TemplateNode
 
@@ -65,6 +73,10 @@ public struct EdgeToolsTemplate: Sendable {
         message: error.message(in: self.parsedSource)
       )
     }
+    self.estimatedMemorySize = templateMemorySize(
+      sourceSize: self.parsedSource.count,
+      root: self.root
+    )
   }
 
   /// Renders the template.
