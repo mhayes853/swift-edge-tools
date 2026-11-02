@@ -7,7 +7,7 @@ import OrderedCollections
 ///
 /// The cache keys templates by their source and options, and parses a template the first time
 /// it's requested. When the cached templates exceed the limits of the cache's ``Policy``, the
-/// cache evicts templates in the policy's ``Policy/Eviction`` order until they fit.
+/// cache evicts the least recently used templates until they fit.
 ///
 /// ```swift
 /// let policy = EdgeToolsTemplateCache.Policy(maximumMemorySize: 512 * 1024)
@@ -17,16 +17,6 @@ import OrderedCollections
 public final class EdgeToolsTemplateCache: Sendable {
   /// The limits a cache keeps its templates within.
   public struct Policy: Hashable, Sendable {
-    /// The order in which a cache evicts templates.
-    @nonexhaustive
-    public enum Eviction: Hashable, Sendable {
-      /// Evicts the template that the cache returned least recently first.
-      case leastRecentlyUsed
-    }
-
-    /// The order in which the cache evicts templates.
-    public var eviction: Eviction
-
     /// The maximum number of cached templates, or `nil` for no limit.
     public var maximumCount: Int?
 
@@ -36,12 +26,7 @@ public final class EdgeToolsTemplateCache: Sendable {
     /// The cache doesn't store a template whose estimated size exceeds this limit on its own.
     public var maximumMemorySize: Int?
 
-    public init(
-      eviction: Eviction = .leastRecentlyUsed,
-      maximumCount: Int? = nil,
-      maximumMemorySize: Int? = nil
-    ) {
-      self.eviction = eviction
+    public init(maximumCount: Int? = nil, maximumMemorySize: Int? = nil) {
       self.maximumCount = maximumCount
       self.maximumMemorySize = maximumMemorySize
     }
@@ -139,14 +124,11 @@ private struct State {
   var estimatedMemorySize = 0
 
   mutating func access(_ key: Key) -> EdgeToolsTemplate? {
-    switch self.policy.eviction {
-    case .leastRecentlyUsed:
-      guard let template = self.templates.removeValue(forKey: key) else {
-        return nil
-      }
-      self.templates[key] = template
-      return template
+    guard let template = self.templates.removeValue(forKey: key) else {
+      return nil
     }
+    self.templates[key] = template
+    return template
   }
 
   mutating func insert(_ template: EdgeToolsTemplate, for key: Key) -> EdgeToolsTemplate {
